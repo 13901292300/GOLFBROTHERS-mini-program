@@ -10,6 +10,7 @@ const gameStore = require('../../utils/gameStore.js');
 const weatherService = require('../../utils/weatherService.js');
 const matchState = require('../../utils/matchState.js');
 const gameProgress = require('../../utils/gameProgress.js');
+const matchStatus = require('../../utils/matchStatus.js');
 const gameLifecycle = require('../../utils/gameLifecycle.js');
 
 // 单组 Game 球员行配色（按槽位顺序）
@@ -94,7 +95,22 @@ function cornerRank(colArr, pIdx) {
   return null;
 }
 
-const MORE_MENU_ITEMS = [
+/** 多组普通球局 / 球队赛事记分页：更多功能面板（仅此 10 项） */
+const MORE_MENU_ITEMS_COMPACT = [
+  { icon: '⚑', label: '修改T台', bg: 'bg-pga-blue' },
+  { icon: '▦', label: '成绩卡', bg: 'bg-pga-blue' },
+  { icon: '↗', label: '统计数据', bg: 'bg-pga-blue' },
+  { icon: '👥', label: '球友圈', bg: 'bg-pga-blue' },
+  { icon: '✐', label: '球童记分', bg: 'bg-pga-blue' },
+  { icon: '📖', label: '记账本', bg: 'bg-pga-blue' },
+  { icon: '🪪', label: '海报', bg: 'bg-pga-blue' },
+  { icon: '🎨', label: '风格选择', bg: 'bg-pga-blue' },
+  { icon: '💬', label: '反馈', bg: 'bg-pga-blue' },
+  { icon: '⏻', label: '结束比赛', bg: 'bg-gold' }
+];
+
+/** 演示/标准模式等其它记分场景（保留原完整菜单） */
+const MORE_MENU_ITEMS_LEGACY = [
   { icon: '✎', label: '修改比赛', bg: 'bg-pga-blue' },
   { icon: '⌖', label: '修改半场', bg: 'bg-pga-blue' },
   { icon: '⚑', label: '修改T台', bg: 'bg-pga-blue' },
@@ -110,6 +126,17 @@ const MORE_MENU_ITEMS = [
   { icon: '✕', label: '取消比赛', bg: 'bg-red' },
   { icon: '⏻', label: '结束比赛', bg: 'bg-gold' }
 ];
+
+function resolveMoreMenuItems(mode, options) {
+  const opts = options || {};
+  if (mode === 'game' || mode === 'individual_stroke') {
+    return MORE_MENU_ITEMS_COMPACT;
+  }
+  if (mode === 'fourball_best' && opts.hasRealMatch) {
+    return MORE_MENU_ITEMS_COMPACT;
+  }
+  return MORE_MENU_ITEMS_LEGACY;
+}
 
 const GROUP_PLAYERS = [
   { slot: 1, name: '大雷', avatar: 'https://i.pravatar.cc/150?img=11' },
@@ -516,7 +543,7 @@ Page({
 
     columns: buildColumns(),
     playersView: [],
-    moreMenuItems: MORE_MENU_ITEMS,
+    moreMenuItems: MORE_MENU_ITEMS_COMPACT,
     groupPlayers: GROUP_PLAYERS,
     // 占位：真正展示前由 openGroupManagePage() 用当前记分页面球员快照覆盖（唯一数据源）
     groupSlots: [],
@@ -636,6 +663,7 @@ Page({
     const course = (ms && ms.course) || {};
     this.setData({
       mode: 'standard',
+      moreMenuItems: resolveMoreMenuItems('standard'),
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
@@ -718,6 +746,7 @@ Page({
     const colStartW = this._computeBestballColStartWidth();
     this.setData({
       mode: 'fourball_best',
+      moreMenuItems: resolveMoreMenuItems('fourball_best', { hasRealMatch: hasMatch }),
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
       layoutType: 'fourball',
@@ -1028,7 +1057,8 @@ Page({
     this.setData({
       mode: 'individual_stroke',
       groupId: groupId || '',
-      gameFinished: groupsStore.deriveTeeSheetStatus(group, 'groups').statusKey === 'completed',
+      gameFinished: matchStatus.getMatchStatus(group, { source: 'groups' }).isCompleted,
+      moreMenuItems: resolveMoreMenuItems('individual_stroke'),
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
@@ -1057,17 +1087,14 @@ Page({
         putts: (saved.putts || []).slice()
       };
     });
-    // 进入即标记该组「进行中」（已完成的组不回退）
-    if (group.status !== 'finished') {
-      gameStore.updateGroupStatus(gameId, groupIndex, 'in_progress');
-    }
-    const gameFinished = gameProgress.isGameEnded(game) || group.status === 'finished';
+    const ms = matchStatus.getMatchStatus(group, { source: 'game' });
     this.setData({
       mode: 'game',
       gameId: gameId,
       gameGroupIndex: groupIndex,
       groupId: gameId + ':' + groupIndex,
-      gameFinished: gameFinished,
+      gameFinished: ms.isCompleted,
+      moreMenuItems: resolveMoreMenuItems('game'),
       scoresCompleted: gameProgress.isScoringCompleted(game, groupIndex),
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -1526,10 +1553,10 @@ Page({
         return;
       }
       wx.showModal({
-        title: '取消比赛？',
-        content: '取消比赛将丢失本场所有数据，且无法恢复。是否确认取消？',
-        cancelText: '暂不取消',
-        confirmText: '确认取消',
+        title: '取消比赛',
+        content: '取消比赛将删除本场GAME所有数据，是否确认？',
+        cancelText: '取消',
+        confirmText: '确认',
         confirmColor: '#dc2626',
         success: (res) => {
           if (res.confirm) this._confirmCancelGame();
@@ -1544,12 +1571,19 @@ Page({
   },
 
   _syncGameFinishedState() {
+    if (this._boundToStore() && this.data.groupId) {
+      const ms = matchStatus.getMatchStatusForTournamentGroup(this.data.groupId);
+      this.setData({
+        gameFinished: ms.isCompleted,
+        scoresCompleted: this._isAllScoresCompleted()
+      });
+      return;
+    }
     if (!this.data.gameId) return;
-    const game = gameStore.getGame(this.data.gameId);
     const group = gameStore.getGroup(this.data.gameId, this._gameGroupIndex || 0) || {};
-    const gameFinished = gameProgress.isGameEnded(game) || group.status === 'finished';
+    const ms = matchStatus.getMatchStatus(group, { source: 'game' });
     this.setData({
-      gameFinished: gameFinished,
+      gameFinished: ms.isCompleted,
       scoresCompleted: this._isAllScoresCompleted()
     });
   },
@@ -1613,6 +1647,7 @@ Page({
   _afterScoresPersisted() {
     const scoresCompleted = this._isAllScoresCompleted();
     this.setData({ scoresCompleted });
+    this._syncGameFinishedState();
     this._maybeShowEndGroupPrompt();
   },
 
@@ -1648,7 +1683,7 @@ Page({
 
   _confirmEndGroupGame() {
     if (this._boundToStore() && this.data.groupId) {
-      groupsStore.updateGroupStatus(this.data.groupId, 'finished');
+      groupsStore.updateGroupStatus(this.data.groupId, matchStatus.FINISHED_STORAGE_STATUS);
       this.setData({ gameFinished: true, scoresCompleted: true });
       wx.showToast({ title: '比赛已结束', icon: 'success' });
       return;

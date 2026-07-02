@@ -163,7 +163,7 @@
         <view wx:for="{{groupCards}}" wx:key="groupId" class="hub-game-row">
           <view class="hub-game-row__left">
             <text class="hub-game-row__name">{{item.name}}</text>
-            <text class="hub-group-status hub-group-status--{{item.status}}">{{item.statusText}} · {{item.playerCount}}人</text>
+            <text class="hub-group-status hub-group-status--{{item.statusKey}}">{{item.statusText}} · {{item.playerCount}}人</text>
           </view>
           <view bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="hub-enter-btn">进入记分</view>
         </view>

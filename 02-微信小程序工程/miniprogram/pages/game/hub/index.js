@@ -10,7 +10,8 @@ const gameStore = require('../../../utils/gameStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
 const gameLeaderboard = require('../../../utils/gameLeaderboard.js');
 const groupsStore = require('../../../utils/groupsStore.js');
-const tPositionUtil = require('../../../utils/tPosition.js');
+const matchStatus = require('../../../utils/matchStatus.js');
+const gameLifecycle = require('../../../utils/gameLifecycle.js');
 
 const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
 
@@ -74,11 +75,6 @@ function formatDiffWithPlus(diff) {
   return String(diff);
 }
 
-const STATUS_TEXT = {
-  not_started: '未开始',
-  in_progress: '进行中',
-  finished: '已完成'
-};
 
 /* ===== 逐洞成绩卡（与球队比赛领先榜完全一致的派生逻辑/视觉） ===== */
 // 单洞杆差 → 状态：eagle / birdie / par / bogey / double-bogey / empty
@@ -360,11 +356,14 @@ Page({
       this.setData({ leaderboard: [], groupCards: [] });
       return;
     }
+    const userGi = this._resolveUserGroupIndex(game);
+    const headerMs = matchStatus.getMatchStatusForGameGroup(game, userGi);
     this.setData({
       courseName: game.courseName || '',
       roundName: game.roundName || game.courseName || '高尔夫球局',
       gameFormat: game.gameMode || '个人比杆赛',
-      statusText: game.status === 'finished' ? '已结束' : '进行中',
+      statusText: matchStatus.getMatchStatusLabelZh(headerMs.statusKey),
+      matchStatusBadge: headerMs.statusBadge,
       hasComposition: gameLeaderboard.gameHasComposition(game),
       leaderboard: this._buildLeaderboard(game),
       groupCards: this._buildGroupCards(game),
@@ -380,7 +379,7 @@ Page({
   _resolveUserGroupIndex(game) {
     const uid = (gameStore.getCurrentUser() || {}).userId;
     let idx = -1;
-    (game.groups || []).forEach((grp, gi) => {
+    gameStore.listGroups(game).forEach((grp, gi) => {
       const hit = (grp.playersSlots || []).some((p) => p && p.playerId === uid);
       if (hit) idx = gi;
     });
@@ -396,30 +395,10 @@ Page({
 
   // 分组表 / 游戏：组卡片（球员列表 + 状态 + 进入记分）
   _buildGroupCards(game) {
-    return (game.groups || []).map((grp, gi) => {
-      const players = (grp.playersSlots || []).filter(Boolean).map((p) => {
-        const enriched = tPositionUtil.enrichPlayer(p);
-        return {
-          playerId: enriched.playerId,
-          name: enriched.name,
-          avatar: enriched.avatar,
-          v: enriched.v,
-          teeMarkerClass: enriched.teeMarkerClass
-        };
-      });
-      const st = groupsStore.deriveTeeSheetStatus(grp, 'game');
-      return {
-        groupIndex: gi,
-        groupId: grp.groupId,
-        name: grp.name,
-        status: grp.status || 'not_started',
-        statusText: STATUS_TEXT[grp.status] || STATUS_TEXT.not_started,
-        statusBadge: st.statusBadge,
-        statusKey: st.statusKey,
-        playerCount: players.length,
-        players: players
-      };
-    });
+    return groupsStore.buildGameTeeSheetView(game).map((card) => ({
+      ...card,
+      statusText: matchStatus.getMatchStatusLabelZh(card.statusKey)
+    }));
   },
 
   // ===== 吸顶（与赛事详情页一致） =====
@@ -579,7 +558,51 @@ Page({
       this.setData({ showMoreSheet: false, moreFabExpanded: false, activeTab: 'leaderboard' });
       return;
     }
+    if (permission === 'cancel_match') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this._promptCancelGame();
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  _promptCancelGame() {
+    if (!this._gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '取消比赛',
+      content: '取消比赛将删除本场GAME所有数据，是否确认？',
+      cancelText: '取消',
+      confirmText: '确认',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (res.confirm) this._confirmCancelGame();
+      }
+    });
+  },
+
+  _confirmCancelGame() {
+    const gameId = this._gameId;
+    if (!gameId) return;
+    const removed = gameLifecycle.purgeGameCompletely(gameId);
+    if (!removed) {
+      wx.showToast({ title: '比赛不存在或已删除', icon: 'none' });
+      return;
+    }
+    this._gameId = '';
+    this.setData({
+      gameId: '',
+      groupCards: [],
+      leaderboard: [],
+      showMoreSheet: false,
+      moreFabExpanded: false
+    });
+    wx.showToast({ title: '比赛已取消', icon: 'success', duration: 1500 });
+    setTimeout(() => {
+      wx.reLaunch({ url: '/pages/home/index?tab=my' });
+    }, 300);
   },
 
   /* ===== 风格选择 sheet ===== */

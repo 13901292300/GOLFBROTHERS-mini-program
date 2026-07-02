@@ -24,6 +24,7 @@
  */
 
 const STORAGE_KEY = 'gb_games_v1';
+const matchStatus = require('./matchStatus.js');
 
 // 当前登录用户（占位；接入真实账号体系后替换）
 const CURRENT_USER = {
@@ -90,21 +91,28 @@ function updateGame(gameId, patch) {
 
 // ===== 多组 Game 支持 =====
 
+/** 统一解析球局内全部分组（单组 / 多组 / 旧结构兼容） */
+function listGroups(game) {
+  if (!game) return [];
+  if (Array.isArray(game.groups) && game.groups.length) {
+    return game.groups;
+  }
+  return [{
+    groupId: (game.gameId || 'legacy') + '-g1',
+    name: '第1组',
+    status: game.status === 'finished' || game.status === 'ended'
+      ? matchStatus.FINISHED_STORAGE_STATUS
+      : 'not_started',
+    playersSlots: game.playersSlots || [],
+    scoresByPlayer: game.scoresByPlayer || {}
+  }];
+}
+
 /** 读取某组（兼容旧单组：无 groups 时用顶层 playersSlots/scoresByPlayer 兜底） */
 function getGroup(gameId, groupIndex) {
   const game = getGame(gameId);
   if (!game) return null;
-  if (Array.isArray(game.groups) && game.groups.length) {
-    return game.groups[groupIndex || 0] || null;
-  }
-  // 旧结构兜底
-  return {
-    groupId: game.gameId + '-g1',
-    name: '第1组',
-    status: game.status === 'finished' ? 'finished' : 'in_progress',
-    playersSlots: game.playersSlots || [],
-    scoresByPlayer: game.scoresByPlayer || {}
-  };
+  return listGroups(game)[groupIndex || 0] || null;
 }
 
 /** 写入某组某球员逐洞成绩（持久化，刷新可恢复） */
@@ -159,11 +167,16 @@ function updateGroupStatus(gameId, groupIndex, status) {
   const idx = list.findIndex((g) => g && g.gameId === gameId);
   if (idx < 0) return null;
   const game = list[idx];
-  if (Array.isArray(game.groups) && game.groups[groupIndex || 0]) {
-    game.groups[groupIndex || 0].status = status;
-    list[idx] = game;
-    _writeAll(list);
+  const gi = groupIndex || 0;
+  if (Array.isArray(game.groups) && game.groups.length) {
+    if (game.groups[gi]) {
+      game.groups[gi].status = status;
+    }
+  } else if (gi === 0 && status === matchStatus.FINISHED_STORAGE_STATUS) {
+    game.status = matchStatus.FINISHED_STORAGE_STATUS;
   }
+  list[idx] = game;
+  _writeAll(list);
   return game;
 }
 
@@ -207,6 +220,7 @@ module.exports = {
   saveGame,
   updateGame,
   getGroup,
+  listGroups,
   setGroupPlayerScores,
   setGroupTeamScores,
   updateGroupStatus,

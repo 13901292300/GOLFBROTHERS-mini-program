@@ -63,14 +63,17 @@
   padding: 2px 10px;
   border-radius: 999px;
 }
+.hub-group-status--upcoming,
 .hub-group-status--not_started {
   color: var(--text-muted);
   background: var(--bg-subtle);
 }
+.hub-group-status--live,
 .hub-group-status--in_progress {
   color: var(--text-on-dark);
   background: var(--data-blue);
 }
+.hub-group-status--completed,
 .hub-group-status--finished {
   color: var(--text-on-dark);
   background: var(--champion-gold);

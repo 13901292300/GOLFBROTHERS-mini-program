@@ -981,84 +981,22 @@ page {
   flex-shrink: 0;
 }
 
-/* More Sheet */
-.more-sheet {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: flex-end;
-}
-
-.more-sheet__panel {
-  width: 100%;
-  background: var(--bg-card);
-  border-top: 6rpx solid #002d62;
-  border-radius: 48rpx 48rpx 0 0;
-  padding: 48rpx;
-  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
-}
-
-.more-sheet__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 64rpx;
-}
-
-.more-sheet__title {
-  font-size: 36rpx;
-  font-weight: 900;
-  font-style: italic;
-  color: var(--text-primary);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.more-sheet__close {
-  font-size: 40rpx;
-  color: var(--text-secondary);
-  padding: 8rpx;
-}
-
-.more-sheet__grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 64rpx 32rpx;
-}
-
-.more-sheet__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.more-sheet__icon {
-  width: 128rpx;
-  height: 128rpx;
-  border-radius: 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.25);
-}
-
-.more-sheet__icon.bg-pga-blue { background: var(--pga-blue); color: var(--champion-gold); }
-.more-sheet__icon.bg-slate { background: #475569; color: #fff; }
-.more-sheet__icon.bg-red { background: #ef4444; color: #fff; }
-.more-sheet__icon.bg-gold { background: var(--champion-gold); color: #002d62; }
-
-.more-sheet__label {
-  font-size: 22rpx;
-  font-weight: 900;
-  color: var(--text-secondary);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-align: center;
-}
+/* ===== 更多功能面板（与中间页 M 按钮 bottom-sheet 规范一致） ===== */
+.sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 150; }
+.bottom-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; color: var(--tour-blue); border-radius: 80rpx 80rpx 0 0; z-index: 180; box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35); padding-bottom: env(safe-area-inset-bottom); }
+.sheet-handle { width: 96rpx; height: 8rpx; border-radius: 999rpx; background: #e5e7eb; margin: 24rpx auto 40rpx; }
+.feature-section { padding: 0 48rpx 24rpx; }
+.feature-section-title { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 24rpx; padding: 0 4rpx; color: var(--tour-blue); }
+.fst-main { font-size: 24rpx; font-weight: 800; letter-spacing: 0.12em; }
+.fst-sub { font-style: normal; font-size: 20rpx; color: #9ca3af; letter-spacing: 0.08em; }
+.feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24rpx; row-gap: 32rpx; }
+.feature-item { display: flex; flex-direction: column; align-items: center; min-height: 156rpx; }
+.feature-icon { width: 112rpx; height: 112rpx; border-radius: 24rpx; background: var(--tour-blue); color: var(--champion-gold); display: flex; align-items: center; justify-content: center; margin-bottom: 16rpx; font-size: 44rpx; box-shadow: 0 12rpx 24rpx rgba(0, 45, 98, 0.18); }
+.feature-icon.danger { background: #ff5722; color: #fff; }
+.feature-icon.warning { background: #ffc107; color: var(--tour-blue); }
+.feature-label { color: var(--tour-blue); font-size: 20rpx; line-height: 1.2; font-weight: 800; text-align: center; }
+.sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
+.sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
 
 /* Score Input Sheet */
 .score-input-sheet {

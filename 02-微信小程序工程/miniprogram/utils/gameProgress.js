@@ -6,6 +6,7 @@
  * - finished / ended：用户点击「确认结束」后 → 首页卡片置灰
  */
 const gameStore = require('./gameStore.js');
+const matchStatus = require('./matchStatus.js');
 
 const TOTAL_HOLES = 18;
 // 与首页 .ds-progress-marker 宽度一致；用于 left 计算避免第18洞溢出
@@ -192,8 +193,8 @@ function confirmFinishGame(gameId, groupIndex) {
   if (!gameId) return null;
   const game = gameStore.getGame(gameId);
   if (!game || isGameEnded(game)) return game;
-  gameStore.updateGame(gameId, { status: 'finished' });
-  gameStore.updateGroupStatus(gameId, groupIndex || 0, 'finished');
+  gameStore.updateGame(gameId, { status: matchStatus.FINISHED_STORAGE_STATUS });
+  gameStore.updateGroupStatus(gameId, groupIndex || 0, matchStatus.FINISHED_STORAGE_STATUS);
   return gameStore.getGame(gameId);
 }
 
