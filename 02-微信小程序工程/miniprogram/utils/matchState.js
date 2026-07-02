@@ -127,9 +127,12 @@ function buildFromGame(game, groupIndex) {
     course: {
       courseId: (game && game.courseId) || '',
       courseName: (game && game.courseName) || '',
+      courseLocation: (game && game.courseLocation) || '',
       halfText: (game && game.courseHalfText) || '',
       teeTime: (game && game.teeTime) || '',
-      roundName: (game && game.roundName) || (game && game.courseName) || ''
+      roundName: (game && game.roundName) || (game && game.courseName) || '',
+      front9Course: (game && game.front9Course) || null,
+      back9Course: (game && game.back9Course) || null
     },
     scores: emptyScores(),
     groupCount: groups.length || 1

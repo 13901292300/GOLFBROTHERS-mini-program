@@ -2,8 +2,11 @@
  * 普通 GAME 领先榜：个人模式 / 组合（teams）模式派生
  */
 const { getProfileById } = require('./playerDirectory.js');
+const holeLayout = require('./holeLayout.js');
 
-const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
+function holePars() {
+  return holeLayout.getLayout().holePars;
+}
 
 // 姓名列约可容纳字符数（与 .lr-player 45% 宽、28rpx 字号估算）
 const TEAM_NAME_MAX_UNITS = 14;
@@ -58,6 +61,8 @@ function normalizeMembers(team) {
 /** 是否存在球员组合（teams）数据 */
 function gameHasComposition(game) {
   if (!game) return false;
+  const mode = game.gameMode || '';
+  if (mode !== '最好成绩赛' && mode !== '最佳球位赛') return false;
   const map = game.groupCompositionMap || {};
   const mapTeams = Object.keys(map).some((gid) => {
     const c = map[gid];
@@ -132,7 +137,7 @@ function aggregateScores(scores) {
   (scores || []).forEach((s, i) => {
     if (isFilled(s)) {
       total += Number(s);
-      parThru += HOLE_PARS[i];
+      parThru += holePars()[i];
       thru += 1;
     }
   });
@@ -249,7 +254,7 @@ function build(game, openIndex) {
 }
 
 module.exports = {
-  HOLE_PARS,
+  holePars,
   gameHasComposition,
   formatTeamDisplayName,
   enrichPlayerIdentity,

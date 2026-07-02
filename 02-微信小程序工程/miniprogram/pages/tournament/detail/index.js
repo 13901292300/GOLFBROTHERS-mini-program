@@ -7,6 +7,7 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const groupsStore = require('../../../utils/groupsStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
+const holeLayout = require('../../../utils/holeLayout.js');
 
 /* ===== 讨论区 ===== */
 const WATCHERS = [
@@ -99,6 +100,7 @@ Page({
     fabStyle: '',
     fabTopPx: 0,
     showStyleSheet: false,
+    halfSheetVisible: false,
     showWatchers: false,
     featuresCommon: [],
     featuresPermission: []
@@ -108,6 +110,7 @@ Page({
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     groupsStore.ensureInitialized();
+    this._syncTournamentHoleLayout();
     this.setData({ courseName: groupsStore.getCourseName() });
     this.loadScoreDisplayMode();
     this.refreshGroupsDerived();
@@ -496,6 +499,7 @@ Page({
       avatar: p.avatar || ''
     }));
     const groupCount = (groupsStore.getGroups() || []).length || 2;
+    const courseMeta = groupsStore.getTournamentCourseMeta();
     matchStateUtil.setMatchState({
       mode: 'individual_stroke',
       formatType: 'individual_stroke',
@@ -503,7 +507,14 @@ Page({
       groupIndex: 0,
       groupId: groupId,
       players: players,
-      course: { courseName: groupsStore.getCourseName() || '' },
+      course: {
+        courseId: courseMeta.courseId || '',
+        courseName: courseMeta.courseName || groupsStore.getCourseName() || '',
+        courseLocation: courseMeta.courseLocation || '',
+        halfText: courseMeta.courseHalfText || '',
+        front9Course: courseMeta.front9Course || null,
+        back9Course: courseMeta.back9Course || null
+      },
       scores: matchStateUtil.emptyScores(),
       // 赛事出发表为多组场景：返回回到赛事详情（>1 → navigateBack）
       groupCount: groupCount
@@ -512,7 +523,19 @@ Page({
   },
 
   /* ===== 出发表 + 领先榜（均由 groups 派生，无独立数据源） ===== */
+  _syncTournamentHoleLayout() {
+    const meta = groupsStore.getTournamentCourseMeta();
+    const layout = holeLayout.resolveLayoutFromContext({
+      courseId: meta.courseId,
+      courseName: meta.courseName,
+      front9Course: meta.front9Course,
+      back9Course: meta.back9Course
+    });
+    holeLayout.applyLayout(layout);
+  },
+
   refreshGroupsDerived() {
+    this._syncTournamentHoleLayout();
     groupsStore.ensureInitialized();
     this.setData({
       teeGroups: groupsStore.getTeeGroupsView(),
@@ -585,7 +608,20 @@ Page({
       this.setData({ showMoreSheet: false, moreFabExpanded: false, activeTab: 'leaderboard' });
       return;
     }
+    if (permission === 'edit_half') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false, halfSheetVisible: true });
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  closeHalfSheet() {
+    this.setData({ halfSheetVisible: false });
+  },
+
+  onHalfCourseConfirmed() {
+    this.setData({ halfSheetVisible: false, courseName: groupsStore.getCourseName() });
+    this.refreshGroupsDerived();
   },
 
   /* ===== 风格选择 ===== */

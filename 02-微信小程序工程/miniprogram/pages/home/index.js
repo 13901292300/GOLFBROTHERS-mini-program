@@ -2,6 +2,7 @@ const { createHeaderStyle } = require('../../utils/headerEngine.js');
 const gameStore = require('../../utils/gameStore.js');
 const matchStateUtil = require('../../utils/matchState.js');
 const gameProgress = require('../../utils/gameProgress.js');
+const quickCreate = require('../../utils/quickCreate.js');
 
 function formatGameDate(ts) {
   const d = ts ? new Date(ts) : new Date();
@@ -471,6 +472,25 @@ Page({
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
     });
+  },
+
+  onQuickCreate() {
+    if (this._quickCreating) return;
+    this._quickCreating = true;
+    this.setData({ createOverlayOpen: false });
+    setTimeout(() => {
+      this.setData({ createOverlayVisible: false });
+    }, 300);
+    wx.showLoading({ title: '创建中…', mask: true });
+    quickCreate
+      .quickCreateAndEnterScore()
+      .catch(() => {
+        wx.showToast({ title: '创建失败', icon: 'none' });
+      })
+      .finally(() => {
+        wx.hideLoading();
+        this._quickCreating = false;
+      });
   },
 
   // 解析卡片 navUrl 上的查询参数（仅用于把旧卡片入口翻译为 matchState）

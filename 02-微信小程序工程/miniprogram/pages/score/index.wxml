@@ -110,7 +110,7 @@
             </view>
             <view
               wx:for="{{columns}}"
-              wx:key="label"
+              wx:key="colIdx"
               wx:for-index="ci"
               class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}}"
             >
@@ -127,7 +127,7 @@
             </view>
             <view
               wx:for="{{columns}}"
-              wx:key="label"
+              wx:key="colIdx"
               wx:for-index="ci"
               class="scoreboard-cell {{item.isSpecial ? 'scoreboard-cell--special-par' : ''}}"
             >
@@ -193,7 +193,7 @@
             <view
               wx:for="{{item.columns}}"
               wx:for-item="col"
-              wx:key="label"
+              wx:key="colIdx"
               wx:for-index="cIdx"
               bindtap="onScoreCellTap"
               data-player-idx="{{gIdx}}"
@@ -248,7 +248,7 @@
             <view
               wx:for="{{item.cells}}"
               wx:for-item="cell"
-              wx:key="label"
+              wx:key="colIdx"
               wx:for-index="cIdx"
               bindtap="onScoreCellTap"
               data-player-idx="{{pIdx}}"
@@ -308,16 +308,19 @@
   <view wx:if="{{showMoreSheet}}" bindtap="toggleSheet" class="sheet-overlay"></view>
   <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="noop">
     <view class="sheet-handle"></view>
-    <view class="feature-section">
+    <view class="feature-section feature-section--menu">
       <view class="feature-section-title">
         <text class="fst-main">更多功能</text>
         <text class="fst-sub">本组记分</text>
       </view>
       <view class="feature-grid">
-        <view wx:for="{{moreMenuItems}}" wx:key="label" bindtap="onMoreMenuTap" data-label="{{item.label}}" class="feature-item">
-          <view class="feature-icon {{item.bg === 'bg-red' ? 'danger' : (item.bg === 'bg-gold' ? 'warning' : '')}}"><text>{{item.icon}}</text></view>
-          <text class="feature-label">{{item.label}}</text>
-        </view>
+        <block wx:for="{{moreMenuItems}}" wx:key="label">
+          <view wx:if="{{item.empty}}" class="feature-item feature-item--empty"></view>
+          <view wx:else bindtap="onMoreMenuTap" data-label="{{item.label}}" class="feature-item">
+            <view class="feature-icon {{item.bg === 'bg-red' ? 'danger' : (item.bg === 'bg-gold' ? 'warning' : '')}}"><text>{{item.icon}}</text></view>
+            <text class="feature-label">{{item.label}}</text>
+          </view>
+        </block>
       </view>
     </view>
     <view class="sheet-cancel-wrap">
@@ -591,5 +594,13 @@
       </view>
     </view>
   </scroll-view>
+
+  <half-course-sheet
+    visible="{{halfSheetVisible}}"
+    game-id="{{gameId}}"
+    mode="{{mode}}"
+    bind:close="closeHalfSheet"
+    bind:confirm="onHalfCourseConfirmed"
+  />
 
 </view>

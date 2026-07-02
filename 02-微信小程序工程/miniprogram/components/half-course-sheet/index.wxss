@@ -1,0 +1,51 @@
+@import '../../styles/half-course-panel.wxss';
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 150;
+}
+
+.bottom-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  color: var(--tour-blue, #002d62);
+  border-radius: 80rpx 80rpx 0 0;
+  z-index: 180;
+  box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.sheet-handle {
+  width: 96rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: #e5e7eb;
+  margin: 24rpx auto 40rpx;
+}
+
+.sheet-overlay--half {
+  z-index: 210;
+}
+
+.bottom-sheet.half-course-sheet {
+  z-index: 230;
+  pointer-events: auto;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+  background: #fff;
+}
+
+.half-course-sheet .half-course-panel {
+  pointer-events: auto;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

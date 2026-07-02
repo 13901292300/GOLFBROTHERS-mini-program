@@ -1,0 +1,158 @@
+/**
+ * 修改半场 — 比赛级统一逻辑（单组记分页 / Game Hub / 球队赛详情共用）
+ * 成绩绑定记分格索引 0-17，半场变更只更新 course 配置与 HOLE/PAR 显示，禁止搬迁成绩。
+ */
+
+const halfCourse = require('./halfCourse.js');
+const gameStore = require('./gameStore.js');
+const groupsStore = require('./groupsStore.js');
+const matchState = require('./matchState.js');
+const holeLayout = require('./holeLayout.js');
+
+function readMatchState() {
+  try {
+    const ms = wx.getStorageSync(matchState.MATCH_STATE_KEY || 'matchState');
+    return ms && typeof ms === 'object' ? ms : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** 解析当前比赛的半场编辑上下文 */
+function buildContext(opts) {
+  const o = opts || {};
+  if (o.gameId) {
+    const game = gameStore.getGame(o.gameId);
+    if (game) {
+      return {
+        gameId: o.gameId,
+        mode: 'game',
+        source: 'game',
+        courseId: game.courseId,
+        courseName: game.courseName,
+        courseLocation: game.courseLocation,
+        front9Course: game.front9Course,
+        back9Course: game.back9Course
+      };
+    }
+  }
+  if (o.source === 'tournament' || o.mode === 'individual_stroke') {
+    const meta = groupsStore.getTournamentCourseMeta();
+    return {
+      gameId: '',
+      mode: 'individual_stroke',
+      source: 'tournament',
+      courseId: meta.courseId,
+      courseName: meta.courseName,
+      courseLocation: meta.courseLocation,
+      front9Course: meta.front9Course,
+      back9Course: meta.back9Course
+    };
+  }
+  const ms = readMatchState();
+  const c = (ms && ms.course) || {};
+  return {
+    gameId: (ms && ms.gameId) || o.gameId || '',
+    mode: (ms && ms.mode) || o.mode || '',
+    source: o.source || 'matchState',
+    courseId: c.courseId,
+    courseName: c.courseName,
+    courseLocation: c.courseLocation,
+    front9Course: c.front9Course,
+    back9Course: c.back9Course
+  };
+}
+
+/** 打开弹窗前：校验球场并回显当前前九/后九 */
+function prepareSheet(ctx) {
+  const course = halfCourse.resolveHalfCourseRecord(ctx.courseId, ctx.courseName);
+  if (!course) return { ok: false, message: '未找到球场数据' };
+  const halves = halfCourse.buildHalves(course);
+  if (halves.length < 2) return { ok: false, message: '当前球场无可调整的半场' };
+  const front9 = ctx.front9Course || (halves[0] && halves[0].key) || null;
+  const back9 = ctx.back9Course || (halves[1] && halves[1].key) || null;
+  return {
+    ok: true,
+    data: {
+      halfCourse: {
+        id: course.courseId,
+        name: course.courseName,
+        location: course.location || ''
+      },
+      halves: halves,
+      front9: front9,
+      back9: back9
+    }
+  };
+}
+
+/**
+ * 确认修改半场：更新 game / 赛事 meta / matchState + 全局 holeLayout
+ * 不触碰 scores / putts 数组
+ */
+function apply(ctx, front9, back9) {
+  const combo = halfCourse.formatHalfCombo(front9, back9);
+  const courseHalfText = halfCourse.formatCourseHalfText(combo);
+
+  if (ctx.gameId) {
+    const game = gameStore.getGame(ctx.gameId);
+    if (game) {
+      gameStore.saveGame(
+        Object.assign({}, game, {
+          front9Course: front9 || null,
+          back9Course: back9 || null,
+          courseHalfText: courseHalfText
+        })
+      );
+    }
+  }
+
+  if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
+    const meta = groupsStore.getTournamentCourseMeta();
+    groupsStore.setTournamentCourseHalf({
+      courseId: meta.courseId,
+      courseName: meta.courseName,
+      courseLocation: meta.courseLocation,
+      front9Course: front9 || null,
+      back9Course: back9 || null,
+      courseHalfText: courseHalfText
+    });
+  }
+
+  const ms = readMatchState();
+  if (ms) {
+    const c = Object.assign({}, ms.course || {}, {
+      halfText: courseHalfText,
+      front9Course: front9 || null,
+      back9Course: back9 || null
+    });
+    if (ctx.gameId) {
+      const game = gameStore.getGame(ctx.gameId);
+      if (game) {
+        c.courseId = game.courseId || c.courseId;
+        c.courseName = game.courseName || c.courseName;
+        c.courseLocation = game.courseLocation || c.courseLocation;
+      }
+    }
+    matchState.setMatchState(Object.assign({}, ms, { course: c }));
+  }
+
+  const layoutCtx = Object.assign({}, ctx, {
+    front9Course: front9 || null,
+    back9Course: back9 || null
+  });
+  const layout = holeLayout.resolveLayoutFromContext(layoutCtx);
+  holeLayout.applyLayout(layout);
+  if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
+    groupsStore.setHolePars(layout.holePars);
+  }
+
+  return { combo, courseHalfText, layout };
+}
+
+module.exports = {
+  buildContext,
+  prepareSheet,
+  apply,
+  readMatchState
+};

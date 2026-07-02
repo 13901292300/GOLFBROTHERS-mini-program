@@ -2,6 +2,8 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const { FRIEND_ID_SET } = require('../../../utils/playerDirectory.js');
 const gameStore = require('../../../utils/gameStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
+const gameEdit = require('../../../utils/gameEdit.js');
+const halfCourseEdit = require('../../../utils/halfCourseEdit.js');
 
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
@@ -73,6 +75,12 @@ Page({
     headerBarStyle: '',
     headerTotalHeight: 92,
 
+    isEditMode: false,
+    editGameId: '',
+    pageEyebrow: 'CREATE',
+    pageTitle: '普通创建',
+    submitButtonText: '开始记分',
+
     roundName: '',
     courseName: '',
     courseId: '',
@@ -130,9 +138,16 @@ Page({
     teeIndex: [0, 0, 0, 0]
   },
 
-  onLoad() {
+  onLoad(options) {
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
+    this._editReturnTo = (options && options.returnTo) || 'hub';
+
+    if (options && options.mode === 'edit' && options.gameId) {
+      this._compositionQueue = [];
+      this._initEditMode(options.gameId);
+      return;
+    }
 
     // 初始组别：第1组首位为发起人，其余空位
     const firstGroup = {
@@ -152,6 +167,52 @@ Page({
     this._tee = { year: 2026, month: 5, day: 4, hour: 9, minute: 40 };
     this._buildWheels();
     this._applyTeeText();
+  },
+
+  _initEditMode(gameId) {
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      setTimeout(() => this.onBack(), 600);
+      return;
+    }
+    const form = gameEdit.hydrateCreateFormFromGame(game);
+    if (!form) {
+      wx.showToast({ title: '无法加载比赛', icon: 'none' });
+      setTimeout(() => this.onBack(), 600);
+      return;
+    }
+    this._editGameId = gameId;
+    this._groupSeq = (form.groups && form.groups.length) || 1;
+    const teeParsed = gameEdit.parseTeeTimeText(form.teeTimeText);
+    this._tee = teeParsed || { year: 2026, month: 5, day: 4, hour: 9, minute: 40 };
+    this._buildWheels();
+    const compositionSummaryText = this._buildCompositionSummary(form.groupCompositionMap || {});
+    this.setData(
+      {
+        isEditMode: true,
+        editGameId: gameId,
+        pageEyebrow: 'EDIT',
+        pageTitle: '修改比赛',
+        submitButtonText: '确认修改',
+        roundName: form.roundName,
+        courseId: form.courseId,
+        courseName: form.courseName,
+        courseLocation: form.courseLocation,
+        front9Course: form.front9Course,
+        back9Course: form.back9Course,
+        courseHalfText: form.courseHalfText,
+        teeTimeText: form.teeTimeText,
+        gameMode: form.gameMode,
+        visibility: form.visibility,
+        accessCode: form.accessCode || '',
+        groups: form.groups,
+        groupCompositionMap: form.groupCompositionMap || {},
+        compositionSummaryText: compositionSummaryText
+      },
+      () => this._refreshGroupMeta()
+    );
+    if (!form.teeTimeText) this._applyTeeText();
   },
 
   onShow() {
@@ -441,19 +502,7 @@ Page({
   },
 
   _compositionRecordValid(rec, count) {
-    if (!rec || rec.playerCount !== count || !rec.compositionType) return false;
-    const total = rec.compositionType.split('+').reduce((s, n) => s + Number(n), 0);
-    if (total !== count) return false;
-    if (!Array.isArray(rec.teams) || !rec.teams.length) return false;
-    const roster = rec.teams.reduce((s, t) => s + ((t.members || t.players) || []).length, 0);
-    if (roster !== count) return false;
-    if (rec.teamMode === 'single_team') {
-      return rec.teams.length === 1;
-    }
-    if (rec.teamMode === 'split_team') {
-      return rec.teams.length >= 2;
-    }
-    return false;
+    return gameEdit.compositionRecordValid(rec, count);
   },
 
   _buildCompositionSummary(map) {
@@ -632,7 +681,7 @@ Page({
   _openNextCompositionSheet() {
     const queue = this._compositionQueue || [];
     if (!queue.length) {
-      this._doStart();
+      this._finishSubmitFlow();
       return;
     }
     const item = queue[0];
@@ -1009,21 +1058,153 @@ Page({
     return '';
   },
 
+  _buildFormSnapshot() {
+    return {
+      courseId: this.data.courseId,
+      courseName: (this.data.courseName || '').trim(),
+      courseLocation: this.data.courseLocation || '',
+      front9Course: this.data.front9Course || null,
+      back9Course: this.data.back9Course || null,
+      courseHalfText: this.data.courseHalfText || '',
+      teeTimeText: this.data.teeTimeText || '',
+      roundName: this.data.roundName,
+      gameMode: this.data.gameMode || '',
+      visibility: this.data.visibility,
+      accessCode: this.data.accessCode,
+      groups: this.data.groups || [],
+      groupCompositionMap: this.data.groupCompositionMap || {}
+    };
+  },
+
+  /** 编辑模式：合并原 GAME + 当前表单，保证未改字段（如半场）仍参与校验 */
+  _buildMergedFormSnapshot() {
+    const form = this._buildFormSnapshot();
+    if (!this.data.isEditMode) return form;
+    const gameId = this.data.editGameId || this._editGameId;
+    const existing = gameStore.getGame(gameId);
+    return gameEdit.mergeFormWithExistingGame(existing, form);
+  },
+
+  _validationHelpers(extra) {
+    return Object.assign(
+      {
+        filledInGroup: (g) => this._filledCountForGroup(g)
+      },
+      extra || {}
+    );
+  },
+
+  _filledCountForGroup(g) {
+    const idx = (this.data.groups || []).findIndex((x) => x && g && x.id === g.id);
+    return idx >= 0 ? this._groupFilledCount(idx) : 0;
+  },
+
+  _validateBasicForm() {
+    const snapshot = this.data.isEditMode ? this._buildMergedFormSnapshot() : this._buildFormSnapshot();
+    return gameEdit.validateSubmitForm(snapshot, this._validationHelpers({ skipComposition: true }));
+  },
+
+  _validateBeforeSubmit() {
+    const snapshot = this.data.isEditMode ? this._buildMergedFormSnapshot() : this._buildFormSnapshot();
+    return gameEdit.validateSubmitForm(snapshot, this._validationHelpers());
+  },
+
+  _finishSubmitFlow() {
+    const err = this._validateBeforeSubmit();
+    if (err) {
+      wx.showToast({ title: err, icon: 'none' });
+      return;
+    }
+    if (this.data.isEditMode) {
+      this._doUpdate();
+    } else {
+      this._doStart();
+    }
+  },
+
   onStart() {
-    const courseId = this.data.courseId;
-    const courseName = (this.data.courseName || '').trim();
-    if (!courseId || !courseName) {
-      wx.showToast({ title: '尚未选择球场，请选择后才可进入记分', icon: 'none' });
+    const snapshot = this.data.isEditMode ? this._buildMergedFormSnapshot() : this._buildFormSnapshot();
+
+    // 先走「门禁校验」：跳过半场与组合完整性，以便赛制变更时优先进入组合分配
+    const gateErr = gameEdit.validateSubmitForm(
+      snapshot,
+      this._validationHelpers({ skipComposition: true, skipHalfCourse: true })
+    );
+    if (gateErr) {
+      wx.showToast({ title: gateErr, icon: 'none' });
       return;
     }
+
     if (this._beginCompositionFlow()) {
-      wx.showToast({ title: '请逐组确认组合类型', icon: 'none' });
       return;
     }
-    this._doStart();
+
+    const err = this._validateBasicForm();
+    if (err) {
+      wx.showToast({ title: err, icon: 'none' });
+      return;
+    }
+
+    this._finishSubmitFlow();
+  },
+
+  _doUpdate() {
+    const err = this._validateBeforeSubmit();
+    if (err) {
+      wx.showToast({ title: err, icon: 'none' });
+      return;
+    }
+    const gameId = this.data.editGameId || this._editGameId;
+    const existing = gameStore.getGame(gameId);
+    if (!existing) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    const form = this._buildMergedFormSnapshot();
+    const updated = gameEdit.buildUpdatedGame(existing, form, {
+      resolveRoundName: () => this._resolveRoundName()
+    });
+    gameStore.saveGame(updated);
+
+    halfCourseEdit.apply(
+      {
+        gameId: gameId,
+        mode: 'game',
+        courseId: updated.courseId,
+        courseName: updated.courseName,
+        front9Course: updated.front9Course,
+        back9Course: updated.back9Course
+      },
+      updated.front9Course,
+      updated.back9Course
+    );
+
+    const ms = matchStateUtil.getMatchState();
+    const gi = ms && ms.groupIndex != null ? Number(ms.groupIndex) || 0 : 0;
+    matchStateUtil.setMatchState(matchStateUtil.buildFromGame(updated, gi));
+
+    wx.showToast({ title: '已保存', icon: 'success' });
+    setTimeout(() => {
+      if (getCurrentPages().length > 1) {
+        wx.navigateBack({ delta: 1 });
+      } else if (this._editReturnTo === 'score') {
+        matchStateUtil.enterScorePage();
+      } else if (gameStore.isMultiGroup(updated)) {
+        wx.redirectTo({
+          url: '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId)
+        });
+      } else {
+        wx.redirectTo({ url: '/pages/home/index?tab=my' });
+      }
+    }, 400);
   },
 
   _doStart() {
+    const err = this._validateBeforeSubmit();
+    if (err) {
+      wx.showToast({ title: err, icon: 'none' });
+      return;
+    }
     const courseId = this.data.courseId;
     const courseName = (this.data.courseName || '').trim();
     const compositionMap = this.data.groupCompositionMap || {};

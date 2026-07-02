@@ -12,8 +12,11 @@ const gameLeaderboard = require('../../../utils/gameLeaderboard.js');
 const groupsStore = require('../../../utils/groupsStore.js');
 const matchStatus = require('../../../utils/matchStatus.js');
 const gameLifecycle = require('../../../utils/gameLifecycle.js');
+const holeLayout = require('../../../utils/holeLayout.js');
 
-const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
+function holePars() {
+  return holeLayout.getLayout().holePars;
+}
 
 /* ===== 讨论区（与球队比赛讨论区逻辑一致：围观 + 评论流） ===== */
 const WATCHERS = [
@@ -111,7 +114,7 @@ function sumCell(scores, from, to, mode) {
   for (let i = from; i < to; i++) {
     if (isFilled(scores[i])) {
       gross += Number(scores[i]);
-      diff += Number(scores[i]) - HOLE_PARS[i];
+      diff += Number(scores[i]) - holePars()[i];
       filled += 1;
     }
   }
@@ -120,7 +123,7 @@ function sumCell(scores, from, to, mode) {
 }
 function sumPar(from, to) {
   let n = 0;
-  for (let i = from; i < to; i++) n += HOLE_PARS[i];
+  for (let i = from; i < to; i++) n += holePars()[i];
   return n;
 }
 // 由聚合成绩数组构建逐洞成绩卡（结构与 groupsStore.buildPlayerScorecard 完全一致）
@@ -133,22 +136,22 @@ function buildScorecard(scores, mode) {
   const backHead = ['Hole', '10', '11', '12', '13', '14', '15', '16', '17', '18', 'In', 'Tot'];
 
   const frontPar = [{ t: 'Par', m: '', c: '' }];
-  for (let i = 0; i < 9; i++) frontPar.push(parCell(HOLE_PARS[i]));
+  for (let i = 0; i < 9; i++) frontPar.push(parCell(holePars()[i]));
   frontPar.push(parCell(sumPar(0, 9)));
   frontPar.push(blank);
 
   const backPar = [{ t: 'Par', m: '', c: '' }];
-  for (let i = 9; i < 18; i++) backPar.push(parCell(HOLE_PARS[i]));
+  for (let i = 9; i < 18; i++) backPar.push(parCell(holePars()[i]));
   backPar.push(parCell(sumPar(9, 18)));
   backPar.push(parCell(sumPar(0, 18)));
 
   const frontScore = [blank];
-  for (let i = 0; i < 9; i++) frontScore.push(holeCell(arr[i], HOLE_PARS[i], mode));
+  for (let i = 0; i < 9; i++) frontScore.push(holeCell(arr[i], holePars()[i], mode));
   frontScore.push(sumCell(arr, 0, 9, mode));
   frontScore.push(blank);
 
   const backScore = [blank];
-  for (let i = 9; i < 18; i++) backScore.push(holeCell(arr[i], HOLE_PARS[i], mode));
+  for (let i = 9; i < 18; i++) backScore.push(holeCell(arr[i], holePars()[i], mode));
   backScore.push(sumCell(arr, 9, 18, mode));
   backScore.push(sumCell(arr, 0, 18, mode));
 
@@ -193,6 +196,7 @@ Page({
     fabStyle: '',
     fabTopPx: 0,
     showStyleSheet: false,
+    halfSheetVisible: false,
     featuresCommon: [],
     featuresPermission: [],
     scoringDisplay: 'gross', // gross | strokeDiff（风格选择用）
@@ -220,6 +224,7 @@ Page({
       activeTab: tab,
       currentGroupIndex: isNaN(currentGroupIndex) ? -1 : currentGroupIndex
     });
+    this._syncHubHoleLayout();
     this.applyMoreAccess();
     this.refreshGame();
   },
@@ -350,12 +355,25 @@ Page({
   },
 
   // ===== 数据：统一从 gameStore 读取 =====
+  _syncHubHoleLayout() {
+    const game = gameStore.getGame(this._gameId);
+    if (!game) return;
+    const layout = holeLayout.resolveLayoutFromContext({
+      courseId: game.courseId,
+      courseName: game.courseName,
+      front9Course: game.front9Course,
+      back9Course: game.back9Course
+    });
+    holeLayout.applyLayout(layout);
+  },
+
   refreshGame() {
     const game = gameStore.getGame(this._gameId);
     if (!game) {
       this.setData({ leaderboard: [], groupCards: [] });
       return;
     }
+    this._syncHubHoleLayout();
     const userGi = this._resolveUserGroupIndex(game);
     const headerMs = matchStatus.getMatchStatusForGameGroup(game, userGi);
     this.setData({
@@ -563,7 +581,35 @@ Page({
       this._promptCancelGame();
       return;
     }
+    if (permission === 'edit_match') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      if (!this._gameId) {
+        wx.showToast({ title: '当前为演示模式', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({
+        url:
+          '/pages/create/normal/index?mode=edit&gameId=' +
+          encodeURIComponent(this._gameId) +
+          '&returnTo=hub',
+        fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
+    if (permission === 'edit_half') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false, halfSheetVisible: true });
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  closeHalfSheet() {
+    this.setData({ halfSheetVisible: false });
+  },
+
+  onHalfCourseConfirmed() {
+    this.setData({ halfSheetVisible: false });
+    this.refreshGame();
   },
 
   _promptCancelGame() {

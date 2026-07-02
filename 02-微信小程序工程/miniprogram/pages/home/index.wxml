@@ -440,7 +440,7 @@
           </view>
           <text class="text-slate-300 text-10px">›</text>
         </view>
-        <view class="ds-card ds-card-action ds-card-action--neutral flex items-center justify-between rounded-xl ds-bg-hover">
+        <view bindtap="onQuickCreate" class="ds-card ds-card-action ds-card-action--neutral flex items-center justify-between rounded-xl ds-bg-hover">
           <view class="flex items-center">
             <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><text class="text-lg">⚡</text></view>
             <view style="margin-left:12px">

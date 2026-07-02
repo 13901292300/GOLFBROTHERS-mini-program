@@ -7,8 +7,8 @@
           <text class="gb-header__chevron">‹</text>
         </view>
         <view>
-          <text class="gb-header__eyebrow">CREATE</text>
-          <text class="gb-header__title">普通创建</text>
+          <text class="gb-header__eyebrow">{{pageEyebrow}}</text>
+          <text class="gb-header__title">{{pageTitle}}</text>
         </view>
       </view>
       <!-- 右侧不绘制假胶囊：真实微信胶囊避让由 headerBarStyle 的 padding-right 保证 -->
@@ -125,7 +125,7 @@
 
   <!-- 底部按钮：固定底部安全区上方 -->
   <view class="footer">
-    <button class="start-btn" bindtap="onStart">开始记分</button>
+    <button class="start-btn" bindtap="onStart">{{submitButtonText}}</button>
   </view>
 
   <!-- 底部弹层：选择赛制 -->

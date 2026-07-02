@@ -1,6 +1,7 @@
 {
   "navigationStyle": "custom",
   "usingComponents": {
-    "discussion": "/components/discussion/index"
+    "discussion": "/components/discussion/index",
+    "half-course-sheet": "/components/half-course-sheet/index"
   }
 }

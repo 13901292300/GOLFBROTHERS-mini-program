@@ -5,8 +5,47 @@
 
 const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
 
+/** 半场变更后仅按记分格索引 hi 重算 diff；禁止搬迁 score / putts */
+function setHolePars(nextPars) {
+  if (!Array.isArray(nextPars) || nextPars.length !== 18) return HOLE_PARS.slice();
+  HOLE_PARS.splice(0, 18, ...nextPars);
+  (_store() || []).forEach((group) => {
+    (group.players || []).forEach((player) => {
+      (player.holes || []).forEach((hole, hi) => {
+        if (isFilledScore(hole && hole.score)) {
+          hole.diff = hole.score - HOLE_PARS[hi];
+        } else if (hole) {
+          hole.diff = null;
+        }
+      });
+    });
+  });
+  return HOLE_PARS.slice();
+}
+
+function getHolePars() {
+  return HOLE_PARS.slice();
+}
+
 /* 赛事级球场名称（单一数据源，供领先榜逐洞详情标题等复用；后续接入真实赛事数据时改此处） */
-const TOURNAMENT_META = { courseName: '北京清河湾高尔夫乡村俱乐部 A&B' };
+const TOURNAMENT_META = {
+  courseId: 'c-qhw',
+  courseName: '北京清河湾高尔夫乡村俱乐部 A&B',
+  courseLocation: '北京 · 昌平',
+  front9Course: 'A',
+  back9Course: 'B',
+  courseHalfText: '（A/B）'
+};
+
+function getTournamentCourseMeta() {
+  return Object.assign({}, TOURNAMENT_META);
+}
+
+function setTournamentCourseHalf(patch) {
+  if (!patch || typeof patch !== 'object') return getTournamentCourseMeta();
+  Object.assign(TOURNAMENT_META, patch);
+  return getTournamentCourseMeta();
+}
 
 // 当前球场名称：优先取赛事 meta，无则兜底 'COURSE'（禁止在视图层写死）
 function getCourseName() {
@@ -540,5 +579,9 @@ module.exports = {
   buildLeaderboard,
   buildPlayerScorecard,
   getScoreStatus,
-  getCourseName
+  getCourseName,
+  getTournamentCourseMeta,
+  setTournamentCourseHalf,
+  setHolePars,
+  getHolePars
 };

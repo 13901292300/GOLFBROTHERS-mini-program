@@ -276,4 +276,11 @@
       <view bindtap="closeStyleSheet" class="style-done-btn">完成</view>
     </view>
   </view>
+
+  <half-course-sheet
+    visible="{{halfSheetVisible}}"
+    game-id="{{gameId}}"
+    bind:close="closeHalfSheet"
+    bind:confirm="onHalfCourseConfirmed"
+  />
 </view>

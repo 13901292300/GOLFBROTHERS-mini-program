@@ -1,0 +1,77 @@
+<block wx:if="{{visible}}">
+  <view catchtouchmove="noop" bindtap="onClose" class="sheet-overlay sheet-overlay--half"></view>
+  <view class="bottom-sheet half-course-sheet" catchtap="noop" catchtouchmove="noop">
+    <view class="sheet-handle"></view>
+    <view class="half-course-panel" catchtap="noop">
+      <view class="half-sheet-head">
+        <text class="half-sheet-eyebrow">COURSE</text>
+        <text class="half-sheet-title">选择半场</text>
+        <view bindtap="onClose" class="half-sheet-close">×</view>
+      </view>
+      <scroll-view scroll-y class="half-sheet-body">
+        <text class="half-course-name">{{halfCourse.name}}</text>
+        <text class="half-hint">请选择半场</text>
+        <view class="half-split">
+          <view class="half-col">
+            <text class="half-col__title">前9洞</text>
+            <view class="half-tags">
+              <view
+                wx:for="{{halves}}"
+                wx:key="key"
+                bindtap="selectHalf"
+                data-side="front"
+                data-key="{{item.key}}"
+                class="half-tag {{front9 === item.key ? 'active' : ''}}"
+              >
+                <text class="half-tag__code">{{item.label}}</text>
+                <text wx:if="{{item.name}}" class="half-tag__name">{{item.name}}</text>
+              </view>
+            </view>
+          </view>
+          <view class="half-col">
+            <text class="half-col__title">后9洞</text>
+            <view class="half-tags">
+              <view
+                wx:for="{{halves}}"
+                wx:key="key"
+                bindtap="selectHalf"
+                data-side="back"
+                data-key="{{item.key}}"
+                class="half-tag {{back9 === item.key ? 'active' : ''}}"
+              >
+                <text class="half-tag__code">{{item.label}}</text>
+                <text wx:if="{{item.name}}" class="half-tag__name">{{item.name}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view class="par-table">
+          <text class="par-table__title">标准 PAR</text>
+          <view
+            wx:for="{{halves}}"
+            wx:key="key"
+            bindtap="toggleHalfRow"
+            data-key="{{item.key}}"
+            class="par-row {{(front9 === item.key || back9 === item.key) ? 'active' : ''}}"
+          >
+            <view class="par-row__head">
+              <text class="par-row__code">{{item.label}}</text>
+              <text class="par-row__name">{{item.name || '—'}}</text>
+              <view class="par-row__tags">
+                <text wx:if="{{front9 === item.key}}" class="par-side-tag">前9</text>
+                <text wx:if="{{back9 === item.key}}" class="par-side-tag">后9</text>
+              </view>
+              <text class="par-row__total">PAR {{item.parTotal}}</text>
+            </view>
+            <view class="par-hole-row">
+              <view wx:for="{{item.par}}" wx:for-item="p" wx:key="index" class="par-hole-cell">{{p}}</view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="half-sheet-footer">
+        <button class="half-confirm-btn {{(front9 || back9) ? '' : 'is-disabled'}}" disabled="{{!front9 && !back9}}" bindtap="confirmEditHalf">确认</button>
+      </view>
+    </view>
+  </view>
+</block>

@@ -137,6 +137,60 @@ function setGroupPlayerScores(gameId, groupIndex, playerId, scores, putts) {
   return game;
 }
 
+/** 按 playersSlots 合并成绩：保留仍在名单中的球员；移除已删除球员 */
+function mergeScoresForPlayersSlots(oldScores, playersSlots) {
+  const prev = oldScores || {};
+  const next = {};
+  (playersSlots || []).filter(Boolean).forEach((p) => {
+    if (prev[p.playerId]) {
+      next[p.playerId] = {
+        scores: (prev[p.playerId].scores || []).slice(),
+        putts: (prev[p.playerId].putts || []).slice()
+      };
+    }
+  });
+  return next;
+}
+
+/**
+ * 写入某组球员槽位（记分页增删球员后同步 GAME 数据源）
+ * - 更新 groups[gi].playersSlots / scoresByPlayer
+ * - 第 1 组同步顶层 playersSlots（首页卡片头像）
+ */
+function setGroupPlayersSlots(gameId, groupIndex, playersSlots) {
+  const list = _readAll();
+  const idx = list.findIndex((g) => g && g.gameId === gameId);
+  if (idx < 0) return null;
+  const game = list[idx];
+  const gi = groupIndex || 0;
+  const slots = (playersSlots || []).map((p) => {
+    if (!p) return null;
+    return {
+      playerId: p.playerId,
+      name: p.name || '球员',
+      avatar: p.avatar || ''
+    };
+  });
+
+  if (!Array.isArray(game.groups) || !game.groups.length) {
+    if (gi !== 0) return null;
+    game.playersSlots = slots.slice();
+    game.scoresByPlayer = mergeScoresForPlayersSlots(game.scoresByPlayer, slots);
+  } else if (game.groups[gi]) {
+    game.groups[gi].playersSlots = slots;
+    game.groups[gi].scoresByPlayer = mergeScoresForPlayersSlots(game.groups[gi].scoresByPlayer, slots);
+    if (gi === 0) {
+      game.playersSlots = slots.slice();
+    }
+  } else {
+    return null;
+  }
+
+  list[idx] = game;
+  _writeAll(list);
+  return game;
+}
+
 /** 写入某组团队记分实体成绩（最好成绩 / 最佳球位统一引擎） */
 function setGroupTeamScores(gameId, groupIndex, engineGroups) {
   const list = _readAll();
@@ -222,6 +276,7 @@ module.exports = {
   getGroup,
   listGroups,
   setGroupPlayerScores,
+  setGroupPlayersSlots,
   setGroupTeamScores,
   updateGroupStatus,
   isMultiGroup,

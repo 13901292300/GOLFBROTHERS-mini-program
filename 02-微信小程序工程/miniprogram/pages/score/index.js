@@ -12,23 +12,23 @@ const matchState = require('../../utils/matchState.js');
 const gameProgress = require('../../utils/gameProgress.js');
 const matchStatus = require('../../utils/matchStatus.js');
 const gameLifecycle = require('../../utils/gameLifecycle.js');
+const halfCourseEdit = require('../../utils/halfCourseEdit.js');
+const holeLayout = require('../../utils/holeLayout.js');
 
 // 单组 Game 球员行配色（按槽位顺序）
 const GAME_COLOR_CLASSES = ['border-red', 'border-gold', 'border-white', 'border-light'];
 
-const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
+const SPECIAL_IDX = holeLayout.SPECIAL_IDX;
 
-const COLUMN_LABELS = [
-  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'OUT',
-  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'IN', 'TOT'
-];
-
-const COLUMN_PARS = [
-  4, 4, 4, 3, 4, 5, 4, 3, 4, 35,
-  4, 4, 3, 4, 4, 5, 3, 4, 4, 35, 70
-];
-
-const SPECIAL_IDX = [9, 19, 20];
+function holePars() {
+  return holeLayout.getLayout().holePars;
+}
+function columnLabels() {
+  return holeLayout.getLayout().columnLabels;
+}
+function columnPars() {
+  return holeLayout.getLayout().columnPars;
+}
 
 // pair 行 swipe indent：头像重叠块几何（用于居中 gap 计算，仅 progress>0 时启用）
 const PAIR_SWIPE_GEOM = {
@@ -73,7 +73,7 @@ const PLAYER_SEEDS = [
   }
 ];
 
-const COLUMN_TRIANGLES = COLUMN_LABELS.map((_, colIdx) => {
+const COLUMN_TRIANGLES = columnLabels().map((_, colIdx) => {
   if (SPECIAL_IDX.includes(colIdx)) return null;
   const colors = ['triangle-red', 'triangle-red', 'triangle-blue', 'triangle-blue'];
   const j = (colIdx * 3 + 1) % 4;
@@ -98,6 +98,7 @@ function cornerRank(colArr, pIdx) {
 /** 多组普通球局 / 球队赛事记分页：更多功能面板（仅此 10 项） */
 const MORE_MENU_ITEMS_COMPACT = [
   { icon: '⚑', label: '修改T台', bg: 'bg-pga-blue' },
+  { icon: '⌖', label: '修改半场', bg: 'bg-pga-blue' },
   { icon: '▦', label: '成绩卡', bg: 'bg-pga-blue' },
   { icon: '↗', label: '统计数据', bg: 'bg-pga-blue' },
   { icon: '👥', label: '球友圈', bg: 'bg-pga-blue' },
@@ -109,8 +110,8 @@ const MORE_MENU_ITEMS_COMPACT = [
   { icon: '⏻', label: '结束比赛', bg: 'bg-gold' }
 ];
 
-/** 演示/标准模式等其它记分场景（保留原完整菜单） */
-const MORE_MENU_ITEMS_LEGACY = [
+/** 演示/标准模式等其它记分场景：主功能区（原「虚拟」位留空） */
+const MORE_MENU_ITEMS_LEGACY_MAIN = [
   { icon: '✎', label: '修改比赛', bg: 'bg-pga-blue' },
   { icon: '⌖', label: '修改半场', bg: 'bg-pga-blue' },
   { icon: '⚑', label: '修改T台', bg: 'bg-pga-blue' },
@@ -121,21 +122,79 @@ const MORE_MENU_ITEMS_LEGACY = [
   { icon: '📖', label: '记账本', bg: 'bg-pga-blue' },
   { icon: '🪪', label: '海报', bg: 'bg-pga-blue' },
   { icon: '🎨', label: '风格选择', bg: 'bg-pga-blue' },
-  { icon: '💬', label: '反馈', bg: 'bg-pga-blue' },
-  { icon: '👻', label: '虚拟', bg: 'bg-slate' },
+  { icon: '💬', label: '反馈', bg: 'bg-pga-blue' }
+];
+const MORE_MENU_LEGACY_PLACEHOLDER = { empty: true, label: '__placeholder__' };
+const MORE_MENU_ITEMS_LEGACY_FOOTER = [
   { icon: '✕', label: '取消比赛', bg: 'bg-red' },
   { icon: '⏻', label: '结束比赛', bg: 'bg-gold' }
 ];
+const MORE_MENU_ITEMS_LEGACY = MORE_MENU_ITEMS_LEGACY_MAIN
+  .concat([MORE_MENU_LEGACY_PLACEHOLDER])
+  .concat(MORE_MENU_ITEMS_LEGACY_FOOTER);
+
+function resolveMoreMenuPanels(mode, options) {
+  const opts = options || {};
+  const groupCount = opts.groupCount != null ? Number(opts.groupCount) : 1;
+  const isMultiGroup = groupCount > 1;
+
+  let useLegacyFull = false;
+  if (mode === 'game') {
+    // 单组普通球局 → 完整面板；多组普通球局记分页 → 缩减面板
+    useLegacyFull = !isMultiGroup;
+  } else if (mode === 'fourball_best' && opts.hasRealMatch) {
+    // 组合赛制单组球局与单组个人比杆赛相同：完整面板；仅多组记分页缩减
+    useLegacyFull = !isMultiGroup;
+  } else if (mode === 'individual_stroke') {
+    useLegacyFull = false;
+  } else {
+    useLegacyFull = true;
+  }
+
+  if (useLegacyFull) {
+    return {
+      moreMenuItems: MORE_MENU_ITEMS_LEGACY.slice()
+    };
+  }
+  return {
+    moreMenuItems: MORE_MENU_ITEMS_COMPACT.slice()
+  };
+}
 
 function resolveMoreMenuItems(mode, options) {
-  const opts = options || {};
-  if (mode === 'game' || mode === 'individual_stroke') {
-    return MORE_MENU_ITEMS_COMPACT;
+  return resolveMoreMenuPanels(mode, options).moreMenuItems;
+}
+
+function resolveGroupCountFromContext(matchState, game) {
+  if (matchState && matchState.groupCount != null) {
+    const n = Number(matchState.groupCount);
+    if (!isNaN(n) && n > 0) return n;
   }
-  if (mode === 'fourball_best' && opts.hasRealMatch) {
-    return MORE_MENU_ITEMS_COMPACT;
+  if (game && Array.isArray(game.groups) && game.groups.length) {
+    return game.groups.length;
   }
-  return MORE_MENU_ITEMS_LEGACY;
+  return 1;
+}
+
+/** 记分页「更多功能」用组数：单组固定 1，多组才解析 matchState / game.groups */
+function resolveScorePageGroupCount(gameId, matchState) {
+  if (!gameId) return 1;
+  const game = gameStore.getGame(gameId);
+  if (!game || !gameStore.isMultiGroup(game)) return 1;
+  return resolveGroupCountFromContext(matchState, game);
+}
+
+/**
+ * 普通球局记分页「更多功能」面板：仅以 gameStore 实际组数为准（与展示 mode 解耦）
+ * - 单组 → 完整面板（含修改比赛 / 取消比赛）
+ * - 多组 → 缩减面板（管理功能由 Hub M 按钮承接）
+ */
+function resolveNormalGameMoreMenu(gameId, matchState) {
+  const groupCount = resolveScorePageGroupCount(gameId, matchState);
+  if (groupCount <= 1) {
+    return { moreMenuItems: MORE_MENU_ITEMS_LEGACY.slice() };
+  }
+  return { moreMenuItems: MORE_MENU_ITEMS_COMPACT.slice() };
 }
 
 const GROUP_PLAYERS = [
@@ -242,9 +301,9 @@ function bestScoreClass(diff) {
 
 // displayMode（gross/diff）统一驱动记分格主数字与右下角杆差，逻辑与 enrichPlayer 保持一致
 function buildBestBallColumns(displayMode) {
-  return COLUMN_LABELS.map((label, idx) => {
+  return columnLabels().map((label, idx) => {
     const isSpecial = SPECIAL_IDX.includes(idx);
-    const par = COLUMN_PARS[idx];
+    const par = columnPars()[idx];
     let score;
     let putts;
     let diff;
@@ -259,6 +318,7 @@ function buildBestBallColumns(displayMode) {
       putts = Math.max(1, 2 + (idx % 2 === 0 ? 0 : -1));
     }
     return {
+      colIdx: idx,
       label,
       par,
       isSpecial,
@@ -278,9 +338,10 @@ function buildBestBallColumns(displayMode) {
 
 // 空成绩列（真实比赛进入统一模板时：18 洞默认空，UI 不显示任何 0 / 假数据）
 function buildEmptyBestColumns() {
-  return COLUMN_LABELS.map((label, idx) => ({
+  return columnLabels().map((label, idx) => ({
+    colIdx: idx,
     label,
-    par: COLUMN_PARS[idx],
+    par: columnPars()[idx],
     isSpecial: SPECIAL_IDX.includes(idx),
     isTot: idx === 20,
     score: '',
@@ -300,8 +361,8 @@ function buildTeamBestColumns(scores, putts, displayMode) {
   putts = putts || [];
   let outSum = 0, inSum = 0, outPutts = 0, inPutts = 0, outDiff = 0, inDiff = 0, outFilled = 0, inFilled = 0;
   let holeCursor = 0;
-  const columns = COLUMN_LABELS.map((label, idx) => {
-    const par = COLUMN_PARS[idx];
+  const columns = columnLabels().map((label, idx) => {
+    const par = columnPars()[idx];
     if (SPECIAL_IDX.includes(idx)) {
       const isOut = idx === 9;
       const isIn = idx === 19;
@@ -310,7 +371,7 @@ function buildTeamBestColumns(scores, putts, displayMode) {
       const diffTotal = isOut ? outDiff : isIn ? inDiff : outDiff + inDiff;
       const filled = isOut ? outFilled : isIn ? inFilled : outFilled + inFilled;
       return {
-        label, par, isSpecial: true, isTot: idx === 20,
+        colIdx: idx, label, par, isSpecial: true, isTot: idx === 20,
         score: filled > 0 ? sum : '',
         mainStr: filled > 0 ? String(sum) : '',
         putts: filled > 0 ? puttTotal : '',
@@ -325,7 +386,7 @@ function buildTeamBestColumns(scores, putts, displayMode) {
     const s = scores[hi];
     if (!isFilledScore(s)) {
       return {
-        label, par, isSpecial: false, isTot: false,
+        colIdx: idx, label, par, isSpecial: false, isTot: false,
         score: '', mainStr: '', putts: '', diff: 0, diffStr: '', diffClass: 'diff-even', scoreClass: ''
       };
     }
@@ -334,7 +395,7 @@ function buildTeamBestColumns(scores, putts, displayMode) {
     if (hi < 9) { outSum += s; outPutts += p; outDiff += diff; outFilled += 1; }
     else { inSum += s; inPutts += p; inDiff += diff; inFilled += 1; }
     return {
-      label, par, isSpecial: false, isTot: false,
+      colIdx: idx, label, par, isSpecial: false, isTot: false,
       score: s,
       mainStr: formatMainScore(s, par, displayMode),
       putts: p,
@@ -354,9 +415,10 @@ function buildTeamBestColumns(scores, putts, displayMode) {
 }
 
 function buildColumns() {
-  return COLUMN_LABELS.map((label, idx) => ({
+  return columnLabels().map((label, idx) => ({
+    colIdx: idx,
     label,
-    par: COLUMN_PARS[idx],
+    par: columnPars()[idx],
     isSpecial: SPECIAL_IDX.includes(idx),
     isOut: idx === 9,
     isIn: idx === 19,
@@ -384,8 +446,9 @@ function enrichPlayer(player, pIdx, displayMode) {
   let inFilled = 0;
   let scoreIdx = 0;
 
-  const cells = COLUMN_LABELS.map((label, colIdx) => {
-    const par = COLUMN_PARS[colIdx];
+  // scores[hi] 绑定记分格索引 hi（0-17），半场变更只改 label/par，禁止按旧洞号搬迁成绩
+  const cells = columnLabels().map((label, colIdx) => {
+    const par = columnPars()[colIdx];
     if (SPECIAL_IDX.includes(colIdx)) {
       const isOut = colIdx === 9;
       const isIn = colIdx === 19;
@@ -395,6 +458,7 @@ function enrichPlayer(player, pIdx, displayMode) {
       const filled = isOut ? outFilled : isIn ? inFilled : outFilled + inFilled;
       return {
         type: 'special',
+        colIdx,
         label,
         par,
         val: filled > 0 ? sum : '',
@@ -414,6 +478,7 @@ function enrichPlayer(player, pIdx, displayMode) {
     if (!isFilledScore(s)) {
       return {
         type: 'hole',
+        colIdx,
         label,
         par,
         holeIndex: hi,
@@ -445,6 +510,7 @@ function enrichPlayer(player, pIdx, displayMode) {
 
     return {
       type: 'hole',
+      colIdx,
       label,
       par,
       holeIndex: hi,
@@ -515,6 +581,7 @@ Page({
     gameFinished: false,
     scoresCompleted: false,
     showMoreSheet: false,
+    halfSheetVisible: false,
     showScoreSheet: false,
     showGroupManage: false,
     scoreSheetOpen: false,
@@ -594,7 +661,7 @@ Page({
     }
 
     this._matchState = ms;
-    const mode = ms.mode || this._modeForFormat(ms.formatType);
+    const mode = this._resolvePageMode(ms);
     const gameId = ms.gameId || '';
     const groupIndex = ms.groupIndex != null ? Number(ms.groupIndex) || 0 : 0;
     const groupId = ms.groupId || gameId || '';
@@ -607,6 +674,8 @@ Page({
       gameId: gameId,
       gameGroupIndex: groupIndex
     });
+
+    this._syncHoleLayoutFromCourse({ refresh: false });
 
     if (mode === 'game') {
       this.initGameMode(gameId, groupIndex);
@@ -635,6 +704,7 @@ Page({
 
     // 会话内本地状态回灌：同一会话再次进入该球局不丢失成绩
     this.hydrateFromSession();
+    this._syncMoreMenuItems();
   },
 
   // formatType → 渲染模式（仅当 matchState.mode 缺省时的兜底推导）
@@ -644,6 +714,46 @@ Page({
     }
     if (formatType === 'individual_stroke') return 'individual_stroke';
     return 'standard';
+  },
+
+  // 有 gameId 的普通球局必须走 game 模式，避免 formatType 兜底误用球队精简面板
+  _resolvePageMode(ms) {
+    if (!ms) return 'standard';
+    const m = ms.mode;
+    if (m === 'game' || m === 'fourball_best' || m === 'individual_stroke' || m === 'standard') {
+      return m;
+    }
+    if (ms.gameId) return 'game';
+    return this._modeForFormat(ms.formatType);
+  },
+
+  _resolveMoreMenuForCurrentContext() {
+    const mode = this.data.mode;
+    const ms = this._matchState || this._readMatchState();
+    const gameId = this.data.gameId || (ms && ms.gameId) || '';
+
+    // 普通球局记分页：优先按 gameStore 组数决定（单组必为完整面板，与 mode 无关）
+    if (gameId && gameStore.getGame(gameId)) {
+      return resolveNormalGameMoreMenu(gameId, ms);
+    }
+
+    if (mode === 'standard') return resolveMoreMenuPanels('standard');
+    if (mode === 'individual_stroke') return resolveMoreMenuPanels('individual_stroke');
+    if (mode === 'fourball_best') {
+      const hasMatch = !!(ms && Array.isArray(ms.players) && ms.players.length);
+      return resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: 1 });
+    }
+    if (mode === 'game') {
+      return resolveMoreMenuPanels('game', { groupCount: 1 });
+    }
+    return { moreMenuItems: MORE_MENU_ITEMS_COMPACT.slice() };
+  },
+
+  _syncMoreMenuItems() {
+    const panels = this._resolveMoreMenuForCurrentContext();
+    if (panels && panels.moreMenuItems) {
+      this.setData({ moreMenuItems: panels.moreMenuItems });
+    }
   },
 
   // 标准模式：球员/球场全部来自 matchState（无球员时回退演示种子，仅用于首页原型卡片）
@@ -661,9 +771,10 @@ Page({
         }))
       : PLAYER_SEEDS.map((p) => JSON.parse(JSON.stringify(p)));
     const course = (ms && ms.course) || {};
+    const menuPanels = resolveMoreMenuPanels('standard');
     this.setData({
       mode: 'standard',
-      moreMenuItems: resolveMoreMenuItems('standard'),
+      moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
@@ -708,15 +819,9 @@ Page({
     const hasMatch = !!(this.data.gameId && ms && Array.isArray(ms.players) && ms.players.length);
 
     if (hasMatch) {
-      // 球员继承：来源唯一为创建页 selectedPlayers；成绩初始化为空数组（enrichPlayer/空列派生空白）
-      this._playersSource = ms.players.map((p, i) => ({
-        id: (p && (p.playerId || p.id)) || ('seat-' + i),
-        playerId: (p && (p.playerId || p.id)) || ('seat-' + i),
-        name: (p && p.name) || '球员',
-        avatar: (p && p.avatar) || '',
-        scores: [],
-        putts: []
-      }));
+      const group = this._loadPlayersFromGameGroup(this.data.gameId, this._gameGroupIndex || 0);
+      // matchState.players 与 gameStore 对齐（buildFromGame 入口亦会重建）
+      this._syncMatchStatePlayers(group.playersSlots || []);
     } else if (!this._playersSource || !this._playersSource.length) {
       // 首页演示态（无真实比赛）：回退原型种子球员
       this._playersSource = PLAYER_SEEDS.map((p) => JSON.parse(JSON.stringify(p)));
@@ -744,9 +849,13 @@ Page({
     // 真实比赛：球队记分行 = 各组逐洞最佳（best across groups）派生；演示态保留原型数据
     const team = hasMatch ? this._teamBestColumns(this.data.scoreDisplayMode) : null;
     const colStartW = this._computeBestballColStartWidth();
+    const groupCount = resolveScorePageGroupCount(this.data.gameId, ms);
+    const menuPanels = this.data.gameId
+      ? resolveNormalGameMoreMenu(this.data.gameId, ms)
+      : resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: groupCount });
     this.setData({
       mode: 'fourball_best',
-      moreMenuItems: resolveMoreMenuItems('fourball_best', { hasRealMatch: hasMatch }),
+      moreMenuItems: menuPanels.moreMenuItems,
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
       layoutType: 'fourball',
@@ -1058,43 +1167,30 @@ Page({
       mode: 'individual_stroke',
       groupId: groupId || '',
       gameFinished: matchStatus.getMatchStatus(group, { source: 'groups' }).isCompleted,
-      moreMenuItems: resolveMoreMenuItems('individual_stroke'),
+      moreMenuItems: resolveMoreMenuPanels('individual_stroke').moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
       'match.format': '个人比杆赛'
     });
+    const ms = this._matchState || this._readMatchState();
+    if (ms) this.buildGameContextFromMatchState(ms);
     this.refreshPlayers();
   },
 
   // Game 模式：球员来源 = 该组 playersSlots，所有记分格初始化为空（支持单组/多组）
   initGameMode(gameId, groupIndex) {
     const game = gameStore.getGame(gameId);
-    const group = gameStore.getGroup(gameId, groupIndex) || { playersSlots: [], scoresByPlayer: {} };
-    const slots = group.playersSlots || [];
-    const players = slots.filter(Boolean);
-    const scoresByPlayer = group.scoresByPlayer || {};
-    this._playersSource = players.map((p, i) => {
-      const saved = scoresByPlayer[p.playerId] || {};
-      return {
-        id: p.playerId,
-        playerId: p.playerId,
-        name: p.name,
-        avatar: p.avatar,
-        colorClass: GAME_COLOR_CLASSES[i % GAME_COLOR_CLASSES.length],
-        // 记分初始化：无任何成绩 → 空数组（enrichPlayer 派生为空格 UI）
-        scores: (saved.scores || []).slice(),
-        putts: (saved.putts || []).slice()
-      };
-    });
+    const group = this._loadPlayersFromGameGroup(gameId, groupIndex, { colorClasses: true });
     const ms = matchStatus.getMatchStatus(group, { source: 'game' });
+    const menuPanels = resolveNormalGameMoreMenu(gameId, this._matchState || this._readMatchState());
     this.setData({
       mode: 'game',
       gameId: gameId,
       gameGroupIndex: groupIndex,
       groupId: gameId + ':' + groupIndex,
       gameFinished: ms.isCompleted,
-      moreMenuItems: resolveMoreMenuItems('game'),
+      moreMenuItems: menuPanels.moreMenuItems,
       scoresCompleted: gameProgress.isScoringCompleted(game, groupIndex),
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -1167,10 +1263,50 @@ Page({
   // 只读取全局主题并渲染，本页不允许修改主题
   onShow() {
     this.applyTheme(getApp().getTheme());
-    if (this.data.gameId) {
+    if (this.data.gameId && !this.data.noMatch) {
+      this._refreshScorePageFromGame();
+    } else if (this.data.gameId) {
       this._syncGameFinishedState();
       this._maybeShowEndGroupPrompt();
     }
+  },
+
+  /**
+   * 从 gameStore 重建 matchState 并按最新赛制重新初始化记分页（修改比赛返回 / onShow 刷新）
+   */
+  _refreshScorePageFromGame() {
+    const gameId = this.data.gameId;
+    const game = gameStore.getGame(gameId);
+    if (!game) return;
+
+    const gi = this._gameGroupIndex != null ? Number(this._gameGroupIndex) || 0 : 0;
+    const ms = matchState.buildFromGame(game, gi);
+    matchState.setMatchState(ms);
+    this._matchState = ms;
+
+    const nextMode = this._resolvePageMode(ms);
+    this.setData({
+      mode: nextMode,
+      formatType: ms.formatType,
+      groupId: ms.groupId || gameId + ':' + gi,
+      gameGroupIndex: gi
+    });
+
+    this._syncHoleLayoutFromCourse({ refresh: false });
+    this.buildGameContext(game);
+
+    if (nextMode === 'game') {
+      this.initGameMode(gameId, gi);
+    } else if (nextMode === 'fourball_best') {
+      this.initFourBallBestMode();
+    } else if (nextMode === 'individual_stroke') {
+      this.initIndividualStrokeMode(ms.groupId || gameId);
+    }
+
+    this.hydrateFromSession();
+    this._syncGameFinishedState();
+    this._maybeShowEndGroupPrompt();
+    this._syncMoreMenuItems();
   },
 
   applyTheme(theme) {
@@ -1243,14 +1379,105 @@ Page({
     return 'score:' + (this.data.mode || 'standard') + ':' + (this.data.groupId || '');
   },
 
+  _isGameStoreContext() {
+    return !!this.data.gameId && (this.data.mode === 'game' || this.data.mode === 'fourball_best');
+  },
+
+  /** 从 gameStore 某组 playersSlots 加载球员 + 槽位（增删后再次进入的唯一数据源） */
+  _loadPlayersFromGameGroup(gameId, groupIndex, options) {
+    const opts = options || {};
+    const group = gameStore.getGroup(gameId, groupIndex || 0) || { playersSlots: [], scoresByPlayer: {} };
+    const slots = group.playersSlots || [];
+    const scoresByPlayer = group.scoresByPlayer || {};
+    const n = Math.max(playerSlots.DEFAULT_SLOT_SIZE, slots.length);
+    this._demoSlots = [];
+    this._demoSlotCache = [];
+    for (let i = 0; i < n; i++) {
+      const p = slots[i];
+      if (!p) {
+        this._demoSlots[i] = null;
+        continue;
+      }
+      const saved = scoresByPlayer[p.playerId] || {};
+      this._demoSlots[i] = {
+        id: p.playerId,
+        playerId: p.playerId,
+        name: p.name,
+        avatar: p.avatar || '',
+        scores: (saved.scores || []).slice(),
+        putts: (saved.putts || []).slice()
+      };
+    }
+    let colorIdx = 0;
+    this._playersSource = this._demoSlots.filter(Boolean).map((p) => {
+      const row = {
+        id: p.playerId,
+        playerId: p.playerId,
+        name: p.name,
+        avatar: p.avatar,
+        scores: (p.scores || []).slice(),
+        putts: (p.putts || []).slice()
+      };
+      if (opts.colorClasses) {
+        row.colorClass = GAME_COLOR_CLASSES[colorIdx % GAME_COLOR_CLASSES.length];
+        colorIdx++;
+      }
+      return row;
+    });
+    return group;
+  },
+
+  _playersSlotsPayload() {
+    if (this._demoSlots && this._demoSlots.length) {
+      return this._demoSlots.map((p) => {
+        if (!p) return null;
+        return {
+          playerId: p.playerId || p.id,
+          name: p.name || '球员',
+          avatar: p.avatar || ''
+        };
+      });
+    }
+    return (this._playersSource || []).map((p) => ({
+      playerId: p.playerId || p.id,
+      name: p.name || '球员',
+      avatar: p.avatar || ''
+    }));
+  },
+
+  _syncMatchStatePlayers(playersSlots) {
+    const ms = this._matchState || matchState.getMatchState();
+    if (!ms || !this.data.gameId || ms.gameId !== this.data.gameId) return;
+    const players = (playersSlots || []).filter(Boolean).map((p) => ({
+      playerId: p.playerId,
+      name: p.name,
+      avatar: p.avatar || ''
+    }));
+    const next = Object.assign({}, ms, { players: players });
+    matchState.setMatchState(next);
+    this._matchState = next;
+  },
+
+  /** 将记分页增删后的球员名单写回 gameStore（含 groups[0] 与顶层 playersSlots） */
+  _persistGameRoster() {
+    if (!this._isGameStoreContext()) return;
+    const gi = this._gameGroupIndex || 0;
+    const playersSlots = this._playersSlotsPayload();
+    gameStore.setGroupPlayersSlots(this.data.gameId, gi, playersSlots);
+    this._syncMatchStatePlayers(playersSlots);
+  },
+
   // 将当前本地 state 写入会话：个人比杆赛 → 出发表 groups；其他模式 → scoreSessions
   persistSession() {
-    if (this.data.mode === 'game' && this.data.gameId) {
-      // Game：逐球员写入该组持久化（刷新/重启可恢复，记分数据不丢失）
+    if (this._isGameStoreContext()) {
       const gi = this._gameGroupIndex || 0;
+      this._persistGameRoster();
       (this._playersSource || []).forEach((p) => {
         gameStore.setGroupPlayerScores(this.data.gameId, gi, p.playerId || p.id, p.scores, p.putts);
       });
+      if (this.data.mode === 'fourball_best') {
+        this._persistTeamScores();
+      }
       return;
     }
     if (this.data.mode === 'individual_stroke' && this.data.groupId) {
@@ -1268,7 +1495,7 @@ Page({
 
   // 回灌：个人比杆赛从 groups 读取；其他模式从 scoreSessions
   hydrateFromSession() {
-    if (this.data.mode === 'game' && this.data.gameId) {
+    if (this._isGameStoreContext()) {
       const group = gameStore.getGroup(this.data.gameId, this._gameGroupIndex || 0) || {};
       const scoresByPlayer = group.scoresByPlayer || {};
       let changed = false;
@@ -1509,7 +1736,103 @@ Page({
   },
 
   toggleSheet() {
-    this.setData({ showMoreSheet: !this.data.showMoreSheet });
+    const show = !this.data.showMoreSheet;
+    if (show) {
+      const panels = this._resolveMoreMenuForCurrentContext();
+      this.setData({ showMoreSheet: true, moreMenuItems: panels.moreMenuItems });
+      return;
+    }
+    this.setData({ showMoreSheet: false });
+  },
+
+  /** 仅重建 HOLE/PAR 显示；scores[0..17] 绑定记分格位置，禁止搬迁或清空 */
+  _syncHoleLayoutFromCourse(options) {
+    const opts = options || {};
+    const ctx = {};
+    const ms = this._matchState || this._readMatchState();
+
+    if (this.data.gameId) {
+      const game = gameStore.getGame(this.data.gameId);
+      if (game) {
+        ctx.courseId = game.courseId;
+        ctx.courseName = game.courseName;
+        ctx.front9Course = game.front9Course;
+        ctx.back9Course = game.back9Course;
+      }
+    } else if (this.data.mode === 'individual_stroke') {
+      const meta = groupsStore.getTournamentCourseMeta();
+      ctx.courseId = meta.courseId;
+      ctx.courseName = meta.courseName;
+      ctx.front9Course = meta.front9Course;
+      ctx.back9Course = meta.back9Course;
+    } else if (ms && ms.course) {
+      const c = ms.course;
+      ctx.courseId = c.courseId;
+      ctx.courseName = c.courseName;
+      ctx.front9Course = c.front9Course;
+      ctx.back9Course = c.back9Course;
+    }
+
+    const layout = holeLayout.resolveLayoutFromContext(ctx);
+    holeLayout.applyLayout(layout);
+
+    if (this.data.mode === 'individual_stroke') {
+      groupsStore.setHolePars(layout.holePars);
+    }
+
+    const patch = { columns: buildColumns() };
+
+    if (this.data.showScoreSheet) {
+      const hi = this.data.sheetHoleIndex;
+      if (hi >= 0 && hi < holeLayout.SCORE_CELL_COUNT) {
+        const cIdx = hi < 9 ? hi : hi + 1;
+        patch.sheetHoleLabel = columnLabels()[cIdx];
+        patch.sheetPar = holePars()[hi];
+        const p = (this._playersSource || [])[this.data.activePlayerIdx];
+        const raw = p && (p.scores || [])[hi];
+        if (isFilledScore(raw)) {
+          patch.panelScore = raw;
+          const putt = p.putts && p.putts[hi];
+          if (putt != null && putt !== '') patch.panelPutt = putt;
+        }
+        if (this.data.scorePanelMode === 'quick') {
+          patch.quickPanelScores = this._quickDefaultsForHole(hi, holePars()[hi]);
+        }
+      }
+    }
+
+    if (opts.refresh === false) {
+      this.setData(patch);
+    } else {
+      this.setData(patch, () => this.refreshPlayers());
+    }
+  },
+
+  openEditHalfSheet() {
+    this.setData({ halfSheetVisible: true });
+  },
+
+  closeHalfSheet() {
+    this.setData({ halfSheetVisible: false });
+  },
+
+  onHalfCourseConfirmed() {
+    this.persistSession();
+    const ms = halfCourseEdit.readMatchState();
+    if (ms) {
+      this._matchState = ms;
+      if (!this.data.gameId) {
+        this.buildGameContextFromMatchState(ms);
+      }
+    }
+    if (this.data.gameId) {
+      const game = gameStore.getGame(this.data.gameId);
+      if (game) {
+        this.buildGameContext(game);
+        this.setData({ 'match.course': game.courseName || '' });
+      }
+    }
+    this._syncHoleLayoutFromCourse();
   },
 
   onMoreMenuTap(e) {
@@ -1562,6 +1885,26 @@ Page({
           if (res.confirm) this._confirmCancelGame();
         }
       });
+      return;
+    }
+
+    if (label === '修改比赛') {
+      if (!this.data.gameId) {
+        wx.showToast({ title: '当前为演示模式', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({
+        url:
+          '/pages/create/normal/index?mode=edit&gameId=' +
+          encodeURIComponent(this.data.gameId) +
+          '&returnTo=score',
+        fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
+
+    if (label === '修改半场') {
+      this.openEditHalfSheet();
     }
   },
 
@@ -2150,12 +2493,12 @@ Page({
 
     const pIdx = Number(playerIdx);
 
-    const label = COLUMN_LABELS[cIdx];
+    const label = columnLabels()[cIdx];
     let holeIndex = 0;
     if (cIdx < 9) holeIndex = cIdx;
     else if (cIdx > 9 && cIdx < 19) holeIndex = cIdx - 1;
 
-    const par = HOLE_PARS[holeIndex];
+    const par = holePars()[holeIndex];
     const player = this.data.playersView[pIdx];
     const rawScore = player.scores[holeIndex];
     const hasScore = rawScore !== null && rawScore !== undefined && rawScore !== '';
@@ -2190,12 +2533,12 @@ Page({
   // 复用同一面板：技术面板逐组录入；快捷面板按组数渲染 N 个控件（不新增 UI 结构）。
   openTeamScoreInput(cIdx, groupIndex) {
     if (this._scoreEditBlocked()) return;
-    const label = COLUMN_LABELS[cIdx];
+    const label = columnLabels()[cIdx];
     let holeIndex = 0;
     if (cIdx < 9) holeIndex = cIdx;
     else if (cIdx > 9 && cIdx < 19) holeIndex = cIdx - 1;
 
-    const par = HOLE_PARS[holeIndex];
+    const par = holePars()[holeIndex];
     const groups = this._engineGroups || [];
     // 聚焦被点击的组（行级绑定）；越界则回退第一个未填组
     let active = groupIndex != null && groups[groupIndex] ? groupIndex : -1;
@@ -2496,8 +2839,8 @@ Page({
 
   _jumpSheetHole(holeIndex) {
     const { activePlayerIdx, playersView } = this.data;
-    const label = HOLE_PARS.length && (holeIndex < 9 ? COLUMN_LABELS[holeIndex] : COLUMN_LABELS[holeIndex + 1]);
-    const par = HOLE_PARS[holeIndex];
+    const label = holePars().length && (holeIndex < 9 ? columnLabels()[holeIndex] : columnLabels()[holeIndex + 1]);
+    const par = holePars()[holeIndex];
     const player = playersView[activePlayerIdx];
     const score = player.scores[holeIndex];
     const hasScore = isFilledScore(score);
