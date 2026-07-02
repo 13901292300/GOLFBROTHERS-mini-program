@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高尔夫江湖 - 普通球局创建</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'tour-blue': '#002D62',
+            'champion-gold': '#CE9224',
+            'data-blue': '#00AEEF',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans SC', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --tour-blue: #002D62;
+      --champion-gold: #CE9224;
+      --data-blue: #00AEEF;
+
+      --bg-primary: #000000;
+      --bg-card: #111111;
+      --bg-subtle: #0A0A0A;
+      --bg-hover: #1A1A1A;
+      --border: #222222;
+      --border-hover: #333333;
+
+      --text-primary: #F1F5F9;
+      --text-secondary: #E5E7F9;
+      --text-muted: #888888;
+      --text-disabled: #555555;
+
+      --error: #EF4444;
+      --shadow-card: none;
+    }
+
+    body.bright-mode {
+      --bg-primary: #FCFCFC;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F3F4F6;
+      --bg-hover: #F9FAFB;
+      --border: #E5E7EB;
+      --border-hover: #D1D5DB;
+
+      --text-primary: #002D62;
+      --text-secondary: #374151;
+      --text-muted: #6B7280;
+      --text-disabled: #9CA3AF;
+
+      --error: #DC2626;
+      --shadow-card: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background-color .3s, color .3s;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 448px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: var(--bg-primary);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Header: strict Design System */
+    .app-header {
+      height: 76px;
+      background: var(--tour-blue);
+      border-bottom: 2px solid var(--champion-gold);
+      color: #FFFFFF;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+
+    .header-left,
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-back {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      font-size: 20px;
+      border: 0;
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: #FFFFFF;
+      white-space: nowrap;
+    }
+
+    .theme-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.20);
+      background: rgba(255,255,255,.10);
+      color: var(--champion-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .mini-capsule {
+      height: 40px;
+      padding: 0 9px 0 11px;
+      border-radius: 9999px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.22);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .capsule-dots {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .capsule-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #FFFFFF;
+    }
+
+    .capsule-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255,255,255,.30);
+    }
+
+    .capsule-circle {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #FFFFFF;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .capsule-circle::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      background: #FFFFFF;
+    }
+
+    .content {
+      flex: 1;
+      padding: 16px;
+      padding-bottom: 100px;
+      overflow-y: auto;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+
+    .section-label h2 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .section-count {
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: var(--champion-gold);
+      white-space: nowrap;
+    }
+
+    .ds-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-card);
+      transition: all .3s ease;
+    }
+
+    .ds-field {
+      height: 64px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .field-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .field-value {
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 800;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .field-value.strong {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .field-value.italic {
+      font-style: italic;
+    }
+
+    .field-placeholder {
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 700;
+      font-style: italic;
+      color: var(--text-disabled);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .field-icon {
+      color: var(--champion-gold);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .group-card {
+min-height: 140px;
+  border-radius: 8px;
+
+      padding: 16px 12px 14px;
+      position: relative;
+      overflow: visible;
+    }
+
+    .group-card::before {
+  border-radius: 8px 8px 0 0;
+
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--tour-blue);
+      border-radius: 8px 8px 0 0;
+    }
+
+    .delete-group-btn {
+      position: absolute;
+      top: -11px;
+      right: -7px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-card);
+      background: var(--error);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,.16);
+    }
+
+    .player-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .player-slot {
+      min-width: 0;
+      text-align: center;
+    }
+
+    .avatar-shell {
+width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-subtle);
+      border: 2px dashed var(--border-hover);
+      color: var(--text-disabled);
+      overflow: hidden;
+    }
+
+    .avatar-shell.filled {
+      border-style: solid;
+      border-color: var(--champion-gold);
+      background: var(--bg-subtle);
+    }
+
+    .avatar-shell img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .avatar-plus {
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .player-name {
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 900;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-name.placeholder {
+      color: var(--text-disabled);
+      font-weight: 700;
+    }
+
+    .ds-btn-accent {
+      background: var(--champion-gold);
+      color: #FFFFFF;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all .15s ease;
+      border: none;
+      cursor: pointer;
+    }
+
+    .ds-btn-accent:active {
+      transform: scale(.98);
+    }.footer {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 448px;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+      background: var(--tour-blue);
+      border-top: 1px solid rgba(255,255,255,.12);
+      z-index: 30;
+    }
+
+    .start-btn {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--champion-gold);
+      color: #FFFFFF;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 700;
+      transition: all .15s ease;
+    }
+
+    .start-btn:active {
+      transform: scale(.98);
+    }
+  
+    .add-group-btn {
+      width: auto;
+      height: 36px;
+      margin-top: 12px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+      border-radius: 6px;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+
+    .add-group-btn .add-group-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border-hover);
+      color: var(--text-muted);
+      background: transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .add-group-btn:active {
+      transform: scale(.98);
+    }
+
+    .add-group-btn:hover .add-group-icon {
+      border-color: var(--text-muted);
+    }
+
+    /* Restore DS card top blue line: full-width 3px line clipped by card radius */
+    .group-card {
+      min-height: 144px !important;
+      border-radius: 16px !important;
+      padding-top: 30px !important;
+      padding-right: 34px !important;
+      padding-bottom: 10px !important;
+      padding-left: 12px !important;
+      position: relative !important;
+      overflow: hidden !important;
+    }
+
+    .group-card::before {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 3px !important;
+      background: var(--tour-blue) !important;
+      border-radius: 0 !important;
+      z-index: 1 !important;
+    }
+
+    .group-number {
+      top: 11px !important;
+      left: 14px !important;
+      color: var(--text-muted) !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      z-index: 2 !important;
+    }
+
+    .delete-group-btn {
+      top: 9px !important;
+      right: 9px !important;
+      width: 26px !important;
+      height: 26px !important;
+      border-width: 2px !important;
+      z-index: 3 !important;
+    }
+
+    .player-grid {
+      margin-top: 8px !important;
+      gap: 6px !important;
+      align-items: start !important;
+      position: relative !important;
+      z-index: 2 !important;
+    }
+
+    .avatar-shell {
+      width: 54px !important;
+      height: 54px !important;
+      margin-top: 0 !important;
+      margin-bottom: 7px !important;
+    }
+
+    .player-name {
+      font-size: 10px !important;
+      line-height: 1.15 !important;
+    }
+
+    /* Bottom sheet: game mode selection */
+    .game-mode-field {
+      cursor: pointer;
+    }
+
+    .sheet-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.46);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+      z-index: 80;
+    }
+
+    .sheet-mask.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translate(-50%, 105%);
+      width: 100%;
+      max-width: 448px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-bottom: 0;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -16px 36px rgba(0,0,0,.24);
+      padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
+      z-index: 90;
+      transition: transform .24s ease;
+    }
+
+    .bottom-sheet.show {
+      transform: translate(-50%, 0);
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      border-radius: 9999px;
+      background: var(--border-hover);
+      margin: 0 auto 14px;
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .sheet-overline {
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 900;
+      letter-spacing: .15em;
+      color: var(--data-blue);
+    }
+
+    .sheet-header h3 {
+      margin: 2px 0 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .sheet-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .game-mode-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .game-mode-option {
+      width: 100%;
+      min-height: 64px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      text-align: left;
+      transition: all .15s ease;
+    }
+
+    .game-mode-option:active {
+      transform: scale(.98);
+    }
+
+    .game-mode-option.active {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.10);
+    }
+
+    .mode-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
+    }
+
+    .mode-text {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .mode-text strong {
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .mode-text em {
+      font-size: 12px;
+      line-height: 1.3;
+      font-style: normal;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .mode-check {
+      color: var(--champion-gold);
+      font-size: 14px;
+      opacity: 0;
+      flex-shrink: 0;
+    }
+
+    .game-mode-option.active .mode-check {
+      opacity: 1;
+    }
+
+    /* Bottom sheet: wheel tee time picker */
+    .tee-time-field { cursor: pointer; }
+
+    .wheel-time-sheet {
+      padding-top: 10px !important;
+      padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .wheel-year-bar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .year-arrow {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .wheel-year-text {
+      font-size: 20px;
+      line-height: 1;
+      font-weight: 900;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wheel-title-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      height: 28px;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .wheel-picker {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      height: 170px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .wheel-picker::before,
+    .wheel-picker::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 48px;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .wheel-picker::before {
+      top: 0;
+      background: linear-gradient(to bottom, var(--bg-subtle), rgba(255,255,255,0));
+    }
+
+    .wheel-picker::after {
+      bottom: 0;
+      background: linear-gradient(to top, var(--bg-subtle), rgba(255,255,255,0));
+    }
+
+    .wheel-highlight {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 50%;
+      height: 40px;
+      transform: translateY(-50%);
+      border-top: 1px solid var(--border-hover);
+      border-bottom: 1px solid var(--border-hover);
+      background: rgba(206,146,36,.08);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .wheel-column {
+      position: relative;
+      z-index: 2;
+      height: 170px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      border-right: 1px solid var(--border);
+    }
+
+    .wheel-column:last-child { border-right: 0; }
+    .wheel-column::-webkit-scrollbar { display: none; }
+
+    .wheel-spacer {
+      height: 65px;
+      scroll-snap-align: start;
+      flex-shrink: 0;
+    }
+
+    .wheel-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wheel-item.active {
+      color: var(--champion-gold);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .sheet-confirm-btn {
+      width: 100%;
+      height: 48px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+
+    /* Round name editable input */
+    .round-name-input {
+      width: 100%;
+      height: 44px;
+      padding: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 18px;
+      line-height: 1.4;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .round-name-input::placeholder {
+      color: var(--text-disabled);
+      font-weight: 700;
+    }
+
+</style>
+</head>
+
+<body class="bright-mode">
+  <div class="page">
+    <header class="app-header">
+      <div class="header-left">
+        <button class="header-back" aria-label="返回">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <h1 class="header-title">普通创建</h1>
+      </div>
+
+      <div class="header-right">
+        <button class="theme-btn" onclick="toggleTheme()" aria-label="切换主题">
+          <i id="theme-icon" class="fas fa-moon"></i>
+        </button>
+        <div class="mini-capsule" aria-hidden="true">
+          <div class="capsule-dots"><span></span><span></span><span></span></div>
+          <div class="capsule-divider"></div>
+          <div class="capsule-circle"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="section">
+        <div class="section-label">
+          <h2>比赛名称</h2>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-main">
+            <input id="round-name-input" class="round-name-input" type="text" value="TIGERHOODS的球局" placeholder="请输入比赛名称" />
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>选择球场</h2>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-main">
+            <div class="field-placeholder">请选择球场...</div>
+          </div>
+          <i class="fas fa-chevron-right field-icon"></i>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>开球时间</h2>
+        </div>
+        <div class="ds-card ds-field tee-time-field" onclick="openTeeTimeSheet()">
+          <div class="field-main">
+            <div id="selected-tee-time" class="field-value italic">2026年05月04日 周一 09:40</div>
+          </div>
+          <i class="far fa-calendar-alt field-icon"></i>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>参赛组别 (至少一组)</h2>
+          <span class="section-count">第1组 1/4人</span>
+        </div>
+
+        <div id="group-list">
+          <div class="ds-card group-card" data-group-index="1">
+            <button class="delete-group-btn" aria-label="删除组别" onclick="deleteGroup(this)">
+              <i class="fas fa-times"></i>
+            </button>
+
+          <span class="group-number" style="position:absolute;top:8px;left:12px;font-size:12px;font-weight:700;color:#888;">第1组</span>
+<div class="player-grid">
+            <div class="player-slot">
+              <div class="avatar-shell filled">
+                <img alt="TigerHoods" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80">
+              </div>
+              <div class="player-name">TIGERHOODS</div>
+            </div>
+
+            <div class="player-slot">
+              <div class="avatar-shell">
+                <span class="avatar-plus">+</span>
+              </div>
+              <div class="player-name placeholder">玩家2</div>
+            </div>
+
+            <div class="player-slot">
+              <div class="avatar-shell">
+                <span class="avatar-plus">+</span>
+              </div>
+              <div class="player-name placeholder">玩家3</div>
+            </div>
+
+            <div class="player-slot">
+              <div class="avatar-shell">
+                <span class="avatar-plus">+</span>
+              </div>
+              <div class="player-name placeholder">玩家4</div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <button class="add-group-btn" onclick="addGroup()">
+          <span class="add-group-icon"><i class="fas fa-plus"></i></span>
+          <span>添加新组</span>
+        </button>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>选择赛制</h2>
+        </div>
+        <div class="ds-card ds-field game-mode-field" onclick="openGameModeSheet()">
+          <div class="field-main">
+            <div id="selected-game-mode" class="field-value italic">个人比杆赛</div>
+          </div>
+          <i class="fas fa-chevron-right field-icon"></i>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" style="background:transparent;">
+      <button class="start-btn">开始记分</button>
+    </footer>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('bright-mode');
+      const icon = document.getElementById('theme-icon');
+      const isBright = document.body.classList.contains('bright-mode');
+      icon.classList.toggle('fa-moon', isBright);
+      icon.classList.toggle('fa-sun', !isBright);
+    }
+  </script>
+
+<script>
+function updateDeleteButtons() {
+  const groupCards = document.querySelectorAll('.group-card');
+  groupCards.forEach((card, idx) => {
+    const deleteBtn = card.querySelector('.delete-group-btn');
+    if (!deleteBtn) return;
+    // 只有当组数 >=2 时才显示删除按钮
+    deleteBtn.style.display = groupCards.length >= 2 ? 'flex' : 'none';
+  });
+}
+// 初次加载
+document.addEventListener('DOMContentLoaded', updateDeleteButtons);
+// 以后新增组后可调用 updateDeleteButtons() 更新状态
+</script>
+
+
+
+
+
+<script>
+function getGroupList() {
+  return document.getElementById('group-list');
+}
+
+function buildEmptySlotMarkup(label) {
+  return `
+    <div class="avatar-shell">
+      <span class="avatar-plus">+</span>
+    </div>
+    <div class="player-name placeholder">${label}</div>
+  `;
+}
+
+function resetCardToEmptyGroup(card) {
+  const playerSlots = card.querySelectorAll('.player-slot');
+  playerSlots.forEach((slot, idx) => {
+    slot.innerHTML = buildEmptySlotMarkup(`玩家${idx + 1}`);
+  });
+}
+
+function refreshGroupLabels() {
+  const groupCards = document.querySelectorAll('#group-list .group-card');
+  groupCards.forEach((card, idx) => {
+    let groupNumber = card.querySelector('.group-number');
+    if (!groupNumber) {
+      groupNumber = document.createElement('span');
+      groupNumber.className = 'group-number';
+      card.insertBefore(groupNumber, card.firstChild);
+    }
+    groupNumber.textContent = `第${idx + 1}组`;
+    card.dataset.groupIndex = String(idx + 1);
+  });
+
+  const sectionCount = document.querySelector('.section-count');
+  if (sectionCount) {
+    sectionCount.textContent = groupCards.length === 1 ? '第1组 1/4人' : `共${groupCards.length}组`;
+  }
+}
+
+function updateDeleteButtons() {
+  const groupCards = document.querySelectorAll('#group-list .group-card');
+  groupCards.forEach((card) => {
+    const deleteBtn = card.querySelector('.delete-group-btn');
+    if (!deleteBtn) return;
+    deleteBtn.style.display = groupCards.length >= 2 ? 'flex' : 'none';
+  });
+}
+
+function addGroup() {
+  const groupList = getGroupList();
+  if (!groupList) return;
+
+  const firstCard = groupList.querySelector('.group-card');
+  if (!firstCard) return;
+
+  const newCard = firstCard.cloneNode(true);
+  resetCardToEmptyGroup(newCard);
+
+  const deleteBtn = newCard.querySelector('.delete-group-btn');
+  if (deleteBtn) {
+    deleteBtn.setAttribute('onclick', 'deleteGroup(this)');
+  }
+
+  groupList.appendChild(newCard);
+
+  refreshGroupLabels();
+  updateDeleteButtons();
+}
+
+function deleteGroup(btn) {
+  const card = btn.closest('.group-card');
+  if (!card) return;
+
+  const groupCards = document.querySelectorAll('#group-list .group-card');
+  if (groupCards.length <= 1) return;
+
+  card.remove();
+  refreshGroupLabels();
+  updateDeleteButtons();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  refreshGroupLabels();
+  updateDeleteButtons();
+});
+</script>
+
+
+  <div id="game-mode-mask" class="sheet-mask" onclick="closeGameModeSheet()"></div>
+  <div id="game-mode-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="选择赛制">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="sheet-overline">GAME MODE</div>
+        <h3>选择赛制</h3>
+      </div>
+      <button class="sheet-close" onclick="closeGameModeSheet()" aria-label="关闭">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="game-mode-list">
+      <button class="game-mode-option active" onclick="selectGameMode('个人比杆赛', this)">
+        <span class="mode-icon"><i class="fas fa-user"></i></span>
+        <span class="mode-text">
+          <strong>个人比杆赛</strong>
+          <em>每位球员独立记分，按总杆排名</em>
+        </span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option" onclick="selectGameMode('最好成绩赛', this)">
+        <span class="mode-icon"><i class="fas fa-star"></i></span>
+        <span class="mode-text">
+          <strong>最好成绩赛</strong>
+          <em>每洞取队内最好成绩</em>
+        </span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option" onclick="selectGameMode('最佳球位赛', this)">
+        <span class="mode-icon"><i class="fas fa-location-dot"></i></span>
+        <span class="mode-text">
+          <strong>最佳球位赛</strong>
+          <em>选择最佳落点继续击球</em>
+        </span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option" onclick="selectGameMode('四人两球赛', this)">
+        <span class="mode-icon"><i class="fas fa-people-group"></i></span>
+        <span class="mode-text">
+          <strong>四人两球赛</strong>
+          <em>两人一队，每队使用一颗球</em>
+        </span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+    </div>
+  </div>
+
+
+<script>
+function openGameModeSheet() {
+  const mask = document.getElementById('game-mode-mask');
+  const sheet = document.getElementById('game-mode-sheet');
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+}
+
+function closeGameModeSheet() {
+  const mask = document.getElementById('game-mode-mask');
+  const sheet = document.getElementById('game-mode-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function selectGameMode(mode, btn) {
+  const selected = document.getElementById('selected-game-mode');
+  if (selected) selected.textContent = mode;
+
+  document.querySelectorAll('.game-mode-option').forEach(option => {
+    option.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+
+  closeGameModeSheet();
+}
+</script>
+
+
+  
+  <div id="tee-time-mask" class="sheet-mask" onclick="closeTeeTimeSheet()"></div>
+  <div id="tee-time-sheet" class="bottom-sheet tee-time-sheet wheel-time-sheet" role="dialog" aria-modal="true" aria-label="选择开球时间">
+    <div class="sheet-handle"></div>
+
+    <div class="wheel-year-bar">
+      <button class="year-arrow" onclick="changeTeeYear(-1)" aria-label="上一年">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <div class="wheel-year-text"><span id="tee-year-value">2026</span>年</div>
+      <button class="year-arrow" onclick="changeTeeYear(1)" aria-label="下一年">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+
+    <div class="wheel-title-row">
+      <span>月</span>
+      <span>日</span>
+      <span>时</span>
+      <span>分</span>
+    </div>
+
+    <div class="wheel-picker">
+      <div class="wheel-highlight"></div>
+      <div class="wheel-column" id="month-wheel"></div>
+      <div class="wheel-column" id="day-wheel"></div>
+      <div class="wheel-column" id="hour-wheel"></div>
+      <div class="wheel-column" id="minute-wheel"></div>
+    </div>
+
+    <button class="sheet-confirm-btn" onclick="confirmTeeTime()">确认时间</button>
+  </div>
+
+
+
+
+
+<script>
+const teeState = { year: 2026, month: 5, day: 4, hour: 9, minute: 40 };
+const weekNames = ['周日','周一','周二','周三','周四','周五','周六'];
+
+function pad2(num) {
+  return String(num).padStart(2, '0');
+}
+
+function getDaysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function getWeekday(year, month, day) {
+  return weekNames[new Date(year, month - 1, day).getDay()];
+}
+
+function buildWheel(columnId, values, currentValue, formatter) {
+  const column = document.getElementById(columnId);
+  if (!column) return;
+
+  column.innerHTML =
+    '<div class="wheel-spacer"></div>' +
+    values.map(value => {
+      const active = value === currentValue ? ' active' : '';
+      return `<div class="wheel-item${active}" data-value="${value}">${formatter(value)}</div>`;
+    }).join('') +
+    '<div class="wheel-spacer"></div>';
+
+  column.querySelectorAll('.wheel-item').forEach(item => {
+    item.addEventListener('click', () => {
+      setWheelValue(columnId, Number(item.dataset.value));
+    });
+  });
+
+  requestAnimationFrame(() => scrollWheelToValue(columnId, currentValue, false));
+}
+
+function scrollWheelToValue(columnId, value, smooth) {
+  const column = document.getElementById(columnId);
+  if (!column) return;
+  const item = column.querySelector(`.wheel-item[data-value="${value}"]`);
+  if (!item) return;
+  const targetTop = item.offsetTop - column.clientHeight / 2 + item.clientHeight / 2;
+  column.scrollTo({ top: targetTop, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function updateWheelActive(columnId, value) {
+  const column = document.getElementById(columnId);
+  if (!column) return;
+  column.querySelectorAll('.wheel-item').forEach(item => {
+    item.classList.toggle('active', Number(item.dataset.value) === value);
+  });
+}
+
+function setWheelValue(columnId, value) {
+  const map = {
+    'month-wheel': 'month',
+    'day-wheel': 'day',
+    'hour-wheel': 'hour',
+    'minute-wheel': 'minute'
+  };
+  const key = map[columnId];
+  if (!key) return;
+
+  teeState[key] = value;
+
+  if (key === 'month') {
+    const maxDay = getDaysInMonth(teeState.year, teeState.month);
+    if (teeState.day > maxDay) teeState.day = maxDay;
+    buildDayWheel();
+  }
+
+  updateWheelActive(columnId, value);
+  scrollWheelToValue(columnId, value, true);
+}
+
+function bindWheelScroll(columnId) {
+  const column = document.getElementById(columnId);
+  if (!column || column.dataset.bound === '1') return;
+  column.dataset.bound = '1';
+
+  let timer = null;
+  column.addEventListener('scroll', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const items = Array.from(column.querySelectorAll('.wheel-item'));
+      if (!items.length) return;
+
+      const center = column.scrollTop + column.clientHeight / 2;
+      let closest = items[0];
+      let minDistance = Infinity;
+
+      items.forEach(item => {
+        const itemCenter = item.offsetTop + item.clientHeight / 2;
+        const distance = Math.abs(itemCenter - center);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closest = item;
+        }
+      });
+
+      setWheelValue(columnId, Number(closest.dataset.value));
+    }, 100);
+  });
+}
+
+function buildDayWheel() {
+  const days = Array.from({ length: getDaysInMonth(teeState.year, teeState.month) }, (_, i) => i + 1);
+  buildWheel('day-wheel', days, teeState.day, value => pad2(value));
+  bindWheelScroll('day-wheel');
+}
+
+function buildTeeTimeWheels() {
+  const yearEl = document.getElementById('tee-year-value');
+  if (yearEl) yearEl.textContent = teeState.year;
+
+  buildWheel('month-wheel', Array.from({ length: 12 }, (_, i) => i + 1), teeState.month, value => pad2(value));
+  buildDayWheel();
+  buildWheel('hour-wheel', Array.from({ length: 24 }, (_, i) => i), teeState.hour, value => pad2(value));
+  buildWheel('minute-wheel', [0, 10, 20, 30, 40, 50], teeState.minute, value => pad2(value));
+
+  ['month-wheel','day-wheel','hour-wheel','minute-wheel'].forEach(bindWheelScroll);
+}
+
+function changeTeeYear(delta) {
+  teeState.year += delta;
+  const maxDay = getDaysInMonth(teeState.year, teeState.month);
+  if (teeState.day > maxDay) teeState.day = maxDay;
+  buildTeeTimeWheels();
+}
+
+function openTeeTimeSheet() {
+  const mask = document.getElementById('tee-time-mask');
+  const sheet = document.getElementById('tee-time-sheet');
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+  requestAnimationFrame(buildTeeTimeWheels);
+}
+
+function closeTeeTimeSheet() {
+  const mask = document.getElementById('tee-time-mask');
+  const sheet = document.getElementById('tee-time-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function confirmTeeTime() {
+  const selected = document.getElementById('selected-tee-time');
+  const weekday = getWeekday(teeState.year, teeState.month, teeState.day);
+  if (selected) {
+    selected.textContent = `${teeState.year}年${pad2(teeState.month)}月${pad2(teeState.day)}日 ${weekday} ${pad2(teeState.hour)}:${pad2(teeState.minute)}`;
+  }
+  closeTeeTimeSheet();
+}
+
+document.addEventListener('DOMContentLoaded', buildTeeTimeWheels);
+</script>
+
+</body>
+</html>

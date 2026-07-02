@@ -1,0 +1,6 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "discussion": "/components/discussion/index"
+  }
+}

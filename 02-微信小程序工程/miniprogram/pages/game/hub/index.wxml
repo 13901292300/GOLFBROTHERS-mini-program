@@ -1,0 +1,276 @@
+<view class="detail-page {{themeClass}}" bindtap="onPageTap">
+  <!-- Header -->
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">GAME HUB</text>
+          <text class="gb-header__title">{{roundName}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="detail-scroll" scroll-y="{{scrollEnabled}}" bindscroll="onScroll">
+    <!-- HEADER 与 TAB 直连：Game 概要信息统一在「游戏」TAB 内展示，此处不再插入信息栏 -->
+    <!-- Tabs（流内） -->
+    <view class="tab-scroll-wrap">
+      <scroll-view class="gb-tabs" scroll-x enable-flex>
+        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+        <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+        <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      </scroll-view>
+    </view>
+
+    <!-- 讨论区改由页面根级 .ds-fullscreen 复用统一组件渲染，此处不再插入围观行 -->
+
+    <view class="detail-main {{activeTab === 'interaction' ? 'detail-main--flush' : ''}}">
+
+      <!-- 领先榜 -->
+      <block wx:if="{{activeTab === 'leaderboard'}}">
+        <view class="leaderboard-table-wrap">
+          <view class="leaderboard-head">
+            <text class="lh-pos">POS</text>
+            <text class="lh-player">PLAYER</text>
+            <text class="lh-thru">THRU</text>
+            <text class="lh-total">TOTAL</text>
+          </view>
+          <view wx:if="{{leaderboard.length === 0}}" class="hub-empty">暂无成绩</view>
+
+          <block wx:for="{{leaderboard}}" wx:key="rowId">
+            <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row">
+              <text class="lr-pos pos-cell">{{item.pos}}</text>
+              <view class="lr-player">
+                <text class="player-name">{{item.name}}</text>
+                <text wx:if="{{!item.isTeam}}" class="gender-icon {{item.isFemale ? 'gender-f' : 'gender-m'}}">{{item.isFemale ? '♀' : '♂'}}</text>
+              </view>
+              <text class="lr-thru">{{item.thru}}</text>
+              <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
+            </view>
+
+            <view wx:if="{{item.expanded}}" class="scorecard-row">
+              <!-- 组合：每名成员完整身份（与个人展开面板同一组件） -->
+              <view wx:if="{{item.isTeam}}" class="sc-team-stack-wrap">
+                <leaderboard-player-identity
+                  wx:for="{{item.members}}"
+                  wx:for-item="mem"
+                  wx:key="playerId"
+                  player="{{mem}}"
+                  followed="{{followMap[mem.playerId]}}"
+                  is-self="{{mem.playerId === currentUserId}}"
+                  bind:follow="onLeaderboardFollow"
+                />
+              </view>
+
+              <!-- 个人：资料卡（与个人比杆赛展开面板同一组件） -->
+              <leaderboard-player-identity
+                wx:else
+                player="{{item.player}}"
+                followed="{{followMap[item.playerId]}}"
+                is-self="{{item.playerId === currentUserId}}"
+                bind:follow="onLeaderboardFollow"
+              />
+
+              <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+                <text class="sc-course course-name-title">{{courseName}}</text>
+
+                <view class="tour-scorecard">
+                  <view class="tsc-row tsc-head">
+                    <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view class="tour-scorecard">
+                  <view class="tsc-row tsc-head">
+                    <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view class="score-legend-area">
+                  <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                </view>
+                <image class="sc-ad" src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85" mode="widthFix"></image>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
+
+      <!-- 分组表：结构与「球队比赛 → 出发表」完全一致（整卡点击进入对应组记分页，无额外入口） -->
+      <view wx:if="{{activeTab === 'group'}}" class="tee-sheet-list">
+        <view wx:for="{{groupCards}}" wx:key="groupId" bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="tee-group-card {{index === 0 ? 'js-first-tee-group' : ''}}">
+          <view class="tee-group-meta">
+            <text class="tee-group-badge">{{item.name}}</text>
+          </view>
+          <view class="tee-player-grid">
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="tee-player">
+              <view class="tee-avatar-wrap">
+                <image class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
+              </view>
+              <text class="tee-player-name">{{pl.name}}</text>
+              <text wx:if="{{pl.team}}" class="{{pl.teamClass}}">{{pl.team}}</text>
+            </view>
+          </view>
+          <text class="tee-status">{{item.statusText}}</text>
+        </view>
+      </view>
+
+      <!-- 讨论区内容由页面根级 .ds-fullscreen 统一组件承载，scroll 容器内不再渲染聊天 -->
+
+      <!-- 游戏 -->
+      <block wx:if="{{activeTab === 'game'}}">
+        <view class="ds-card info-card">
+          <view class="info-row"><text class="info-row-label">状态</text><text class="info-row-value">{{statusText}}</text></view>
+          <view class="info-row"><text class="info-row-label">球场</text><text class="info-row-value">{{courseName}}</text></view>
+          <view class="info-row"><text class="info-row-label">赛制</text><text class="info-row-value">{{gameFormat}}</text></view>
+          <view class="info-row"><text class="info-row-label">分组</text><text class="info-row-value">{{groupCards.length}} 组</text></view>
+        </view>
+
+        <view class="hub-section-title">按组继续记分</view>
+        <view wx:for="{{groupCards}}" wx:key="groupId" class="hub-game-row">
+          <view class="hub-game-row__left">
+            <text class="hub-game-row__name">{{item.name}}</text>
+            <text class="hub-group-status hub-group-status--{{item.status}}">{{item.statusText}} · {{item.playerCount}}人</text>
+          </view>
+          <view bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="hub-enter-btn">进入记分</view>
+        </view>
+      </block>
+
+    </view>
+  </scroll-view>
+
+  <!-- 吸顶 TAB（讨论区时围观行随 TAB 一同吸附，构成 TAB + 围观行同一吸附体系） -->
+  <view wx:if="{{tabFixed}}" class="tab-scroll-wrap tab-scroll-wrap--fixed" style="top:{{headerTotalHeight}}px;">
+    <scroll-view class="gb-tabs" scroll-x enable-flex>
+      <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+      <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+      <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
+      <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+    </scroll-view>
+  </view>
+
+  <!-- 讨论区全屏层：TAB（固定）+ 统一讨论区组件（围观/聊天/输入自包含）。与球队比赛完全一致的复用方式 -->
+  <view wx:if="{{activeTab === 'interaction'}}" class="ds-fullscreen" style="top:{{headerTotalHeight}}px;">
+    <view class="tab-scroll-wrap">
+      <scroll-view class="gb-tabs" scroll-x enable-flex>
+        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+        <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+        <view bindtap="switchTab" data-tab="interaction" class="tab-btn active">讨论区</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      </scroll-view>
+    </view>
+    <discussion
+      class="ds-fill"
+      watchers="{{watchers}}"
+      messages="{{chat}}"
+      theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
+    ></discussion>
+  </view>
+
+  <!-- 分组表 TAB 底部快捷入口：与「出发表」完全一致（透明悬浮、第一组完全进入视口时出现、点击进入自己小组） -->
+  <view
+    wx:if="{{activeTab === 'group' && quickEntryVisible}}"
+    bindtap="onEnterMyGroup"
+    class="tee-quick-entry-float"
+  >快速进入自己的小组 ›</view>
+
+  <!-- MORE FAB（与球队比赛完全一致） -->
+  <view
+    wx:if="{{activeTab !== 'interaction'}}"
+    catchtap="onMoreFabTap"
+    bindtouchstart="onMoreFabTouchStart"
+    bindtouchmove="onMoreFabTouchMove"
+    bindtouchend="onMoreFabTouchEnd"
+    bindtouchcancel="onMoreFabTouchEnd"
+    class="leaderboard-fab {{moreFabExpanded ? 'leaderboard-fab--expanded' : ''}} {{moreFabDragging ? 'leaderboard-fab--dragging' : ''}} {{moreFabHitTarget ? 'leaderboard-fab--hit' : ''}}"
+    style="{{fabStyle}}"
+  >
+    <text class="fab-label">{{moreFabExpanded ? 'MORE' : 'M'}}</text>
+  </view>
+
+  <!-- 更多功能 bottom sheet（100% 复用球队比赛结构/样式/动画） -->
+  <view wx:if="{{showMoreSheet}}" bindtap="closeMoreSheet" class="sheet-overlay"></view>
+  <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="feature-section">
+      <view class="feature-section-title"><text class="fst-main">常用功能</text><text class="fst-sub">普通用户可用</text></view>
+      <view class="feature-grid">
+        <view wx:for="{{featuresCommon}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+          <view class="feature-icon"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="feature-section">
+      <view class="feature-section-title"><text class="fst-main">管理功能</text><text class="fst-sub">需权限</text></view>
+      <view class="feature-grid">
+        <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="sheet-cancel-wrap">
+      <view bindtap="closeMoreSheet" class="sheet-cancel-btn">取 消</view>
+    </view>
+  </view>
+
+  <!-- 风格选择 sheet（由「风格选择」功能项打开，与球队比赛一致） -->
+  <view wx:if="{{showStyleSheet}}" bindtap="closeStyleSheet" class="sheet-overlay"></view>
+  <view class="style-sheet {{showStyleSheet ? 'active' : ''}}" catchtap="stopPropagation">
+    <view class="style-sheet__head">
+      <view>
+        <text class="style-sheet__title">风格选择</text>
+        <text class="style-sheet__sub">这些设置会影响所有记分相关页面。</text>
+      </view>
+      <view bindtap="closeStyleSheet" class="style-sheet__close">✕</view>
+    </view>
+    <view class="style-section">
+      <text class="style-section-title">记分显示</text>
+      <view class="style-option-row">
+        <view bindtap="setScoringDisplay" data-value="gross" class="style-option {{scoringDisplay === 'gross' ? 'active' : ''}}">总杆记分</view>
+        <view bindtap="setScoringDisplay" data-value="strokeDiff" class="style-option {{scoringDisplay === 'strokeDiff' ? 'active' : ''}}">杆差记分</view>
+      </view>
+    </view>
+    <view class="style-section">
+      <text class="style-section-title">记分面板</text>
+      <view class="style-option-row">
+        <view bindtap="setScorePanel" data-value="technical" class="style-option {{scorePanel === 'technical' ? 'active' : ''}}">技术面板</view>
+        <view bindtap="setScorePanel" data-value="quick" class="style-option {{scorePanel === 'quick' ? 'active' : ''}}">快捷面板</view>
+      </view>
+    </view>
+    <view class="style-done-wrap">
+      <view bindtap="closeStyleSheet" class="style-done-btn">完成</view>
+    </view>
+  </view>
+</view>

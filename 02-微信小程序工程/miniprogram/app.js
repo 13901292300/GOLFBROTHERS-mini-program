@@ -1,0 +1,49 @@
+// app.js
+const THEME_KEY = 'gb-theme';
+
+function normalizeTheme(theme) {
+  return theme === 'dark' ? 'dark' : 'bright';
+}
+
+App({
+  globalData: {
+    // env 参数说明：
+    // env 参数决定接下来小程序发起的云开发调用（wx.cloud.xxx）会请求到哪个云环境的资源
+    // 此处请填入环境 ID, 环境 ID 可在微信开发者工具右上顶部工具栏点击云开发按钮打开获取
+    env: "",
+    // 全局唯一主题状态：'bright' | 'dark'（仅首页可写）
+    theme: 'bright'
+  },
+
+  onLaunch: function () {
+    this.globalData.theme = this.getTheme();
+
+    if (!wx.cloud) {
+      console.error("请使用 2.2.3 或以上的基础库以使用云能力");
+    } else {
+      wx.cloud.init({
+        env: this.globalData.env,
+        traceUser: true,
+      });
+    }
+  },
+
+  // 读取全局主题（带持久化兜底）
+  getTheme: function () {
+    try {
+      return normalizeTheme(wx.getStorageSync(THEME_KEY));
+    } catch (e) {
+      return 'bright';
+    }
+  },
+
+  // 写入全局主题（唯一写入口，仅首页调用）
+  setTheme: function (theme) {
+    theme = normalizeTheme(theme);
+    this.globalData.theme = theme;
+    try {
+      wx.setStorageSync(THEME_KEY, theme);
+    } catch (e) {}
+    return theme;
+  }
+});

@@ -1,0 +1,117 @@
+/* 复用赛事详情页统一样式（Header / TAB 吸顶 / 领先榜 / 分组卡 / 讨论区 / ds-card 等） */
+@import "../../tournament/detail/index.wxss";
+
+/* ===== Game Hub 专属 ===== */
+
+/* 分组表「空间约束型滚动」：
+   1) 去除赛事详情页为吸顶强制的 min-height（该 min-height 会把内容撑高，导致分组少时仍可无意义滚动）；
+      改为内容自然高度 → 内容 ≤ 视口时 scroll-view 原生不可滚动，内容 > 视口时才滚动（配合 JS scrollEnabled 显式约束）。
+   2) padding-bottom 预留底部「快速进入自己小组」按钮占位高度（按钮 96rpx + 底距 24rpx + 安全区 + 间隙），
+      使滚动到底时最后一组卡片恰好停在按钮上方，不被遮挡（即 maxScrollTop = listH -(viewportH - buttonH)）。 */
+.tee-sheet-list {
+  min-height: 0;
+  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
+}
+
+.hub-summary {
+  padding: 16px 16px 8px;
+  background: var(--bg-card);
+}
+.hub-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.hub-summary__course {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hub-status-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-on-dark);
+  background: var(--champion-gold);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+.hub-empty {
+  padding: 28px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* 组合展开：多名球员纵向叠放完整 scorecard-profile */
+.sc-team-stack-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 分组状态标签（游戏 TAB「按组继续记分」行使用） */
+.hub-group-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.hub-group-status--not_started {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+.hub-group-status--in_progress {
+  color: var(--text-on-dark);
+  background: var(--data-blue);
+}
+.hub-group-status--finished {
+  color: var(--text-on-dark);
+  background: var(--champion-gold);
+}
+
+/* 游戏 TAB：按组继续记分 */
+.hub-section-title {
+  margin: 18px 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.hub-game-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.hub-game-row__left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hub-game-row__name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.hub-enter-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-on-dark);
+  background: var(--data-blue);
+  padding: 8px 18px;
+  border-radius: 999px;
+}

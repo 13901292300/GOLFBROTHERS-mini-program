@@ -1,0 +1,24 @@
+<view class="scorecard-profile">
+  <view class="sc-profile-left">
+    <view class="sc-avatar-wrap">
+      <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
+      <view wx:if="{{player.flag}}" class="sc-flag">
+        <image src="https://flagcdn.com/w40/{{player.flag}}.png" mode="aspectFill"></image>
+      </view>
+    </view>
+    <view class="sc-profile-meta">
+      <view class="sc-name-line">
+        <text class="sc-name">{{player.name}}</text>
+        <text class="sc-chevron">›</text>
+      </view>
+      <view class="sc-sub">
+        COUNTRY: <text class="sc-sub-strong">{{player.country || '—'}}</text>　AGE: <text class="sc-sub-strong">{{player.age || '—'}}</text>
+      </view>
+    </view>
+  </view>
+  <view
+    wx:if="{{!isSelf}}"
+    catchtap="onFollowTap"
+    class="sc-follow-btn {{followed ? 'sc-follow-btn--followed' : ''}}"
+  >{{followed ? '已关注' : '加关注'}}</view>
+</view>

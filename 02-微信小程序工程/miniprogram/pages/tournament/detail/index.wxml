@@ -1,0 +1,397 @@
+<view class="detail-page {{themeClass}}" bindtap="onPageTap">
+
+  <!-- 讨论区围观行模板（流内 + 吸顶克隆共用） -->
+  <template name="discussionWatchersStrip">
+    <scroll-view class="ds-watchers-strip" scroll-x>
+      <view class="ds-watchers-track">
+        <text class="ds-watchers-label">围观</text>
+        <view
+          wx:for="{{watchers}}"
+          wx:key="name"
+          class="ds-watchers-avatar"
+          data-userid="{{item.userId}}"
+          data-name="{{item.name}}"
+          bindtouchstart="onWatcherAvatarTouchStart"
+          bindtouchmove="onWatcherAvatarTouchMove"
+          bindtouchend="onWatcherAvatarTouchEnd"
+          bindtouchcancel="onWatcherAvatarTouchEnd"
+        >
+          <image class="ds-watchers-avatar__img" src="{{item.avatar}}" mode="aspectFill"></image>
+        </view>
+        <view class="ds-watchers-more" bindtap="openWatchers">更多 ›</view>
+      </view>
+    </scroll-view>
+  </template>
+
+  <!-- Header -->
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TOURNAMENT</text>
+          <text class="gb-header__title">赛事详情</text>
+        </view>
+      </view>
+      <!-- 右侧不绘制假胶囊：真实微信胶囊避让由 headerBarStyle 的 padding-right 保证 -->
+    </view>
+  </view>
+
+  <scroll-view class="detail-scroll" scroll-y scroll-into-view="{{scrollToTopView}}" bindscroll="onScroll">
+    <!-- 顶部哨兵：切 TAB 时滚动回此处，确保每个 TAB 从「信息区域」开始，吸顶仅由后续 scroll 触发 -->
+    <view id="ds-page-top"></view>
+    <!-- Hero -->
+    <view class="hero-wrap">
+      <view class="hero">
+        <image class="hero__img" src="https://cdn.screenshottocode.com/uV3Ftwc20Ey3qt6GC34JR.jpg" mode="aspectFill"></image>
+        <view class="hero__overlay"></view>
+        <view class="registered-chip">已报名</view>
+      </view>
+      <view class="event-logo-wrap">
+        <view class="event-logo"><text class="event-logo__ball">⛳</text></view>
+      </view>
+    </view>
+
+    <!-- Event Intro -->
+    <view class="event-intro">
+      <text class="event-date">May 18 2026</text>
+      <view class="event-title">
+        <text class="event-title__line">星途 · 新西兰旅行者挑战赛</text>
+        <text class="event-title__line">2026 江湖业余球员巡回赛第五站</text>
+      </view>
+      <view class="meta-chip-row">
+        <view class="meta-chip">📅 18洞个人比杆赛</view>
+        <view class="meta-chip">👥 球队赛</view>
+      </view>
+
+      <view class="ds-card info-card">
+        <view class="info-row"><text class="info-row-label">主办</text><text class="info-row-value">江湖业余球员巡回赛组委会</text></view>
+        <view class="info-row"><text class="info-row-label">球场</text><text class="info-row-value">北京清河湾高尔夫乡村俱乐部 A&B</text></view>
+        <view class="info-row"><text class="info-row-label">价格</text><text class="info-row-value">1680元</text></view>
+      </view>
+    </view>
+
+    <!-- Divider -->
+    <view class="section-divider"><text class="section-divider__text">赛事组织</text></view>
+
+    <!-- Tabs（始终在流内，滚动到顶时由外层固定克隆接管吸顶） -->
+    <view class="tab-scroll-wrap tab-scroll-wrap--inflow">
+      <scroll-view class="gb-tabs" scroll-x enable-flex bindscroll="onTabHScroll">
+        <view bindtap="switchTab" data-tab="details" class="tab-btn {{activeTab === 'details' ? 'active' : ''}}">赛事详情</view>
+        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+        <view bindtap="switchTab" data-tab="tee-sheet" class="tab-btn {{activeTab === 'tee-sheet' ? 'active' : ''}}">出发表</view>
+        <view bindtap="switchTab" data-tab="discussion" class="tab-btn {{activeTab === 'discussion' ? 'active' : ''}}">讨论区</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      </scroll-view>
+      <view wx:if="{{tabShowLeftIndicator}}" class="tab-overflow-hint tab-overflow-hint--left" aria-hidden="true"><text class="tab-overflow-hint__chev">‹</text></view>
+      <view wx:if="{{tabShowRightIndicator}}" class="tab-overflow-hint tab-overflow-hint--right" aria-hidden="true"><text class="tab-overflow-hint__chev">›</text></view>
+    </view>
+
+    <!-- 围观行（讨论 TAB）：独立层，紧随 TAB 之后，二级吸顶 -->
+    <view
+      wx:if="{{activeTab === 'discussion'}}"
+      class="ds-watchers-wrap ds-watchers-wrap--inflow {{themeClass === 'dark-mode' ? 'ds-watchers--dark' : 'ds-watchers--bright'}}"
+    >
+      <template is="discussionWatchersStrip" data="{{watchers: watchers}}" />
+    </view>
+
+    <!-- Content -->
+    <view class="detail-main {{activeTab === 'discussion' ? 'detail-main--flush' : ''}}">
+
+      <!-- 赛事详情 -->
+      <block wx:if="{{activeTab === 'details'}}">
+        <view class="ad-image"><image src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85" mode="aspectFill" class="ad-image__img ad-image__img--sm"></image></view>
+        <view class="ds-card pad-card">
+          <view class="card-head"><text class="card-title">赛事规则</text><text class="card-kicker">RULES</text></view>
+          <text class="card-text">本次比赛采用国际高尔夫球联合会最新颁布的《高尔夫球规则》以及竞赛委员会制定的"比赛条件"和"当地规则"。比赛为单轮18洞个人比杆赛。</text>
+        </view>
+        <view class="ad-image"><image src="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=900&q=85" mode="aspectFill" class="ad-image__img ad-image__img--lg"></image></view>
+        <view class="ds-card pad-card">
+          <view class="card-head"><text class="card-title">参赛须知</text><text class="card-kicker">NOTICE</text></view>
+          <text class="card-text">参赛球员需在开球前30分钟到达签到处领取记分卡，并准时在指定发球台出发。比赛过程中请保持良好的礼仪及球场速度。</text>
+        </view>
+        <view class="ds-card pad-card">
+          <view class="card-head"><text class="card-title">赛事服务</text><text class="card-kicker">SERVICE</text></view>
+          <view class="service-grid">
+            <view class="service-cell"><text class="service-cell__icon">📋</text><text class="service-cell__label">签到</text></view>
+            <view class="service-cell"><text class="service-cell__icon">🍽️</text><text class="service-cell__label">餐饮</text></view>
+            <view class="service-cell"><text class="service-cell__icon">🏆</text><text class="service-cell__label">颁奖</text></view>
+          </view>
+        </view>
+        <view class="partners-section">
+          <text class="partners-title">GOLF BROTHERS PARTNERS</text>
+          <view class="partners-grid">
+            <view class="partner-cell">🧒</view>
+            <view class="partner-cell">🚗</view>
+            <view class="partner-cell">Vivata 1872</view>
+            <view class="partner-cell">⚛️</view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 领先榜 -->
+      <block wx:if="{{activeTab === 'leaderboard'}}">
+        <view class="leaderboard-table-wrap">
+          <view class="leaderboard-head">
+            <text class="lh-pos">POS</text>
+            <text class="lh-player">PLAYER</text>
+            <text class="lh-thru">THRU</text>
+            <text class="lh-total">TOTAL</text>
+          </view>
+
+          <block wx:for="{{leaderboard}}" wx:key="playerId">
+            <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row">
+              <text class="lr-pos pos-cell">{{item.pos}}</text>
+              <view class="lr-player">
+                <text class="player-name">{{item.name}}</text>
+                <text class="gender-icon {{item.isFemale ? 'gender-f' : 'gender-m'}}">{{item.isFemale ? '♀' : '♂'}}</text>
+              </view>
+              <text class="lr-thru">{{item.thru}}</text>
+              <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
+            </view>
+
+            <!-- 展开成绩卡 -->
+            <view wx:if="{{item.expanded}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
+              <view class="scorecard-profile">
+                <view class="sc-profile-left">
+                  <view class="sc-avatar-wrap">
+                    <image class="sc-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <view class="sc-flag"><image src="https://flagcdn.com/w40/{{item.flag}}.png" mode="aspectFill"></image></view>
+                  </view>
+                  <view class="sc-profile-meta">
+                    <view class="sc-name-line"><text class="sc-name">{{item.name}}</text><text class="sc-chevron">›</text></view>
+                    <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
+                  </view>
+                </view>
+                <view catchtap="noop" class="sc-follow-btn">加关注</view>
+              </view>
+
+              <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+                <text class="sc-course course-name-title">{{courseName}}</text>
+
+                <view class="tour-scorecard">
+                  <view class="tsc-row tsc-head">
+                    <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view class="tour-scorecard">
+                  <view class="tsc-row tsc-head">
+                    <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view class="score-legend-area">
+                  <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                </view>
+                <image class="sc-ad" src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85" mode="widthFix"></image>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
+
+      <!-- 出发表：卡片点击进入任意组（保留）+ 底部固定按钮快捷进入自己组（共存） -->
+      <!-- 列表容器预留底部安全间距，确保最后一组不被底部固定按钮遮挡 -->
+      <view wx:if="{{activeTab === 'tee-sheet'}}" class="tee-sheet-list">
+        <view wx:for="{{teeGroups}}" wx:key="id" bindtap="onEnterGroup" data-group-id="{{item.id}}" class="tee-group-card {{index === 0 ? 'js-first-tee-group' : ''}}">
+          <view class="tee-group-meta">
+            <text class="tee-group-badge">{{item.badge}}</text>
+            <view class="tee-start-info"><text class="tee-clock">🕘</text>{{item.time}} 出发 <text class="tee-hole-pill">{{item.hole}}</text></view>
+          </view>
+          <view class="tee-player-grid">
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="tee-player">
+              <view class="tee-avatar-wrap">
+                <image class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
+              </view>
+              <text class="tee-player-name">{{pl.name}}</text>
+              <text class="{{pl.teamClass}}">{{pl.team}}</text>
+            </view>
+          </view>
+          <text class="tee-status">{{item.status}}</text>
+        </view>
+      </view>
+
+      <!-- 讨论区：仅切换内容区，保留顶部比赛信息与 TAB 结构 -->
+      <block wx:if="{{activeTab === 'discussion'}}">
+        <discussion
+          class="discussion-inline"
+          watchers="{{watchers}}"
+          messages="{{chat}}"
+          theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
+          fixed-input="{{true}}"
+          show-input-bar="{{scrollYState >= 100}}"
+          show-watchers-strip="{{false}}"
+          bottom-spacer-height="{{contentSpacerHeight}}"
+        ></discussion>
+      </block>
+
+      <!-- 游戏 -->
+      <block wx:if="{{activeTab === 'game'}}">
+        <view class="game-tab-panel ds-card">
+          <view class="pad-card game-tab-body">
+            <text class="card-title">游戏</text>
+            <text class="card-text card-text--mt">游戏内容将在下一步接入。当前页面已预留该 TAB 容器。</text>
+          </view>
+          <view
+            wx:if="{{contentSpacerHeight > 0}}"
+            class="game-tab-spacer"
+            style="height:{{contentSpacerHeight}}px;"
+          ></view>
+        </view>
+      </block>
+
+    </view>
+  </scroll-view>
+
+  <!-- 吸顶 TAB：常驻节点（避免 remount），显示状态仅由 scroll-aware sticky state 控制 -->
+  <view class="tab-scroll-wrap tab-scroll-wrap--fixed {{isStickyTab ? 'tab-scroll-wrap--show' : 'tab-scroll-wrap--hide'}}" style="top:{{headerTotalHeight}}px;">
+    <scroll-view class="gb-tabs" scroll-x enable-flex scroll-left="{{tabHScrollLeft}}" bindscroll="onTabHScroll">
+      <view bindtap="switchTab" data-tab="details" class="tab-btn {{activeTab === 'details' ? 'active' : ''}}">赛事详情</view>
+      <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+      <view bindtap="switchTab" data-tab="tee-sheet" class="tab-btn {{activeTab === 'tee-sheet' ? 'active' : ''}}">出发表</view>
+      <view bindtap="switchTab" data-tab="discussion" class="tab-btn {{activeTab === 'discussion' ? 'active' : ''}}">讨论区</view>
+      <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+    </scroll-view>
+    <view wx:if="{{tabShowLeftIndicator}}" class="tab-overflow-hint tab-overflow-hint--left" aria-hidden="true"><text class="tab-overflow-hint__chev">‹</text></view>
+    <view wx:if="{{tabShowRightIndicator}}" class="tab-overflow-hint tab-overflow-hint--right" aria-hidden="true"><text class="tab-overflow-hint__chev">›</text></view>
+  </view>
+
+  <!-- 吸顶围观行：二级 sticky，紧贴 TAB 下方（z-index 低于 TAB） -->
+  <view
+    wx:if="{{activeTab === 'discussion'}}"
+    class="ds-watchers-wrap ds-watchers-wrap--fixed {{isStickyWatchers ? 'ds-watchers-wrap--show' : 'ds-watchers-wrap--hide'}} {{themeClass === 'dark-mode' ? 'ds-watchers--dark' : 'ds-watchers--bright'}}"
+    style="top:{{stickyWatchersTop}}px;"
+  >
+    <template is="discussionWatchersStrip" data="{{watchers: watchers}}" />
+  </view>
+
+  <!-- 出发表 TAB：透明悬浮快捷按钮（仅当"第一组卡片完全进入视口"时显示，固定底部，不参与布局流） -->
+  <view
+    wx:if="{{activeTab === 'tee-sheet' && quickEntryVisible}}"
+    bindtap="onEnterGroup"
+    data-group-id="g1"
+    class="tee-quick-entry-float"
+  >快速进入自己的小组 ›</view>
+
+  <!-- MORE FAB（讨论区为聚焦聊天全屏层，隐藏 FAB，避免遮挡输入栏） -->
+  <view
+    wx:if="{{activeTab !== 'discussion'}}"
+    catchtap="onMoreFabTap"
+    bindtouchstart="onMoreFabTouchStart"
+    bindtouchmove="onMoreFabTouchMove"
+    bindtouchend="onMoreFabTouchEnd"
+    bindtouchcancel="onMoreFabTouchEnd"
+    class="leaderboard-fab {{moreFabExpanded ? 'leaderboard-fab--expanded' : ''}} {{moreFabDragging ? 'leaderboard-fab--dragging' : ''}} {{moreFabHitTarget ? 'leaderboard-fab--hit' : ''}}"
+    style="{{fabStyle}}"
+  >
+    <text class="fab-label">{{moreFabExpanded ? 'MORE' : 'M'}}</text>
+  </view>
+
+  <!-- 更多功能 bottom sheet -->
+  <view wx:if="{{showMoreSheet}}" bindtap="closeMoreSheet" class="sheet-overlay"></view>
+  <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="feature-section">
+      <view class="feature-section-title"><text class="fst-main">常用功能</text><text class="fst-sub">普通用户可用</text></view>
+      <view class="feature-grid">
+        <view wx:for="{{featuresCommon}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+          <view class="feature-icon"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="feature-section">
+      <view class="feature-section-title"><text class="fst-main">管理功能</text><text class="fst-sub">需权限</text></view>
+      <view class="feature-grid">
+        <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="sheet-cancel-wrap">
+      <view bindtap="closeMoreSheet" class="sheet-cancel-btn">取 消</view>
+    </view>
+  </view>
+
+  <!-- 风格选择 sheet -->
+  <view wx:if="{{showStyleSheet}}" bindtap="closeStyleSheet" class="sheet-overlay"></view>
+  <view class="style-sheet {{showStyleSheet ? 'active' : ''}}" catchtap="stopPropagation">
+    <view class="style-sheet__head">
+      <view>
+        <text class="style-sheet__title">风格选择</text>
+        <text class="style-sheet__sub">这些设置会影响所有记分相关页面。</text>
+      </view>
+      <view bindtap="closeStyleSheet" class="style-sheet__close">✕</view>
+    </view>
+    <view class="style-section">
+      <text class="style-section-title">记分显示</text>
+      <view class="style-option-row">
+        <view bindtap="setScoringDisplay" data-value="gross" class="style-option {{scoringDisplay === 'gross' ? 'active' : ''}}">总杆记分</view>
+        <view bindtap="setScoringDisplay" data-value="strokeDiff" class="style-option {{scoringDisplay === 'strokeDiff' ? 'active' : ''}}">杆差记分</view>
+      </view>
+    </view>
+    <view class="style-section">
+      <text class="style-section-title">记分面板</text>
+      <view class="style-option-row">
+        <view bindtap="setScorePanel" data-value="technical" class="style-option {{scorePanel === 'technical' ? 'active' : ''}}">技术面板</view>
+        <view bindtap="setScorePanel" data-value="quick" class="style-option {{scorePanel === 'quick' ? 'active' : ''}}">快捷面板</view>
+      </view>
+    </view>
+    <view class="style-done-wrap">
+      <view bindtap="closeStyleSheet" class="style-done-btn">完成</view>
+    </view>
+  </view>
+
+  <!-- 围观弹层 -->
+  <view wx:if="{{showWatchers}}" bindtap="closeWatchers" class="watchers-modal show">
+    <view catchtap="stopPropagation" class="watchers-sheet">
+      <view class="watchers-sheet-header">
+        <view>
+          <text class="watchers-sheet-title">全部围观用户</text>
+          <text class="watchers-sheet-subtitle">点击 @ 可提及用户</text>
+        </view>
+        <view bindtap="closeWatchers" class="watchers-close-btn">✕</view>
+      </view>
+      <scroll-view scroll-y class="watchers-list">
+        <view wx:for="{{allWatchers}}" wx:key="name" class="watcher-item">
+          <image src="{{item.avatar}}" mode="aspectFill"></image>
+          <view class="watcher-col">
+            <text class="watcher-name">{{item.name}}</text>
+            <text class="watcher-hint">围观用户</text>
+          </view>
+          <text class="watcher-at">@</text>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>

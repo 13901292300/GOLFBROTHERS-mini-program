@@ -1,0 +1,7 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "discussion": "/components/discussion/index",
+    "leaderboard-player-identity": "/components/leaderboard-player-identity/index"
+  }
+}

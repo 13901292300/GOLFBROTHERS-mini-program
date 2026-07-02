@@ -1,0 +1,7 @@
+{
+  "navigationStyle": "custom",
+  "disableScroll": true,
+  "usingComponents": {
+    "avatar-mosaic": "/components/avatar-mosaic/index"
+  }
+}

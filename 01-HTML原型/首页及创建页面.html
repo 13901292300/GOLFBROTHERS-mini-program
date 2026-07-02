@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Golf Brothers - 首页</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,700;0,800;0,900;1,900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="theme-global.js"></script>
+    <link rel="stylesheet" href="design-system.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'tour-blue': '#002D62',
+                        'champion-gold': '#CE9224',
+                        'data-blue': '#00AEEF',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans SC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="ds-app bright-mode ds-app-shell overflow-hidden">
+    <div class="ds-app-frame">
+    
+    <!-- Header -->
+    <header class="ds-app-header shrink-0 z-50">
+        <div class="ds-app-header-bar">
+            <div class="flex items-center min-w-0 flex-1">
+                <div class="ds-brand-logo ds-brand-logo--header ds-brand-logo--on-dark" role="img" aria-label="GOLF BROTHERS">
+                    <div class="ds-brand-flag">
+                        <div class="ds-brand-flag-pole"></div>
+                        <div class="ds-brand-flag-cloth"></div>
+                    </div>
+                    <span>GOLF</span><span class="ds-brand-brothers">BROTHERS</span>
+                </div>
+            </div>
+            <div class="ds-app-header-actions">
+                <button onclick="toggleTheme()" class="ds-icon-btn ds-icon-btn--on-dark" aria-label="切换主题">
+                    <i id="theme-icon" class="fas fa-moon text-sm"></i>
+                </button>
+                <div class="flex items-center status-pill border rounded-full px-3 py-1.5 space-x-3 shrink-0">
+                    <div class="flex space-x-1">
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                    </div>
+                    <div class="w-[1px] h-4 status-line"></div>
+                    <div class="w-5 h-5 border-2 status-circle rounded-full flex items-center justify-center">
+                        <div class="w-2.5 h-2.5 status-dot rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Scrollable Container -->
+    <div class="ds-scroll-main no-scrollbar z-10 scroll-smooth">
+        <!-- Background Banner Section (Scrolls away) -->
+        <div id="main-banner" class="relative w-full h-[35vh] overflow-hidden -mt-[20px]">
+            <img src="https://cdn.screenshottocode.com/eMlt4raQ2b_sRTivrb5v4.jpg" class="w-full h-full object-cover object-top" alt="Golf Banner">
+        </div>
+
+        <!-- Top Navigation Tabs (Sticky) - stays below the banner for every bottom menu -->
+        <div id="main-tabs" class="ds-tab-nav main-tabs sticky top-0 z-40 flex shadow-lg -mt-[20px]">
+            <button id="primary-tab" onclick="switchTopTab('primary')" class="ds-tab-item ds-tab-item--active tab-btn flex-1 py-4 uppercase tracking-widest">我的</button>
+            <button id="secondary-tab" onclick="switchTopTab('secondary')" class="ds-tab-item tab-btn flex-1 py-4 uppercase tracking-widest">日程</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="tab-content-area" class="ds-content-area">
+            <!-- 我的内容 -->
+            <div id="my-content">
+                <main class="ds-main space-y-4">
+                    <!-- Card 1 · 进行中 -->
+                    <a href="记分页面/个人比杆赛记分及添加删除页面.html" class="ds-card ds-card-tour ds-card-active active:opacity-90 transition-opacity">
+                        <span class="ds-live-badge animate-flash-live">LIVE</span>
+                        <button type="button" class="ds-card-star" data-favorited="true" onclick="event.preventDefault(); event.stopPropagation(); toggleStar(this)" title="收藏">
+                            <i class="fas fa-star text-xs"></i>
+                        </button>
+                        <div class="ds-group-avatar ds-group-avatar--3">
+                            <img src="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=100" alt="">
+                            <img src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=100" alt="">
+                            <img src="https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100" alt="">
+                        </div>
+                        <div class="ds-card-tour-body">
+                            <h3 class="ds-card-tour-title text-sm font-bold truncate ds-text-primary leading-tight">周末业余邀请赛</h3>
+                            <div class="ds-card-tour-progress">
+                                <div class="ds-progress-track">
+                                    <div class="ds-progress-fill" style="width:25%"></div>
+                                    <div class="ds-progress-marker" style="left:25%">04</div>
+                                </div>
+                            </div>
+                            <div class="ds-card-tour-meta flex items-center gap-2 text-[9px] ds-text-muted min-w-0">
+                                <span class="truncate">佘山国际高尔夫俱乐部</span>
+                                <span class="shrink-0">2025/07/20</span>
+                                <span class="shrink-0"><i class="fas fa-eye mr-0.5"></i>64</span>
+                            </div>
+                        </div>
+                    </a>
+
+                    <!-- Card 2 · 已结束 -->
+                    <a href="记分页面/四人最好成绩_最佳球位记分界面.html" class="ds-card ds-card-tour active:opacity-90 transition-opacity">
+                        <button type="button" class="ds-card-star" data-favorited="false" onclick="event.preventDefault(); event.stopPropagation(); toggleStar(this)" title="收藏">
+                            <i class="far fa-star text-xs"></i>
+                        </button>
+                        <div class="ds-group-avatar ds-group-avatar--4">
+                            <img src="https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100" alt="">
+                            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100" alt="">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100" alt="">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100" alt="">
+                        </div>
+                        <div class="ds-card-tour-body">
+                            <h3 class="ds-card-tour-title text-sm font-bold truncate ds-text-primary leading-tight">四人最佳球位挑战-18</h3>
+                            <div class="ds-card-tour-progress">
+                                <div class="ds-progress-track">
+                                    <div class="ds-progress-fill" style="width:100%"></div>
+                                    <div class="ds-progress-marker ds-progress-marker--finish">F</div>
+                                </div>
+                            </div>
+                            <div class="ds-card-tour-meta flex items-center gap-2 text-[9px] ds-text-muted min-w-0">
+                                <span class="truncate">华彬国际高尔夫俱乐部</span>
+                                <span class="shrink-0">2025/04/15</span>
+                                <span class="shrink-0"><i class="fas fa-eye mr-0.5"></i>72</span>
+                            </div>
+                        </div>
+                    </a>
+
+                    <!-- Card 3 · 球队赛 -->
+                    <a href="赛事详情页/正在进行中的队内赛页面.html" class="ds-card ds-card-club active:opacity-90 transition-opacity">
+                        <button type="button" class="ds-card-star" data-favorited="true" onclick="event.preventDefault(); event.stopPropagation(); toggleStar(this)" title="收藏">
+                            <i class="fas fa-star text-xs"></i>
+                        </button>
+                        <div class="ds-card-club-main">
+                            <div class="flex flex-col items-center shrink-0">
+                                <div class="w-16 h-16 rounded-full overflow-hidden shrink-0">
+                                    <img src="https://cdn.screenshottocode.com/4xhZC0kyGivdD4E_wX-1F.png" class="w-full h-full object-cover" alt="交杯鲜啤高尔夫俱乐部">
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0 flex flex-col pr-6 gap-1">
+                                <p class="text-base font-black ds-text-data tracking-tight leading-none">May/25/2026</p>
+                                <h3 class="text-sm font-bold break-words ds-text-primary leading-snug">交杯鲜啤挑战赛&amp;江湖业余球员巡回赛第三站</h3>
+                                <div class="flex items-center gap-3 text-[9px] ds-text-muted min-w-0">
+                                    <span class="truncate">北京清河湾高尔夫乡村俱乐部A&amp;B</span>
+                                    <span class="shrink-0"><i class="fas fa-eye mr-0.5"></i>256</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ds-club-footer">
+                            <div class="ds-club-footer-line"></div>
+                            <span class="ds-club-footer-label">CLUB</span>
+                            <div class="ds-club-footer-line ds-club-footer-line--right"></div>
+                        </div>
+                    </a>
+                </main>
+            </div>
+
+            <!-- 日程内容 -->
+            <div id="schedule-content" class="hidden ds-main">
+                <div class="space-y-6">
+                    <!-- Container for schedule cards -->
+                    <div id="schedule-cards-container" class="space-y-6">
+                        <!-- Initial Schedule Card -->
+                        <div class="ds-card rounded-xl overflow-hidden schedule-card">
+                            <div onclick="openCalendarPicker(this)" class="ds-card-header flex justify-between items-center cursor-pointer active:opacity-90 transition-opacity">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-[#ce9224]">
+                                        <i class="far fa-calendar-check text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="schedule-date-display ds-body-bold text-sm italic" style="color:var(--text-on-dark)">2024年05月20日</p>
+                                        <p class="schedule-day-display ds-overline" style="color:rgba(255,255,255,0.6)">星期一 · Monday</p>
+                                    </div>
+                                </div>
+                                <i onclick="removeSchedule(this, event)" class="fas fa-trash-alt text-[#ce9224] text-xs hover:text-red-500 transition-colors"></i>
+                            </div>
+                            <div class="p-4">
+                                <div class="relative">
+                                    <textarea placeholder="在这里输入您的球局安排、事件记录..." 
+                                              oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                                              class="ds-input ds-textarea rounded-xl"
+                                    ></textarea>
+                                    <div class="absolute bottom-3 right-3 flex items-center space-x-2">
+                                        <span class="text-[10px] font-bold text-slate-300">自动保存中...</span>
+                                        <i class="fas fa-check-circle text-green-400 text-xs"></i>
+                                    </div>
+                                </div>
+                                <div class="schedule-remind-section mt-3 pt-3 border-t ds-border">
+                                    <div class="schedule-remind-tags flex flex-wrap gap-1.5 mb-2"></div>
+                                    <button type="button" onclick="openScheduleRemindeePicker(this)" class="ds-btn-text inline-flex items-center space-x-1.5 text-[11px]">
+                                        <i class="fas fa-user-plus text-[10px]"></i>
+                                        <span>添加被提醒人</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add New Button -->
+                    <div onclick="addNewSchedule()" class="ds-card-dashed p-8 flex flex-col items-center justify-center space-y-3 opacity-60 cursor-pointer hover:opacity-100 transition-all group">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#ce9224] group-hover:text-white transition-all">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-[#ce9224]">添加新日程</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 赛事内容：保持顶部 Header、Banner、Tab 与底部导航不动，只切换中间容器 -->
+            <div id="tournament-content" class="hidden">
+                <main class="ds-main space-y-4">
+            <!-- Team Tournament Card 1 -->
+            <div class="ds-card ds-card-club">
+                <button type="button" class="ds-card-star" data-favorited="true" onclick="event.stopPropagation(); toggleStar(this)" title="收藏">
+                    <i class="fas fa-star text-xs"></i>
+                </button>
+                <div class="ds-card-club-main">
+                    <div class="flex flex-col items-center shrink-0">
+                        <div class="w-16 h-16 rounded-full overflow-hidden shrink-0">
+                            <img src="https://cdn.screenshottocode.com/4xhZC0kyGivdD4E_wX-1F.png" class="w-full h-full object-cover" alt="交杯鲜啤高尔夫俱乐部">
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0 flex flex-col pr-6 gap-1">
+                        <p class="text-base font-black ds-text-data tracking-tight leading-none">May/25/2026</p>
+                        <h3 class="text-sm font-bold break-words ds-text-primary leading-snug">交杯鲜啤挑战赛&amp;江湖业余球员巡回赛第三站</h3>
+                        <div class="flex items-center gap-3 text-[9px] ds-text-muted min-w-0">
+                            <span class="truncate">北京清河湾高尔夫乡村俱乐部A&amp;B</span>
+                            <span class="shrink-0"><i class="fas fa-eye mr-0.5"></i>168</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="ds-club-footer">
+                    <div class="ds-club-footer-line"></div>
+                    <span class="ds-club-footer-label">CLUB</span>
+                    <div class="ds-club-footer-line ds-club-footer-line--right"></div>
+                </div>
+            </div>
+
+            <!-- Team Tournament Card 2 -->
+            <div class="ds-card ds-card-club">
+                <button type="button" class="ds-card-star" data-favorited="true" onclick="event.stopPropagation(); toggleStar(this)" title="收藏">
+                    <i class="fas fa-star text-xs"></i>
+                </button>
+                <div class="ds-card-club-main">
+                    <div class="flex flex-col items-center shrink-0">
+                        <div class="w-16 h-16 rounded-full overflow-hidden shrink-0">
+                            <img src="https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100" class="w-full h-full object-cover" alt="高球兄弟精英队">
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0 flex flex-col pr-6 gap-1">
+                        <p class="text-base font-black ds-text-data tracking-tight leading-none">Aug/15/2026</p>
+                        <h3 class="text-sm font-bold break-words ds-text-primary leading-snug">高球兄弟精英队内部排名赛</h3>
+                        <div class="flex items-center gap-3 text-[9px] ds-text-muted min-w-0">
+                            <span class="truncate">北京通盈雁栖湖高尔夫俱乐部</span>
+                            <span class="shrink-0"><i class="fas fa-eye mr-0.5"></i>32</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="ds-club-footer">
+                    <div class="ds-club-footer-line"></div>
+                    <span class="ds-club-footer-label">CLUB</span>
+                    <div class="ds-club-footer-line ds-club-footer-line--right"></div>
+                </div>
+            </div>
+
+            <!-- Team Tournament Card 3 -->
+            <div class="ds-card ds-card-club">
+                <button type="button" class="ds-card-star" data-favorited="false" onclick="event.stopPropagation(); toggleStar(this)" title="收藏">
+                    <i class="far fa-star text-xs"></i>
+                </button>
+                <div class="ds-card-club-main">
+                    <div class="flex flex-col items-center shrink-0">
+                        <div class="w-16 h-16 rounded-full overflow-hidden shrink-0">
+                            <img src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=100" class="w-full h-full object-cover" alt="北京球友联合会">
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0 flex flex-col pr-6 gap-1">
+                        <p class="text-base font-black ds-text-data tracking-tight leading-none">Sep/22/2026</p>
+                        <h3 class="text-sm font-bold break-words ds-text-primary leading-snug">北京球友联合会月度挑战赛</h3>
+                        <div class="flex items-center gap-3 text-[9px] ds-text-muted min-w-0">
+                            <span class="truncate">鸿华国际高尔夫俱乐部</span>
+                            <span class="shrink-0"><i class="fas fa-eye mr-0.5"></i>80</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="ds-club-footer">
+                    <div class="ds-club-footer-line"></div>
+                    <span class="ds-club-footer-label">CLUB</span>
+                    <div class="ds-club-footer-line ds-club-footer-line--right"></div>
+                </div>
+            </div>
+                </main>
+
+            </div>
+
+            <!-- 我的菜单内容：个人中心，按视觉规范整合到中间容器 -->
+            <div id="profile-content" class="hidden ds-page-profile">
+                <main class="pb-32">
+                    <section class="relative overflow-hidden" style="background:var(--bg-card)">
+                        <div class="relative h-56 overflow-hidden ds-profile-hero">
+                            <img id="profile-banner-img" src="https://cdn.screenshottocode.com/fjGiYQjgxR_OzO3H9s1OQ.png" alt="Golf Course" class="w-full h-full object-cover opacity-80">
+                            <div class="absolute inset-0 bg-gradient-to-b from-black/70 via-black/20 to-transparent"></div>
+                            <div class="absolute top-5 left-5 flex items-center gap-4">
+                                <div class="relative">
+                                    <i class="far fa-bell text-2xl text-white"></i>
+                                    <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-600 rounded-full border-2 border-black"></span>
+                                </div>
+                                <button onclick="toggleTheme()" class="bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/20 text-white hover:bg-black/60 transition-all" aria-label="切换主题">
+                                    <i class="fas fa-sun text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="relative -mt-20 flex flex-col items-center px-6 pb-7">
+                            <div class="relative mb-5">
+                                <div class="w-28 h-28 ds-profile-avatar-ring shadow-[0_18px_45px_rgba(0,0,0,0.45)] relative group cursor-pointer">
+                                    <img src="https://cdn.screenshottocode.com/H0XDATQ7nxMnJo8KZn-wV.jpg" alt="Avatar" class="w-full h-full object-cover">
+                                    <div onclick="toggleEditProfile(true)" class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <i class="fas fa-camera text-white text-xl"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center w-full">
+                                <div class="flex items-center justify-center gap-3 mb-5 group cursor-pointer" onclick="toggleEditProfile(true)">
+                                    <h1 class="ds-display text-4xl leading-none">TigerHoods</h1>
+                                    <i class="fas fa-mars text-[#00AEEF] text-lg"></i>
+                                    <i class="fas fa-pen text-[10px] text-slate-400 opacity-60 group-hover:opacity-100 transition-opacity"></i>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 max-w-[300px] mx-auto">
+                                    <div class="ds-card ds-card-stat rounded-lg px-4 py-3 flex flex-col items-center">
+                                        <span class="ds-overline mb-1">江湖差点</span>
+                                        <span class="text-3xl font-black italic leading-none ds-text-gold">11.6</span>
+                                    </div>
+                                    <div class="ds-card ds-card-stat rounded-lg px-4 py-3 flex flex-col items-center">
+                                        <span class="ds-overline mb-1">浮动系数</span>
+                                        <span class="text-3xl font-black italic leading-none ds-text-data">4.2</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="px-4 pt-4 space-y-4">
+                        <div class="ds-card ds-list-section rounded-xl overflow-hidden">
+                            <div class="px-4 py-3 ds-bg-subtle flex justify-between items-center border-b ds-border">
+                                <span class="ds-overline ds-text-gold">赛事中心</span>
+                                <span class="text-[8px] text-slate-400 font-bold uppercase tracking-widest">始于 2024</span>
+                            </div>
+                            <div class="ds-list-item profile-list-item flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-users text-[#22C55E] text-xl w-5"></i><span class="ds-body font-normal">通讯录</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                            <div class="ds-list-item profile-list-item flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-trophy text-[#ce9224] text-xl w-5"></i><span class="ds-body font-normal">历史成绩</span></div>
+                                <div class="flex items-center gap-2"><span class="text-[10px] font-black bg-red-600/10 text-red-500 border border-red-600/20 px-2 py-0.5 rounded-sm">LIVE</span><i class="fas fa-chevron-right text-[10px] text-slate-300"></i></div>
+                            </div>
+                            <div class="ds-list-item profile-list-item flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-chart-bar text-[#00AEEF] text-xl w-5"></i><span class="ds-body font-normal">数据统计</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                            <div onclick="window.location.href='导航栏-我的/江湖足迹/江湖足迹.html'" class="ds-list-item profile-list-item flex items-center justify-between px-4 py-4 cursor-pointer">
+                                <div class="flex items-center gap-4"><i class="fas fa-flag text-[#EF4444] text-xl w-5"></i><span class="ds-body font-normal">江湖足迹</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                            <div class="flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-shield-alt text-[#ce9224] text-xl w-5"></i><span class="ds-body font-normal">我的球队</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                        </div>
+
+                        <div class="ds-card ds-list-section rounded-xl overflow-hidden">
+                            <div class="px-4 py-3 bg-slate-50 border-b border-slate-100"><span class="ds-overline">资产与工具</span></div>
+                            <div class="ds-list-item profile-list-item flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-credit-card text-[#00AEEF] text-xl w-5"></i><span class="ds-body font-normal">我的钱包</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                            <div class="ds-list-item profile-list-item flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-file-invoice text-[#ce9224] text-xl w-5"></i><span class="ds-body font-normal">小账本</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                            <div class="flex items-center justify-between px-4 py-4">
+                                <div class="flex items-center gap-4"><i class="fas fa-cog text-slate-400 text-xl w-5"></i><span class="font-normal text-slate-500">设置</span></div>
+                                <i class="fas fa-chevron-right text-[10px] text-slate-300"></i>
+                            </div>
+                        </div>
+
+                        <footer class="p-8 text-center opacity-40">
+                            <p class="font-black italic text-sm tracking-[0.2em] text-slate-500">江湖精英系统</p>
+                        </footer>
+                    </section>
+                </main>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Bottom Navigation（固定在 shell 底行，不参与滚动） -->
+    <nav class="ds-bottom-nav shrink-0 px-4 py-3 flex justify-between items-center">
+        <div id="nav-home" onclick="showHomeSection()" class="ds-bottom-nav-item ds-bottom-nav-item--active flex-1 flex flex-col items-center cursor-pointer">
+            <i class="fas fa-chart-bar text-xl"></i>
+            <span class="text-[11px] font-normal mt-1 uppercase tracking-widest">首页</span>
+        </div>
+        <div class="ds-bottom-nav-item flex-1 flex flex-col items-center cursor-pointer">
+            <i class="fas fa-users text-xl"></i>
+            <span class="text-[11px] font-normal mt-1 uppercase tracking-widest">广场</span>
+        </div>
+        <div onclick="toggleCreateOverlay()" class="ds-bottom-nav-item flex-1 flex flex-col items-center cursor-pointer">
+            <div class="ds-bottom-nav-fab flex items-center justify-center text-white">
+                <i class="fas fa-plus text-2xl"></i>
+            </div>
+        </div>
+        <div id="nav-tournament" class="ds-bottom-nav-item flex-1 flex flex-col items-center cursor-pointer" onclick="showTournamentSection()">
+            <i class="fas fa-layer-group text-xl"></i>
+            <span class="text-[11px] font-normal mt-1 uppercase tracking-widest">赛事</span>
+        </div>
+        <div id="nav-profile" class="ds-bottom-nav-item flex-1 flex flex-col items-center cursor-pointer" onclick="showProfileSection()">
+            <i class="fas fa-user text-xl"></i>
+            <span class="text-[11px] font-normal mt-1 uppercase tracking-widest">我的</span>
+        </div>
+    </nav>
+
+    </div><!-- /.ds-app-frame -->
+
+    <!-- Create Overlay -->
+    <div id="create-overlay" class="ds-overlay-viewport fixed inset-0 bg-white/95 z-[100] hidden flex flex-col transition-all duration-300 transform translate-y-full opacity-0 max-w-md mx-auto">
+        <!-- Overlay Header -->
+        <header class="ds-app-header shrink-0">
+            <div class="px-4 pt-6 pb-4 flex justify-between items-center relative">
+                <div class="flex items-center">
+                    <img src="https://cdn.screenshottocode.com/7hdzS5bjOESpA9U0swP2y.png" class="h-6 object-contain" alt="GOLF BROTHERS">
+                </div>
+                <!-- Mini Program Style Controls -->
+                <div class="flex items-center status-pill border rounded-full px-3 py-1.5 space-x-3">
+                    <div class="flex space-x-1">
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                    </div>
+                    <div class="w-[1px] h-4 status-line"></div>
+                    <div class="w-5 h-5 border-2 status-circle rounded-full flex items-center justify-center">
+                        <div class="w-2.5 h-2.5 status-dot rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Options Container -->
+        <div class="flex-grow flex flex-col justify-center pt-0 pb-6 space-y-8 overflow-y-auto no-scrollbar">
+            <!-- Custom User Area Scrollable Container (Moved to Top) -->
+            <div class="px-6 mb-2">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">常用功能</span>
+                    <button class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[#002d62] hover:bg-[#002d62] hover:text-white transition-all shadow-sm">
+                        <i class="fas fa-pen text-[10px]"></i>
+                    </button>
+                </div>
+                <div class="flex overflow-x-auto no-scrollbar space-x-4 py-2">
+                    <!-- Example Custom Buttons -->
+                    <div class="flex-none flex flex-col items-center space-y-2 group">
+                        <div class="w-14 h-14 bg-white border border-slate-100 border-t-2 border-t-green-500 rounded-2xl shadow-sm flex items-center justify-center text-green-500">
+                            <i class="fas fa-history text-lg"></i>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-600 uppercase">历史成绩</span>
+                    </div>
+                    <div class="flex-none flex flex-col items-center space-y-2 group">
+                        <div class="w-14 h-14 bg-white border border-slate-100 border-t-2 border-t-purple-500 rounded-2xl shadow-sm flex items-center justify-center text-purple-500">
+                            <i class="fas fa-trophy text-lg"></i>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-600 uppercase">荣誉榜</span>
+                    </div>
+                    <div class="flex-none flex flex-col items-center space-y-2 group">
+                        <div class="w-14 h-14 bg-white border border-slate-100 border-t-2 border-t-orange-500 rounded-2xl shadow-sm flex items-center justify-center text-orange-500">
+                            <i class="fas fa-map text-lg"></i>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-600 uppercase">球场地图</span>
+                    </div>
+                    <div class="flex-none flex flex-col items-center space-y-2 group">
+                        <div class="w-14 h-14 bg-white border border-slate-100 border-t-2 border-t-red-500 rounded-2xl shadow-sm flex items-center justify-center text-red-500">
+                            <i class="fas fa-heart text-lg"></i>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-600 uppercase">收藏夹</span>
+                    </div>
+                    <div class="flex-none flex flex-col items-center space-y-2 group">
+                        <div class="w-14 h-14 bg-white border border-slate-100 border-t-2 border-t-blue-400 rounded-2xl shadow-sm flex items-center justify-center text-blue-400">
+                            <i class="fas fa-cog text-lg"></i>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-600 uppercase">更多设置</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vertical Buttons (Wide Style) -->
+            <div class="flex flex-col space-y-4 px-6 pt-6 max-w-[92%] mx-auto w-full">
+                <div onclick="openMoreCreate()" class="ds-card ds-card-action flex items-center justify-between rounded-xl group ds-bg-hover transition-colors cursor-pointer">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-[#002d62]">
+                            <i class="fas fa-th-large text-lg"></i>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-black text-[#002d62] uppercase tracking-wider block leading-none">更多创建</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase mt-1 block">Discover more match types</span>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300 text-[10px] group-hover:text-[#ce9224] transition-colors"></i>
+                </div>
+
+                <div onclick="openNormalCreate()" class="ds-card ds-card-action ds-card-action--gold flex items-center justify-between rounded-xl group ds-bg-hover transition-colors cursor-pointer">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-[#ce9224]">
+                            <i class="fas fa-golf-ball text-lg"></i>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-black text-[#002d62] uppercase tracking-wider block leading-none">普通创建</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase mt-1 block">Standard tournament setup</span>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300 text-[10px] group-hover:text-[#ce9224] transition-colors"></i>
+                </div>
+
+                <div class="ds-card ds-card-action ds-card-action--neutral flex items-center justify-between rounded-xl group ds-bg-hover transition-colors">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+                            <i class="fas fa-bolt text-lg"></i>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-black text-[#002d62] uppercase tracking-wider block leading-none">快捷创建</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase mt-1 block">Quick start 1-on-1 match</span>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300 text-[10px] group-hover:text-[#ce9224] transition-colors"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Close Button Area -->
+        <div class="pb-16 flex justify-center">
+            <button onclick="toggleCreateOverlay()" class="w-14 h-14 bg-white border-2 border-slate-100 rounded-full shadow-xl flex items-center justify-center text-slate-400 hover:text-[#ce9224] transition-colors">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- More Create Selection Page -->
+    <div id="more-create-page" class="ds-page-overlay ds-overlay-viewport fixed inset-0 z-[250] hidden flex flex-col max-w-md mx-auto overflow-hidden">
+        <header class="ds-app-header shrink-0">
+            <div class="px-4 pt-6 pb-4 flex justify-between items-center relative">
+                <div class="flex items-center space-x-4">
+                    <i onclick="closeMoreCreate()" class="fas fa-chevron-left text-white text-lg cursor-pointer"></i>
+                    <h1 class="text-white font-black text-lg">更多创建</h1>
+                </div>
+                <div class="flex items-center status-pill border rounded-full px-3 py-1.5 space-x-3">
+                    <div class="flex space-x-1">
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                        <div class="w-1.5 h-1.5 status-dot rounded-full"></div>
+                    </div>
+                    <div class="w-[1px] h-4 status-line"></div>
+                    <div class="w-5 h-5 border-2 status-circle rounded-full flex items-center justify-center">
+                        <div class="w-2.5 h-2.5 status-dot rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-grow overflow-y-auto p-6 space-y-6">
+            <div class="text-center pb-4">
+                <h2 class="text-xl font-black text-[#002d62] italic uppercase">选择比赛类型</h2>
+                <p class="text-[10px] font-bold text-slate-400 mt-1 tracking-[0.2em]">SELECT TOURNAMENT CATEGORY</p>
+            </div>
+
+            <!-- More Create Options Grid -->
+            <div class="grid grid-cols-1 gap-4">
+                <!-- Team Internal -->
+                <div class="ds-card ds-card-selectable group ds-bg-hover transition-all cursor-pointer">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-[#002d62]">
+                                <i class="fas fa-users-cog text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-black text-[#002d62] uppercase tracking-wide">队内赛</h3>
+                                <p class="text-[10px] font-bold text-slate-400 mt-0.5 uppercase">Internal Club Rankings</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-200 text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Team vs Team -->
+                <div class="ds-card ds-card-selectable ds-card-selectable--gold group ds-bg-hover transition-all cursor-pointer">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-[#ce9224]">
+                                <i class="fas fa-shield-alt text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-black text-[#002d62] uppercase tracking-wide">队际赛</h3>
+                                <p class="text-[10px] font-bold text-slate-400 mt-0.5 uppercase">Club vs Club Challenge</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-200 text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Series -->
+                <div class="ds-card ds-card-selectable ds-card-selectable--neutral group ds-bg-hover transition-all cursor-pointer">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-800">
+                                <i class="fas fa-layer-group text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-black text-[#002d62] uppercase tracking-wide">系列赛</h3>
+                                <p class="text-[10px] font-bold text-slate-400 mt-0.5 uppercase">Multi-stage Tour Series</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-200 text-xs"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pt-8 opacity-40">
+                <div class="border-t border-slate-200 w-1/4 mx-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Picker Overlay -->
+    <div id="calendar-picker" class="fixed inset-0 z-[400] hidden">
+        <div class="absolute inset-0 bg-black/40" onclick="closeCalendarPicker()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-6 transform translate-y-full transition-transform duration-300 max-w-md mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="changeMonth(-1)" class="w-10 h-10 flex items-center justify-center text-slate-400"><i class="fas fa-chevron-left"></i></button>
+                <span id="calendar-month-year" class="font-black text-[#002d62] dark:text-white italic text-lg">2024年5月</span>
+                <button onclick="changeMonth(1)" class="w-10 h-10 flex items-center justify-center text-slate-400"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-7 gap-1 text-center mb-2">
+                <div class="text-[10px] font-black text-slate-300 uppercase">日</div>
+                <div class="text-[10px] font-black text-slate-300 uppercase">一</div>
+                <div class="text-[10px] font-black text-slate-300 uppercase">二</div>
+                <div class="text-[10px] font-black text-slate-300 uppercase">三</div>
+                <div class="text-[10px] font-black text-slate-300 uppercase">四</div>
+                <div class="text-[10px] font-black text-slate-300 uppercase">五</div>
+                <div class="text-[10px] font-black text-slate-300 uppercase">六</div>
+            </div>
+            
+            <div id="calendar-days" class="grid grid-cols-7 gap-1 text-center">
+                <!-- Days injected by JS -->
+            </div>
+
+            <div class="mt-8 flex justify-end space-x-4">
+                <button onclick="closeCalendarPicker()" class="px-6 py-2 text-slate-400 font-bold">取消</button>
+                <button onclick="confirmCalendarDate()" class="ds-btn-accent ds-btn-accent--pill px-8 font-black italic">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Remindee Picker (schedule module only) -->
+    <div id="schedule-remind-picker" class="fixed inset-0 z-[410] hidden">
+        <div class="absolute inset-0 bg-black/40" onclick="closeScheduleRemindeePicker()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl transform translate-y-full transition-transform duration-300 max-w-md mx-auto max-h-[75vh] flex flex-col">
+            <div class="px-6 pt-6 pb-3 shrink-0">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="font-black text-[#002d62] italic text-lg">选择被提醒人</span>
+                    <button onclick="closeScheduleRemindeePicker()" class="text-slate-400 text-sm font-bold">关闭</button>
+                </div>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+                    <input id="schedule-remind-search" type="text" placeholder="搜索好友昵称或ID" oninput="renderScheduleFriendList()"
+                           class="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-sm font-medium text-slate-700 outline-none border border-transparent focus:border-[#ce9224]/30">
+                </div>
+            </div>
+            <div id="schedule-remind-friend-list" class="flex-1 overflow-y-auto px-6 pb-2 space-y-2 no-scrollbar"></div>
+            <div class="shrink-0 px-6 py-4 flex justify-end space-x-3 border-t border-slate-100">
+                <button onclick="closeScheduleRemindeePicker()" class="px-6 py-2 text-slate-400 font-bold">取消</button>
+                <button onclick="confirmScheduleRemindees()" class="px-8 py-2 bg-[#ce9224] text-white rounded-full font-black italic shadow-lg shadow-yellow-100">确认</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Profile Edit Modal -->
+    <div id="edit-profile-modal" class="ds-overlay-viewport ds-overlay-closed fixed inset-0 z-[320] hidden translate-y-full transition-transform duration-300 ease-out ds-profile-edit-panel max-w-md mx-auto flex flex-col">
+        <header class="ds-app-header shrink-0">
+            <div class="px-4 pt-6 pb-4 flex justify-between items-center relative">
+                <button onclick="toggleEditProfile(false)" class="text-white text-sm font-bold">取消</button>
+                <h2 class="text-white font-black text-lg italic uppercase tracking-tighter">编辑资料</h2>
+                <button onclick="toggleEditProfile(false)" class="text-[#ce9224] text-sm font-black">保存</button>
+            </div>
+        </header>
+        <div class="flex-1 overflow-y-auto p-5 pb-10">
+            <div class="flex flex-col items-center mb-8">
+                <div class="relative w-24 h-24 mb-3">
+                    <img src="https://cdn.screenshottocode.com/H0XDATQ7nxMnJo8KZn-wV.jpg" class="w-full h-full rounded-full object-cover border-4 border-[#ce9224]">
+                    <div class="absolute bottom-0 right-0 bg-[#002d62] w-8 h-8 rounded-full flex items-center justify-center border-4 border-white">
+                        <i class="fas fa-camera text-white text-[10px]"></i>
+                    </div>
+                </div>
+                <button type="button" onclick="toggleBannerPicker(true)" class="flex items-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest hover:text-[#ce9224] transition-colors">
+                    <i class="fas fa-image"></i> 更换头像背景
+                </button>
+            </div>
+            <div class="space-y-5">
+                <div class="ds-profile-field pb-2">
+                    <label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">身份类型</label>
+                    <div class="flex gap-2 mt-2"><button class="ds-chip ds-chip--selected">球友</button><button class="ds-chip">球童</button></div>
+                </div>
+                <div class="ds-profile-field pb-2"><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">昵称</label><input type="text" value="TigerHoods" class="bg-transparent w-full text-lg font-bold outline-none focus:text-[#ce9224]"></div>
+                <div class="ds-profile-field pb-2"><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">性别</label><div class="flex gap-4 mt-2"><button class="ds-chip ds-chip--selected">男</button><button class="ds-chip">女</button></div></div>
+                <div class="profile-field pb-2 flex justify-between items-end"><div><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">差点 Handicap</label><span class="text-lg font-black text-[#ce9224]">11.6</span></div><span class="text-[10px] text-slate-400 mb-1">系统自动计算</span></div>
+                <div class="ds-profile-field pb-2"><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">国籍</label><select class="bg-transparent w-full text-lg font-bold outline-none appearance-none"><option>中国</option><option>美国</option><option>日本</option><option>韩国</option></select></div>
+                <div class="ds-profile-field pb-2"><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">所在省份</label><input type="text" value="广东" class="bg-transparent w-full text-lg font-bold outline-none focus:text-[#ce9224]"></div>
+                <div class="ds-profile-field pb-2"><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">常打球场</label><div class="w-full text-lg font-bold py-1 flex justify-between items-center text-slate-500"><span>选择球场</span><i class="fas fa-search text-xs text-slate-400"></i></div></div>
+                <div class="ds-profile-field pb-2"><label class="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-1">个人签名</label><textarea class="bg-transparent w-full text-sm font-bold outline-none focus:text-[#ce9224] h-20 resize-none" placeholder="写下你的球场格言..."></textarea></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Banner Picker Modal -->
+    <div id="banner-picker-modal" class="fixed inset-0 z-[330] hidden items-end bg-black/70 backdrop-blur-sm max-w-md mx-auto">
+        <div class="w-full bg-white rounded-t-3xl p-5 border-t border-slate-200">
+            <div class="flex items-center justify-between mb-4"><h3 class="text-sm font-black text-[#002d62] tracking-widest">更换头像背景</h3><button onclick="toggleBannerPicker(false)" class="text-slate-500 text-sm">关闭</button></div>
+            <div class="grid grid-cols-2 gap-3">
+                <button type="button" onclick="chooseBanner('https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80')" class="h-24 rounded-2xl overflow-hidden border border-slate-100 relative"><img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80" class="w-full h-full object-cover"><span class="absolute left-3 bottom-3 text-xs font-bold text-white">草地球场</span></button>
+                <button type="button" onclick="chooseBanner('https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80')" class="h-24 rounded-2xl overflow-hidden border border-slate-100 relative"><img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80" class="w-full h-full object-cover"><span class="absolute left-3 bottom-3 text-xs font-bold text-white">夜景风格</span></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPickerDate = new Date();
+        let selectedCalendarDate = new Date();
+
+        let activeScheduleCard = null;
+
+        const SCHEDULE_FRIENDS = [
+            { id: '838031', name: 'Alexander', avatar: 'https://i.pravatar.cc/150?img=20' },
+            { id: '839102', name: 'Bogey King', avatar: 'https://i.pravatar.cc/150?img=30' },
+            { id: '781229', name: 'Mason', avatar: 'https://i.pravatar.cc/150?img=47' },
+            { id: '770821', name: 'Eagle Lee', avatar: 'https://i.pravatar.cc/150?img=55' },
+            { id: '882104', name: '球友老王', avatar: 'https://i.pravatar.cc/150?img=12' },
+            { id: '901337', name: 'Par达人', avatar: 'https://i.pravatar.cc/150?img=33' }
+        ];
+        let activeRemindScheduleCard = null;
+        let tempRemindeeSelection = new Set();
+
+        function getScheduleRemindSectionHtml() {
+            return `
+                <div class="schedule-remind-section mt-3 pt-3 border-t ds-border">
+                    <div class="schedule-remind-tags flex flex-wrap gap-1.5 mb-2"></div>
+                    <button type="button" onclick="openScheduleRemindeePicker(this)" class="ds-btn-text inline-flex items-center space-x-1.5 text-[11px]">
+                        <i class="fas fa-user-plus text-[10px]"></i>
+                        <span>添加被提醒人</span>
+                    </button>
+                </div>`;
+        }
+
+        function getCardRemindees(card) {
+            try { return JSON.parse(card.dataset.remindees || '[]'); } catch { return []; }
+        }
+
+        function renderRemindeeTags(card) {
+            const container = card.querySelector('.schedule-remind-tags');
+            if (!container) return;
+            const remindes = getCardRemindees(card);
+            container.innerHTML = remindes.map(r =>
+                `<span class="ds-tag-mention"><span class="at">@</span>${r.name}</span>`
+            ).join('');
+        }
+
+        function openScheduleRemindeePicker(btn) {
+            activeRemindScheduleCard = btn.closest('.schedule-card');
+            tempRemindeeSelection = new Set(getCardRemindees(activeRemindScheduleCard).map(r => r.id));
+            const search = document.getElementById('schedule-remind-search');
+            if (search) search.value = '';
+            renderScheduleFriendList();
+            const picker = document.getElementById('schedule-remind-picker');
+            const panel = picker.querySelector('.transform');
+            picker.classList.remove('hidden');
+            setTimeout(() => panel.classList.remove('translate-y-full'), 10);
+        }
+
+        function closeScheduleRemindeePicker() {
+            const picker = document.getElementById('schedule-remind-picker');
+            const panel = picker.querySelector('.transform');
+            panel.classList.add('translate-y-full');
+            setTimeout(() => picker.classList.add('hidden'), 300);
+            activeRemindScheduleCard = null;
+        }
+
+        function renderScheduleFriendList() {
+            const list = document.getElementById('schedule-remind-friend-list');
+            if (!list) return;
+            const keyword = (document.getElementById('schedule-remind-search')?.value || '').trim().toLowerCase();
+            const filtered = SCHEDULE_FRIENDS.filter(f =>
+                !keyword || f.name.toLowerCase().includes(keyword) || f.id.includes(keyword)
+            );
+            list.innerHTML = filtered.map(f => {
+                const selected = tempRemindeeSelection.has(f.id);
+                return `<div onclick="toggleScheduleRemindee('${f.id}')" class="schedule-friend-row flex items-center gap-3 p-3 rounded-xl border border-slate-100 cursor-pointer transition-colors ${selected ? 'selected' : ''}">
+                    <div class="schedule-select-state w-5 h-5 rounded-full border-2 border-slate-200 flex items-center justify-center text-transparent text-[9px] shrink-0"><i class="fas fa-check"></i></div>
+                    <img src="${f.avatar}" alt="${f.name}" class="w-10 h-10 rounded-full object-cover shrink-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-black text-slate-800 truncate">${f.name}</div>
+                        <div class="text-[10px] font-bold text-slate-400 mt-0.5">ID: ${f.id}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleScheduleRemindee(id) {
+            if (tempRemindeeSelection.has(id)) tempRemindeeSelection.delete(id);
+            else tempRemindeeSelection.add(id);
+            renderScheduleFriendList();
+        }
+
+        function confirmScheduleRemindees() {
+            if (!activeRemindScheduleCard) return;
+            const selected = SCHEDULE_FRIENDS.filter(f => tempRemindeeSelection.has(f.id));
+            activeRemindScheduleCard.dataset.remindees = JSON.stringify(selected);
+            renderRemindeeTags(activeRemindScheduleCard);
+            closeScheduleRemindeePicker();
+        }
+
+        function openCalendarPicker(el) {
+            activeScheduleCard = el ? el.closest('.schedule-card') : null;
+            const picker = document.getElementById('calendar-picker');
+            const panel = picker.querySelector('.transform');
+            picker.classList.remove('hidden');
+            setTimeout(() => panel.classList.remove('translate-y-full'), 10);
+            renderCalendar();
+        }
+
+        function closeCalendarPicker() {
+            const picker = document.getElementById('calendar-picker');
+            const panel = picker.querySelector('.transform');
+            panel.classList.add('translate-y-full');
+            setTimeout(() => picker.classList.add('hidden'), 300);
+        }
+
+        function renderCalendar() {
+            const daysContainer = document.getElementById('calendar-days');
+            const monthYearLabel = document.getElementById('calendar-month-year');
+            daysContainer.innerHTML = '';
+
+            const year = currentPickerDate.getFullYear();
+            const month = currentPickerDate.getMonth();
+            monthYearLabel.innerText = `${year}年${month + 1}月`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+
+            // Padding
+            for (let i = 0; i < firstDay; i++) {
+                daysContainer.innerHTML += '<div></div>';
+            }
+
+            for (let d = 1; d <= lastDate; d++) {
+                const isSelected = selectedCalendarDate.getDate() === d && 
+                                 selectedCalendarDate.getMonth() === month && 
+                                 selectedCalendarDate.getFullYear() === year;
+                
+                const dayEl = document.createElement('div');
+                dayEl.className = `h-10 flex items-center justify-center text-sm font-bold rounded-full cursor-pointer transition-colors ${isSelected ? 'ds-calendar-day--selected' : 'ds-text-muted ds-bg-hover'}`;
+                dayEl.innerText = d;
+                dayEl.onclick = () => selectDate(d);
+                daysContainer.appendChild(dayEl);
+            }
+        }
+
+        function selectDate(day) {
+            selectedCalendarDate = new Date(currentPickerDate.getFullYear(), currentPickerDate.getMonth(), day);
+            renderCalendar();
+        }
+
+        function changeMonth(dir) {
+            currentPickerDate.setMonth(currentPickerDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function confirmCalendarDate() {
+            const y = selectedCalendarDate.getFullYear();
+            const m = selectedCalendarDate.getMonth() + 1;
+            const d = selectedCalendarDate.getDate();
+            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            const weekDayFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const weekDayStr = weekdays[selectedCalendarDate.getDay()];
+            const weekDayEn = weekDayFull[selectedCalendarDate.getDay()];
+
+            if (activeScheduleCard) {
+                activeScheduleCard.querySelector('.schedule-date-display').innerText = `${y}年${m < 10 ? '0'+m : m}月${d < 10 ? '0'+d : d}日`;
+                activeScheduleCard.querySelector('.schedule-day-display').innerText = `${weekDayStr} · ${weekDayEn}`;
+            }
+
+            closeCalendarPicker();
+        }
+
+        function addNewSchedule() {
+            const container = document.getElementById('schedule-cards-container');
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = today.getMonth() + 1;
+            const d = today.getDate();
+            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            const weekDayFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            const newCard = document.createElement('div');
+            newCard.className = 'ds-card rounded-xl overflow-hidden schedule-card';
+            newCard.innerHTML = `
+                <div onclick="openCalendarPicker(this)" class="ds-card-header flex justify-between items-center cursor-pointer active:opacity-90 transition-opacity">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-[#ce9224]">
+                            <i class="far fa-calendar-check text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="schedule-date-display ds-body-bold text-sm italic" style="color:var(--text-on-dark)">${y}年${m < 10 ? '0'+m : m}月${d < 10 ? '0'+d : d}日</p>
+                            <p class="schedule-day-display ds-overline" style="color:rgba(255,255,255,0.6)">${weekdays[today.getDay()]} · ${weekDayFull[today.getDay()]}</p>
+                        </div>
+                    </div>
+                    <i onclick="removeSchedule(this, event)" class="fas fa-trash-alt text-[#ce9224] text-xs hover:text-red-500 transition-colors"></i>
+                </div>
+                <div class="p-4">
+                    <div class="relative">
+                        <textarea placeholder="在这里输入您的球局安排、事件记录..." 
+                                  oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                                  class="ds-input ds-textarea rounded-xl"
+                        ></textarea>
+                        <div class="absolute bottom-3 right-3 flex items-center space-x-2">
+                            <span class="text-[10px] font-bold text-slate-300">自动保存中...</span>
+                            <i class="fas fa-check-circle text-green-400 text-xs"></i>
+                        </div>
+                    </div>
+                    ${getScheduleRemindSectionHtml()}
+                </div>
+            `;
+            container.appendChild(newCard);
+            newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        function removeSchedule(btn, event) {
+            event.stopPropagation();
+            const card = btn.closest('.schedule-card');
+            if (card) {
+                card.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    card.remove();
+                }, 300);
+            }
+        }
+
+        let currentMainSection = 'home';
+
+        function toggleStar(btn) {
+            const favorited = btn.getAttribute('data-favorited') === 'true';
+            const icon = btn.querySelector('i');
+            if (favorited) {
+                btn.setAttribute('data-favorited', 'false');
+                if (icon) { icon.classList.remove('fas'); icon.classList.add('far'); }
+            } else {
+                btn.setAttribute('data-favorited', 'true');
+                if (icon) { icon.classList.remove('far'); icon.classList.add('fas'); }
+            }
+        }
+
+        function setTabActive(which) {
+            const primary = document.getElementById('primary-tab');
+            const secondary = document.getElementById('secondary-tab');
+            [primary, secondary].forEach(btn => btn.classList.remove('ds-tab-item--active'));
+            const active = which === 'secondary' ? secondary : primary;
+            if (active) active.classList.add('ds-tab-item--active');
+        }
+
+        function setBottomNavActive(section) {
+            const home = document.getElementById('nav-home');
+            const tournament = document.getElementById('nav-tournament');
+            const profile = document.getElementById('nav-profile');
+            [home, tournament, profile].forEach(item => {
+                if (!item) return;
+                item.classList.remove('ds-bottom-nav-item--active');
+            });
+            const active = section === 'tournament' ? tournament : (section === 'profile' ? profile : home);
+            if (active) active.classList.add('ds-bottom-nav-item--active');
+        }
+
+        function hideMainContents() {
+            document.getElementById('my-content').classList.add('hidden');
+            document.getElementById('schedule-content').classList.add('hidden');
+            document.getElementById('tournament-content').classList.add('hidden');
+            document.getElementById('profile-content').classList.add('hidden');
+        }
+
+        function setHeroTabsVisible(visible) {
+            const banner = document.getElementById('main-banner');
+            const tabs = document.getElementById('main-tabs');
+            [banner, tabs].forEach(el => {
+                if (!el) return;
+                el.classList.toggle('hidden', !visible);
+            });
+        }
+
+        function showHomeSection() {
+            currentMainSection = 'home';
+            setHeroTabsVisible(true);
+            document.getElementById('primary-tab').innerText = '我的';
+            document.getElementById('secondary-tab').innerText = '日程';
+            hideMainContents();
+            document.getElementById('my-content').classList.remove('hidden');
+            setTabActive('primary');
+            setBottomNavActive('home');
+        }
+
+        function showTournamentSection() {
+            currentMainSection = 'tournament';
+            setHeroTabsVisible(true);
+            document.getElementById('primary-tab').innerText = '我的球队赛';
+            document.getElementById('secondary-tab').innerText = '所有球队赛';
+            hideMainContents();
+            document.getElementById('tournament-content').classList.remove('hidden');
+            setTabActive('primary');
+            setBottomNavActive('tournament');
+        }
+
+        function showProfileSection() {
+            currentMainSection = 'profile';
+            setHeroTabsVisible(false);
+            hideMainContents();
+            document.getElementById('profile-content').classList.remove('hidden');
+            setTabActive('primary');
+            setBottomNavActive('profile');
+        }
+
+        function switchTopTab(which) {
+            hideMainContents();
+            setTabActive(which);
+            if (currentMainSection === 'home') {
+                if (which === 'secondary') {
+                    document.getElementById('schedule-content').classList.remove('hidden');
+                } else {
+                    document.getElementById('my-content').classList.remove('hidden');
+                }
+            } else if (currentMainSection === 'tournament') {
+                // 赛事菜单下两个 Tab 都展示球队比赛卡片；后续可按“我的/所有”接接口过滤。
+                document.getElementById('tournament-content').classList.remove('hidden');
+            } else if (currentMainSection === 'profile') {
+                document.getElementById('profile-content').classList.remove('hidden');
+                if (which === 'secondary') toggleEditProfile(true);
+            }
+        }
+
+        function openMoreCreate() {
+            document.getElementById('more-create-page').classList.remove('hidden');
+        }
+
+        function closeMoreCreate() {
+            document.getElementById('more-create-page').classList.add('hidden');
+        }
+
+        function toggleCreateOverlay() {
+            const overlay = document.getElementById('create-overlay');
+            if (overlay.classList.contains('hidden')) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    overlay.classList.remove('translate-y-full', 'opacity-0');
+                }, 10);
+            } else {
+                overlay.classList.add('translate-y-full', 'opacity-0');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function switchTab(el) {
+            // Backward-compatible wrapper. The visible tabs now route through switchTopTab().
+            switchTopTab(el && el.innerText && (el.innerText.includes('日程') || el.innerText.includes('所有')) ? 'secondary' : 'primary');
+        }
+
+        function openNormalCreate() {
+            window.location.href = '创建/普通创建页面.html';
+        }
+
+        function toggleEditProfile(show) {
+            const modal = document.getElementById('edit-profile-modal');
+            if (!modal) return;
+            if (show) {
+                modal.classList.remove('hidden', 'ds-overlay-closed');
+                setTimeout(() => modal.classList.remove('translate-y-full'), 10);
+            } else {
+                modal.classList.add('translate-y-full');
+                setTimeout(() => {
+                    modal.classList.add('hidden', 'ds-overlay-closed');
+                }, 300);
+            }
+        }
+
+        function toggleBannerPicker(show) {
+            const modal = document.getElementById('banner-picker-modal');
+            if (!modal) return;
+            modal.classList.toggle('hidden', !show);
+            modal.classList.toggle('flex', show);
+        }
+
+        function chooseBanner(url) {
+            const img = document.getElementById('profile-banner-img');
+            if (img) img.src = url;
+            toggleBannerPicker(false);
+        }
+
+        (function initRouteFromHash() {
+            if (window.location.hash === '#profile') {
+                showProfileSection();
+            }
+        })();
+    </script>
+</body>
+</html>

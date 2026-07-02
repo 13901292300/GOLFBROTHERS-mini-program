@@ -1,0 +1,2713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tour Elite - Scorecard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'golf-dark': '#000000',
+                        'golf-card': '#111111',
+                        'golf-border': '#222222',
+                        'golf-muted': '#888888',
+                        'golf-light': '#00aeef',
+                        'golf-gold': '#d4a843',
+                        'golf-green': '#004438',
+                        'pga-blue': '#002d62',
+                        'pga-gold': '#ce9224'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'Noto Sans SC', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #000000; color: #f1f5f9; transition: background-color 0.3s, color 0.3s; }
+        
+        /* Light Mode Styles */
+        body.bright-mode { background-color: #ffffff; color: #000000; }
+        .bright-mode #main-header { background-color: #f8fafc; border-bottom-color: #f1f5f9; }
+        .bright-mode #main-header h1 { color: #002d62; }
+        .bright-mode .bg-golf-card { background-color: #f8fafc !important; border-color: #f1f5f9 !important; }
+        .bright-mode .bg-golf-dark { background-color: #ffffff !important; }
+        .bright-mode .text-white { color: #0f172a !important; }
+        .bright-mode .text-golf-muted { color: #94a3b8 !important; }
+        .bright-mode .border-golf-border { border-color: #f1f5f9 !important; }
+        .bright-mode .border-r { border-right-color: #f1f5f9 !important; }
+        .bright-mode .sticky-col { background-color: #f1f5f9 !important; border-right-color: #e2e8f0 !important; }
+        .bright-mode .bg-white.text-black { background-color: #002d62 !important; color: #ffffff !important; }
+        .bright-mode .bg-pga-blue\/20 { background-color: rgba(0, 45, 98, 0.05) !important; }
+        .bright-mode .bg-pga-blue\/5 { background-color: rgba(0, 45, 98, 0.02) !important; }
+        .bright-mode #more-sheet .bg-golf-card { background-color: #ffffff !important; }
+        .bright-mode #more-sheet h3 { color: #002d62 !important; }
+        .bright-mode .score-bogey { border-color: #94a3b8; color: #000000; }
+        .bright-mode .score-double { border-color: #94a3b8; color: #000000; }
+        .bright-mode tr:hover { background-color: rgba(0, 45, 98, 0.02) !important; }
+        .bright-mode .hover\:bg-golf-card:hover { background-color: rgba(0, 45, 98, 0.02) !important; }
+        .bright-mode .hover\:bg-pga-blue\/10:hover { background-color: rgba(0, 45, 98, 0.05) !important; }
+        
+        .bright-mode #quick-score-btn { color: #ffffff !important; }
+        .bright-mode nav button.active-tab span { color: #ffffff !important; }
+        .bright-mode .text-pga-gold.tot-score { color: #002d62 !important; }
+        
+        /* Bright Mode Score Input Sheet Fixes */
+        .bright-mode #score-input-sheet .bg-golf-card { background-color: #ffffff !important; }
+        .bright-mode #score-input-sheet .sheet-main-panel { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+        .bright-mode #score-input-sheet .bg-golf-dark { background-color: #f1f5f9 !important; }
+        .bright-mode #score-input-sheet .stepper-btn { background-color: #ffffff !important; border: 1px solid #e2e8f0; }
+        .bright-mode #score-input-sheet .direction-circle { background-color: #ffffff !important; }
+        .bright-mode #score-input-sheet .direction-circle.active { background-color: #facc15 !important; }
+        .bright-mode #score-input-sheet .text-white { color: #002d62 !important; }
+        .bright-mode #score-input-sheet .bg-pga-blue { background-color: #002d62 !important; }
+        .bright-mode #score-input-sheet .bg-pga-blue .text-white { color: #ffffff !important; }
+        .bright-mode #score-input-sheet .bg-golf-dark.text-golf-muted { background-color: #f1f5f9 !important; color: #94a3b8 !important; }
+        .bright-mode #score-input-sheet .text-sm.font-black.text-white { color: #64748b !important; }
+        .bright-mode #score-input-sheet .text-lg.font-black.text-white { color: #0f172a !important; }
+        
+
+        /* Hole number style: keep blue background and white text in DARK mode */
+        .hole-number {
+            background-color: #002d62 !important;
+            color: #ffffff !important;
+            border-color: #002d62 !important;
+        }
+        body.bright-mode .hole-number {
+            background-color: #002d62 !important;
+            color: #ffffff !important;
+            border-color: #002d62 !important;
+        }
+
+        /* Hole Circle Color Fix */
+        .bright-mode .bg-white.text-black { background-color: #002d62 !important; color: #ffffff !important; }
+        .bright-mode th .bg-white.text-black { background-color: #002d62 !important; color: #ffffff !important; }
+        
+        /* Bright Mode Player List Selection Fix */
+        .bright-mode #sheet-player-list { background-color: #ffffff !important; }
+        .bright-mode #sheet-player-list .sheet-player-item.active { background-color: #f1f5f9 !important; border-right-color: #d4a843 !important; }
+        .bright-mode #sheet-player-list .sheet-player-item.active span { color: #002d62 !important; }
+        .bright-mode #sheet-player-list .sheet-player-item.inactive { opacity: 0.3 !important; filter: grayscale(1); }
+        .bright-mode #sheet-player-list .sheet-player-item.inactive span { color: #94a3b8 !important; }
+        .bright-mode .text-golf-light.opacity-80 { color: #002d62 !important; opacity: 0.6 !important; }
+        .bright-mode .text-white { color: #000000 !important; }
+        .bright-mode .score-birdie span, .bright-mode .score-bogey span, .bright-mode .score-double span { color: inherit !important; }
+        
+        /* Score Input Sheet Styles */
+        .sheet-player-active {
+            background-color: #fff9c4;
+            border-top-left-radius: 1.5rem;
+            border-bottom-left-radius: 1.5rem;
+            position: relative;
+            z-index: 10;
+        }
+        .sheet-main-panel {
+            background-color: #fff9c4;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .stepper-btn {
+            background: white;
+            border-radius: 9999px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            padding: 2px 6px;
+        }
+        .control-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #002d55;
+            transition: opacity 0.2s;
+        }
+        .control-icon.minus, .control-icon.plus { background-color: #facc15; }
+        .direction-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .direction-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .direction-circle.active {
+            background: #facc15;
+            color: #002d55;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .sticky-col { position: sticky; left: 0; z-index: 20; background-color: #0a0a0a; }
+        .score-birdie { border: 2px solid #ef4444; color: #ef4444; border-radius: 9999px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+        .score-bogey { border: 1px solid #888888; color: #ffffff; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; }
+        .score-double { border: 4px double #888888; color: #ffffff; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+        .triangle-red {
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 14px 14px 0;
+            border-color: transparent #ef4444 transparent transparent;
+            position: absolute;
+            top: 0;
+            right: 0;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .triangle-blue {
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 14px 14px 0;
+            border-color: transparent #3b82f6 transparent transparent;
+            position: absolute;
+            top: 0;
+            right: 0;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* Scorecell corner markers: direct child of the td, pinned to this cell's top-right corner */
+        td.score-cell > .triangle-red,
+        td.score-cell > .triangle-blue {
+            top: 0 !important;
+            right: 0 !important;
+        }
+
+
+        /* Muted horizontal borders */
+        .border-b { border-bottom-color: #222222 !important; }
+        .bright-mode .border-b { border-bottom-color: #f1f5f9 !important; }
+        .border-golf-border { border-color: #222222 !important; }
+        .bright-mode .border-golf-border { border-color: #f1f5f9 !important; }
+        
+        /* Grid lines for dark mode */
+        table td, table th { border-right: 1px solid #222222; border-bottom: 1px solid #222222; }
+        .bright-mode table td, .bright-mode table th { border-right-color: #f1f5f9; border-bottom-color: #f1f5f9; }
+    
+
+
+        /* Smooth left-scroll compact avatar column: width follows scroll distance, row height stays fixed */
+        #scoreboard-scroll {
+            --player-col-width: 140px;
+            --player-col-padding-x: 10px;
+            --player-diff-opacity: 1;
+            --player-diff-scale: 1;
+            --player-name-width: 120px;
+            --player-name-align: left;
+        }
+        #scoreboard-scroll tbody tr {
+            height: 92px;
+        }
+        #scoreboard-scroll td.score-cell,
+        #scoreboard-scroll td.player-cell {
+            height: 92px;
+            min-height: 92px;
+        }
+        .player-col-header,
+        .player-cell {
+            width: var(--player-col-width) !important;
+            min-width: var(--player-col-width) !important;
+            max-width: var(--player-col-width) !important;
+            padding-left: var(--player-col-padding-x) !important;
+            padding-right: var(--player-col-padding-x) !important;
+            overflow: hidden;
+            transition: none;
+        }
+        .player-cell-content {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .paired-avatars {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            position: relative;
+            height: 52px;
+            width: 100%;
+            transition: transform 0.1s linear;
+        }
+        .avatar-with-diff {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            position: absolute;
+            width: 40px;
+            top: 0;
+        }
+        .avatar-with-diff:nth-child(1) {
+            left: 12px;
+            z-index: 10;
+        }
+        .avatar-with-diff:nth-child(2) {
+            left: 64px;
+            z-index: 5;
+            transition: transform 0.1s linear;
+        }
+        .paired-avatars .player-diff-wrap {
+            position: absolute;
+            left: 104px;
+            top: 10px;
+            width: 32px;
+            text-align: left;
+            transition: opacity 0.1s;
+        }
+        .player-diff-score {
+            font-size: 1.1rem !important;
+            line-height: 1.2 !important;
+        }
+        .player-avatar-img {
+            border-radius: 9999px !important;
+            width: 36px;
+            height: 36px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: #000;
+        }
+        .paired-names {
+            display: flex;
+            width: 100%;
+            position: relative;
+            height: 12px;
+        }
+        .player-name-line {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 9px !important;
+            width: 40px;
+            position: absolute;
+            text-align: center;
+        }
+        .player-name-line:nth-child(1) {
+            left: 12px;
+        }
+        .player-name-line:nth-child(2) {
+            left: 64px;
+            transition: transform 0.1s linear;
+        }
+        .tee-marker-strip-right {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+        .tee-half {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Visual spec alignment: TAB uses regular font weight; score digits enlarged one step. */
+
+
+        /* Header: match tournament detail page style */
+        .gb-header {
+            height: 72px;
+            background: #002d62;
+            border-bottom: 2px solid #ce9224;
+            color: #ffffff;
+        }
+        .gb-header .theme-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.20);
+            background: rgba(255,255,255,.10);
+            color: #ce9224;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gb-header .mini-program-pill {
+            background: rgba(0,0,0,.20);
+            border: 1px solid rgba(255,255,255,.20);
+        }
+        body.bright-mode .gb-header {
+            background: #002d62 !important;
+            border-bottom-color: #ce9224 !important;
+        }
+        body.bright-mode .gb-header h1,
+        body.bright-mode .gb-header p,
+        body.bright-mode .gb-header button,
+        body.bright-mode .gb-header i {
+            color: #ffffff !important;
+        }
+        body.bright-mode .gb-header .theme-btn {
+            color: #ce9224 !important;
+            background: rgba(255,255,255,.10) !important;
+            border-color: rgba(255,255,255,.20) !important;
+        }
+
+
+        /* Course/Game info accordion */
+        .bright-mode #course-game-info { background-color: #f8fafc !important; border-bottom-color: #f1f5f9 !important; }
+        .bright-mode #course-game-info .bg-golf-dark\/60 { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+        .bright-mode #course-game-info h2,
+        .bright-mode #course-game-info .text-white { color: #002d62 !important; }
+        .bright-mode #course-game-info .bg-pga-blue.text-white { color: #ffffff !important; }
+
+
+
+        /* Scorecard discussion tab: aligned with tournament-detail discussion style */
+        .score-tab-panel-hidden { display: none !important; }
+        .score-discussion-panel { background:#f3f4f6; color:#0f172a; display:flex; flex-direction:column; height:100%; min-height:0; }
+        body:not(.bright-mode) .score-discussion-panel { background:#0b0f14; color:#f8fafc; }
+        .discussion-watchers-strip { height:48px; display:flex; align-items:center; gap:8px; padding:7px 12px; overflow-x:auto; border-bottom:1px solid rgba(148,163,184,.24); background:#fff; flex-shrink:0; }
+        body:not(.bright-mode) .discussion-watchers-strip { background:#101820; border-bottom-color:#1f2937; }
+        .discussion-watchers-label { font-size:11px; font-weight:700; color:#64748b; margin-right:2px; flex-shrink:0; }
+        .discussion-avatar-btn { width:32px; height:32px; border-radius:9999px; padding:0; border:2px solid #fff; overflow:hidden; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+        body:not(.bright-mode) .discussion-avatar-btn { border-color:#1f2937; }
+        .discussion-avatar-btn img { width:100%; height:100%; object-fit:cover; display:block; }
+        .discussion-more-btn { height:30px; padding:0 10px; border-radius:999px; border:1px solid rgba(148,163,184,.3); font-size:11px; color:#64748b; background:rgba(255,255,255,.7); flex-shrink:0; }
+        body:not(.bright-mode) .discussion-more-btn { background:rgba(15,23,42,.72); color:#cbd5e1; }
+        .discussion-chat { flex:1; min-height:0; overflow-y:auto; padding:14px 12px 18px; }
+        .discussion-time { text-align:center; font-size:11px; color:#94a3b8; margin:4px 0 14px; }
+        .chat-row { display:flex; gap:8px; margin-bottom:14px; align-items:flex-start; }
+        .chat-row.self { flex-direction:row-reverse; }
+        .chat-avatar { width:34px; height:34px; border-radius:9999px; object-fit:cover; flex-shrink:0; }
+        .chat-body { max-width:72%; }
+        .chat-meta { font-size:10px; color:#94a3b8; margin:0 0 4px 2px; }
+        .chat-row.self .chat-meta { text-align:right; margin-right:2px; }
+        .chat-bubble { position:relative; background:#fff; border-radius:10px; padding:8px 10px; font-size:13px; line-height:1.45; box-shadow:0 1px 2px rgba(15,23,42,.08); color:#0f172a; }
+        .chat-row.self .chat-bubble { background:#d9fdd3; }
+        body:not(.bright-mode) .chat-bubble { background:#182330; color:#f8fafc; }
+        body:not(.bright-mode) .chat-row.self .chat-bubble { background:#0f4b32; }
+        .discussion-input-bar { flex-shrink:0; display:flex; align-items:center; gap:8px; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid rgba(148,163,184,.25); background:#f8fafc; }
+        body:not(.bright-mode) .discussion-input-bar { background:#111827; border-top-color:#263241; }
+        .discussion-input { flex:1; height:36px; border-radius:18px; border:1px solid rgba(148,163,184,.28); background:#fff; color:#0f172a; padding:0 12px; font-size:13px; outline:none; }
+        body:not(.bright-mode) .discussion-input { background:#0b1220; color:#f8fafc; border-color:#263241; }
+        .discussion-icon-btn { width:36px; height:36px; border-radius:9999px; display:flex; align-items:center; justify-content:center; color:#64748b; background:transparent; flex-shrink:0; }
+        body:not(.bright-mode) .discussion-icon-btn { color:#cbd5e1; }
+        .discussion-send { height:34px; padding:0 12px; border-radius:17px; background:#002d62; color:#fff; font-size:12px; font-weight:800; }
+        .discussion-attach-panel { display:none; grid-template-columns:repeat(4,1fr); gap:12px; padding:12px; background:#f8fafc; border-top:1px solid rgba(148,163,184,.22); }
+        body:not(.bright-mode) .discussion-attach-panel { background:#111827; border-top-color:#263241; }
+        .discussion-attach-panel.show { display:grid; }
+        .attach-item { display:flex; flex-direction:column; align-items:center; gap:6px; font-size:11px; color:#64748b; }
+        .attach-icon { width:42px; height:42px; border-radius:14px; background:#fff; display:flex; align-items:center; justify-content:center; color:#002d62; box-shadow:0 1px 4px rgba(15,23,42,.1); }
+        body:not(.bright-mode) .attach-icon { background:#182330; color:#ce9224; }
+
+
+        /* Group manage page */
+        .group-manage-avatar { width: 46px; height: 46px; border-radius: 9999px; object-fit: cover; }
+        .group-delete-badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 9999px; background: #ef4444; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid #111111; }
+        .bright-mode .group-delete-badge { border-color: #ffffff; }
+        .qr-mock {
+            width: 210px;
+            height: 210px;
+            border-radius: 18px;
+            background:
+                linear-gradient(90deg, #111 10px, transparent 10px) 0 0/20px 20px,
+                linear-gradient(#111 10px, transparent 10px) 0 0/20px 20px,
+                #ffffff;
+            border: 12px solid #ffffff;
+            box-shadow: 0 18px 40px rgba(0,0,0,.35);
+            position: relative;
+        }
+        .qr-mock::before,
+        .qr-mock::after {
+            content: "";
+            position: absolute;
+            width: 46px;
+            height: 46px;
+            border: 8px solid #111;
+            background: #fff;
+        }
+        .qr-mock::before { left: 12px; top: 12px; }
+        .qr-mock::after { right: 12px; top: 12px; }
+        .qr-eye-third { position:absolute; left:12px; bottom:12px; width:46px; height:46px; border:8px solid #111; background:#fff; }
+
+
+        /* Score input sheet: wider player area with per-hole score beside avatar */
+        #score-input-sheet .score-sheet-layout {
+            gap: 10px !important;
+        }
+        #score-input-sheet #sheet-player-list {
+            width: 132px !important;
+            min-width: 132px !important;
+            max-width: 132px !important;
+            padding: 8px 6px !important;
+        }
+        #score-input-sheet .sheet-main-panel {
+            padding: 20px !important;
+            min-width: 0 !important;
+        }
+        #score-input-sheet .sheet-player-item {
+            height: 62px;
+            padding: 7px 8px !important;
+            border-radius: 16px;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px;
+            border-right-width: 0 !important;
+            border: 1px solid transparent;
+        }
+        #score-input-sheet .sheet-player-item.active {
+            background: rgba(0,45,98,.22) !important;
+            border-color: #ce9224 !important;
+        }
+        #score-input-sheet .sheet-player-avatar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            min-width: 0;
+            flex: 1;
+        }
+        #score-input-sheet .sheet-player-avatar-wrap img {
+            width: 34px !important;
+            height: 34px !important;
+            border-radius: 9999px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        #score-input-sheet .sheet-player-name {
+            max-width: 44px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 9px;
+            font-weight: 900;
+            color: #ffffff;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+        #score-input-sheet .sheet-hole-score {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            background: rgba(206,146,36,.16);
+            border: 1px solid rgba(206,146,36,.48);
+            color: #ce9224;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 900;
+            flex-shrink: 0;
+            font-style: italic;
+        }
+        #score-input-sheet .sheet-player-item.inactive .sheet-hole-score {
+            opacity: .55;
+            background: rgba(255,255,255,.05);
+            border-color: rgba(255,255,255,.12);
+            color: #94a3b8;
+        }
+        body.bright-mode #score-input-sheet .sheet-player-item.active {
+            background: #f1f5f9 !important;
+            border-color: #ce9224 !important;
+        }
+        body.bright-mode #score-input-sheet .sheet-player-name {
+            color: #002d62 !important;
+        }
+        body.bright-mode #score-input-sheet .sheet-hole-score {
+            background: rgba(0,45,98,.06);
+            border-color: rgba(0,45,98,.18);
+            color: #002d62;
+        }
+        body.bright-mode #score-input-sheet .sheet-player-item.inactive .sheet-hole-score {
+            color: #94a3b8;
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+
+        /* Score sheet refinement: name below avatar, wider +/- controls */
+        #score-input-sheet .sheet-player-item {
+            align-items: center !important;
+        }
+        #score-input-sheet .sheet-player-avatar-wrap {
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 4px !important;
+            flex: 1;
+            min-width: 0;
+        }
+        #score-input-sheet .sheet-player-avatar-wrap img {
+            margin: 0 !important;
+        }
+        #score-input-sheet .sheet-player-name {
+            max-width: 48px !important;
+            text-align: center !important;
+            display: block !important;
+            line-height: 1.05 !important;
+        }
+        #score-input-sheet .sheet-hole-score {
+            margin-left: 4px;
+        }
+
+        #score-input-sheet .stepper-btn {
+            min-width: 112px !important;
+            padding: 3px 8px !important;
+            justify-content: space-between !important;
+            gap: 12px !important;
+        }
+        #score-input-sheet .stepper-btn span {
+            min-width: 28px !important;
+            text-align: center !important;
+        }
+        #score-input-sheet .control-icon {
+            width: 30px !important;
+            height: 30px !important;
+            flex-shrink: 0;
+        }
+
+
+        /* Score sheet active player border fix */
+        #score-input-sheet #sheet-player-list {
+            overflow: visible !important;
+            padding-right: 8px !important;
+        }
+        #score-input-sheet .sheet-player-item {
+            box-sizing: border-box !important;
+            margin-right: 0 !important;
+            position: relative;
+        }
+        #score-input-sheet .sheet-player-item.active {
+            border: 2px solid #ce9224 !important;
+            box-shadow: inset 0 0 0 1px rgba(206,146,36,.25);
+        }
+
+
+        /* Bright mode: keep score input hole label fully visible */
+        #score-input-sheet #sheet-hole-label {
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            padding: 0 !important;
+            background-color: #002d62 !important;
+            color: #ffffff !important;
+            border-color: #ffffff !important;
+            font-size: 15px !important;
+            line-height: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+        }
+
+        body.bright-mode #score-input-sheet #sheet-hole-label,
+        body.bright #score-input-sheet #sheet-hole-label {
+            background-color: #002d62 !important;
+            color: #ffffff !important;
+            border-color: #ffffff !important;
+        }
+
+
+/* Ensure add/delete page header width matches main scorecard standard */
+#group-manage-page iframe {
+    width: 100%;
+    height: 100%;
+}
+#group-manage-page iframe body #app .gb-header {
+    max-width: 430px !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+
+
+        /* Quick panel only: keep player column aligned with technical panel; all players active, no gold current-player border */
+        #score-input-sheet.quick-mode #sheet-player-list {
+            width: 132px !important;
+            min-width: 132px !important;
+            max-width: 132px !important;
+            padding: 8px 6px !important;
+            overflow: visible !important;
+        }
+
+        #score-input-sheet.quick-mode .sheet-player-item,
+        #score-input-sheet.quick-mode .sheet-player-item.active,
+        #score-input-sheet.quick-mode .sheet-player-item.inactive {
+            height: 62px !important;
+            padding: 7px 8px !important;
+            border-radius: 16px !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+            opacity: 1 !important;
+            filter: none !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+            background: transparent !important;
+        }
+
+        #score-input-sheet.quick-mode .sheet-player-avatar-wrap {
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 4px !important;
+            flex: 1 !important;
+            min-width: 0 !important;
+        }
+
+        #score-input-sheet.quick-mode .sheet-player-avatar-wrap img {
+            width: 34px !important;
+            height: 34px !important;
+            margin: 0 !important;
+            opacity: 1 !important;
+            filter: none !important;
+        }
+
+        #score-input-sheet.quick-mode .sheet-player-name {
+            max-width: 48px !important;
+            text-align: center !important;
+            display: block !important;
+            line-height: 1.05 !important;
+            opacity: 1 !important;
+            filter: none !important;
+            color: #ffffff !important;
+        }
+
+        #score-input-sheet.quick-mode .sheet-hole-score {
+            display: flex !important;
+            opacity: 1 !important;
+            filter: none !important;
+            border-color: rgba(206,146,36,.48) !important;
+            box-shadow: none !important;
+        }
+
+        body.bright-mode #score-input-sheet.quick-mode .sheet-player-item,
+        body.bright-mode #score-input-sheet.quick-mode .sheet-player-item.active,
+        body.bright-mode #score-input-sheet.quick-mode .sheet-player-item.inactive {
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+            filter: none !important;
+        }
+
+        body.bright-mode #score-input-sheet.quick-mode .sheet-player-name {
+            color: #002d62 !important;
+        }
+
+
+        /* Score input panel mode switch */
+        #score-input-sheet .panel-mode-switch {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            width: fit-content;
+            margin: 0 auto 12px;
+            padding: 3px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.10);
+        }
+        #score-input-sheet .panel-mode-btn {
+            height: 28px;
+            padding: 0 14px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+        #score-input-sheet .panel-mode-btn.active {
+            background: #002d62;
+            color: #ffffff;
+        }
+
+
+        #score-input-sheet .score-panel-hidden { display: none !important; }
+
+        /* Quick panel only: right-side score controls */
+        #score-input-sheet .quick-score-control-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+}
+
+        #score-input-sheet .quick-score-control-row {
+            height: 62px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 4px;
+        }
+
+        #score-input-sheet .quick-score-control {
+            min-width: 112px;
+            height: 36px;
+            border-radius: 9999px;
+            background: #ffffff;
+            box-shadow: 0 4px 8px rgba(0,0,0,.14);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 3px 8px;
+            gap: 12px;
+        }
+
+        #score-input-sheet .quick-score-control-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 9999px;
+            background: #facc15;
+            color: #002d62;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        #score-input-sheet .quick-score-control-value {
+            min-width: 28px;
+            text-align: center;
+            font-size: 18px;
+            line-height: 1;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        /* Quick panel only: precise row-by-row alignment with left score-number boxes */
+        #score-input-sheet .quick-score-control-list {
+            width: 100% !important;
+            display: grid !important;
+            grid-template-rows: repeat(4, 62px) !important;
+            row-gap: 0 !important;
+            gap: 0 !important;
+            align-items: stretch !important;
+        }
+
+        #score-input-sheet .quick-score-control-row {
+            height: 62px !important;
+            min-height: 62px !important;
+            max-height: 62px !important;
+            display: flex !items-center !justify-content: flex-start !padding-left: 4px !padding-top: 0 !padding-bottom: 0 !margin: 0 !box-sizing: border-box !important;
+        }
+
+
+        /* Quick panel only: move right-side score controls up about 13px */
+        #score-input-sheet .quick-score-control-list {
+            transform: translateY(-13px) !important;
+        }
+
+
+        /* Quick panel only: left score boxes mirror right-side controls, same style for all players */
+        #score-input-sheet.quick-mode .sheet-player-item.active,
+        #score-input-sheet.quick-mode .sheet-player-item.inactive,
+        #score-input-sheet.quick-mode .sheet-player-item {
+            opacity: 1 !important;
+            filter: none !important;
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+        }
+
+        #score-input-sheet.quick-mode .sheet-hole-score {
+            display: flex !important;
+            width: 34px !important;
+            height: 34px !important;
+            border-radius: 12px !important;
+            background: rgba(206,146,36,.16) !important;
+            border: 1px solid rgba(206,146,36,.48) !important;
+            color: #ce9224 !important;
+            opacity: 1 !important;
+            filter: none !important;
+            font-size: 15px !important;
+            font-weight: 900 !important;
+            font-style: italic !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        body.bright-mode #score-input-sheet.quick-mode .sheet-hole-score {
+            background: rgba(0,45,98,.06) !important;
+            border-color: rgba(0,45,98,.18) !important;
+            color: #002d62 !important;
+            opacity: 1 !important;
+            filter: none !important;
+        }
+
+</style>
+</head>
+<body class="font-sans overflow-hidden h-screen flex flex-col max-w-md mx-auto">
+
+    <!-- Header -->
+    <header id="main-header" class="gb-header shrink-0">
+        <div class="h-full px-4 pt-6 pb-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button class="w-9 h-9 flex items-center justify-center text-white active:opacity-70" aria-label="返回">
+                    <i class="fas fa-chevron-left text-lg"></i>
+                </button>
+                <div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.24em] text-white/50 leading-none mb-1">SCORECARD</p>
+                    <h1 class="text-white text-base font-black italic tracking-tight leading-none">记分卡</h1>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="toggleTheme()" class="theme-btn" aria-label="切换主题">
+                    <i id="theme-icon" class="fas fa-sun text-sm"></i>
+                </button>
+                <div class="mini-program-pill rounded-full px-3 py-1.5 flex items-center gap-3">
+                    <div class="flex gap-1">
+                        <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                        <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                        <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                    </div>
+                    <span class="w-px h-4 bg-white/20"></span>
+                    <span class="w-5 h-5 border-2 border-white rounded-full flex items-center justify-center">
+                        <span class="w-2.5 h-2.5 bg-white rounded-full"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-pga-blue flex items-stretch h-14 shrink-0 border-b border-golf-border">
+        <button id="tab-btn-score" onclick="switchScorecardTab('score')" class="flex-1 flex flex-col items-center justify-center relative group active-tab">
+            <span class="tab-label text-sm font-normal text-white tracking-widest uppercase">记分</span>
+            <div class="tab-indicator absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-[3px] bg-pga-gold rounded-full"></div>
+        </button>
+        <button id="tab-btn-discussion" onclick="switchScorecardTab('discussion')" class="flex-1 flex flex-col items-center justify-center relative group">
+            <span class="tab-label text-sm font-normal text-white/60 group-hover:text-white tracking-widest uppercase transition-colors">互动</span>
+            <div class="tab-indicator hidden absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-[3px] bg-pga-gold rounded-full"></div>
+        </button>
+        <button id="tab-btn-game" onclick="switchScorecardTab('game')" class="flex-1 flex flex-col items-center justify-center relative group">
+            <span class="tab-label text-sm font-normal text-white/60 group-hover:text-white tracking-widest uppercase transition-colors">游戏</span>
+            <div class="tab-indicator hidden absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-[3px] bg-pga-gold rounded-full"></div>
+        </button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-hidden flex flex-col">
+        <div id="score-tab-panel" class="flex-1 overflow-hidden flex flex-col">
+        <!-- Course & Game Info -->
+        <section id="course-game-info" class="bg-golf-card border-b border-golf-border shrink-0">
+            <div class="px-4 py-3 flex items-center text-left">
+                <span class="w-1.5 h-4 bg-pga-gold rounded-full shrink-0 mr-2"></span>
+                <h2 class="text-sm font-bold text-white tracking-wide truncate">Pinehurst No. 2</h2>
+                <button onclick="toggleGameInfo()" class="ml-2 w-7 h-7 rounded-full border border-golf-border flex items-center justify-center text-pga-gold active:opacity-80 shrink-0" aria-label="展开本场信息">
+                    <i id="game-info-chevron" class="fas fa-chevron-down text-xs transition-transform duration-200"></i>
+                </button>
+            </div>
+            <div id="game-info-panel" class="hidden px-4 pb-3 pt-1 border-t border-golf-border/70">
+                <div class="rounded-xl overflow-hidden border border-golf-border bg-golf-dark/60 text-xs">
+                    <div class="flex items-center justify-between px-3 py-2 border-b border-golf-border">
+                        <span class="text-golf-muted">比赛名称</span>
+                        <span class="text-white font-bold truncate ml-3">Tour Elite Series</span>
+                    </div>
+                    <div class="flex items-center justify-between px-3 py-2 border-b border-golf-border">
+                        <span class="text-golf-muted">赛制</span>
+                        <span class="text-white font-bold truncate ml-3">个人比杆赛</span>
+                    </div>
+                    <div class="flex items-center justify-between px-3 py-2 border-b border-golf-border">
+                        <span class="text-golf-muted">天气</span>
+                        <span class="text-white font-bold truncate ml-3">晴 · 22°C · 微风</span>
+                    </div>
+                    <div class="flex items-center justify-between px-3 py-2">
+                        <span class="text-golf-muted">开球时间</span>
+                        <span class="text-white font-bold truncate ml-3">08:30 AM</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Scoreboard Table Container -->
+        <div id="scoreboard-scroll" class="flex-1 overflow-auto no-scrollbar bg-golf-dark">
+            <div class="min-w-max">
+                <table class="w-full text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-golf-card border-b border-golf-border text-golf-muted">
+                            <th class="player-col-header p-4 text-center sticky-col border-r border-golf-border min-w-[140px]">
+                                <div class="text-[10px] font-black uppercase tracking-widest">Hole</div>
+                            </th>
+                            <!-- Hole Numbers -->
+                            <script>
+                                const holeLabels = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','OUT','B1','B2','B3','B4','B5','B6','B7','B8','B9','IN','TOT'];
+                                holeLabels.forEach(h => {
+                                    const isSpecial = ['OUT', 'IN', 'TOT'].includes(h);
+                                    document.write(`<th class="p-3 text-center min-w-[72px] font-black ${isSpecial ? 'bg-pga-blue/20 text-golf-light' : ''}">
+                                        <div class="flex flex-col items-center gap-1">
+                                            <div class="w-8 h-8 rounded-full ${isSpecial ? 'bg-golf-dark border border-golf-border text-golf-muted' : 'hole-number'} flex items-center justify-center text-[10px] font-black">${h}</div>
+                                        </div>
+                                    </th>`);
+                                });
+                            </script>
+                        </tr>
+                        <tr class="bg-golf-dark border-b border-golf-border text-golf-muted">
+                            <td class="p-2 text-center sticky-col border-r border-golf-border">
+                                <div class="text-[10px] font-bold uppercase tracking-widest">Par</div>
+                            </td>
+                            <script>
+                                const pars = [4,4,4,3,4,5,4,3,4, 35, 4,4,3,4,4,5,3,4,4, 35, 70];
+                                pars.forEach((p, i) => {
+                                    const isSpecial = [9, 19, 20].includes(i);
+                                    document.write(`<td class="p-2 text-center font-bold ${isSpecial ? 'bg-golf-card text-golf-muted border-r border-golf-border' : ''}">${p}</td>`);
+                                });
+                            </script>
+                        </tr>
+                    </thead>
+                    <tbody id="player-rows">
+                        <script>
+                            const players = [
+                                { name: "T. WOODS", score: "-4", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100", pos: "1", color: "border-red-600" },
+                                { name: "S. SCHEFFLER", score: "-2", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100", pos: "2", color: "border-pga-gold" },
+                                { name: "R. MCILROY", score: "E", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100", pos: "3", color: "border-white" },
+                                { name: "X. SCHAUFFELE", score: "+3", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100", pos: "4", color: "border-golf-light" }
+                            ];
+
+                                // Pre-calculate triangles for each column to ensure 2 red 2 blue
+                                const columnTriangles = pars.map((_, colIdx) => {
+                                    if ([9, 19, 20].includes(colIdx)) return null;
+                                    let colors = ['triangle-red', 'triangle-red', 'triangle-blue', 'triangle-blue'];
+                                    for (let i = colors.length - 1; i > 0; i--) {
+                                        const j = Math.floor(Math.random() * (i + 1));
+                                        [colors[i], colors[j]] = [colors[j], colors[i]];
+                                    }
+                                    return colors;
+                                });
+
+                                players.forEach((p, pIdx) => {
+                                    // Only create rows for pairs: 0&2 (1st&3rd), 1&3 (2nd&4th)
+                                    if (pIdx > 1) return;
+                                    
+                                    const p1 = players[pIdx];
+                                    const p2 = players[pIdx + 2];
+
+                                    const renderPlayerPairCell = (player1, player2) => {
+                                        const color1 = player1.color.replace('border-', 'bg-');
+                                        const color2 = player2.color.replace('border-', 'bg-');
+                                        
+                                        return `
+                                            <td class="player-cell p-2 sticky-col border-r border-golf-border z-30">
+                                                <div class="player-cell-content">
+                                                    <div class="paired-avatars">
+                                                        <div class="avatar-with-diff">
+                                                            <img src="${player1.avatar}" class="player-avatar-img border ${player1.color}">
+                                                        </div>
+                                                        <div class="avatar-with-diff">
+                                                            <img src="${player2.avatar}" class="player-avatar-img border ${player2.color}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="paired-names">
+                                                        <span class="player-name-line font-black uppercase italic text-golf-muted truncate">${player1.name.split(' ')[1] || player1.name}</span>
+                                                        <span class="player-name-line font-black uppercase italic text-golf-muted truncate">${player2.name.split(' ')[1] || player2.name}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="tee-marker-strip-right">
+                                                    <div class="tee-half ${color1}"></div>
+                                                    <div class="tee-half ${color2}"></div>
+                                                </div>
+                                            </td>
+                                        `;
+                                    };
+
+                                    document.write(`<tr class="border-b border-golf-border hover:bg-golf-card transition-colors">`);
+                                    document.write(renderPlayerPairCell(p1, p2));
+
+
+                                    let outSum = 0, inSum = 0, total = 0;
+                                    let outPutts = 0, inPutts = 0;
+                                    let outDiff = 0, inDiff = 0;
+                                    const formatDiff = (value) => value === 0 ? "E" : (value > 0 ? "+" + value : String(value));
+
+                                    pars.forEach((par, idx) => {
+                                        const isSpecial = [9, 19, 20].includes(idx);
+                                        let content = "";
+                                        let cornerMarker = "";
+                                        
+                                        if (isSpecial) {
+                                            let val = Math.floor(Math.random() * 20) + 70;
+                                            let puttTotal = 30;
+                                            let diffTotal = -2;
+                                            let textColorClass = (idx === 20) ? 'text-pga-gold tot-score' : 'text-golf-muted';
+                                            let diffColorClass = diffTotal < 0 ? 'text-red-400' : (diffTotal > 0 ? 'text-golf-muted' : 'text-golf-gold');
+                                            content = `<div class="relative w-full h-full flex flex-col items-center justify-center min-h-[52px]">
+                                                <span class="font-black ${textColorClass} text-2xl italic italic-force">${val}</span>
+                                                <div class="absolute bottom-[3px] left-[4px] right-[4px] flex justify-between items-end pointer-events-none">
+                                                    <span class="text-[8px] font-bold text-golf-light opacity-80 leading-none">${puttTotal}</span>
+                                                    <span class="text-[8px] font-bold ${diffColorClass} leading-none">${formatDiff(diffTotal)}</span>
+                                                </div>
+                                            </div>`;
+                                        } else {
+                                            let s = par + (Math.random() > 0.8 ? 1 : (Math.random() > 0.8 ? -1 : 0));
+                                            let diff = s - par;
+                                            let diffStr = diff === 0 ? "E" : (diff > 0 ? "+" + diff : String(diff)); 
+                                            let putts = Math.floor(Math.random() * 3) + 1;
+
+                                            let triangleClass = columnTriangles[idx][pIdx];
+                                            cornerMarker = '<div class="' + triangleClass + '"></div>';
+
+                                            content = `<div class="relative w-full h-full flex flex-col items-center justify-center min-h-[52px]">
+                                                <div class="${diff === -1 ? 'score-birdie' : (diff === 1 ? 'score-bogey' : (diff >= 2 ? 'score-double' : ''))}">
+                                                    <span class="text-2xl font-extrabold text-white">${s}</span>
+                                                </div>
+                                                <div class="absolute bottom-[3px] left-[4px] right-[4px] flex justify-between items-end pointer-events-none">
+                                                    <span class="text-[8px] font-bold text-golf-light opacity-80 leading-none">${putts}</span>
+                                                    <span class="text-[8px] font-bold ${diff < 0 ? 'text-red-400' : (diff > 0 ? 'text-golf-muted' : 'text-golf-gold')} leading-none">${diffStr}</span>
+                                                </div>
+                                            </div>`;
+                                        }
+                                        document.write(`<td onclick="openScoreInput(${pIdx}, '${holeLabels[idx]}', ${par})" class="score-cell relative overflow-hidden p-1 text-center border-r border-golf-border cursor-pointer hover:bg-pga-blue/10 ${isSpecial ? 'bg-pga-blue/5' : ''}">${cornerMarker}${content}</td>`);
+                                    });
+                                    document.write(`</tr>`);
+                                });
+                        </script>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        </div>
+
+        <section id="discussion-tab-panel" class="score-discussion-panel score-tab-panel-hidden">
+            <div class="discussion-watchers-strip no-scrollbar" aria-label="围观人员">
+                <span class="discussion-watchers-label">围观</span>
+                <button class="discussion-avatar-btn" data-mention="TigerHoods" oncontextmenu="insertDiscussionMention('TigerHoods'); return false;" onclick="insertDiscussionMention('TigerHoods')"><img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80" alt="TigerHoods"></button>
+                <button class="discussion-avatar-btn" data-mention="Alex" oncontextmenu="insertDiscussionMention('Alex'); return false;" onclick="insertDiscussionMention('Alex')"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80" alt="Alex"></button>
+                <button class="discussion-avatar-btn" data-mention="大雷" oncontextmenu="insertDiscussionMention('大雷'); return false;" onclick="insertDiscussionMention('大雷')"><img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=120&h=120&q=80" alt="大雷"></button>
+                <button class="discussion-avatar-btn" data-mention="Yan" oncontextmenu="insertDiscussionMention('Yan'); return false;" onclick="insertDiscussionMention('Yan')"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80" alt="Yan"></button>
+                <button class="discussion-more-btn">更多</button>
+            </div>
+
+            <div class="discussion-chat no-scrollbar">
+                <div class="discussion-time">今天 08:12</div>
+                <div class="chat-row">
+                    <img class="chat-avatar" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80" alt="Alex">
+                    <div class="chat-body">
+                        <div class="chat-meta">Alex</div>
+                        <div class="chat-bubble">今天果岭速度挺快，短推要保守一点。</div>
+                    </div>
+                </div>
+                <div class="chat-row self">
+                    <img class="chat-avatar" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80" alt="TigerHoods">
+                    <div class="chat-body">
+                        <div class="chat-meta">我</div>
+                        <div class="chat-bubble">收到，A4 洞开始注意落点。</div>
+                    </div>
+                </div>
+                <div class="chat-row">
+                    <img class="chat-avatar" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=120&h=120&q=80" alt="大雷">
+                    <div class="chat-body">
+                        <div class="chat-meta">大雷</div>
+                        <div class="chat-bubble">前组节奏不错，我们保持就行。</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="discussion-attach-panel" class="discussion-attach-panel">
+                <div class="attach-item"><div class="attach-icon"><i class="fas fa-image"></i></div><span>照片</span></div>
+                <div class="attach-item"><div class="attach-icon"><i class="fas fa-video"></i></div><span>视频</span></div>
+                <div class="attach-item"><div class="attach-icon"><i class="fas fa-camera"></i></div><span>拍摄</span></div>
+                <div class="attach-item"><div class="attach-icon"><i class="fas fa-at"></i></div><span>@球友</span></div>
+            </div>
+
+            <div class="discussion-input-bar">
+                <button class="discussion-icon-btn" onclick="insertDiscussionEmoji()"><i class="far fa-smile text-xl"></i></button>
+                <input id="discussion-input" class="discussion-input" placeholder="说点什么..." />
+                <button class="discussion-icon-btn" onclick="toggleDiscussionAttach()"><i class="fas fa-plus text-xl"></i></button>
+                <button class="discussion-send">发送</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Floating Actions -->
+    <div id="score-actions" class="p-4 bg-golf-dark border-t border-golf-border flex gap-3 shrink-0">
+        <!-- Main Action Button (Primary) -->
+        <button id="quick-score-btn" onclick="openGroupManagePage()" class="flex-1 bg-pga-blue hover:bg-blue-800 text-white font-black uppercase tracking-widest rounded-lg py-3.5 text-sm transition-colors">
+            添加/删除
+        </button>
+        <!-- Menu Button (Secondary) -->
+        <button onclick="toggleSheet()" class="flex-1 bg-transparent border border-golf-border text-golf-light hover:bg-white/10 font-bold uppercase tracking-wider rounded-lg py-3.5 text-sm transition-colors">
+            更多功能
+        </button>
+    </div>
+
+    <!-- Add / Delete Group Players Page - isolated iframe -->
+    <div id="group-manage-page" class="fixed inset-0 z-[650] hidden bg-black max-w-md mx-auto">
+        <iframe
+            id="group-manage-frame"
+            title="添加/删除球员"
+            srcdoc="&lt;!DOCTYPE html&gt;
+
+&lt;html lang=&quot;zh-CN&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;/&gt;
+&lt;meta content=&quot;width=device-width, initial-scale=1.0&quot; name=&quot;viewport&quot;/&gt;
+&lt;title&gt;添加/删除球员&lt;/title&gt;
+&lt;script src=&quot;https://cdn.tailwindcss.com&quot;&gt;&lt;/script&gt;
+&lt;link href=&quot;https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;amp;display=swap&quot; rel=&quot;stylesheet&quot;/&gt;
+&lt;link href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css&quot; rel=&quot;stylesheet&quot;/&gt;
+&lt;script&gt;
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            &#x27;golf-dark&#x27;: &#x27;#000000&#x27;,
+            &#x27;golf-card&#x27;: &#x27;#111111&#x27;,
+            &#x27;golf-border&#x27;: &#x27;#222222&#x27;,
+            &#x27;golf-muted&#x27;: &#x27;#888888&#x27;,
+            &#x27;golf-light&#x27;: &#x27;#00AEEF&#x27;,
+            &#x27;pga-blue&#x27;: &#x27;#002D62&#x27;,
+            &#x27;pga-gold&#x27;: &#x27;#CE9224&#x27;
+          },
+          fontFamily: {
+            sans: [&#x27;Inter&#x27;, &#x27;Noto Sans SC&#x27;, &#x27;sans-serif&#x27;]
+          }
+        }
+      }
+    }
+&lt;/script&gt;
+&lt;style&gt;
+    :root {
+      --bg: #000000;
+      --card: #111111;
+      --card-2: #181818;
+      --border: #222222;
+      --text: #ffffff;
+      --muted: #888888;
+      --soft: rgba(255,255,255,0.06);
+    }
+
+    body.bright,
+    body.bright-mode {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --card-2: #f8fafc;
+      --border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --soft: rgba(0,45,98,0.05);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, &quot;Noto Sans SC&quot;, sans-serif;
+      transition: background .25s ease, color .25s ease;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      transition: background .25s ease;
+    }
+
+    /* Sub-page header entered from scorecard */
+    .sub-header {
+      height: 58px;
+      background: #002D62;
+      color: #ffffff;
+      border-bottom: 2px solid #CE9224;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      flex-shrink: 0;
+    }
+
+    .header-side {
+      width: 82px;
+      display: flex;
+      align-items: center;
+    }
+
+    .header-side.right {
+      justify-content: flex-end;
+    }
+
+    .header-title {
+      flex: 1;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: .03em;
+      white-space: nowrap;
+    }
+
+    .header-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    .theme-switch {
+      height: 30px;
+      padding: 2px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.16);
+      display: flex;
+      gap: 2px;
+    }
+
+    .theme-switch button {
+      width: 25px;
+      height: 24px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 900;
+      color: rgba(255,255,255,.62);
+    }
+
+    .theme-switch button.active {
+      background: #CE9224;
+      color: #002D62;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      padding-bottom: 28px;
+    }
+
+    .section-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 3px solid #002D62;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: background .25s ease, border-color .25s ease;
+    }
+
+    .section-head {
+      padding: 14px 14px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--text);
+      letter-spacing: .08em;
+    }
+
+    .section-desc {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .players-strip {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      padding: 14px;
+      scrollbar-width: none;
+    }
+
+    .players-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .player-item {
+      flex: 0 0 auto;
+      width: 56px;
+      text-align: center;
+    }
+
+    .avatar-wrap {
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 6px;
+      position: relative;
+    }
+
+    .avatar-wrap img {
+      width: 50px;
+      height: 50px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 2px solid #002D62;
+      display: block;
+    }
+
+    .delete-dot {
+      position: absolute;
+      top: -4px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: white;
+      border: 2px solid var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+
+    .player-name {
+      display: block;
+      max-width: 56px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .qr-card {
+      margin-top: 16px;
+      padding: 22px 18px 18px;
+      text-align: center;
+    }
+
+    .qr-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .qr-subtitle {
+      font-size: 11px;
+      line-height: 1.6;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+
+    .qr-box {
+      width: 242px;
+      height: 242px;
+      margin: 0 auto;
+      border-radius: 20px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    }
+
+    .qr-box img {
+      width: 220px;
+      height: 220px;
+      display: block;
+    }
+
+    .share-note {
+      margin-top: 14px;
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0 14px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: &quot;&quot;;
+      height: 1px;
+      background: var(--border);
+      flex: 1;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      flex: 1;
+      height: 48px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 900;
+      transition: background .2s ease, transform .2s ease;
+    }
+
+    .action-btn:active {
+      transform: scale(.98);
+    }
+
+    .action-btn.manual {
+      color: #CE9224;
+    }
+
+    .action-btn.friends {
+      color: #002D62;
+    }
+
+    body:not(.bright):not(.bright-mode) .action-btn.friends {
+      color: #00AEEF;
+    }
+
+    .sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: none;
+      justify-content: center;
+      align-items: flex-end;
+      background: rgba(0,0,0,.58);
+      backdrop-filter: blur(8px);
+    }
+
+    .sheet.show {
+      display: flex;
+    }
+
+    .sheet-panel {
+      width: 100%;
+      max-width: 430px;
+      max-height: 86vh;
+      background: var(--bg);
+      border-top: 3px solid #002D62;
+      border-radius: 24px 24px 0 0;
+      overflow: hidden;
+      animation: slideUp .22s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(24px); opacity: .75; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .sheet-header {
+      height: 54px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card);
+    }
+
+    .sheet-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .search-box {
+      margin: 14px 16px;
+      position: relative;
+    }
+
+    .search-box i {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .search-box input {
+      width: 100%;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 0 14px 0 36px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .friend-list {
+      padding: 0 16px 16px;
+      max-height: 52vh;
+      overflow-y: auto;
+    }
+
+    .friend-row {
+      height: 62px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      margin-bottom: 10px;
+    }
+
+    .friend-row img {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      object-fit: cover;
+    }
+
+    .friend-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .friend-main .name {
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .friend-main .meta {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+      margin-top: 3px;
+    }
+
+    .select-state {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: transparent;
+      flex-shrink: 0;
+    }
+
+    .friend-row.selected {
+      border-color: #00AEEF;
+      background: var(--soft);
+    }
+
+    .friend-row.selected .select-state {
+      border-color: #00AEEF;
+      background: #00AEEF;
+      color: #ffffff;
+      font-size: 10px;
+    }
+
+    .sheet-footer {
+      display: flex;
+      gap: 10px;
+      padding: 14px 16px 18px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-btn {
+      height: 46px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .footer-btn.cancel {
+      width: 88px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .footer-btn.confirm {
+      flex: 1;
+      background: #002D62;
+      color: #ffffff;
+    }
+
+    /* Mini Program Standard Header */
+    .mp-header {
+      height: 64px;
+      background: #002D62;
+      color: #ffffff;
+      border-bottom: 2px solid #CE9224;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .mp-back {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    .mp-title {
+      position: absolute;
+      left: 64px;
+      right: 104px;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: .03em;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    .mp-capsule {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 88px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.42);
+      background: rgba(0,0,0,.18);
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .mp-capsule-btn {
+      width: 44px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 15px;
+    }
+
+    .mp-capsule-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255,255,255,.34);
+      flex-shrink: 0;
+    }
+
+    .mode-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+
+    .mode-row-title {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .mode-row-desc {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .mode-switch {
+      height: 30px;
+      padding: 2px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .mode-switch button {
+      width: 28px;
+      height: 24px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 900;
+      color: var(--muted);
+    }
+
+    .mode-switch button.active {
+      background: #002D62;
+      color: #ffffff;
+    }
+
+    body.bright .mp-header,
+    body.bright-mode .mp-header {
+      background: #002D62;
+      color: #ffffff;
+      border-bottom-color: #CE9224;
+    }
+
+  
+    /* Imported scorecard header for Add/Delete page */
+    .gb-header {
+      height: 72px;
+      background: #002d62;
+      border-bottom: 2px solid #ce9224;
+      color: #ffffff;
+      flex-shrink: 0;
+    }
+    .gb-header .theme-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.20);
+      background: rgba(255,255,255,.10);
+      color: #ce9224;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .gb-header .mini-program-pill {
+      background: rgba(0,0,0,.20);
+      border: 1px solid rgba(255,255,255,.20);
+    }
+    body.bright .gb-header,
+    body.bright-mode .gb-header {
+      background: #002d62 !important;
+      border-bottom-color: #ce9224 !important;
+    }
+    body.bright .gb-header h1,
+    body.bright .gb-header p,
+    body.bright .gb-header button,
+    body.bright .gb-header i,
+    body.bright-mode .gb-header h1,
+    body.bright-mode .gb-header p,
+    body.bright-mode .gb-header button,
+    body.bright-mode .gb-header i {
+      color: #ffffff !important;
+    }
+    body.bright .gb-header .theme-btn,
+    body.bright-mode .gb-header .theme-btn {
+      color: #ce9224 !important;
+      background: rgba(255,255,255,.10) !important;
+      border-color: rgba(255,255,255,.20) !important;
+    }
+
+  
+    /* Fixed 1-4 group player slots */
+    .players-strip.fixed-slots {
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      overflow: visible;
+      padding: 14px;
+    }
+
+    .player-item.fixed-slot {
+      width: auto;
+      min-width: 0;
+      text-align: center;
+      position: relative;
+    }
+
+    .slot-index {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #002D62;
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 900;
+      margin: 0 auto 6px; line-height: 1;
+    }
+
+    .empty-slot .avatar-wrap {
+      border: 1px dashed var(--border);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card-2);
+    }
+
+    .empty-slot .empty-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .empty-slot .player-name {
+      color: var(--muted);
+      opacity: .65;
+    }
+
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body id=&quot;app&quot;&gt;
+&lt;div class=&quot;page&quot;&gt;
+&lt;header id=&quot;main-header&quot; class=&quot;gb-header shrink-0&quot;&gt;
+      &lt;div class=&quot;h-full px-4 pt-6 pb-4 flex items-center justify-between&quot;&gt;
+        &lt;div class=&quot;flex items-center gap-3&quot;&gt;
+          &lt;button class=&quot;w-9 h-9 flex items-center justify-center text-white active:opacity-70&quot; aria-label=&quot;返回&quot; onclick=&quot;parent.closeGroupManagePage()&quot;&gt;
+            &lt;i class=&quot;fas fa-chevron-left text-lg&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+          &lt;div&gt;
+            &lt;p class=&quot;text-[9px] font-black uppercase tracking-[0.24em] text-white/50 leading-none mb-1&quot;&gt;SCORECARD&lt;/p&gt;
+            &lt;h1 class=&quot;text-white text-base font-black italic tracking-tight leading-none&quot;&gt;添加/删除&lt;/h1&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class=&quot;flex items-center gap-3&quot;&gt;
+          &lt;button onclick=&quot;toggleTheme()&quot; class=&quot;theme-btn&quot; aria-label=&quot;切换主题&quot;&gt;
+            &lt;i id=&quot;theme-icon&quot; class=&quot;fas fa-moon text-sm&quot;&gt;&lt;/i&gt;
+          &lt;/button&gt;
+          &lt;div class=&quot;mini-program-pill rounded-full px-3 py-1.5 flex items-center gap-3&quot;&gt;
+            &lt;div class=&quot;flex gap-1&quot;&gt;
+              &lt;span class=&quot;w-1.5 h-1.5 bg-white rounded-full&quot;&gt;&lt;/span&gt;
+              &lt;span class=&quot;w-1.5 h-1.5 bg-white rounded-full&quot;&gt;&lt;/span&gt;
+              &lt;span class=&quot;w-1.5 h-1.5 bg-white rounded-full&quot;&gt;&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;span class=&quot;w-px h-4 bg-white/20&quot;&gt;&lt;/span&gt;
+            &lt;span class=&quot;w-5 h-5 border-2 border-white rounded-full flex items-center justify-center&quot;&gt;
+              &lt;span class=&quot;w-2.5 h-2.5 bg-white rounded-full&quot;&gt;&lt;/span&gt;
+            &lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/header&gt;
+&lt;main class=&quot;content&quot;&gt;
+
+&lt;section class=&quot;section-card&quot;&gt;
+&lt;div class=&quot;section-head&quot;&gt;
+&lt;div&gt;
+&lt;div class=&quot;section-title&quot;&gt;本组球员&lt;/div&gt;
+&lt;div class=&quot;section-desc&quot;&gt;点击头像右上角可移出本组&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;text-[10px] font-black text-pga-gold&quot;&gt;&lt;span id=&quot;playerCount&quot;&gt;4&lt;/span&gt;/4&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;players-strip fixed-slots&quot; id=&quot;groupPlayers&quot;&gt;
+&lt;div class=&quot;player-item fixed-slot&quot; data-player=&quot;&quot; data-slot=&quot;1&quot;&gt;
+&lt;div class=&quot;slot-index&quot;&gt;1&lt;/div&gt;
+&lt;div class=&quot;avatar-wrap&quot;&gt;
+&lt;img alt=&quot;大雷&quot; src=&quot;https://i.pravatar.cc/150?img=11&quot;/&gt;
+&lt;button aria-label=&quot;删除大雷&quot; class=&quot;delete-dot&quot; type=&quot;button&quot;&gt;&lt;i class=&quot;fas fa-times&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+&lt;/div&gt;
+&lt;span class=&quot;player-name&quot;&gt;大雷&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class=&quot;player-item fixed-slot&quot; data-player=&quot;&quot; data-slot=&quot;2&quot;&gt;
+&lt;div class=&quot;slot-index&quot;&gt;2&lt;/div&gt;
+&lt;div class=&quot;avatar-wrap&quot;&gt;
+&lt;img alt=&quot;Alex&quot; src=&quot;https://i.pravatar.cc/150?img=12&quot;/&gt;
+&lt;button aria-label=&quot;删除Alex&quot; class=&quot;delete-dot&quot; type=&quot;button&quot;&gt;&lt;i class=&quot;fas fa-times&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+&lt;/div&gt;
+&lt;span class=&quot;player-name&quot;&gt;Alex&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class=&quot;player-item fixed-slot&quot; data-player=&quot;&quot; data-slot=&quot;3&quot;&gt;
+&lt;div class=&quot;slot-index&quot;&gt;3&lt;/div&gt;
+&lt;div class=&quot;avatar-wrap&quot;&gt;
+&lt;img alt=&quot;Bogey King&quot; src=&quot;https://i.pravatar.cc/150?img=30&quot;/&gt;
+&lt;button aria-label=&quot;删除Bogey King&quot; class=&quot;delete-dot&quot; type=&quot;button&quot;&gt;&lt;i class=&quot;fas fa-times&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+&lt;/div&gt;
+&lt;span class=&quot;player-name&quot;&gt;Bogey King&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class=&quot;player-item fixed-slot&quot; data-player=&quot;&quot; data-slot=&quot;4&quot;&gt;
+&lt;div class=&quot;slot-index&quot;&gt;4&lt;/div&gt;
+&lt;div class=&quot;avatar-wrap&quot;&gt;
+&lt;img alt=&quot;老周&quot; src=&quot;https://i.pravatar.cc/150?img=44&quot;/&gt;
+&lt;button aria-label=&quot;删除老周&quot; class=&quot;delete-dot&quot; type=&quot;button&quot;&gt;&lt;i class=&quot;fas fa-times&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+&lt;/div&gt;
+&lt;span class=&quot;player-name&quot;&gt;老周&lt;/span&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/section&gt;
+&lt;section class=&quot;section-card qr-card&quot;&gt;
+&lt;div class=&quot;qr-title&quot;&gt;扫码加入本组&lt;/div&gt;
+&lt;div class=&quot;qr-subtitle&quot;&gt;现场球友扫描二维码后，可申请加入当前记分组。&lt;/div&gt;
+&lt;div class=&quot;qr-box&quot;&gt;
+&lt;img alt=&quot;加入本组二维码&quot; src=&quot;https://api.qrserver.com/v1/create-qr-code/?size=220x220&amp;amp;data=GolfBrothersGroupJoin&amp;amp;color=000&amp;amp;bgcolor=fff&quot;/&gt;
+&lt;/div&gt;
+&lt;div class=&quot;share-note&quot;&gt;长按二维码可保存或转发&lt;/div&gt;
+&lt;div class=&quot;divider&quot;&gt;其他添加方式&lt;/div&gt;
+&lt;div class=&quot;actions&quot;&gt;
+&lt;button class=&quot;action-btn manual&quot; type=&quot;button&quot;&gt;
+&lt;i class=&quot;fas fa-pen&quot;&gt;&lt;/i&gt;
+&lt;span&gt;手工添加&lt;/span&gt;
+&lt;/button&gt;
+&lt;button class=&quot;action-btn friends&quot; id=&quot;openFriendSheet&quot; type=&quot;button&quot;&gt;
+&lt;i class=&quot;fas fa-user-plus&quot;&gt;&lt;/i&gt;
+&lt;span&gt;好友选择&lt;/span&gt;
+&lt;/button&gt;
+&lt;/div&gt;
+&lt;/section&gt;
+&lt;/main&gt;
+&lt;/div&gt;
+&lt;div class=&quot;sheet&quot; id=&quot;friendSheet&quot;&gt;
+&lt;div class=&quot;sheet-panel&quot;&gt;
+&lt;div class=&quot;sheet-header&quot;&gt;
+&lt;div class=&quot;sheet-title&quot;&gt;好友选择&lt;/div&gt;
+&lt;button aria-label=&quot;关闭&quot; class=&quot;header-btn&quot; id=&quot;closeFriendSheet&quot; type=&quot;button&quot;&gt;
+&lt;i class=&quot;fas fa-times text-sm&quot;&gt;&lt;/i&gt;
+&lt;/button&gt;
+&lt;/div&gt;
+&lt;div class=&quot;search-box&quot;&gt;
+&lt;i class=&quot;fas fa-search&quot;&gt;&lt;/i&gt;
+&lt;input placeholder=&quot;搜索好友昵称或ID&quot; type=&quot;text&quot;/&gt;
+&lt;/div&gt;
+&lt;div class=&quot;friend-list&quot;&gt;
+&lt;div class=&quot;friend-row&quot;&gt;
+&lt;div class=&quot;select-state&quot;&gt;&lt;i class=&quot;fas fa-check&quot;&gt;&lt;/i&gt;&lt;/div&gt;
+&lt;img alt=&quot;Alexander&quot; src=&quot;https://i.pravatar.cc/150?img=20&quot;/&gt;
+&lt;div class=&quot;friend-main&quot;&gt;
+&lt;div class=&quot;name&quot;&gt;Alexander&lt;/div&gt;
+&lt;div class=&quot;meta&quot;&gt;ID: 838031&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;friend-row selected&quot;&gt;
+&lt;div class=&quot;select-state&quot;&gt;&lt;i class=&quot;fas fa-check&quot;&gt;&lt;/i&gt;&lt;/div&gt;
+&lt;img alt=&quot;Bogey King&quot; src=&quot;https://i.pravatar.cc/150?img=30&quot;/&gt;
+&lt;div class=&quot;friend-main&quot;&gt;
+&lt;div class=&quot;name&quot;&gt;Bogey King&lt;/div&gt;
+&lt;div class=&quot;meta&quot;&gt;ID: 839102 · 已在本组&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;friend-row&quot;&gt;
+&lt;div class=&quot;select-state&quot;&gt;&lt;i class=&quot;fas fa-check&quot;&gt;&lt;/i&gt;&lt;/div&gt;
+&lt;img alt=&quot;Mason&quot; src=&quot;https://i.pravatar.cc/150?img=47&quot;/&gt;
+&lt;div class=&quot;friend-main&quot;&gt;
+&lt;div class=&quot;name&quot;&gt;Mason&lt;/div&gt;
+&lt;div class=&quot;meta&quot;&gt;ID: 781229&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;friend-row&quot;&gt;
+&lt;div class=&quot;select-state&quot;&gt;&lt;i class=&quot;fas fa-check&quot;&gt;&lt;/i&gt;&lt;/div&gt;
+&lt;img alt=&quot;Eagle Lee&quot; src=&quot;https://i.pravatar.cc/150?img=55&quot;/&gt;
+&lt;div class=&quot;friend-main&quot;&gt;
+&lt;div class=&quot;name&quot;&gt;Eagle Lee&lt;/div&gt;
+&lt;div class=&quot;meta&quot;&gt;ID: 770821&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;sheet-footer&quot;&gt;
+&lt;button class=&quot;footer-btn cancel&quot; id=&quot;cancelFriendSheet&quot; type=&quot;button&quot;&gt;取消&lt;/button&gt;
+&lt;button class=&quot;footer-btn confirm&quot; type=&quot;button&quot;&gt;确认添加&lt;/button&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+
+
+
+
+
+&lt;script&gt;
+(function () {
+  const body = document.body;
+  const themeIcon = document.getElementById(&#x27;theme-icon&#x27;);
+  const themeBtn = document.querySelector(&#x27;.theme-btn&#x27;);
+  const groupPlayers = document.getElementById(&#x27;groupPlayers&#x27;);
+  const playerCount = document.getElementById(&#x27;playerCount&#x27;);
+  const friendSheet = document.getElementById(&#x27;friendSheet&#x27;);
+  const openFriendSheet = document.getElementById(&#x27;openFriendSheet&#x27;);
+  const closeFriendSheet = document.getElementById(&#x27;closeFriendSheet&#x27;);
+  const cancelFriendSheet = document.getElementById(&#x27;cancelFriendSheet&#x27;);
+
+  function setTheme(isBright) {
+    isBright = !!isBright;
+    body.classList.toggle(&#x27;bright&#x27;, isBright);
+    body.classList.toggle(&#x27;bright-mode&#x27;, isBright);
+
+    // DARK shows sun; BRIGHT shows moon
+    document.querySelectorAll(&#x27;#theme-icon, .theme-btn i&#x27;).forEach(icon =&gt; {
+      icon.classList.toggle(&#x27;fa-sun&#x27;, !isBright);
+      icon.classList.toggle(&#x27;fa-moon&#x27;, isBright);
+    });
+  }
+
+  window.setAddDeleteTheme = setTheme;
+
+  function refreshCount() {
+    if (!groupPlayers || !playerCount) return;
+    playerCount.textContent = groupPlayers.querySelectorAll(&#x27;.player-item:not(.empty-slot)&#x27;).length;
+  }
+
+  function clearPlayerSlot(item) {
+    if (!item) return;
+    const slot = item.dataset.slot || &#x27;&#x27;;
+    item.classList.add(&#x27;empty-slot&#x27;);
+    item.removeAttribute(&#x27;data-player&#x27;);
+    item.innerHTML = `
+      &lt;div class=&quot;slot-index&quot;&gt;${slot}&lt;/div&gt;
+      &lt;div class=&quot;avatar-wrap&quot;&gt;
+        &lt;div class=&quot;empty-avatar&quot;&gt;&lt;i class=&quot;fas fa-plus&quot;&gt;&lt;/i&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;span class=&quot;player-name&quot;&gt;空位&lt;/span&gt;
+    `;
+    refreshCount();
+  }
+
+  if (groupPlayers) {
+    groupPlayers.classList.add(&#x27;fixed-slots&#x27;);
+    Array.from(groupPlayers.querySelectorAll(&#x27;.player-item&#x27;)).forEach((item, index) =&gt; {
+      item.classList.add(&#x27;fixed-slot&#x27;);
+      item.dataset.slot = item.dataset.slot || String(index + 1);
+      if (!item.classList.contains(&#x27;empty-slot&#x27;)) {
+        item.setAttribute(&#x27;data-player&#x27;, &#x27;&#x27;);
+      }
+      if (!item.querySelector(&#x27;.slot-index&#x27;)) {
+        item.insertAdjacentHTML(&#x27;afterbegin&#x27;, `&lt;div class=&quot;slot-index&quot;&gt;${item.dataset.slot}&lt;/div&gt;`);
+      }
+    });
+
+    groupPlayers.addEventListener(&#x27;click&#x27;, function (event) {
+      const del = event.target.closest(&#x27;.delete-dot&#x27;);
+      if (!del) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const item = del.closest(&#x27;.player-item&#x27;);
+      if (!item || item.classList.contains(&#x27;empty-slot&#x27;)) return;
+      clearPlayerSlot(item);
+    });
+  }
+
+  if (themeBtn) {
+    themeBtn.addEventListener(&#x27;click&#x27;, function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      try {
+        if (parent &amp;&amp; typeof parent.toggleTheme === &#x27;function&#x27;) {
+          parent.toggleTheme();
+          return;
+        }
+      } catch (e) {}
+
+      setTheme(!(body.classList.contains(&#x27;bright&#x27;) || body.classList.contains(&#x27;bright-mode&#x27;)));
+    });
+  }
+
+  if (openFriendSheet &amp;&amp; friendSheet) {
+    openFriendSheet.addEventListener(&#x27;click&#x27;, () =&gt; friendSheet.classList.add(&#x27;show&#x27;));
+  }
+  if (closeFriendSheet &amp;&amp; friendSheet) {
+    closeFriendSheet.addEventListener(&#x27;click&#x27;, () =&gt; friendSheet.classList.remove(&#x27;show&#x27;));
+  }
+  if (cancelFriendSheet &amp;&amp; friendSheet) {
+    cancelFriendSheet.addEventListener(&#x27;click&#x27;, () =&gt; friendSheet.classList.remove(&#x27;show&#x27;));
+  }
+  if (friendSheet) {
+    friendSheet.addEventListener(&#x27;click&#x27;, (event) =&gt; {
+      if (event.target === friendSheet) friendSheet.classList.remove(&#x27;show&#x27;);
+    });
+  }
+
+  document.querySelectorAll(&#x27;.friend-row&#x27;).forEach(row =&gt; {
+    row.addEventListener(&#x27;click&#x27;, () =&gt; row.classList.toggle(&#x27;selected&#x27;));
+  });
+
+  const initialBright = (() =&gt; {
+    try { return parent.document.body.classList.contains(&#x27;bright-mode&#x27;) || parent.document.body.classList.contains(&#x27;bright&#x27;); }
+    catch (e) { return false; }
+  })();
+  setTheme(initialBright);
+  refreshCount();
+})();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;"
+            class="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms">
+        </iframe>
+    </div>
+
+<!-- More Menu Bottom Sheet -->
+    <div id="more-sheet" class="fixed inset-0 z-[100] hidden flex items-end justify-center bg-black/60 backdrop-blur-sm transition-opacity">
+        <div class="w-full max-w-md bg-golf-card border-t-[3px] border-pga-blue rounded-t-3xl p-6 transform translate-y-0 transition-transform">
+            <div class="flex justify-between items-center mb-8">
+                <h3 class="text-lg font-black uppercase tracking-widest text-white italic italic-force">Tournament Controls</h3>
+                <button onclick="toggleSheet()" class="text-golf-muted hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-y-8 gap-x-4 mb-4">
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="far fa-edit text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">修改比赛</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-map-marked-alt text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">修改半场</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-flag text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">修改T台</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-th text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">成绩卡</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-chart-line text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">统计数据</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-users text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">球友圈</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-user-edit text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">球童记分</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-book text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">记账本</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-id-badge text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">海报</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-palette text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">风格选择</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-blue rounded-2xl flex items-center justify-center text-pga-gold shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-comment-alt text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">反馈</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-slate-600 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-ghost text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">虚拟</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-times-circle text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">取消比赛</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 cursor-pointer group">
+                    <div class="w-16 h-16 bg-pga-gold rounded-2xl flex items-center justify-center text-pga-blue shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fas fa-power-off text-2xl"></i>
+                    </div>
+                    <span class="text-[11px] font-black uppercase tracking-widest text-golf-muted group-hover:text-white">结束比赛</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Score Input Sheet -->
+    <div id="score-input-sheet" class="fixed inset-0 z-[500] hidden">
+        <div class="absolute inset-0 bg-black/40" onclick="closeScoreInput()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-golf-card rounded-t-[3rem] border-t-[3px] border-pga-blue transform translate-y-full transition-transform duration-300 max-w-md mx-auto overflow-hidden pb-6">
+            <div class="w-16 h-1 bg-golf-border rounded-full mx-auto mt-3 mb-4"></div>
+
+            <div class="panel-mode-switch" role="tablist" aria-label="记分面板类型">
+                <button id="panel-mode-tech" class="panel-mode-btn active" type="button" onclick="switchScorePanelMode('tech')">技术面板</button>
+                <button id="panel-mode-quick" class="panel-mode-btn" type="button" onclick="switchScorePanelMode('quick')">快捷面板</button>
+            </div>
+            
+            <div class="flex items-center justify-center mb-4 space-x-6">
+                <button class="w-8 h-8 rounded-full bg-golf-dark flex items-center justify-center text-golf-muted">
+                    <i class="fas fa-chevron-left text-xs"></i>
+                </button>
+                <div class="flex flex-col items-center">
+                    <div class="w-10 h-10 rounded-full bg-pga-blue flex items-center justify-center text-white text-base font-black mb-2 shadow-sm border-2 border-white" id="sheet-hole-label">A1</div>
+                    <div class="flex space-x-4 text-golf-muted font-bold text-[10px]">
+                        <div class="flex items-center space-x-1"><span>PAR</span> <span class="text-white text-xs" id="sheet-par-val">4</span></div>
+                        <div class="flex items-center space-x-1"><span>YARDS</span> <span class="text-golf-light text-xs">422</span></div>
+                    </div>
+                </div>
+                <button class="w-8 h-8 rounded-full bg-golf-dark flex items-center justify-center text-golf-muted">
+                    <i class="fas fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+
+            <div class="score-sheet-layout flex px-4 gap-2 h-[300px]">
+                <div class="sheet-player-list-wide flex flex-col bg-golf-dark/50 rounded-[1.5rem] overflow-hidden py-2" id="sheet-player-list">
+                    <!-- Players injected by JS -->
+                </div>
+
+                <div id="tech-score-panel" class="flex-1 sheet-main-panel p-5 flex flex-col justify-between !bg-golf-dark border border-golf-border">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-black text-white">成绩</span>
+                        <div class="stepper-btn !bg-golf-card">
+                            <button onclick="adjustSheetVal('score', -1)" class="control-icon minus"><i class="fas fa-minus text-[10px]"></i></button>
+                            <span class="text-lg font-black w-8 text-center text-white" id="panel-score">4</span>
+                            <button onclick="adjustSheetVal('score', 1)" class="control-icon plus"><i class="fas fa-plus text-[10px]"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-black text-white">推杆</span>
+                        <div class="stepper-btn !bg-golf-card">
+                            <button onclick="adjustSheetVal('putt', -1)" class="control-icon minus"><i class="fas fa-minus text-[10px]"></i></button>
+                            <span class="text-lg font-black w-8 text-center text-white" id="panel-putt">2</span>
+                            <button onclick="adjustSheetVal('putt', 1)" class="control-icon plus"><i class="fas fa-plus text-[10px]"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-black text-white">罚杆</span>
+                        <div class="stepper-btn !bg-golf-card">
+                            <button onclick="adjustSheetVal('penalty', -1)" class="control-icon minus"><i class="fas fa-minus text-[10px]"></i></button>
+                            <span class="text-lg font-black w-8 text-center text-white" id="panel-penalty">0</span>
+                            <button onclick="adjustSheetVal('penalty', 1)" class="control-icon plus"><i class="fas fa-plus text-[10px]"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-black text-white">沙坑</span>
+                        <div class="stepper-btn !bg-golf-card">
+                            <button onclick="adjustSheetVal('bunker', -1)" class="control-icon minus"><i class="fas fa-minus text-[10px]"></i></button>
+                            <span class="text-lg font-black w-8 text-center text-white" id="panel-bunker">0</span>
+                            <button onclick="adjustSheetVal('bunker', 1)" class="control-icon plus"><i class="fas fa-plus text-[10px]"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-end mt-2">
+                        <div class="direction-btn">
+                            <div class="direction-circle active"><i class="fas fa-bullseye text-xs"></i></div>
+                            <span class="text-[8px] font-black text-pga-gold uppercase">Fairway</span>
+                        </div>
+                        <div class="direction-btn">
+                            <div class="direction-circle"><i class="fas fa-arrow-left text-xs"></i></div>
+                            <span class="text-[8px] font-bold text-golf-muted uppercase">Left</span>
+                        </div>
+                        <div class="direction-btn">
+                            <div class="direction-circle"><i class="fas fa-arrow-right text-xs"></i></div>
+                            <span class="text-[8px] font-bold text-golf-muted uppercase">Right</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="quick-score-panel" class="flex-1 sheet-main-panel p-4 !bg-golf-dark border border-golf-border score-panel-hidden">
+                    <div id="quick-score-control-list" class="quick-score-control-list">
+                        <div class="quick-score-control-row">
+                            <div class="quick-score-control">
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(0, -1)"><i class="fas fa-minus"></i></button>
+                                <span id="quick-score-value-0" class="quick-score-control-value">4</span>
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(0, 1)"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        <div class="quick-score-control-row">
+                            <div class="quick-score-control">
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(1, -1)"><i class="fas fa-minus"></i></button>
+                                <span id="quick-score-value-1" class="quick-score-control-value">4</span>
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(1, 1)"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        <div class="quick-score-control-row">
+                            <div class="quick-score-control">
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(2, -1)"><i class="fas fa-minus"></i></button>
+                                <span id="quick-score-value-2" class="quick-score-control-value">4</span>
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(2, 1)"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        <div class="quick-score-control-row">
+                            <div class="quick-score-control">
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(3, -1)"><i class="fas fa-minus"></i></button>
+                                <span id="quick-score-value-3" class="quick-score-control-value">4</span>
+                                <button type="button" class="quick-score-control-btn" onclick="adjustQuickPanelScore(3, 1)"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex px-10 mt-6 gap-4">
+                <button onclick="closeScoreInput()" class="flex-1 py-3 bg-golf-dark text-golf-muted rounded-full font-black text-xs uppercase tracking-widest border border-golf-border">清除</button>
+                <button onclick="closeScoreInput()" class="flex-1 py-3 bg-pga-gold text-black rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-pga-gold/20">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let activePlayerIdx = 0;
+        let sheetCurrentPar = 4;
+
+        function openScoreInput(playerIdx, holeLabel, par) {
+            if (['OUT', 'IN', 'TOT'].includes(holeLabel)) return;
+            
+            activePlayerIdx = playerIdx;
+            sheetCurrentPar = par;
+            
+            document.getElementById('sheet-hole-label').innerText = holeLabel;
+            document.getElementById('sheet-par-val').innerText = par;
+            document.getElementById('panel-score').innerText = par;
+            
+            renderSheetPlayerList();
+            
+            const sheet = document.getElementById('score-input-sheet');
+            const panel = sheet.querySelector('.transform');
+            sheet.classList.remove('hidden');
+            setTimeout(() => panel.classList.remove('translate-y-full'), 10);
+        }
+
+        function renderSheetPlayerList() {
+            const listEl = document.getElementById('sheet-player-list');
+            listEl.innerHTML = '';
+
+            players.forEach((p, idx) => {
+                const isActive = idx === activePlayerIdx;
+                const displayName = p.name.split('.')[1] || p.name;
+                const mockHoleScore = (typeof quickPanelScores !== 'undefined' && quickPanelScores[idx] != null && document.getElementById('score-input-sheet')?.classList.contains('quick-mode')) ? quickPanelScores[idx] : sheetCurrentPar + (idx === 0 ? 0 : (idx === 1 ? 1 : (idx === 2 ? -1 : 0)));
+                const playerHtml = `
+                    <div class="sheet-player-item ${isActive ? 'active' : 'inactive opacity-60'} cursor-pointer transition-all" onclick="activePlayerIdx=${idx}; renderSheetPlayerList();">
+                        <div class="sheet-player-avatar-wrap">
+                            <img src="${p.avatar}" class="border border-white/20">
+                            <span class="sheet-player-name">${displayName}</span>
+                        </div>
+                        <div class="sheet-hole-score" id="quick-left-score-${idx}">${mockHoleScore}</div>
+                    </div>`;
+                listEl.insertAdjacentHTML('beforeend', playerHtml);
+            });
+        }
+
+        function adjustSheetVal(type, val) {
+            const el = document.getElementById(`panel-${type}`);
+            let current = parseInt(el.innerText);
+            el.innerText = Math.max(0, current + val);
+        }
+
+
+        function switchScorePanelMode(mode) {
+            const isQuick = mode === 'quick';
+            const sheet = document.getElementById('score-input-sheet');
+            const quickPanel = document.getElementById('quick-score-panel');
+            const techPanel = document.getElementById('tech-score-panel');
+            const quickBtn = document.getElementById('panel-mode-quick');
+            const techBtn = document.getElementById('panel-mode-tech');
+
+            if (sheet) sheet.classList.toggle('quick-mode', isQuick);
+            if (quickPanel) quickPanel.classList.toggle('score-panel-hidden', !isQuick);
+            if (techPanel) techPanel.classList.toggle('score-panel-hidden', isQuick);
+            if (quickBtn) quickBtn.classList.toggle('active', isQuick);
+            if (techBtn) techBtn.classList.toggle('active', !isQuick);
+        }
+
+
+        const quickPanelScores = [4, 4, 4, 4];
+
+
+        function syncQuickPanelScoreDisplay(playerIdx) {
+            const value = quickPanelScores[playerIdx];
+            const rightEl = document.getElementById(`quick-score-value-${playerIdx}`);
+            const leftEl = document.getElementById(`quick-left-score-${playerIdx}`);
+
+            if (rightEl) rightEl.innerText = value;
+            if (leftEl) leftEl.innerText = value;
+        }
+
+        function resetQuickPanelScores() {
+            for (let i = 0; i < quickPanelScores.length; i++) {
+                quickPanelScores[i] = sheetCurrentPar || 4;
+                syncQuickPanelScoreDisplay(i);
+            }
+        }
+
+        function adjustQuickPanelScore(playerIdx, delta) {
+            if (quickPanelScores[playerIdx] == null) quickPanelScores[playerIdx] = sheetCurrentPar || 4;
+            quickPanelScores[playerIdx] = Math.max(1, quickPanelScores[playerIdx] + delta);
+            syncQuickPanelScoreDisplay(playerIdx);
+        }
+
+        function closeScoreInput() {
+            const sheet = document.getElementById('score-input-sheet');
+            const panel = sheet.querySelector('.transform');
+            panel.classList.add('translate-y-full');
+            setTimeout(() => sheet.classList.add('hidden'), 300);
+        }
+
+
+
+        function switchScorecardTab(tab) {
+            const scorePanel = document.getElementById('score-tab-panel');
+            const discussionPanel = document.getElementById('discussion-tab-panel');
+            const actions = document.getElementById('score-actions');
+            const tabs = ['score', 'discussion', 'game'];
+            tabs.forEach(name => {
+                const btn = document.getElementById('tab-btn-' + name);
+                if (!btn) return;
+                const label = btn.querySelector('.tab-label');
+                const indicator = btn.querySelector('.tab-indicator');
+                const active = name === tab;
+                btn.classList.toggle('active-tab', active);
+                if (label) {
+                    label.classList.toggle('text-white', active);
+                    label.classList.toggle('text-white/60', !active);
+                }
+                if (indicator) indicator.classList.toggle('hidden', !active);
+            });
+            const showDiscussion = tab === 'discussion';
+            if (scorePanel) scorePanel.classList.toggle('score-tab-panel-hidden', showDiscussion);
+            if (discussionPanel) discussionPanel.classList.toggle('score-tab-panel-hidden', !showDiscussion);
+            if (actions) actions.classList.toggle('hidden', showDiscussion);
+            document.body.classList.toggle('discussion-active', showDiscussion);
+        }
+
+        function insertDiscussionMention(name) {
+            const input = document.getElementById('discussion-input');
+            if (!input) return;
+            const mention = '@' + name + ' ';
+            input.value = input.value ? input.value + mention : mention;
+            input.focus();
+        }
+
+        function insertDiscussionEmoji() {
+            const input = document.getElementById('discussion-input');
+            if (!input) return;
+            input.value += ' 😊';
+            input.focus();
+        }
+
+        function toggleDiscussionAttach() {
+            const panel = document.getElementById('discussion-attach-panel');
+            if (panel) panel.classList.toggle('show');
+        }
+
+        function openGroupManagePage() {
+            const page = document.getElementById('group-manage-page');
+            const frame = document.getElementById('group-manage-frame');
+            if (!page) return;
+
+            page.classList.remove('hidden');
+
+            const apply = function () {
+                if (typeof syncGlobalTheme === 'function') {
+                    syncGlobalTheme(isGlobalBrightMode());
+                }
+            };
+
+            apply();
+            setTimeout(apply, 30);
+            setTimeout(apply, 150);
+
+            if (frame) {
+                frame.onload = apply;
+            }
+        }
+
+        function closeGroupManagePage() {
+            const page = document.getElementById('group-manage-page');
+            if (page) page.classList.add('hidden');
+        }
+
+        function isGlobalBrightMode() {
+            return document.body.classList.contains('bright-mode') || document.body.classList.contains('bright');
+        }
+
+        function syncGlobalTheme(isBright) {
+            document.body.classList.toggle('bright-mode', !!isBright);
+            document.body.classList.toggle('bright', !!isBright);
+
+            // DARK shows sun; BRIGHT shows moon
+            document.querySelectorAll('#theme-icon, .theme-btn i').forEach(icon => {
+                icon.classList.toggle('fa-sun', !isBright);
+                icon.classList.toggle('fa-moon', !!isBright);
+            });
+
+            const page = document.getElementById('group-manage-page');
+            if (page) {
+                page.classList.toggle('bright-mode', !!isBright);
+                page.classList.toggle('bright', !!isBright);
+            }
+
+            const frame = document.getElementById('group-manage-frame');
+            if (frame) {
+                try {
+                    const win = frame.contentWindow;
+                    const doc = frame.contentDocument || (win && win.document);
+                    if (win && typeof win.setAddDeleteTheme === 'function') {
+                        win.setAddDeleteTheme(!!isBright);
+                    }
+                    if (doc && doc.body) {
+                        doc.body.classList.toggle('bright', !!isBright);
+                        doc.body.classList.toggle('bright-mode', !!isBright);
+                        doc.querySelectorAll('#theme-icon, .theme-btn i').forEach(icon => {
+                            icon.classList.toggle('fa-sun', !isBright);
+                            icon.classList.toggle('fa-moon', !!isBright);
+                        });
+                    }
+                } catch (e) {}
+            }
+        }
+
+        function toggleTheme() {
+            syncGlobalTheme(!isGlobalBrightMode());
+        }
+
+
+
+        function toggleSheet() {
+            const sheet = document.getElementById('more-sheet');
+            sheet.classList.toggle('hidden');
+        }
+
+        function toggleGameInfo() {
+            const panel = document.getElementById('game-info-panel');
+            const chevron = document.getElementById('game-info-chevron');
+            if (!panel || !chevron) return;
+            panel.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-180');
+        }
+
+
+        const scoreboardScroll = document.getElementById('scoreboard-scroll');
+        if (scoreboardScroll) {
+            let compactRaf = null;
+            const updateCompactAvatarColumn = () => {
+                compactRaf = null;
+                const startWidth = 140;
+                const minWidth = 84; 
+                const maxScroll = 80; 
+                
+                const progress = Math.min(1, Math.max(0, scoreboardScroll.scrollLeft / maxScroll));
+                
+                const width = startWidth - (startWidth - minWidth) * progress;
+                const paddingX = 10;
+                
+                // secondAvatarShift: moves second avatar to tuck under first
+                const shiftMax = 34;
+                const currentShift = shiftMax * progress;
+
+                // containerShift: moves the whole group to center it in the narrowing column
+                // Initial left padding is 12px. Total width 140.
+                // End width 84. Combined avatar block is about 36 + 18 = 54px wide.
+                // To center 54 in 84: (84 - 54) / 2 = 15px from edge.
+                // Starting left position is 12px. So we need to shift about 3px right.
+                const containerShiftMax = 3; 
+                const currentContainerShift = containerShiftMax * progress;
+
+                const playerCells = document.querySelectorAll('.player-cell');
+                playerCells.forEach((cell, cellIdx) => {
+                    const avatarGroup = cell.querySelector('.paired-avatars');
+                    const nameGroup = cell.querySelector('.paired-names');
+                    const secondAvatar = cell.querySelector('.avatar-with-diff:nth-child(2)');
+                    const names = cell.querySelectorAll('.player-name-line');
+                    
+                    if (avatarGroup) avatarGroup.style.transform = `translateX(${currentContainerShift}px)`;
+                    if (nameGroup) nameGroup.style.transform = `translateX(${currentContainerShift}px)`;
+
+                    if (secondAvatar) {
+                        secondAvatar.style.transform = `translateX(-${currentShift}px)`;
+                    }
+
+                    // Update names to show initial + ellipsis when indented
+                    names.forEach((nameSpan, nameIdx) => {
+                        const playerObj = nameIdx === 0 ? players[cellIdx] : players[cellIdx + 2];
+                        const fullLastName = playerObj.name.split(' ')[1] || playerObj.name;
+                        
+                        if (progress > 0.5) {
+                            nameSpan.innerText = fullLastName.charAt(0) + '...';
+                        } else {
+                            nameSpan.innerText = fullLastName;
+                        }
+
+                        if (nameIdx === 1) {
+                            nameSpan.style.transform = `translateX(-${currentShift}px)`;
+                        }
+                    });
+                });
+
+                const diffOpacity = Math.max(0, 1 - progress * 2);
+                
+                scoreboardScroll.style.setProperty('--player-col-width', width.toFixed(2) + 'px');
+                scoreboardScroll.style.setProperty('--player-col-padding-x', paddingX.toFixed(2) + 'px');
+                scoreboardScroll.style.setProperty('--player-diff-opacity', diffOpacity.toFixed(3));
+            };
+            scoreboardScroll.addEventListener('scroll', function () {
+                if (compactRaf) return;
+                compactRaf = requestAnimationFrame(updateCompactAvatarColumn);
+            }, { passive: true });
+            updateCompactAvatarColumn();
+        }
+    </script>
+
+
+<script>
+(function () {
+  function initGlobalThemeSwitch() {
+    if (typeof syncGlobalTheme === 'function' && typeof isGlobalBrightMode === 'function') {
+      syncGlobalTheme(isGlobalBrightMode());
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGlobalThemeSwitch);
+  } else {
+    initGlobalThemeSwitch();
+  }
+})();
+</script>
+
+</body>
+</html>

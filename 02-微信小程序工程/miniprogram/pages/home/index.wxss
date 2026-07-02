@@ -1,0 +1,1756 @@
+/**
+ * Golf Brothers Design System V3.0 — aligned with 01-HTML原型/design-system.css
+ */
+
+page {
+  position: relative;
+
+  /* ===== DESIGN TOKENS (single source of truth) ===== */
+  /* Colors — brand */
+  --primary-blue: #002D62;
+  --champion-gold: #CE9224;
+  --data-blue: #00AEEF;
+  --tour-blue: var(--primary-blue);
+
+  /* Colors — surface */
+  --bg-primary: #FCFCFC;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F3F4F6;
+  --bg-hover: #F9FAFB;
+  --border: #E5E7EB;
+  --border-hover: #D1D5DB;
+
+  /* Colors — text */
+  --text-primary: var(--primary-blue);
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+  --text-disabled: #9CA3AF;
+  --text-on-dark: #FFFFFF;
+
+  /* Colors — semantic */
+  --success: #16A34A;
+  --warning: #D97706;
+  --error: #DC2626;
+  --star-inactive: #c0c0c0;
+  --neutral-slate: #334155;
+
+  /* Colors — palette (shortcuts / accents) */
+  --accent-green: #22c55e;
+  --accent-green-light: #4ade80;
+  --accent-red: #ef4444;
+  --accent-purple: #a855f7;
+  --accent-orange: #f97316;
+  --accent-blue-light: #60a5fa;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+
+  /* Colors — alpha */
+  --white-alpha-10: rgba(255, 255, 255, 0.1);
+  --white-alpha-20: rgba(255, 255, 255, 0.2);
+  --white-alpha-60: rgba(255, 255, 255, 0.6);
+  --white-alpha-95: rgba(255, 255, 255, 0.95);
+  --black-alpha-20: rgba(0, 0, 0, 0.2);
+  --black-alpha-40: rgba(0, 0, 0, 0.4);
+  --black-alpha-45: rgba(0, 0, 0, 0.45);
+  --black-alpha-35: rgba(0, 0, 0, 0.35);
+  --black-alpha-70: rgba(0, 0, 0, 0.7);
+  --gold-alpha-08: rgba(206, 146, 36, 0.08);
+  --gold-alpha-15: rgba(206, 146, 36, 0.15);
+  --gold-alpha-35: rgba(206, 146, 36, 0.35);
+  --primary-blue-alpha-08: rgba(0, 45, 98, 0.08);
+  --primary-blue-alpha-10: rgba(0, 45, 98, 0.1);
+  --shadow-black-05: rgba(0, 0, 0, 0.05);
+  --shadow-black-10: rgba(0, 0, 0, 0.1);
+
+  --error-alpha-10: rgba(220, 38, 38, 0.1);
+  --error-alpha-20: rgba(220, 38, 38, 0.2);
+  --border-dark: rgba(148, 163, 184, 0.16);
+  --border-dark-hover: rgba(148, 163, 184, 0.28);
+
+  /* Spacing */
+  --space-page: 16px;
+  --space-section: 24px;
+  --card-padding: 12px;
+  --card-padding-x: 16px;
+  /* TAB 高度统一走全局设计 token（app.wxss page → 50px），与赛事/记分/分组/讨论区一致 */
+  --tab-height: 50px;
+  --bottom-nav-height: 56px;
+  --card-tour-height: 88px;
+  --card-tour-body-height: 64px;
+  --fab-size: 56px;
+  --input-padding-y: 12px;
+  --input-padding-x: 16px;
+  --overlay-panel-radius: 24px;
+  --overlay-panel-padding: 24px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 6px -1px var(--shadow-black-05);
+  --shadow-tab: 0 10px 15px -3px var(--shadow-black-10), 0 4px 6px -4px var(--shadow-black-10);
+  --shadow-fab: 0 10px 25px var(--gold-alpha-35);
+  --shadow-gold-soft: 0 10px 15px var(--gold-alpha-15);
+  --shadow-overlay-deep: 0 18px 45px var(--black-alpha-45);
+
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 小程序 button 默认样式重置 */
+button {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  line-height: inherit;
+  font-size: inherit;
+  color: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  overflow: visible;
+}
+button::after {
+  border: none;
+}
+
+.ds-app.dark-theme {
+  --bg-primary: #050816;
+  --bg-card: #0B1220;
+  --bg-subtle: #121A2B;
+  --bg-hover: #1A2332;
+  --border: var(--border-dark);
+  --border-hover: var(--border-dark-hover);
+  --text-primary: #E5EEFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --shadow-card: 0 18px 40px var(--black-alpha-35);
+}
+
+.ds-app {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+  box-sizing: border-box;
+}
+
+.ds-overlay-viewport {
+  height: 100vh;
+  max-height: 100vh;
+}
+
+/* ===== TYPOGRAPHY ===== */
+.ds-display {
+  font-size: 2.25rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.ds-body-bold {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.ds-overline {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ds-body { font-size: 0.875rem; font-weight: 400; line-height: 1.5; color: var(--text-secondary); }
+.ds-text-primary { color: var(--text-primary); }
+.ds-text-muted { color: var(--text-muted); }
+.ds-text-gold { color: var(--champion-gold); }
+.ds-text-data { color: var(--data-blue); }
+.ds-bg-subtle { background-color: var(--bg-subtle); }
+.ds-bg-hover { background-color: var(--bg-hover); }
+.ds-border { border-color: var(--border); }
+
+/* =========================
+   LAYOUT FREEZE ZONE
+   DO NOT MODIFY WITHOUT APPROVAL
+   ========================= */
+/*
+ * Width: page → shell → frame → scroll → bottom-nav = 100% only
+ * Forbidden: 28rem | 100vw | transform:scale() layout | margin:auto centering
+ *            width:0 | width:auto hacks | max-width:20% on nav items
+ */
+
+/* --- Viewport chain --- */
+page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.ds-app,
+.ds-app-shell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.ds-app-shell {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.ds-app-frame {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.ds-scroll-main {
+  flex: 1;
+  height: 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  /* 单一滚动上下文：禁止 contain/transform，避免 sticky 断裂 */
+}
+
+.ds-scroll-main .ds-content-area,
+.ds-scroll-main .ds-main,
+.ds-scroll-main #main-banner,
+.ds-scroll-main #main-tabs {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.ds-content-area,
+.ds-main {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* --- Bottom nav freeze (5 equal slots, FAB out of flow) --- */
+.ds-bottom-nav-shell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  min-width: 0;
+  position: relative;
+  flex-shrink: 0;
+  z-index: 50;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.ds-bottom-nav {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  height: var(--bottom-nav-height);
+  position: relative;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.ds-bottom-nav-item {
+  flex: 1;
+  min-width: 0;
+  height: var(--bottom-nav-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  line-height: 1;
+}
+
+/* 中间「+」主操作入口：放大约 1.15×（56→64px）并上浮，层级高于 tab bar 与背景 */
+.ds-bottom-nav-fab {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) translateY(-50%);
+  width: 64px;
+  height: 64px;
+  z-index: 100;
+  flex: none;
+  pointer-events: auto;
+}
+
+/* --- Component flex seal (scoped, not global utilities) --- */
+.flex-row,
+.ds-tab-item,
+.ds-tab-nav,
+.ds-bottom-nav-item,
+.ds-card-tour-meta,
+.ds-card-tour,
+.ds-card-club,
+.ds-card-club-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ds-tab-nav {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.ds-tab-item {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  justify-content: center;
+  height: var(--tab-height);
+  overflow: hidden;
+  padding: 0;
+  line-height: 1;
+}
+
+.ds-tab-item__inner {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-card-tour-meta,
+.ds-card-club-main,
+.flex-row,
+.ds-card-tour {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.ds-card-tour,
+.ds-card-club {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ds-card-tour-meta__grow,
+.ds-card-club__grow,
+.ds-card-club__meta-grow,
+.ds-card-club__title-wrap,
+.ds-card-tour__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-card-tour-meta__fixed,
+.ds-card-club__meta-fixed,
+.ds-card-club__avatar-col,
+.ds-card-club__avatar-img,
+.ds-card-club__date {
+  flex-shrink: 0;
+}
+
+.tab-text,
+.bottom-tab-text {
+  display: block;
+  line-height: 1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ds-bottom-nav-item .item-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ds-bottom-nav-item .icon {
+  flex-shrink: 0;
+}
+
+/* --- Text intrinsic width seal (no direct text layout leak) ---
+   普通球局卡片(Compact)：标题单行省略，纳入本组；球队比赛卡片(Fluid)标题换行在下方单独定义。 */
+.ds-card-tour-title,
+.ds-card-tour-meta text,
+.ds-card-club-main text,
+.ds-card-club__content text,
+.ds-tab-item .tab-text,
+.ds-bottom-nav-item .bottom-tab-text {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* =========================
+   END LAYOUT FREEZE ZONE
+   ========================= */
+
+/* ===== CARD ===== */
+.ds-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.ds-app.bright-mode .ds-card {
+  box-shadow: var(--shadow-card);
+}
+
+.ds-card-tour,
+.ds-card-club {
+  position: relative;
+}
+
+.card-action-layer {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+.card-star {
+  font-size: 18px;
+  color: var(--star-inactive);
+  opacity: 0.6;
+  line-height: 1;
+}
+
+.card-star.active {
+  color: var(--champion-gold);
+  opacity: 1;
+}
+
+/* 普通球局卡片（Compact）：固定高度，标题单行省略，信息不改变卡片高度 */
+.ds-card-tour {
+  height: var(--card-tour-height);
+  padding: var(--card-padding);
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+/* 集成头像容器：独立视觉模块（与卡片背景区分），固定 64x64，不随内容变化，溢出裁剪
+   - 独立背景色（--bg-subtle，非卡片 --bg-card），形成清晰视觉分层
+   - 容器圆角 3px（仅作用于容器，不作用于头像）
+   - 1px 描边强化"独立模块"边界
+   - 内部 1px gap 透出该背景色，形成拼图分隔线 */
+.ds-group-avatar-mosaic {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  max-width: 64px;
+  max-height: 64px;
+  flex-shrink: 0;
+  flex-grow: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px !important;
+}
+.ds-card-tour::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--tour-blue);
+}
+.ds-card-tour.ds-card-active {
+  border: 3px solid var(--champion-gold) !important;
+}
+.ds-card-tour.ds-card-active::before { display: none; }
+
+.ds-group-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  flex-shrink: 0;
+  align-self: center;
+  display: grid !important;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+.ds-group-avatar--3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.ds-group-avatar--3 .avatar-cell:first-child { grid-column: 1 / -1; }
+.ds-group-avatar--4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.avatar-cell {
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+.avatar-cell image {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ds-card-tour .card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  height: var(--card-tour-body-height);
+  position: relative;
+  padding-right: 24px;
+  box-sizing: border-box;
+}
+.ds-card-tour .card-top,
+.ds-card-tour .card-bottom {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+.ds-card-tour .card-top .ds-card-tour-title {
+  width: 100%;
+}
+.ds-card-tour .card-bottom .ds-card-tour-meta {
+  width: 100%;
+}
+/* 进度行：左缘=内容盒左缘(=题目左对齐)，向右延展 +24px 吃掉 .card 的 padding-right，
+   使进度条更舒展（约 +10% 长度）。仅改变容器长度，不改变任何比例计算逻辑。 */
+.ds-card-tour .card-middle {
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: calc(100% + 24px);
+}
+/* 普通球局卡片标题（Compact）：单行省略（截断规则由上方组统一提供） */
+.ds-card-tour-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  display: block;
+}
+.ds-card-tour-progress {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* track 右端内缩 9px（≈五角星半宽），终点与星标中心对齐 */
+.ds-card-tour .ds-progress-track {
+  width: calc(100% - 9px);
+  --progress-marker-size: 16px;
+}
+/* 普通球局卡片底部：单行信息流 [日期] [围观数] [球场信息]，全部左对齐、同 baseline、自然 gap */
+.ds-card-tour-meta {
+  font-size: 9px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+}
+.ds-card-tour-meta__date {
+  flex-shrink: 0;
+}
+/* 围观数：眼睛图标 + 数字作为一个信息单元（内部紧凑 gap） */
+.ds-card-tour-meta__views {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+}
+/* 球场信息：占据剩余空间并在过长时单行截断，保证不换行 */
+.ds-card-tour-meta__venue {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.ds-card-club {
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--card-padding);
+  gap: 8px;
+  position: relative;
+  min-height: 120px;
+}
+.ds-card-club::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--tour-blue);
+}
+/* 以 LOGO 为垂直锚点的卡片主体：纵向堆叠（锚定行 + LOGO 下方信息行） */
+.ds-card-club-main {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+/* 锚定行：LOGO（左）+ 文本列（右）顶部对齐；行高由文本列自然撑开 */
+.ds-card-club__head {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  position: relative;
+}
+/* LOGO：固定 64×64，顶部对齐为锚点起点，不随内容变形 */
+.ds-card-club__avatar-col {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.ds-card-club__avatar-img {
+  flex-shrink: 0;
+}
+/* 文本列：date / title / 球队名称 / 球场信息 同一列、统一左对齐 */
+.ds-card-club__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  padding-right: 24px;
+  gap: 4px;
+}
+/* LOGO 锚定子块：与 64px LOGO 等高，date 顶对齐 LOGO 顶、title 底对齐 LOGO 底（space-between，非 margin/line-height 假对齐） */
+.ds-card-club__anchor {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 64px;
+  min-width: 0;
+}
+/* 球队名称：与球场信息同一字体体系（text-9px / ds-text-muted），左对齐，不破坏层级 */
+.ds-card-club__team {
+  min-width: 0;
+  width: 100%;
+}
+/* 球队比赛卡片（Fluid）：标题允许换行并撑高卡片，禁止省略号截断（高特异性覆盖单行截断组） */
+.ds-card-club__content .ds-card-club__title-wrap {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.ds-card-club__content .ds-card-club__title-wrap text {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: clip;
+}
+.ds-card-club__date {
+  flex-shrink: 0;
+}
+.ds-card-club__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+.ds-card-club__meta-fixed {
+  flex-shrink: 0;
+}
+
+.ds-live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  background: var(--data-blue);
+  color: var(--text-on-dark);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+  line-height: 1.2;
+}
+.live-badge-pulse { animation: flash-live 1.5s ease-in-out infinite; }
+
+.ds-card-stat {
+  border-top: 3px solid var(--tour-blue);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  box-sizing: border-box;
+}
+.ds-card-header {
+  background: var(--tour-blue);
+  color: var(--text-on-dark);
+  padding: var(--input-padding-y) var(--input-padding-x);
+}
+.ds-card-dashed {
+  border: 2px dashed var(--border);
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--radius-xl);
+}
+.ds-card-action {
+  padding: var(--card-padding);
+  border-left: 4px solid var(--tour-blue);
+  box-sizing: border-box;
+}
+.ds-card-action.rounded-xl { border-radius: var(--radius-xl); }
+.ds-card-action--gold { border-left-color: var(--champion-gold); }
+.ds-card-action--neutral { border-left-color: var(--slate-700); }
+/* DARK 模式可读性修复：创建按钮为深色底(--bg-hover)，标题须用反色文字(text-inverse)，禁止深底深字。
+   仅作用于标题(同时含 .text-11px.text-tour-blue)；左侧图标在浅色 tile 上，保持深蓝不变。 */
+.ds-app.dark-theme .ds-card-action .text-11px.text-tour-blue { color: var(--text-on-dark); }
+.ds-card-selectable {
+  padding: 16px;
+  border-top: 2px solid var(--tour-blue);
+  box-sizing: border-box;
+}
+.ds-card-selectable--gold { border-top-color: var(--champion-gold); }
+.ds-card-selectable--neutral { border-top-color: var(--slate-700); }
+.ds-list-section { overflow: hidden; border-top: 3px solid var(--tour-blue); }
+.ds-list-item {
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.ds-list-item:last-child { border-bottom: none; }
+
+/* ===== BUTTONS（金色=创建/修改/添加/确认，蓝色=浏览/文字链） ===== */
+.ds-btn-primary {
+  background: var(--tour-blue);
+  color: var(--text-on-dark);
+  padding: 10px 24px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+}
+.ds-btn-accent {
+  background: var(--champion-gold);
+  color: var(--text-on-dark);
+  padding: 10px 32px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.4;
+}
+.ds-btn-accent--pill { border-radius: 9999px; }
+.ds-btn-text {
+  background: transparent;
+  color: var(--data-blue);
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+}
+.bg-gold {
+  background-color: var(--champion-gold) !important;
+  color: var(--text-on-dark) !important;
+  padding: 8px 32px;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.4;
+  box-shadow: var(--shadow-gold-soft);
+}
+
+/* D/B 开关：统一为记分页版本（唯一控制入口） */
+.theme-btn {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 999rpx;
+  border: 1px solid var(--white-alpha-20);
+  background: var(--white-alpha-10);
+  color: var(--text-on-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+.theme-btn:active {
+  transform: scale(0.92);
+  background: var(--white-alpha-20);
+}
+.theme-btn__icon {
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+/* ===== HEADER（胶囊适配：高度由 JS 内联 px 控制） ===== */
+.ds-app-header {
+  background-color: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  flex-shrink: 0;
+  z-index: 50;
+  box-sizing: border-box;
+}
+.ds-app-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+}
+.ds-header__fixed {
+  flex-shrink: 0;
+}
+.ds-header-bar__brand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+/* 首页主 Header：隐藏 HTML 原型假胶囊，使用系统真实胶囊 */
+.ds-app-frame > .ds-app-header .status-pill {
+  display: none;
+}
+.ds-app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-height: 32px;
+}
+.ds-app-header .status-pill {
+  background: var(--black-alpha-20);
+  border-color: var(--white-alpha-20);
+}
+.ds-app-header .status-dot { background: var(--bg-card); }
+.ds-app-header .status-circle { border-color: var(--text-on-dark); }
+.ds-app-header .status-line { background: var(--white-alpha-20); }
+
+.ds-brand-logo {
+  display: flex;
+  align-items: flex-end;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  line-height: 0.85;
+  font-size: 18px;
+  letter-spacing: -0.8px;
+  color: var(--text-on-dark);
+  flex-shrink: 0;
+}
+.ds-brand-flag {
+  position: relative;
+  width: 15px;
+  height: 22px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.ds-brand-flag-pole {
+  position: absolute;
+  width: 3px;
+  height: 100%;
+  background: currentColor;
+  border-radius: 1px;
+}
+.ds-brand-flag-cloth {
+  position: absolute;
+  left: 3px;
+  top: 10%;
+  width: 120%;
+  height: 60%;
+  background: var(--champion-gold);
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%, 15% 50%);
+}
+.ds-brand-brothers { color: var(--champion-gold); }
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--white-alpha-20);
+  background: var(--black-alpha-20);
+  border-radius: 9999px;
+  padding: 6px 12px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.status-dot { border-radius: 9999px; background: var(--bg-card); }
+.status-line { width: 1px; height: 16px; background: var(--white-alpha-20); flex-shrink: 0; }
+.status-circle {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--text-on-dark);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ===== TABS (visual only — layout → LAYOUT FREEZE ZONE) ===== */
+.ds-tab-nav {
+  background: var(--tour-blue);
+  border-bottom: 1px solid var(--white-alpha-10);
+  height: var(--tab-height);
+  box-shadow: var(--shadow-tab);
+}
+.ds-tab-item {
+  position: relative;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: transparent;
+  border: none;
+}
+.ds-tab-item--active { font-weight: 500; }
+
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: var(--tab-indicator-height);
+  border-radius: 999px;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.tab-indicator.active {
+  background: var(--tab-indicator-color);
+  opacity: 1;
+}
+
+/* ===== BOTTOM NAV (visual only — layout → LAYOUT FREEZE ZONE) ===== */
+/* 底部导航整体上移 10px 视觉空间（叠加在 safe-area 之上），不贴底、保持 safe-area 兼容 */
+.ds-bottom-nav-shell {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+}
+.ds-bottom-nav-item {
+  color: var(--text-muted);
+}
+.ds-bottom-nav-item--active { color: var(--champion-gold); }
+.ds-bottom-nav-item--placeholder {
+  pointer-events: none;
+}
+/* 图标：固定尺寸的 flex 几何居中盒（emoji 基线差异由 flex 居中抹平，不随文本变化） */
+.ds-bottom-nav-item .icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+/* 文字：纯 flex 居中 + gap 间距，不使用 margin 修正；text-align 仅水平、line-height:1 防止额外行高 */
+.bottom-tab-text {
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+.ds-bottom-nav-fab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--champion-gold);
+  color: var(--text-on-dark);
+  /* 上浮(elevation)：与 bar 同色描边环 + 金色投影，从导航栏中明显浮起 */
+  border: 3px solid var(--bg-card);
+  box-sizing: border-box;
+  box-shadow: var(--shadow-fab);
+}
+/* 内层容器：撑满圆底并 flex 几何居中（结构：gold circle → inner flex → "+"） */
+.ds-bottom-nav-fab__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+/* 「+」由两条矩形 bar 组成，几何中心对齐，不依赖字体 baseline / line-height / transform */
+.ds-bottom-nav-fab__plus {
+  position: relative;
+  width: 26px;
+  height: 26px;
+}
+.ds-bottom-nav-fab__plus::before,
+.ds-bottom-nav-fab__plus::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: auto;
+  background: var(--text-on-dark);
+  border-radius: 2px;
+}
+/* 横杠 */
+.ds-bottom-nav-fab__plus::before {
+  width: 26px;
+  height: 4px;
+}
+/* 竖杠 */
+.ds-bottom-nav-fab__plus::after {
+  width: 4px;
+  height: 26px;
+}
+
+/* ===== SCOPED OVERLAY LAYOUT ===== */
+.ds-overlay__grow {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.ds-overlay__fixed {
+  flex-shrink: 0;
+}
+.ds-schedule-friend__grow {
+  flex: 1;
+  min-width: 0;
+}
+.ds-schedule-friend__name {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--slate-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ===== INPUT ===== */
+.ds-input {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ds-textarea {
+  min-height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+.ds-tag-mention {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: var(--primary-blue-alpha-08);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.ds-tag-at { color: var(--champion-gold); margin-right: 1px; }
+.ds-chip {
+  padding: 4px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  display: inline-block;
+  margin-right: 8px;
+}
+.ds-chip--selected {
+  background: var(--primary-blue-alpha-10);
+  border-color: var(--tour-blue);
+  color: var(--data-blue);
+}
+
+/* ===== PROGRESS ===== */
+/* ===== 分段进度条（双层结构）=====
+   track 层：灰色底，width:100%，代表「未完成」整体轨道
+   active 层：PGA 蓝，width=progressPercentage%，绝对定位从起点(=题目左对齐)铺到当前 step
+   起点 = 进度轨道左侧 = 题目左侧（track 与 title 同为 body 内 100% 宽，左缘对齐） */
+.ds-progress-track {
+  height: 2px;
+  background: var(--border);
+  border-radius: 9999px;
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+.ds-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--tour-blue);
+  border-radius: 9999px;
+}
+/* indicator：左缘锚点定位
+   第1–17洞：left = ratio * 100%（ratio=(hole-1)/17）
+   第18洞：left = calc(100% - 16px)，右缘贴 track 末端（与五角星中心对齐）
+   禁止 left:100% 导致指示器溢出 */
+.ds-progress-marker {
+  position: absolute;
+  top: -7px;
+  width: var(--progress-marker-size, 16px);
+  height: var(--progress-marker-size, 16px);
+  max-width: var(--progress-marker-size, 16px);
+  background: var(--tour-blue);
+  border: 2px solid var(--bg-card);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-on-dark);
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  box-sizing: border-box;
+  z-index: 1;
+}
+/* indicator 内「数字文本」单独斜体：仅作用于数字，不影响 indicator 容器/形状/其他 UI 文字 */
+.ds-progress-marker__num {
+  font-style: italic;
+  font-weight: inherit;
+  font-size: inherit;
+  color: inherit;
+  line-height: 1;
+}
+.ds-progress-marker--finish {
+  left: auto !important;
+  right: 0;
+  top: -9px;
+  width: 20px;
+  height: 20px;
+}
+
+/* ===== 已结束状态（finished）：最高优先级，完全覆盖 active（蓝色/分段/比例）逻辑 =====
+   finished > active > default。轨道收敛为 1px 线，关闭蓝色 fill 与比例渲染，指示器统一灰色。
+   灰阶层级（Gray Hierarchy）：
+     · 进行中-已完成 → PGA 蓝 (--tour-blue)
+     · 进行中-未完成 → 浅灰   (--border)
+     · 已结束       → 深灰   (--text-muted，明显深于未完成灰，形成视觉压制) */
+.ds-progress-track--finish {
+  height: 1px;
+  background: var(--text-muted) !important;
+}
+/* 关闭 active 残留：彻底移除蓝色 progress fill（同时 WXML 已不渲染 fill，双保险） */
+.ds-progress-track--finish .ds-progress-fill {
+  display: none !important;
+}
+/* 指示器与 track 同体系（灰阶）：中性灰底 + 白字，无任何蓝色/active 样式残留 */
+.ds-progress-track--finish .ds-progress-marker,
+.ds-progress-marker--finish {
+  background: var(--text-muted) !important;
+  border-color: var(--bg-card) !important;
+  color: #ffffff !important;
+}
+
+/* ===== OVERLAY & SHEET ===== */
+.ds-page-overlay { background: var(--bg-primary); }
+.ds-profile-hero {
+  height: 224px;
+  clip-path: ellipse(112% 66% at 50% 30%);
+  position: relative;
+}
+.ds-profile-avatar-ring {
+  width: 112px;
+  height: 112px;
+  border: 6px solid var(--champion-gold);
+  background: var(--tour-blue);
+  border-radius: 9999px;
+  overflow: hidden;
+  box-shadow: var(--shadow-overlay-deep);
+  position: relative;
+}
+.ds-profile-edit-panel { background: var(--bg-primary); color: var(--text-primary); }
+.ds-profile-field {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+}
+
+/* CLUB 底部：金色侧翼装饰线（gold line —— CLUB —— gold line），整体居中、左右对称 */
+/* CLUB 收口结构：整体作为 flex group，占卡片宽度约 68%，水平居中、对称 */
+.ds-club-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 68%;
+  max-width: 68%;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+/* 金色侧翼线：等比例延伸（flex:1），1px 高，向外端渐隐，左右对称 */
+.ds-club-footer-line {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--champion-gold));
+}
+.ds-club-footer-line--right {
+  background: linear-gradient(to left, transparent, var(--champion-gold));
+}
+/* CLUB 文案：固定不拉伸、不偏移 */
+.ds-club-footer-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--champion-gold);
+}
+
+.schedule-friend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--card-padding);
+  border-radius: 12px;
+  border: 1px solid var(--slate-100);
+  box-sizing: border-box;
+}
+.schedule-friend-row.selected {
+  border-color: var(--champion-gold);
+  background: var(--gold-alpha-08);
+}
+.schedule-select-state {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: transparent;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.schedule-friend-row.selected .schedule-select-state {
+  border-color: var(--champion-gold);
+  background: var(--champion-gold);
+  color: var(--text-on-dark);
+}
+.ds-calendar-day--selected {
+  background: var(--champion-gold) !important;
+  color: var(--text-on-dark) !important;
+}
+
+.ds-content-area {
+  background: var(--bg-primary);
+}
+.ds-main {
+  padding: var(--space-page);
+  padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+}
+.ds-page-profile { background: var(--bg-primary); }
+
+/* ===== UTILITIES ===== */
+/* flex-1 / min-w-0 / shrink-0 / truncate / text-* : scoped to .ds-app — see SCOPED LAYOUT */
+.flex { display: flex; }
+.flex-row { display: flex; align-items: center; box-sizing: border-box; }
+.flex-col { flex-direction: column; }
+.flex-none { flex: none; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-end { align-items: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+.overflow-hidden { overflow: hidden; }
+.rounded-full { border-radius: 9999px; }
+.rounded-xl { border-radius: 12px; }
+.rounded-2xl { border-radius: 16px; }
+.rounded-3xl { border-radius: 24px; }
+.rounded-lg { border-radius: 8px; }
+.rounded-t-3xl { border-radius: 24px 24px 0 0; }
+.break-words { word-break: break-word; }
+.uppercase { text-transform: uppercase; }
+.italic { font-style: italic; }
+.font-bold { font-weight: 700; }
+.font-black { font-weight: 900; }
+.font-normal { font-weight: 400; }
+.text-center { text-align: center; }
+.leading-none { line-height: 1; }
+.leading-tight { line-height: 1.25; }
+.leading-snug { line-height: 1.375; }
+.tracking-widest { letter-spacing: 0.1em; }
+.tracking-wider { letter-spacing: 0.05em; }
+
+/* ===== SCOPED LAYOUT UTILITIES (.ds-app only) ===== */
+.ds-app .ds-u-grow { flex: 1; min-width: 0; }
+.ds-app .ds-u-shrink { flex-shrink: 0; }
+.ds-app .ds-u-min { min-width: 0; }
+.ds-app .ds-u-clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.ds-app .block { display: block; }
+.ds-app .text-xs { font-size: 12px; }
+.ds-app .text-sm { font-size: 14px; }
+.ds-app .text-base { font-size: 16px; }
+.ds-app .text-lg { font-size: 18px; }
+.ds-app .text-xl { font-size: 20px; }
+.ds-app .text-2xl { font-size: 24px; }
+.ds-app .text-3xl { font-size: 30px; }
+.ds-app .text-4xl { font-size: 36px; }
+.ds-app .text-8px { font-size: 8px; }
+.ds-app .text-9px { font-size: 9px; }
+.ds-app .text-10px { font-size: 10px; }
+.ds-app .text-11px { font-size: 11px; }
+.tracking-tight { letter-spacing: -0.025em; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.space-y-4 { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.space-y-4 > view { width: 100%; max-width: 100%; min-width: 0; }
+.space-y-6 { display: flex; flex-direction: column; gap: 24px; }
+.space-y-8 { display: flex; flex-direction: column; gap: 32px; }
+.p-4 { padding: 16px; box-sizing: border-box; }
+.p-5 { padding: 20px; box-sizing: border-box; }
+.p-6 { padding: 24px; box-sizing: border-box; }
+.p-8 { padding: 32px; box-sizing: border-box; }
+.px-3 { padding-left: 12px; padding-right: 12px; box-sizing: border-box; }
+.px-4 { padding-left: 16px; padding-right: 16px; box-sizing: border-box; }
+.px-6 { padding-left: 24px; padding-right: 24px; box-sizing: border-box; }
+.px-8 { padding-left: 32px; padding-right: 32px; box-sizing: border-box; }
+.py-1 { padding-top: 4px; padding-bottom: 4px; }
+.py-1-5 { padding-top: 6px; padding-bottom: 6px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.py-2-5 { padding-top: 10px; padding-bottom: 10px; }
+.py-3 { padding-top: 12px; padding-bottom: 12px; }
+.py-4 { padding-top: 16px; padding-bottom: 16px; }
+.pt-4 { padding-top: 16px; }
+.pt-6 { padding-top: 24px; }
+.pb-2 { padding-bottom: 8px; }
+.pb-3 { padding-bottom: 12px; }
+.pb-4 { padding-bottom: 16px; }
+.pb-7 { padding-bottom: 28px; }
+.pb-10 { padding-bottom: 40px; }
+.pb-16 { padding-bottom: 64px; }
+.pb-32 { padding-bottom: 128px; }
+.pl-9 { padding-left: 36px; }
+.pr-4 { padding-right: 16px; }
+.pr-6 { padding-right: 24px; }
+.mt-0-5 { margin-top: 2px; }
+.mt-1 { margin-top: 4px; }
+.mt-3 { margin-top: 12px; }
+.mt-8 { margin-top: 32px; }
+.-mt-20 { margin-top: -80px; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-5 { margin-bottom: 20px; }
+.mb-6 { margin-bottom: 24px; }
+.mb-8 { margin-bottom: 32px; }
+.mx-auto { margin-left: 0; margin-right: 0; }
+.max-w-300 { max-width: 300px; }
+.w-1-5 { width: 6px; } .h-1-5 { height: 6px; }
+.w-2-5 { width: 10px; } .h-2-5 { height: 10px; }
+.w-5 { width: 20px; } .h-5 { height: 20px; }
+.w-6 { width: 24px; } .h-6 { height: 24px; }
+.w-8 { width: 32px; } .h-8 { height: 32px; }
+.w-10 { width: 40px; } .h-10 { height: 40px; }
+.w-12 { width: 48px; } .h-12 { height: 48px; }
+.w-14 { width: 56px; } .h-14 { height: 56px; }
+.w-16 { width: 64px; } .h-16 { height: 64px; }
+.w-24 { width: 96px; } .h-24 { height: 96px; }
+.w-28 { width: 112px; } .h-28 { height: 112px; }
+.h-banner { height: 35vh; min-height: 180px; }
+.mt-neg-20 { margin-top: -20px; }
+.sticky { position: sticky; top: 0; z-index: 1000; }
+
+/* 首页主 TAB：与唯一滚动容器同层，吸顶锚定 scroll-main 顶部 */
+#main-tabs.main-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+.grid { display: grid; }
+.grid-cols-2 { grid-template-columns: 1fr 1fr; }
+.grid-cols-7 { grid-template-columns: repeat(7, 1fr); }
+.gap-1-5 { gap: 6px; }
+.opacity-40 { opacity: 0.4; }
+.opacity-60 { opacity: 0.6; }
+.opacity-80 { opacity: 0.8; }
+.bg-white { background-color: var(--bg-card); }
+.bg-white-95 { background-color: var(--white-alpha-95); }
+.bg-white-10 { background-color: var(--white-alpha-10); }
+.bg-slate-50 { background-color: var(--slate-50); }
+.bg-slate-100 { background-color: var(--slate-100); }
+.bg-black-40 { background-color: var(--black-alpha-40); }
+.bg-black-70 { background-color: var(--black-alpha-70); }
+.bg-tour-blue { background-color: var(--tour-blue); }
+.text-white { color: var(--text-on-dark); }
+.text-slate-300 { color: var(--slate-300); }
+.text-slate-400 { color: var(--slate-400); }
+.text-slate-500 { color: var(--slate-500); }
+.text-slate-700 { color: var(--slate-700); }
+.text-slate-800 { color: var(--slate-800); }
+.text-tour-blue { color: var(--primary-blue); }
+.text-gold { color: var(--champion-gold); }
+.text-data-blue { color: var(--data-blue); }
+.text-green-400 { color: var(--accent-green-light); }
+.text-green-500 { color: var(--accent-green); }
+.text-green-500-icon { color: var(--accent-green); }
+.text-red-500 { color: var(--accent-red); }
+.text-purple-500 { color: var(--accent-purple); }
+.text-orange-500 { color: var(--accent-orange); }
+.text-blue-400 { color: var(--accent-blue-light); }
+.border { border: 1px solid var(--border); }
+.border-b { border-bottom: 1px solid var(--border); }
+.border-t { border-top: 1px solid var(--border); }
+.border-slate-100 { border-color: var(--slate-100); }
+.border-white { border-color: var(--text-on-dark); }
+.border-white-20 { border-color: var(--white-alpha-20); }
+.border-2 { border-width: 2px; border-style: solid; }
+.border-4 { border-width: 4px; border-style: solid; }
+.border-t-green { border-top: 2px solid var(--accent-green); }
+.border-t-purple { border-top: 2px solid var(--accent-purple); }
+.border-t-orange { border-top: 2px solid var(--accent-orange); }
+.border-t-red { border-top: 2px solid var(--accent-red); }
+.border-t-blue { border-top: 2px solid var(--accent-blue-light); }
+.object-cover { width: 100%; height: 100%; }
+.object-top { object-position: top; }
+
+/* ===== FIXED / OVERLAY LAYERS ===== */
+.fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.max-w-md {
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+}
+.max-h-75vh { max-height: 75vh; }
+.max-w-92 { max-width: 92%; }
+.w-1-4 { width: 25%; }
+
+.overlay-backdrop {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: var(--black-alpha-40);
+}
+.overlay-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  max-width: 100%;
+  background: var(--bg-card);
+  border-radius: var(--overlay-panel-radius) var(--overlay-panel-radius) 0 0;
+  padding: var(--overlay-panel-padding);
+  transition: transform 0.3s ease;
+  transform: translateY(100%);
+  box-sizing: border-box;
+}
+.panel-open { transform: translateY(0); }
+.panel-closed { transform: translateY(100%); }
+
+.overlay-open {
+  transform: translateY(0);
+  opacity: 1;
+}
+.overlay-closed {
+  transform: translateY(100%);
+  opacity: 0;
+}
+
+.z-10 { z-index: 10; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+.z-100 { z-index: 100; }
+.z-250 { z-index: 250; }
+.z-320 { z-index: 320; }
+.z-330 { z-index: 330; }
+.z-400 { z-index: 400; }
+.z-410 { z-index: 410; }
+
+.shadow-lg { box-shadow: var(--shadow-tab); }
+.shadow-xl { box-shadow: 0 20px 25px -5px var(--shadow-black-10), 0 8px 10px -6px var(--shadow-black-10); }
+.shadow-sm { box-shadow: 0 1px 2px var(--shadow-black-05); }
+.transition-all { transition: all 0.3s ease; }
+
+.schedule-date-text { color: var(--text-on-dark); }
+.schedule-day-text { color: var(--white-alpha-60); }
+.schedule-remind-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.schedule-remind-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.calendar-day {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 9999px;
+}
+.calendar-day-muted { color: var(--text-muted); }
+.schedule-card-removing {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.banner-gradient {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(to bottom, var(--black-alpha-70), var(--black-alpha-20), transparent);
+  pointer-events: none;
+}
+.profile-notify-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: var(--error);
+  border-radius: 9999px;
+  border: 2px solid var(--text-primary);
+}
+.profile-avatar-border { border-color: var(--champion-gold); }
+.profile-avatar-overlay {
+  background: var(--black-alpha-40);
+  top: 0; right: 0; bottom: 0; left: 0;
+}
+.profile-live-badge {
+  font-size: 10px;
+  font-weight: 900;
+  background: var(--error-alpha-10);
+  color: var(--accent-red);
+  border: 1px solid var(--error-alpha-20);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.profile-list-header {
+  padding: var(--input-padding-y) var(--input-padding-x);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.profile-list-header-alt {
+  padding: var(--input-padding-y) var(--input-padding-x);
+  background: var(--slate-50);
+  border-bottom: 1px solid var(--slate-100);
+  box-sizing: border-box;
+}
+
+/* 中间“+”创建面板：操作面板顶部（非页面级蓝色 HEADER，无假胶囊/返回） */
+.create-sheet-head {
+  background: transparent;
+  padding: 12px 16px 8px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
+}
+.create-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.5);
+  margin: 0 auto 12px;
+}
+
+.more-create-header {
+  padding: 24px 16px 16px;
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.shortcut-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 16px;
+  padding: 8px 0;
+  -webkit-overflow-scrolling: touch;
+}
+.shortcut-tile {
+  width: 56px;
+  height: 56px;
+  background: var(--bg-card);
+  border: 1px solid var(--slate-100);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px var(--shadow-black-05);
+  box-sizing: border-box;
+}
+.shortcut-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--slate-600);
+  text-transform: uppercase;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.banner-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.banner-picker-item {
+  height: 96px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--slate-100);
+  position: relative;
+  padding: 0;
+  width: 100%;
+}
+.banner-picker-label {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+  z-index: 1;
+}
+.edit-field-input {
+  background: transparent;
+  width: 100%;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.edit-field-textarea {
+  background: transparent;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  height: 80px;
+  color: var(--text-primary);
+}
+
+/* 创建浮层关闭按钮 */
+.w-14.h-14.bg-white {
+  width: 56px;
+  height: 56px;
+  background: var(--bg-card);
+  border: 2px solid var(--slate-100);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 20px 25px -5px var(--shadow-black-10);
+}
+
+@keyframes flash-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

@@ -1,0 +1,642 @@
+<view class="ds-app ds-app-shell {{themeClass}} overflow-hidden">
+  <view class="ds-app-frame">
+
+    <!-- Header -->
+    <view class="ds-app-header ds-header__fixed z-50" style="{{headerRootStyle}}">
+      <view class="ds-app-header-bar" style="{{headerBarStyle}}">
+        <view class="ds-header-bar__brand flex items-center">
+          <view class="ds-brand-logo ds-brand-logo--header ds-brand-logo--on-dark">
+            <view class="ds-brand-flag">
+              <view class="ds-brand-flag-pole"></view>
+              <view class="ds-brand-flag-cloth"></view>
+            </view>
+            <text>GOLF</text><text class="ds-brand-brothers">BROTHERS</text>
+          </view>
+        </view>
+        <view class="ds-app-header-actions">
+          <view bindtap="toggleTheme" class="theme-btn" aria-label="切换主题">
+            <text class="theme-btn__icon">{{themeIcon === 'sun' ? '☀' : '🌙'}}</text>
+          </view>
+          <view class="status-pill border rounded-full px-3 py-1.5">
+            <view class="flex">
+              <view class="status-dot w-1-5 h-1-5"></view>
+              <view class="status-dot w-1-5 h-1-5" style="margin-left:4px"></view>
+              <view class="status-dot w-1-5 h-1-5" style="margin-left:4px"></view>
+            </view>
+            <view class="status-line"></view>
+            <view class="status-circle">
+              <view class="status-dot w-2-5 h-2-5"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 唯一滚动容器：使用 view + overflow-y，sticky 在 scroll-view 内不生效 -->
+    <view class="ds-scroll-main no-scrollbar z-10">
+      <!-- Background Banner -->
+      <view wx:if="{{heroTabsVisible}}" id="main-banner" class="relative w-full h-banner overflow-hidden mt-neg-20">
+        <image src="https://cdn.screenshottocode.com/eMlt4raQ2b_sRTivrb5v4.jpg" class="w-full h-full object-cover object-top" mode="aspectFill"></image>
+      </view>
+
+      <!-- Top Navigation Tabs -->
+      <view wx:if="{{heroTabsVisible}}" id="main-tabs" class="ds-tab-nav main-tabs sticky shadow-lg mt-neg-20 flex">
+        <button bindtap="switchTopTab" data-which="primary" class="ds-tab-item {{primaryTabActive ? 'ds-tab-item--active tab-active' : 'tab-inactive'}} uppercase tracking-widest"><view class="ds-tab-item__inner"><text class="tab-text">{{primaryTabText}}</text><view class="tab-indicator {{primaryTabActive ? 'active' : ''}}"></view></view></button>
+        <button bindtap="switchTopTab" data-which="secondary" class="ds-tab-item {{secondaryTabActive ? 'ds-tab-item--active tab-active' : 'tab-inactive'}} uppercase tracking-widest"><view class="ds-tab-item__inner"><text class="tab-text">{{secondaryTabText}}</text><view class="tab-indicator {{secondaryTabActive ? 'active' : ''}}"></view></view></button>
+      </view>
+
+      <!-- Tab Content -->
+      <view id="tab-content-area" class="ds-content-area">
+
+        <!-- 我的内容 -->
+        <view wx:if="{{showMyContent}}" id="my-content">
+          <view class="ds-main space-y-4">
+            <block wx:for="{{myCards}}" wx:key="id">
+              <!-- Tour cards -->
+              <view wx:if="{{item.type === 'tour'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour {{item.active ? 'ds-card-active' : ''}}">
+                <text wx:if="{{item.live}}" class="ds-live-badge live-badge-pulse">LIVE</text>
+                <view class="card-action-layer">
+                  <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
+                </view>
+                <view class="ds-group-avatar-mosaic">
+                  <avatar-mosaic avatars="{{item.avatars}}" size="62"></avatar-mosaic>
+                </view>
+                <view class="ds-card-tour__body card">
+                  <view class="card-top">
+                    <text class="ds-card-tour-title ds-text-primary leading-tight">{{item.title}}</text>
+                  </view>
+                  <view class="card-middle">
+                    <view class="ds-card-tour-progress">
+                      <view class="ds-progress-track {{item.progressFinish ? 'ds-progress-track--finish' : ''}}">
+                        <view wx:if="{{!item.progressFinish}}" class="ds-progress-fill" style="width:{{item.progressWidth}}"></view>
+                        <view class="ds-progress-marker {{item.progressFinish ? 'ds-progress-marker--finish' : ''}}" style="{{item.progressFinish ? '' : 'left:' + item.progressMarkerLeft}}"><text class="ds-progress-marker__num">{{item.progressMarkerText}}</text></view>
+                      </view>
+                    </view>
+                  </view>
+                  <view class="card-bottom">
+                    <view class="ds-card-tour-meta flex items-center ds-text-muted">
+                      <text class="ds-card-tour-meta__date">{{item.date}}</text>
+                      <view class="ds-card-tour-meta__views">
+                        <text>👁</text>
+                        <text>{{item.views}}</text>
+                      </view>
+                      <text class="ds-card-tour-meta__venue">{{item.venue}}</text>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              <!-- Club card -->
+              <view wx:elif="{{item.type === 'club'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
+                <view class="card-action-layer">
+                  <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
+                </view>
+                <view class="ds-card-club-main">
+                  <view class="ds-card-club__head">
+                    <view class="ds-card-club__avatar-col">
+                      <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
+                        <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
+                      </view>
+                    </view>
+                    <view class="ds-card-club__content">
+                      <view class="ds-card-club__anchor">
+                        <view class="ds-card-club__date">
+                          <text class="text-base font-black ds-text-data tracking-tight leading-none">{{item.clubDate}}</text>
+                        </view>
+                        <view class="ds-card-club__title-wrap">
+                          <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                        </view>
+                      </view>
+                      <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
+                        <text>{{item.teamName}}</text>
+                      </view>
+                      <view class="ds-card-club__meta-row ds-text-muted text-9px">
+                        <view class="ds-card-club__meta-grow">
+                          <text>{{item.venue}}</text>
+                        </view>
+                        <view class="ds-card-club__meta-fixed">
+                          <text>👁</text>
+                        </view>
+                        <view class="ds-card-club__meta-fixed">
+                          <text>{{item.views}}</text>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+                <view class="ds-club-footer">
+                  <view class="ds-club-footer-line"></view>
+                  <text class="ds-club-footer-label">CLUB</text>
+                  <view class="ds-club-footer-line ds-club-footer-line--right"></view>
+                </view>
+              </view>
+            </block>
+          </view>
+        </view>
+
+        <!-- 日程内容 -->
+        <view wx:if="{{showScheduleContent}}" id="schedule-content" class="ds-main">
+          <view class="space-y-6">
+            <view id="schedule-cards-container" class="space-y-6">
+              <view wx:for="{{scheduleCards}}" wx:key="id" class="ds-card rounded-xl overflow-hidden schedule-card {{item.removing ? 'schedule-card-removing' : ''}}">
+                <view bindtap="openCalendarPicker" data-index="{{index}}" class="ds-card-header flex justify-between items-center">
+                  <view class="flex items-center">
+                    <view class="w-10 h-10 bg-white-10 rounded-xl flex items-center justify-center text-gold">
+                      <text class="text-xl">📅</text>
+                    </view>
+                    <view style="margin-left:12px">
+                      <text class="schedule-date-display ds-body-bold text-sm italic schedule-date-text">{{item.dateDisplay}}</text>
+                      <view><text class="schedule-day-display ds-overline schedule-day-text">{{item.dayDisplay}}</text></view>
+                    </view>
+                  </view>
+                  <text catchtap="removeSchedule" data-index="{{index}}" class="text-gold text-xs">🗑</text>
+                </view>
+                <view class="p-4">
+                  <view class="relative">
+                    <textarea placeholder="在这里输入您的球局安排、事件记录..." value="{{item.note}}" bindinput="onScheduleNoteInput" data-index="{{index}}" auto-height class="ds-input ds-textarea rounded-xl"></textarea>
+                    <view class="absolute" style="bottom:12px;right:12px">
+                      <view class="flex items-center">
+                        <text class="text-10px font-bold text-slate-300">自动保存中...</text>
+                        <text class="text-green-400 text-xs" style="margin-left:8px">✓</text>
+                      </view>
+                    </view>
+                  </view>
+                  <view class="schedule-remind-section">
+                    <view class="schedule-remind-tags">
+                      <text wx:for="{{item.remindees}}" wx:for-item="r" wx:key="id" class="ds-tag-mention"><text class="ds-tag-at">@</text>{{r.name}}</text>
+                    </view>
+                    <button bindtap="openScheduleRemindeePicker" data-index="{{index}}" class="ds-btn-text text-11px">
+                      <text>＋ 添加被提醒人</text>
+                    </button>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view bindtap="addNewSchedule" class="ds-card-dashed p-8 flex flex-col items-center justify-center opacity-60">
+              <view class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                <text>＋</text>
+              </view>
+              <text class="text-xs font-bold text-slate-400 uppercase tracking-widest" style="margin-top:12px">添加新日程</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 赛事内容 -->
+        <view wx:if="{{showTournamentContent}}" id="tournament-content">
+          <view class="ds-main space-y-4">
+            <view wx:for="{{tournamentCards}}" wx:key="id" class="ds-card ds-card-club">
+              <view class="card-action-layer">
+                <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
+              </view>
+              <view class="ds-card-club-main">
+                <view class="ds-card-club__head">
+                  <view class="ds-card-club__avatar-col">
+                    <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
+                      <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
+                    </view>
+                  </view>
+                  <view class="ds-card-club__content">
+                    <view class="ds-card-club__anchor">
+                      <view class="ds-card-club__date">
+                        <text class="text-base font-black ds-text-data tracking-tight leading-none">{{item.clubDate}}</text>
+                      </view>
+                      <view class="ds-card-club__title-wrap">
+                        <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                      </view>
+                    </view>
+                    <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
+                      <text>{{item.teamName}}</text>
+                    </view>
+                    <view class="ds-card-club__meta-row ds-text-muted text-9px">
+                      <view class="ds-card-club__meta-grow">
+                        <text>{{item.venue}}</text>
+                      </view>
+                      <view class="ds-card-club__meta-fixed">
+                        <text>👁</text>
+                      </view>
+                      <view class="ds-card-club__meta-fixed">
+                        <text>{{item.views}}</text>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              <view class="ds-club-footer">
+                <view class="ds-club-footer-line"></view>
+                <text class="ds-club-footer-label">CLUB</text>
+                <view class="ds-club-footer-line ds-club-footer-line--right"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 广场内容：进行中 GAME（普通卡片，无金边） -->
+        <view wx:if="{{showPlazaContent}}" id="plaza-content">
+          <view class="ds-main space-y-4">
+            <view wx:if="{{plazaCards.length === 0}}" class="ds-card-dashed p-8 flex flex-col items-center justify-center opacity-60">
+              <text class="text-xs font-bold text-slate-400 uppercase tracking-widest">暂无进行中的球局</text>
+            </view>
+            <view wx:for="{{plazaCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour">
+              <view class="ds-group-avatar-mosaic">
+                <avatar-mosaic avatars="{{item.avatars}}" size="62"></avatar-mosaic>
+              </view>
+              <view class="ds-card-tour__body card">
+                <view class="card-top">
+                  <text class="ds-card-tour-title ds-text-primary leading-tight">{{item.title}}</text>
+                </view>
+                <view class="card-middle">
+                  <view class="ds-card-tour-progress">
+                    <view class="ds-progress-track {{item.progressFinish ? 'ds-progress-track--finish' : ''}}">
+                      <view wx:if="{{!item.progressFinish}}" class="ds-progress-fill" style="width:{{item.progressWidth}}"></view>
+                      <view class="ds-progress-marker {{item.progressFinish ? 'ds-progress-marker--finish' : ''}}" style="{{item.progressFinish ? '' : 'left:' + item.progressMarkerLeft}}"><text class="ds-progress-marker__num">{{item.progressMarkerText}}</text></view>
+                    </view>
+                  </view>
+                </view>
+                <view class="card-bottom">
+                  <view class="ds-card-tour-meta flex items-center ds-text-muted">
+                    <text class="ds-card-tour-meta__date">{{item.date}}</text>
+                    <view class="ds-card-tour-meta__views"><text>👁</text><text>{{item.views}}</text></view>
+                    <text class="ds-card-tour-meta__venue">{{item.venue}}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 我的菜单内容 -->
+        <view wx:if="{{showProfileContent}}" id="profile-content" class="ds-page-profile">
+          <view class="pb-32">
+            <view class="relative overflow-hidden" style="background:var(--bg-card)">
+              <view class="relative ds-profile-hero overflow-hidden">
+                <image id="profile-banner-img" src="{{profileBannerImg}}" class="w-full h-full opacity-80" mode="aspectFill"></image>
+                <view class="banner-gradient"></view>
+                <view class="absolute" style="top:20px;left:20px">
+                  <view class="flex items-center gap-4">
+                    <view class="relative">
+                      <text class="text-2xl text-white">🔔</text>
+                      <view class="profile-notify-dot"></view>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              <view class="relative -mt-20 flex flex-col items-center px-6 pb-7">
+                <view class="relative mb-5">
+                  <view class="ds-profile-avatar-ring relative">
+                    <image src="https://cdn.screenshottocode.com/H0XDATQ7nxMnJo8KZn-wV.jpg" class="w-full h-full" mode="aspectFill"></image>
+                    <view bindtap="toggleEditProfile" data-show="{{true}}" class="absolute inset-0 profile-avatar-overlay flex items-center justify-center">
+                      <text class="text-white text-xl">📷</text>
+                    </view>
+                  </view>
+                </view>
+                <view class="text-center w-full">
+                  <view class="flex items-center justify-center gap-3 mb-5" bindtap="toggleEditProfile" data-show="{{true}}">
+                    <text class="ds-display text-4xl leading-none">TigerHoods</text>
+                    <text class="text-data-blue text-lg">♂</text>
+                    <text class="text-10px text-slate-400">✎</text>
+                  </view>
+                  <view class="grid grid-cols-2 gap-4 max-w-300 mx-auto">
+                    <view class="ds-card ds-card-stat rounded-lg px-4 py-3 flex flex-col items-center">
+                      <text class="ds-overline mb-1">江湖差点</text>
+                      <text class="text-3xl font-black italic leading-none ds-text-gold">11.6</text>
+                    </view>
+                    <view class="ds-card ds-card-stat rounded-lg px-4 py-3 flex flex-col items-center">
+                      <text class="ds-overline mb-1">浮动系数</text>
+                      <text class="text-3xl font-black italic leading-none ds-text-data">4.2</text>
+                    </view>
+                  </view>
+                </view>
+              </view>
+            </view>
+
+            <view class="px-4 pt-4 space-y-4">
+              <view class="ds-card ds-list-section rounded-xl overflow-hidden">
+                <view class="profile-list-header flex justify-between items-center">
+                  <text class="ds-overline ds-text-gold">赛事中心</text>
+                  <text class="text-8px text-slate-400 font-bold uppercase tracking-widest">始于 2024</text>
+                </view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-green-500 text-xl">👥</text><text class="ds-body font-normal">通讯录</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-gold text-xl">🏆</text><text class="ds-body font-normal">历史成绩</text></view>
+                  <view class="flex items-center gap-2"><text class="profile-live-badge">LIVE</text><text class="text-10px text-slate-300">›</text></view>
+                </view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-data-blue text-xl">📊</text><text class="ds-body font-normal">数据统计</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+                <view class="ds-list-item" bindtap="navigateToFootprints">
+                  <view class="flex items-center gap-4"><text class="text-red-500 text-xl">🚩</text><text class="ds-body font-normal">江湖足迹</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-gold text-xl">🛡</text><text class="ds-body font-normal">我的球队</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+              </view>
+
+              <view class="ds-card ds-list-section rounded-xl overflow-hidden">
+                <view class="profile-list-header-alt"><text class="ds-overline">资产与工具</text></view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-data-blue text-xl">💳</text><text class="ds-body font-normal">我的钱包</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-gold text-xl">📄</text><text class="ds-body font-normal">小账本</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+                <view class="ds-list-item">
+                  <view class="flex items-center gap-4"><text class="text-slate-400 text-xl">⚙</text><text class="font-normal text-slate-500">设置</text></view>
+                  <text class="text-10px text-slate-300">›</text>
+                </view>
+              </view>
+
+              <view class="p-8 text-center opacity-40">
+                <text class="font-black italic text-sm tracking-widest text-slate-500">江湖精英系统</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+      </view>
+    </view>
+
+    <!-- Bottom Navigation -->
+    <view class="ds-bottom-nav-shell">
+      <view class="ds-bottom-nav">
+        <view bindtap="showHomeSection" class="ds-bottom-nav-item {{bottomNavActive === 'home' ? 'ds-bottom-nav-item--active' : ''}}">
+          <view class="item-inner">
+            <text class="icon">📊</text>
+            <text class="bottom-tab-text">首页</text>
+          </view>
+        </view>
+        <view bindtap="showPlazaSection" class="ds-bottom-nav-item {{bottomNavActive === 'plaza' ? 'ds-bottom-nav-item--active' : ''}}">
+          <view class="item-inner">
+            <text class="icon">👥</text>
+            <text class="bottom-tab-text">广场</text>
+          </view>
+        </view>
+        <view class="ds-bottom-nav-item ds-bottom-nav-item--placeholder"></view>
+        <view bindtap="showTournamentSection" class="ds-bottom-nav-item {{bottomNavActive === 'tournament' ? 'ds-bottom-nav-item--active' : ''}}">
+          <view class="item-inner">
+            <text class="icon">📑</text>
+            <text class="bottom-tab-text">赛事</text>
+          </view>
+        </view>
+        <view bindtap="showProfileSection" class="ds-bottom-nav-item {{bottomNavActive === 'profile' ? 'ds-bottom-nav-item--active' : ''}}">
+          <view class="item-inner">
+            <text class="icon">👤</text>
+            <text class="bottom-tab-text">我的</text>
+          </view>
+        </view>
+      </view>
+      <view bindtap="toggleCreateOverlay" class="ds-bottom-nav-fab">
+        <view class="ds-bottom-nav-fab__inner">
+          <view class="ds-bottom-nav-fab__plus"></view>
+        </view>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- Create Overlay -->
+  <view wx:if="{{createOverlayVisible}}" class="ds-overlay-viewport fixed inset-0 bg-white-95 z-100 flex flex-col max-w-md transition-all {{createOverlayOpen ? 'overlay-open' : 'overlay-closed'}}">
+    <view class="create-sheet-head ds-overlay__fixed">
+      <view class="create-sheet-handle"></view>
+    </view>
+    <view class="ds-overlay__grow flex flex-col justify-center pb-6 space-y-8 overflow-y-auto">
+      <view class="px-6 mb-2">
+        <view class="flex items-center justify-between mb-3">
+          <text class="text-10px font-black text-slate-400 uppercase tracking-widest italic">常用功能</text>
+          <button class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-tour-blue">✎</button>
+        </view>
+        <view class="shortcut-scroll">
+          <view class="flex-none flex flex-col items-center"><view class="shortcut-tile border-t-green"><text class="text-green-500-icon">↺</text></view><text class="shortcut-label">历史成绩</text></view>
+          <view class="flex-none flex flex-col items-center"><view class="shortcut-tile border-t-purple"><text class="text-purple-500">🏆</text></view><text class="shortcut-label">荣誉榜</text></view>
+          <view class="flex-none flex flex-col items-center"><view class="shortcut-tile border-t-orange"><text class="text-orange-500">🗺</text></view><text class="shortcut-label">球场地图</text></view>
+          <view class="flex-none flex flex-col items-center"><view class="shortcut-tile border-t-red"><text class="text-red-500">♥</text></view><text class="shortcut-label">收藏夹</text></view>
+          <view class="flex-none flex flex-col items-center"><view class="shortcut-tile border-t-blue"><text class="text-blue-400">⚙</text></view><text class="shortcut-label">更多设置</text></view>
+        </view>
+      </view>
+      <view class="flex flex-col space-y-4 px-6 pt-6 max-w-92 mx-auto w-full">
+        <view bindtap="openMoreCreate" class="ds-card ds-card-action flex items-center justify-between rounded-xl ds-bg-hover">
+          <view class="flex items-center">
+            <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-tour-blue"><text class="text-lg">▦</text></view>
+            <view style="margin-left:12px">
+              <text class="text-11px font-black text-tour-blue uppercase tracking-wider block leading-none">更多创建</text>
+              <text class="text-8px font-bold text-slate-400 uppercase mt-1 block">Discover more match types</text>
+            </view>
+          </view>
+          <text class="text-slate-300 text-10px">›</text>
+        </view>
+        <view bindtap="openNormalCreate" class="ds-card ds-card-action ds-card-action--gold flex items-center justify-between rounded-xl ds-bg-hover">
+          <view class="flex items-center">
+            <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-gold"><text class="text-lg">⛳</text></view>
+            <view style="margin-left:12px">
+              <text class="text-11px font-black text-tour-blue uppercase tracking-wider block leading-none">普通创建</text>
+              <text class="text-8px font-bold text-slate-400 uppercase mt-1 block">Standard tournament setup</text>
+            </view>
+          </view>
+          <text class="text-slate-300 text-10px">›</text>
+        </view>
+        <view class="ds-card ds-card-action ds-card-action--neutral flex items-center justify-between rounded-xl ds-bg-hover">
+          <view class="flex items-center">
+            <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><text class="text-lg">⚡</text></view>
+            <view style="margin-left:12px">
+              <text class="text-11px font-black text-tour-blue uppercase tracking-wider block leading-none">快捷创建</text>
+              <text class="text-8px font-bold text-slate-400 uppercase mt-1 block">Quick start 1-on-1 match</text>
+            </view>
+          </view>
+          <text class="text-slate-300 text-10px">›</text>
+        </view>
+      </view>
+    </view>
+    <view class="pb-16 flex justify-center">
+      <button bindtap="toggleCreateOverlay" class="w-14 h-14 bg-white border-2 border-slate-100 rounded-full shadow-xl flex items-center justify-center text-slate-400">
+        <text class="text-2xl">×</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- More Create Selection Page -->
+  <view wx:if="{{moreCreateVisible}}" class="ds-page-overlay ds-overlay-viewport fixed inset-0 z-250 flex flex-col max-w-md overflow-hidden">
+    <view class="ds-app-header ds-overlay__fixed">
+      <view class="more-create-header">
+        <view class="flex items-center">
+          <text bindtap="closeMoreCreate" class="text-white text-lg" style="margin-right:16px">‹</text>
+          <text class="text-white font-black text-lg">更多创建</text>
+        </view>
+        <view class="status-pill border rounded-full">
+          <view class="flex"><view class="status-dot"></view><view class="status-dot" style="margin-left:4px"></view><view class="status-dot" style="margin-left:4px"></view></view>
+          <view class="status-line"></view>
+          <view class="status-circle"><view class="status-dot w-2-5 h-2-5"></view></view>
+        </view>
+      </view>
+    </view>
+    <scroll-view scroll-y class="ds-overlay__grow p-6 space-y-6">
+      <view class="text-center pb-4">
+        <text class="text-xl font-black text-tour-blue italic uppercase">选择比赛类型</text>
+        <view><text class="text-10px font-bold text-slate-400 mt-1 tracking-widest">SELECT TOURNAMENT CATEGORY</text></view>
+      </view>
+      <view class="space-y-4">
+        <view class="ds-card ds-card-selectable ds-bg-hover">
+          <view class="flex items-center justify-between">
+            <view class="flex items-center">
+              <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-tour-blue"><text class="text-xl">👥</text></view>
+              <view style="margin-left:16px">
+                <text class="text-sm font-black text-tour-blue uppercase tracking-wide">队内赛</text>
+                <view><text class="text-10px font-bold text-slate-400 mt-0.5 uppercase">Internal Club Rankings</text></view>
+              </view>
+            </view>
+            <text class="text-slate-300 text-xs">›</text>
+          </view>
+        </view>
+        <view class="ds-card ds-card-selectable ds-card-selectable--gold ds-bg-hover">
+          <view class="flex items-center justify-between">
+            <view class="flex items-center">
+              <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-gold"><text class="text-xl">🛡</text></view>
+              <view style="margin-left:16px">
+                <text class="text-sm font-black text-tour-blue uppercase tracking-wide">队际赛</text>
+                <view><text class="text-10px font-bold text-slate-400 uppercase">Club vs Club Challenge</text></view>
+              </view>
+            </view>
+            <text class="text-slate-300 text-xs">›</text>
+          </view>
+        </view>
+        <view class="ds-card ds-card-selectable ds-card-selectable--neutral ds-bg-hover">
+          <view class="flex items-center justify-between">
+            <view class="flex items-center">
+              <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center"><text class="text-xl">📑</text></view>
+              <view style="margin-left:16px">
+                <text class="text-sm font-black text-tour-blue uppercase tracking-wide">系列赛</text>
+                <view><text class="text-10px font-bold text-slate-400 uppercase">Multi-stage Tour Series</text></view>
+              </view>
+            </view>
+            <text class="text-slate-300 text-xs">›</text>
+          </view>
+        </view>
+      </view>
+      <view class="pt-8 opacity-40">
+        <view class="border-t border-slate-100 w-1-4 mx-auto"></view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- Calendar Picker Overlay -->
+  <view wx:if="{{calendarPickerVisible}}" class="fixed inset-0 z-400">
+    <view class="overlay-backdrop" bindtap="closeCalendarPicker"></view>
+    <view class="overlay-panel max-w-md {{calendarPanelOpen ? 'panel-open' : 'panel-closed'}}">
+      <view class="flex justify-between items-center mb-6">
+        <button bindtap="changeMonth" data-dir="-1" class="w-10 h-10 flex items-center justify-center text-slate-400">‹</button>
+        <text class="font-black text-tour-blue italic text-lg">{{calendarMonthYear}}</text>
+        <button bindtap="changeMonth" data-dir="1" class="w-10 h-10 flex items-center justify-center text-slate-400">›</button>
+      </view>
+      <view class="grid grid-cols-7 gap-1 text-center mb-2">
+        <text wx:for="{{['日','一','二','三','四','五','六']}}" wx:key="*this" class="text-10px font-black text-slate-300 uppercase">{{item}}</text>
+      </view>
+      <view class="grid grid-cols-7 gap-1 text-center">
+        <block wx:for="{{calendarDays}}" wx:key="index">
+          <view wx:if="{{item.empty}}"></view>
+          <view wx:else bindtap="selectDate" data-day="{{item.day}}" class="calendar-day {{item.selected ? 'ds-calendar-day--selected' : 'calendar-day-muted'}}">{{item.day}}</view>
+        </block>
+      </view>
+      <view class="mt-8 flex justify-end">
+        <button bindtap="closeCalendarPicker" class="px-6 py-2 text-slate-400 font-bold" style="margin-right:16px">取消</button>
+        <button bindtap="confirmCalendarDate" class="ds-btn-accent ds-btn-accent--pill px-8 font-black italic">确认</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Schedule Remindee Picker -->
+  <view wx:if="{{scheduleRemindPickerVisible}}" class="fixed inset-0 z-410">
+    <view class="overlay-backdrop" bindtap="closeScheduleRemindeePicker"></view>
+    <view class="overlay-panel max-w-md max-h-75vh flex flex-col {{scheduleRemindPanelOpen ? 'panel-open' : 'panel-closed'}}" style="padding:0">
+      <view class="px-6 pt-6 pb-3 ds-overlay__fixed">
+        <view class="flex justify-between items-center mb-4">
+          <text class="font-black text-tour-blue italic text-lg">选择被提醒人</text>
+          <button bindtap="closeScheduleRemindeePicker" class="text-slate-400 text-sm font-bold">关闭</button>
+        </view>
+        <view class="relative">
+          <text class="absolute text-slate-300 text-xs" style="left:12px;top:50%;transform:translateY(-50%)">🔍</text>
+          <input value="{{scheduleRemindSearch}}" bindinput="onScheduleRemindSearchInput" placeholder="搜索好友昵称或ID" class="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-sm font-medium text-slate-700 border border-transparent" />
+        </view>
+      </view>
+      <scroll-view scroll-y class="ds-overlay__grow px-6 pb-2">
+        <view wx:for="{{filteredScheduleFriends}}" wx:key="id" bindtap="toggleScheduleRemindee" data-id="{{item.id}}" class="schedule-friend-row {{item.selected ? 'selected' : ''}}" style="margin-bottom:8px">
+          <view class="schedule-select-state"><text wx:if="{{item.selected}}">✓</text></view>
+          <image src="{{item.avatar}}" class="w-10 h-10 rounded-full ds-u-shrink" mode="aspectFill"></image>
+          <view class="ds-schedule-friend__grow">
+            <text class="ds-schedule-friend__name">{{item.name}}</text>
+            <view><text class="text-10px font-bold text-slate-400 mt-0.5">ID: {{item.id}}</text></view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="ds-overlay__fixed px-6 py-4 flex justify-end border-t border-slate-100">
+        <button bindtap="closeScheduleRemindeePicker" class="px-6 py-2 text-slate-400 font-bold" style="margin-right:12px">取消</button>
+        <button bindtap="confirmScheduleRemindees" class="px-8 py-2 bg-gold text-white rounded-full font-black italic shadow-sm">确认</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Profile Edit Modal -->
+  <view wx:if="{{editProfileVisible}}" class="ds-overlay-viewport ds-profile-edit-panel fixed inset-0 z-320 max-w-md flex flex-col transition-all {{editProfileOpen ? 'overlay-open' : 'overlay-closed'}}">
+    <view class="ds-app-header ds-overlay__fixed">
+      <view class="more-create-header">
+        <button bindtap="onEditProfileCancel" class="text-white text-sm font-bold">取消</button>
+        <text class="text-white font-black text-lg italic uppercase tracking-tight">编辑资料</text>
+        <button bindtap="onEditProfileSave" class="text-gold text-sm font-black">保存</button>
+      </view>
+    </view>
+    <scroll-view scroll-y class="ds-overlay__grow p-5 pb-10">
+      <view class="flex flex-col items-center mb-8">
+        <view class="relative w-24 h-24 mb-3">
+          <image src="https://cdn.screenshottocode.com/H0XDATQ7nxMnJo8KZn-wV.jpg" class="w-full h-full rounded-full border-4 profile-avatar-border" mode="aspectFill"></image>
+          <view class="absolute bg-tour-blue w-8 h-8 rounded-full flex items-center justify-center border-4 border-white" style="bottom:0;right:0">
+            <text class="text-white text-10px">📷</text>
+          </view>
+        </view>
+        <button bindtap="toggleBannerPicker" data-show="{{true}}" class="flex items-center gap-2 text-10px text-slate-500 font-black uppercase tracking-widest">
+          <text>🖼 更换头像背景</text>
+        </button>
+      </view>
+      <view class="space-y-4">
+        <view class="ds-profile-field">
+          <text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">身份类型</text>
+          <view class="flex gap-2 mt-2"><text class="ds-chip ds-chip--selected">球友</text><text class="ds-chip">球童</text></view>
+        </view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">昵称</text><input type="text" value="TigerHoods" class="edit-field-input" /></view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">性别</text><view class="flex gap-4 mt-2"><text class="ds-chip ds-chip--selected">男</text><text class="ds-chip">女</text></view></view>
+        <view class="ds-profile-field flex justify-between items-end">
+          <view><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">差点 Handicap</text><text class="text-lg font-black text-gold">11.6</text></view>
+          <text class="text-10px text-slate-400 mb-1">系统自动计算</text>
+        </view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">国籍</text><picker mode="selector" range="{{['中国','美国','日本','韩国']}}"><view class="text-lg font-bold">中国</view></picker></view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">所在省份</text><input type="text" value="广东" class="edit-field-input" /></view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">常打球场</text><view class="w-full text-lg font-bold py-1 flex justify-between items-center text-slate-500"><text>选择球场</text><text class="text-xs text-slate-400">🔍</text></view></view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">个人签名</text><textarea class="edit-field-textarea" placeholder="写下你的球场格言..."></textarea></view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- Profile Banner Picker Modal -->
+  <view wx:if="{{bannerPickerVisible}}" class="fixed inset-0 z-330 flex flex-col justify-end bg-black-70 max-w-md">
+    <view class="w-full bg-white rounded-t-3xl p-5 border-t border-slate-100">
+      <view class="flex items-center justify-between mb-4">
+        <text class="text-sm font-black text-tour-blue tracking-widest">更换头像背景</text>
+        <button bindtap="toggleBannerPicker" data-show="{{false}}" class="text-slate-500 text-sm">关闭</button>
+      </view>
+      <view class="banner-picker-grid">
+        <button bindtap="chooseBanner" data-url="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80" class="banner-picker-item">
+          <image src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80" class="w-full h-full" mode="aspectFill"></image>
+          <text class="banner-picker-label">草地球场</text>
+        </button>
+        <button bindtap="chooseBanner" data-url="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80" class="banner-picker-item">
+          <image src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80" class="w-full h-full" mode="aspectFill"></image>
+          <text class="banner-picker-label">夜景风格</text>
+        </button>
+      </view>
+    </view>
+  </view>
+
+</view>

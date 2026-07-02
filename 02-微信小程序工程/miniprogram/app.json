@@ -1,0 +1,31 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/score/index",
+    "pages/tournament/detail/index",
+    "pages/create/normal/index",
+    "pages/course/select/index",
+    "pages/player/friends/index",
+    "pages/player/combos/index",
+    "pages/player/manual/index",
+    "pages/game/hub/index",
+    "pages/index/index",
+    "pages/example/index"
+  ],
+  "window": {
+    "backgroundColor": "#F6F6F6",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#F6F6F6",
+    "navigationBarTitleText": "云开发 QuickStart",
+    "navigationBarTextStyle": "black"
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于按距离为你推荐附近的高尔夫球场"
+    }
+  },
+  "requiredPrivateInfos": ["getLocation"],
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

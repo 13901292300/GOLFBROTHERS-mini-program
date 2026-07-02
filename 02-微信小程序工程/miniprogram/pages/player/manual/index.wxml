@@ -1,0 +1,44 @@
+<view class="player-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">ADD PLAYER</text>
+          <text class="gb-header__title">手工添加</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="search-bar-wrap">
+    <view class="search-bar">
+      <text class="search-bar__icon">🔍</text>
+      <input class="search-bar__input" type="text" value="{{query}}" placeholder="搜索用户或输入姓名新建" placeholder-class="search-bar__ph" bindinput="onSearchInput" />
+      <view wx:if="{{query}}" bindtap="clearSearch" class="search-bar__clear"><text>×</text></view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="page-body">
+    <view wx:if="{{showCreate}}" class="create-row" bindtap="createNew">
+      <view class="create-icon"><text>＋</text></view>
+      <view class="create-meta">
+        <text class="create-title">新建球员「{{query}}」</text>
+        <text class="create-sub">创建并加入该位置</text>
+      </view>
+    </view>
+
+    <view wx:if="{{results.length}}" class="result-label">{{query ? '匹配用户' : '推荐用户'}}</view>
+    <view wx:for="{{results}}" wx:key="playerId" class="friend-row {{disabledMap[item.playerId] ? 'is-disabled' : ''}}" bindtap="pickExisting" data-friend="{{item}}">
+      <image class="friend-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+      <text class="friend-name">{{item.name}}</text>
+      <text wx:if="{{disabledMap[item.playerId]}}" class="friend-used">已在本场使用</text>
+      <text wx:else class="friend-add">添加</text>
+    </view>
+
+    <view wx:if="{{!results.length && !showCreate}}" class="empty-tip">无匹配用户</view>
+    <view class="body-pad"></view>
+  </scroll-view>
+</view>

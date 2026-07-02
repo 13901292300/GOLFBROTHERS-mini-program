@@ -1,0 +1,99 @@
+<!-- 统一讨论区聊天系统：自包含 flex 面板，填满宿主高度 -->
+<view class="ds-root {{theme === 'dark' ? 'ds-dark' : 'ds-bright'}} {{fixedInput ? 'ds-root--fixed-input' : ''}}">
+
+  <!-- L1：围观行（面板顶部，不随聊天滚动）。垂直居中交给内层 .ws-track（不依赖 scroll-view 自身 flex，规避其居中失效） -->
+  <scroll-view wx:if="{{showWatchersStrip}}" class="tab-watchers-strip" scroll-x>
+    <view class="ws-track">
+      <text class="discussion-watchers-label">围观</text>
+      <view
+        wx:for="{{watchers}}"
+        wx:key="name"
+        class="discussion-avatar-btn"
+        data-userid="{{item.userId}}"
+        data-name="{{item.name}}"
+        bindtouchstart="onAvatarTouchStart"
+        bindtouchmove="onAvatarTouchMove"
+        bindtouchend="onAvatarTouchEnd"
+        bindtouchcancel="onAvatarTouchEnd"
+      >
+        <image class="discussion-avatar-img" src="{{item.avatar}}" mode="aspectFill"></image>
+      </view>
+      <view class="discussion-more-btn">更多 ›</view>
+    </view>
+  </scroll-view>
+
+  <!-- L2：聊天内容（内部滚动） -->
+  <scroll-view class="ds-chat-scroll" scroll-y scroll-into-view="{{toView}}" scroll-with-animation>
+    <view class="discussion-chat">
+      <view class="discussion-time">今天</view>
+      <view wx:for="{{chat}}" wx:key="index" id="ds-msg-{{index}}" class="chat-row {{item.self ? 'self' : ''}}">
+        <image
+          wx:if="{{!item.self}}"
+          class="chat-avatar"
+          src="{{item.avatar}}"
+          mode="aspectFill"
+          data-userid="{{item.userId}}"
+          data-name="{{item.name}}"
+          bindtouchstart="onAvatarTouchStart"
+          bindtouchmove="onAvatarTouchMove"
+          bindtouchend="onAvatarTouchEnd"
+          bindtouchcancel="onAvatarTouchEnd"
+        ></image>
+        <view class="chat-col">
+          <text class="chat-meta">{{item.name}}</text>
+          <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
+        </view>
+        <image wx:if="{{item.self}}" class="chat-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+      </view>
+      <view
+        wx:if="{{bottomSpacerHeight > 0}}"
+        class="discussion-content-spacer"
+        style="height:{{bottomSpacerHeight}}px;"
+      ></view>
+    </view>
+  </scroll-view>
+
+  <!-- L3：输入栏（面板底部，含 safe area；微信式 textarea + 发送态） -->
+  <view wx:if="{{showInputBar}}" class="discussion-input-bar {{fixedInput ? 'discussion-input-bar--fixed' : ''}}">
+    <view class="discussion-plus-btn" bindtap="noop">＋</view>
+    <view class="discussion-input-box">
+      <textarea
+        class="discussion-input"
+        value="{{draft}}"
+        cursor="{{cursor}}"
+        focus="{{inputFocus}}"
+        bindinput="onDraftInput"
+        bindblur="onDraftBlur"
+        bindconfirm="onSend"
+        auto-height
+        placeholder="说点什么…"
+        placeholder-class="discussion-input__ph"
+        confirm-type="send"
+        confirm-hold="{{false}}"
+        show-confirm-bar="{{false}}"
+        adjust-position="{{!emojiPanelOpen}}"
+        cursor-spacing="24"
+      ></textarea>
+    </view>
+    <view class="discussion-emoji-btn {{emojiPanelOpen ? 'is-on' : ''}}" bindtap="toggleEmojiPanel">☺</view>
+    <view class="discussion-send {{canSend ? 'is-active' : 'is-disabled'}}" bindtap="onSend">发送</view>
+  </view>
+
+  <!-- 表情面板 overlay（wx:if 挂载/卸载，与输入栏 DOM 互不复用） -->
+  <!-- 遮罩仅覆盖输入栏「以上」区域（bottom=输入栏高度），绝不盖住输入栏，避免拦截输入交互 -->
+  <view wx:if="{{emojiPanelOpen && showInputBar}}" class="emoji-mask" style="bottom:{{emojiPanelBottom}}px;" bindtap="closeEmojiPanel"></view>
+  <view wx:if="{{emojiPanelOpen && showInputBar}}" class="emoji-panel" style="bottom:{{emojiPanelBottom}}px;">
+    <scroll-view scroll-y class="emoji-scroll">
+      <view class="emoji-grid">
+        <view
+          wx:for="{{emojiList}}"
+          wx:key="*this"
+          class="emoji-cell"
+          data-emoji="{{item}}"
+          bindtap="insertEmoji"
+        >{{item}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+</view>

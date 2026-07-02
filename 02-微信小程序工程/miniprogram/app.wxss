@@ -1,0 +1,54 @@
+/**app.wxss**/
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+} 
+
+button {
+  background: initial;
+}
+
+button:focus{
+  outline: 0;
+}
+
+button::after{
+  border: none;
+}
+
+
+page {
+  background: #f6f6f6;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+
+  /* ===== 品牌色 单一来源（视觉规范 V3.0，全局唯一标准，与主题无关） ===== */
+  --champion-gold: #CE9224;
+  --tour-blue: #002D62;
+  --pga-blue: #002D62;
+  --data-blue: #00AEEF;
+
+  /* ===== 全局统一 TAB 颜色 token（与主题无关，dark/bright 一致） ===== */
+  --tab-active-color: #ffffff;
+  --tab-inactive-color: rgba(255, 255, 255, 0.5);
+
+  /* ===== 全局统一 TAB 高度 / 字号 token（设计系统唯一标准，所有页面 TAB 一致） ===== */
+  --tab-height: 50px;
+  --tab-font-size: 26rpx;
+
+  /* ===== 全局统一 TAB 金色指示器 token（粗细 + 色值唯一标准，所有页面一致，禁止局部覆盖） ===== */
+  --tab-indicator-height: 3px;
+  --tab-indicator-color: var(--champion-gold);
+}
+
+/* 所有 TAB（首页顶部 / 记分页 / 其他 tab 组件）统一使用以下两类 */
+.tab-active {
+  color: var(--tab-active-color);
+}
+
+.tab-inactive {
+  color: var(--tab-inactive-color);
+}

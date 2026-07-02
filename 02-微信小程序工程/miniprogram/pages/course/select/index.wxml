@@ -1,0 +1,205 @@
+<view class="course-page {{themeClass}}">
+  <!-- 标准 Header（统一 Header Engine 驱动，右侧由真实胶囊避让，不绘制假胶囊） -->
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">COURSE</text>
+          <text class="gb-header__title">选择球场</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索栏（HEADER 下方、TAB 上方）：第三入口，跨 常去 + 附近 + 全库 -->
+  <view class="search-bar-wrap">
+    <view class="search-bar">
+      <text class="search-bar__icon">🔍</text>
+      <input
+        class="search-bar__input"
+        type="text"
+        value="{{searchQuery}}"
+        placeholder="搜索球场或输入名称/拼音/简写"
+        placeholder-class="search-bar__ph"
+        confirm-type="search"
+        bindinput="onSearchInput"
+      />
+      <view wx:if="{{searchQuery}}" bindtap="clearSearch" class="search-bar__clear"><text>×</text></view>
+    </view>
+  </view>
+
+  <!-- 吸顶 TAB（仅非搜索模式显示；搜索模式隐藏 TAB，展示搜索结果） -->
+  <view wx:if="{{!searchMode}}" class="tab-scroll-wrap">
+    <view class="gb-tabs">
+      <view bindtap="switchTab" data-tab="frequent" class="tab-btn {{activeTab === 'frequent' ? 'active' : ''}}">常去球场</view>
+      <view bindtap="switchTab" data-tab="nearby" class="tab-btn {{activeTab === 'nearby' ? 'active' : ''}}">附近球场</view>
+    </view>
+  </view>
+
+  <!-- 搜索结果（搜索模式，最多 20 条） -->
+  <scroll-view wx:if="{{searchMode}}" class="course-scroll" scroll-y>
+    <view class="course-list">
+      <view
+        wx:for="{{searchResults}}"
+        wx:key="courseId"
+        class="ds-card course-card {{item.courseId === selectedId ? 'selected' : ''}}"
+        bindtap="onSelectCourse"
+        data-id="{{item.courseId}}"
+      >
+        <view class="course-card__main">
+          <view class="course-card__title-row">
+            <text class="course-card__name">{{item.courseName}}</text>
+            <text class="course-source-tag source-{{item.sourceLabel === '常去' ? 'freq' : (item.sourceLabel === '附近' ? 'near' : 'db')}}">{{item.sourceLabel}}</text>
+          </view>
+          <text class="course-card__meta">{{item.metaText}}</text>
+        </view>
+        <view class="course-card__check {{item.courseId === selectedId ? 'on' : ''}}">
+          <text wx:if="{{item.courseId === selectedId}}">✓</text>
+        </view>
+      </view>
+
+      <view wx:if="{{searchResults.length === 0}}" class="course-empty">未找到匹配的球场，换个关键词试试</view>
+    </view>
+  </scroll-view>
+
+  <!-- TAB 列表内容（非搜索模式） -->
+  <scroll-view wx:else class="course-scroll" scroll-y>
+    <!-- 常去球场 -->
+    <block wx:if="{{activeTab === 'frequent'}}">
+      <view class="course-list">
+        <view
+          wx:for="{{frequentCourses}}"
+          wx:key="courseId"
+          class="ds-card course-card {{item.courseId === selectedId ? 'selected' : ''}}"
+          bindtap="onSelectCourse"
+          data-id="{{item.courseId}}"
+        >
+          <view class="course-card__main">
+            <text class="course-card__name">{{item.courseName}}</text>
+            <text class="course-card__meta">{{item.location}} · {{item.metaText}}</text>
+          </view>
+          <view class="course-card__check {{item.courseId === selectedId ? 'on' : ''}}">
+            <text wx:if="{{item.courseId === selectedId}}">✓</text>
+          </view>
+        </view>
+
+        <view wx:if="{{frequentCourses.length === 0}}" class="course-empty">暂无常去球场记录</view>
+      </view>
+    </block>
+
+    <!-- 附近球场 -->
+    <block wx:elif="{{activeTab === 'nearby'}}">
+      <view wx:if="{{locating}}" class="course-empty">正在定位附近球场…</view>
+      <view class="course-list">
+        <view
+          wx:for="{{nearbyCourses}}"
+          wx:key="courseId"
+          class="ds-card course-card {{item.courseId === selectedId ? 'selected' : ''}}"
+          bindtap="onSelectCourse"
+          data-id="{{item.courseId}}"
+        >
+          <view class="course-card__main">
+            <text class="course-card__name">{{item.courseName}}</text>
+            <text class="course-card__meta">{{item.location}} · {{item.metaText}}</text>
+          </view>
+          <view class="course-card__check {{item.courseId === selectedId ? 'on' : ''}}">
+            <text wx:if="{{item.courseId === selectedId}}">✓</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </scroll-view>
+
+  <!-- 二级弹窗：选择半场（多半场球场 halfCourseCount>=3 触发；HEADER 统一规范） -->
+  <view wx:if="{{halfPopupVisible}}" class="half-popup">
+    <view class="gb-header" style="{{headerRootStyle}}">
+      <view class="gb-header__inner" style="{{headerBarStyle}}">
+        <view class="gb-header__left">
+          <view bindtap="closeHalfPopup" class="gb-header__back" aria-label="返回">
+            <text class="gb-header__chevron">‹</text>
+          </view>
+          <view>
+            <text class="gb-header__eyebrow">COURSE</text>
+            <text class="gb-header__title">选择半场</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view class="half-body" scroll-y>
+      <!-- 第一行：当前球场名称（只读） -->
+      <text class="half-course-name">{{halfCourse.name}}</text>
+      <!-- 第二行：固定提示 -->
+      <text class="half-hint">请选择半场</text>
+
+      <!-- 核心选择区：左右结构分栏（非 TAB） -->
+      <view class="half-split">
+        <view class="half-col">
+          <text class="half-col__title">前9洞</text>
+          <view class="half-tags">
+            <view
+              wx:for="{{halves}}"
+              wx:key="key"
+              bindtap="selectHalf"
+              data-side="front"
+              data-key="{{item.key}}"
+              class="half-tag {{front9 === item.key ? 'active' : ''}}"
+            >
+              <text class="half-tag__code">{{item.label}}</text>
+              <text wx:if="{{item.name}}" class="half-tag__name">{{item.name}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="half-col">
+          <text class="half-col__title">后9洞</text>
+          <view class="half-tags">
+            <view
+              wx:for="{{halves}}"
+              wx:key="key"
+              bindtap="selectHalf"
+              data-side="back"
+              data-key="{{item.key}}"
+              class="half-tag {{back9 === item.key ? 'active' : ''}}"
+            >
+              <text class="half-tag__code">{{item.label}}</text>
+              <text wx:if="{{item.name}}" class="half-tag__name">{{item.name}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 标准 PAR 值表：与上方半场选择状态联动高亮，点击行 = 同步 toggle 选择 -->
+      <view class="par-table">
+        <text class="par-table__title">标准 PAR</text>
+        <view
+          wx:for="{{halves}}"
+          wx:key="key"
+          bindtap="toggleHalfRow"
+          data-key="{{item.key}}"
+          class="par-row {{(front9 === item.key || back9 === item.key) ? 'active' : ''}}"
+        >
+          <view class="par-row__head">
+            <text class="par-row__code">{{item.label}}</text>
+            <text class="par-row__name">{{item.name || '—'}}</text>
+            <view class="par-row__tags">
+              <text wx:if="{{front9 === item.key}}" class="par-side-tag">前9</text>
+              <text wx:if="{{back9 === item.key}}" class="par-side-tag">后9</text>
+            </view>
+            <text class="par-row__total">PAR {{item.parTotal}}</text>
+          </view>
+          <view class="par-hole-row">
+            <view wx:for="{{item.par}}" wx:for-item="p" wx:key="index" class="par-hole-cell">{{p}}</view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="half-footer">
+      <button class="half-confirm-btn {{(front9 || back9) ? '' : 'is-disabled'}}" disabled="{{!front9 && !back9}}" bindtap="confirmHalf">确认</button>
+    </view>
+  </view>
+</view>

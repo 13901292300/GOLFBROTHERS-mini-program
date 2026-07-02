@@ -1,0 +1,5 @@
+.sc-follow-btn--followed {
+  background: var(--bg-subtle) !important;
+  color: var(--text-muted) !important;
+  border: 1px solid var(--border);
+}

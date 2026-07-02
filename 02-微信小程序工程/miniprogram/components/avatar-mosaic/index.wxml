@@ -1,0 +1,8 @@
+<view class="am-root" style="width:{{size}}px;height:{{size}}px;">
+  <view wx:for="{{rows}}" wx:for-item="row" wx:for-index="ri" wx:key="ri" class="am-row">
+    <view wx:for="{{row}}" wx:for-item="cell" wx:for-index="ci" wx:key="ci" class="am-cell" style="{{cellStyle}}">
+      <image wx:if="{{!cell.plus}}" class="am-img" src="{{cell.avatar}}" mode="aspectFill"></image>
+      <view wx:else class="am-plus" style="{{plusStyle}}">{{cell.plus}}</view>
+    </view>
+  </view>
+</view>

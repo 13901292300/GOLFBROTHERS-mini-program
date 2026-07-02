@@ -1,0 +1,56 @@
+.player-page { --tour-blue: #002d62; --champion-gold: #ce9224; --data-blue: #00aeef; }
+.player-page.dark-mode {
+  --bg-primary: #000000; --bg-card: #111111; --bg-subtle: #0a0a0a; --bg-hover: #1a1a1a;
+  --border: #222222; --border-hover: #333333;
+  --text-primary: #f1f5f9; --text-secondary: #e5e7f9; --text-muted: #888888; --shadow-card: none;
+}
+.player-page.bright-mode {
+  --bg-primary: #fcfcfc; --bg-card: #ffffff; --bg-subtle: #f3f4f6; --bg-hover: #f9fafb;
+  --border: #e5e7eb; --border-hover: #d1d5db;
+  --text-primary: #002d62; --text-secondary: #374151; --text-muted: #6b7280;
+  --shadow-card: 0 8rpx 12rpx -2rpx rgba(0, 0, 0, 0.05);
+}
+
+page { height: 100%; background: var(--bg-primary); }
+.player-page { display: flex; flex-direction: column; height: 100vh; background: var(--bg-primary); color: var(--text-primary); overflow-x: hidden; }
+
+.gb-header { background: var(--tour-blue); border-bottom: 2px solid var(--champion-gold); color: #fff; flex-shrink: 0; }
+.gb-header__inner { display: flex; align-items: center; justify-content: space-between; }
+.gb-header__left { display: flex; align-items: center; gap: 20rpx; }
+.gb-header__back { width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; }
+.gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
+.gb-header__eyebrow { display: block; font-size: 17rpx; font-weight: 900; letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.5); line-height: 1; margin-bottom: 6rpx; }
+.gb-header__title { display: block; color: #fff; font-size: 32rpx; font-weight: 900; font-style: italic; line-height: 1; }
+
+.search-bar-wrap { flex-shrink: 0; background: var(--bg-primary); padding: 20rpx 32rpx; }
+.search-bar { display: flex; align-items: center; gap: 16rpx; height: 76rpx; padding: 0 24rpx; border-radius: 999rpx; background: var(--bg-subtle); border: 1px solid var(--border); }
+.search-bar__icon { font-size: 28rpx; color: var(--text-muted); flex-shrink: 0; }
+.search-bar__input { flex: 1; min-width: 0; font-size: 28rpx; color: var(--text-primary); }
+.search-bar__ph { color: var(--text-muted); }
+.search-bar__clear { width: 40rpx; height: 40rpx; border-radius: 50%; background: var(--border-hover); color: var(--bg-card); display: flex; align-items: center; justify-content: center; font-size: 26rpx; flex-shrink: 0; }
+
+.search-empty { padding: 80rpx 32rpx; text-align: center; }
+.search-empty__text { font-size: 28rpx; font-weight: 700; color: var(--text-muted); }
+
+.me-row-wrap { flex-shrink: 0; background: var(--bg-primary); border-bottom: 1px solid var(--border); }
+.me-row { border-bottom: none; }
+
+.page-body { flex: 1; min-height: 0; }
+.body-pad { height: 40rpx; }
+
+.letter-section { padding: 0 0 8rpx; }
+.letter-head { padding: 12rpx 32rpx; font-size: 24rpx; font-weight: 900; color: var(--text-muted); background: var(--bg-subtle); }
+.friend-row { display: flex; align-items: center; gap: 24rpx; padding: 22rpx 32rpx; border-bottom: 1px solid var(--border); }
+.friend-avatar { width: 84rpx; height: 84rpx; border-radius: 50%; background: var(--bg-subtle); flex-shrink: 0; }
+.friend-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
+.friend-name { font-size: 30rpx; font-weight: 700; color: var(--text-primary); }
+.friend-sub { font-size: 22rpx; font-weight: 600; color: var(--text-muted); }
+.friend-tag { font-size: 20rpx; font-weight: 700; color: var(--champion-gold); }
+.friend-tag--used { color: var(--text-muted); }
+.friend-row.is-disabled { opacity: 0.42; }
+.friend-row.is-disabled .friend-name { color: var(--text-muted); }
+.friend-check { width: 48rpx; height: 48rpx; border-radius: 50%; border: 2rpx solid var(--border-hover); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 28rpx; flex-shrink: 0; }
+.friend-check.on { background: var(--data-blue); border-color: var(--data-blue); }
+
+.page-footer { flex-shrink: 0; padding: 16rpx 32rpx calc(20rpx + env(safe-area-inset-bottom)); background: var(--bg-primary); border-top: 1px solid var(--border); }
+.confirm-btn { width: 100%; height: 92rpx; line-height: 92rpx; border: 0; border-radius: 14rpx; background: var(--tour-blue); color: #fff; font-size: 30rpx; font-weight: 800; padding: 0; }

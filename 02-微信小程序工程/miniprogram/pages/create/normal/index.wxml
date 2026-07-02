@@ -1,0 +1,331 @@
+<view class="create-page {{themeClass}}">
+  <!-- 标准 Header（统一 Header Engine 驱动） -->
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">CREATE</text>
+          <text class="gb-header__title">普通创建</text>
+        </view>
+      </view>
+      <!-- 右侧不绘制假胶囊：真实微信胶囊避让由 headerBarStyle 的 padding-right 保证 -->
+    </view>
+  </view>
+
+  <!-- 主体内容 -->
+  <scroll-view class="content" scroll-y>
+    <!-- 比赛名称 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">比赛名称</text></view>
+      <view class="ds-card ds-field">
+        <view class="field-main">
+          <input class="round-name-input" type="text" value="{{roundName}}" placeholder="请输入比赛名称" bindinput="onRoundNameInput" />
+        </view>
+      </view>
+    </view>
+
+    <!-- 选择球场 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">选择球场</text></view>
+      <view class="ds-card ds-field" bindtap="onSelectCourse">
+        <view class="field-main">
+          <block wx:if="{{courseName}}">
+            <text class="field-value strong italic">{{courseName}}{{courseHalfText}}</text>
+            <text wx:if="{{courseLocation}}" class="field-subvalue">{{courseLocation}}</text>
+          </block>
+          <text wx:else class="field-placeholder">请选择球场...</text>
+        </view>
+        <text class="field-icon">›</text>
+      </view>
+    </view>
+
+    <!-- 开球时间 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">开球时间</text></view>
+      <view class="ds-card ds-field" bindtap="openTeeTimeSheet">
+        <view class="field-main">
+          <text class="field-value italic">{{teeTimeText}}</text>
+        </view>
+        <text class="field-icon">📅</text>
+      </view>
+    </view>
+
+    <!-- 参赛组别 -->
+    <view class="section">
+      <view class="section-label">
+        <text class="section-label__h2">参赛组别（点击球员头像可删除）</text>
+        <text class="section-count">{{groupCountText}}</text>
+      </view>
+
+      <view class="group-list">
+        <view wx:for="{{groups}}" wx:for-item="group" wx:for-index="gIdx" wx:key="id" class="ds-card group-card">
+          <view wx:if="{{groups.length >= 2}}" catchtap="deleteGroup" data-index="{{gIdx}}" class="delete-group-btn">
+            <text>×</text>
+          </view>
+          <text class="group-number">第{{gIdx + 1}}组</text>
+          <view class="player-grid">
+            <view wx:for="{{group.players}}" wx:for-item="player" wx:for-index="pIdx" wx:key="key" class="player-slot" catchtap="onPlayerSlotTap" data-group="{{gIdx}}" data-player="{{pIdx}}">
+              <view class="avatar-shell {{player.filled ? 'filled' : ''}}">
+                <image wx:if="{{player.filled}}" class="avatar-img" src="{{player.avatar}}" mode="aspectFill"></image>
+                <text wx:else class="avatar-plus">+</text>
+              </view>
+              <text class="player-name {{player.filled ? '' : 'placeholder'}}">{{player.name}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="add-group-btn" bindtap="addGroup">
+        <view class="add-group-icon"><text>+</text></view>
+        <text>添加新组</text>
+      </view>
+    </view>
+
+    <!-- 选择赛制 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">选择赛制</text></view>
+      <view class="ds-card ds-field" bindtap="openGameModeSheet">
+        <view class="field-main">
+          <text class="field-value italic">{{gameMode}}</text>
+          <text wx:if="{{compositionSummaryText}}" class="field-subvalue">组合 {{compositionSummaryText}}</text>
+        </view>
+        <text class="field-icon">›</text>
+      </view>
+    </view>
+
+    <!-- 隐私设置（赛制之后、确认创建之前） -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">隐私设置</text></view>
+      <view class="ds-card privacy-card">
+        <!-- 单行三段：左=开关 / 中=状态文本 / 右=密码(仅私密渲染) -->
+        <view class="privacy-row">
+          <!-- 左：开关（行首，拨动切换，不使用 radio/checkbox） -->
+          <view class="privacy-left" catchtap="toggleVisibility">
+            <view class="privacy-switch {{visibility === 'private' ? 'is-private' : ''}}">
+              <view class="privacy-switch__thumb"></view>
+            </view>
+          </view>
+          <!-- 中：状态文本 -->
+          <view class="privacy-center">
+            <text class="privacy-state {{visibility === 'private' ? 'is-private' : ''}}">{{visibility === 'private' ? '私密' : '公开'}}</text>
+          </view>
+          <!-- 右：密码 + 复制（仅私密渲染，公开时完全不占位） -->
+          <view wx:if="{{visibility === 'private'}}" class="privacy-right">
+            <text class="access-code-label">访问密码</text>
+            <text class="access-code-value">{{accessCode}}</text>
+            <view class="access-code-copy" catchtap="copyAccessCode"><text>复制</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部按钮：固定底部安全区上方 -->
+  <view class="footer">
+    <button class="start-btn" bindtap="onStart">开始记分</button>
+  </view>
+
+  <!-- 底部弹层：选择赛制 -->
+  <view class="sheet-mask {{showGameMode ? 'show' : ''}}" bindtap="closeGameModeSheet"></view>
+  <view class="bottom-sheet {{showGameMode ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">GAME MODE</text>
+        <text class="sheet-header__h3">选择赛制</text>
+      </view>
+      <view class="sheet-close" bindtap="closeGameModeSheet"><text>×</text></view>
+    </view>
+    <view class="game-mode-list">
+      <view wx:for="{{gameModes}}" wx:for-item="gm" wx:key="name" class="game-mode-option {{gm.name === gameMode ? 'active' : ''}}" bindtap="selectGameMode" data-name="{{gm.name}}">
+        <view class="mode-icon"><text>{{gm.icon}}</text></view>
+        <view class="mode-text">
+          <text class="mode-text__strong">{{gm.name}}</text>
+          <text class="mode-text__em">{{gm.desc}}</text>
+        </view>
+        <text class="mode-check">✓</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部弹层：逐组组合类型（最好成绩赛 / 最佳球位赛 → 点击开始记分后按组顺序确认） -->
+  <view class="sheet-mask {{showComposition ? 'show' : ''}}" bindtap="closeCompositionSheet"></view>
+  <view class="bottom-sheet {{showComposition ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">COMPOSITION</text>
+        <text class="sheet-header__h3">{{compositionGroupTitle || '组合类型'}}</text>
+      </view>
+      <view class="sheet-close" bindtap="closeCompositionSheet"><text>×</text></view>
+    </view>
+    <view class="game-mode-list">
+      <view wx:for="{{compositionOptions}}" wx:for-item="opt" wx:key="id" class="game-mode-option {{opt.id === compositionPendingSelected ? 'active' : ''}}" bindtap="selectComposition" data-id="{{opt.id}}">
+        <view class="mode-icon"><text>{{opt.icon}}</text></view>
+        <view class="mode-text">
+          <text class="mode-text__strong">{{opt.label}}</text>
+          <text class="mode-text__em">{{opt.desc}}</text>
+        </view>
+        <text class="mode-check">✓</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部弹层：球员分配（旧版队伍桶 + 待分配池） -->
+  <view class="sheet-mask {{showGrouping ? 'show' : ''}}" bindtap="closeGroupingSheet"></view>
+  <view class="bottom-sheet {{showGrouping ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">GROUPING</text>
+        <text class="sheet-header__h3">{{groupingTitle || ('分配球员 · ' + groupingLabel)}}</text>
+      </view>
+      <view class="sheet-close" bindtap="closeGroupingSheet"><text>×</text></view>
+    </view>
+
+    <text class="grouping-hint">{{groupingHint}}（已选 {{groupingSelectCount}}/{{groupingSelectRequired}}）</text>
+
+    <!-- 队伍桶：队伍1手动分配；其余队伍选满后自动预览 -->
+    <view class="grouping-teams">
+      <view
+        wx:for="{{groupingTeams}}"
+        wx:for-index="ti"
+        wx:key="teamId"
+        class="grouping-team {{ti === groupingActive ? 'active' : ''}} {{item.auto ? 'auto' : ''}} {{item.members.length === item.size ? 'full' : ''}}"
+        bindtap="selectGroupingTeam"
+        data-idx="{{ti}}"
+      >
+        <view class="grouping-team__head">
+          <text class="grouping-team__name">{{item.name}}</text>
+          <text class="grouping-team__count">{{item.members.length}}/{{item.size}} · {{item.sizeLabel}}{{item.auto ? ' · 自动' : ''}}</text>
+        </view>
+        <view class="grouping-team__members">
+          <block wx:if="{{!item.auto}}">
+            <view
+              wx:for="{{item.members}}"
+              wx:for-item="m"
+              wx:key="playerId"
+              class="grouping-chip"
+              catchtap="unassignPlayer"
+              data-player-id="{{m.playerId}}"
+            >
+              <image class="grouping-chip__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
+              <text class="grouping-chip__name">{{m.name}}</text>
+              <text class="grouping-chip__x">×</text>
+            </view>
+          </block>
+          <block wx:else>
+            <view
+              wx:for="{{item.members}}"
+              wx:for-item="m"
+              wx:key="playerId"
+              class="grouping-chip readonly"
+            >
+              <image class="grouping-chip__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
+              <text class="grouping-chip__name">{{m.name}}</text>
+            </view>
+          </block>
+          <text wx:if="{{!item.members.length}}" class="grouping-team__empty">{{item.auto ? '选满队伍1后自动分组' : '点击下方球员加入'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 待分配球员池（仅当前组） -->
+    <view class="grouping-pool">
+      <text class="grouping-pool__title">待分配（{{groupingPoolCount}}）</text>
+      <view class="grouping-pool__list">
+        <block wx:for="{{groupingPlayers}}" wx:for-item="p" wx:key="playerId">
+          <view
+            wx:if="{{p.teamIndex < 0}}"
+            class="grouping-chip pool"
+            bindtap="assignPlayer"
+            data-player-id="{{p.playerId}}"
+          >
+            <image class="grouping-chip__avatar" src="{{p.avatar}}" mode="aspectFill"></image>
+            <text class="grouping-chip__name">{{p.name}}</text>
+            <text class="grouping-chip__plus">+</text>
+          </view>
+        </block>
+        <text wx:if="{{groupingPoolCount === 0 && groupingComplete}}" class="grouping-pool__done">分配完成 ✓</text>
+      </view>
+    </view>
+
+    <view class="grouping-confirm {{groupingComplete ? '' : 'disabled'}}" bindtap="confirmGrouping">确认分组</view>
+  </view>
+
+  <!-- 底部弹层：开球时间滚轮 -->
+  <view class="sheet-mask {{showTeeTime ? 'show' : ''}}" bindtap="closeTeeTimeSheet"></view>
+  <view class="bottom-sheet wheel-time-sheet {{showTeeTime ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+
+    <view class="wheel-year-bar">
+      <view class="year-arrow" bindtap="changeYear" data-delta="-1"><text>‹</text></view>
+      <view class="wheel-year-text">{{teeYear}}年</view>
+      <view class="year-arrow" bindtap="changeYear" data-delta="1"><text>›</text></view>
+    </view>
+
+    <view class="wheel-title-row">
+      <text>月</text><text>日</text><text>时</text><text>分</text>
+    </view>
+
+    <picker-view class="wheel-picker" indicator-class="wheel-indicator" value="{{teeIndex}}" bindchange="onTeeChange">
+      <picker-view-column>
+        <view wx:for="{{months}}" wx:key="*this" class="wheel-item">{{item}}</view>
+      </picker-view-column>
+      <picker-view-column>
+        <view wx:for="{{days}}" wx:key="*this" class="wheel-item">{{item}}</view>
+      </picker-view-column>
+      <picker-view-column>
+        <view wx:for="{{hours}}" wx:key="*this" class="wheel-item">{{item}}</view>
+      </picker-view-column>
+      <picker-view-column>
+        <view wx:for="{{minutes}}" wx:key="*this" class="wheel-item">{{item}}</view>
+      </picker-view-column>
+    </picker-view>
+
+    <button class="sheet-confirm-btn" bindtap="confirmTeeTime">确认时间</button>
+  </view>
+
+  <!-- 底部弹层：空位 → 选择添加方式（好友列表 / 老牌组合 / 手工添加） -->
+  <view class="sheet-mask {{showAddPlayer ? 'show' : ''}}" bindtap="closeAddPlayer"></view>
+  <view class="bottom-sheet {{showAddPlayer ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">ADD PLAYER</text>
+        <text class="sheet-header__h3">选择添加方式</text>
+      </view>
+      <view class="sheet-close" bindtap="closeAddPlayer"><text>×</text></view>
+    </view>
+    <view class="game-mode-list">
+      <view class="game-mode-option" bindtap="addFromFriends">
+        <view class="mode-icon"><text>👥</text></view>
+        <view class="mode-text">
+          <text class="mode-text__strong">好友列表</text>
+          <text class="mode-text__em">从我的好友中选择球员</text>
+        </view>
+        <text class="mode-arrow">›</text>
+      </view>
+      <view class="game-mode-option" bindtap="addFromCombo">
+        <view class="mode-icon"><text>★</text></view>
+        <view class="mode-text">
+          <text class="mode-text__strong">老牌组合</text>
+          <text class="mode-text__em">常用四人组 / 上次比赛组合</text>
+        </view>
+        <text class="mode-arrow">›</text>
+      </view>
+      <view class="game-mode-option" bindtap="addManual">
+        <view class="mode-icon"><text>✎</text></view>
+        <view class="mode-text">
+          <text class="mode-text__strong">手工添加</text>
+          <text class="mode-text__em">手动输入姓名加入该位置</text>
+        </view>
+        <text class="mode-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+</view>

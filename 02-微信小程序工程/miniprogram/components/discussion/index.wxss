@@ -1,0 +1,152 @@
+/* 统一讨论区聊天系统样式（全局唯一）。组件自带主题 token（不依赖宿主页面变量是否齐全），
+   由 .ds-bright / .ds-dark 根类切换，确保任何记分/赛事页面表现完全一致。 */
+
+/* 根：自包含 flex 面板，填满宿主高度（宿主须给定高度，如 flex:1 容器） */
+.ds-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  /* 品牌色（与主题无关，单一来源对齐 app.wxss） */
+  --tour-blue: #002d62;
+  --data-blue: #00aeef;
+  --champion-gold: #ce9224;
+}
+/* 主题 token：组件内自定义，避免宿主缺失 --border/--bg-subtle/--text-muted 等导致样式失效 */
+.ds-bright {
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-muted: #6b7280;
+  background: #ededed;
+}
+.ds-dark {
+  --bg-card: #111111;
+  --bg-subtle: #0a0a0a;
+  --border: #222222;
+  --text-primary: #f1f5f9;
+  --text-muted: #888888;
+  background: #0a0a0a;
+}
+
+/* L1 围观行（scroll-view 容器）：固定高度、横向滚动；不在 scroll-view 上做 flex（其居中不可靠） */
+.tab-watchers-strip {
+  flex: 0 0 auto;
+  height: 112rpx;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+/* 内层轨道：真正的 flex center 行（强制覆盖任何来源），inline-flex 以便内容超宽时横向滚动 */
+.ws-track {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  min-width: 100%;
+  gap: 20rpx;
+  padding: 0 28rpx;
+  box-sizing: border-box;
+  vertical-align: top;
+}
+.discussion-watchers-label { flex: 0 0 auto; align-self: center; color: var(--text-muted); font-size: 22rpx; font-weight: 700; letter-spacing: 0.04em; }
+/* 头像 wrapper：固定尺寸 flex 居中容器，强制垂直居中、零位移；尺寸不受行高影响 */
+.discussion-avatar-btn {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: center !important;
+  width: 72rpx !important;
+  height: 72rpx !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 9999rpx;
+  border: 2px solid var(--bg-card);
+  overflow: hidden;
+  background: var(--bg-subtle);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+  line-height: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
+  vertical-align: middle;
+}
+/* 头像 image：block 消除 inline 基线间隙（偏上根因），铺满 wrapper 裁切式填充 */
+.discussion-avatar-btn .discussion-avatar-img,
+.discussion-avatar-btn image {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  vertical-align: middle !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+.discussion-more-btn { flex: 0 0 auto; align-self: center; height: 64rpx; line-height: 64rpx; padding: 0 24rpx; border-radius: 9999rpx; border: 1px solid var(--border); background: var(--bg-subtle); font-size: 22rpx; font-weight: 500; white-space: nowrap; }
+.ds-dark .discussion-more-btn { color: var(--champion-gold); }
+.ds-bright .discussion-more-btn { color: var(--tour-blue); }
+
+/* L2 聊天流：内部滚动区（flex:1，min-height:0 让其在面板内部独立滚动） */
+.ds-chat-scroll { flex: 1 1 auto; min-height: 0; }
+.ds-root--fixed-input .ds-chat-scroll {
+  padding-bottom: calc(128rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.discussion-chat { padding: 28rpx 28rpx 20rpx; display: flex; flex-direction: column; gap: 28rpx; }
+.discussion-content-spacer {
+  width: 100%;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.ds-bright .discussion-content-spacer { background: #ededed; }
+.ds-dark .discussion-content-spacer { background: #0a0a0a; }
+.discussion-time { align-self: center; background: rgba(0, 0, 0, 0.12); color: #fff; font-size: 20rpx; padding: 8rpx 16rpx; border-radius: 8rpx; }
+.ds-dark .discussion-time { background: rgba(255, 255, 255, 0.12); color: var(--text-muted); }
+.chat-row { display: flex; align-items: flex-start; gap: 18rpx; }
+.chat-row.self { justify-content: flex-end; }
+.chat-avatar { width: 76rpx; height: 76rpx; border-radius: 12rpx; flex-shrink: 0; background: var(--bg-subtle); }
+.chat-col { display: flex; flex-direction: column; max-width: 496rpx; }
+.chat-meta { color: #999; font-size: 22rpx; margin-bottom: 8rpx; }
+.chat-row.self .chat-meta { text-align: right; }
+.chat-bubble { position: relative; padding: 18rpx 22rpx; border-radius: 12rpx; background: #fff; color: #111827; font-size: 28rpx; line-height: 1.45; word-break: break-word; }
+.chat-row.self .chat-bubble { background: #95ec69; }
+.ds-dark .chat-bubble { background: #1a1a1a; color: var(--text-primary); }
+.ds-dark .chat-row.self .chat-bubble { background: #2b5f24; color: #fff; }
+.mention-text { color: var(--tour-blue); font-weight: 700; }
+.ds-dark .mention-text { color: var(--data-blue); }
+
+/* L3 输入栏：面板底部（flex 不收缩），底部对齐使 textarea 多行增高时按钮贴底。
+   z-index 高于 emoji mask(126)/panel(128)，且 pointer-events:auto，确保任何情况下输入栏可点可输入、不被遮罩拦截 */
+.discussion-input-bar { position: relative; z-index: 130; pointer-events: auto; flex: 0 0 auto; display: flex; align-items: flex-end; gap: 20rpx; min-height: 112rpx; padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); background: #f7f7f7; border-top: 1px solid #d1d5db; box-sizing: border-box; }
+.discussion-input-bar--fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.ds-dark .discussion-input-bar { background: #111111; border-color: var(--border); }
+.discussion-plus-btn, .discussion-emoji-btn { width: 68rpx; height: 68rpx; border-radius: 50%; border: 1px solid #cfd3d8; color: #5f6368; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; font-size: 36rpx; }
+.ds-dark .discussion-plus-btn, .ds-dark .discussion-emoji-btn { border-color: var(--border); color: var(--text-muted); }
+.discussion-input-box { position: relative; z-index: 1; pointer-events: auto; flex: 1; display: flex; align-items: center; min-height: 72rpx; max-height: 240rpx; padding: 10rpx 22rpx; border-radius: 16rpx; background: #fff; box-sizing: border-box; }
+.ds-dark .discussion-input-box { background: var(--bg-subtle); }
+/* 强制恢复输入能力：禁止任何 pointer-events:none 残留，允许文本选择与文本光标 */
+.discussion-input { width: 100%; min-height: 52rpx; max-height: 220rpx; color: #111827; font-size: 28rpx; line-height: 1.45; pointer-events: auto !important; user-select: text; -webkit-user-select: text; cursor: text; }
+.ds-dark .discussion-input { color: var(--text-primary); }
+.discussion-input__ph { color: #9ca3af; font-size: 28rpx; }
+.discussion-send { flex: 0 0 auto; height: 72rpx; line-height: 72rpx; padding: 0 30rpx; border-radius: 12rpx; font-size: 26rpx; font-weight: 700; text-align: center; }
+.discussion-send.is-disabled { background: #c8ccd2; color: #f3f4f6; }
+.ds-dark .discussion-send.is-disabled { background: #2a2a2a; color: var(--text-muted); }
+.discussion-send.is-active { background: var(--tour-blue); color: #fff; }
+.discussion-emoji-btn.is-on { border-color: var(--tour-blue); color: var(--tour-blue); }
+
+/* 表情面板（微信式底部 overlay，悬于输入栏正上方） */
+.emoji-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 126; background: transparent; }
+.emoji-panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 128; display: flex; flex-direction: column; background: #f7f7f7; border-top: 1px solid #d1d5db; box-shadow: 0 -8rpx 24rpx rgba(0, 0, 0, 0.08); animation: emojiSlideUp 0.22s ease; }
+@keyframes emojiSlideUp { from { transform: translateY(100%); opacity: 0.5; } to { transform: translateY(0); opacity: 1; } }
+.ds-dark .emoji-panel { background: #111111; border-color: var(--border); }
+.emoji-scroll { height: 460rpx; }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6rpx; padding: 20rpx 16rpx; }
+.emoji-cell { height: 84rpx; display: flex; align-items: center; justify-content: center; font-size: 44rpx; border-radius: 12rpx; }
+.emoji-cell:active { background: rgba(0, 0, 0, 0.08); }
+.ds-dark .emoji-cell:active { background: rgba(255, 255, 255, 0.1); }

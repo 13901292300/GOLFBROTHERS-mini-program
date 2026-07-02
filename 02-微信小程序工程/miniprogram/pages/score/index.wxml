@@ -1,0 +1,590 @@
+<view class="score-page {{themeClass}}">
+  <!-- Header -->
+  <view id="main-header" class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">SCORECARD</text>
+          <text class="gb-header__title">记分卡</text>
+        </view>
+      </view>
+      <view class="gb-header__right">
+        <view class="mini-program-pill">
+          <view class="mini-program-pill__dots">
+            <view class="mini-program-pill__dot"></view>
+            <view class="mini-program-pill__dot"></view>
+            <view class="mini-program-pill__dot"></view>
+          </view>
+          <view class="mini-program-pill__line"></view>
+          <view class="mini-program-pill__circle">
+            <view class="mini-program-pill__circle-inner"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Navigation Tabs -->
+  <view class="tab-nav">
+    <view
+      bindtap="switchScorecardTab"
+      data-tab="score"
+      class="tab-nav__item {{activeTab === 'score' ? 'tab-nav__item--active' : ''}}"
+    >
+      <text class="tab-nav__label {{activeTab === 'score' ? 'tab-active' : 'tab-inactive'}}">记分</text>
+      <view wx:if="{{activeTab === 'score'}}" class="tab-nav__indicator"></view>
+    </view>
+    <view bindtap="switchScorecardTab" data-tab="discussion" class="tab-nav__item {{activeTab === 'discussion' ? 'tab-nav__item--active' : ''}}">
+      <text class="tab-nav__label {{activeTab === 'discussion' ? 'tab-active' : 'tab-inactive'}}">讨论区</text>
+      <view wx:if="{{activeTab === 'discussion'}}" class="tab-nav__indicator"></view>
+    </view>
+    <view bindtap="switchScorecardTab" data-tab="game" class="tab-nav__item {{activeTab === 'game' ? 'tab-nav__item--active' : ''}}">
+      <text class="tab-nav__label {{activeTab === 'game' ? 'tab-active' : 'tab-inactive'}}">游戏</text>
+      <view wx:if="{{activeTab === 'game'}}" class="tab-nav__indicator"></view>
+    </view>
+  </view>
+
+  <!-- Main Content -->
+  <view class="score-main">
+    <!-- Score Tab Panel -->
+    <view wx:if="{{activeTab !== 'discussion'}}" class="score-tab-panel">
+      <!-- Course & Game Info：TAB 与 HOLE 之间的可下拉信息栏（轻量 Context Panel 入口） -->
+      <view id="course-game-info" class="course-game-info">
+        <view class="course-game-info__head score-info-row">
+          <view class="score-info-left">
+            <view class="course-game-info__accent"></view>
+            <text class="course-game-info__course course-name">{{match.course}}</text>
+            <view bindtap="toggleGameInfo" class="course-game-info__toggle course-dropdown-btn" aria-label="展开本场信息">
+              <text class="course-game-info__chevron {{gameInfoOpen ? 'course-game-info__chevron--open' : ''}}">⌄</text>
+            </view>
+          </view>
+          <view class="score-display-switch">
+            <view
+              bindtap="setScoreDisplayMode"
+              data-value="gross"
+              class="score-display-switch__btn {{scoreDisplayMode === 'gross' ? 'score-display-switch__btn--active' : ''}}"
+            >总杆</view>
+            <view
+              bindtap="setScoreDisplayMode"
+              data-value="diff"
+              class="score-display-switch__btn {{scoreDisplayMode === 'diff' ? 'score-display-switch__btn--active' : ''}}"
+            >杆差</view>
+          </view>
+        </view>
+        <!-- Context Panel 已移至 .score-page 根级浮层（position:fixed），不再参与本容器布局流 -->
+      </view>
+
+      <!-- Best Ball Roster Strip（仅 3 人及以上组展示；2+2 / 2+1+1 等纯 pair/single 组合时名册为空并隐藏） -->
+      <view wx:if="{{mode === 'fourball_best' && bestRoster.length}}" class="bestball-roster-strip">
+        <view class="bestball-roster-inner">
+          <view
+            wx:for="{{bestRoster}}"
+            wx:key="playerId"
+            class="bestball-player-card {{item.groupClass}}"
+            style="--tee-color:{{item.teeColor}};"
+          >
+            <!-- 左：球员区（头像在上、昵称在下，纵向居中） -->
+            <view class="bestball-player-id">
+              <image class="bestball-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <text class="bestball-player-name">{{item.name}}</text>
+            </view>
+            <!-- 右：T台区（独立固定右侧，不参与球员头像/昵称布局） -->
+            <view class="bestball-tee-line">
+              <view class="bestball-tee-dot"></view>
+              <text>{{item.tee}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Scoreboard Table Container -->
+      <scroll-view class="scoreboard-scroll" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
+        <view class="scoreboard-inner">
+          <!-- thead row 1: Hole labels -->
+          <view class="scoreboard-row scoreboard-row--head">
+            <view class="scoreboard-cell sticky-col player-col-header">
+              <text class="col-head-label">Hole</text>
+            </view>
+            <view
+              wx:for="{{columns}}"
+              wx:key="label"
+              wx:for-index="ci"
+              class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}}"
+            >
+              <view class="hole-label-wrap">
+                <view class="hole-label-circle {{item.isSpecial ? 'hole-label-circle--special' : 'hole-number'}}">{{item.label}}</view>
+              </view>
+            </view>
+          </view>
+
+          <!-- thead row 2: Par -->
+          <view class="scoreboard-row scoreboard-row--par">
+            <view class="scoreboard-cell sticky-col">
+              <text class="col-par-label">Par</text>
+            </view>
+            <view
+              wx:for="{{columns}}"
+              wx:key="label"
+              wx:for-index="ci"
+              class="scoreboard-cell {{item.isSpecial ? 'scoreboard-cell--special-par' : ''}}"
+            >
+              <text class="par-val">{{item.par}}</text>
+            </view>
+          </view>
+
+          <!-- tbody: fourball_best 按组渲染记分行（每组一行）；标准/赛事模式走 wx:else 球员行 -->
+          <block wx:if="{{mode === 'fourball_best'}}">
+          <view
+            wx:for="{{bestTeams}}"
+            wx:key="id"
+            wx:for-index="gIdx"
+            class="scoreboard-row scoreboard-row--player"
+          >
+            <!-- pair(2人)：四人四球原型并排双头像；single(1人)：个人比杆样式；team(>=3人)：球队样式 -->
+            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'single' ? 'bestball-single-cell' : (item.kind === 'pair' ? 'bestball-pair-cell' : 'bestball-mode-cell')}}">
+              <block wx:if="{{item.kind === 'single'}}">
+                <view class="player-card">
+                  <view class="player-top-line">
+                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <view class="player-diff-wrap">
+                      <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                    </view>
+                  </view>
+                  <text class="player-name-line">{{item.name}}</text>
+                </view>
+                <view class="player-tee-marker {{item.colorClass}}"></view>
+              </block>
+              <block wx:elif="{{item.kind === 'pair'}}">
+                <view class="player-cell-content">
+                  <view class="paired-avatars">
+                    <view class="pair-avatar-group">
+                      <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
+                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                      </view>
+                    </view>
+                    <view class="player-diff-wrap">
+                      <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                    </view>
+                  </view>
+                  <view class="paired-names">
+                    <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
+                  </view>
+                </view>
+                <view class="tee-marker-strip-right">
+                  <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="tee-half" style="background:{{pm.teeColor}};"></view>
+                </view>
+              </block>
+              <block wx:else>
+                <view class="bestball-mode-layout">
+                  <view class="bestball-mode-wrap">
+                    <text class="bestball-mode-kicker">TEAM SCORE</text>
+                    <text class="bestball-mode-main">{{item.label}}</text>
+                  </view>
+                  <view class="player-diff-wrap bestball-mode-diff">
+                    <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                  </view>
+                </view>
+              </block>
+            </view>
+
+            <view
+              wx:for="{{item.columns}}"
+              wx:for-item="col"
+              wx:key="label"
+              wx:for-index="cIdx"
+              bindtap="onScoreCellTap"
+              data-player-idx="{{gIdx}}"
+              data-col-idx="{{cIdx}}"
+              class="scoreboard-cell score-cell {{col.isSpecial ? 'scoreboard-cell--special-cell' : ''}}"
+            >
+              <block wx:if="{{col.isSpecial}}">
+                <view class="special-cell-inner">
+                  <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{col.score}}</text>
+                  <view class="special-cell-meta">
+                    <text class="special-cell-putt">{{col.putts}}</text>
+                    <text class="special-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+
+              <block wx:else>
+                <view class="hole-cell-inner">
+                  <view class="{{col.scoreClass}}">
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}}">{{col.mainStr}}</text>
+                  </view>
+                  <view class="hole-cell-meta">
+                    <text class="hole-cell-putt">{{col.putts}}</text>
+                    <text class="hole-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+          </block>
+
+          <block wx:else>
+          <view
+            wx:for="{{playersView}}"
+            wx:key="id"
+            wx:for-index="pIdx"
+            class="scoreboard-row scoreboard-row--player"
+          >
+            <view class="scoreboard-cell sticky-col player-cell">
+              <view class="player-card">
+                <view class="player-top-line">
+                  <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                  <view class="player-diff-wrap">
+                    <text class="player-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
+                  </view>
+                </view>
+                <text class="player-name-line">{{item.name}}</text>
+              </view>
+              <view class="player-tee-marker {{item.colorClass}}"></view>
+            </view>
+
+            <view
+              wx:for="{{item.cells}}"
+              wx:for-item="cell"
+              wx:key="label"
+              wx:for-index="cIdx"
+              bindtap="onScoreCellTap"
+              data-player-idx="{{pIdx}}"
+              data-col-idx="{{cIdx}}"
+              class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
+            >
+              <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+              <!-- 名次视觉：纯红=1 纯蓝=2 蓝+白腰线=3 红+白腰线=4（取消数字，腰线左上→右下且裁剪于三角内） -->
+              <view wx:if="{{cell.triangleClass && (cell.gameCornerRank === 3 || cell.gameCornerRank === 4)}}" class="corner-waist"></view>
+
+              <block wx:if="{{cell.type === 'special'}}">
+                <view class="special-cell-inner">
+                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                  <view class="special-cell-meta">
+                    <text class="special-cell-putt">{{cell.puttTotal}}</text>
+                    <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+
+              <block wx:else>
+                <view class="hole-cell-inner">
+                  <view class="{{cell.scoreClass}}">
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}}">{{cell.mainStr}}</text>
+                  </view>
+                  <view class="hole-cell-meta">
+                    <text class="hole-cell-putt">{{cell.putts}}</text>
+                    <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+          </block>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- Discussion Tab Panel -->
+    <!-- 讨论区：复用全局唯一 Discussion Chat System 组件（围观行 + 聊天流 + emoji + 输入栏，禁止本页单独实现） -->
+    <view wx:if="{{activeTab === 'discussion'}}" id="discussion-tab-panel" class="score-discussion-panel">
+      <discussion
+        watchers="{{watchers}}"
+        messages="{{chatMessages}}"
+        theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
+      ></discussion>
+    </view>
+  </view>
+
+  <!-- Floating Actions -->
+  <view wx:if="{{activeTab !== 'discussion'}}" id="score-actions" class="score-actions">
+    <view bindtap="openGroupManagePage" id="quick-score-btn" class="score-actions__primary">添加/删除</view>
+    <view bindtap="toggleSheet" class="score-actions__secondary">更多功能</view>
+  </view>
+
+  <!-- More Menu Bottom Sheet -->
+  <view wx:if="{{showMoreSheet}}" id="more-sheet" class="more-sheet" bindtap="toggleSheet">
+    <view class="more-sheet__panel" catchtap="">
+      <view class="more-sheet__head">
+        <text class="more-sheet__title">Tournament Controls</text>
+        <view bindtap="toggleSheet" class="more-sheet__close">×</view>
+      </view>
+      <view class="more-sheet__grid">
+        <view wx:for="{{moreMenuItems}}" wx:key="label" class="more-sheet__item" bindtap="onMoreMenuTap" data-label="{{item.label}}">
+          <view class="more-sheet__icon {{item.bg}}"><text>{{item.icon}}</text></view>
+          <text class="more-sheet__label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Score Input Sheet -->
+  <view wx:if="{{showScoreSheet}}" id="score-input-sheet" class="score-input-sheet {{scorePanelMode === 'quick' ? 'quick-mode' : ''}}">
+    <view class="score-input-sheet__mask" bindtap="closeScoreInput"></view>
+    <view class="score-input-sheet__panel {{scoreSheetOpen ? 'score-input-sheet__panel--open' : ''}}">
+      <view class="score-input-sheet__handle"></view>
+
+      <view class="panel-mode-switch">
+        <view
+          bindtap="switchScorePanelMode"
+          data-mode="tech"
+          class="panel-mode-btn {{scorePanelMode === 'tech' ? 'panel-mode-btn--active' : ''}}"
+        >技术面板</view>
+        <view
+          bindtap="switchScorePanelMode"
+          data-mode="quick"
+          class="panel-mode-btn {{scorePanelMode === 'quick' ? 'panel-mode-btn--active' : ''}}"
+        >快捷面板</view>
+      </view>
+
+      <view class="sheet-hole-nav">
+        <view bindtap="sheetPrevHole" class="sheet-hole-nav__btn">‹</view>
+        <view class="sheet-hole-nav__center">
+          <view class="sheet-hole-label">{{sheetHoleLabel}}</view>
+          <view class="sheet-hole-meta">
+            <view class="sheet-hole-meta__item"><text>PAR</text><text class="sheet-hole-meta__val">{{sheetPar}}</text></view>
+            <view class="sheet-hole-meta__item"><text>YARDS</text><text class="sheet-hole-meta__val sheet-hole-meta__val--light">{{sheetYards}}</text></view>
+          </view>
+        </view>
+        <view bindtap="sheetNextHole" class="sheet-hole-nav__btn">›</view>
+      </view>
+
+      <view class="score-sheet-layout">
+        <view class="sheet-player-list">
+          <view
+            wx:for="{{sheetPlayers}}"
+            wx:key="id"
+            wx:for-index="sIdx"
+            bindtap="onSheetPlayerTap"
+            data-idx="{{sIdx}}"
+            class="sheet-player-item {{scorePanelMode === 'tech' && item.active ? 'sheet-player-item--active' : 'sheet-player-item--inactive'}}"
+          >
+            <view class="sheet-player-avatar-wrap">
+              <image class="sheet-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <text class="sheet-player-name">{{item.name}}</text>
+            </view>
+            <view class="sheet-hole-score">{{item.holeScore}}</view>
+          </view>
+        </view>
+
+        <view wx:if="{{scorePanelMode === 'tech'}}" class="sheet-main-panel tech-score-panel">
+          <view class="sheet-control-row">
+            <text class="sheet-control-label">成绩</text>
+            <view class="stepper-btn">
+              <view bindtap="adjustSheetVal" data-type="score" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <text class="stepper-val">{{panelMainDisplay}}</text>
+              <view bindtap="adjustSheetVal" data-type="score" data-delta="1" class="control-icon control-icon--plus">+</view>
+            </view>
+          </view>
+          <view class="sheet-control-row">
+            <text class="sheet-control-label">推杆</text>
+            <view class="stepper-btn">
+              <view bindtap="adjustSheetVal" data-type="putt" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <text class="stepper-val">{{panelPutt}}</text>
+              <view bindtap="adjustSheetVal" data-type="putt" data-delta="1" class="control-icon control-icon--plus">+</view>
+            </view>
+          </view>
+          <view class="sheet-control-row">
+            <text class="sheet-control-label">罚杆</text>
+            <view class="stepper-btn">
+              <view bindtap="adjustSheetVal" data-type="penalty" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <text class="stepper-val">{{panelPenalty}}</text>
+              <view bindtap="adjustSheetVal" data-type="penalty" data-delta="1" class="control-icon control-icon--plus">+</view>
+            </view>
+          </view>
+          <view class="sheet-control-row">
+            <text class="sheet-control-label">沙坑</text>
+            <view class="stepper-btn">
+              <view bindtap="adjustSheetVal" data-type="bunker" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <text class="stepper-val">{{panelBunker}}</text>
+              <view bindtap="adjustSheetVal" data-type="bunker" data-delta="1" class="control-icon control-icon--plus">+</view>
+            </view>
+          </view>
+          <view class="direction-row">
+            <view class="direction-btn">
+              <view class="direction-circle direction-circle--active">◎</view>
+              <text class="direction-label direction-label--gold">Fairway</text>
+            </view>
+            <view class="direction-btn">
+              <view class="direction-circle">←</view>
+              <text class="direction-label">Left</text>
+            </view>
+            <view class="direction-btn">
+              <view class="direction-circle">→</view>
+              <text class="direction-label">Right</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{scorePanelMode === 'quick'}}" class="sheet-main-panel quick-score-panel">
+          <view class="quick-score-control-list">
+            <view wx:for="{{quickPanelDisplay}}" wx:key="*this" wx:for-index="qIdx" class="quick-score-control-row">
+              <view class="quick-score-control">
+                <view bindtap="adjustQuickPanelScore" data-idx="{{qIdx}}" data-delta="-1" class="quick-score-control-btn">−</view>
+                <text class="quick-score-control-value">{{item}}</text>
+                <view bindtap="adjustQuickPanelScore" data-idx="{{qIdx}}" data-delta="1" class="quick-score-control-btn">+</view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="sheet-footer-btns">
+        <view bindtap="closeScoreInput" class="sheet-footer-btn sheet-footer-btn--clear">清除</view>
+        <view bindtap="confirmScoreInput" class="sheet-footer-btn sheet-footer-btn--confirm">确认</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Group Manage Page -->
+  <view wx:if="{{showGroupManage}}" id="group-manage-page" class="group-manage-page">
+    <view class="gb-header" style="{{headerRootStyle}}">
+      <view class="gb-header__inner" style="{{headerBarStyle}}">
+        <view class="gb-header__left">
+          <view bindtap="closeGroupManagePage" class="gb-header__back" aria-label="返回">
+            <text class="gb-header__chevron">‹</text>
+          </view>
+          <view>
+            <text class="gb-header__eyebrow">SCORECARD</text>
+            <text class="gb-header__title">添加/删除</text>
+          </view>
+        </view>
+        <view class="gb-header__right">
+          <view class="mini-program-pill">
+            <view class="mini-program-pill__dots">
+              <view class="mini-program-pill__dot"></view>
+              <view class="mini-program-pill__dot"></view>
+              <view class="mini-program-pill__dot"></view>
+            </view>
+            <view class="mini-program-pill__line"></view>
+            <view class="mini-program-pill__circle">
+              <view class="mini-program-pill__circle-inner"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view class="group-manage-content" scroll-y>
+      <view class="section-card">
+        <view class="section-head">
+          <view>
+            <text class="section-title">本组球员</text>
+            <text class="section-desc">点击头像右上角可移出本组</text>
+          </view>
+          <text class="section-count">{{playerCount}}/4</text>
+        </view>
+        <view class="players-strip fixed-slots">
+          <view wx:for="{{groupSlots}}" wx:key="slotId" wx:for-index="slotIdx" class="player-item fixed-slot {{item.status !== 'occupied' ? 'empty-slot' : ''}}">
+            <text class="slot-index">{{item.slotId}}</text>
+            <view class="avatar-wrap">
+              <block wx:if="{{item.status === 'occupied'}}">
+                <image src="{{item.player.avatar}}" mode="aspectFill"></image>
+                <view catchtap="removeGroupSlot" data-index="{{slotIdx}}" class="delete-dot">×</view>
+              </block>
+              <block wx:elif="{{item.status === 'pending'}}">
+                <view bindtap="onEmptySlotTap" data-index="{{slotIdx}}" class="empty-avatar empty-avatar--pending">…</view>
+              </block>
+              <block wx:else>
+                <view bindtap="onEmptySlotTap" data-index="{{slotIdx}}" class="empty-avatar {{item.hasCache ? 'empty-avatar--cache' : ''}}">＋</view>
+                <view wx:if="{{item.hasCache}}" class="slot-cache-badge">↻</view>
+              </block>
+            </view>
+            <text class="player-name">{{item.status === 'occupied' ? item.player.name : (item.status === 'pending' ? '待加入' : (item.hasCache ? '可继承成绩' : '空位'))}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-card qr-card">
+        <text class="qr-title">扫码加入本组</text>
+        <text class="qr-subtitle">现场球友扫描二维码后，可申请加入当前记分组。</text>
+        <view class="qr-box">
+          <image class="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=GolfBrothersGroupJoin&color=000&bgcolor=fff" mode="aspectFit"></image>
+        </view>
+        <text class="share-note">长按二维码可保存或转发</text>
+      </view>
+    </scroll-view>
+
+    <!-- 固定底部操作栏：贴底、不随内容滚动、不被二维码区域影响 -->
+    <view class="group-manage-footer">
+      <view class="group-actions">
+        <view bindtap="addGroupPlayer" class="group-action-btn group-action-btn--manual">
+          <text class="group-action-btn__icon">✎</text>
+          <text>手工添加</text>
+        </view>
+        <view bindtap="onFooterFriend" class="group-action-btn group-action-btn--friends">
+          <text class="group-action-btn__icon">＋</text>
+          <text>好友选择</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 点击空位：底部动作弹窗（好友列表 / 老牌组合 / 手工添加） -->
+  <view wx:if="{{addSheetVisible}}" class="add-sheet" bindtap="closeAddSheet">
+      <view class="add-sheet__panel" catchtap="noop">
+        <view class="add-sheet__title">选择添加方式</view>
+        <view class="add-sheet__list">
+          <view class="add-sheet__item" bindtap="addMethodFriend">
+            <view class="add-sheet__icon add-sheet__icon--friend">👥</view>
+            <view class="add-sheet__main">
+              <text class="add-sheet__name">好友列表</text>
+              <text class="add-sheet__sub">从我的好友中选择球员</text>
+            </view>
+            <text class="add-sheet__arrow">›</text>
+          </view>
+          <view class="add-sheet__item" bindtap="addMethodCombo">
+            <view class="add-sheet__icon add-sheet__icon--combo">⭐</view>
+            <view class="add-sheet__main">
+              <text class="add-sheet__name">老牌组合</text>
+              <text class="add-sheet__sub">常用四人组 / 上次比赛组合</text>
+            </view>
+            <text class="add-sheet__arrow">›</text>
+          </view>
+          <view class="add-sheet__item" bindtap="addMethodManual">
+            <view class="add-sheet__icon add-sheet__icon--manual">✎</view>
+            <view class="add-sheet__main">
+              <text class="add-sheet__name">手工添加</text>
+              <text class="add-sheet__sub">手动创建球员并加入该位置</text>
+            </view>
+            <text class="add-sheet__arrow">›</text>
+          </view>
+        </view>
+        <view class="add-sheet__cancel" bindtap="closeAddSheet">取消</view>
+      </view>
+    </view>
+
+  <!-- 信息继承型展开面板（Context Panel）：根级 fixed 浮层，与记分表完全解耦，不挤压 TAB / HOLE / score grid -->
+  <view wx:if="{{gameInfoOpen}}" class="game-info-mask" bindtap="closeGameInfo"></view>
+  <scroll-view
+    wx:if="{{gameInfoOpen}}"
+    scroll-y
+    class="game-info-panel game-context-panel"
+    style="top:{{gameInfoTop}}px;max-height:{{gameInfoMaxH}}px;"
+    catchtap="noop"
+  >
+
+    <!-- 轻量 Context Panel：单列纯文本 label+value，仅 5 项基础赛事信息（球场含半场 / 比赛名称 / 赛制 / 开球时间 / 天气），
+         数据全部继承自 createGame（+ 第三方天气）。严禁球场分段 / 头像 / 球员 / group / score / leaderboard / 运行时状态。
+         私密比赛额外追加只读「围观密码」（复用创建密码）。 -->
+    <view class="gc-list">
+      <view class="gc-item"><text class="gc-item-label">球场</text><text class="gc-item-value">{{gameContext.courseFull || match.course || '—'}}</text></view>
+      <view class="gc-item"><text class="gc-item-label">比赛名称</text><text class="gc-item-value">{{gameContext.title || match.name || '—'}}</text></view>
+      <view class="gc-item"><text class="gc-item-label">赛制</text><text class="gc-item-value">{{gameContext.format || match.format || '—'}}</text></view>
+      <view class="gc-item"><text class="gc-item-label">开球时间</text><text class="gc-item-value">{{gameContext.teeTime || match.teeTime || '未设置'}}</text></view>
+      <!-- 第5项：天气（第三方实时，单行纯文本，无卡片/无图标网格） -->
+      <view class="gc-item {{gameContext.isPrivate ? '' : 'gc-item--last'}}"><text class="gc-item-label">天气</text><text class="gc-item-value">{{gameContext.weather.line || '—'}}</text></view>
+      <!-- 私密追加项：围观密码（仅私密比赛显示，密码复用 createGame.accessCode，不重新生成） -->
+      <view wx:if="{{gameContext.isPrivate}}" class="gc-item gc-item--last">
+        <text class="gc-item-label">围观密码</text>
+        <view class="gc-code-wrap">
+          <text class="gc-item-value gc-code-value">{{gameContext.accessCode || '—'}}</text>
+          <view wx:if="{{gameContext.accessCode}}" class="gc-copy-btn" catchtap="copyAccessCode">复制</view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+</view>
