@@ -127,6 +127,7 @@
 
       <!-- 分组表：结构与「球队比赛 → 出发表」完全一致（整卡点击进入对应组记分页，无额外入口） -->
       <view wx:if="{{activeTab === 'group'}}" class="tee-sheet-list">
+        <view wx:if="{{groupCards.length === 0}}" class="hub-empty">暂无分组</view>
         <view wx:for="{{groupCards}}" wx:key="groupId" bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="tee-group-card {{index === 0 ? 'js-first-tee-group' : ''}}">
           <view class="tee-group-meta">
             <text class="tee-group-badge">{{item.name}}</text>

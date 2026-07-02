@@ -30,7 +30,7 @@
 
   <view class="me-row-wrap">
     <view class="friend-row me-row" bindtap="toggleMe">
-      <image class="friend-avatar" src="{{currentUser.avatar}}" mode="aspectFill"></image>
+      <image class="friend-avatar" src="{{currentUser.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="me"></image>
       <view class="friend-meta">
         <text class="friend-name">我</text>
         <text class="friend-sub">{{currentUser.name}}{{currentUser.phone ? ' · ' + currentUser.phone : ''}}</text>
@@ -50,7 +50,7 @@
     <view wx:for="{{sections}}" wx:key="letter" class="letter-section">
       <view class="letter-head">{{item.letter}}</view>
       <view wx:for="{{item.items}}" wx:for-item="f" wx:key="playerId" class="friend-row {{disabledMap[f.playerId] ? 'is-disabled' : ''}}" bindtap="toggleFriend" data-id="{{f.playerId}}">
-        <image class="friend-avatar" src="{{f.avatar}}" mode="aspectFill"></image>
+        <image class="friend-avatar" src="{{f.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="friend" data-id="{{f.playerId}}"></image>
         <view class="friend-meta">
           <text class="friend-name">{{f.name}}</text>
           <text wx:if="{{disabledMap[f.playerId]}}" class="friend-tag friend-tag--used">已在本场比赛中使用</text>

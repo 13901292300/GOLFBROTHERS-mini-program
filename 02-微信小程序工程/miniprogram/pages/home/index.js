@@ -3,6 +3,7 @@ const gameStore = require('../../utils/gameStore.js');
 const matchStateUtil = require('../../utils/matchState.js');
 const gameProgress = require('../../utils/gameProgress.js');
 const quickCreate = require('../../utils/quickCreate.js');
+const mockAvatars = require('../../utils/mockAvatars.js');
 
 function formatGameDate(ts) {
   const d = ts ? new Date(ts) : new Date();
@@ -13,12 +14,12 @@ function formatGameDate(ts) {
 }
 
 const SCHEDULE_FRIENDS = [
-  { id: '838031', name: 'Alexander', avatar: 'https://i.pravatar.cc/150?img=20' },
-  { id: '839102', name: 'Bogey King', avatar: 'https://i.pravatar.cc/150?img=30' },
-  { id: '781229', name: 'Mason', avatar: 'https://i.pravatar.cc/150?img=47' },
-  { id: '770821', name: 'Eagle Lee', avatar: 'https://i.pravatar.cc/150?img=55' },
-  { id: '882104', name: '球友老王', avatar: 'https://i.pravatar.cc/150?img=12' },
-  { id: '901337', name: 'Par达人', avatar: 'https://i.pravatar.cc/150?img=33' }
+  { id: '838031', name: 'Alexander', avatar: mockAvatars.avatarByIndex(0) },
+  { id: '839102', name: 'Bogey King', avatar: mockAvatars.avatarByIndex(1) },
+  { id: '781229', name: 'Mason', avatar: mockAvatars.avatarByIndex(2) },
+  { id: '770821', name: 'Eagle Lee', avatar: mockAvatars.avatarByIndex(3) },
+  { id: '882104', name: '球友老王', avatar: mockAvatars.avatarByIndex(4) },
+  { id: '901337', name: 'Par达人', avatar: mockAvatars.avatarByIndex(5) }
 ];
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -264,7 +265,9 @@ Page({
     } else {
       (g.playersSlots || []).forEach((p) => { if (p) allPlayers.push(p); });
     }
-    const avatars = allPlayers.map((p) => p.avatar).filter(Boolean);
+    const avatars = allPlayers
+      .map((p) => mockAvatars.resolveAvatar(p.avatar, p.playerId))
+      .filter(Boolean);
     // 多组 Game → 进入 Game Hub 控制页；单组 → 直接进入记分
     const multi = Array.isArray(g.groups) && g.groups.length > 1;
     const navUrl = multi

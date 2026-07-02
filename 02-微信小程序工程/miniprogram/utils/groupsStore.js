@@ -1,3 +1,4 @@
+const mockAvatars = require('./mockAvatars.js');
 /**
  * 出发表 groups — 领先榜唯一数据源（会话内 app.globalData.groups）
  * 结构：groups[].players[].holes[{ holeNo, score, putts, diff }]
@@ -57,28 +58,28 @@ const TOURNAMENT_SEED = [
   {
     groupId: 'g1', groupName: '第1组', time: '08:00', hole: '1号洞', status: '未开始',
     players: [
-      { playerId: 'g1-p1', name: 'Alex', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 30, avatar: 'https://cdn.screenshottocode.com/cZq11NkHJWMWEDneVJEYI.png' },
-      { playerId: 'g1-p2', name: 'TigerHoo...', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 45, avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=160&h=160&q=80' },
-      { playerId: 'g1-p3', name: 'yan72', team: '蓝队', teamClass: 'tee-team-blue', v: false, gender: 'male', flag: 'cn', country: 'CHN', age: 33, avatar: 'https://cdn.screenshottocode.com/niMpIqepFahYJ6kEAhYs5.png' },
-      { playerId: 'g1-p4', name: '大雷', team: '蓝队', teamClass: 'tee-team-blue', v: false, gender: 'male', flag: 'cn', country: 'CHN', age: 35, avatar: 'https://cdn.screenshottocode.com/IzKC6-Rz1vcRKIaxXLBjh.png' }
+      { playerId: 'g1-p1', name: 'Alex', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 30, avatar: mockAvatars.avatarByIndex(0) },
+      { playerId: 'g1-p2', name: 'TigerHoo...', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 45, avatar: mockAvatars.avatarByIndex(1) },
+      { playerId: 'g1-p3', name: 'yan72', team: '蓝队', teamClass: 'tee-team-blue', v: false, gender: 'male', flag: 'cn', country: 'CHN', age: 33, avatar: mockAvatars.avatarByIndex(2) },
+      { playerId: 'g1-p4', name: '大雷', team: '蓝队', teamClass: 'tee-team-blue', v: false, gender: 'male', flag: 'cn', country: 'CHN', age: 35, avatar: mockAvatars.avatarByIndex(3) }
     ]
   },
   {
     groupId: 'g2', groupName: '第2组', time: '08:10', hole: '1号洞', status: '未开始',
     players: [
-      { playerId: 'g2-p1', name: 'awen', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'female', flag: 'cn', country: 'CHN', age: 28, avatar: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=160&h=160&q=80' },
-      { playerId: 'g2-p2', name: '阿咪阿咪红', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'female', flag: 'cn', country: 'CHN', age: 30, avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=160&h=160&q=80' },
-      { playerId: 'g2-p3', name: '邵亮', team: '蓝队', teamClass: 'tee-team-blue', v: true, gender: 'male', flag: 'cn', country: 'CHN', age: 36, avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&h=160&q=80' },
-      { playerId: 'g2-p4', name: '郝军峰', team: '蓝队', teamClass: 'tee-team-blue', v: true, gender: 'male', flag: 'cn', country: 'CHN', age: 38, avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&h=160&q=80' }
+      { playerId: 'g2-p1', name: 'awen', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'female', flag: 'cn', country: 'CHN', age: 28, avatar: mockAvatars.avatarByIndex(4) },
+      { playerId: 'g2-p2', name: '阿咪阿咪红', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'female', flag: 'cn', country: 'CHN', age: 30, avatar: mockAvatars.avatarByIndex(5) },
+      { playerId: 'g2-p3', name: '邵亮', team: '蓝队', teamClass: 'tee-team-blue', v: true, gender: 'male', flag: 'cn', country: 'CHN', age: 36, avatar: mockAvatars.avatarByIndex(6) },
+      { playerId: 'g2-p4', name: '郝军峰', team: '蓝队', teamClass: 'tee-team-blue', v: true, gender: 'male', flag: 'cn', country: 'CHN', age: 38, avatar: mockAvatars.avatarByIndex(7) }
     ]
   },
   {
     groupId: 'g3', groupName: '第3组', time: '08:20', hole: '10号洞', status: '未开始',
     players: [
-      { playerId: 'g3-p1', name: '淳淳', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'female', flag: 'cn', country: 'CHN', age: 27, avatar: 'https://cdn.screenshottocode.com/XCHx1R0ZWBbEz1Mj9I2kI.png' },
-      { playerId: 'g3-p2', name: '大吉', team: '红队', teamClass: 'tee-team-red', v: true, gender: 'male', flag: 'cn', country: 'CHN', age: 31, avatar: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=160&h=160&q=80' },
-      { playerId: 'g3-p3', name: 'Alexander', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 40, avatar: 'https://cdn.screenshottocode.com/Bd1K7CISOTpTom7xGUSFF.png' },
-      { playerId: 'g3-p4', name: 'Bogey king', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 34, avatar: 'https://cdn.screenshottocode.com/wTbkmKH4E8zmyHX41z1Bz.png' }
+      { playerId: 'g3-p1', name: '淳淳', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'female', flag: 'cn', country: 'CHN', age: 27, avatar: mockAvatars.avatarByIndex(8) },
+      { playerId: 'g3-p2', name: '大吉', team: '红队', teamClass: 'tee-team-red', v: true, gender: 'male', flag: 'cn', country: 'CHN', age: 31, avatar: mockAvatars.avatarByIndex(9) },
+      { playerId: 'g3-p3', name: 'Alexander', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 40, avatar: mockAvatars.avatarByIndex(0) },
+      { playerId: 'g3-p4', name: 'Bogey king', team: '红队', teamClass: 'tee-team-red', v: false, gender: 'male', flag: 'us', country: 'USA', age: 34, avatar: mockAvatars.avatarByIndex(1) }
     ]
   }
 ];
@@ -203,7 +204,7 @@ function loadGroupForScoring(groupId) {
     playerId: p.playerId,
     id: p.playerId,
     name: p.name,
-    avatar: p.avatar,
+    avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
     colorClass: 'border-white',
     scores: p.holes.map((h) => (isFilledScore(h.score) ? h.score : undefined)),
     putts: p.holes.map((h) => (h.putts != null && h.putts !== '' ? h.putts : undefined))

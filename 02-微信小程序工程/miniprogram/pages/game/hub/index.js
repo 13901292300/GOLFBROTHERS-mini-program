@@ -1,3 +1,4 @@
+const mockAvatars = require('../../../utils/mockAvatars.js');
 /**
  * Game Hub —— 多组 Game 的中间控制页（赛事控制中心）
  * 四个 TAB：领先榜 / 分组表 / 讨论区 / 游戏
@@ -20,16 +21,16 @@ function holePars() {
 
 /* ===== 讨论区（与球队比赛讨论区逻辑一致：围观 + 评论流） ===== */
 const WATCHERS = [
-  { name: 'Alex', avatar: 'https://cdn.screenshottocode.com/cZq11NkHJWMWEDneVJEYI.png' },
-  { name: 'TigerHoods', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80' },
-  { name: 'yan72', avatar: 'https://cdn.screenshottocode.com/niMpIqepFahYJ6kEAhYs5.png' },
-  { name: '大雷', avatar: 'https://cdn.screenshottocode.com/IzKC6-Rz1vcRKIaxXLBjh.png' },
-  { name: '邵亮', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=120&h=120&q=80' }
+  { name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
+  { name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
+  { name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72') },
+  { name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
+  { name: '邵亮', avatar: mockAvatars.pickMockAvatar('邵亮') }
 ];
 const CHAT = [
-  { self: false, name: 'Alex', avatar: 'https://cdn.screenshottocode.com/cZq11NkHJWMWEDneVJEYI.png', text: '各组都开球了吗？领先榜可以刷起来了。', mention: '' },
-  { self: true, name: '我', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80', text: '我们组在第 1 组，已经在记分了。', mention: '@Alex' },
-  { self: false, name: 'yan72', avatar: 'https://cdn.screenshottocode.com/niMpIqepFahYJ6kEAhYs5.png', text: '收到，第 2 组马上出发。', mention: '' }
+  { self: false, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex'), text: '各组都开球了吗？领先榜可以刷起来了。', mention: '' },
+  { self: true, name: '我', avatar: mockAvatars.pickMockAvatar('我'), text: '我们组在第 1 组，已经在记分了。', mention: '@Alex' },
+  { self: false, name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72'), text: '收到，第 2 组马上出发。', mention: '' }
 ];
 
 /* ===== 更多功能面板（与球队比赛 100% 复用同一结构/文案/图标） ===== */
@@ -127,6 +128,20 @@ function sumPar(from, to) {
   return n;
 }
 // 由聚合成绩数组构建逐洞成绩卡（结构与 groupsStore.buildPlayerScorecard 完全一致）
+const VALID_HUB_TABS = ['leaderboard', 'group', 'interaction', 'game'];
+const HUB_TAB_ALIASES = {
+  groups: 'group',
+  teeingSheet: 'group',
+  tee: 'group'
+};
+
+function resolveHubActiveTab(rawTab, from) {
+  let tab = HUB_TAB_ALIASES[rawTab] || rawTab;
+  if (VALID_HUB_TABS.indexOf(tab) >= 0) return tab;
+  if (from === 'score') return 'group';
+  return 'leaderboard';
+}
+
 function buildScorecard(scores, mode) {
   const arr = scores || [];
   const parCell = (v) => ({ t: String(v), m: '', c: '' });
@@ -169,6 +184,8 @@ Page({
     scrollEnabled: true,
 
     gameId: '',
+    hubReady: false,
+    groups: [],
     activeTab: 'leaderboard',
     currentGroupIndex: -1,
     // 分组表底部快捷按钮显隐：第一组卡片完全进入视口时才显示（与出发表一致）
@@ -208,25 +225,79 @@ Page({
     followMap: {}
   },
 
+  _hubDebug(stage, extra) {
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameId ? gameStore.getGameById(gameId) : null;
+    const groups = game ? gameStore.listGroups(game) : [];
+    console.log('[HUB_DEBUG]', Object.assign({
+      stage: stage,
+      options: this._loadOptions || {},
+      gameId: gameId,
+      hasGame: !!game,
+      groupsLength: groups.length,
+      activeTab: this.data.activeTab,
+      from: this._entryFrom || '',
+      groupCardsLength: (this.data.groupCards || []).length
+    }, extra || {}));
+  },
+
+  _fallbackHome(reason) {
+    console.log('[HUB_FALLBACK_HOME]', { reason: reason, gameId: this._gameId || this.data.gameId });
+    wx.showToast({ title: '比赛不存在', icon: 'none' });
+    setTimeout(() => {
+      wx.reLaunch({ url: '/pages/home/index?tab=my' });
+    }, 300);
+  },
+
   onLoad(options) {
+    console.log('[HUB_ON_LOAD]', options);
+    const opt = options || {};
+    this._loadOptions = opt;
+    this._entryFrom = opt.from || '';
+
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
-    const opt = options || {};
-    this._gameId = opt.gameId || '';
-    this.setData({ currentUserId: (gameStore.getCurrentUser() || {}).userId || '' });
-    // 入参：activeTab（默认 leaderboard；兼容 'groups'→'group'）+ currentGroup（高亮当前记分组）
-    const VALID_TABS = ['leaderboard', 'group', 'interaction', 'game'];
-    let tab = opt.activeTab === 'groups' ? 'group' : opt.activeTab;
-    if (VALID_TABS.indexOf(tab) < 0) tab = 'leaderboard';
+
+    const gameId = opt.gameId || '';
+    if (!gameId) {
+      this._hubDebug('onLoad_missing_gameId');
+      this._fallbackHome('missing_gameId');
+      return;
+    }
+
+    const game = gameStore.getGameById(gameId);
+    if (!game) {
+      this._hubDebug('onLoad_game_not_found');
+      this._fallbackHome('game_not_found');
+      return;
+    }
+
+    this._gameId = gameId;
+    const groups = gameStore.listGroups(game);
+    const tab = resolveHubActiveTab(opt.activeTab, opt.from);
     const currentGroupIndex = opt.currentGroup != null ? Number(opt.currentGroup) : -1;
+
     this.setData({
-      gameId: this._gameId,
+      currentUserId: (gameStore.getCurrentUser() || {}).userId || '',
+      gameId: gameId,
+      hubReady: true,
+      groups: groups,
       activeTab: tab,
-      currentGroupIndex: isNaN(currentGroupIndex) ? -1 : currentGroupIndex
+      currentGroupIndex: isNaN(currentGroupIndex) ? -1 : currentGroupIndex,
+      roundName: game.roundName || game.courseName || '高尔夫球局'
     });
+
+    this._hubDebug('onLoad_ready', { resolvedTab: tab });
     this._syncHubHoleLayout();
     this.applyMoreAccess();
     this.refreshGame();
+
+    if (tab === 'group') {
+      wx.nextTick(() => {
+        this.setupTeeObserver();
+        this.updateGroupScrollConstraint();
+      });
+    }
   },
 
   onReady() {
@@ -236,6 +307,14 @@ Page({
   },
 
   onShow() {
+    console.log('[HUB_ON_SHOW]', {
+      options: this._loadOptions || this.options,
+      dataGameId: this.data.gameId,
+      activeTab: this.data.activeTab,
+      hubReady: this.data.hubReady
+    });
+    if (!this.data.hubReady || !this._gameId) return;
+
     this.applyTheme(getApp().getTheme());
     // 逐洞详情显示模式跟随记分页全局记忆（与球队比赛同键）
     let mode = 'gross';
@@ -356,7 +435,8 @@ Page({
 
   // ===== 数据：统一从 gameStore 读取 =====
   _syncHubHoleLayout() {
-    const game = gameStore.getGame(this._gameId);
+    const gameId = this._gameId || this.data.gameId;
+    const game = gameId ? gameStore.getGameById(gameId) : null;
     if (!game) return;
     const layout = holeLayout.resolveLayoutFromContext({
       courseId: game.courseId,
@@ -368,15 +448,36 @@ Page({
   },
 
   refreshGame() {
-    const game = gameStore.getGame(this._gameId);
-    if (!game) {
-      this.setData({ leaderboard: [], groupCards: [] });
+    const gameId = this._gameId || this.data.gameId;
+    const game = gameId ? gameStore.getGameById(gameId) : null;
+    const groups = game ? gameStore.listGroups(game) : [];
+
+    if (!gameId || !game) {
+      console.log('[HUB_DEBUG]', {
+        stage: 'refreshGame_missing',
+        gameId: gameId,
+        hasGame: !!game,
+        groupsLength: groups.length,
+        activeTab: this.data.activeTab
+      });
+      this.setData({
+        hubReady: false,
+        leaderboard: [],
+        groupCards: [],
+        groups: []
+      });
       return;
     }
+
+    this._gameId = gameId;
     this._syncHubHoleLayout();
     const userGi = this._resolveUserGroupIndex(game);
     const headerMs = matchStatus.getMatchStatusForGameGroup(game, userGi);
+    const groupCards = this._buildGroupCards(game);
     this.setData({
+      gameId: gameId,
+      hubReady: true,
+      groups: groups,
       courseName: game.courseName || '',
       roundName: game.roundName || game.courseName || '高尔夫球局',
       gameFormat: game.gameMode || '个人比杆赛',
@@ -384,9 +485,10 @@ Page({
       matchStatusBadge: headerMs.statusBadge,
       hasComposition: gameLeaderboard.gameHasComposition(game),
       leaderboard: this._buildLeaderboard(game),
-      groupCards: this._buildGroupCards(game),
+      groupCards: groupCards,
       userGroupIndex: this._resolveUserGroupIndex(game)
     });
+    this._hubDebug('refreshGame');
     // 已展开的逐洞详情随数据刷新（成绩可能变化）
     this.updateOpenScorecard();
     // 分组数据变化可能改变内容高度 → 重新计算分组表滚动约束
@@ -450,7 +552,7 @@ Page({
   },
 
   switchTab(e) {
-    const tab = e.currentTarget.dataset.tab;
+    const tab = resolveHubActiveTab(e.currentTarget.dataset.tab, this._entryFrom);
     if (tab === this.data.activeTab) return;
     this.setData({ activeTab: tab });
     if (tab === 'group') {
@@ -675,7 +777,7 @@ Page({
 
   // 进入某组记分页：先写好该组 matchState（本组球员/赛制/球场/组数），再统一 enterScorePage
   _enterGroupScore(gi) {
-    const game = gameStore.getGame(this._gameId);
+    const game = gameStore.getGameById(this._gameId || this.data.gameId);
     if (!game) {
       wx.showToast({ title: '暂无比赛数据', icon: 'none' });
       return;

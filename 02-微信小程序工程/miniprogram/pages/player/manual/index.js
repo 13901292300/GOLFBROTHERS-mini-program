@@ -6,6 +6,7 @@
  */
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
+const mockAvatars = require('../../../utils/mockAvatars.js');
 
 Page({
   data: {
@@ -90,7 +91,7 @@ Page({
     this._return({
       playerId: 'm-' + Date.now(),
       name,
-      avatar: 'https://i.pravatar.cc/150?img=' + (10 + Math.floor(Math.random() * 60)),
+      avatar: mockAvatars.pickMockAvatar(name),
       source: 'manual'
     });
   },

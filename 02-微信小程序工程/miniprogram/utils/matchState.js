@@ -22,6 +22,7 @@
 
 const MATCH_STATE_KEY = 'matchState';
 const SCORE_PAGE_URL = '/pages/score/index';
+const gameStore = require('./gameStore.js');
 
 function getMatchState() {
   try {
@@ -108,7 +109,7 @@ function resolveGroupsFromGame(game, group, groupIndex) {
 // 由 game 对象 + 组序号构建 matchState（home / game hub / create 复用，保证多组各取本组球员）
 function buildFromGame(game, groupIndex) {
   const gi = Number(groupIndex) || 0;
-  const groups = (game && game.groups) || [];
+  const groups = gameStore.listGroups(game);
   const group = groups[gi] || { playersSlots: [] };
   const players = (group.playersSlots || [])
     .filter(Boolean)

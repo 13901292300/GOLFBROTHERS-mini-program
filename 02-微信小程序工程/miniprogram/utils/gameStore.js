@@ -25,13 +25,14 @@
 
 const STORAGE_KEY = 'gb_games_v1';
 const matchStatus = require('./matchStatus.js');
+const mockAvatars = require('./mockAvatars.js');
 
 // 当前登录用户（占位；接入真实账号体系后替换）
 const CURRENT_USER = {
   userId: 'me',
   name: 'TIGERHOODS',
   phone: '13800000000',
-  avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80'
+  avatar: mockAvatars.avatarByIndex(2)
 };
 
 function getCurrentUser() {
@@ -66,6 +67,11 @@ function getActiveGames() {
 function getGame(gameId) {
   if (!gameId) return null;
   return _readAll().find((g) => g && g.gameId === gameId) || null;
+}
+
+/** getGame 别名（调试 / 外部调用统一命名） */
+function getGameById(gameId) {
+  return getGame(gameId);
 }
 
 /** 新建或覆盖保存一个 game（按 gameId 去重；新 game 置顶） */
@@ -235,7 +241,8 @@ function updateGroupStatus(gameId, groupIndex, status) {
 }
 
 function isMultiGroup(game) {
-  return !!(game && Array.isArray(game.groups) && game.groups.length > 1);
+  if (!game) return false;
+  return listGroups(game).length > 1;
 }
 
 /** 创建者所在组下标；不在任何组则 -1 */
@@ -271,6 +278,7 @@ module.exports = {
   listGames,
   getActiveGames,
   getGame,
+  getGameById,
   saveGame,
   updateGame,
   getGroup,

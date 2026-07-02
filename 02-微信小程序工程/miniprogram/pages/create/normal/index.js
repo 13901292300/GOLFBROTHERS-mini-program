@@ -46,7 +46,7 @@ function buildCompositionOptions(count) {
   ];
 }
 
-const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=';
+const mockAvatars = require('../../../utils/mockAvatars.js');
 
 // 组人数 → 组类型（用于 groups[].type：1=single / 2=pair / 3=triple / 4=quad）
 function partType(size) {
@@ -153,7 +153,7 @@ Page({
     const firstGroup = {
       id: 'grp-1',
       players: [
-        { key: 'grp-1-p1', filled: true, playerId: 'me', name: 'TIGERHOODS', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80' },
+        { key: 'grp-1-p1', filled: true, playerId: 'me', name: 'TIGERHOODS', avatar: mockAvatars.pickMockAvatar('me') },
         { key: 'grp-1-p2', filled: false, name: '玩家2' },
         { key: 'grp-1-p3', filled: false, name: '玩家3' },
         { key: 'grp-1-p4', filled: false, name: '玩家4' }
@@ -468,7 +468,7 @@ Page({
       filled: true,
       playerId: payload.playerId || ('p-' + Date.now() + '-' + pIdx),
       name: payload.name,
-      avatar: payload.avatar || (DEFAULT_AVATAR + (10 + Math.floor(Math.random() * 60)))
+      avatar: payload.avatar || mockAvatars.pickMockAvatar(payload.playerId || payload.name)
     };
     group.players = players;
     groups[gIdx] = group;
@@ -1165,6 +1165,13 @@ Page({
       resolveRoundName: () => this._resolveRoundName()
     });
     gameStore.saveGame(updated);
+
+    const savedGame = gameStore.getGameById(gameId);
+    console.log('[EDIT_SAVE_RESULT]', {
+      gameId,
+      groupsLength: savedGame ? gameStore.listGroups(savedGame).length : 0,
+      groups: savedGame ? gameStore.listGroups(savedGame) : []
+    });
 
     halfCourseEdit.apply(
       {

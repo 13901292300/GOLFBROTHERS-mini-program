@@ -16,6 +16,8 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 
 const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
 
+const mockAvatars = require('../../../utils/mockAvatars.js');
+
 const gameStore = require('../../../utils/gameStore.js');
 
 
@@ -36,9 +38,19 @@ function buildCurrentUser() {
 
     phone: u.phone || '',
 
-    avatar: u.avatar || ''
+    avatar: mockAvatars.resolveAvatar(u.avatar, u.userId || 'me')
 
   };
+
+}
+
+function mapFriendRow(f) {
+
+  return Object.assign({}, f, {
+
+    avatar: mockAvatars.resolveAvatar(f.avatar, f.playerId)
+
+  });
 
 }
 
@@ -130,7 +142,9 @@ Page({
 
     maxAdd: 4,
 
-    selectedCount: 0
+    selectedCount: 0,
+
+    defaultAvatar: mockAvatars.DEFAULT_AVATAR
 
   },
 
@@ -182,7 +196,7 @@ Page({
 
 
 
-    this._allFriends = FRIEND_LIST;
+    this._allFriends = (FRIEND_LIST || []).map(mapFriendRow);
 
     this._currentGroupPlayerIds = groupPlayerIds.slice();
 
@@ -248,7 +262,7 @@ Page({
 
   _applyFriendFilter(keyword) {
 
-    const filtered = filterFriends(this._allFriends || FRIEND_LIST, keyword);
+    const filtered = filterFriends(this._allFriends || [], keyword).map(mapFriendRow);
 
     const trimmed = (keyword || '').trim();
 
@@ -379,6 +393,42 @@ Page({
     if (ch && ch.emit) ch.emit('friendsSelected', { friends: selected });
 
     this.onBack();
+
+  },
+
+  onAvatarError(e) {
+
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+
+    const fallback = mockAvatars.DEFAULT_AVATAR;
+
+    if (ds.type === 'me' && this.data.currentUser) {
+
+      this.setData({ 'currentUser.avatar': fallback });
+
+      return;
+
+    }
+
+    const id = ds.id;
+
+    if (!id) return;
+
+    const sections = (this.data.sections || []).map((sec) => ({
+
+      letter: sec.letter,
+
+      items: (sec.items || []).map((f) => (f.playerId === id ? Object.assign({}, f, { avatar: fallback }) : f))
+
+    }));
+
+    this.setData({ sections: sections });
+
+    if (this._allFriends) {
+
+      this._allFriends = this._allFriends.map((f) => (f.playerId === id ? Object.assign({}, f, { avatar: fallback }) : f));
+
+    }
 
   }
 

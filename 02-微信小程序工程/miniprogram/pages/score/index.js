@@ -14,6 +14,7 @@ const matchStatus = require('../../utils/matchStatus.js');
 const gameLifecycle = require('../../utils/gameLifecycle.js');
 const halfCourseEdit = require('../../utils/halfCourseEdit.js');
 const holeLayout = require('../../utils/holeLayout.js');
+const mockAvatars = require('../../utils/mockAvatars.js');
 
 // 单组 Game 球员行配色（按槽位顺序）
 const GAME_COLOR_CLASSES = ['border-red', 'border-gold', 'border-white', 'border-light'];
@@ -42,7 +43,7 @@ const PLAYER_SEEDS = [
   {
     id: 'p1',
     name: 'T. WOODS',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100',
+    avatar: mockAvatars.avatarByIndex(0),
     colorClass: 'border-red',
     scores: [4, 3, 5, 3, 4, 5, 4, 2, 4, 4, 4, 4, 5, 4, 5, 3, 4, 5],
     putts: [2, 1, 2, 1, 2, 2, 1, 1, 2, 2, 1, 2, 2, 1, 2, 1, 2, 2]
@@ -50,7 +51,7 @@ const PLAYER_SEEDS = [
   {
     id: 'p2',
     name: 'S. SCHEFFLER',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
+    avatar: mockAvatars.avatarByIndex(1),
     colorClass: 'border-gold',
     scores: [4, 4, 4, 3, 5, 5, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 4],
     putts: [2, 2, 1, 1, 2, 3, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2]
@@ -58,7 +59,7 @@ const PLAYER_SEEDS = [
   {
     id: 'p3',
     name: 'R. MCILROY',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
+    avatar: mockAvatars.avatarByIndex(2),
     colorClass: 'border-white',
     scores: [5, 4, 4, 4, 4, 6, 4, 3, 5, 4, 4, 3, 5, 4, 5, 3, 5, 4],
     putts: [2, 2, 2, 2, 1, 3, 2, 1, 2, 2, 1, 1, 2, 2, 3, 1, 2, 2]
@@ -66,7 +67,7 @@ const PLAYER_SEEDS = [
   {
     id: 'p4',
     name: 'X. SCHAUFFELE',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+    avatar: mockAvatars.avatarByIndex(3),
     colorClass: 'border-light',
     scores: [4, 5, 4, 3, 4, 5, 5, 4, 4, 5, 4, 4, 4, 5, 5, 4, 4, 5],
     putts: [2, 2, 1, 1, 2, 2, 3, 2, 2, 2, 2, 2, 1, 2, 3, 2, 1, 2]
@@ -198,10 +199,10 @@ function resolveNormalGameMoreMenu(gameId, matchState) {
 }
 
 const GROUP_PLAYERS = [
-  { slot: 1, name: '大雷', avatar: 'https://i.pravatar.cc/150?img=11' },
-  { slot: 2, name: 'Alex', avatar: 'https://i.pravatar.cc/150?img=12' },
-  { slot: 3, name: 'Bogey King', avatar: 'https://i.pravatar.cc/150?img=30' },
-  { slot: 4, name: '老周', avatar: 'https://i.pravatar.cc/150?img=44' }
+  { slot: 1, name: '大雷', avatar: mockAvatars.avatarByIndex(0) },
+  { slot: 2, name: 'Alex', avatar: mockAvatars.avatarByIndex(1) },
+  { slot: 3, name: 'Bogey King', avatar: mockAvatars.avatarByIndex(2) },
+  { slot: 4, name: '老周', avatar: mockAvatars.avatarByIndex(3) }
 ];
 
 // 固定 1-4 槽位：统一走全局 playerSlots 模型（删除=置空、添加=补空位、顺序固定）
@@ -254,10 +255,10 @@ function scoreStyle(diff) {
 
 /* ===== 四人最佳球位模式（fourball_best）专用数据，复刻 HTML 原型 ===== */
 const BEST_ROSTER = [
-  { name: 'WOODS', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', tee: '黑T', teeColor: '#dc2626' },
-  { name: 'SCHEFFLER', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', tee: '金T', teeColor: '#ce9224' },
-  { name: 'MCILROY', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', tee: '白T', teeColor: '#ffffff' },
-  { name: 'SCHAUFFELE', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', tee: '蓝T', teeColor: '#00aeef' }
+  { name: 'WOODS', avatar: mockAvatars.avatarByIndex(0), tee: '黑T', teeColor: '#dc2626' },
+  { name: 'SCHEFFLER', avatar: mockAvatars.avatarByIndex(1), tee: '金T', teeColor: '#ce9224' },
+  { name: 'MCILROY', avatar: mockAvatars.avatarByIndex(2), tee: '白T', teeColor: '#ffffff' },
+  { name: 'SCHAUFFELE', avatar: mockAvatars.avatarByIndex(3), tee: '蓝T', teeColor: '#00aeef' }
 ];
 
 // 四人最佳球位「球员名册条」T台配色（按槽位顺序分配，新增球员复用同一调色板）
@@ -532,6 +533,7 @@ function enrichPlayer(player, pIdx, displayMode) {
   const relScore = outDiff + inDiff;
 
   return Object.assign({}, player, {
+    avatar: mockAvatars.resolveAvatar(player.avatar, player.playerId || player.id || player.name),
     relScoreStr: totalFilled > 0 ? formatDiff(relScore) : '',
     relScore,
     relClass: relScore < 0 ? 'diff-under' : relScore === 0 ? 'diff-even' : '',
@@ -633,21 +635,22 @@ Page({
     sheetPlayers: [],
 
     watchers: [
-      { name: 'TigerHoods', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80' },
-      { name: 'Alex', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80' },
-      { name: '大雷', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=120&h=120&q=80' },
-      { name: 'Yan', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80' }
+      { name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
+      { name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
+      { name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
+      { name: 'Yan', avatar: mockAvatars.pickMockAvatar('Yan') }
     ],
     chatMessages: [
-      { self: false, name: 'Alex', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80', text: '今天果岭速度挺快，短推要保守一点。' },
-      { self: true, name: '我', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80', text: '收到，A4 洞开始注意落点。' },
-      { self: false, name: '大雷', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=120&h=120&q=80', text: '前组节奏不错，我们保持就行。' }
+      { self: false, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex'), text: '今天果岭速度挺快，短推要保守一点。' },
+      { self: true, name: '我', avatar: mockAvatars.pickMockAvatar('我'), text: '收到，A4 洞开始注意落点。' },
+      { self: false, name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷'), text: '前组节奏不错，我们保持就行。' }
     ]
   },
 
   // 记分页 onLoad 只做一件事：读取 matchState → 据此渲染 UI。
   // matchState 是唯一数据源：不读取 URL 赛制参数、不写死默认赛制、不初始化默认比赛数据。
-  onLoad() {
+  onLoad(options) {
+    this._pageOptions = options || {};
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
 
@@ -1289,7 +1292,8 @@ Page({
       mode: nextMode,
       formatType: ms.formatType,
       groupId: ms.groupId || gameId + ':' + gi,
-      gameGroupIndex: gi
+      gameGroupIndex: gi,
+      gameId: ms.gameId || gameId
     });
 
     this._syncHoleLayoutFromCourse({ refresh: false });
@@ -1403,7 +1407,7 @@ Page({
         id: p.playerId,
         playerId: p.playerId,
         name: p.name,
-        avatar: p.avatar || '',
+        avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
         scores: (saved.scores || []).slice(),
         putts: (saved.putts || []).slice()
       };
@@ -1414,7 +1418,7 @@ Page({
         id: p.playerId,
         playerId: p.playerId,
         name: p.name,
-        avatar: p.avatar,
+        avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
         scores: (p.scores || []).slice(),
         putts: (p.putts || []).slice()
       };
@@ -1434,7 +1438,7 @@ Page({
         return {
           playerId: p.playerId || p.id,
           name: p.name || '球员',
-          avatar: p.avatar || ''
+          avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId || p.id)
         };
       });
     }
@@ -1602,49 +1606,76 @@ Page({
     this.setData({ sheetPlayers, panelMainDisplay, quickPanelDisplay });
   },
 
-  // 导航栈中是否已有 Game Hub（多组球局返回必须回到 Hub，而非创建页）
-  _hubPageInStack() {
-    return getCurrentPages().some((p) => {
-      const r = (p && p.route) || '';
-      return r.indexOf('game/hub') >= 0;
-    });
-  },
-
-  // 多组球局记分页返回：优先 navigateBack 到 Hub；栈缺失时兜底 redirectTo Hub
-  _backToMultiGroupHub() {
-    const gi = this._gameGroupIndex != null ? this._gameGroupIndex : 0;
-    if (this._hubPageInStack()) {
-      wx.navigateBack();
-      return;
-    }
-    wx.redirectTo({
-      url:
-        '/pages/game/hub/index?gameId=' + encodeURIComponent(this.data.gameId) +
-        '&activeTab=group&currentGroup=' + gi
-    });
+  _resolveScoreBackGameId() {
+    const ms = this._matchState || this._readMatchState() || {};
+    return (
+      this.data.gameId ||
+      ms.gameId ||
+      (this._pageOptions && this._pageOptions.gameId) ||
+      (this.options && this.options.gameId) ||
+      ''
+    );
   },
 
   onBack() {
+    console.log('[SCORE_BACK_CLICKED]', {
+      gameId: this.data.gameId,
+      pageGameId: (this._pageOptions && this._pageOptions.gameId) || (this.options && this.options.gameId),
+      currentGroupId: this.data.groupId,
+      route: this.route
+    });
+
     if (this.data.gameId && (this.data.mode === 'game' || this.data.mode === 'fourball_best')) {
       this.persistSession();
     }
 
-    const game = this.data.gameId ? gameStore.getGame(this.data.gameId) : null;
-    if (gameStore.isMultiGroup(game)) {
-      this._backToMultiGroupHub();
+    const gameId = this._resolveScoreBackGameId();
+    const latestGame = gameId ? gameStore.getGameById(gameId) : null;
+    const latestGroups = latestGame ? gameStore.listGroups(latestGame) : [];
+
+    console.log('[SCORE_BACK_LATEST_GAME]', {
+      gameId,
+      hasGame: !!latestGame,
+      groupsLength: latestGroups ? latestGroups.length : 0,
+      groups: latestGroups
+    });
+
+    if (!gameId) {
+      console.log('[SCORE_BACK_ACTION]', { action: 'home_no_gameId' });
+      wx.reLaunch({ url: '/pages/home/index?tab=my' });
       return;
     }
 
+    if (!latestGame) {
+      console.log('[SCORE_BACK_ACTION]', { action: 'home_game_missing', gameId });
+      wx.reLaunch({ url: '/pages/home/index?tab=my' });
+      return;
+    }
+
+    if (latestGroups.length > 1) {
+      const hubUrl =
+        '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId) +
+        '&activeTab=teeingSheet&from=score';
+      console.log('[SCORE_BACK_ACTION]', { action: 'redirectTo', hubUrl, groupsLength: latestGroups.length });
+      wx.redirectTo({
+        url: hubUrl,
+        fail: (err) => {
+          console.log('[SCORE_BACK_ACTION]', { action: 'reLaunch', hubUrl, err: err && err.errMsg });
+          wx.reLaunch({ url: hubUrl });
+        }
+      });
+      return;
+    }
+
+    console.log('[SCORE_BACK_ACTION]', { action: 'home_single_group', gameId, groupsLength: latestGroups.length });
     if (this.data.mode === 'game') {
       wx.reLaunch({ url: '/pages/home/index?tab=my' });
       return;
     }
 
-    // 其余模式（含四人最佳球位统一模板）：依据 matchState.groupCount 决定返回行为
     const ms = this._readMatchState();
     const groupCount = ms && ms.groupCount != null ? Number(ms.groupCount) : 0;
     if (groupCount <= 1) {
-      // 单组比赛：直接重启返回首页
       wx.reLaunch({ url: '/pages/home/index' });
       return;
     }

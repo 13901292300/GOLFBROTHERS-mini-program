@@ -6,19 +6,44 @@
  *      不与其它比赛 / leaderboard 数据源混用。
  */
 
+const mockAvatars = require('./mockAvatars.js');
+
+function friendEntry(playerId, name, remark, phone, pinyin, avatarIndex, extra) {
+  return Object.assign(
+    {
+      playerId: playerId,
+      name: name,
+      remark: remark,
+      phone: phone,
+      avatar: mockAvatars.avatarByIndex(avatarIndex),
+      pinyin: pinyin
+    },
+    extra || {}
+  );
+}
+
+function comboPlayer(playerId, name) {
+  const hit = FRIEND_LIST.find((f) => f.playerId === playerId);
+  return {
+    playerId: playerId,
+    name: name,
+    avatar: hit ? hit.avatar : mockAvatars.pickMockAvatar(playerId)
+  };
+}
+
 const FRIEND_LIST = [
-  { playerId: 'fr-1001', name: 'Jordan', remark: '乔老板', phone: '13800001001', avatar: 'https://i.pravatar.cc/150?img=51', pinyin: 'jordan', gender: 'male', country: 'USA', age: 29, flag: 'us' },
-  { playerId: 'fr-1002', name: 'Rose', remark: '玫瑰', phone: '13800001002', avatar: 'https://i.pravatar.cc/150?img=52', pinyin: 'rose', gender: 'female', country: 'ENG', age: 27, flag: 'gb-eng' },
-  { playerId: 'fr-1003', name: '阿杰', remark: '球场老司机', phone: '13812345678', avatar: 'https://i.pravatar.cc/150?img=53', pinyin: 'ajie', gender: 'male', country: 'CHN', age: 31, flag: 'cn' },
-  { playerId: 'fr-1004', name: 'Mia', remark: '米娅', phone: '13800001004', avatar: 'https://i.pravatar.cc/150?img=54', pinyin: 'mia', gender: 'female', country: 'AUS', age: 25, flag: 'au' },
-  { playerId: 'fr-1005', name: '老张', remark: '张哥', phone: '13987654321', avatar: 'https://i.pravatar.cc/150?img=55', pinyin: 'laozhang', gender: 'male', country: 'CHN', age: 45, flag: 'cn' },
-  { playerId: 'fr-1006', name: 'Kevin', remark: '凯文', phone: '13800001006', avatar: 'https://i.pravatar.cc/150?img=56', pinyin: 'kevin', gender: 'male', country: 'CAN', age: 33, flag: 'ca' },
-  { playerId: 'fr-1007', name: 'Bella', remark: '贝拉', phone: '13800001007', avatar: 'https://i.pravatar.cc/150?img=57', pinyin: 'bella', gender: 'female', country: 'ESP', age: 28, flag: 'es' },
-  { playerId: 'fr-1008', name: '陈浩', remark: '浩子', phone: '13711112222', avatar: 'https://i.pravatar.cc/150?img=58', pinyin: 'chenhao', gender: 'male', country: 'CHN', age: 30, flag: 'cn' },
-  { playerId: 'fr-1009', name: 'David', remark: '大卫', phone: '13800001009', avatar: 'https://i.pravatar.cc/150?img=59', pinyin: 'david', gender: 'male', country: 'USA', age: 36, flag: 'us' },
-  { playerId: 'fr-1010', name: '王磊', remark: '磊哥', phone: '13633334444', avatar: 'https://i.pravatar.cc/150?img=60', pinyin: 'wanglei', gender: 'male', country: 'CHN', age: 38, flag: 'cn' },
-  { playerId: 'fr-1011', name: 'Frank', remark: '弗兰克', phone: '13800001011', avatar: 'https://i.pravatar.cc/150?img=61', pinyin: 'frank', gender: 'male', country: 'GER', age: 41, flag: 'de' },
-  { playerId: 'fr-1012', name: '赵敏', remark: '敏敏', phone: '13555556666', avatar: 'https://i.pravatar.cc/150?img=62', pinyin: 'zhaomin', gender: 'female', country: 'CHN', age: 26, flag: 'cn' }
+  friendEntry('fr-1001', 'Jordan', '乔老板', '13800001001', 'jordan', 0, { gender: 'male', country: 'USA', age: 29, flag: 'us' }),
+  friendEntry('fr-1002', 'Rose', '玫瑰', '13800001002', 'rose', 1, { gender: 'female', country: 'ENG', age: 27, flag: 'gb-eng' }),
+  friendEntry('fr-1003', '阿杰', '球场老司机', '13812345678', 'ajie', 2, { gender: 'male', country: 'CHN', age: 31, flag: 'cn' }),
+  friendEntry('fr-1004', 'Mia', '米娅', '13800001004', 'mia', 3, { gender: 'female', country: 'AUS', age: 25, flag: 'au' }),
+  friendEntry('fr-1005', '老张', '张哥', '13987654321', 'laozhang', 4, { gender: 'male', country: 'CHN', age: 45, flag: 'cn' }),
+  friendEntry('fr-1006', 'Kevin', '凯文', '13800001006', 'kevin', 5, { gender: 'male', country: 'CAN', age: 33, flag: 'ca' }),
+  friendEntry('fr-1007', 'Bella', '贝拉', '13800001007', 'bella', 6, { gender: 'female', country: 'ESP', age: 28, flag: 'es' }),
+  friendEntry('fr-1008', '陈浩', '浩子', '13711112222', 'chenhao', 7, { gender: 'male', country: 'CHN', age: 30, flag: 'cn' }),
+  friendEntry('fr-1009', 'David', '大卫', '13800001009', 'david', 8, { gender: 'male', country: 'USA', age: 36, flag: 'us' }),
+  friendEntry('fr-1010', '王磊', '磊哥', '13633334444', 'wanglei', 9, { gender: 'male', country: 'CHN', age: 38, flag: 'cn' }),
+  friendEntry('fr-1011', 'Frank', '弗兰克', '13800001011', 'frank', 0, { gender: 'male', country: 'GER', age: 41, flag: 'de' }),
+  friendEntry('fr-1012', '赵敏', '敏敏', '13555556666', 'zhaomin', 1, { gender: 'female', country: 'CHN', age: 26, flag: 'cn' })
 ];
 
 const PRESET_COMBOS = [
@@ -28,10 +53,10 @@ const PRESET_COMBOS = [
     desc: '固定球友 · 4 人',
     useCount: 42,
     players: [
-      { playerId: 'fr-1001', name: 'Jordan', avatar: 'https://i.pravatar.cc/150?img=51' },
-      { playerId: 'fr-1002', name: 'Rose', avatar: 'https://i.pravatar.cc/150?img=52' },
-      { playerId: 'fr-1003', name: '阿杰', avatar: 'https://i.pravatar.cc/150?img=53' },
-      { playerId: 'fr-1005', name: '老张', avatar: 'https://i.pravatar.cc/150?img=55' }
+      comboPlayer('fr-1001', 'Jordan'),
+      comboPlayer('fr-1002', 'Rose'),
+      comboPlayer('fr-1003', '阿杰'),
+      comboPlayer('fr-1005', '老张')
     ]
   },
   {
@@ -40,9 +65,9 @@ const PRESET_COMBOS = [
     desc: '沿用上一场 · 3 人',
     useCount: 31,
     players: [
-      { playerId: 'fr-1004', name: 'Mia', avatar: 'https://i.pravatar.cc/150?img=54' },
-      { playerId: 'fr-1006', name: 'Kevin', avatar: 'https://i.pravatar.cc/150?img=56' },
-      { playerId: 'fr-1003', name: '阿杰', avatar: 'https://i.pravatar.cc/150?img=53' }
+      comboPlayer('fr-1004', 'Mia'),
+      comboPlayer('fr-1006', 'Kevin'),
+      comboPlayer('fr-1003', '阿杰')
     ]
   },
   {
@@ -51,10 +76,10 @@ const PRESET_COMBOS = [
     desc: '周末固定局 · 4 人',
     useCount: 27,
     players: [
-      { playerId: 'fr-1007', name: 'Bella', avatar: 'https://i.pravatar.cc/150?img=57' },
-      { playerId: 'fr-1008', name: '陈浩', avatar: 'https://i.pravatar.cc/150?img=58' },
-      { playerId: 'fr-1009', name: 'David', avatar: 'https://i.pravatar.cc/150?img=59' },
-      { playerId: 'fr-1010', name: '王磊', avatar: 'https://i.pravatar.cc/150?img=60' }
+      comboPlayer('fr-1007', 'Bella'),
+      comboPlayer('fr-1008', '陈浩'),
+      comboPlayer('fr-1009', 'David'),
+      comboPlayer('fr-1010', '王磊')
     ]
   },
   {
@@ -63,10 +88,10 @@ const PRESET_COMBOS = [
     desc: '同事局 · 4 人',
     useCount: 19,
     players: [
-      { playerId: 'fr-1011', name: 'Frank', avatar: 'https://i.pravatar.cc/150?img=61' },
-      { playerId: 'fr-1012', name: '赵敏', avatar: 'https://i.pravatar.cc/150?img=62' },
-      { playerId: 'fr-1001', name: 'Jordan', avatar: 'https://i.pravatar.cc/150?img=51' },
-      { playerId: 'fr-1004', name: 'Mia', avatar: 'https://i.pravatar.cc/150?img=54' }
+      comboPlayer('fr-1011', 'Frank'),
+      comboPlayer('fr-1012', '赵敏'),
+      comboPlayer('fr-1001', 'Jordan'),
+      comboPlayer('fr-1004', 'Mia')
     ]
   },
   {
@@ -74,10 +99,7 @@ const PRESET_COMBOS = [
     name: '老搭档',
     desc: '双人局 · 2 人',
     useCount: 14,
-    players: [
-      { playerId: 'fr-1002', name: 'Rose', avatar: 'https://i.pravatar.cc/150?img=52' },
-      { playerId: 'fr-1005', name: '老张', avatar: 'https://i.pravatar.cc/150?img=55' }
-    ]
+    players: [comboPlayer('fr-1002', 'Rose'), comboPlayer('fr-1005', '老张')]
   },
   {
     id: 'combo-tour',
@@ -85,10 +107,10 @@ const PRESET_COMBOS = [
     desc: '比赛局 · 4 人',
     useCount: 11,
     players: [
-      { playerId: 'fr-1003', name: '阿杰', avatar: 'https://i.pravatar.cc/150?img=53' },
-      { playerId: 'fr-1006', name: 'Kevin', avatar: 'https://i.pravatar.cc/150?img=56' },
-      { playerId: 'fr-1008', name: '陈浩', avatar: 'https://i.pravatar.cc/150?img=58' },
-      { playerId: 'fr-1011', name: 'Frank', avatar: 'https://i.pravatar.cc/150?img=61' }
+      comboPlayer('fr-1003', '阿杰'),
+      comboPlayer('fr-1006', 'Kevin'),
+      comboPlayer('fr-1008', '陈浩'),
+      comboPlayer('fr-1011', 'Frank')
     ]
   },
   {
@@ -97,9 +119,9 @@ const PRESET_COMBOS = [
     desc: '练习局 · 3 人',
     useCount: 6,
     players: [
-      { playerId: 'fr-1007', name: 'Bella', avatar: 'https://i.pravatar.cc/150?img=57' },
-      { playerId: 'fr-1009', name: 'David', avatar: 'https://i.pravatar.cc/150?img=59' },
-      { playerId: 'fr-1010', name: '王磊', avatar: 'https://i.pravatar.cc/150?img=60' }
+      comboPlayer('fr-1007', 'Bella'),
+      comboPlayer('fr-1009', 'David'),
+      comboPlayer('fr-1010', '王磊')
     ]
   }
 ];

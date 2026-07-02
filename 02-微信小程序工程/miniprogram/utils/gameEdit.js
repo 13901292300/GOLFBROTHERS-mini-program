@@ -165,7 +165,13 @@ function mergeFormWithExistingGame(existing, form) {
     gameMode: f.gameMode || existing.gameMode || '',
     visibility: f.visibility || existing.visibility || 'public',
     accessCode: f.accessCode != null ? f.accessCode : (existing.accessCode || ''),
-    groups: f.groups && f.groups.length ? f.groups : [],
+    groups: f.groups && f.groups.length ? f.groups : gameStore.listGroups(existing).map((sg, gi) => {
+      const id = sg.groupId || 'grp-' + (gi + 1);
+      return {
+        id: id,
+        players: slotsToCreatePlayers(id, sg.playersSlots || [])
+      };
+    }),
     groupCompositionMap: f.groupCompositionMap || existing.groupCompositionMap || {}
   };
 }

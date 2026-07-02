@@ -2,6 +2,7 @@
  * 普通 GAME 领先榜：个人模式 / 组合（teams）模式派生
  */
 const { getProfileById } = require('./playerDirectory.js');
+const mockAvatars = require('./mockAvatars.js');
 const holeLayout = require('./holeLayout.js');
 
 function holePars() {
@@ -46,7 +47,7 @@ function enrichPlayerIdentity(m) {
   return {
     playerId: m.playerId,
     name: m.name || '',
-    avatar: m.avatar || '',
+    avatar: mockAvatars.resolveAvatar(m.avatar, m.playerId || m.name),
     flag: prof.flag || '',
     country: prof.country || '',
     age: prof.age || '',
@@ -192,7 +193,7 @@ function buildPlayerRows(game) {
         isTeam: false,
         playerId: p.playerId,
         name: p.name,
-        avatar: p.avatar,
+        avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
         isFemale: prof.gender === 'female',
         flag: prof.flag,
         country: prof.country,

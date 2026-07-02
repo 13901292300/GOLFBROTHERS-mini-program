@@ -1,3 +1,4 @@
+const mockAvatars = require('../../utils/mockAvatars.js');
 /**
  * 赛事详情页（球队赛 / 队内赛正在进行中）
  * 1:1 复刻 01-HTML原型/记分页面/队内赛正在进行中.html
@@ -11,19 +12,19 @@ const holeLayout = require('../../../utils/holeLayout.js');
 
 /* ===== 讨论区 ===== */
 const WATCHERS = [
-  { name: 'Alex', avatar: 'https://cdn.screenshottocode.com/cZq11NkHJWMWEDneVJEYI.png' },
-  { name: 'TigerHoods', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80' },
-  { name: 'yan72', avatar: 'https://cdn.screenshottocode.com/niMpIqepFahYJ6kEAhYs5.png' },
-  { name: '大雷', avatar: 'https://cdn.screenshottocode.com/IzKC6-Rz1vcRKIaxXLBjh.png' },
-  { name: '邵亮', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=120&h=120&q=80' },
-  { name: '郝军峰', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80' },
-  { name: '大吉', avatar: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=120&h=120&q=80' },
-  { name: 'Alexander', avatar: 'https://cdn.screenshottocode.com/Bd1K7CISOTpTom7xGUSFF.png' }
+  { name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
+  { name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
+  { name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72') },
+  { name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
+  { name: '邵亮', avatar: mockAvatars.pickMockAvatar('邵亮') },
+  { name: '郝军峰', avatar: mockAvatars.pickMockAvatar('郝军峰') },
+  { name: '大吉', avatar: mockAvatars.pickMockAvatar('大吉') },
+  { name: 'Alexander', avatar: mockAvatars.pickMockAvatar('Alexander') }
 ];
 const CHAT = [
-  { self: false, name: 'Alex', avatar: 'https://cdn.screenshottocode.com/cZq11NkHJWMWEDneVJEYI.png', text: '今天风不小，后九洞可能要多看一杆。', mention: '' },
-  { self: true, name: '我', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80', text: '收到，我在出发表看一下同组开球时间。', mention: '@Alex' },
-  { self: false, name: 'yan72', avatar: 'https://cdn.screenshottocode.com/niMpIqepFahYJ6kEAhYs5.png', text: '领先榜刚刷新，TigerHoods 已经到 -7 了。', mention: '' }
+  { self: false, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex'), text: '今天风不小，后九洞可能要多看一杆。', mention: '' },
+  { self: true, name: '我', avatar: mockAvatars.pickMockAvatar('我'), text: '收到，我在出发表看一下同组开球时间。', mention: '@Alex' },
+  { self: false, name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72'), text: '领先榜刚刷新，TigerHoods 已经到 -7 了。', mention: '' }
 ];
 
 /* ===== 更多功能面板 ===== */
