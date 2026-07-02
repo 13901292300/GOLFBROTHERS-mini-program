@@ -1010,6 +1010,7 @@ Page({
   // 个人比杆赛模式：从出发表 groups 加载本组球员与 holes 成绩（唯一数据源）
   initIndividualStrokeMode(groupId) {
     groupsStore.ensureInitialized();
+    const group = groupsStore.getGroup(groupId);
     const loaded = groupsStore.loadGroupForScoring(groupId);
     this._playersSource = loaded.length
       ? loaded.map((p) => ({
@@ -1027,6 +1028,7 @@ Page({
     this.setData({
       mode: 'individual_stroke',
       groupId: groupId || '',
+      gameFinished: groupsStore.deriveTeeSheetStatus(group, 'groups').statusKey === 'completed',
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
@@ -1488,6 +1490,19 @@ Page({
     this.setData({ showMoreSheet: false });
 
     if (label === '结束比赛') {
+      if (this._boundToStore() && this.data.groupId) {
+        wx.showModal({
+          title: '结束本组比赛？',
+          content: '确认结束比赛后，本组成绩将不可再修改。',
+          cancelText: '暂不结束',
+          confirmText: '确认结束',
+          confirmColor: '#ce9224',
+          success: (res) => {
+            if (res.confirm) this._confirmEndGroupGame();
+          }
+        });
+        return;
+      }
       if (!this.data.gameId) {
         wx.showToast({ title: '当前为演示模式', icon: 'none' });
         return;
@@ -1632,6 +1647,12 @@ Page({
   },
 
   _confirmEndGroupGame() {
+    if (this._boundToStore() && this.data.groupId) {
+      groupsStore.updateGroupStatus(this.data.groupId, 'finished');
+      this.setData({ gameFinished: true, scoresCompleted: true });
+      wx.showToast({ title: '比赛已结束', icon: 'success' });
+      return;
+    }
     if (!this.data.gameId) return;
     gameProgress.confirmFinishGame(this.data.gameId, this._gameGroupIndex || 0);
     this.setData({ gameFinished: true, scoresCompleted: true });

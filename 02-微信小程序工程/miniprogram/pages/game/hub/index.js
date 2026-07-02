@@ -9,6 +9,8 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const gameStore = require('../../../utils/gameStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
 const gameLeaderboard = require('../../../utils/gameLeaderboard.js');
+const groupsStore = require('../../../utils/groupsStore.js');
+const tPositionUtil = require('../../../utils/tPosition.js');
 
 const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
 
@@ -395,30 +397,25 @@ Page({
   // 分组表 / 游戏：组卡片（球员列表 + 状态 + 进入记分）
   _buildGroupCards(game) {
     return (game.groups || []).map((grp, gi) => {
-      const players = (grp.playersSlots || []).filter(Boolean).map((p) => ({
-        playerId: p.playerId,
-        name: p.name,
-        avatar: p.avatar
-      }));
-      // 动态推导状态：所有球员打满 18 洞 → 已完成；有成绩 → 进行中；否则取存储/未开始
-      let anyScore = false;
-      let allDone = players.length > 0;
-      players.forEach((p) => {
-        const rec = (grp.scoresByPlayer || {})[p.playerId] || {};
-        const filledCount = (rec.scores || []).filter(isFilled).length;
-        if (filledCount > 0) anyScore = true;
-        if (filledCount < 18) allDone = false;
+      const players = (grp.playersSlots || []).filter(Boolean).map((p) => {
+        const enriched = tPositionUtil.enrichPlayer(p);
+        return {
+          playerId: enriched.playerId,
+          name: enriched.name,
+          avatar: enriched.avatar,
+          v: enriched.v,
+          teeMarkerClass: enriched.teeMarkerClass
+        };
       });
-      let status = grp.status || 'not_started';
-      if (allDone) status = 'finished';
-      else if (anyScore) status = 'in_progress';
-      else if (status !== 'in_progress') status = 'not_started';
+      const st = groupsStore.deriveTeeSheetStatus(grp, 'game');
       return {
         groupIndex: gi,
         groupId: grp.groupId,
         name: grp.name,
-        status: status,
-        statusText: STATUS_TEXT[status] || '未开始',
+        status: grp.status || 'not_started',
+        statusText: STATUS_TEXT[grp.status] || STATUS_TEXT.not_started,
+        statusBadge: st.statusBadge,
+        statusKey: st.statusKey,
         playerCount: players.length,
         players: players
       };

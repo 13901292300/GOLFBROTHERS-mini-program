@@ -246,23 +246,93 @@ function addPlayerToGroup(groupId, player, maxSlots) {
   return { ok: true, index: idx };
 }
 
+/** 本组是否已确认结束（结束比赛操作写入的 status） */
+function isTeeGroupFinished(status) {
+  const s = String(status || '').toLowerCase();
+  return s === 'finished' || s === 'completed' || s === '已结束' || s === '已完成';
+}
+
+/** 出发表 groups：本组是否存在至少一洞成绩 */
+function hasAnyHoleScoreInGroupsStoreGroup(group) {
+  if (!group) return false;
+  return (group.players || []).filter(Boolean).some((p) =>
+    (p.holes || []).some((h) => isFilledScore(h.score))
+  );
+}
+
+/** gameStore 组：本组是否存在至少一洞成绩 */
+function hasAnyHoleScoreInGameGroup(group) {
+  if (!group) return false;
+  const scoresByPlayer = group.scoresByPlayer || {};
+  return (group.playersSlots || []).filter(Boolean).some((p) => {
+    const rec = scoresByPlayer[p.playerId] || {};
+    return (rec.scores || []).some(isFilledScore);
+  });
+}
+
+/**
+ * 出发表状态语义推导（优先级：COMPLETED > LIVE > UPCOMING）
+ * source: 'groups'（赛事出发表）| 'game'（Game Hub 分组表）
+ */
+function deriveTeeSheetStatus(group, source) {
+  if (!group) {
+    return { statusBadge: 'UPCOMING', statusKey: 'upcoming' };
+  }
+  if (isTeeGroupFinished(group.status)) {
+    return { statusBadge: 'COMPLETED', statusKey: 'completed' };
+  }
+  const hasScore = source === 'game'
+    ? hasAnyHoleScoreInGameGroup(group)
+    : hasAnyHoleScoreInGroupsStoreGroup(group);
+  if (hasScore) {
+    return { statusBadge: 'LIVE', statusKey: 'live' };
+  }
+  return { statusBadge: 'UPCOMING', statusKey: 'upcoming' };
+}
+
+/** @deprecated 请使用 deriveTeeSheetStatus；保留兼容旧调用 */
+function mapTeeSheetStatusBadge(status) {
+  if (isTeeGroupFinished(status)) return 'COMPLETED';
+  const s = String(status || '').toLowerCase();
+  if (s === 'in_progress' || s === '进行中' || s === 'live') return 'LIVE';
+  return 'UPCOMING';
+}
+
+/** 写入本组 status（结束比赛确认等场景） */
+function updateGroupStatus(groupId, status) {
+  const group = getGroup(groupId);
+  if (!group) return false;
+  group.status = status;
+  return true;
+}
+
 /** 出发表 WXML 视图（直接映射 groups，无独立数据） */
 function getTeeGroupsView() {
-  return getGroups().map((g) => ({
-    id: g.groupId,
-    badge: g.groupName,
-    time: g.time,
-    hole: g.hole,
-    status: g.status,
-    players: g.players.filter(Boolean).map((p) => ({
-      playerId: p.playerId,
-      name: p.name,
-      avatar: p.avatar,
-      team: p.team,
-      teamClass: p.teamClass,
-      v: p.v
-    }))
-  }));
+  const tPositionUtil = require('./tPosition');
+  return getGroups().map((g) => {
+    const st = deriveTeeSheetStatus(g, 'groups');
+    return {
+      id: g.groupId,
+      badge: g.groupName,
+      time: g.time,
+      hole: g.hole,
+      status: g.status,
+      statusBadge: st.statusBadge,
+      statusKey: st.statusKey,
+      players: g.players.filter(Boolean).map((p) => {
+        const enriched = tPositionUtil.enrichPlayer(p);
+        return {
+          playerId: enriched.playerId,
+          name: enriched.name,
+          avatar: enriched.avatar,
+          team: enriched.team,
+          teamClass: enriched.teamClass,
+          v: enriched.v,
+          teeMarkerClass: enriched.teeMarkerClass
+        };
+      })
+    };
+  });
 }
 
 function totalClass(diff) {
@@ -470,6 +540,9 @@ module.exports = {
   bindPlayerToSlot,
   getSlotCache,
   getTeeGroupsView,
+  deriveTeeSheetStatus,
+  mapTeeSheetStatusBadge,
+  updateGroupStatus,
   buildLeaderboard,
   buildPlayerScorecard,
   getScoreStatus,

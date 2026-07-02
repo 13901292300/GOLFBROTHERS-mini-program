@@ -388,15 +388,68 @@ page {
 .tee-start-info { display: inline-flex; align-items: center; gap: 12rpx; color: var(--text-secondary); font-size: 22rpx; font-weight: 500; white-space: nowrap; }
 .tee-clock { color: var(--champion-gold); font-size: 20rpx; }
 .tee-hole-pill { display: inline-flex; align-items: center; height: 36rpx; padding: 0 14rpx; border-radius: 9999rpx; background: rgba(206, 146, 36, 0.12); color: var(--champion-gold); border: 1px solid rgba(206, 146, 36, 0.22); font-size: 20rpx; font-weight: 700; }
-.tee-player-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx; align-items: start; }
-.tee-player { min-width: 0; text-align: center; }
-.tee-avatar-wrap { position: relative; width: 96rpx; height: 96rpx; margin: 0 auto 16rpx; }
-.tee-avatar { width: 96rpx; height: 96rpx; border-radius: 9999rpx; border: 1px solid var(--border); background: var(--bg-subtle); display: block; }
+.tee-player-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx 8rpx; align-items: start; }
+.tee-player {
+  display: grid;
+  grid-template-columns: 96rpx minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8rpx;
+  row-gap: 4rpx;
+  align-items: start;
+  min-width: 0;
+}
+.tee-avatar-wrap {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  position: relative;
+  width: 96rpx;
+  height: 96rpx;
+  align-self: start;
+}
+.tee-avatar { width: 80rpx; height: 80rpx; border-radius: 9999rpx; border: 1px solid var(--border); background: var(--bg-subtle); display: block; }
 .tee-v-badge { position: absolute; right: -4rpx; bottom: -4rpx; width: 40rpx; height: 40rpx; border-radius: 9999rpx; background: #fff; border: 1px solid rgba(206, 146, 36, 0.55); display: flex; align-items: center; justify-content: center; color: var(--champion-gold); font-size: 20rpx; font-weight: 900; box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.16); }
-.tee-player-name { display: block; color: var(--text-primary); font-size: 28rpx; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tee-team-red { display: block; margin-top: 10rpx; font-size: 24rpx; color: #dc2626; }
-.tee-team-blue { display: block; margin-top: 10rpx; font-size: 24rpx; color: #0284c7; }
-.tee-status { position: absolute; right: 32rpx; top: 36rpx; color: var(--text-muted); font-size: 26rpx; }
+.tee-player-name {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  align-self: start;
+  color: var(--text-primary);
+  font-size: 24rpx;
+  line-height: 1.2;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tee-marker-line {
+  grid-column: 2;
+  grid-row: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  line-height: 1;
+}
+.tee-marker-dot { width: 10rpx; height: 10rpx; border-radius: 9999rpx; flex-shrink: 0; }
+.tee-marker-dot--female { background: #dc2626; }
+.tee-marker-dot--male { background: #0284c7; }
+.tee-marker-letter { font-size: 20rpx; font-weight: 700; color: var(--text-secondary); line-height: 1; }
+.tee-team-red { display: none; }
+.tee-team-blue { display: none; }
+.tee-status {
+  position: absolute;
+  right: 28rpx;
+  top: 0;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--text-muted);
+  font-size: 26rpx;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
 /* 出发表底部悬浮快捷按钮：保留标准按钮视觉（填充/圆角/内边距/点击态），
    仅移除外层背景容器（panel/card/bar）。按钮自身直接 fixed 悬浮，不形成区域块。 */
 .tee-quick-entry-float {

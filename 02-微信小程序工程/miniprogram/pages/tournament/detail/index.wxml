@@ -233,10 +233,13 @@
                 <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
               </view>
               <text class="tee-player-name">{{pl.name}}</text>
-              <text class="{{pl.teamClass}}">{{pl.team}}</text>
+              <view class="tee-marker-line">
+                <view class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
+                <text class="tee-marker-letter">T</text>
+              </view>
             </view>
           </view>
-          <text class="tee-status">{{item.status}}</text>
+          <text class="tee-status">{{item.statusBadge}}</text>
         </view>
       </view>
 
