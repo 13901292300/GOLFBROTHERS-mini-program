@@ -183,7 +183,7 @@
         <!-- 赛事内容 -->
         <view wx:if="{{showTournamentContent}}" id="tournament-content">
           <view class="ds-main space-y-4">
-            <view wx:for="{{tournamentCards}}" wx:key="id" class="ds-card ds-card-club">
+            <view wx:for="{{tournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
               <view class="card-action-layer">
                 <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
               </view>
@@ -422,33 +422,33 @@
       <view class="flex flex-col space-y-4 px-6 pt-6 max-w-92 mx-auto w-full">
         <view bindtap="openMoreCreate" class="ds-card ds-card-action flex items-center justify-between rounded-xl ds-bg-hover">
           <view class="flex items-center">
-            <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-tour-blue"><text class="text-lg">▦</text></view>
-            <view style="margin-left:12px">
-              <text class="text-11px font-black text-tour-blue uppercase tracking-wider block leading-none">更多创建</text>
-              <text class="text-8px font-bold text-slate-400 uppercase mt-1 block">Discover more match types</text>
+            <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-tour-blue"><text class="text-xl">▦</text></view>
+            <view style="margin-left:16px">
+              <text class="text-sm font-black text-tour-blue uppercase tracking-wide block leading-none">更多创建</text>
+              <view><text class="text-10px font-bold text-slate-400 mt-0.5 uppercase">Discover more match types</text></view>
             </view>
           </view>
-          <text class="text-slate-300 text-10px">›</text>
+          <text class="text-slate-300 text-xs">›</text>
         </view>
         <view bindtap="openNormalCreate" class="ds-card ds-card-action ds-card-action--gold flex items-center justify-between rounded-xl ds-bg-hover">
           <view class="flex items-center">
-            <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-gold"><text class="text-lg">⛳</text></view>
-            <view style="margin-left:12px">
-              <text class="text-11px font-black text-tour-blue uppercase tracking-wider block leading-none">普通创建</text>
-              <text class="text-8px font-bold text-slate-400 uppercase mt-1 block">Standard tournament setup</text>
+            <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-gold"><text class="text-xl">⛳</text></view>
+            <view style="margin-left:16px">
+              <text class="text-sm font-black text-tour-blue uppercase tracking-wide block leading-none">普通创建</text>
+              <view><text class="text-10px font-bold text-slate-400 mt-0.5 uppercase">Standard tournament setup</text></view>
             </view>
           </view>
-          <text class="text-slate-300 text-10px">›</text>
+          <text class="text-slate-300 text-xs">›</text>
         </view>
         <view bindtap="onQuickCreate" class="ds-card ds-card-action ds-card-action--neutral flex items-center justify-between rounded-xl ds-bg-hover">
           <view class="flex items-center">
-            <view class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><text class="text-lg">⚡</text></view>
-            <view style="margin-left:12px">
-              <text class="text-11px font-black text-tour-blue uppercase tracking-wider block leading-none">快捷创建</text>
-              <text class="text-8px font-bold text-slate-400 uppercase mt-1 block">Quick start 1-on-1 match</text>
+            <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><text class="text-xl">⚡</text></view>
+            <view style="margin-left:16px">
+              <text class="text-sm font-black text-tour-blue uppercase tracking-wide block leading-none">快捷创建</text>
+              <view><text class="text-10px font-bold text-slate-400 mt-0.5 uppercase">Quick start 1-on-1 match</text></view>
             </view>
           </view>
-          <text class="text-slate-300 text-10px">›</text>
+          <text class="text-slate-300 text-xs">›</text>
         </view>
       </view>
     </view>
@@ -461,16 +461,16 @@
 
   <!-- More Create Selection Page -->
   <view wx:if="{{moreCreateVisible}}" class="ds-page-overlay ds-overlay-viewport fixed inset-0 z-250 flex flex-col max-w-md overflow-hidden">
-    <view class="ds-app-header ds-overlay__fixed">
-      <view class="more-create-header">
-        <view class="flex items-center">
-          <text bindtap="closeMoreCreate" class="text-white text-lg" style="margin-right:16px">‹</text>
-          <text class="text-white font-black text-lg">更多创建</text>
-        </view>
-        <view class="status-pill border rounded-full">
-          <view class="flex"><view class="status-dot"></view><view class="status-dot" style="margin-left:4px"></view><view class="status-dot" style="margin-left:4px"></view></view>
-          <view class="status-line"></view>
-          <view class="status-circle"><view class="status-dot w-2-5 h-2-5"></view></view>
+    <view class="gb-header" style="{{headerRootStyle}}">
+      <view class="gb-header__inner" style="{{headerBarStyle}}">
+        <view class="gb-header__left">
+          <view catchtap="closeMoreCreate" class="gb-header__back" aria-label="返回">
+            <text class="gb-header__chevron">‹</text>
+          </view>
+          <view>
+            <text class="gb-header__eyebrow">CREATE</text>
+            <text class="gb-header__title">更多创建</text>
+          </view>
         </view>
       </view>
     </view>
@@ -480,7 +480,7 @@
         <view><text class="text-10px font-bold text-slate-400 mt-1 tracking-widest">SELECT TOURNAMENT CATEGORY</text></view>
       </view>
       <view class="space-y-4">
-        <view class="ds-card ds-card-selectable ds-bg-hover">
+        <view class="ds-card ds-card-selectable ds-bg-hover" bindtap="openTeamInternalCreate">
           <view class="flex items-center justify-between">
             <view class="flex items-center">
               <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-tour-blue"><text class="text-xl">👥</text></view>
@@ -492,7 +492,7 @@
             <text class="text-slate-300 text-xs">›</text>
           </view>
         </view>
-        <view class="ds-card ds-card-selectable ds-card-selectable--gold ds-bg-hover">
+        <view class="ds-card ds-card-selectable ds-card-selectable--gold ds-bg-hover" bindtap="openTeamInterCreate">
           <view class="flex items-center justify-between">
             <view class="flex items-center">
               <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-gold"><text class="text-xl">🛡</text></view>
@@ -504,7 +504,7 @@
             <text class="text-slate-300 text-xs">›</text>
           </view>
         </view>
-        <view class="ds-card ds-card-selectable ds-card-selectable--neutral ds-bg-hover">
+        <view class="ds-card ds-card-selectable ds-card-selectable--neutral ds-bg-hover" bindtap="openSeriesCreate">
           <view class="flex items-center justify-between">
             <view class="flex items-center">
               <view class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center"><text class="text-xl">📑</text></view>

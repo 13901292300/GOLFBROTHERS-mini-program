@@ -171,7 +171,8 @@ Page({
         title: '交杯鲜啤挑战赛&江湖业余球员巡回赛第三站',
         teamName: '江湖业余球员巡回赛',
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
-        views: '168'
+        views: '168',
+        navUrl: '/pages/tournament/detail/index'
       },
       {
         id: 'tour-2',
@@ -181,7 +182,8 @@ Page({
         title: '高球兄弟精英队内部排名赛',
         teamName: '高球兄弟精英队',
         venue: '北京通盈雁栖湖高尔夫俱乐部',
-        views: '32'
+        views: '32',
+        navUrl: '/pages/tournament/detail/index'
       },
       {
         id: 'tour-3',
@@ -191,7 +193,8 @@ Page({
         title: '北京球友联合会月度挑战赛',
         teamName: '北京球友联合会',
         venue: '鸿华国际高尔夫俱乐部',
-        views: '80'
+        views: '80',
+        navUrl: '/pages/tournament/detail/index'
       }
     ],
     currentPickerYear: 0,
@@ -447,11 +450,19 @@ Page({
   },
 
   openMoreCreate() {
-    this.setData({ moreCreateVisible: true });
+    this.setData({
+      moreCreateVisible: true,
+      createOverlayVisible: true,
+      createOverlayOpen: true
+    });
   },
 
   closeMoreCreate() {
-    this.setData({ moreCreateVisible: false });
+    this.setData({
+      moreCreateVisible: false,
+      createOverlayVisible: true,
+      createOverlayOpen: true
+    });
   },
 
   toggleCreateOverlay() {
@@ -471,6 +482,33 @@ Page({
   openNormalCreate() {
     wx.navigateTo({
       url: '/pages/create/normal/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
+  openTeamInternalCreate() {
+    wx.navigateTo({
+      url: '/pages/create/team-internal/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
+  openTeamInterCreate() {
+    wx.navigateTo({
+      url: '/pages/create/team-inter/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
+  openSeriesCreate() {
+    wx.navigateTo({
+      url: '/pages/create/series/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }

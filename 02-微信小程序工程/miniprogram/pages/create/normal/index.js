@@ -983,8 +983,18 @@ Page({
     this.setData({ days, teeIndex: [mIdx, dayIdx, hIdx, minIdx] });
   },
 
+  onTimePickerChange(e) {
+    this.onTeeChange({ detail: { value: e.detail.value } });
+  },
+
   changeYear(e) {
     const delta = Number(e.currentTarget.dataset.delta);
+    this._tee.year += delta;
+    this._buildWheels();
+  },
+
+  onTimePickerYearChange(e) {
+    const delta = Number(e.detail.delta);
     this._tee.year += delta;
     this._buildWheels();
   },

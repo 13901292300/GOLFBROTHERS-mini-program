@@ -1,4 +1,4 @@
-const mockAvatars = require('../../utils/mockAvatars.js');
+const mockAvatars = require('../../../utils/mockAvatars.js');
 /**
  * 赛事详情页（球队赛 / 队内赛正在进行中）
  * 1:1 复刻 01-HTML原型/记分页面/队内赛正在进行中.html

@@ -4,13 +4,15 @@
     "pages/score/index",
     "pages/tournament/detail/index",
     "pages/create/normal/index",
+    "pages/create/team-internal/index",
+    "pages/create/team-inter/index",
+    "pages/create/series/index",
+    "pages/team/select/index",
     "pages/course/select/index",
     "pages/player/friends/index",
     "pages/player/combos/index",
     "pages/player/manual/index",
-    "pages/game/hub/index",
-    "pages/index/index",
-    "pages/example/index"
+    "pages/game/hub/index"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",

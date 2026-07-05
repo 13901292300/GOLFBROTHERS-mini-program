@@ -1,0 +1,3776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高尔夫江湖 - 创建队内赛</title>
+  <script src="https://cdn.tailwindcss.com">
+
+
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'tour-blue': '#002D62',
+            'champion-gold': '#CE9224',
+            'data-blue': '#00AEEF',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans SC', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --tour-blue: #002D62;
+      --champion-gold: #CE9224;
+      --data-blue: #00AEEF;
+
+      --bg-primary: #000000;
+      --bg-card: #111111;
+      --bg-subtle: #0A0A0A;
+      --bg-hover: #1A1A1A;
+      --border: #222222;
+      --border-hover: #333333;
+
+      --text-primary: #F1F5F9;
+      --text-secondary: #E5E7F9;
+      --text-muted: #888888;
+      --text-disabled: #555555;
+
+      --error: #EF4444;
+      --shadow-card: none;
+    }
+
+    body.bright-mode {
+      --bg-primary: #FCFCFC;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F3F4F6;
+      --bg-hover: #F9FAFB;
+      --border: #E5E7EB;
+      --border-hover: #D1D5DB;
+
+      --text-primary: #002D62;
+      --text-secondary: #374151;
+      --text-muted: #6B7280;
+      --text-disabled: #9CA3AF;
+
+      --error: #DC2626;
+      --shadow-card: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background-color .3s, color .3s;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 448px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: var(--bg-primary);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Header: unified with normal-round create page */
+    .app-header {
+      height: 76px;
+      background: var(--tour-blue);
+      border-bottom: 2px solid var(--champion-gold);
+      color: #FFFFFF;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+
+    .header-left,
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-back {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      font-size: 20px;
+      border: 0;
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: #FFFFFF;
+      white-space: nowrap;
+    }
+
+    .theme-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.20);
+      background: rgba(255,255,255,.10);
+      color: var(--champion-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .mini-capsule {
+      height: 40px;
+      padding: 0 9px 0 11px;
+      border-radius: 9999px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.22);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .capsule-dots {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .capsule-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #FFFFFF;
+    }
+
+    .capsule-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255,255,255,.30);
+    }
+
+    .capsule-circle {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #FFFFFF;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .capsule-circle::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      background: #FFFFFF;
+    }
+
+    .content {
+      flex: 1;
+      padding: 16px;
+      padding-bottom: 100px;
+      overflow-y: auto;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+
+    .section-label h2 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .section-note {
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .ds-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-card);
+      transition: all .3s ease;
+      position: relative;
+    }
+
+    .ds-card.top-line::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--tour-blue);
+      border-radius: 8px 8px 0 0;
+      pointer-events: none;
+    }
+
+    .ds-field {
+      min-height: 64px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .field-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .field-value {
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 800;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .field-value.strong {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .field-value.italic {
+      font-style: italic;
+    }
+
+    .field-placeholder {
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 700;
+      font-style: italic;
+      color: var(--text-disabled);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .field-icon {
+      color: var(--champion-gold);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .round-name-input {
+      width: 100%;
+      height: 44px;
+      padding: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 18px;
+      line-height: 1.4;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .round-name-input::placeholder {
+      color: var(--text-disabled);
+      font-weight: 700;
+    }
+
+    .team-card {
+      min-height: 86px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      cursor: pointer;
+    }
+
+    .team-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .team-logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--bg-subtle);
+    }
+
+    .team-title {
+      font-size: 16px;
+      line-height: 1.3;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ds-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 2px;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge-gold {
+      background: var(--champion-gold);
+      color: #FFFFFF;
+    }
+
+    .badge-info {
+      background: var(--data-blue);
+      color: #FFFFFF;
+    }
+
+    .badge-muted {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .time-card {
+      padding: 0 16px;
+    }
+
+    .inner-row {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .inner-row:last-child {
+      border-bottom: 0;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 900;
+      letter-spacing: .15em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .data-value {
+      font-size: 20px;
+      line-height: 1;
+      font-weight: 800;
+      font-style: italic;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .selected-field {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.08);
+    }
+
+    .option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .option-card {
+      min-height: 48px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .option-card.active {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.08);
+    }
+
+    .option-card.disabled {
+      opacity: .55;
+    }
+
+    .option-card span.label {
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .option-card.disabled span.label {
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .ds-radio {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      position: relative;
+      transition: all .15s ease;
+      flex-shrink: 0;
+    }
+
+    .ds-radio.checked {
+      border-color: var(--tour-blue);
+      background: var(--tour-blue);
+    }
+
+    .ds-radio.checked::after {
+      content: "";
+      width: 10px;
+      height: 10px;
+      background: #FFFFFF;
+      border-radius: 50%;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .ds-toggle {
+      appearance: none;
+      width: 44px;
+      height: 24px;
+      background: var(--border);
+      border-radius: 9999px;
+      position: relative;
+      cursor: pointer;
+      transition: background .2s ease;
+      flex-shrink: 0;
+      border: 0;
+    }
+
+    .ds-toggle::after {
+      content: "";
+      width: 20px;
+      height: 20px;
+      background: #FFFFFF;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform .2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+
+    .ds-toggle:checked {
+      background: var(--tour-blue);
+    }
+
+    .ds-toggle:checked::after {
+      transform: translateX(20px);
+    }
+
+    .ds-btn-primary {
+      height: 48px;
+      padding: 0 24px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .ds-btn-primary:active {
+      transform: scale(.98);
+      background: #001d42;
+    }
+
+    .add-info-btn {
+      width: 100%;
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .footer {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 448px;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+      background: transparent;
+      z-index: 30;
+    }
+
+    .start-btn {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 700;
+      transition: all .15s ease;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    }
+
+    .start-btn:active {
+      transform: scale(.98);
+      background: #001d42;
+    }
+  
+    /* Bottom sheet: game mode selection, unified with normal-round create page */
+    .game-mode-field {
+      cursor: pointer;
+    }
+
+    .sheet-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.46);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+      z-index: 80;
+    }
+
+    .sheet-mask.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translate(-50%, 105%);
+      width: 100%;
+      max-width: 448px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-bottom: 0;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -16px 36px rgba(0,0,0,.24);
+      padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
+      z-index: 90;
+      transition: transform .24s ease;
+    }
+
+    .bottom-sheet.show {
+      transform: translate(-50%, 0);
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      border-radius: 9999px;
+      background: var(--border-hover);
+      margin: 0 auto 14px;
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .sheet-overline {
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 900;
+      letter-spacing: .15em;
+      color: var(--data-blue);
+    }
+
+    .sheet-header h3 {
+      margin: 2px 0 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .sheet-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .game-mode-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .game-mode-option {
+      width: 100%;
+      min-height: 64px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      text-align: left;
+      transition: all .15s ease;
+    }
+
+    .game-mode-option:active {
+      transform: scale(.98);
+    }
+
+    .game-mode-option.active {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.10);
+    }
+
+    .mode-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
+    }
+
+    .mode-text {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .mode-text strong {
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .mode-text em {
+      font-size: 12px;
+      line-height: 1.3;
+      font-style: normal;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .mode-check {
+      color: var(--champion-gold);
+      font-size: 14px;
+      opacity: 0;
+      flex-shrink: 0;
+    }
+
+    .game-mode-option.active .mode-check {
+      opacity: 1;
+    }
+
+
+    /* Inline radio options: no card background, no individual border */
+    .inline-choice-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      padding: 2px 0;
+    }
+
+    .inline-choice {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: var(--text-secondary);
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .inline-choice .choice-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border-hover);
+      background: transparent;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .inline-choice.active {
+      color: var(--text-primary);
+    }
+
+    .inline-choice.active .choice-dot {
+      border-color: var(--tour-blue);
+      background: var(--tour-blue);
+    }
+
+    .inline-choice.active .choice-dot::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+
+    /* Bottom sheet: wheel time picker, same as normal create page */
+    .sheet-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.46);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+      z-index: 80;
+    }
+
+    .sheet-mask.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translate(-50%, 105%);
+      width: 100%;
+      max-width: 448px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-bottom: 0;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -16px 36px rgba(0,0,0,.24);
+      padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
+      z-index: 90;
+      transition: transform .24s ease;
+    }
+
+    .bottom-sheet.show {
+      transform: translate(-50%, 0);
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      border-radius: 9999px;
+      background: var(--border-hover);
+      margin: 0 auto 14px;
+    }
+
+    .wheel-time-sheet {
+      padding-top: 10px !important;
+      padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .wheel-sheet-title {
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 10px;
+    }
+
+    .wheel-year-bar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .year-arrow {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .wheel-year-text {
+      font-size: 20px;
+      line-height: 1;
+      font-weight: 900;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wheel-title-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      height: 28px;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .wheel-picker {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      height: 170px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .wheel-picker::before,
+    .wheel-picker::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 48px;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .wheel-picker::before {
+      top: 0;
+      background: linear-gradient(to bottom, var(--bg-subtle), rgba(255,255,255,0));
+    }
+
+    .wheel-picker::after {
+      bottom: 0;
+      background: linear-gradient(to top, var(--bg-subtle), rgba(255,255,255,0));
+    }
+
+    .wheel-highlight {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 50%;
+      height: 40px;
+      transform: translateY(-50%);
+      border-top: 1px solid var(--border-hover);
+      border-bottom: 1px solid var(--border-hover);
+      background: rgba(206,146,36,.08);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .wheel-column {
+      position: relative;
+      z-index: 2;
+      height: 170px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      border-right: 1px solid var(--border);
+    }
+
+    .wheel-column:last-child { border-right: 0; }
+    .wheel-column::-webkit-scrollbar { display: none; }
+
+    .wheel-spacer {
+      height: 65px;
+      scroll-snap-align: start;
+      flex-shrink: 0;
+    }
+
+    .wheel-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wheel-item.active {
+      color: var(--champion-gold);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .sheet-confirm-btn {
+      width: 100%;
+      height: 48px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+
+    /* Team game mode sheet: simple text-only options */
+    .team-game-mode-list {
+      gap: 8px !important;
+    }
+
+    .simple-mode-option {
+      min-height: 48px !important;
+      padding: 0 14px !important;
+      justify-content: space-between !important;
+      gap: 12px !important;
+    }
+
+    .simple-mode-option .mode-name {
+      flex: 1;
+      min-width: 0;
+      font-size: 15px;
+      line-height: 1.3;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+
+    /* Status badge placed at right side, before chevron */
+    .field-right {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+
+    /* Event flow text editor sheet */
+    .event-editor-textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      outline: none;
+      padding: 12px;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+
+    .event-editor-textarea:focus {
+      border-color: var(--tour-blue);
+    }
+
+    .event-editor-textarea::placeholder {
+      color: var(--text-disabled);
+    }
+
+    .event-editor-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .sheet-cancel-btn {
+      width: 100%;
+      height: 48px;
+      border-radius: 6px;
+      border: 1px solid var(--border-hover);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    }
+
+
+    /* Shift first radio option right by about 4 Chinese characters */
+    .inline-choice.first-choice-shifted {
+      margin-left: 4em;
+    }
+
+
+    /* Light add event info button, aligned with normal-create add group button */
+    .add-event-info-btn {
+      width: auto;
+      height: 36px;
+      margin-top: 12px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+      border-radius: 6px;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      cursor: pointer;
+    }
+
+    .add-event-info-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border-hover);
+      color: var(--text-muted);
+      background: transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .add-event-info-btn:active {
+      transform: scale(.98);
+    }
+
+    .add-event-info-btn:hover .add-event-info-icon {
+      border-color: var(--text-muted);
+    }
+
+
+    /* Simplified event info flow */
+    .event-info-create-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .event-info-create-row {
+      cursor: pointer;
+    }
+
+    .event-info-create-row .field-value {
+      font-style: normal;
+    }
+
+    .add-info-recommend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .recommend-option {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 14px;
+      text-align: left;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      line-height: 1.3;
+      font-weight: 700;
+    }
+
+    .recommend-option.active {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.10);
+    }
+
+    .recommend-option .check {
+      color: var(--champion-gold);
+      opacity: 0;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .recommend-option.active .check {
+      opacity: 1;
+    }
+
+    .custom-info-block {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      margin-top: 4px;
+    }
+
+    .custom-info-label {
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .custom-info-input {
+      width: 100%;
+      height: 44px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      padding: 0 12px;
+      outline: none;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .custom-info-input:focus {
+      border-color: var(--tour-blue);
+    }
+
+    .sheet-actions-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .sheet-cancel-btn {
+      width: 100%;
+      height: 48px;
+      border-radius: 6px;
+      border: 1px solid var(--border-hover);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    }
+
+    .event-detail-title {
+      margin-bottom: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .event-detail-title strong {
+      color: var(--text-primary);
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .event-detail-textarea {
+      width: 100%;
+      min-height: 190px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      outline: none;
+      padding: 12px;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+
+    .event-detail-textarea:focus {
+      border-color: var(--tour-blue);
+    }
+
+    .event-detail-ad-box {
+      display: none;
+      min-height: 118px;
+      border: 1px dashed var(--border-hover);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .event-detail-ad-box.show {
+      display: flex;
+    }
+
+
+    /* Manual event info type selection */
+    .custom-info-type-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .custom-info-type {
+      height: 42px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    }
+
+    .custom-info-type .choice-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--border-hover);
+      background: transparent;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .custom-info-type.active {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.10);
+      color: var(--text-primary);
+    }
+
+    .custom-info-type.active .choice-dot {
+      border-color: var(--tour-blue);
+      background: var(--tour-blue);
+    }
+
+    .custom-info-type.active .choice-dot::after {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Image event info detail editor */
+    .event-detail-image-box {
+      display: none;
+      min-height: 180px;
+      border: 1px dashed var(--border-hover);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px;
+      margin-bottom: 14px;
+      text-align: center;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .event-detail-image-box.show {
+      display: flex;
+    }
+
+    .event-detail-image-box input {
+      display: none;
+    }
+
+    .event-detail-image-box i {
+      font-size: 28px;
+      color: var(--text-disabled);
+    }
+
+    .event-detail-image-box strong {
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: var(--text-secondary);
+    }
+
+    .event-detail-image-box span {
+      max-width: 260px;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 500;
+      color: var(--text-disabled);
+    }
+
+    .event-detail-image-box img {
+      display: none;
+      width: 100%;
+      max-height: 220px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    .event-detail-image-box.has-image img {
+      display: block;
+    }
+
+    .event-detail-image-box.has-image i,
+    .event-detail-image-box.has-image strong {
+      display: none;
+    }
+
+    .event-detail-textarea.hidden-for-image {
+      display: none;
+    }
+
+
+    .recommend-option small {
+      margin-left: auto;
+      margin-right: 6px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .field-subtitle {
+      margin-top: 4px;
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+
+    /* Event info sortable list on create page */
+    .section-label h2 small {
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .event-info-create-row {
+      user-select: none;
+      touch-action: pan-y;
+      transition: transform .16s ease, opacity .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .event-info-create-row.sort-ready {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.10);
+    }
+
+    .event-info-create-row.dragging {
+      opacity: .72;
+      transform: scale(.98);
+      border-color: var(--champion-gold);
+      box-shadow: 0 8px 18px rgba(0,0,0,.16);
+    }
+
+    .event-info-create-row.drag-over {
+      border-color: var(--data-blue);
+      background: rgba(0,174,239,.08);
+    }
+
+    .event-info-drag-handle {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-right: 8px;
+    }
+
+    .event-info-row-left {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+
+    /* Fixed long-press sorting behavior */
+    .event-info-create-row {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      cursor: pointer;
+    }
+
+    .event-info-create-row.sort-ready {
+      border-color: var(--champion-gold) !important;
+      background: rgba(206,146,36,.10) !important;
+    }
+
+    .event-info-create-row.dragging {
+      opacity: .72;
+      transform: scale(.985);
+      border-color: var(--champion-gold) !important;
+      box-shadow: 0 8px 18px rgba(0,0,0,.16);
+    }
+
+    .event-info-create-row.drag-over {
+      border-color: var(--data-blue) !important;
+      background: rgba(0,174,239,.08) !important;
+    }
+
+    .event-info-drag-handle {
+      cursor: grab;
+    }
+
+    .event-info-create-row.dragging .event-info-drag-handle {
+      cursor: grabbing;
+      color: var(--champion-gold);
+    }
+
+
+    /* Final event info fixes */
+    .event-info-create-row {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      cursor: pointer;
+      transition: transform .16s ease, opacity .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .event-info-create-row.sort-ready {
+      border-color: var(--champion-gold) !important;
+      background: rgba(206,146,36,.10) !important;
+    }
+
+    .event-info-create-row.dragging {
+      opacity: .72;
+      transform: scale(.985);
+      border-color: var(--champion-gold) !important;
+      box-shadow: 0 8px 18px rgba(0,0,0,.16);
+    }
+
+    .event-info-create-row.drag-over {
+      border-color: var(--data-blue) !important;
+      background: rgba(0,174,239,.08) !important;
+    }
+
+    .event-info-drag-handle {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-right: 8px;
+      cursor: grab;
+    }
+
+    .event-info-create-row.dragging .event-info-drag-handle {
+      cursor: grabbing;
+      color: var(--champion-gold);
+    }
+
+    .event-info-row-left {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .field-subtitle {
+      margin-top: 4px;
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .recommend-option small {
+      margin-left: auto;
+      margin-right: 6px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .event-detail-image-box {
+      display: none;
+      min-height: 180px;
+      border: 1px dashed var(--border-hover);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px;
+      margin-bottom: 14px;
+      text-align: center;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .event-detail-image-box.show {
+      display: flex;
+    }
+
+    .event-detail-image-box input {
+      display: none;
+    }
+
+    .event-detail-image-box i {
+      font-size: 28px;
+      color: var(--text-disabled);
+    }
+
+    .event-detail-image-box strong {
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: var(--text-secondary);
+    }
+
+    .event-detail-image-box span {
+      max-width: 260px;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 500;
+      color: var(--text-disabled);
+    }
+
+    .event-detail-image-box img {
+      display: none;
+      width: 100%;
+      max-height: 220px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    .event-detail-image-box.has-image img {
+      display: block;
+    }
+
+    .event-detail-image-box.has-image i,
+    .event-detail-image-box.has-image strong {
+      display: none;
+    }
+
+    .event-detail-textarea.hidden-for-image {
+      display: none;
+    }
+
+
+    /* Mobile-compatible event info sorting */
+    .event-info-create-list.sorting-active {
+      touch-action: none;
+      overscroll-behavior: contain;
+    }
+
+    .event-info-create-row {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .event-info-create-row.mobile-sort-ready {
+      border-color: var(--champion-gold) !important;
+      background: rgba(206,146,36,.10) !important;
+    }
+
+    .event-info-create-row.mobile-dragging {
+      opacity: .76;
+      transform: scale(.985);
+      border-color: var(--champion-gold) !important;
+      box-shadow: 0 8px 18px rgba(0,0,0,.18);
+    }
+
+    .event-info-create-row.mobile-drag-over {
+      border-color: var(--data-blue) !important;
+      background: rgba(0,174,239,.08) !important;
+    }
+
+
+    /* Delete button only inside event info editor */
+    .event-detail-delete-btn {
+      width: 100%;
+      height: 44px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(220,38,38,.28);
+      background: rgba(220,38,38,.06);
+      color: var(--error);
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .event-detail-delete-btn:active {
+      transform: scale(.98);
+      background: rgba(220,38,38,.12);
+    }
+
+
+    .event-info-empty-row {
+      cursor: default;
+      opacity: .82;
+    }
+
+
+    /* Stable two-step delete button */
+    .event-detail-delete-btn {
+      width: 100%;
+      height: 44px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(220,38,38,.30);
+      background: rgba(220,38,38,.06);
+      color: var(--error);
+      font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 800;
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
+    }
+
+    .event-detail-delete-btn.confirming {
+      background: var(--error);
+      color: #FFFFFF;
+      border-color: var(--error);
+    }
+
+    .event-detail-delete-btn:active {
+      transform: scale(.98);
+    }
+
+
+    /* Integrated team select page */
+    .team-select-page {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      background: var(--bg-primary);
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      max-width: 448px;
+      margin: 0 auto;
+      left: 50%;
+      transform: translateX(-50%);
+      min-height: 100vh;
+    }
+
+    .team-select-page.show {
+      display: flex;
+    }
+
+    .team-select-search-area {
+      padding: 16px 16px 8px;
+      flex-shrink: 0;
+      background: var(--bg-primary);
+    }
+
+    .team-select-search-box {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-card);
+      box-shadow: var(--shadow-card);
+    }
+
+    .team-select-search-box i {
+      color: var(--text-muted);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .team-select-search-box input {
+      flex: 1;
+      min-width: 0;
+      height: 44px;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 15px;
+      line-height: 1.4;
+      font-weight: 700;
+    }
+
+    .team-select-search-box input::placeholder {
+      color: var(--text-disabled);
+      font-weight: 500;
+    }
+
+    .team-search-action {
+      border: 0;
+      background: transparent;
+      color: var(--champion-gold);
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 800;
+      padding: 0;
+      white-space: nowrap;
+    }
+
+    .team-select-content {
+      flex: 1;
+      min-height: 0;
+      padding: 16px;
+      padding-bottom: 104px;
+      overflow-y: auto;
+    }
+
+    .team-select-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .team-select-row {
+      min-height: 76px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .team-select-row.selected {
+      border-color: var(--champion-gold);
+      background: rgba(206,146,36,.08);
+    }
+
+    .team-select-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .team-select-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .team-select-name {
+      font-size: 16px;
+      line-height: 1.25;
+      font-weight: 800;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .team-select-meta {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .team-select-indicator {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--border-hover);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: transparent;
+      flex-shrink: 0;
+      transition: all .15s ease;
+    }
+
+    .team-select-row.selected .team-select-indicator {
+      border-color: var(--tour-blue);
+      background: var(--tour-blue);
+      color: #FFFFFF;
+      font-size: 12px;
+    }
+
+    .team-selected-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .team-selected-chip {
+      min-height: 56px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .team-selected-chip img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+    }
+
+    .team-selected-chip span {
+      flex: 1;
+      min-width: 0;
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.3;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .team-remove-selected {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 0;
+      background: rgba(220,38,38,.08);
+      color: var(--error);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .team-select-footer {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 448px;
+      padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+      background: rgba(252,252,252,.92);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      z-index: 125;
+    }
+
+    body:not(.bright-mode) .team-select-footer {
+      background: rgba(0,0,0,.86);
+    }
+
+    .team-select-footer-tip {
+      margin: 0 0 10px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .team-select-footer-tip strong {
+      color: var(--champion-gold);
+      font-weight: 900;
+    }
+
+    .team-select-empty {
+      min-height: 340px;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      padding: 28px 16px;
+    }
+
+    .team-select-empty.show {
+      display: flex;
+    }
+
+    .team-empty-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 18px;
+      color: var(--champion-gold);
+      font-size: 26px;
+    }
+
+    .team-empty-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.3;
+      font-weight: 900;
+      color: var(--text-primary);
+    }
+
+    .team-empty-desc {
+      margin: 10px 0 24px;
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .team-create-inline-btn {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--champion-gold);
+      color: #FFFFFF;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .team-create-form {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      padding: 16px;
+      padding-bottom: 32px;
+      overflow-y: auto;
+    }
+
+    .team-create-form.show {
+      display: block;
+    }
+
+    .team-form-card {
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .team-form-label {
+      margin: 0 0 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    .team-required {
+      color: var(--error);
+      margin-right: 4px;
+    }
+
+    .team-form-input,
+    .team-form-textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      outline: none;
+      padding: 0 12px;
+      font-size: 15px;
+      line-height: 1.4;
+      font-weight: 700;
+    }
+
+    .team-form-input {
+      height: 46px;
+    }
+
+    .team-form-textarea {
+      min-height: 126px;
+      resize: none;
+      padding-top: 12px;
+      font-weight: 500;
+    }
+
+    .team-form-input::placeholder,
+    .team-form-textarea::placeholder {
+      color: var(--text-disabled);
+      font-weight: 500;
+    }
+
+    .team-form-input:focus,
+    .team-form-textarea:focus {
+      border-color: var(--tour-blue);
+    }
+
+    .team-char-count {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text-disabled);
+    }
+
+    .team-textarea-count {
+      top: auto;
+      bottom: 12px;
+      transform: none;
+    }
+
+    .team-logo-upload {
+      height: 196px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px dashed var(--border-hover);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      gap: 10px;
+    }
+
+    .team-logo-circle {
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--champion-gold);
+      font-size: 24px;
+    }
+
+    .team-logo-upload strong {
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: var(--text-secondary);
+    }
+
+    .team-logo-upload span {
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 500;
+      color: var(--text-disabled);
+    }
+
+
+    /* Position fix: make integrated team select page align exactly with create page */
+    #integrated-team-select-page.team-select-page {
+      position: fixed !important;
+      top: 0 !important;
+      left: 50% !important;
+      right: auto !important;
+      bottom: 0 !important;
+      width: min(100vw, 448px) !important;
+      max-width: 448px !important;
+      height: 100vh !important;
+      min-height: 100vh !important;
+      margin: 0 !important;
+      transform: translateX(-50%) !important;
+      overflow: hidden !important;
+      background: var(--bg-primary) !important;
+      z-index: 120 !important;
+    }
+
+    #integrated-team-select-page .app-header {
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+      right: auto !important;
+      width: 100% !important;
+      max-width: none !important;
+      flex-shrink: 0 !important;
+      z-index: 1 !important;
+    }
+
+    #integrated-team-select-page .team-select-footer {
+      position: absolute !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      transform: none !important;
+      width: 100% !important;
+      max-width: none !important;
+      z-index: 2 !important;
+    }
+
+    #integrated-team-select-page .team-select-content {
+      width: 100% !important;
+    }
+
+    #integrated-team-select-page .team-create-form {
+      width: 100% !important;
+    }
+
+</style>
+</head>
+
+<body class="bright-mode">
+  <div class="page">
+    <header class="app-header">
+      <div class="header-left">
+        <button class="header-back" aria-label="返回">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <h1 class="header-title">队内赛创建</h1>
+      </div>
+
+      <div class="header-right">
+        <button class="theme-btn" onclick="toggleTheme()" aria-label="切换主题">
+          <i id="theme-icon" class="fas fa-moon"></i>
+        </button>
+        <div class="mini-capsule" aria-hidden="true">
+          <div class="capsule-dots"><span></span><span></span><span></span></div>
+          <div class="capsule-divider"></div>
+          <div class="capsule-circle"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="section">
+        <div class="section-label">
+          <h2>球队</h2>
+        </div>
+        <div class="ds-card top-line team-card" onclick="openTeamSelectPage()">
+          <div class="team-left">
+            <img id="selected-team-logo" src="https://cdn.screenshottocode.com/DM-5_NqNpHCFQx-BFpqJc.png" alt="Logo" class="team-logo">
+            <div class="field-main">
+              <div id="selected-team-name" class="team-title">北京湘鹰高尔夫俱乐部</div>
+              <span id="selected-team-role" class="ds-badge badge-gold">超级管理员</span>
+            </div>
+          </div>
+          <i class="fas fa-chevron-right field-icon"></i>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>比赛名称</h2>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-main">
+            <input class="round-name-input" type="text" value="北京湘鹰高尔夫俱乐部队内赛" placeholder="请输入比赛名称" />
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>比赛场地</h2>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-main">
+            <div class="field-placeholder">选择球场</div>
+          </div>
+          <i class="fas fa-chevron-right field-icon"></i>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>时间设置</h2>
+        </div>
+        <div class="ds-card top-line time-card">
+          <div class="inner-row" onclick="openTimeWheelSheet('tee')">
+            <div>
+              <div class="meta-label">开球时间</div>
+              <div id="tee-time-value" class="data-value">2026-06-03 17:10</div>
+            </div>
+            <i class="fas fa-chevron-right field-icon"></i>
+          </div>
+          <div class="inner-row" onclick="openTimeWheelSheet('deadline')">
+            <div>
+              <div class="meta-label">报名截止</div>
+              <div id="deadline-time-value" class="data-value">2026-06-02 18:00</div>
+            </div>
+            <i class="fas fa-chevron-right field-icon"></i>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>比赛赛制</h2>
+        </div>
+        <div class="ds-card ds-field game-mode-field" onclick="openGameModeSheet()">
+          <div class="field-main">
+            <div id="selected-game-mode" class="field-value italic">个人比杆赛</div>
+          </div>
+          <i class="fas fa-chevron-right field-icon"></i>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>分队设置</h2>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-main">
+            <div class="field-placeholder">进入分队设置</div>
+          </div>
+          <div class="field-right">
+            <span class="ds-badge badge-gold">已设置</span>
+            <i class="fas fa-chevron-right field-icon"></i>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>参赛费用</h2>
+          <span class="section-note">仅展示</span>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-main">
+            <div class="field-placeholder">进入费用设置</div>
+          </div>
+          <div class="field-right">
+            <span class="ds-badge badge-info">未设置</span>
+            <i class="fas fa-chevron-right field-icon"></i>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>分组权限</h2>
+        </div>
+        <div class="inline-choice-row" data-choice-group="group-permission">
+          <button class="inline-choice active first-choice-shifted" type="button" onclick="selectInlineChoice(this)">
+            <span class="choice-dot"></span>
+            <span>管理员分组</span>
+          </button>
+          <button class="inline-choice" type="button" onclick="selectInlineChoice(this)">
+            <span class="choice-dot"></span>
+            <span>球员自行分组</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>是否公开报名</h2>
+        </div>
+        <div class="inline-choice-row" data-choice-group="public-signup">
+          <button class="inline-choice active first-choice-shifted" type="button" onclick="selectInlineChoice(this)">
+            <span class="choice-dot"></span>
+            <span>公开报名</span>
+          </button>
+          <button class="inline-choice" type="button" onclick="selectInlineChoice(this)">
+            <span class="choice-dot"></span>
+            <span>仅限队内报名</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>赛事信息 <small>（可手工拖动进行信息排序）</small></h2>
+        </div>
+
+        <div id="event-info-create-list" class="event-info-create-list">
+          <div class="ds-card ds-field event-info-create-row" onclick="openEventDetailEditor(0)">
+            <div class="field-main">
+              <div class="field-value">赛事流程</div>
+            </div>
+            <div class="field-right">
+              <span class="ds-badge badge-info">未设置</span>
+              <i class="fas fa-chevron-right field-icon"></i>
+            </div>
+          </div>
+        </div>
+
+        <button class="add-event-info-btn" type="button" onclick="openAddEventInfoSheet()">
+          <span class="add-event-info-icon"><i class="fas fa-plus"></i></span>
+          <span>添加赛事信息</span>
+        </button>
+      </section>
+
+      <section class="section">
+        <div class="section-label">
+          <h2>隐私设置</h2>
+        </div>
+        <div class="ds-card ds-field">
+          <div class="field-value">是否为秘密比赛</div>
+          <input class="ds-toggle" type="checkbox" checked aria-label="是否为秘密比赛">
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <button class="start-btn">创建并开启报名</button>
+    </footer>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('bright-mode');
+      const icon = document.getElementById('theme-icon');
+      const isBright = document.body.classList.contains('bright-mode');
+      icon.classList.toggle('fa-moon', isBright);
+      icon.classList.toggle('fa-sun', !isBright);
+    }
+  </script>
+
+  <div id="game-mode-mask" class="sheet-mask" onclick="closeGameModeSheet()"></div>
+  <div id="game-mode-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="选择赛制">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="sheet-overline">GAME MODE</div>
+        <h3>选择赛制</h3>
+      </div>
+      <button class="sheet-close" onclick="closeGameModeSheet()" aria-label="关闭">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    
+    <div class="game-mode-list team-game-mode-list">
+      <button class="game-mode-option simple-mode-option active" onclick="selectGameMode('个人比杆赛', this)">
+        <span class="mode-name">个人比杆赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('四人四球比杆赛', this)">
+        <span class="mode-name">四人四球比杆赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('最佳球位比杆赛', this)">
+        <span class="mode-name">最佳球位比杆赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('四人两球比杆赛', this)">
+        <span class="mode-name">四人两球比杆赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('个人比洞赛', this)">
+        <span class="mode-name">个人比洞赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('四人四球比洞赛', this)">
+        <span class="mode-name">四人四球比洞赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('最佳球位比洞赛', this)">
+        <span class="mode-name">最佳球位比洞赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+
+      <button class="game-mode-option simple-mode-option" onclick="selectGameMode('四人两球比洞赛', this)">
+        <span class="mode-name">四人两球比洞赛</span>
+        <i class="fas fa-check mode-check"></i>
+      </button>
+    </div>
+
+  </div>
+
+<script>
+function openGameModeSheet() {
+  const mask = document.getElementById('game-mode-mask');
+  const sheet = document.getElementById('game-mode-sheet');
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+}
+
+function closeGameModeSheet() {
+  const mask = document.getElementById('game-mode-mask');
+  const sheet = document.getElementById('game-mode-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function selectGameMode(mode, btn) {
+  const selected = document.getElementById('selected-game-mode');
+  if (selected) selected.textContent = mode;
+
+  document.querySelectorAll('.game-mode-option').forEach(option => {
+    option.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+
+  closeGameModeSheet();
+}
+</script>
+
+
+<script>
+function selectInlineChoice(btn) {
+  const row = btn.closest('.inline-choice-row');
+  if (!row) return;
+  row.querySelectorAll('.inline-choice').forEach(item => item.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+
+
+  <div id="time-wheel-mask" class="sheet-mask" onclick="closeTimeWheelSheet()"></div>
+  <div id="time-wheel-sheet" class="bottom-sheet wheel-time-sheet" role="dialog" aria-modal="true" aria-label="选择时间">
+    <div class="sheet-handle"></div>
+    <h3 id="time-wheel-title" class="wheel-sheet-title">选择时间</h3>
+
+    <div class="wheel-year-bar">
+      <button class="year-arrow" onclick="changeWheelYear(-1)" aria-label="上一年">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <div class="wheel-year-text"><span id="wheel-year-value">2026</span>年</div>
+      <button class="year-arrow" onclick="changeWheelYear(1)" aria-label="下一年">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+
+    <div class="wheel-title-row">
+      <span>月</span>
+      <span>日</span>
+      <span>时</span>
+      <span>分</span>
+    </div>
+
+    <div class="wheel-picker">
+      <div class="wheel-highlight"></div>
+      <div class="wheel-column" id="month-wheel"></div>
+      <div class="wheel-column" id="day-wheel"></div>
+      <div class="wheel-column" id="hour-wheel"></div>
+      <div class="wheel-column" id="minute-wheel"></div>
+    </div>
+
+    <button class="sheet-confirm-btn" onclick="confirmWheelTime()">确认时间</button>
+  </div>
+
+
+<script>
+let activeTimeTarget = 'tee';
+
+const timeValues = {
+  tee: { year: 2026, month: 6, day: 3, hour: 17, minute: 10 },
+  deadline: { year: 2026, month: 6, day: 2, hour: 18, minute: 0 }
+};
+
+const weekNamesForWheel = ['周日','周一','周二','周三','周四','周五','周六'];
+
+function pad2Wheel(num) {
+  return String(num).padStart(2, '0');
+}
+
+function getWheelDaysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function parseExistingTime(target) {
+  const id = target === 'deadline' ? 'deadline-time-value' : 'tee-time-value';
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const match = el.textContent.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+  if (!match) return;
+
+  timeValues[target] = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5])
+  };
+}
+
+function getWheelState() {
+  return timeValues[activeTimeTarget];
+}
+
+function buildWheel(columnId, values, currentValue, formatter) {
+  const column = document.getElementById(columnId);
+  if (!column) return;
+
+  column.innerHTML =
+    '<div class="wheel-spacer"></div>' +
+    values.map(value => {
+      const active = value === currentValue ? ' active' : '';
+      return `<div class="wheel-item${active}" data-value="${value}">${formatter(value)}</div>`;
+    }).join('') +
+    '<div class="wheel-spacer"></div>';
+
+  column.querySelectorAll('.wheel-item').forEach(item => {
+    item.addEventListener('click', () => {
+      setWheelValue(columnId, Number(item.dataset.value));
+    });
+  });
+
+  requestAnimationFrame(() => scrollWheelToValue(columnId, currentValue, false));
+}
+
+function scrollWheelToValue(columnId, value, smooth) {
+  const column = document.getElementById(columnId);
+  if (!column) return;
+  const item = column.querySelector(`.wheel-item[data-value="${value}"]`);
+  if (!item) return;
+  const targetTop = item.offsetTop - column.clientHeight / 2 + item.clientHeight / 2;
+  column.scrollTo({ top: targetTop, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function updateWheelActive(columnId, value) {
+  const column = document.getElementById(columnId);
+  if (!column) return;
+  column.querySelectorAll('.wheel-item').forEach(item => {
+    item.classList.toggle('active', Number(item.dataset.value) === value);
+  });
+}
+
+function setWheelValue(columnId, value) {
+  const map = {
+    'month-wheel': 'month',
+    'day-wheel': 'day',
+    'hour-wheel': 'hour',
+    'minute-wheel': 'minute'
+  };
+
+  const key = map[columnId];
+  if (!key) return;
+
+  const state = getWheelState();
+  state[key] = value;
+
+  if (key === 'month') {
+    const maxDay = getWheelDaysInMonth(state.year, state.month);
+    if (state.day > maxDay) state.day = maxDay;
+    buildDayWheel();
+  }
+
+  updateWheelActive(columnId, value);
+  scrollWheelToValue(columnId, value, true);
+}
+
+function bindWheelScroll(columnId) {
+  const column = document.getElementById(columnId);
+  if (!column || column.dataset.bound === '1') return;
+  column.dataset.bound = '1';
+
+  let timer = null;
+  column.addEventListener('scroll', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const items = Array.from(column.querySelectorAll('.wheel-item'));
+      if (!items.length) return;
+
+      const center = column.scrollTop + column.clientHeight / 2;
+      let closest = items[0];
+      let minDistance = Infinity;
+
+      items.forEach(item => {
+        const itemCenter = item.offsetTop + item.clientHeight / 2;
+        const distance = Math.abs(itemCenter - center);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closest = item;
+        }
+      });
+
+      setWheelValue(columnId, Number(closest.dataset.value));
+    }, 100);
+  });
+}
+
+function buildDayWheel() {
+  const state = getWheelState();
+  const days = Array.from({ length: getWheelDaysInMonth(state.year, state.month) }, (_, i) => i + 1);
+  buildWheel('day-wheel', days, state.day, value => pad2Wheel(value));
+  bindWheelScroll('day-wheel');
+}
+
+function buildTimeWheels() {
+  const state = getWheelState();
+  const yearEl = document.getElementById('wheel-year-value');
+  if (yearEl) yearEl.textContent = state.year;
+
+  buildWheel('month-wheel', Array.from({ length: 12 }, (_, i) => i + 1), state.month, value => pad2Wheel(value));
+  buildDayWheel();
+  buildWheel('hour-wheel', Array.from({ length: 24 }, (_, i) => i), state.hour, value => pad2Wheel(value));
+  buildWheel('minute-wheel', [0, 10, 20, 30, 40, 50], state.minute, value => pad2Wheel(value));
+
+  ['month-wheel','day-wheel','hour-wheel','minute-wheel'].forEach(bindWheelScroll);
+}
+
+function changeWheelYear(delta) {
+  const state = getWheelState();
+  state.year += delta;
+  const maxDay = getWheelDaysInMonth(state.year, state.month);
+  if (state.day > maxDay) state.day = maxDay;
+  buildTimeWheels();
+}
+
+function openTimeWheelSheet(target) {
+  activeTimeTarget = target || 'tee';
+  parseExistingTime(activeTimeTarget);
+
+  const title = document.getElementById('time-wheel-title');
+  if (title) title.textContent = activeTimeTarget === 'deadline' ? '选择报名截止时间' : '选择开球时间';
+
+  const mask = document.getElementById('time-wheel-mask');
+  const sheet = document.getElementById('time-wheel-sheet');
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+  requestAnimationFrame(buildTimeWheels);
+}
+
+function closeTimeWheelSheet() {
+  const mask = document.getElementById('time-wheel-mask');
+  const sheet = document.getElementById('time-wheel-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function confirmWheelTime() {
+  const state = getWheelState();
+  const id = activeTimeTarget === 'deadline' ? 'deadline-time-value' : 'tee-time-value';
+  const el = document.getElementById(id);
+  if (el) {
+    el.textContent = `${state.year}-${pad2Wheel(state.month)}-${pad2Wheel(state.day)} ${pad2Wheel(state.hour)}:${pad2Wheel(state.minute)}`;
+  }
+  closeTimeWheelSheet();
+}
+</script>
+
+
+  <div id="event-flow-mask" class="sheet-mask" onclick="closeEventFlowEditor()"></div>
+  <div id="event-flow-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="编辑赛事流程">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="sheet-overline">EVENT INFO</div>
+        <h3>编辑赛事流程</h3>
+      </div>
+      <button class="sheet-close" onclick="closeEventFlowEditor()" aria-label="关闭">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <textarea id="event-flow-textarea" class="event-editor-textarea" placeholder="请输入赛事流程，例如：签到时间、开球仪式、开球安排、赛后颁奖等。"></textarea>
+
+    <div class="event-editor-actions">
+      <button class="sheet-cancel-btn" onclick="closeEventFlowEditor()">取消</button>
+      <button class="sheet-confirm-btn" onclick="saveEventFlow()">保存</button>
+    </div>
+  </div>
+
+
+<script>
+let eventFlowText = '';
+
+function openEventFlowEditor() {
+  const mask = document.getElementById('event-flow-mask');
+  const sheet = document.getElementById('event-flow-sheet');
+  const textarea = document.getElementById('event-flow-textarea');
+
+  if (textarea) textarea.value = eventFlowText;
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+
+  setTimeout(() => {
+    if (textarea) textarea.focus();
+  }, 220);
+}
+
+function closeEventFlowEditor() {
+  const mask = document.getElementById('event-flow-mask');
+  const sheet = document.getElementById('event-flow-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function saveEventFlow() {
+  const textarea = document.getElementById('event-flow-textarea');
+  const status = document.getElementById('event-flow-status');
+
+  eventFlowText = textarea ? textarea.value.trim() : '';
+
+  if (status) {
+    if (eventFlowText) {
+      status.textContent = '已设置';
+      status.classList.remove('badge-info');
+      status.classList.add('badge-gold');
+    } else {
+      status.textContent = '未设置';
+      status.classList.remove('badge-gold');
+      status.classList.add('badge-info');
+    }
+  }
+
+  closeEventFlowEditor();
+}
+</script>
+
+
+  <div id="add-event-info-mask" class="sheet-mask" onclick="closeAddEventInfoSheet()"></div>
+  <div id="add-event-info-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="添加赛事信息">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="sheet-overline">ADD EVENT INFO</div>
+        <h3>添加赛事信息</h3>
+      </div>
+      <button class="sheet-close" onclick="closeAddEventInfoSheet()" aria-label="关闭">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="add-info-recommend-list" id="recommend-info-list"></div>
+
+    <div class="custom-info-block">
+      <div class="custom-info-label">或者手工添加信息项</div>
+
+      <div class="custom-info-type-row">
+        <button id="manual-type-text" class="custom-info-type active" type="button" onclick="selectManualInfoType('text')">
+          <span class="choice-dot"></span>
+          <span>文本</span>
+        </button>
+        <button id="manual-type-image" class="custom-info-type" type="button" onclick="selectManualInfoType('image')">
+          <span class="choice-dot"></span>
+          <span>图片</span>
+        </button>
+      </div>
+
+      <input id="custom-event-info-title" class="custom-info-input" type="text" placeholder="例如：晚宴安排、交通说明、着装要求">
+    </div>
+
+    <div class="sheet-actions-two">
+      <button class="sheet-cancel-btn" type="button" onclick="closeAddEventInfoSheet()">取消</button>
+      <button class="sheet-confirm-btn" type="button" onclick="confirmAddEventInfo()">确认添加</button>
+    </div>
+  </div>
+
+  <div id="event-detail-mask" class="sheet-mask" onclick="closeEventDetailEditor()"></div>
+  <div id="event-detail-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="编辑赛事信息">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="sheet-overline">EDIT EVENT INFO</div>
+        <h3>编辑赛事信息</h3>
+      </div>
+      <button class="sheet-close" onclick="closeEventDetailEditor()" aria-label="关闭">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="event-detail-title">当前编辑：<strong id="event-detail-current-title">赛事流程</strong></div>
+
+    <label id="event-detail-image-box" class="event-detail-image-box">
+      <input id="event-detail-image-input" type="file" accept="image/*" onchange="handleEventImageUpload(event)">
+      <i class="fas fa-image"></i>
+      <strong>点击上传图片</strong>
+      <span id="event-detail-image-hint">建议尺寸：宽 750px × 高 360px，JPG/PNG，单张图片</span>
+      <img id="event-detail-image-preview" alt="赛事图片预览">
+    </label>
+
+    <textarea id="event-detail-textarea" class="event-detail-textarea" placeholder="请输入详细内容"></textarea>
+
+    <button id="delete-event-info-btn" class="event-detail-delete-btn" type="button">删除本项</button>
+
+    <div class="sheet-actions-two">
+      <button class="sheet-cancel-btn" type="button" onclick="closeEventDetailEditor()">取消</button>
+      <button class="sheet-confirm-btn" type="button" onclick="saveEventDetail()">保存内容</button>
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+let eventInfoItems = [
+  { title: '赛事流程', type: 'text', content: '', imageData: '', status: '未设置' }
+];
+
+// 系统推荐项：只有“赞助商广告”为图片，其余均为文本
+const recommendedEventInfo = [
+  { title: '赛事介绍', type: 'text' },
+  { title: '赛事规则', type: 'text' },
+  { title: '奖项设置', type: 'text' },
+  { title: '赞助商广告', type: 'image' },
+  { title: '交通说明', type: 'text' },
+  { title: '晚宴安排', type: 'text' }
+];
+
+let selectedRecommendIndex = null;
+let manualInfoType = 'text';
+let editingEventInfoIndex = 0;
+
+function getInfoTypeLabel(type) {
+  return type === 'image' ? '图片' : '文本';
+}
+
+function renderEventInfoCreateList() {
+  const list = document.getElementById('event-info-create-list');
+  if (!list) return;
+
+  if (!eventInfoItems.length) {
+    list.innerHTML = `
+      <div class="ds-card ds-field event-info-empty-row">
+        <div class="field-main">
+          <div class="field-placeholder">尚未添加赛事信息</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = eventInfoItems.map((item, index) => {
+    const badgeClass = item.status === '已设置' ? 'badge-gold' : 'badge-info';
+    return `
+      <div class="ds-card ds-field event-info-create-row" data-index="${index}">
+        <div class="event-info-row-left">
+          <span class="event-info-drag-handle"><i class="fas fa-grip-lines"></i></span>
+          <div class="field-main">
+            <div class="field-value">${item.title}</div>
+            <div class="field-subtitle">${getInfoTypeLabel(item.type)}信息</div>
+          </div>
+        </div>
+        <div class="field-right">
+          <span class="ds-badge ${badgeClass}">${item.status}</span>
+          <i class="fas fa-chevron-right field-icon"></i>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderRecommendInfoList() {
+  const list = document.getElementById('recommend-info-list');
+  if (!list) return;
+
+  const existingTitles = new Set(eventInfoItems.map(item => item.title));
+
+  list.innerHTML = recommendedEventInfo.map((item, index) => {
+    const disabled = existingTitles.has(item.title);
+    const active = selectedRecommendIndex === index ? ' active' : '';
+    return `
+      <button class="recommend-option${active}" type="button" ${disabled ? 'disabled style="opacity:.42;"' : ''} onclick="selectRecommendInfo(${index})">
+        <span>${item.title}</span>
+        <small>${getInfoTypeLabel(item.type)}</small>
+        <i class="fas fa-check check"></i>
+      </button>
+    `;
+  }).join('');
+}
+
+function selectRecommendInfo(index) {
+  selectedRecommendIndex = index;
+  const customInput = document.getElementById('custom-event-info-title');
+  if (customInput) customInput.value = '';
+  renderRecommendInfoList();
+}
+
+function selectManualInfoType(type) {
+  manualInfoType = type;
+  const textBtn = document.getElementById('manual-type-text');
+  const imageBtn = document.getElementById('manual-type-image');
+
+  if (textBtn) textBtn.classList.toggle('active', type === 'text');
+  if (imageBtn) imageBtn.classList.toggle('active', type === 'image');
+
+  selectedRecommendIndex = null;
+  renderRecommendInfoList();
+}
+
+function openAddEventInfoSheet() {
+  selectedRecommendIndex = null;
+  manualInfoType = 'text';
+
+  const customInput = document.getElementById('custom-event-info-title');
+  if (customInput) customInput.value = '';
+
+  selectManualInfoType('text');
+  renderRecommendInfoList();
+
+  const mask = document.getElementById('add-event-info-mask');
+  const sheet = document.getElementById('add-event-info-sheet');
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+}
+
+function closeAddEventInfoSheet() {
+  const mask = document.getElementById('add-event-info-mask');
+  const sheet = document.getElementById('add-event-info-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function confirmAddEventInfo() {
+  const customInput = document.getElementById('custom-event-info-title');
+  const customTitle = customInput ? customInput.value.trim() : '';
+
+  let newItem = null;
+
+  if (customTitle) {
+    newItem = { title: customTitle, type: manualInfoType, content: '', imageData: '', status: '未设置' };
+  } else if (selectedRecommendIndex !== null) {
+    const picked = recommendedEventInfo[selectedRecommendIndex];
+    newItem = { title: picked.title, type: picked.type, content: '', imageData: '', status: '未设置' };
+  }
+
+  if (!newItem) return;
+
+  const exists = eventInfoItems.some(item => item.title === newItem.title);
+  if (!exists) {
+    eventInfoItems.push(newItem);
+    renderEventInfoCreateList();
+  }
+
+  closeAddEventInfoSheet();
+}
+
+function openEventDetailEditor(index) {
+  editingEventInfoIndex = index;
+  const item = eventInfoItems[index];
+  if (!item) return;
+
+  const titleEl = document.getElementById('event-detail-current-title');
+  const textarea = document.getElementById('event-detail-textarea');
+  const imageBox = document.getElementById('event-detail-image-box');
+  const imagePreview = document.getElementById('event-detail-image-preview');
+  const imageHint = document.getElementById('event-detail-image-hint');
+
+  if (titleEl) titleEl.textContent = `${item.title}（${getInfoTypeLabel(item.type)}）`;
+
+  const isImage = item.type === 'image';
+
+  if (textarea) {
+    textarea.classList.toggle('hidden-for-image', isImage);
+    textarea.value = item.content || '';
+    textarea.placeholder = item.title === '奖项设置'
+      ? '请输入奖项设置，例如：总杆冠军、净杆冠军、最近旗杆奖、最远距离奖等。'
+      : '请输入详细内容。';
+  }
+
+  if (imageBox) {
+    imageBox.classList.toggle('show', isImage);
+    imageBox.classList.toggle('has-image', isImage && !!item.imageData);
+  }
+
+  if (imagePreview) imagePreview.src = item.imageData || '';
+
+  if (imageHint) {
+    imageHint.textContent = item.title === '赞助商广告'
+      ? '建议尺寸：宽 750px × 高 360px，JPG/PNG，单张广告图'
+      : '建议尺寸：宽 750px × 高 360px，JPG/PNG，单张图片';
+  }
+
+  const mask = document.getElementById('event-detail-mask');
+  const sheet = document.getElementById('event-detail-sheet');
+  if (mask) mask.classList.add('show');
+  if (sheet) sheet.classList.add('show');
+}
+
+function closeEventDetailEditor() {
+  const mask = document.getElementById('event-detail-mask');
+  const sheet = document.getElementById('event-detail-sheet');
+  if (mask) mask.classList.remove('show');
+  if (sheet) sheet.classList.remove('show');
+}
+
+function handleEventImageUpload(event) {
+  const item = eventInfoItems[editingEventInfoIndex];
+  if (!item || item.type !== 'image') return;
+
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    item.imageData = e.target.result;
+    item.status = '已设置';
+
+    const preview = document.getElementById('event-detail-image-preview');
+    const box = document.getElementById('event-detail-image-box');
+
+    if (preview) preview.src = item.imageData;
+    if (box) box.classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveEventDetail() {
+  const item = eventInfoItems[editingEventInfoIndex];
+  if (!item) return;
+
+  if (item.type === 'image') {
+    item.status = item.imageData ? '已设置' : '未设置';
+  } else {
+    const textarea = document.getElementById('event-detail-textarea');
+    item.content = textarea ? textarea.value.trim() : '';
+    item.status = item.content ? '已设置' : '未设置';
+  }
+
+  renderEventInfoCreateList();
+  closeEventDetailEditor();
+}
+
+
+
+
+
+
+
+/* PC + mobile long-press sorting */
+let sortTimer = null;
+let sortActive = false;
+let sortFromIndex = null;
+let sortOverIndex = null;
+let startY = 0;
+let startX = 0;
+let suppressClick = false;
+
+function getEventPoint(event) {
+  const touch = event.touches && event.touches[0] ? event.touches[0] : null;
+  const changedTouch = event.changedTouches && event.changedTouches[0] ? event.changedTouches[0] : null;
+  const point = touch || changedTouch || event;
+  return {
+    x: point.clientX,
+    y: point.clientY
+  };
+}
+
+function getRowFromEventTarget(target) {
+  return target ? target.closest('.event-info-create-row') : null;
+}
+
+function getIndexFromPoint(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const row = getRowFromEventTarget(el);
+  if (!row) return null;
+  return Number(row.dataset.index);
+}
+
+function moveEventInfoItem(fromIndex, toIndex) {
+  if (fromIndex === toIndex) return;
+  if (fromIndex < 0 || toIndex < 0) return;
+  if (fromIndex >= eventInfoItems.length || toIndex >= eventInfoItems.length) return;
+
+  const moved = eventInfoItems.splice(fromIndex, 1)[0];
+  eventInfoItems.splice(toIndex, 0, moved);
+  renderEventInfoCreateList();
+}
+
+function clearSortVisual() {
+  const list = document.getElementById('event-info-create-list');
+  if (list) list.classList.remove('sorting-active');
+
+  document.querySelectorAll('.event-info-create-row').forEach(row => {
+    row.classList.remove('sort-ready', 'dragging', 'drag-over', 'mobile-sort-ready', 'mobile-dragging', 'mobile-drag-over');
+  });
+}
+
+function startSortFromRow(row) {
+  if (!row) return;
+  const list = document.getElementById('event-info-create-list');
+
+  sortActive = true;
+  suppressClick = true;
+
+  if (list) list.classList.add('sorting-active');
+
+  row.classList.add('sort-ready', 'dragging', 'mobile-sort-ready', 'mobile-dragging');
+
+  if (navigator.vibrate) {
+    try { navigator.vibrate(12); } catch (e) {}
+  }
+}
+
+function handleSortStart(event) {
+  const row = getRowFromEventTarget(event.target);
+  if (!row) return;
+
+  const point = getEventPoint(event);
+  startX = point.x;
+  startY = point.y;
+  sortFromIndex = Number(row.dataset.index);
+  sortOverIndex = sortFromIndex;
+  sortActive = false;
+
+  clearTimeout(sortTimer);
+  sortTimer = setTimeout(() => startSortFromRow(row), 420);
+}
+
+function handleSortMove(event) {
+  if (sortFromIndex === null) return;
+
+  const point = getEventPoint(event);
+  const distanceY = Math.abs(point.y - startY);
+  const distanceX = Math.abs(point.x - startX);
+
+  if (!sortActive) {
+    if (distanceY > 14 || distanceX > 14) {
+      clearTimeout(sortTimer);
+    }
+    return;
+  }
+
+  event.preventDefault();
+
+  const targetIndex = getIndexFromPoint(point.x, point.y);
+  document.querySelectorAll('.event-info-create-row').forEach(row => {
+    row.classList.remove('drag-over', 'mobile-drag-over');
+  });
+
+  if (targetIndex !== null && targetIndex !== sortFromIndex) {
+    sortOverIndex = targetIndex;
+    const targetRow = document.querySelector(`.event-info-create-row[data-index="${targetIndex}"]`);
+    if (targetRow) targetRow.classList.add('drag-over', 'mobile-drag-over');
+  }
+}
+
+function handleSortEnd(event) {
+  clearTimeout(sortTimer);
+
+  if (sortActive) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const fromIndex = sortFromIndex;
+    const toIndex = sortOverIndex;
+
+    sortActive = false;
+    clearSortVisual();
+
+    if (fromIndex !== null && toIndex !== null && fromIndex !== toIndex) {
+      moveEventInfoItem(fromIndex, toIndex);
+    }
+
+    setTimeout(() => {
+      suppressClick = false;
+    }, 260);
+  } else {
+    clearSortVisual();
+  }
+
+  sortFromIndex = null;
+  sortOverIndex = null;
+}
+
+function bindEventInfoDelegatedSort() {
+  const list = document.getElementById('event-info-create-list');
+  if (!list || list.dataset.mobileSortBound === '1') return;
+  list.dataset.mobileSortBound = '1';
+
+  list.addEventListener('click', (event) => {
+    const row = getRowFromEventTarget(event.target);
+    if (!row) return;
+
+    if (suppressClick || sortActive) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressClick = false;
+      return;
+    }
+
+    openEventDetailEditor(Number(row.dataset.index));
+  });
+
+  // PC / modern Android
+  list.addEventListener('pointerdown', handleSortStart);
+  list.addEventListener('pointermove', handleSortMove);
+  list.addEventListener('pointerup', handleSortEnd);
+  list.addEventListener('pointercancel', handleSortEnd);
+
+  // iOS Safari fallback
+  list.addEventListener('touchstart', handleSortStart, { passive: true });
+  list.addEventListener('touchmove', handleSortMove, { passive: false });
+  list.addEventListener('touchend', handleSortEnd, { passive: false });
+  list.addEventListener('touchcancel', handleSortEnd, { passive: false });
+
+  list.addEventListener('contextmenu', (event) => {
+    if (getRowFromEventTarget(event.target)) event.preventDefault();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderEventInfoCreateList();
+  bindEventInfoDelegatedSort();
+});
+</script>
+
+
+<script>
+(function bindStableTwoStepDelete() {
+  let pendingDeleteIndex = null;
+  let pendingDeleteTimer = null;
+
+  function getCurrentDeleteButton() {
+    return document.getElementById('delete-event-info-btn');
+  }
+
+  function resetDeleteButton() {
+    const btn = getCurrentDeleteButton();
+    if (!btn) return;
+    btn.classList.remove('confirming');
+    btn.textContent = '删除本项';
+    pendingDeleteIndex = null;
+    clearTimeout(pendingDeleteTimer);
+  }
+
+  function performDeleteCurrentEventInfo(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    const btn = getCurrentDeleteButton();
+    if (!btn) return;
+
+    const index = Number(window.editingEventInfoIndex ?? editingEventInfoIndex);
+    if (Number.isNaN(index) || index < 0 || index >= eventInfoItems.length) {
+      resetDeleteButton();
+      return;
+    }
+
+    const item = eventInfoItems[index];
+
+    if (pendingDeleteIndex !== index) {
+      pendingDeleteIndex = index;
+      btn.classList.add('confirming');
+      btn.textContent = `再次点击确认删除「${item.title}」`;
+
+      clearTimeout(pendingDeleteTimer);
+      pendingDeleteTimer = setTimeout(resetDeleteButton, 3000);
+      return;
+    }
+
+    clearTimeout(pendingDeleteTimer);
+    eventInfoItems.splice(index, 1);
+
+    if (eventInfoItems.length === 0) {
+      editingEventInfoIndex = 0;
+      if ('editingEventInfoIndex' in window) window.editingEventInfoIndex = 0;
+    } else {
+      editingEventInfoIndex = Math.min(index, eventInfoItems.length - 1);
+      if ('editingEventInfoIndex' in window) window.editingEventInfoIndex = editingEventInfoIndex;
+    }
+
+    resetDeleteButton();
+
+    if (typeof renderEventInfoCreateList === 'function') renderEventInfoCreateList();
+    if (typeof closeEventDetailEditor === 'function') closeEventDetailEditor();
+  }
+
+  window.handleDeleteCurrentEventInfo = performDeleteCurrentEventInfo;
+
+  document.addEventListener('click', function(event) {
+    const btn = event.target.closest && event.target.closest('#delete-event-info-btn');
+    if (!btn) return;
+    performDeleteCurrentEventInfo(event);
+  }, true);
+
+  document.addEventListener('touchend', function(event) {
+    const btn = event.target.closest && event.target.closest('#delete-event-info-btn');
+    if (!btn) return;
+    performDeleteCurrentEventInfo(event);
+  }, { passive: false, capture: true });
+
+  document.addEventListener('click', function(event) {
+    const sheet = document.getElementById('event-detail-sheet');
+    const btn = getCurrentDeleteButton();
+    if (!sheet || !btn) return;
+    if (!sheet.classList.contains('show')) return;
+    if (event.target.closest && event.target.closest('#delete-event-info-btn')) return;
+    if (pendingDeleteIndex !== null) resetDeleteButton();
+  }, true);
+})();
+</script>
+
+
+  <div id="integrated-team-select-page" class="team-select-page" aria-label="选择球队页面">
+    <header class="app-header">
+      <div class="header-left">
+        <button class="header-back" onclick="closeTeamSelectPage()" aria-label="返回创建页">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <h1 id="team-select-header-title" class="header-title">选择球队</h1>
+      </div>
+
+      <div class="header-right">
+        <button class="theme-btn" onclick="toggleTheme()" aria-label="切换主题">
+          <i class="fas fa-moon"></i>
+        </button>
+        <div class="mini-capsule" aria-hidden="true">
+          <div class="capsule-dots"><span></span><span></span><span></span></div>
+          <div class="capsule-divider"></div>
+          <div class="capsule-circle"></div>
+        </div>
+      </div>
+    </header>
+
+    <section id="team-select-list-view" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+      <div class="team-select-search-area">
+        <div class="team-select-search-box">
+          <i class="fas fa-search"></i>
+          <input id="team-select-search-input" type="text" placeholder="搜索球队名称" oninput="handleIntegratedTeamSearchInput()" onkeydown="handleIntegratedTeamSearchKey(event)">
+          <button class="team-search-action" onclick="handleIntegratedTeamSearch()">搜索</button>
+        </div>
+      </div>
+
+      <main class="team-select-content">
+        <section id="integrated-selected-section" class="section hidden">
+          <div class="section-label">
+            <h2>已选球队</h2>
+            <span class="section-note"><span id="integrated-selected-count-header">0</span> 个</span>
+          </div>
+          <div id="integrated-selected-list" class="team-selected-list"></div>
+        </section>
+
+        <section id="integrated-all-teams-section" class="section">
+          <div class="section-label">
+            <h2>全部球队</h2>
+            <span class="section-note">选择一个球队</span>
+          </div>
+          <div id="integrated-teams-list" class="team-select-list"></div>
+        </section>
+
+        <section id="integrated-team-empty" class="team-select-empty">
+          <div class="team-empty-icon"><i class="fas fa-shield-alt"></i></div>
+          <h2 class="team-empty-title">未找到球队</h2>
+          <p class="team-empty-desc">
+            “<span id="integrated-empty-term">同济大学</span>”队目前不存在。<br>
+            你可以立即创建这个球队。
+          </p>
+          <button class="team-create-inline-btn" onclick="openIntegratedCreateTeam()">立即创建</button>
+        </section>
+      </main>
+
+      <footer class="team-select-footer">
+        <p class="team-select-footer-tip">已选择 <strong id="integrated-selected-count">0</strong> 个球队，至少选择 1 个</p>
+        <button id="integrated-confirm-team-btn" class="start-btn" disabled onclick="confirmIntegratedTeamSelection()">确认</button>
+      </footer>
+    </section>
+
+    <section id="team-create-view" class="team-create-form">
+      <section class="ds-card top-line team-form-card">
+        <p class="team-form-label">球队 Logo</p>
+        <label class="team-logo-upload">
+          <input type="file" accept="image/*" hidden>
+          <span class="team-logo-circle"><i class="fas fa-plus"></i></span>
+          <strong>上传 Logo</strong>
+          <span>支持 JPG / PNG，建议正方形图片</span>
+        </label>
+      </section>
+
+      <section class="ds-card team-form-card">
+        <p class="team-form-label"><span class="team-required">*</span>球队名称</p>
+        <div class="relative">
+          <input id="integrated-create-team-name" class="team-form-input pr-14" type="text" value="" placeholder="请输入球队名称" oninput="updateIntegratedCreateNameCount()">
+          <span id="integrated-create-team-name-count" class="team-char-count">0/30</span>
+        </div>
+      </section>
+
+      <section class="ds-card team-form-card">
+        <p class="team-form-label">球队口号</p>
+        <div class="relative">
+          <input id="integrated-create-slogan" class="team-form-input pr-14" type="text" placeholder="请输入球队口号" oninput="updateIntegratedSloganCount()">
+          <span id="integrated-create-slogan-count" class="team-char-count">0/50</span>
+        </div>
+      </section>
+
+      <section class="ds-card team-form-card">
+        <p class="team-form-label">球队描述</p>
+        <div class="relative">
+          <textarea id="integrated-create-desc" class="team-form-textarea pr-14" placeholder="请输入球队描述，介绍一下你的球队..." oninput="updateIntegratedDescCount()"></textarea>
+          <span id="integrated-create-desc-count" class="team-char-count team-textarea-count">0/500</span>
+        </div>
+      </section>
+
+      <button class="start-btn" onclick="createIntegratedTeam()">创建球队</button>
+    </section>
+  </div>
+
+
+<script>
+const integratedTeamsData = [
+  { id: 1, name: '北京湘鹰高尔夫俱乐部', logo: 'https://cdn.screenshottocode.com/DM-5_NqNpHCFQx-BFpqJc.png', role: '超级管理员' },
+  { id: 2, name: '星途高尔夫俱乐部', logo: 'https://cdn.screenshottocode.com/qVUycQ7F9tG24cpSq6o79.png', role: '管理员' },
+  { id: 3, name: '江湖俱乐部', logo: 'https://cdn.screenshottocode.com/1Frp5wUW6AN7BRP_3ZTvF.png', role: '成员' },
+  { id: 4, name: '银河队', logo: 'https://cdn.screenshottocode.com/Jn3YaEQzAGdy5Lr3P0Pgr.png', role: '成员' },
+  { id: 5, name: '六字头俱乐部', logo: 'https://cdn.screenshottocode.com/5ANEkcUsOxU5fJlFMR-KT.png', role: '成员' },
+  { id: 6, name: '火星队', logo: 'https://cdn.screenshottocode.com/ZjKaKYIQI2T2KWscpbxZ7.png', role: '成员' },
+  { id: 7, name: '太阳花', logo: 'https://cdn.screenshottocode.com/IgDv02kAKYECUGzACxmtl.png', role: '成员' }
+];
+
+let integratedSelectedTeamId = 1;
+let integratedTeamSelectMode = 'list';
+
+function getIntegratedFilteredTeams() {
+  const input = document.getElementById('team-select-search-input');
+  const term = input ? input.value.trim().toLowerCase() : '';
+  if (!term) return integratedTeamsData;
+  return integratedTeamsData.filter(team => team.name.toLowerCase().includes(term));
+}
+
+function getRoleBadgeClass(role) {
+  if (role === '超级管理员') return 'badge-gold';
+  if (role === '管理员') return 'badge-info';
+  return 'badge-muted';
+}
+
+function renderIntegratedTeams() {
+  const list = document.getElementById('integrated-teams-list');
+  const selectedList = document.getElementById('integrated-selected-list');
+  const selectedSection = document.getElementById('integrated-selected-section');
+  const emptySection = document.getElementById('integrated-team-empty');
+  const allSection = document.getElementById('integrated-all-teams-section');
+  if (!list || !selectedList || !selectedSection) return;
+
+  const filtered = getIntegratedFilteredTeams();
+  const termInput = document.getElementById('team-select-search-input');
+  const term = termInput ? termInput.value.trim() : '';
+
+  if (term && filtered.length === 0) {
+    if (emptySection) emptySection.classList.add('show');
+    if (allSection) allSection.style.display = 'none';
+    const termEl = document.getElementById('integrated-empty-term');
+    if (termEl) termEl.textContent = term;
+  } else {
+    if (emptySection) emptySection.classList.remove('show');
+    if (allSection) allSection.style.display = '';
+  }
+
+  list.innerHTML = filtered.map(team => {
+    const selected = team.id === integratedSelectedTeamId;
+    return `
+      <div class="ds-card team-select-row ${selected ? 'selected' : ''}" onclick="toggleIntegratedTeamSelect(${team.id})">
+        <img class="team-select-logo" src="${team.logo}" alt="${team.name}">
+        <div class="team-select-main">
+          <div class="team-select-name">${team.name}</div>
+          <div class="team-select-meta">
+            <span class="ds-badge ${getRoleBadgeClass(team.role)}">${team.role}</span>
+            <span>我的球队</span>
+          </div>
+        </div>
+        <span class="team-select-indicator"><i class="fas fa-check"></i></span>
+      </div>
+    `;
+  }).join('');
+
+  const selectedTeam = integratedTeamsData.find(team => team.id === integratedSelectedTeamId);
+  if (selectedTeam) {
+    selectedSection.classList.remove('hidden');
+    document.getElementById('integrated-selected-count-header').textContent = '1';
+    selectedList.innerHTML = `
+      <div class="ds-card team-selected-chip">
+        <img src="${selectedTeam.logo}" alt="${selectedTeam.name}">
+        <span>${selectedTeam.name}</span>
+        <button class="team-remove-selected" onclick="event.stopPropagation(); clearIntegratedTeamSelection()" aria-label="取消选择">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    `;
+  } else {
+    selectedSection.classList.add('hidden');
+    selectedList.innerHTML = '';
+  }
+
+  updateIntegratedTeamFooter();
+}
+
+function updateIntegratedTeamFooter() {
+  const count = integratedSelectedTeamId ? 1 : 0;
+  const countEl = document.getElementById('integrated-selected-count');
+  const btn = document.getElementById('integrated-confirm-team-btn');
+  if (countEl) countEl.textContent = count;
+  if (btn) btn.disabled = count === 0;
+}
+
+function toggleIntegratedTeamSelect(id) {
+  integratedSelectedTeamId = integratedSelectedTeamId === id ? null : id;
+  renderIntegratedTeams();
+}
+
+function clearIntegratedTeamSelection() {
+  integratedSelectedTeamId = null;
+  renderIntegratedTeams();
+}
+
+function openTeamSelectPage() {
+  const page = document.getElementById('integrated-team-select-page');
+  const listView = document.getElementById('team-select-list-view');
+  const createView = document.getElementById('team-create-view');
+  const title = document.getElementById('team-select-header-title');
+
+  if (page) page.classList.add('show');
+  if (listView) listView.style.display = 'flex';
+  if (createView) createView.classList.remove('show');
+  if (title) title.textContent = '选择球队';
+
+  integratedTeamSelectMode = 'list';
+
+  const selectedName = document.getElementById('selected-team-name');
+  const currentName = selectedName ? selectedName.textContent.trim() : '';
+  const currentTeam = integratedTeamsData.find(team => team.name === currentName);
+  if (currentTeam) integratedSelectedTeamId = currentTeam.id;
+
+  renderIntegratedTeams();
+}
+
+function closeTeamSelectPage() {
+  const page = document.getElementById('integrated-team-select-page');
+
+  if (integratedTeamSelectMode === 'create') {
+    const listView = document.getElementById('team-select-list-view');
+    const createView = document.getElementById('team-create-view');
+    const title = document.getElementById('team-select-header-title');
+
+    integratedTeamSelectMode = 'list';
+    if (listView) listView.style.display = 'flex';
+    if (createView) createView.classList.remove('show');
+    if (title) title.textContent = '选择球队';
+    renderIntegratedTeams();
+    return;
+  }
+
+  if (page) page.classList.remove('show');
+}
+
+function confirmIntegratedTeamSelection() {
+  const team = integratedTeamsData.find(item => item.id === integratedSelectedTeamId);
+  if (!team) return;
+
+  const logo = document.getElementById('selected-team-logo');
+  const name = document.getElementById('selected-team-name');
+  const role = document.getElementById('selected-team-role');
+
+  if (logo) logo.src = team.logo;
+  if (name) name.textContent = team.name;
+  if (role) {
+    role.textContent = team.role;
+    role.classList.remove('badge-gold', 'badge-info', 'badge-muted');
+    role.classList.add(getRoleBadgeClass(team.role));
+  }
+
+  const page = document.getElementById('integrated-team-select-page');
+  if (page) page.classList.remove('show');
+}
+
+function handleIntegratedTeamSearchInput() {
+  renderIntegratedTeams();
+}
+
+function handleIntegratedTeamSearchKey(event) {
+  if (event.key === 'Enter') handleIntegratedTeamSearch();
+}
+
+function handleIntegratedTeamSearch() {
+  renderIntegratedTeams();
+}
+
+function openIntegratedCreateTeam() {
+  const input = document.getElementById('team-select-search-input');
+  const createName = document.getElementById('integrated-create-team-name');
+  const listView = document.getElementById('team-select-list-view');
+  const createView = document.getElementById('team-create-view');
+  const title = document.getElementById('team-select-header-title');
+
+  integratedTeamSelectMode = 'create';
+
+  if (createName) createName.value = input ? input.value.trim() : '';
+  if (listView) listView.style.display = 'none';
+  if (createView) createView.classList.add('show');
+  if (title) title.textContent = '创建球队';
+
+  updateIntegratedCreateNameCount();
+  updateIntegratedSloganCount();
+  updateIntegratedDescCount();
+}
+
+function createIntegratedTeam() {
+  const nameInput = document.getElementById('integrated-create-team-name');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if (!name) return;
+
+  const newTeam = {
+    id: Date.now(),
+    name,
+    logo: 'https://cdn.screenshottocode.com/DM-5_NqNpHCFQx-BFpqJc.png',
+    role: '超级管理员'
+  };
+
+  integratedTeamsData.unshift(newTeam);
+  integratedSelectedTeamId = newTeam.id;
+
+  const searchInput = document.getElementById('team-select-search-input');
+  if (searchInput) searchInput.value = '';
+
+  const listView = document.getElementById('team-select-list-view');
+  const createView = document.getElementById('team-create-view');
+  const title = document.getElementById('team-select-header-title');
+
+  integratedTeamSelectMode = 'list';
+  if (listView) listView.style.display = 'flex';
+  if (createView) createView.classList.remove('show');
+  if (title) title.textContent = '选择球队';
+
+  renderIntegratedTeams();
+}
+
+function updateIntegratedCreateNameCount() {
+  const input = document.getElementById('integrated-create-team-name');
+  const count = document.getElementById('integrated-create-team-name-count');
+  if (input && count) count.textContent = `${input.value.length}/30`;
+}
+
+function updateIntegratedSloganCount() {
+  const input = document.getElementById('integrated-create-slogan');
+  const count = document.getElementById('integrated-create-slogan-count');
+  if (input && count) count.textContent = `${input.value.length}/50`;
+}
+
+function updateIntegratedDescCount() {
+  const input = document.getElementById('integrated-create-desc');
+  const count = document.getElementById('integrated-create-desc-count');
+  if (input && count) count.textContent = `${input.value.length}/500`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderIntegratedTeams();
+});
+</script>
+
+</body>
+</html>

@@ -6,13 +6,13 @@
  * - 同一 playerId / 昵称稳定映射到同一头像
  * - 仅空值 / 非法路径 / 加载失败时使用 default-avatar
  */
-const DEFAULT_AVATAR = '/assets/mock-avatars/default-avatar.png';
+const DEFAULT_AVATAR = '/assets/mock-avatars/default-avatar.jpg';
 
 const MOCK_AVATAR_COUNT = 10;
 
 const MOCK_AVATAR_PATHS = Array.from({ length: MOCK_AVATAR_COUNT }, (_, i) => {
   const n = String(i + 1).padStart(2, '0');
-  return '/assets/mock-avatars/mock-avatar-' + n + '.png';
+  return '/assets/mock-avatars/mock-avatar-' + n + '.jpg';
 });
 
 function stableHash(str) {
@@ -59,7 +59,7 @@ function isInvalidAvatarSrc(s) {
 
 function normalizeLocalPath(s) {
   const norm = s.startsWith('/') ? s : '/' + s;
-  const legacy = norm.match(/\/mock-avatar-(\d)\.png$/);
+  const legacy = norm.match(/\/mock-avatar-(\d+)\.(png|jpg)$/);
   if (legacy) {
     return avatarByIndex(parseInt(legacy[1], 10) - 1);
   }

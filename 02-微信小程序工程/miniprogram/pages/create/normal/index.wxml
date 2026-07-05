@@ -34,7 +34,7 @@
         <view class="field-main">
           <block wx:if="{{courseName}}">
             <text class="field-value strong italic">{{courseName}}{{courseHalfText}}</text>
-            <text wx:if="{{courseLocation}}" class="field-subvalue">{{courseLocation}}</text>
+            <text wx:if="{{courseLocation}}" class="field-subvalue ds-desc-text">{{courseLocation}}</text>
           </block>
           <text wx:else class="field-placeholder">请选择球场...</text>
         </view>
@@ -90,7 +90,7 @@
       <view class="ds-card ds-field" bindtap="openGameModeSheet">
         <view class="field-main">
           <text class="field-value italic">{{gameMode}}</text>
-          <text wx:if="{{compositionSummaryText}}" class="field-subvalue">组合 {{compositionSummaryText}}</text>
+          <text wx:if="{{compositionSummaryText}}" class="field-subvalue ds-desc-text">组合 {{compositionSummaryText}}</text>
         </view>
         <text class="field-icon">›</text>
       </view>
@@ -144,7 +144,7 @@
         <view class="mode-icon"><text>{{gm.icon}}</text></view>
         <view class="mode-text">
           <text class="mode-text__strong">{{gm.name}}</text>
-          <text class="mode-text__em">{{gm.desc}}</text>
+          <text class="mode-text__em ds-desc-text">{{gm.desc}}</text>
         </view>
         <text class="mode-check">✓</text>
       </view>
@@ -167,7 +167,7 @@
         <view class="mode-icon"><text>{{opt.icon}}</text></view>
         <view class="mode-text">
           <text class="mode-text__strong">{{opt.label}}</text>
-          <text class="mode-text__em">{{opt.desc}}</text>
+          <text class="mode-text__em ds-desc-text">{{opt.desc}}</text>
         </view>
         <text class="mode-check">✓</text>
       </view>
@@ -186,7 +186,7 @@
       <view class="sheet-close" bindtap="closeGroupingSheet"><text>×</text></view>
     </view>
 
-    <text class="grouping-hint">{{groupingHint}}（已选 {{groupingSelectCount}}/{{groupingSelectRequired}}）</text>
+    <text class="grouping-hint ds-desc-text">{{groupingHint}}（已选 {{groupingSelectCount}}/{{groupingSelectRequired}}）</text>
 
     <!-- 队伍桶：队伍1手动分配；其余队伍选满后自动预览 -->
     <view class="grouping-teams">
@@ -228,14 +228,14 @@
               <text class="grouping-chip__name">{{m.name}}</text>
             </view>
           </block>
-          <text wx:if="{{!item.members.length}}" class="grouping-team__empty">{{item.auto ? '选满队伍1后自动分组' : '点击下方球员加入'}}</text>
+          <text wx:if="{{!item.members.length}}" class="grouping-team__empty ds-hint-text">{{item.auto ? '选满队伍1后自动分组' : '点击下方球员加入'}}</text>
         </view>
       </view>
     </view>
 
     <!-- 待分配球员池（仅当前组） -->
     <view class="grouping-pool">
-      <text class="grouping-pool__title">待分配（{{groupingPoolCount}}）</text>
+      <text class="grouping-pool__title ds-desc-text">待分配（{{groupingPoolCount}}）</text>
       <view class="grouping-pool__list">
         <block wx:for="{{groupingPlayers}}" wx:for-item="p" wx:key="playerId">
           <view
@@ -256,38 +256,19 @@
     <view class="grouping-confirm {{groupingComplete ? '' : 'disabled'}}" bindtap="confirmGrouping">确认分组</view>
   </view>
 
-  <!-- 底部弹层：开球时间滚轮 -->
-  <view class="sheet-mask {{showTeeTime ? 'show' : ''}}" bindtap="closeTeeTimeSheet"></view>
-  <view class="bottom-sheet wheel-time-sheet {{showTeeTime ? 'show' : ''}}" catchtap="noop">
-    <view class="sheet-handle"></view>
-
-    <view class="wheel-year-bar">
-      <view class="year-arrow" bindtap="changeYear" data-delta="-1"><text>‹</text></view>
-      <view class="wheel-year-text">{{teeYear}}年</view>
-      <view class="year-arrow" bindtap="changeYear" data-delta="1"><text>›</text></view>
-    </view>
-
-    <view class="wheel-title-row">
-      <text>月</text><text>日</text><text>时</text><text>分</text>
-    </view>
-
-    <picker-view class="wheel-picker" indicator-class="wheel-indicator" value="{{teeIndex}}" bindchange="onTeeChange">
-      <picker-view-column>
-        <view wx:for="{{months}}" wx:key="*this" class="wheel-item">{{item}}</view>
-      </picker-view-column>
-      <picker-view-column>
-        <view wx:for="{{days}}" wx:key="*this" class="wheel-item">{{item}}</view>
-      </picker-view-column>
-      <picker-view-column>
-        <view wx:for="{{hours}}" wx:key="*this" class="wheel-item">{{item}}</view>
-      </picker-view-column>
-      <picker-view-column>
-        <view wx:for="{{minutes}}" wx:key="*this" class="wheel-item">{{item}}</view>
-      </picker-view-column>
-    </picker-view>
-
-    <button class="sheet-confirm-btn" bindtap="confirmTeeTime">确认时间</button>
-  </view>
+  <time-wheel-picker
+    show="{{showTeeTime}}"
+    year="{{teeYear}}"
+    value="{{teeIndex}}"
+    month-options="{{months}}"
+    day-options="{{days}}"
+    hour-options="{{hours}}"
+    minute-options="{{minutes}}"
+    bind:close="closeTeeTimeSheet"
+    bind:change="onTimePickerChange"
+    bind:yearchange="onTimePickerYearChange"
+    bind:confirm="confirmTeeTime"
+  />
 
   <!-- 底部弹层：空位 → 选择添加方式（好友列表 / 老牌组合 / 手工添加） -->
   <view class="sheet-mask {{showAddPlayer ? 'show' : ''}}" bindtap="closeAddPlayer"></view>
@@ -305,7 +286,7 @@
         <view class="mode-icon"><text>👥</text></view>
         <view class="mode-text">
           <text class="mode-text__strong">好友列表</text>
-          <text class="mode-text__em">从我的好友中选择球员</text>
+          <text class="mode-text__em ds-desc-text">从我的好友中选择球员</text>
         </view>
         <text class="mode-arrow">›</text>
       </view>
@@ -313,7 +294,7 @@
         <view class="mode-icon"><text>★</text></view>
         <view class="mode-text">
           <text class="mode-text__strong">老牌组合</text>
-          <text class="mode-text__em">常用四人组 / 上次比赛组合</text>
+          <text class="mode-text__em ds-desc-text">常用四人组 / 上次比赛组合</text>
         </view>
         <text class="mode-arrow">›</text>
       </view>
@@ -321,7 +302,7 @@
         <view class="mode-icon"><text>✎</text></view>
         <view class="mode-text">
           <text class="mode-text__strong">手工添加</text>
-          <text class="mode-text__em">手动输入姓名加入该位置</text>
+          <text class="mode-text__em ds-desc-text">手动输入姓名加入该位置</text>
         </view>
         <text class="mode-arrow">›</text>
       </view>

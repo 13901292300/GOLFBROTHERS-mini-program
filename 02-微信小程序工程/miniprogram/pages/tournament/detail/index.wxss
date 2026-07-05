@@ -391,9 +391,9 @@ page {
 .tee-player-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx 8rpx; align-items: start; }
 .tee-player {
   display: grid;
-  grid-template-columns: 96rpx minmax(0, 1fr);
+  grid-template-columns: 88rpx minmax(0, 1fr);
   grid-template-rows: auto auto;
-  column-gap: 8rpx;
+  column-gap: 4rpx;
   row-gap: 4rpx;
   align-items: start;
   min-width: 0;
@@ -402,7 +402,7 @@ page {
   grid-column: 1;
   grid-row: 1 / span 2;
   position: relative;
-  width: 96rpx;
+  width: 88rpx;
   height: 96rpx;
   align-self: start;
 }

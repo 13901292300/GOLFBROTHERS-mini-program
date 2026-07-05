@@ -1,0 +1,70 @@
+<view wx:if="{{show}}" class="time-wheel-layer">
+  <view class="time-wheel-mask" bindtap="onMaskTap"></view>
+
+  <view class="time-wheel-sheet">
+    <view class="time-wheel-handle"></view>
+
+    <view wx:if="{{title}}" class="time-wheel-title">{{title}}</view>
+
+    <view class="time-wheel-year-row">
+      <view class="year-arrow" bindtap="onChangeYear" data-delta="-1"><text>‹</text></view>
+      <view class="year-text">{{year}}年</view>
+      <view class="year-arrow" bindtap="onChangeYear" data-delta="1"><text>›</text></view>
+    </view>
+
+    <view class="time-wheel-label-row">
+      <view>月</view>
+      <view>日</view>
+      <view>时</view>
+      <view>分</view>
+    </view>
+
+    <view class="time-wheel-picker-wrap">
+      <view class="time-wheel-highlight"></view>
+
+      <picker-view
+        class="time-wheel-picker"
+        value="{{innerValue}}"
+        bindchange="onPickerChange"
+        indicator-style="height: 80rpx;"
+        mask-style="background: transparent;"
+      >
+        <picker-view-column>
+          <view
+            wx:for="{{monthOptions}}"
+            wx:for-index="idx"
+            wx:key="*this"
+            class="time-wheel-item {{innerValue[0] === idx ? 'active' : ''}}"
+            data-value="{{idx + 1}}"
+          >{{monthLabels[idx]}}</view>
+        </picker-view-column>
+        <picker-view-column>
+          <view
+            wx:for="{{dayOptions}}"
+            wx:for-index="idx"
+            wx:key="*this"
+            class="time-wheel-item {{innerValue[1] === idx ? 'active' : ''}}"
+          >{{item}}</view>
+        </picker-view-column>
+        <picker-view-column>
+          <view
+            wx:for="{{hourOptions}}"
+            wx:for-index="idx"
+            wx:key="*this"
+            class="time-wheel-item {{innerValue[2] === idx ? 'active' : ''}}"
+          >{{item}}</view>
+        </picker-view-column>
+        <picker-view-column>
+          <view
+            wx:for="{{minuteOptions}}"
+            wx:for-index="idx"
+            wx:key="*this"
+            class="time-wheel-item {{innerValue[3] === idx ? 'active' : ''}}"
+          >{{item}}</view>
+        </picker-view-column>
+      </picker-view>
+    </view>
+
+    <button class="time-wheel-confirm" bindtap="onConfirmTap">{{confirmText}}</button>
+  </view>
+</view>

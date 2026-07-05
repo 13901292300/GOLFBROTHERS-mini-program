@@ -1,0 +1,59 @@
+<view class="create-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">{{pageEyebrow}}</text>
+          <text class="gb-header__title">{{pageTitle}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="content-scroll" scroll-y="{{true}}" enhanced show-scrollbar="{{false}}">
+    <view class="content">
+      <view class="section">
+        <view class="section-label"><text class="section-label__h2">时间设置</text></view>
+        <view class="ds-card top-line time-card">
+          <view class="inner-row" bindtap="openTimePicker" data-target="tee">
+            <view>
+              <text class="meta-label">开球时间</text>
+              <text class="data-value">{{teeTimeText}}</text>
+            </view>
+            <text class="field-icon">›</text>
+          </view>
+          <view class="inner-row" bindtap="openTimePicker" data-target="deadline">
+            <view>
+              <text class="meta-label">报名截止</text>
+              <text class="data-value">{{deadlineTimeText}}</text>
+            </view>
+            <text class="field-icon">›</text>
+          </view>
+        </view>
+      </view>
+      <view class="content-spacer"></view>
+    </view>
+  </scroll-view>
+
+  <view class="footer">
+    <button class="submit-btn" bindtap="onSubmit">创建系列赛</button>
+  </view>
+
+  <time-wheel-picker
+    show="{{showTimePicker}}"
+    title="{{timePickerTitle}}"
+    year="{{teeYear}}"
+    value="{{teeIndex}}"
+    month-options="{{months}}"
+    day-options="{{days}}"
+    hour-options="{{hours}}"
+    minute-options="{{minutes}}"
+    bind:close="closeTimePicker"
+    bind:change="onTimePickerChange"
+    bind:yearchange="onTimePickerYearChange"
+    bind:confirm="confirmTimePicker"
+  />
+</view>

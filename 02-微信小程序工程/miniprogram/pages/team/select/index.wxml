@@ -1,0 +1,160 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">{{mode === 'create' ? '创建球队' : '选择球队'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 列表模式 -->
+  <block wx:if="{{mode === 'list'}}">
+    <view class="search-bar-wrap">
+      <view class="search-bar">
+        <text class="search-bar__icon">🔍</text>
+        <input
+          class="search-bar__input"
+          type="text"
+          value="{{searchQuery}}"
+          placeholder="搜索球队名称"
+          placeholder-class="search-bar__ph"
+          confirm-type="search"
+          bindinput="handleSearchInput"
+          bindconfirm="handleSearch"
+        />
+        <view wx:if="{{searchQuery}}" bindtap="clearSearch" class="search-bar__clear"><text>×</text></view>
+      </view>
+    </view>
+
+    <scroll-view class="team-scroll" scroll-y>
+      <view class="team-content">
+        <view wx:if="{{selectedTeam}}" class="section">
+          <view class="section-label">
+            <text class="section-label__h2">已选球队</text>
+            <text class="section-note">1 个</text>
+          </view>
+          <view class="ds-card team-selected-chip">
+            <image class="team-selected-chip__logo" src="{{selectedTeam.logo}}" mode="aspectFill"></image>
+            <text class="team-selected-chip__name">{{selectedTeam.name}}</text>
+            <view class="team-selected-chip__remove" catchtap="onClearSelected"><text>×</text></view>
+          </view>
+        </view>
+
+        <view wx:if="{{!showEmptyState}}" class="section">
+          <view class="section-label">
+            <text class="section-label__h2">全部球队</text>
+            <text class="section-note">选择一个球队</text>
+          </view>
+          <view class="team-list">
+            <view
+              wx:for="{{teams}}"
+              wx:key="id"
+              class="ds-card team-row {{item.selected ? 'selected' : ''}}"
+              bindtap="onToggleTeam"
+              data-id="{{item.id}}"
+            >
+              <image class="team-row__logo" src="{{item.logo}}" mode="aspectFill"></image>
+              <view class="team-row__main">
+                <text class="team-row__name">{{item.name}}</text>
+                <text wx:if="{{item.metaText}}" class="team-row__meta">{{item.metaText}}</text>
+              </view>
+              <view class="team-row__check {{item.selected ? 'on' : ''}}">
+                <text wx:if="{{item.selected}}">✓</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{showEmptyState}}" class="team-empty team-empty--center">
+          <view class="team-empty__icon"><text>🛡</text></view>
+          <text class="team-empty__title">未找到球队</text>
+          <text class="team-empty__desc">“{{emptyTerm}}”队目前不存在。</text>
+          <text class="team-empty__desc team-empty__desc-sub">你可以立即创建这个球队。</text>
+          <button class="team-create-btn" bindtap="openCreateTeam">立即创建</button>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="footer">
+      <text class="footer-tip">已选择 <text class="footer-tip__strong">{{selectedTeam ? 1 : 0}}</text> 个球队，至少选择 1 个</text>
+      <button class="submit-btn {{selectedTeam ? '' : 'disabled'}}" bindtap="onConfirm">确认</button>
+    </view>
+  </block>
+
+  <!-- 创建球队子视图 -->
+  <block wx:else>
+    <scroll-view class="team-scroll" scroll-y>
+      <view class="create-content">
+        <view class="ds-card top-line team-form-card">
+          <text class="team-form-label">球队 Logo</text>
+          <view class="team-logo-upload" bindtap="chooseTeamLogo">
+            <block wx:if="{{createForm.logo}}">
+              <image class="team-logo-preview" src="{{createForm.logo}}" mode="aspectFill"></image>
+            </block>
+            <block wx:else>
+              <view class="team-logo-circle"><text>+</text></view>
+              <text class="team-logo-upload__strong">上传 Logo</text>
+              <text class="team-logo-upload__hint">支持 JPG / PNG，建议正方形图片</text>
+            </block>
+          </view>
+        </view>
+
+        <view class="ds-card team-form-card">
+          <text class="team-form-label"><text class="team-required">*</text>球队名称</text>
+          <view class="team-input-wrap">
+            <input
+              class="team-form-input"
+              type="text"
+              value="{{createForm.name}}"
+              maxlength="{{30}}"
+              placeholder="请输入球队名称"
+              bindinput="handleCreateTeamNameInput"
+            />
+            <text class="team-char-count">{{createNameCount}}/30</text>
+          </view>
+        </view>
+
+        <view class="ds-card team-form-card">
+          <text class="team-form-label">球队口号</text>
+          <view class="team-input-wrap">
+            <input
+              class="team-form-input"
+              type="text"
+              value="{{createForm.slogan}}"
+              maxlength="{{50}}"
+              placeholder="请输入球队口号"
+              bindinput="handleCreateSloganInput"
+            />
+            <text class="team-char-count">{{createSloganCount}}/50</text>
+          </view>
+        </view>
+
+        <view class="ds-card team-form-card">
+          <text class="team-form-label">球队描述</text>
+          <view class="team-textarea-wrap">
+            <textarea
+              class="team-form-textarea"
+              value="{{createForm.desc}}"
+              maxlength="{{500}}"
+              placeholder="请输入球队描述，介绍一下你的球队..."
+              bindinput="handleCreateDescInput"
+            ></textarea>
+            <text class="team-char-count team-textarea-count">{{createDescCount}}/500</text>
+          </view>
+        </view>
+
+        <view class="create-content-spacer"></view>
+      </view>
+    </scroll-view>
+
+    <view class="footer">
+      <button class="create-team-btn {{createForm.name ? '' : 'disabled'}}" bindtap="submitCreateTeam">创建球队</button>
+    </view>
+  </block>
+</view>

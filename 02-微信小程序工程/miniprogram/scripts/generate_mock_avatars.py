@@ -7,7 +7,8 @@ import urllib.request
 from PIL import Image, ImageDraw
 
 OUT = Path(__file__).resolve().parent.parent / 'assets' / 'mock-avatars'
-SIZE = 256
+SIZE = 96
+JPEG_QUALITY = 78
 UA = {'User-Agent': 'Mozilla/5.0 (compatible; GolfBuddyMockAvatar/1.0)'}
 
 # Fixed pravatar ids → stable distinct faces (downloaded once, shipped in repo)
@@ -45,14 +46,14 @@ def main():
         url = 'https://i.pravatar.cc/256?img=' + str(pid)
         try:
             img = crop_square(fetch_image(url))
-            out = OUT / ('mock-avatar-%02d.png' % i)
-            img.save(out, 'PNG', optimize=True)
+            out = OUT / ('mock-avatar-%02d.jpg' % i)
+            img.save(out, 'JPEG', quality=JPEG_QUALITY, optimize=True)
             ok += 1
             print('saved', out.name, out.stat().st_size)
         except Exception as e:
             print('skip', url, e)
-    draw_default().save(OUT / 'default-avatar.png', 'PNG', optimize=True)
-    for legacy in OUT.glob('mock-avatar-[0-9].png'):
+    draw_default().save(OUT / 'default-avatar.jpg', 'JPEG', quality=JPEG_QUALITY, optimize=True)
+    for legacy in OUT.glob('mock-avatar-[0-9].*'):
         legacy.unlink(missing_ok=True)
     print('done:', ok, 'portraits + default in', OUT)
 
