@@ -9,6 +9,7 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const groupsStore = require('../../../utils/groupsStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
+const partnerConfigUtil = require('../../../utils/partnerConfig.js');
 
 /* ===== 讨论区 ===== */
 const WATCHERS = [
@@ -93,6 +94,9 @@ Page({
     // 讨论区聊天数据：传入统一 discussion 组件（聊天/输入/表情逻辑全部由组件承载）
     chat: CHAT,
 
+    partnerConfig: partnerConfigUtil.createDefaultPartnerConfig('GOLF BROTHERS'),
+    partnerLogoRows: [],
+
     // 弹层
     showMoreSheet: false,
     moreFabExpanded: false,
@@ -116,6 +120,15 @@ Page({
     this.loadScoreDisplayMode();
     this.refreshGroupsDerived();
     this.applyMoreAccess();
+    this.refreshPartnerSection();
+  },
+
+  refreshPartnerSection() {
+    const cfg = partnerConfigUtil.loadPartnerConfig('GOLF BROTHERS');
+    this.setData({
+      partnerConfig: cfg,
+      partnerLogoRows: partnerConfigUtil.buildPartnerLogoRows(cfg.partnerLogos)
+    });
   },
 
   // 读取记分页记忆的显示偏好（与记分页同一缓存键，逐洞详情据此显示总杆/杆差）
@@ -141,6 +154,7 @@ Page({
     this.loadScoreDisplayMode();
     // 出发表 groups 可能在记分页被更新 → 重算出发表视图与领先榜（均派生自 groups）
     this.refreshGroupsDerived();
+    this.refreshPartnerSection();
     // 已展开的逐洞详情同步刷新（成绩/模式可能变化）
     this.updateOpenScorecard();
     // 若返回时仍停留在出发表，重建视口观察器（onHide 会解绑）

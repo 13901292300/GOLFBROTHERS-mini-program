@@ -189,9 +189,12 @@
               </view>
               <view class="ds-card-club-main">
                 <view class="ds-card-club__head">
-                  <view class="ds-card-club__avatar-col">
+                  <view class="ds-card-club__avatar-col {{item.statusLabel ? 'has-status-label' : ''}}">
                     <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
                       <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
+                    </view>
+                    <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag">
+                      <text class="ds-badge badge-gold">{{item.statusLabel}}</text>
                     </view>
                   </view>
                   <view class="ds-card-club__content">

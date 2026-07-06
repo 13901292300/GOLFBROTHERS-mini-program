@@ -4,6 +4,7 @@ const matchStateUtil = require('../../utils/matchState.js');
 const gameProgress = require('../../utils/gameProgress.js');
 const quickCreate = require('../../utils/quickCreate.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
+const teamMatchStore = require('../../utils/teamMatchStore.js');
 
 function formatGameDate(ts) {
   const d = ts ? new Date(ts) : new Date();
@@ -221,10 +222,13 @@ Page({
     });
     // 保存静态种子卡片，便于每次刷新时把「进行中 GAME」拼接到最前
     this._baseMyCards = this.data.myCards.slice();
+    this._baseTournamentCards = this.data.tournamentCards.slice();
     this.initHeaderNav();
     this.initGlobalTheme();
     if (options && options.section === 'profile') {
       this.showProfileSection();
+    } else if (options && options.section === 'tournament') {
+      this.showTournamentSection();
     } else if (options && options.tab === 'my') {
       // 记分页返回：自动定位到首页「我的 TAB」
       this.showHomeSection();
@@ -393,7 +397,14 @@ Page({
     });
     this.setHeroTabsVisible(true);
     this.hideMainContents();
-    this.setData({ showTournamentContent: true });
+    const myCards = teamMatchStore.listMatches()
+      .map(teamMatchStore.toTournamentCard)
+      .filter(Boolean);
+    this._myTournamentCards = myCards;
+    this.setData({
+      showTournamentContent: true,
+      tournamentCards: myCards
+    });
     this.setTabActive('primary');
     this.setBottomNavActive('tournament');
   },
@@ -434,7 +445,15 @@ Page({
         this.setData({ showMyContent: true });
       }
     } else if (section === 'tournament') {
-      this.setData({ showTournamentContent: true });
+      const cards = which === 'secondary'
+        ? (this._baseTournamentCards || [])
+        : (this._myTournamentCards || teamMatchStore.listMatches()
+          .map(teamMatchStore.toTournamentCard)
+          .filter(Boolean));
+      this.setData({
+        showTournamentContent: true,
+        tournamentCards: cards
+      });
     } else if (section === 'profile') {
       this.setData({ showProfileContent: true });
       if (which === 'secondary') {

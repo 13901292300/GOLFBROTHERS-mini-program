@@ -1,5 +1,7 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
+const partnerConfigUtil = require('../../../utils/partnerConfig.js');
+const teamMatchStore = require('../../../utils/teamMatchStore.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -47,6 +49,79 @@ const RECOMMENDED_EVENT_INFO = [
 const EVENT_INFO_ROW_GAP_RPX = 16;
 const EVENT_INFO_ROW_HEIGHT_RPX = 128;
 const EVENT_INFO_ROW_STEP_RPX = EVENT_INFO_ROW_HEIGHT_RPX + EVENT_INFO_ROW_GAP_RPX;
+
+const EMPTY_TEAM_LABEL = '请选择球队';
+const EMPTY_TEAM_LOGO = '/assets/mock-avatars/default-avatar.jpg';
+
+const DEFAULT_FEE_LIST = [
+  { id: 1, name: '正式队员', amount: '0' },
+  { id: 2, name: '嘉宾', amount: '0' }
+];
+
+const DEFAULT_TEAM_GROUPS = [
+  { id: 1, renderKey: 'team-group-1', name: '正式队员' },
+  { id: 2, renderKey: 'team-group-2', name: '嘉宾' }
+];
+const ROUND_NAME_SUFFIX = '月例赛';
+
+const DEFAULT_EVENT_SPONSOR_IMAGE_1 = '/assets/partners/partner-g-one-golf.png';
+const DEFAULT_EVENT_SPONSOR_IMAGE_2 = '/assets/partners/partner-vivata-1872.png';
+const DEFAULT_EVENT_RULES_TEXT =
+  '本次比赛采用国际高尔夫球联合会最新颁布的《高尔夫球规则》以及竞赛委员会制定的"比赛条件"和"当地规则"。比赛为单轮18洞个人比杆赛。';
+const DEFAULT_EVENT_NOTICE_TEXT =
+  '参赛球员需在开球前30分钟到达签到处领取记分卡，并准时在指定发球台出发。比赛过程中请保持良好的礼仪及球场速度。';
+
+function createDefaultEventInfoList() {
+  return [
+    {
+      id: 'evt-default-1',
+      title: '广告图片1',
+      type: 'image',
+      content: '',
+      imageData: DEFAULT_EVENT_SPONSOR_IMAGE_1,
+      status: '已设置'
+    },
+    {
+      id: 'evt-default-2',
+      title: '赛事规则',
+      type: 'text',
+      content: DEFAULT_EVENT_RULES_TEXT,
+      imageData: '',
+      status: '已设置'
+    },
+    {
+      id: 'evt-default-3',
+      title: '广告图片2',
+      type: 'image',
+      content: '',
+      imageData: DEFAULT_EVENT_SPONSOR_IMAGE_2,
+      status: '已设置'
+    },
+    {
+      id: 'evt-default-4',
+      title: '参赛须知',
+      type: 'text',
+      content: DEFAULT_EVENT_NOTICE_TEXT,
+      imageData: '',
+      status: '已设置'
+    }
+  ];
+}
+
+function buildEventTitleMapForList(list) {
+  const map = {};
+  (list || []).forEach((item) => {
+    if (item && item.title) map[item.title] = true;
+  });
+  return map;
+}
+
+const DEFAULT_EVENT_INFO_LIST = createDefaultEventInfoList();
+
+function buildDefaultRoundName(teamName) {
+  const name = String(teamName || '').trim();
+  return name ? name + ROUND_NAME_SUFFIX : '';
+}
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -102,12 +177,12 @@ Page({
     pageEyebrow: 'CREATE',
     pageTitle: '队内赛创建',
 
-    teamId: '1',
-    teamName: '北京湘鹰高尔夫俱乐部',
-    teamLogo: mockAvatars.pickMockAvatar('北京湘鹰高尔夫俱乐部'),
-    teamRole: '超级管理员',
+    teamId: '',
+    teamName: EMPTY_TEAM_LABEL,
+    teamLogo: EMPTY_TEAM_LOGO,
+    teamRole: '',
 
-    roundName: '北京湘鹰高尔夫俱乐部队内赛',
+    roundName: '',
     courseName: '',
     courseId: '',
     courseLocation: '',
@@ -126,29 +201,27 @@ Page({
     teamGroupMode: 'free',
     teamGroupSheetDesc: TEAM_GROUP_DESC_DEFAULT,
 
-    teamGroups: [
-      { id: 1, renderKey: 'team-group-1', name: '北京湘鹰高尔夫俱乐部' },
-      { id: 2, renderKey: 'team-group-2', name: '嘉宾' }
-    ],
+    teamGroups: DEFAULT_TEAM_GROUPS.map((item) => Object.assign({}, item)),
     draftTeamGroups: [],
     showTeamGroupSheet: false,
     nextTeamGroupId: 3,
-    teamGroupSummary: '北京湘鹰高尔夫俱乐部 / 嘉宾',
-    feeList: [],
+    teamGroupSummary: '正式队员 / 嘉宾',
+    feeList: DEFAULT_FEE_LIST.slice(),
     draftFeeList: [],
     showFeeSheet: false,
-    nextFeeId: 1,
+    nextFeeId: 3,
     isDiamondMode: false,
-    feeSet: false,
+    feeSet: true,
 
     groupPermission: 'admin',
 
-    eventInfoList: [],
-    eventInfoSortAreaHeight: '0rpx',
+    eventInfoList: DEFAULT_EVENT_INFO_LIST.slice(),
+    eventInfoSortAreaHeight:
+      (DEFAULT_EVENT_INFO_LIST.length * EVENT_INFO_ROW_STEP_RPX - EVENT_INFO_ROW_GAP_RPX) + 'rpx',
     eventInfoDragPositions: [],
     eventInfoDraggingId: '',
     recommendedEventInfo: RECOMMENDED_EVENT_INFO,
-    eventTitleAddedMap: {},
+    eventTitleAddedMap: buildEventTitleMapForList(DEFAULT_EVENT_INFO_LIST),
 
     showAddEventInfoSheet: false,
     showEventDetailSheet: false,
@@ -178,6 +251,8 @@ Page({
     },
     showLogoSheet: false,
 
+    partnerConfig: partnerConfigUtil.createDefaultPartnerConfig(''),
+
     showGameModeSheet: false,
     showTimePicker: false,
     showTimeWheel: false,
@@ -197,6 +272,7 @@ Page({
   },
 
   onLoad() {
+    this._roundNameManual = false;
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
 
@@ -205,6 +281,7 @@ Page({
     this._editingTime = Object.assign({}, this._tee);
     this._activeTimeTarget = 'tee';
     this._freeModeTeamGroups = this._cloneTeamGroups(this.data.teamGroups);
+    this.setData(this._buildEventInfoSortMeta(this.data.eventInfoList));
   },
 
   onShow() {
@@ -234,7 +311,33 @@ Page({
   noop() {},
 
   onRoundNameInput(e) {
+    this._roundNameManual = true;
     this.setData({ roundName: e.detail.value });
+  },
+
+  _hasSelectedTeam() {
+    return !!String(this.data.teamId || '').trim();
+  },
+
+  _applySelectedTeam(payload) {
+    if (!payload) return;
+    const hadTeam = this._hasSelectedTeam();
+    const prevTeamName = hadTeam ? this.data.teamName : '';
+    const prevDefaultTitle = partnerConfigUtil.buildPartnerTitle(prevTeamName);
+    const currentTitle = String((this.data.partnerConfig && this.data.partnerConfig.partnerTitle) || '').trim();
+    const updates = {
+      teamId: payload.teamId || '',
+      teamName: payload.teamName || '',
+      teamLogo: payload.teamLogo || mockAvatars.pickMockAvatar(payload.teamName || ''),
+      teamRole: payload.teamRole || ''
+    };
+    if (!hadTeam || !currentTitle || currentTitle === prevDefaultTitle) {
+      updates['partnerConfig.partnerTitle'] = partnerConfigUtil.buildPartnerTitle(payload.teamName);
+    }
+    if (!this._roundNameManual) {
+      updates.roundName = buildDefaultRoundName(payload.teamName);
+    }
+    this.setData(updates);
   },
 
   onSelectTeam() {
@@ -242,13 +345,7 @@ Page({
       url: '/pages/team/select/index?selectedId=' + (this.data.teamId || ''),
       events: {
         teamSelected: (payload) => {
-          if (!payload) return;
-          this.setData({
-            teamId: payload.teamId || '',
-            teamName: payload.teamName || '',
-            teamLogo: payload.teamLogo || '',
-            teamRole: payload.teamRole || ''
-          });
+          this._applySelectedTeam(payload);
         }
       },
       fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
@@ -294,10 +391,7 @@ Page({
   },
 
   _defaultTeamGroups() {
-    return [
-      { id: 1, renderKey: 'team-group-1', name: this.data.teamName || '球队' },
-      { id: 2, renderKey: 'team-group-2', name: '嘉宾' }
-    ];
+    return DEFAULT_TEAM_GROUPS.map((item) => Object.assign({}, item));
   },
 
   _matchPlayTeamGroups(preserveNames) {
@@ -949,6 +1043,38 @@ Page({
     });
   },
 
+  onPartnerTitleInput(e) {
+    this.setData({ 'partnerConfig.partnerTitle': e.detail.value });
+  },
+
+  choosePartnerLogo() {
+    const logos = (this.data.partnerConfig && this.data.partnerConfig.partnerLogos) || [];
+    if (logos.length >= partnerConfigUtil.MAX_PARTNER_LOGOS) {
+      wx.showToast({ title: '最多上传 8 张', icon: 'none' });
+      return;
+    }
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0];
+        if (!file || !file.tempFilePath) return;
+        const next = logos.concat([file.tempFilePath]);
+        this.setData({ 'partnerConfig.partnerLogos': next });
+      }
+    });
+  },
+
+  removePartnerLogo(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (Number.isNaN(idx)) return;
+    const logos = ((this.data.partnerConfig && this.data.partnerConfig.partnerLogos) || []).slice();
+    logos.splice(idx, 1);
+    this.setData({ 'partnerConfig.partnerLogos': logos });
+  },
+
   openGameModeSheet() {
     this.setData({ showGameModeSheet: true });
   },
@@ -1100,6 +1226,35 @@ Page({
   },
 
   onSubmit() {
-    wx.showToast({ title: '创建功能开发中', icon: 'none' });
+    if (!String(this.data.courseName || '').trim()) {
+      wx.showModal({
+        title: '提示',
+        content: '请选择比赛球场',
+        showCancel: false,
+        confirmText: '确认'
+      });
+      return;
+    }
+
+    partnerConfigUtil.savePartnerConfig(this.data.partnerConfig, this.data.teamName);
+
+    const match = teamMatchStore.buildMatchFromCreatePage(this.data);
+    teamMatchStore.saveMatch(match);
+
+    wx.showModal({
+      title: '提示',
+      content: '创建比赛成功，请到赛事菜单查看',
+      showCancel: false,
+      confirmText: '确认',
+      success: (res) => {
+        if (!res.confirm) return;
+        wx.redirectTo({
+          url: '/pages/home/index?section=tournament',
+          fail: () => {
+            wx.reLaunch({ url: '/pages/home/index?section=tournament' });
+          }
+        });
+      }
+    });
   }
 });

@@ -20,10 +20,10 @@
       <view class="section-label"><text class="section-label__h2">球队设置</text></view>
       <view class="ds-card top-line team-card" bindtap="onSelectTeam">
         <view class="team-left">
-          <image class="team-logo" src="{{teamLogo}}" mode="aspectFill"></image>
+          <image wx:if="{{teamId}}" class="team-logo" src="{{teamLogo}}" mode="aspectFill"></image>
           <view class="field-main">
-            <text class="team-title">{{teamName}}</text>
-            <text class="ds-badge badge-gold">{{teamRole}}</text>
+            <text class="{{teamId ? 'team-title' : 'field-placeholder'}}">{{teamName}}</text>
+            <text wx:if="{{teamId && teamRole}}" class="ds-badge badge-gold">{{teamRole}}</text>
           </view>
         </view>
         <text class="field-icon">›</text>
@@ -245,6 +245,44 @@
         </view>
         <view class="field-right">
           <text class="field-icon">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- PARTNER 配置 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">PARTNER 配置</text></view>
+      <view class="ds-card partner-config-card">
+        <text class="partner-config-desc ds-desc-text">用于赛事详情 TAB 底部合作伙伴展示</text>
+        <view class="partner-config-row">
+          <text class="partner-config-label">展示标题</text>
+          <input
+            class="partner-title-input"
+            value="{{partnerConfig.partnerTitle}}"
+            maxlength="40"
+            placeholder="例如：北京湘鹰高尔夫俱乐部 Partner"
+            bindinput="onPartnerTitleInput"
+          />
+        </view>
+        <view class="partner-logo-grid">
+          <view
+            wx:for="{{partnerConfig.partnerLogos}}"
+            wx:key="*this"
+            class="partner-logo-item"
+          >
+            <image class="partner-logo-img" src="{{item}}" mode="aspectFit" />
+            <view class="partner-logo-remove" catchtap="removePartnerLogo" data-index="{{index}}">
+              <text>×</text>
+            </view>
+          </view>
+          <view
+            wx:if="{{partnerConfig.partnerLogos.length < 8}}"
+            class="partner-logo-add"
+            bindtap="choosePartnerLogo"
+          >
+            <text class="partner-logo-add__icon">+</text>
+            <text class="partner-logo-add__text">上传 Logo</text>
+          </view>
         </view>
       </view>
     </view>
@@ -532,7 +570,7 @@
           wx:if="{{eventDetailDraft.imageData}}"
           class="event-detail-image-preview"
           src="{{eventDetailDraft.imageData}}"
-          mode="aspectFill"
+          mode="widthFix"
         ></image>
       </view>
     </block>
