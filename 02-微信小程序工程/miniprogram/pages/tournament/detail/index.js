@@ -11,6 +11,8 @@ const matchStateUtil = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const gameStore = require('../../../utils/gameStore.js');
+const userProfileStore = require('../../../utils/userProfileStore.js');
 
 /* ===== 赛事详情页 match 视图对象（顶部信息区数据框架） ===== */
 const MATCH_TYPE_LABELS = {
@@ -124,6 +126,28 @@ const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
 const FAB_EDGE_GAP_RPX = 10;
 
+const DEFAULT_REGISTER_GROUPS = [
+  { id: 'team-group-1', name: '正式队员' },
+  { id: 'team-group-2', name: '嘉宾' }
+];
+
+const EMPTY_REGISTER_INFO = {
+  totalCount: 0,
+  users: []
+};
+
+const EMPTY_CURRENT_USER_REGISTER_STATUS = {
+  isRegistered: false,
+  groupId: '',
+  groupName: ''
+};
+
+const EMPTY_REGISTER_PERMISSION = {
+  registerStatus: 'closed',
+  isOpen: false,
+  reason: ''
+};
+
 Page({
   data: {
     themeClass: 'bright-mode',
@@ -138,6 +162,9 @@ Page({
     isStickyWatchers: false,
     watchersOffsetTop: 0,
     stickyWatchersTop: 142,
+    isStickyRegisterExt: false,
+    registerExtOffsetTop: 0,
+    stickyRegisterExtTop: 142,
     tabShowLeftIndicator: false,
     tabShowRightIndicator: false,
     tabHScrollLeft: 0,
@@ -153,6 +180,25 @@ Page({
     match: EMPTY_MATCH_VIEW,
     matchStatus: EMPTY_MATCH_LIFECYCLE,
     eventInfoList: [],
+
+    // 报名 TAB（结构占位，暂无报名业务）
+    registerInfo: EMPTY_REGISTER_INFO,
+    registerTotalCount: 0,
+    registerSubTabs: [],
+    activeRegisterSubTab: '',
+    registerDisplayUsers: [],
+    currentUserRegisterStatus: EMPTY_CURRENT_USER_REGISTER_STATUS,
+    registerPermission: Object.assign({}, EMPTY_REGISTER_PERMISSION),
+    // 报名名单卡片动态高度（px，随设备/尺寸计算；0 表示尚未计算，样式回退）
+    rosterMinHeight: 0,
+    // 报名弹窗（立即报名流程：分组选择 + 比赛名 + 手机号）
+    registerSheetVisible: false,
+    registerCompetitionNameDraft: '',
+    registerSheetGroupId: '',
+    registerPhone: '',
+    registerSubmitting: false,
+    registerCancelModalVisible: false,
+    registerCancelSubmitting: false,
 
     // 领先榜
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
@@ -208,7 +254,7 @@ Page({
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
-    this.setData({
+    this.setData(Object.assign({
       matchId: matchId,
       match: this._mapMatchToView(match),
       matchStatus: lifecycle,
@@ -216,7 +262,7 @@ Page({
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
       activeTab: tabs[0].id,
       eventInfoList: this._resolveEventInfoList(match)
-    });
+    }, this._buildRegisterStatePatch(match)));
   },
 
   // 赛事生命周期：读取 teamMatchStore.match.status，归一化为 registering | ongoing | completed
@@ -316,6 +362,285 @@ Page({
     }));
   },
 
+  _resolveRegisterSubTabs(match, registerInfo) {
+    const source = match && Array.isArray(match.teamGroups) && match.teamGroups.length
+      ? match.teamGroups
+      : DEFAULT_REGISTER_GROUPS;
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    return source.map((group, index) => {
+      const name = String((group && group.name) || '').trim() || ('分组' + (index + 1));
+      const id = group && group.id != null ? String(group.id) : ('register-group-' + (index + 1));
+      const count = users.filter((user) => String(user.groupId) === id).length;
+      return {
+        id: id,
+        name: name,
+        count: count,
+        label: name + '(' + count + ')'
+      };
+    });
+  },
+
+  _resolveRegisterInfo(match) {
+    if (!match || !match.registerInfo) return Object.assign({}, EMPTY_REGISTER_INFO);
+    const info = match.registerInfo || {};
+    const users = Array.isArray(info.users)
+      ? info.users.map((user) => ({
+        userId: user && user.userId ? String(user.userId) : '',
+        // 赛事显示名唯一来源 competitionName；兼容旧数据回退 nickname
+        competitionName: user && user.competitionName ? String(user.competitionName) : (user && user.nickname ? String(user.nickname) : ''),
+        avatar: user && user.avatar ? String(user.avatar) : '',
+        phone: user && user.phone ? String(user.phone) : '',
+        groupId: user && user.groupId != null ? String(user.groupId) : '',
+        groupName: user && user.groupName ? String(user.groupName) : '',
+        registeredAt: user && user.registeredAt != null ? user.registeredAt : ''
+      }))
+      : [];
+    const totalCount = info.totalCount != null ? Number(info.totalCount) : users.length;
+    return {
+      totalCount: Number.isFinite(totalCount) ? totalCount : users.length,
+      users: users
+    };
+  },
+
+  _filterRegisterUsers(registerInfo, activeRegisterSubTab) {
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    const groupId = String(activeRegisterSubTab || '');
+    if (!groupId) return [];
+    return users
+      .filter((user) => String(user.groupId) === groupId)
+      .map((user, index) => ({
+        listKey: user.userId || ('register-user-' + groupId + '-' + index),
+        userId: user.userId || '',
+        competitionName: user.competitionName || '',
+        avatar: user.avatar || '',
+        phone: user.phone || '',
+        groupId: user.groupId || '',
+        groupName: user.groupName || '',
+        registeredAt: user.registeredAt != null ? user.registeredAt : ''
+      }));
+  },
+
+  _resolveCurrentUserRegisterStatus(registerInfo) {
+    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '');
+    if (!currentUserId) return Object.assign({}, EMPTY_CURRENT_USER_REGISTER_STATUS);
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    const matched = users.find((user) => String(user.userId) === currentUserId);
+    if (!matched) return Object.assign({}, EMPTY_CURRENT_USER_REGISTER_STATUS);
+    return {
+      isRegistered: true,
+      groupId: matched.groupId != null ? String(matched.groupId) : '',
+      groupName: matched.groupName ? String(matched.groupName) : ''
+    };
+  },
+
+  switchRegisterSubTab(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id || id === this.data.activeRegisterSubTab) return;
+    this.setData({
+      activeRegisterSubTab: id,
+      registerDisplayUsers: this._filterRegisterUsers(this.data.registerInfo, id)
+    });
+  },
+
+  /**
+   * 依据 match 重建报名相关的页面数据（loadMatch 与报名成功后共用）
+   * @param {object} match teamMatchStore 中的赛事对象
+   * @param {string} preferredSubTab 期望保持选中的分组 id（可选）
+   */
+  _buildRegisterStatePatch(match, preferredSubTab) {
+    const registerInfo = this._resolveRegisterInfo(match);
+    const registerSubTabs = this._resolveRegisterSubTabs(match, registerInfo);
+    let activeRegisterSubTab = '';
+    if (preferredSubTab && registerSubTabs.some((tab) => tab.id === preferredSubTab)) {
+      activeRegisterSubTab = preferredSubTab;
+    } else if (registerSubTabs.length) {
+      activeRegisterSubTab = registerSubTabs[0].id;
+    }
+    return {
+      registerInfo: registerInfo,
+      registerTotalCount: registerInfo.totalCount,
+      registerSubTabs: registerSubTabs,
+      activeRegisterSubTab: activeRegisterSubTab,
+      registerDisplayUsers: this._filterRegisterUsers(registerInfo, activeRegisterSubTab),
+      currentUserRegisterStatus: this._resolveCurrentUserRegisterStatus(registerInfo),
+      registerPermission: this._resolveRegisterPermission(match)
+    };
+  },
+
+  /**
+   * 报名开关判断（registerStatus 优先于用户报名状态；deadlineTime 不参与权限）
+   */
+  _resolveRegisterPermission(match) {
+    if (!match) {
+      return { registerStatus: 'closed', isOpen: false, reason: '报名已关闭' };
+    }
+    const registerStatus = String(match.registerStatus || 'open').trim().toLowerCase();
+    if (registerStatus === 'closed') {
+      return { registerStatus: 'closed', isOpen: false, reason: '报名已关闭' };
+    }
+    return { registerStatus: 'open', isOpen: true, reason: '' };
+  },
+
+  /* ===== 立即报名流程：分组选择 + 比赛名 + 手机号 ===== */
+  openRegisterSheet() {
+    if (!this.data.registerPermission.isOpen) return;
+    if (this.data.currentUserRegisterStatus.isRegistered) return;
+    const profile = userProfileStore.loadProfile();
+    const user = gameStore.getCurrentUser() || {};
+    const subTabs = this.data.registerSubTabs || [];
+    this.setData({
+      registerSheetVisible: true,
+      registerSheetGroupId: subTabs.length ? subTabs[0].id : '',
+      registerCompetitionNameDraft: userProfileStore.getRegisterCompetitionNameDefault(profile),
+      registerPhone: user.phone ? String(user.phone) : ''
+    });
+  },
+
+  closeRegisterSheet() {
+    this.setData({ registerSheetVisible: false });
+  },
+
+  selectRegisterSheetGroup(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    this.setData({ registerSheetGroupId: id });
+  },
+
+  onRegisterCompetitionNameInput(e) {
+    this.setData({ registerCompetitionNameDraft: e.detail.value || '' });
+  },
+
+  confirmRegister() {
+    if (this.data.registerSubmitting) return;
+    if (this.data.currentUserRegisterStatus.isRegistered) {
+      this.setData({ registerSheetVisible: false });
+      return;
+    }
+
+    // 1. 分组必选
+    const groupId = String(this.data.registerSheetGroupId || '');
+    const selectedGroup = (this.data.registerSubTabs || []).find((tab) => tab.id === groupId);
+    if (!selectedGroup) {
+      wx.showToast({ title: '请选择报名分组', icon: 'none' });
+      return;
+    }
+
+    // 2. 最终比赛名（以用户最终输入为准），有变化则写回 competitionName
+    const competitionName = userProfileStore.resolveRegisterCompetitionName(this.data.registerCompetitionNameDraft);
+    if (!competitionName) {
+      wx.showToast({ title: '请输入比赛名', icon: 'none' });
+      return;
+    }
+    const profile = userProfileStore.loadProfile();
+    if (competitionName !== (profile.competitionName || '')) {
+      userProfileStore.setCompetitionName(competitionName);
+    }
+
+    // 3. 读取最新赛事对象，写入 registerInfo.users
+    const match = teamMatchStore.getMatchById(this.data.matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    const userId = String(user.userId || '');
+    if (!userId) {
+      wx.showToast({ title: '用户信息缺失', icon: 'none' });
+      return;
+    }
+
+    this.setData({ registerSubmitting: true });
+
+    if (!match.registerInfo || typeof match.registerInfo !== 'object') {
+      match.registerInfo = { totalCount: 0, users: [] };
+    }
+    if (!Array.isArray(match.registerInfo.users)) {
+      match.registerInfo.users = [];
+    }
+    // 防重：同一 userId 不重复写入
+    const already = match.registerInfo.users.some((item) => String(item && item.userId) === userId);
+    if (!already) {
+      match.registerInfo.users.push({
+        userId: userId,
+        competitionName: competitionName,
+        avatar: user.avatar ? String(user.avatar) : '',
+        phone: this.data.registerPhone ? String(this.data.registerPhone) : (user.phone ? String(user.phone) : ''),
+        groupId: groupId,
+        groupName: selectedGroup.name || '',
+        registeredAt: Date.now()
+      });
+    }
+    // 4. 更新总人数
+    match.registerInfo.totalCount = match.registerInfo.users.length;
+
+    // 5. 持久化
+    teamMatchStore.saveMatch(match);
+
+    // 6. 刷新页面数据（保持当前用户所在分组选中）
+    const patch = this._buildRegisterStatePatch(match, groupId);
+    patch.registerSheetVisible = false;
+    patch.registerSubmitting = false;
+    this.setData(patch, () => {
+      if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+    });
+    wx.showToast({ title: '报名成功', icon: 'success' });
+  },
+
+  /* ===== 取消报名流程 ===== */
+  openCancelRegisterModal() {
+    if (!this.data.registerPermission.isOpen) return;
+    if (!this.data.currentUserRegisterStatus.isRegistered) return;
+    this.setData({ registerCancelModalVisible: true });
+  },
+
+  closeCancelRegisterModal() {
+    this.setData({ registerCancelModalVisible: false });
+  },
+
+  confirmCancelRegister() {
+    if (this.data.registerCancelSubmitting) return;
+    if (!this.data.currentUserRegisterStatus.isRegistered) {
+      this.setData({ registerCancelModalVisible: false });
+      return;
+    }
+
+    const match = teamMatchStore.getMatchById(this.data.matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    const userId = String(user.userId || '');
+    if (!userId) {
+      wx.showToast({ title: '用户信息缺失', icon: 'none' });
+      return;
+    }
+
+    this.setData({ registerCancelSubmitting: true });
+
+    if (!match.registerInfo || typeof match.registerInfo !== 'object') {
+      match.registerInfo = { totalCount: 0, users: [] };
+    }
+    if (!Array.isArray(match.registerInfo.users)) {
+      match.registerInfo.users = [];
+    }
+
+    match.registerInfo.users = match.registerInfo.users.filter(
+      (item) => String(item && item.userId) !== userId
+    );
+    match.registerInfo.totalCount = match.registerInfo.users.length;
+
+    teamMatchStore.saveMatch(match);
+
+    const patch = this._buildRegisterStatePatch(match, this.data.activeRegisterSubTab);
+    patch.registerCancelModalVisible = false;
+    patch.registerCancelSubmitting = false;
+    this.setData(patch, () => {
+      if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+    });
+    wx.showToast({ title: '已取消报名', icon: 'success' });
+  },
+
   refreshPartnerSection() {
     const cfg = partnerConfigUtil.loadPartnerConfig('GOLF BROTHERS');
     this.setData({
@@ -359,6 +684,7 @@ Page({
     wx.nextTick(() => this.updateTabContentSpacer());
     wx.nextTick(() => this.measureTabOverflow());
     if (this.data.activeTab === 'discussion') wx.nextTick(() => this.measureWatchersTop());
+    if (this.data.activeTab === 'register') wx.nextTick(() => this.measureRegisterExtTop());
     wx.nextTick(() => this._refreshFabHitZones());
   },
 
@@ -369,6 +695,13 @@ Page({
 
   onUnload() {
     this.disconnectTeeObserver();
+  },
+
+  onResize() {
+    this.measureTabTop();
+    if (this.data.activeTab === 'register') {
+      wx.nextTick(() => this.computeRosterMinHeight());
+    }
   },
 
   _initMoreFab() {
@@ -462,7 +795,8 @@ Page({
       headerRootStyle: header.headerRootStyle,
       headerBarStyle: header.headerBarStyle,
       headerTotalHeight,
-      stickyWatchersTop: headerTotalHeight + tabBarHeight
+      stickyWatchersTop: headerTotalHeight + tabBarHeight,
+      stickyRegisterExtTop: headerTotalHeight + tabBarHeight
     });
   },
 
@@ -488,11 +822,13 @@ Page({
             if (tabRect.height > 0) {
               patch.tabBarHeight = tabRect.height;
               patch.stickyWatchersTop = (this.data.headerTotalHeight || 0) + tabRect.height;
+              patch.stickyRegisterExtTop = (this.data.headerTotalHeight || 0) + tabRect.height;
             }
             this.setData(patch);
             this._syncStickyByScroll(scrollOff.scrollTop || 0);
             this.updateTabContentSpacer();
             if (this.data.activeTab === 'discussion') this.measureWatchersTop();
+            if (this.data.activeTab === 'register') this.measureRegisterExtTop();
             wx.nextTick(() => this.measureTabOverflow());
           }
         }
@@ -568,6 +904,70 @@ Page({
     });
   },
 
+  // 测量报名扩展区相对滚动内容顶部的偏移，用于二级吸顶（紧贴 TAB 下方）
+  /**
+   * 计算报名名单卡片的动态最小高度：
+   * rosterMinHeight = 窗口高 - HEADER - 主TAB - 报名二级TAB - 底部CTA(含safe-area) - 必要间距
+   * 无 CTA 时以底部 safe-area 兜底；使名单卡片底部刚好落在 CTA 上方，并保证内容足以触发主 TAB 吸顶。
+   */
+  computeRosterMinHeight() {
+    if (this.data.activeTab !== 'register') return;
+    let sys = { windowWidth: 375, windowHeight: 667 };
+    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    const winH = sys.windowHeight || 667;
+    const rpx2px = (sys.windowWidth || 375) / 750;
+    let safeBottom = 0;
+    if (sys.safeArea && typeof sys.screenHeight === 'number') {
+      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
+    }
+    this.createSelectorQuery()
+      .in(this)
+      .select('.gb-header').boundingClientRect()
+      .select('.tab-scroll-wrap--inflow').boundingClientRect()
+      .select('.register-ext-wrap--inflow').boundingClientRect()
+      .select('.register-cta-bar').boundingClientRect()
+      .exec((res) => {
+        res = res || [];
+        const headerH = res[0] && res[0].height ? res[0].height : (this.data.headerTotalHeight || 92);
+        const mainTabH = res[1] && res[1].height ? res[1].height : (this.data.tabBarHeight || 50);
+        const extH = res[2] && res[2].height ? res[2].height : 116 * rpx2px;
+        const ctaH = res[3] && res[3].height ? res[3].height : 0;
+        // CTA 的高度已包含其自身 safe-area 内边距；无 CTA 时用 safeBottom 兜底避让底部
+        const bottomReserve = ctaH > 0 ? ctaH : safeBottom;
+        const gap = 40 * rpx2px; // 必要上下间距（对齐 detail-main 顶部内边距）
+        let h = winH - headerH - mainTabH - extH - bottomReserve - gap;
+        if (!(h > 0)) h = 0;
+        h = Math.round(h);
+        if (h !== this.data.rosterMinHeight) this.setData({ rosterMinHeight: h });
+      });
+  },
+
+  measureRegisterExtTop() {
+    if (this.data.activeTab !== 'register') return;
+    this.computeRosterMinHeight();
+    wx.nextTick(() => {
+      this.createSelectorQuery()
+        .select('.register-ext-wrap--inflow')
+        .boundingClientRect()
+        .select('.detail-scroll')
+        .boundingClientRect()
+        .select('.detail-scroll')
+        .scrollOffset()
+        .exec((res) => {
+          const extRect = res && res[0];
+          const scrollRect = res && res[1];
+          const scrollOff = res && res[2];
+          if (extRect && scrollRect && scrollOff && extRect.height > 0) {
+            const top = extRect.top - scrollRect.top + scrollOff.scrollTop;
+            if (top > 0) {
+              this.setData({ registerExtOffsetTop: top });
+              this._syncStickyRegisterExtByScroll(scrollOff.scrollTop || 0);
+            }
+          }
+        });
+    });
+  },
+
   // 内容不足时注入底部 spacer，保证外层 scroll 仍可继续上滑到 sticky 触发点
   updateTabContentSpacer() {
     const tab = this.data.activeTab;
@@ -620,6 +1020,10 @@ Page({
     if (watchersSticky !== this.data.isStickyWatchers) {
       patch.isStickyWatchers = watchersSticky;
     }
+    const registerExtSticky = this._calcStickyRegisterExt(scrollTop, sticky);
+    if (registerExtSticky !== this.data.isStickyRegisterExt) {
+      patch.isStickyRegisterExt = registerExtSticky;
+    }
     if (patch.isStickyTab === true && !this.data.isStickyTab) {
       patch.tabHScrollLeft = this._lastTabScrollLeft || 0;
     }
@@ -638,6 +1042,21 @@ Page({
     const sticky = this._calcStickyWatchers(scrollTop, this.data.isStickyTab);
     if (sticky !== this.data.isStickyWatchers) {
       this.setData({ isStickyWatchers: sticky });
+    }
+  },
+
+  _calcStickyRegisterExt(scrollTop, isStickyTab) {
+    if (this.data.activeTab !== 'register') return false;
+    if (!isStickyTab) return false;
+    const extThreshold = this.data.registerExtOffsetTop || 0;
+    const stickyTop = this.data.stickyRegisterExtTop || 0;
+    return extThreshold > 0 && scrollTop >= extThreshold - stickyTop;
+  },
+
+  _syncStickyRegisterExtByScroll(scrollTop) {
+    const sticky = this._calcStickyRegisterExt(scrollTop, this.data.isStickyTab);
+    if (sticky !== this.data.isStickyRegisterExt) {
+      this.setData({ isStickyRegisterExt: sticky });
     }
   },
 
@@ -660,10 +1079,14 @@ Page({
     if (tab !== 'discussion' && this.data.isStickyWatchers) {
       patch.isStickyWatchers = false;
     }
+    if (tab !== 'register' && this.data.isStickyRegisterExt) {
+      patch.isStickyRegisterExt = false;
+    }
     this.setData(patch);
     wx.nextTick(() => {
       this.updateTabContentSpacer();
       if (tab === 'discussion') this.measureWatchersTop();
+      if (tab === 'register') this.measureRegisterExtTop();
     });
     if (tab === 'tee-sheet') {
       // 进入出发表：DOM 渲染后绑定"第一组卡片"视口观察器（按钮初始隐藏，由可见性触发）

@@ -5,6 +5,7 @@ const gameProgress = require('../../utils/gameProgress.js');
 const quickCreate = require('../../utils/quickCreate.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
+const userProfileStore = require('../../utils/userProfileStore.js');
 
 function formatGameDate(ts) {
   const d = ts ? new Date(ts) : new Date();
@@ -83,6 +84,8 @@ Page({
     scheduleRemindPanelOpen: false,
     editProfileVisible: false,
     editProfileOpen: false,
+    userProfile: { nickname: '', competitionName: '' },
+    profileEditDraft: { nickname: '', competitionName: '' },
     bannerPickerVisible: false,
     profileBannerImg: 'https://cdn.screenshottocode.com/fjGiYQjgxR_OzO3H9s1OQ.png',
     calendarMonthYear: '',
@@ -225,6 +228,7 @@ Page({
     this._baseTournamentCards = this.data.tournamentCards.slice();
     this.initHeaderNav();
     this.initGlobalTheme();
+    this.refreshUserProfile();
     if (options && options.section === 'profile') {
       this.showProfileSection();
     } else if (options && options.section === 'tournament') {
@@ -241,8 +245,19 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    this.refreshUserProfile();
     // 每次显示刷新进行中 GAME（持久化数据源 → 返回首页不丢失、刷新可恢复）
     this.refreshGames();
+  },
+
+  refreshUserProfile() {
+    const profile = userProfileStore.loadProfile();
+    this.setData({
+      userProfile: {
+        nickname: profile.nickname || '',
+        competitionName: profile.competitionName || ''
+      }
+    });
   },
 
   // 进行中 GAME → 卡片：我的 TAB 金色边框置顶；广场 TAB 普通卡片同步
@@ -633,7 +648,14 @@ Page({
       show = !this.data.editProfileVisible;
     }
     if (show) {
-      this.setData({ editProfileVisible: true });
+      const profile = userProfileStore.loadProfile();
+      this.setData({
+        editProfileVisible: true,
+        profileEditDraft: {
+          nickname: profile.nickname || '',
+          competitionName: profile.competitionName || ''
+        }
+      });
       setTimeout(() => {
         this.setData({ editProfileOpen: true });
       }, 10);
@@ -650,7 +672,26 @@ Page({
   },
 
   onEditProfileSave() {
+    const draft = this.data.profileEditDraft || {};
+    const saved = userProfileStore.updateProfile({
+      nickname: draft.nickname != null ? String(draft.nickname).trim() : '',
+      competitionName: draft.competitionName != null ? String(draft.competitionName).trim() : ''
+    });
+    this.setData({
+      userProfile: {
+        nickname: saved.nickname || '',
+        competitionName: saved.competitionName || ''
+      }
+    });
     this.toggleEditProfile(false);
+  },
+
+  onEditProfileNicknameInput(e) {
+    this.setData({ 'profileEditDraft.nickname': e.detail.value || '' });
+  },
+
+  onEditProfileCompetitionNameInput(e) {
+    this.setData({ 'profileEditDraft.competitionName': e.detail.value || '' });
   },
 
   toggleBannerPicker(arg) {

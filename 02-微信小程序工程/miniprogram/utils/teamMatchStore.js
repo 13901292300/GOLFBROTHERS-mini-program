@@ -65,6 +65,43 @@ function cloneEventInfoList(list) {
   }));
 }
 
+function cloneTeamGroups(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((item, index) => ({
+    id: item && item.id != null ? item.id : index + 1,
+    renderKey: item && item.renderKey
+      ? String(item.renderKey)
+      : ('team-group-' + (item && item.id != null ? item.id : index + 1)),
+    name: item && item.name ? String(item.name).trim() : ''
+  }));
+}
+
+function createDefaultRegisterInfo() {
+  return {
+    totalCount: 0,
+    users: []
+  };
+}
+
+function cloneRegisterInfo(info) {
+  if (!info || typeof info !== 'object') return createDefaultRegisterInfo();
+  const users = Array.isArray(info.users)
+    ? info.users.map((user) => ({
+      userId: user && user.userId ? String(user.userId) : '',
+      nickname: user && user.nickname ? String(user.nickname) : '',
+      avatar: user && user.avatar ? String(user.avatar) : '',
+      groupId: user && user.groupId != null ? user.groupId : '',
+      groupName: user && user.groupName ? String(user.groupName) : '',
+      registeredAt: user && user.registeredAt != null ? user.registeredAt : ''
+    }))
+    : [];
+  const totalCount = info.totalCount != null ? Number(info.totalCount) : users.length;
+  return {
+    totalCount: Number.isFinite(totalCount) ? totalCount : users.length,
+    users: users
+  };
+}
+
 /**
  * 从创建队内赛页 data 构建球队赛记录（复用现有卡片字段语义）
  */
@@ -83,6 +120,8 @@ function buildMatchFromCreatePage(pageData) {
     organizationName: data.organizationName || '',
     feeList: cloneFeeList(data.feeList),
     eventInfoList: cloneEventInfoList(data.eventInfoList),
+    teamGroups: cloneTeamGroups(data.teamGroups),
+    registerInfo: createDefaultRegisterInfo(),
     feeSet: !!data.feeSet,
     isDiamondMode: !!data.isDiamondMode,
     bannerImage: data.bannerImage || '',
@@ -93,6 +132,7 @@ function buildMatchFromCreatePage(pageData) {
     teeTime: data.teeTime || '',
     teeTimeText: data.teeTimeText || '',
     deadlineTime: data.deadlineTime || '',
+    registerStatus: data.registerStatus === 'closed' ? 'closed' : 'open',
     status: 'registering',
     statusLabel: '报名中',
     createdAt: Date.now()

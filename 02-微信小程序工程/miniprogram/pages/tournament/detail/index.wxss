@@ -335,6 +335,363 @@ page {
 .ds-watchers--dark .ds-watchers-more { color: var(--champion-gold); }
 .ds-watchers--bright .ds-watchers-more { color: var(--tour-blue); }
 
+/* ===== 报名 TAB 扩展区（页面级二级 sticky）===== */
+.register-ext-wrap { flex-shrink: 0; }
+.register-ext-wrap--fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 129;
+  box-shadow: 0 8rpx 16rpx rgba(0, 0, 0, 0.08);
+}
+.register-ext-wrap--hide { opacity: 0; pointer-events: none; }
+.register-ext-wrap--show { opacity: 1; pointer-events: auto; }
+.register-ext {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+.register-ext__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx 12rpx;
+}
+.register-ext__summary-label {
+  color: var(--text-secondary);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.register-ext__summary-count {
+  color: var(--champion-gold);
+  font-size: 32rpx;
+  font-weight: 900;
+}
+.register-subtabs-wrap {
+  border-bottom: 1px solid var(--border);
+}
+.register-subtabs {
+  height: 80rpx;
+  white-space: nowrap;
+  padding: 0 16rpx;
+  box-sizing: border-box;
+}
+.register-subtabs::-webkit-scrollbar { display: none; }
+.register-subtab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  height: 80rpx;
+  padding: 0 28rpx;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 28rpx;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+.register-subtab__name,
+.register-subtab__count {
+  line-height: 1;
+}
+.register-subtab--active {
+  color: var(--tour-blue);
+  font-weight: 700;
+}
+.register-subtab--active::after {
+  content: "";
+  position: absolute;
+  left: 28rpx;
+  right: 28rpx;
+  bottom: 0;
+  height: 6rpx;
+  background: var(--tour-blue);
+  border-radius: 3rpx 3rpx 0 0;
+}
+.register-subtab--active .register-subtab__name,
+.register-subtab--active .register-subtab__count {
+  color: var(--tour-blue);
+  font-weight: 700;
+}
+.register-tab-panel { padding: 0; }
+/* 空态复用名单卡片内部空间：占据表头以下剩余高度并垂直居中（min-height 由 style 动态注入，下方为兜底） */
+.register-user-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 92px - var(--tab-height) - 152rpx - 116rpx - 88rpx - env(safe-area-inset-bottom));
+}
+.register-user-empty__text { color: var(--text-muted); font-size: 26rpx; }
+/* 报名名单表格卡片：卡片容器负责首屏撑高，表头自然高度、人员行正常高度（行不设 flex:1）
+   统一详情页视觉：默认 min-height 700px；报名人数超过首屏时卡片继续自然增长（非固定 height）
+   名单超出后随 detail-scroll 正常滚动（不改吸顶阈值测量） */
+/* 卡片高度由 JS 动态计算并通过 style 注入 min-height（rosterMinHeight）：
+   min-height = 窗口高 - HEADER - 主TAB - 报名二级TAB - 底部CTA - 必要间距
+   块级承载 min-height 稳定生效；长名单超出后随内容自然增长并可滚动。
+   下方 calc 仅作 JS 尚未计算完成时的兜底，避免首帧塌陷导致无法上滑 */
+.register-roster-card {
+  display: block;
+  box-sizing: border-box;
+  min-height: calc(100vh - 92px - var(--tab-height) - 152rpx - 116rpx - env(safe-area-inset-bottom));
+  margin-bottom: 180rpx;
+}
+.roster-head {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+}
+.roster-head .roster-col {
+  color: var(--text-muted);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+/* 表体为普通块流：行按内容正常堆叠，卡片高度由 .register-roster-card 的 min-height 保证 */
+.roster-body {
+  display: block;
+}
+.roster-row {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 32rpx;
+  border-bottom: 1px solid var(--border);
+}
+.roster-row:last-child { border-bottom: none; }
+.roster-col--idx {
+  flex: 0 0 80rpx;
+  color: var(--text-secondary);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.roster-col--player {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  min-width: 0;
+}
+.roster-col--handicap {
+  flex: 0 0 140rpx;
+  text-align: right;
+  color: var(--champion-gold);
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.roster-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+}
+.roster-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.roster-gender {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: var(--data-blue, #00aeef);
+}
+/* ===== 报名弹窗（比赛名编辑，结构预留） ===== */
+.register-sheet__head { padding: 8rpx 8rpx 24rpx; }
+.register-sheet__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.register-sheet__sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--text-muted);
+}
+.register-sheet__field { padding: 0 8rpx 16rpx; }
+.register-sheet__label {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.register-sheet__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: var(--bg-secondary, #f1f5f9);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.register-sheet__hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.register-sheet__groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.register-sheet__group {
+  padding: 14rpx 32rpx;
+  border-radius: 999rpx;
+  background: var(--bg-secondary, #f1f5f9);
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text-secondary, #475569);
+  border: 2rpx solid transparent;
+}
+.register-sheet__group--active {
+  background: rgba(0, 45, 98, 0.08);
+  border-color: var(--champion-gold, #c8a24a);
+  color: var(--text-primary);
+}
+.detail-page.dark-mode .register-sheet__group--active {
+  background: rgba(200, 162, 74, 0.16);
+}
+.register-sheet__readonly {
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: var(--bg-secondary, #f1f5f9);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.register-sheet__actions {
+  display: flex;
+  gap: 20rpx;
+  padding: 24rpx 8rpx 8rpx;
+}
+.register-sheet__cancel {
+  flex: 1;
+  text-align: center;
+  padding: 24rpx 0;
+  border-radius: 16rpx;
+  background: var(--bg-secondary, #f1f5f9);
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-secondary, #475569);
+}
+.register-sheet__confirm {
+  flex: 2;
+  text-align: center;
+  padding: 24rpx 0;
+  border-radius: 16rpx;
+  background: var(--champion-gold, #c8a24a);
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.register-sheet__confirm.is-disabled { opacity: 0.5; }
+
+/* ===== 立即报名固定按钮 ===== */
+.register-cta-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--bg-primary, #ffffff);
+  border-top: 2rpx solid var(--border-color, rgba(15, 23, 42, 0.08));
+  box-sizing: border-box;
+}
+.register-cta-btn {
+  text-align: center;
+  padding: 26rpx 0;
+  border-radius: 16rpx;
+  background: var(--champion-gold, #c8a24a);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.register-cta-btn--cancel {
+  background: transparent;
+  color: var(--text-secondary, #475569);
+  border: 2rpx solid var(--border-color, rgba(15, 23, 42, 0.16));
+}
+.register-cta-btn--disabled {
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-muted, #94a3b8);
+  border: 2rpx solid var(--border-color, rgba(15, 23, 42, 0.08));
+  pointer-events: none;
+}
+
+/* ===== 取消报名确认弹窗 ===== */
+.register-cancel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  background: rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+.register-cancel-dialog {
+  width: 100%;
+  max-width: 600rpx;
+  padding: 40rpx 36rpx 32rpx;
+  border-radius: 24rpx;
+  background: var(--bg-primary, #ffffff);
+  box-sizing: border-box;
+}
+.register-cancel-dialog__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+  text-align: center;
+}
+.register-cancel-dialog__desc {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-align: center;
+}
+.register-cancel-dialog__actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+.register-cancel-dialog__btn {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 16rpx;
+  background: var(--bg-secondary, #f1f5f9);
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-secondary, #475569);
+}
+.register-cancel-dialog__btn--danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+.register-cancel-dialog__btn.is-disabled { opacity: 0.5; }
+
+.register-user-name {
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
 .detail-main { padding: 40rpx 32rpx 80rpx; }
 .detail-main--flush { padding: 0; }
 .discussion-inline { display: block; }

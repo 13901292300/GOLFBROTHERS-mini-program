@@ -293,7 +293,7 @@
                 </view>
                 <view class="text-center w-full">
                   <view class="flex items-center justify-center gap-3 mb-5" bindtap="toggleEditProfile" data-show="{{true}}">
-                    <text class="ds-display text-4xl leading-none">TigerHoods</text>
+                    <text class="ds-display text-4xl leading-none">{{userProfile.nickname || '未设置昵称'}}</text>
                     <text class="text-data-blue text-lg">♂</text>
                     <text class="text-10px text-slate-400">✎</text>
                   </view>
@@ -608,7 +608,11 @@
           <text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">身份类型</text>
           <view class="flex gap-2 mt-2"><text class="ds-chip ds-chip--selected">球友</text><text class="ds-chip">球童</text></view>
         </view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">昵称</text><input type="text" value="TigerHoods" class="edit-field-input" /></view>
+        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">昵称</text><input type="text" value="{{profileEditDraft.nickname}}" bindinput="onEditProfileNicknameInput" class="edit-field-input" placeholder="微信/社区昵称" /></view>
+        <view class="ds-profile-field">
+          <text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">比赛名</text>
+          <input type="text" value="{{profileEditDraft.competitionName}}" bindinput="onEditProfileCompetitionNameInput" class="edit-field-input" placeholder="赛事报名、出发表、成绩榜显示名称" />
+        </view>
         <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">性别</text><view class="flex gap-4 mt-2"><text class="ds-chip ds-chip--selected">男</text><text class="ds-chip">女</text></view></view>
         <view class="ds-profile-field flex justify-between items-end">
           <view><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">差点 Handicap</text><text class="text-lg font-black text-gold">11.6</text></view>
