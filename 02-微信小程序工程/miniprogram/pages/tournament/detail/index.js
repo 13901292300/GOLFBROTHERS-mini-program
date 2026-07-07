@@ -10,6 +10,76 @@ const groupsStore = require('../../../utils/groupsStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
+const teamMatchStore = require('../../../utils/teamMatchStore.js');
+
+/* ===== 赛事详情页 match 视图对象（顶部信息区数据框架） ===== */
+const MATCH_TYPE_LABELS = {
+  'team-internal': '队内赛',
+  'inter-team': '队际赛',
+  series: '系列赛'
+};
+
+const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+const EMPTY_MATCH_VIEW = {
+  matchId: '',
+  statusLabel: '',
+  logo: '',
+  bannerImage: '',
+  dateText: '',
+  titleMain: '',
+  titleSub: '',
+  formatLabel: '',
+  typeLabel: '',
+  organizer: '',
+  venue: '',
+  timeText: '',
+  priceTags: [],
+  priceText: ''
+};
+
+/* ===== 赛事生命周期状态（teamMatchStore.match.status） ===== */
+const MATCH_LIFECYCLE = {
+  REGISTERING: 'registering',
+  ONGOING: 'ongoing',
+  COMPLETED: 'completed'
+};
+
+const EMPTY_MATCH_LIFECYCLE = {
+  status: '',
+  isRegistering: false,
+  isOngoing: false,
+  isCompleted: false
+};
+
+/* ===== TAB 配置（按生命周期，流内 TAB 与吸顶 TAB 共用唯一数据源） ===== */
+const TOURNAMENT_TABS = {
+  registering: [
+    { id: 'details', label: '赛事信息' },
+    { id: 'register', label: '报名' },
+    { id: 'groups', label: '分组' },
+    { id: 'discussion', label: '讨论区' }
+  ],
+  ongoing: [
+    { id: 'details', label: '赛事信息' },
+    { id: 'leaderboard', label: '领先榜' },
+    { id: 'tee-sheet', label: '出发表' },
+    { id: 'discussion', label: '讨论区' },
+    { id: 'game', label: '游戏' }
+  ],
+  completed: [
+    { id: 'details', label: '赛事信息' },
+    { id: 'leaderboard', label: '成绩表' },
+    { id: 'tee-sheet', label: '出发表' },
+    { id: 'discussion', label: '讨论区' },
+    { id: 'game', label: '游戏' }
+  ]
+};
+
+// 无 matchId / 未知状态时，沿用进行中 TAB 集，保持既有演示页视觉不变
+function resolveTournamentTabs(status) {
+  return TOURNAMENT_TABS[status] || TOURNAMENT_TABS.ongoing;
+}
 
 /* ===== 讨论区 ===== */
 const WATCHERS = [
@@ -75,6 +145,14 @@ Page({
     scrollToTopView: '',
 
     activeTab: 'details',
+    // TAB 列表（流内 + 吸顶共用；默认进行中集合，loadMatch 后按状态重建）
+    tabs: TOURNAMENT_TABS.ongoing,
+
+    // 顶部赛事信息（来自 teamMatchStore，非硬编码）
+    matchId: '',
+    match: EMPTY_MATCH_VIEW,
+    matchStatus: EMPTY_MATCH_LIFECYCLE,
+    eventInfoList: [],
 
     // 领先榜
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
@@ -111,7 +189,8 @@ Page({
     featuresPermission: []
   },
 
-  onLoad() {
+  onLoad(options) {
+    const matchId = options && options.matchId ? decodeURIComponent(options.matchId) : '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     groupsStore.ensureInitialized();
@@ -121,6 +200,120 @@ Page({
     this.refreshGroupsDerived();
     this.applyMoreAccess();
     this.refreshPartnerSection();
+    this.loadMatch(matchId);
+  },
+
+  /* ===== 顶部赛事信息数据接入（teamMatchStore） ===== */
+  loadMatch(matchId) {
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const lifecycle = this._getMatchLifecycle(match);
+    const tabs = resolveTournamentTabs(lifecycle.status);
+    this.setData({
+      matchId: matchId,
+      match: this._mapMatchToView(match),
+      matchStatus: lifecycle,
+      tabs: tabs,
+      // 首次进入统一落到 tabs[0]（各状态首项均为 details）
+      activeTab: tabs[0].id,
+      eventInfoList: this._resolveEventInfoList(match)
+    });
+  },
+
+  // 赛事生命周期：读取 teamMatchStore.match.status，归一化为 registering | ongoing | completed
+  _getMatchLifecycle(match) {
+    if (!match) return Object.assign({}, EMPTY_MATCH_LIFECYCLE);
+    const raw = String(match.status || '').trim().toLowerCase();
+    const allowed = [
+      MATCH_LIFECYCLE.REGISTERING,
+      MATCH_LIFECYCLE.ONGOING,
+      MATCH_LIFECYCLE.COMPLETED
+    ];
+    const status = allowed.indexOf(raw) >= 0 ? raw : '';
+    return {
+      status: status,
+      isRegistering: status === MATCH_LIFECYCLE.REGISTERING,
+      isOngoing: status === MATCH_LIFECYCLE.ONGOING,
+      isCompleted: status === MATCH_LIFECYCLE.COMPLETED
+    };
+  },
+
+  // 将 teamMatchStore 记录映射为顶部信息区视图字段
+  _mapMatchToView(match) {
+    if (!match) return Object.assign({}, EMPTY_MATCH_VIEW);
+    const venue = [match.courseName, match.courseHalfText].filter(Boolean).join('');
+    const priceTags = this._mapPriceTags(match);
+    return {
+      matchId: match.matchId || '',
+      statusLabel: match.statusLabel || '',
+      logo: this._resolveMatchLogo(match),
+      bannerImage: match.bannerImage || '',
+      dateText: teamMatchStore.formatClubDate(match.teeTime) || '',
+      titleMain: match.roundName || match.teamName || '',
+      titleSub: match.teamName || '',
+      formatLabel: match.gameMode || '',
+      typeLabel: this._resolveTypeLabel(match),
+      organizer: this._resolveOrganizer(match),
+      venue: venue,
+      timeText: this._resolveTimeText(match),
+      priceTags: priceTags,
+      priceText: priceTags.join('  ')
+    };
+  },
+
+  _resolveMatchLogo(match) {
+    if (!match) return '';
+    return match.matchLogo || match.teamLogo || '';
+  },
+
+  _resolveOrganizer(match) {
+    if (!match) return '';
+    const matchType = match.matchType || 'team-internal';
+    if (matchType === 'team-internal') return match.teamName || '';
+    return match.organizationName || match.teamName || '';
+  },
+
+  _resolveTimeText(match) {
+    if (!match) return '';
+    const text = String(match.teeTimeText || '').trim();
+    if (text) return text;
+    const m = String(match.teeTime || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+    if (!m) return '';
+    const year = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10);
+    const day = parseInt(m[3], 10);
+    const weekday = WEEK_NAMES[new Date(year, month - 1, day).getDay()];
+    return year + '/' + m[2] + '/' + m[3] + ' ' + weekday + ' ' + m[4] + ':' + m[5];
+  },
+
+  _resolveTypeLabel(match) {
+    if (!match) return '';
+    const matchType = match.matchType || 'team-internal';
+    return MATCH_TYPE_LABELS[matchType] || '';
+  },
+
+  _mapPriceTags(match) {
+    if (!match || !match.feeSet || !Array.isArray(match.feeList) || !match.feeList.length) {
+      return ['暂无'];
+    }
+    const isDiamond = !!match.isDiamondMode;
+    return match.feeList.map((fee) => {
+      const name = String((fee && fee.name) || '').trim();
+      const amount = fee && fee.amount != null ? String(fee.amount) : '0';
+      const price = isDiamond ? amount + '💎' : '￥' + amount;
+      return name ? name + ' ' + price : price;
+    });
+  },
+
+  _resolveEventInfoList(match) {
+    if (!match || !Array.isArray(match.eventInfoList)) return [];
+    return match.eventInfoList.map((item) => ({
+      id: item && item.id != null ? item.id : '',
+      title: item && item.title ? String(item.title) : '',
+      type: item && item.type ? String(item.type) : '',
+      content: item && item.content != null ? String(item.content) : '',
+      imageData: item && item.imageData != null ? String(item.imageData) : '',
+      status: item && item.status ? String(item.status) : ''
+    }));
   },
 
   refreshPartnerSection() {

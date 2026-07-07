@@ -44,6 +44,27 @@ function resolveMatchLogo(pageData) {
   return '';
 }
 
+function cloneFeeList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((item) => ({
+    id: item && item.id,
+    name: item && item.name ? String(item.name).trim() : '',
+    amount: item && item.amount != null ? String(item.amount) : ''
+  }));
+}
+
+function cloneEventInfoList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((item) => ({
+    id: item && item.id != null ? item.id : '',
+    title: item && item.title ? String(item.title) : '',
+    type: item && item.type ? String(item.type) : '',
+    content: item && item.content != null ? String(item.content) : '',
+    imageData: item && item.imageData != null ? String(item.imageData) : '',
+    status: item && item.status ? String(item.status) : ''
+  }));
+}
+
 /**
  * 从创建队内赛页 data 构建球队赛记录（复用现有卡片字段语义）
  */
@@ -57,6 +78,14 @@ function buildMatchFromCreatePage(pageData) {
     teamLogo: data.teamLogo || '',
     matchLogo: resolveMatchLogo(data),
     roundName: data.roundName || '',
+    gameMode: data.gameMode || data.selectedGameMode || '',
+    matchType: data.matchType || 'team-internal',
+    organizationName: data.organizationName || '',
+    feeList: cloneFeeList(data.feeList),
+    eventInfoList: cloneEventInfoList(data.eventInfoList),
+    feeSet: !!data.feeSet,
+    isDiamondMode: !!data.isDiamondMode,
+    bannerImage: data.bannerImage || '',
     courseId: data.courseId || '',
     courseName: data.courseName || '',
     courseLocation: data.courseLocation || '',

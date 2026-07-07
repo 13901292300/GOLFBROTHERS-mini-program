@@ -45,31 +45,36 @@
     <!-- Hero -->
     <view class="hero-wrap">
       <view class="hero">
-        <image class="hero__img" src="https://cdn.screenshottocode.com/uV3Ftwc20Ey3qt6GC34JR.jpg" mode="aspectFill"></image>
+        <image class="hero__img" src="{{match.bannerImage}}" mode="aspectFill"></image>
         <view class="hero__overlay"></view>
-        <view class="registered-chip">已报名</view>
+        <view class="registered-chip">{{match.statusLabel}}</view>
       </view>
       <view class="event-logo-wrap">
-        <view class="event-logo"><text class="event-logo__ball">⛳</text></view>
+        <view class="event-logo"><image src="{{match.logo}}" mode="aspectFill" style="width:100%;height:100%;"></image></view>
       </view>
     </view>
 
     <!-- Event Intro -->
     <view class="event-intro">
-      <text class="event-date">May 18 2026</text>
+      <text class="event-date">{{match.dateText}}</text>
       <view class="event-title">
-        <text class="event-title__line">星途 · 新西兰旅行者挑战赛</text>
-        <text class="event-title__line">2026 江湖业余球员巡回赛第五站</text>
+        <text class="event-title__line">{{match.titleMain}}</text>
       </view>
       <view class="meta-chip-row">
-        <view class="meta-chip">📅 18洞个人比杆赛</view>
-        <view class="meta-chip">👥 球队赛</view>
+        <view class="meta-chip">📅 {{match.formatLabel}}</view>
+        <view class="meta-chip">👥 {{match.typeLabel}}</view>
       </view>
 
       <view class="ds-card info-card">
-        <view class="info-row"><text class="info-row-label">主办</text><text class="info-row-value">江湖业余球员巡回赛组委会</text></view>
-        <view class="info-row"><text class="info-row-label">球场</text><text class="info-row-value">北京清河湾高尔夫乡村俱乐部 A&B</text></view>
-        <view class="info-row"><text class="info-row-label">价格</text><text class="info-row-value">1680元</text></view>
+        <view class="info-row"><text class="info-row-label">主办</text><text class="info-row-value">{{match.organizer}}</text></view>
+        <view class="info-row"><text class="info-row-label">球场</text><text class="info-row-value">{{match.venue}}</text></view>
+        <view class="info-row"><text class="info-row-label">时间</text><text class="info-row-value">{{match.timeText}}</text></view>
+        <view class="info-row">
+          <text class="info-row-label">价格</text>
+          <view class="info-row-value" style="display:flex;flex-wrap:wrap;gap:8rpx;align-items:center;">
+            <view wx:for="{{match.priceTags}}" wx:key="index" class="meta-chip">{{item}}</view>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -79,11 +84,7 @@
     <!-- Tabs（始终在流内，滚动到顶时由外层固定克隆接管吸顶） -->
     <view class="tab-scroll-wrap tab-scroll-wrap--inflow">
       <scroll-view class="gb-tabs" scroll-x enable-flex bindscroll="onTabHScroll">
-        <view bindtap="switchTab" data-tab="details" class="tab-btn {{activeTab === 'details' ? 'active' : ''}}">赛事详情</view>
-        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
-        <view bindtap="switchTab" data-tab="tee-sheet" class="tab-btn {{activeTab === 'tee-sheet' ? 'active' : ''}}">出发表</view>
-        <view bindtap="switchTab" data-tab="discussion" class="tab-btn {{activeTab === 'discussion' ? 'active' : ''}}">讨论区</view>
-        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+        <view wx:for="{{tabs}}" wx:key="id" bindtap="switchTab" data-tab="{{item.id}}" class="tab-btn {{activeTab === item.id ? 'active' : ''}}">{{item.label}}</view>
       </scroll-view>
       <view wx:if="{{tabShowLeftIndicator}}" class="tab-overflow-hint tab-overflow-hint--left" aria-hidden="true"><text class="tab-overflow-hint__chev">‹</text></view>
       <view wx:if="{{tabShowRightIndicator}}" class="tab-overflow-hint tab-overflow-hint--right" aria-hidden="true"><text class="tab-overflow-hint__chev">›</text></view>
@@ -102,24 +103,15 @@
 
       <!-- 赛事详情 -->
       <block wx:if="{{activeTab === 'details'}}">
-        <view class="ad-image"><image src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85" mode="aspectFill" class="ad-image__img ad-image__img--sm"></image></view>
-        <view class="ds-card pad-card">
-          <view class="card-head"><text class="card-title">赛事规则</text><text class="card-kicker">RULES</text></view>
-          <text class="card-text">本次比赛采用国际高尔夫球联合会最新颁布的《高尔夫球规则》以及竞赛委员会制定的"比赛条件"和"当地规则"。比赛为单轮18洞个人比杆赛。</text>
-        </view>
-        <view class="ad-image"><image src="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=900&q=85" mode="aspectFill" class="ad-image__img ad-image__img--lg"></image></view>
-        <view class="ds-card pad-card">
-          <view class="card-head"><text class="card-title">参赛须知</text><text class="card-kicker">NOTICE</text></view>
-          <text class="card-text">参赛球员需在开球前30分钟到达签到处领取记分卡，并准时在指定发球台出发。比赛过程中请保持良好的礼仪及球场速度。</text>
-        </view>
-        <view class="ds-card pad-card">
-          <view class="card-head"><text class="card-title">赛事服务</text><text class="card-kicker">SERVICE</text></view>
-          <view class="service-grid">
-            <view class="service-cell"><text class="service-cell__icon">📋</text><text class="service-cell__label">签到</text></view>
-            <view class="service-cell"><text class="service-cell__icon">🍽️</text><text class="service-cell__label">餐饮</text></view>
-            <view class="service-cell"><text class="service-cell__icon">🏆</text><text class="service-cell__label">颁奖</text></view>
+        <block wx:for="{{eventInfoList}}" wx:key="id">
+          <view wx:if="{{item.type === 'image'}}" class="ad-image">
+            <image src="{{item.imageData}}" mode="widthFix" class="ad-image__img"></image>
           </view>
-        </view>
+          <view wx:else class="ds-card pad-card">
+            <view class="card-head"><text class="card-title">{{item.title}}</text></view>
+            <text class="card-text">{{item.content}}</text>
+          </view>
+        </block>
         <view class="partners-section">
           <text class="partners-title">{{partnerConfig.partnerTitle}}</text>
           <view wx:if="{{partnerLogoRows.length}}" class="partners-grid partners-grid--logos">
@@ -296,11 +288,7 @@
   <!-- 吸顶 TAB：常驻节点（避免 remount），显示状态仅由 scroll-aware sticky state 控制 -->
   <view class="tab-scroll-wrap tab-scroll-wrap--fixed {{isStickyTab ? 'tab-scroll-wrap--show' : 'tab-scroll-wrap--hide'}}" style="top:{{headerTotalHeight}}px;">
     <scroll-view class="gb-tabs" scroll-x enable-flex scroll-left="{{tabHScrollLeft}}" bindscroll="onTabHScroll">
-      <view bindtap="switchTab" data-tab="details" class="tab-btn {{activeTab === 'details' ? 'active' : ''}}">赛事详情</view>
-      <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
-      <view bindtap="switchTab" data-tab="tee-sheet" class="tab-btn {{activeTab === 'tee-sheet' ? 'active' : ''}}">出发表</view>
-      <view bindtap="switchTab" data-tab="discussion" class="tab-btn {{activeTab === 'discussion' ? 'active' : ''}}">讨论区</view>
-      <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      <view wx:for="{{tabs}}" wx:key="id" bindtap="switchTab" data-tab="{{item.id}}" class="tab-btn {{activeTab === item.id ? 'active' : ''}}">{{item.label}}</view>
     </scroll-view>
     <view wx:if="{{tabShowLeftIndicator}}" class="tab-overflow-hint tab-overflow-hint--left" aria-hidden="true"><text class="tab-overflow-hint__chev">‹</text></view>
     <view wx:if="{{tabShowRightIndicator}}" class="tab-overflow-hint tab-overflow-hint--right" aria-hidden="true"><text class="tab-overflow-hint__chev">›</text></view>
