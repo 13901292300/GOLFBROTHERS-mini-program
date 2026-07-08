@@ -78,7 +78,8 @@ function createDefaultEventInfoList() {
       title: '广告图片1',
       type: 'image',
       content: '',
-      imageData: DEFAULT_EVENT_SPONSOR_IMAGE_1,
+      brightImage: DEFAULT_EVENT_SPONSOR_IMAGE_1,
+      darkImage: DEFAULT_EVENT_SPONSOR_IMAGE_1,
       status: '已设置'
     },
     {
@@ -86,7 +87,8 @@ function createDefaultEventInfoList() {
       title: '赛事规则',
       type: 'text',
       content: DEFAULT_EVENT_RULES_TEXT,
-      imageData: '',
+      brightImage: '',
+      darkImage: '',
       status: '已设置'
     },
     {
@@ -94,7 +96,8 @@ function createDefaultEventInfoList() {
       title: '广告图片2',
       type: 'image',
       content: '',
-      imageData: DEFAULT_EVENT_SPONSOR_IMAGE_2,
+      brightImage: DEFAULT_EVENT_SPONSOR_IMAGE_2,
+      darkImage: DEFAULT_EVENT_SPONSOR_IMAGE_2,
       status: '已设置'
     },
     {
@@ -102,7 +105,8 @@ function createDefaultEventInfoList() {
       title: '参赛须知',
       type: 'text',
       content: DEFAULT_EVENT_NOTICE_TEXT,
-      imageData: '',
+      brightImage: '',
+      darkImage: '',
       status: '已设置'
     }
   ];
@@ -234,7 +238,8 @@ Page({
       title: '',
       type: 'text',
       content: '',
-      imageData: '',
+      brightImage: '',
+      darkImage: '',
       status: '未设置'
     },
     eventDetailEditLabel: '',
@@ -809,7 +814,8 @@ Page({
         title: customTitle,
         type: this.data.manualInfoType || 'text',
         content: '',
-        imageData: '',
+        brightImage: '',
+        darkImage: '',
         status: '未设置'
       };
     } else if (this.data.selectedRecommendIndex !== null && this.data.selectedRecommendIndex !== '') {
@@ -820,7 +826,8 @@ Page({
           title: picked.title,
           type: picked.type,
           content: '',
-          imageData: '',
+          brightImage: '',
+          darkImage: '',
           status: '未设置'
         };
       }
@@ -862,7 +869,8 @@ Page({
         title: item.title,
         type: item.type,
         content: item.content || '',
-        imageData: item.imageData || '',
+        brightImage: item.brightImage || item.imageData || '',
+        darkImage: item.darkImage || item.imageData || '',
         status: item.status || '未设置'
       }
     });
@@ -885,8 +893,9 @@ Page({
     this.setData({ 'eventDetailDraft.content': e.detail.value });
   },
 
-  chooseEventDetailImage() {
+  chooseEventDetailImageByTheme(themeKey) {
     if (this.data.eventDetailDraft.type !== 'image') return;
+    const key = themeKey === 'dark' ? 'darkImage' : 'brightImage';
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
@@ -894,12 +903,24 @@ Page({
       success: (res) => {
         const file = res.tempFiles && res.tempFiles[0];
         if (!file || !file.tempFilePath) return;
+        const nextDraft = Object.assign({}, this.data.eventDetailDraft || {});
+        nextDraft[key] = file.tempFilePath;
+        const hasAnyImage = !!(nextDraft.brightImage || nextDraft.darkImage);
         this.setData({
-          'eventDetailDraft.imageData': file.tempFilePath,
-          'eventDetailDraft.status': '已设置'
+          eventDetailDraft: Object.assign({}, nextDraft, {
+            status: hasAnyImage ? '已设置' : '未设置'
+          })
         });
       }
     });
+  },
+
+  chooseEventDetailBrightImage() {
+    this.chooseEventDetailImageByTheme('bright');
+  },
+
+  chooseEventDetailDarkImage() {
+    this.chooseEventDetailImageByTheme('dark');
   },
 
   saveEventDetail() {
@@ -910,8 +931,10 @@ Page({
     const item = Object.assign({}, list[idx]);
 
     if (item.type === 'image') {
-      item.imageData = draft.imageData || '';
-      item.status = item.imageData ? '已设置' : '未设置';
+      item.brightImage = draft.brightImage || '';
+      item.darkImage = draft.darkImage || '';
+      item.status = (item.brightImage || item.darkImage) ? '已设置' : '未设置';
+      delete item.imageData;
     } else {
       item.content = (draft.content || '').trim();
       item.status = item.content ? '已设置' : '未设置';
@@ -1047,12 +1070,26 @@ Page({
     this.setData({ 'partnerConfig.partnerTitle': e.detail.value });
   },
 
-  choosePartnerLogo() {
+  _createEmptyPartnerLogo() {
+    return { bright: '', dark: '' };
+  },
+
+  onAddPartnerLogoSlot() {
     const logos = (this.data.partnerConfig && this.data.partnerConfig.partnerLogos) || [];
     if (logos.length >= partnerConfigUtil.MAX_PARTNER_LOGOS) {
       wx.showToast({ title: '最多上传 8 张', icon: 'none' });
       return;
     }
+    const next = logos.concat([this._createEmptyPartnerLogo()]);
+    this.setData({ 'partnerConfig.partnerLogos': next });
+  },
+
+  choosePartnerLogoByTheme(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const theme = String(e.currentTarget.dataset.theme || '');
+    if (Number.isNaN(idx) || (theme !== 'bright' && theme !== 'dark')) return;
+    const logos = ((this.data.partnerConfig && this.data.partnerConfig.partnerLogos) || []).slice();
+    if (!logos[idx]) return;
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
@@ -1061,8 +1098,13 @@ Page({
       success: (res) => {
         const file = res.tempFiles && res.tempFiles[0];
         if (!file || !file.tempFilePath) return;
-        const next = logos.concat([file.tempFilePath]);
-        this.setData({ 'partnerConfig.partnerLogos': next });
+        const current = logos[idx];
+        const normalized = typeof current === 'string'
+          ? { bright: current, dark: current }
+          : Object.assign(this._createEmptyPartnerLogo(), current || {});
+        normalized[theme] = file.tempFilePath;
+        logos[idx] = normalized;
+        this.setData({ 'partnerConfig.partnerLogos': logos });
       }
     });
   },

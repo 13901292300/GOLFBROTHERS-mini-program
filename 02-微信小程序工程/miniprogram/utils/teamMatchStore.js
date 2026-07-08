@@ -60,7 +60,12 @@ function cloneEventInfoList(list) {
     title: item && item.title ? String(item.title) : '',
     type: item && item.type ? String(item.type) : '',
     content: item && item.content != null ? String(item.content) : '',
-    imageData: item && item.imageData != null ? String(item.imageData) : '',
+    brightImage: item && (item.brightImage != null || item.imageData != null)
+      ? String(item.brightImage != null ? item.brightImage : item.imageData)
+      : '',
+    darkImage: item && (item.darkImage != null || item.imageData != null)
+      ? String(item.darkImage != null ? item.darkImage : item.imageData)
+      : '',
     status: item && item.status ? String(item.status) : ''
   }));
 }

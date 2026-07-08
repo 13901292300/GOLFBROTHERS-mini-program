@@ -546,14 +546,22 @@ Page({
     });
   },
 
-  _resolveEventInfoList(match) {
+  _resolveEventInfoImage(item, theme) {
+    if (!item || String(item.type) !== 'image') return '';
+    const bright = String(item.brightImage != null ? item.brightImage : (item.imageData || '')).trim();
+    const dark = String(item.darkImage != null ? item.darkImage : (item.imageData || '')).trim();
+    return theme === 'dark' ? (dark || bright) : (bright || dark);
+  },
+
+  _resolveEventInfoList(match, theme) {
+    const resolvedTheme = theme || getApp().getTheme();
     if (!match || !Array.isArray(match.eventInfoList)) return [];
     return match.eventInfoList.map((item) => ({
       id: item && item.id != null ? item.id : '',
       title: item && item.title ? String(item.title) : '',
       type: item && item.type ? String(item.type) : '',
       content: item && item.content != null ? String(item.content) : '',
-      imageData: item && item.imageData != null ? String(item.imageData) : '',
+      imageData: this._resolveEventInfoImage(item, resolvedTheme),
       status: item && item.status ? String(item.status) : ''
     }));
   },
@@ -1001,7 +1009,13 @@ Page({
   },
 
   applyTheme(theme) {
-    this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
+    const dark = theme === 'dark';
+    const patch = { themeClass: dark ? 'dark-mode' : 'bright-mode' };
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    if (match) {
+      patch.eventInfoList = this._resolveEventInfoList(match, theme);
+    }
+    this.setData(patch);
   },
 
   initHeaderNav() {

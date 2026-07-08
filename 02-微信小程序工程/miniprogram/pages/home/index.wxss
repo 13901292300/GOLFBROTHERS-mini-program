@@ -1703,6 +1703,93 @@ page {
   margin: 0 auto 12px;
 }
 
+/*
+ * “+”创建弹屏 / 更多创建：位于 .ds-app 外层，须自行承载 dark-theme token，
+ * 与 .ds-app.dark-theme 同源，不新增第二套主题变量。
+ */
+.create-overlay.dark-theme,
+.more-create-overlay.dark-theme {
+  --bg-primary: #050816;
+  --bg-card: #0B1220;
+  --bg-subtle: #121A2B;
+  --bg-hover: #1A2332;
+  --border: var(--border-dark);
+  --border-hover: var(--border-dark-hover);
+  --text-primary: #E5EEFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --shadow-card: 0 18px 40px var(--black-alpha-35);
+  color: var(--text-primary);
+}
+
+/* 弹屏整体背景：深色半透明 / 实色 */
+.create-overlay.dark-theme.bg-white-95 {
+  background-color: rgba(5, 8, 22, 0.96);
+}
+.more-create-overlay.dark-theme {
+  background: var(--bg-primary);
+}
+
+.create-overlay.dark-theme .create-sheet-handle {
+  background: rgba(148, 163, 184, 0.35);
+}
+
+/* 图标 tile / 关闭按钮 / 功能卡图标底 */
+.create-overlay.dark-theme .bg-slate-50,
+.create-overlay.dark-theme .bg-slate-100,
+.more-create-overlay.dark-theme .bg-slate-50,
+.more-create-overlay.dark-theme .bg-slate-100 {
+  background-color: var(--bg-subtle);
+}
+.create-overlay.dark-theme .bg-white,
+.more-create-overlay.dark-theme .bg-white {
+  background-color: var(--bg-card);
+}
+.create-overlay.dark-theme .border-slate-100,
+.more-create-overlay.dark-theme .border-slate-100 {
+  border-color: var(--border);
+}
+
+/* 功能入口卡片：用深色 surface，标题反色保证可读 */
+.create-overlay.dark-theme .ds-card-action,
+.more-create-overlay.dark-theme .ds-card-selectable {
+  background-color: var(--bg-hover);
+}
+.create-overlay.dark-theme .ds-card-action .text-sm.text-tour-blue,
+.more-create-overlay.dark-theme .text-sm.text-tour-blue,
+.more-create-overlay.dark-theme .text-xl.text-tour-blue {
+  color: var(--text-on-dark);
+}
+
+/* 文案色：覆盖硬编码浅色 utility */
+.create-overlay.dark-theme .text-tour-blue,
+.more-create-overlay.dark-theme .text-tour-blue {
+  color: var(--text-primary);
+}
+.create-overlay.dark-theme .text-slate-300,
+.create-overlay.dark-theme .text-slate-400,
+.more-create-overlay.dark-theme .text-slate-300,
+.more-create-overlay.dark-theme .text-slate-400 {
+  color: var(--text-muted);
+}
+.create-overlay.dark-theme .shortcut-label {
+  color: var(--text-secondary);
+}
+.create-overlay.dark-theme .shortcut-tile {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+/* 底部关闭按钮 */
+.create-overlay.dark-theme .w-14.h-14.bg-white {
+  background-color: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text-muted);
+  box-shadow: 0 8px 24px var(--black-alpha-35);
+}
+
 .more-create-header {
   padding: 24px 16px 16px;
   padding-top: calc(24px + env(safe-area-inset-top, 0px));

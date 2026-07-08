@@ -101,6 +101,7 @@ function snapshotSlots(slots) {
 
 Page({
   data: {
+    themeClass: 'bright-mode',
     headerRootStyle: '',
     headerBarStyle: '',
     groupId: '',
@@ -113,6 +114,7 @@ Page({
 
   onLoad(options) {
     this.initHeaderNav();
+    this.applyTheme(getApp().getTheme());
     const groupId = options && options.groupId ? decodeURIComponent(options.groupId) : '';
     const groupName = options && options.groupName ? decodeURIComponent(options.groupName) : '';
     const matchId = options && options.matchId ? decodeURIComponent(options.matchId) : '';
@@ -132,6 +134,14 @@ Page({
       activeSubTabId: activeSubTabId,
       displayUsers: this._buildDisplayUsers(this._registerInfo, activeSubTabId, slots)
     });
+  },
+
+  onShow() {
+    this.applyTheme(getApp().getTheme());
+  },
+
+  applyTheme(theme) {
+    this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
   },
 
   initHeaderNav() {

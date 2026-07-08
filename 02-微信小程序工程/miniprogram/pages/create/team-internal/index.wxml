@@ -267,10 +267,25 @@
         <view class="partner-logo-grid">
           <view
             wx:for="{{partnerConfig.partnerLogos}}"
-            wx:key="*this"
+            wx:key="index"
             class="partner-logo-item"
           >
-            <image class="partner-logo-img" src="{{item}}" mode="aspectFit" />
+            <view class="partner-logo-dual">
+              <view class="partner-logo-slot" bindtap="choosePartnerLogoByTheme" data-index="{{index}}" data-theme="bright">
+                <text class="partner-logo-slot__label">BRIGHT模式图片</text>
+                <image wx:if="{{item.bright || item.dark}}" class="partner-logo-img" src="{{item.bright || item.dark}}" mode="aspectFit" />
+                <view wx:else class="partner-logo-slot__empty">
+                  <text class="partner-logo-slot__plus">+</text>
+                </view>
+              </view>
+              <view class="partner-logo-slot" bindtap="choosePartnerLogoByTheme" data-index="{{index}}" data-theme="dark">
+                <text class="partner-logo-slot__label">DARK模式图片</text>
+                <image wx:if="{{item.dark || item.bright}}" class="partner-logo-img" src="{{item.dark || item.bright}}" mode="aspectFit" />
+                <view wx:else class="partner-logo-slot__empty">
+                  <text class="partner-logo-slot__plus">+</text>
+                </view>
+              </view>
+            </view>
             <view class="partner-logo-remove" catchtap="removePartnerLogo" data-index="{{index}}">
               <text>×</text>
             </view>
@@ -278,10 +293,10 @@
           <view
             wx:if="{{partnerConfig.partnerLogos.length < 8}}"
             class="partner-logo-add"
-            bindtap="choosePartnerLogo"
+            bindtap="onAddPartnerLogoSlot"
           >
             <text class="partner-logo-add__icon">+</text>
-            <text class="partner-logo-add__text">上传 Logo</text>
+            <text class="partner-logo-add__text">新增 PARTNER</text>
           </view>
         </view>
       </view>
@@ -558,18 +573,37 @@
 
     <block wx:if="{{eventDetailDraft.type === 'image'}}">
       <view
-        class="event-detail-image-box {{eventDetailDraft.imageData ? 'has-image' : ''}}"
-        bindtap="chooseEventDetailImage"
+        class="event-detail-image-box {{eventDetailDraft.brightImage ? 'has-image' : ''}}"
+        bindtap="chooseEventDetailBrightImage"
       >
-        <block wx:if="{{!eventDetailDraft.imageData}}">
+        <text class="event-detail-image-title">BRIGHT模式图片</text>
+        <block wx:if="{{!eventDetailDraft.brightImage}}">
           <text class="event-detail-image-icon">🖼</text>
-          <text class="event-detail-image-strong">点击上传图片</text>
-          <text class="event-detail-image-hint ds-hint-text">建议尺寸：宽 750px × 高 360px，JPG/PNG，单张图片</text>
+          <text class="event-detail-image-strong">点击上传 BRIGHT 图片</text>
+          <text class="event-detail-image-hint ds-hint-text">建议尺寸：宽 750px × 高 360px，JPG/PNG，允许仅上传一张</text>
         </block>
         <image
-          wx:if="{{eventDetailDraft.imageData}}"
+          wx:if="{{eventDetailDraft.brightImage}}"
           class="event-detail-image-preview"
-          src="{{eventDetailDraft.imageData}}"
+          src="{{eventDetailDraft.brightImage}}"
+          mode="widthFix"
+        ></image>
+      </view>
+
+      <view
+        class="event-detail-image-box {{eventDetailDraft.darkImage ? 'has-image' : ''}}"
+        bindtap="chooseEventDetailDarkImage"
+      >
+        <text class="event-detail-image-title">DARK模式图片</text>
+        <block wx:if="{{!eventDetailDraft.darkImage}}">
+          <text class="event-detail-image-icon">🖼</text>
+          <text class="event-detail-image-strong">点击上传 DARK 图片</text>
+          <text class="event-detail-image-hint ds-hint-text">建议尺寸：宽 750px × 高 360px，JPG/PNG，允许仅上传一张</text>
+        </block>
+        <image
+          wx:if="{{eventDetailDraft.darkImage}}"
+          class="event-detail-image-preview"
+          src="{{eventDetailDraft.darkImage}}"
           mode="widthFix"
         ></image>
       </view>

@@ -403,8 +403,8 @@
 
   </view>
 
-  <!-- Create Overlay -->
-  <view wx:if="{{createOverlayVisible}}" class="ds-overlay-viewport fixed inset-0 bg-white-95 z-100 flex flex-col max-w-md transition-all {{createOverlayOpen ? 'overlay-open' : 'overlay-closed'}}">
+  <!-- Create Overlay（主题 class 与首页同源，需挂在弹层根节点：弹层在 .ds-app 外） -->
+  <view wx:if="{{createOverlayVisible}}" class="ds-overlay-viewport create-overlay {{themeClass}} fixed inset-0 bg-white-95 z-100 flex flex-col max-w-md transition-all {{createOverlayOpen ? 'overlay-open' : 'overlay-closed'}}">
     <view class="create-sheet-head ds-overlay__fixed">
       <view class="create-sheet-handle"></view>
     </view>
@@ -462,8 +462,8 @@
     </view>
   </view>
 
-  <!-- More Create Selection Page -->
-  <view wx:if="{{moreCreateVisible}}" class="ds-page-overlay ds-overlay-viewport fixed inset-0 z-250 flex flex-col max-w-md overflow-hidden">
+  <!-- More Create Selection Page（同上：挂 themeClass，复用首页主题 token） -->
+  <view wx:if="{{moreCreateVisible}}" class="ds-page-overlay ds-overlay-viewport more-create-overlay {{themeClass}} fixed inset-0 z-250 flex flex-col max-w-md overflow-hidden">
     <view class="gb-header" style="{{headerRootStyle}}">
       <view class="gb-header__inner" style="{{headerBarStyle}}">
         <view class="gb-header__left">

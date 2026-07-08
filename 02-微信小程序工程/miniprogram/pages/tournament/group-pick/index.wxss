@@ -1,3 +1,28 @@
+/* ===== 主题 Token（对齐赛事详情页） ===== */
+.group-pick-page.dark-mode {
+  --bg-primary: #000000;
+  --bg-card: #111111;
+  --bg-subtle: #0a0a0a;
+  --bg-hover: #1a1a1a;
+  --border: #222222;
+  --border-hover: #333333;
+  --text-primary: #f1f5f9;
+  --text-secondary: #e5e7f9;
+  --text-muted: #888888;
+}
+
+.group-pick-page.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --bg-hover: #f9fafb;
+  --border: #e5e7eb;
+  --border-hover: #d1d5db;
+  --text-primary: #002d62;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+}
+
 page {
   height: 100%;
   background: #fcfcfc;
@@ -7,7 +32,8 @@ page {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  color: #002d62;
+  background: var(--bg-primary, #fcfcfc);
+  color: var(--text-primary, #002d62);
 }
 
 .gb-header {
@@ -25,13 +51,14 @@ page {
 
 .slots-fixed {
   flex-shrink: 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-card, #ffffff);
+  border-bottom: 1px solid var(--border, #e5e7eb);
   padding: 24rpx 32rpx 20rpx;
 }
 .group-title {
   font-size: 30rpx;
   font-weight: 800;
+  color: var(--text-primary, #002d62);
   margin-bottom: 16rpx;
 }
 
@@ -58,12 +85,19 @@ page {
   height: 96rpx;
   align-self: start;
 }
-.tee-avatar { width: 80rpx; height: 80rpx; border-radius: 9999rpx; border: 1px solid #e5e7eb; background: #f3f4f6; display: block; }
+.tee-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 9999rpx;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-subtle, #f3f4f6);
+  display: block;
+}
 .tee-avatar-plus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-muted, #6b7280);
   font-size: 38rpx;
   font-weight: 700;
 }
@@ -72,7 +106,7 @@ page {
   grid-row: 1;
   min-width: 0;
   align-self: start;
-  color: #002d62;
+  color: var(--text-primary, #002d62);
   font-size: 24rpx;
   line-height: 1.2;
   font-weight: 600;
@@ -101,22 +135,29 @@ page {
 }
 .tee-marker-dot--female { background: #dc2626; }
 .tee-marker-dot--male { background: #0284c7; }
-.tee-marker-letter { font-size: 20rpx; font-weight: 700; color: #6b7280; line-height: 1; }
+.tee-marker-letter {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--text-muted, #6b7280);
+  line-height: 1;
+}
 
 .pick-scroll {
   flex: 1;
   min-height: 0;
   padding-bottom: 24rpx;
+  background: var(--bg-primary, #fcfcfc);
 }
 .pick-title {
   font-size: 28rpx;
   font-weight: 800;
-  color: #002d62;
+  color: var(--text-primary, #002d62);
   padding: 24rpx 32rpx 12rpx;
 }
 
 .register-subtabs-wrap {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-primary, #fcfcfc);
 }
 .register-subtabs {
   height: 80rpx;
@@ -132,7 +173,7 @@ page {
   height: 80rpx;
   padding: 0 28rpx;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-muted, #6b7280);
   font-size: 28rpx;
   font-weight: 500;
   box-sizing: border-box;
@@ -142,7 +183,7 @@ page {
   white-space: nowrap;
 }
 .register-subtab--active {
-  color: #002d62;
+  color: var(--text-primary, #002d62);
   font-weight: 700;
 }
 .register-subtab--active::after {
@@ -166,7 +207,7 @@ page {
   column-gap: 16rpx;
   align-items: center;
   padding: 24rpx 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border, #e5e7eb);
 }
 .roster-row--selected {
   background: rgba(0, 45, 98, 0.05);
@@ -180,7 +221,7 @@ page {
   height: 40rpx;
   border-radius: 8rpx;
   border: 2rpx solid #9ca3af;
-  background: #ffffff;
+  background: var(--bg-card, #ffffff);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -234,12 +275,12 @@ page {
   height: 64rpx;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #f3f4f6;
+  background: var(--bg-subtle, #f3f4f6);
 }
 .roster-name {
   font-size: 28rpx;
   font-weight: 700;
-  color: #002d62;
+  color: var(--text-primary, #002d62);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -251,13 +292,13 @@ page {
 }
 .roster-occupied-tip {
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-muted, #6b7280);
   line-height: 1.2;
 }
 
 .pick-empty {
   padding: 48rpx 32rpx;
-  color: #6b7280;
+  color: var(--text-muted, #6b7280);
   font-size: 26rpx;
   text-align: center;
 }
@@ -266,7 +307,7 @@ page {
 .group-pick-cta-bar {
   flex-shrink: 0;
   padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
-  background: #ffffff;
+  background: var(--bg-card, #ffffff);
   border-top: 2rpx solid rgba(15, 23, 42, 0.08);
   box-sizing: border-box;
 }
@@ -282,4 +323,26 @@ page {
 }
 .group-pick-cta-btn:active {
   opacity: 0.9;
+}
+
+/* ===== DARK：选中态 / 指示线 / 复选框 / 主按钮保持可辨识 ===== */
+.group-pick-page.dark-mode .roster-row--selected {
+  background: rgba(0, 174, 239, 0.12);
+}
+
+.group-pick-page.dark-mode .register-subtab--active {
+  color: #f1f5f9;
+}
+
+.group-pick-page.dark-mode .register-subtab--active::after {
+  background: #00aeef;
+}
+
+.group-pick-page.dark-mode .roster-checkbox--checked {
+  border-color: #00aeef;
+  background: #00aeef;
+}
+
+.group-pick-page.dark-mode .group-pick-cta-bar {
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
