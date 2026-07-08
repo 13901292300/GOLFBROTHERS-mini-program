@@ -30,6 +30,7 @@ function _baseFromCurrentUser() {
   return {
     userId: user.userId || 'me',
     nickname: user.name || '',
+    gender: user.gender || '',
     competitionName: ''
   };
 }
@@ -40,6 +41,8 @@ function normalizeProfile(raw) {
   return {
     userId: data.userId || base.userId,
     nickname: data.nickname != null ? String(data.nickname) : base.nickname,
+    // 性别唯一来源：用户个人资料；未设置时回退当前用户默认
+    gender: data.gender != null && data.gender !== '' ? String(data.gender) : base.gender,
     competitionName: data.competitionName != null ? String(data.competitionName).trim() : ''
   };
 }

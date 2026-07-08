@@ -31,6 +31,7 @@ const mockAvatars = require('./mockAvatars.js');
 const CURRENT_USER = {
   userId: 'me',
   name: 'TIGERHOODS',
+  gender: '男',
   phone: '13800000000',
   avatar: mockAvatars.avatarByIndex(2)
 };

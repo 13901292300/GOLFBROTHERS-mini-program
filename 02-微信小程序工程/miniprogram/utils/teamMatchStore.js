@@ -107,6 +107,9 @@ function cloneRegisterInfo(info) {
  */
 function buildMatchFromCreatePage(pageData) {
   const data = pageData || {};
+  const gameStore = require('./gameStore.js');
+  const creator = gameStore.getCurrentUser();
+  const creatorId = data.createdBy || data.creatorId || (creator && creator.userId) || '';
   const matchId = 'team-match-' + Date.now();
   return {
     matchId,
@@ -135,6 +138,8 @@ function buildMatchFromCreatePage(pageData) {
     registerStatus: data.registerStatus === 'closed' ? 'closed' : 'open',
     status: 'registering',
     statusLabel: '报名中',
+    createdBy: creatorId,
+    creatorId: creatorId,
     createdAt: Date.now()
   };
 }

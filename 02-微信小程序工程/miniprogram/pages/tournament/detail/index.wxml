@@ -27,8 +27,7 @@
   <template name="registerExtensionStrip">
     <view class="register-ext">
       <view class="register-ext__summary">
-        <text class="register-ext__summary-label">已报名总人数</text>
-        <text class="register-ext__summary-count">{{registerTotalCount}}</text>
+        <text class="register-ext__summary-text">报名总人数：<text class="register-ext__summary-count">{{registerTotalCount}}</text></text>
       </view>
       <view class="register-subtabs-wrap">
         <scroll-view class="register-subtabs" scroll-x enable-flex>
@@ -39,8 +38,7 @@
             data-id="{{item.id}}"
             class="register-subtab {{activeRegisterSubTab === item.id ? 'register-subtab--active' : ''}}"
           >
-            <text class="register-subtab__name">{{item.name}}</text>
-            <text class="register-subtab__count">{{item.count}}</text>
+            <text class="register-subtab__label">{{item.name}}（{{item.count}}）</text>
           </view>
         </scroll-view>
       </view>
@@ -178,20 +176,21 @@
         <view class="register-tab-panel">
           <view class="register-roster-card ds-card" style="{{rosterMinHeight ? 'min-height:' + rosterMinHeight + 'px;' : ''}}">
             <view class="roster-head">
-              <text class="roster-col roster-col--idx">序号</text>
+              <view class="roster-col roster-col--idx"><text>序号</text></view>
               <text class="roster-col roster-col--player">球员</text>
-              <text class="roster-col roster-col--handicap">江湖差点</text>
+              <view class="roster-col roster-col--handicap"><text>江湖差点</text></view>
             </view>
             <view class="roster-content">
               <view wx:if="{{registerDisplayUsers.length}}" class="roster-body">
                 <view wx:for="{{registerDisplayUsers}}" wx:key="listKey" class="roster-row">
-                  <text class="roster-col roster-col--idx">{{index + 1}}</text>
+                  <view class="roster-col roster-col--idx"><text>{{index + 1}}</text></view>
                   <view class="roster-col roster-col--player">
                     <image class="roster-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
                     <text class="roster-name">{{item.competitionName}}</text>
-                    <text class="roster-gender">{{item.gender}}</text>
+                    <text wx:if="{{item.gender === '男'}}" class="roster-gender">♂</text>
+                    <text wx:elif="{{item.gender === '女'}}" class="roster-gender">♀</text>
                   </view>
-                  <text class="roster-col roster-col--handicap">{{item.handicap}}</text>
+                  <view class="roster-col roster-col--handicap"><text>{{item.handicap}}</text></view>
                 </view>
               </view>
               <view wx:else class="register-user-empty" style="{{rosterMinHeight ? 'min-height:calc(' + rosterMinHeight + 'px - 88rpx);' : ''}}">
@@ -199,6 +198,55 @@
               </view>
             </view>
           </view>
+        </view>
+      </block>
+
+      <!-- 分组 TAB：管理态可添加空分组卡片（复用出发表 tee-group-card 结构） -->
+      <block wx:if="{{activeTab === 'groups'}}">
+        <view class="groups-tab-panel" style="{{groupsPanelMinHeight ? 'min-height:' + groupsPanelMinHeight + 'px;' : ''}}">
+          <view class="groups-tab-header">
+            <text class="groups-tab-header__title">分组</text>
+          </view>
+          <block wx:if="{{groupsTabCards.length > 0}}">
+            <view wx:for="{{groupsTabCards}}" wx:key="groupId" class="tee-group-card" bindtap="onGroupCardTap" data-group-id="{{item.groupId}}" data-group-name="{{item.badge}}">
+              <view wx:if="{{canManageGroups}}" catchtap="onDeleteGroupTap" data-group-id="{{item.groupId}}" data-group-name="{{item.badge}}" class="delete-group-btn">
+                <text>×</text>
+              </view>
+              <view class="tee-group-meta">
+                <text class="tee-group-badge">{{item.badge}}</text>
+              </view>
+              <view class="tee-player-grid">
+                <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="tee-player">
+                  <view class="tee-avatar-wrap">
+                    <image wx:if="{{pl.avatar}}" class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                    <view wx:else class="tee-avatar tee-avatar-plus">+</view>
+                  </view>
+                  <text class="tee-player-name">{{pl.name}}</text>
+                  <view class="tee-marker-line">
+                    <view wx:if="{{pl.teeMarkerClass}}" class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
+                    <text class="tee-marker-letter">{{pl.teeLabel}}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view wx:if="{{canManageGroups}}" class="groups-tab-toolbar">
+              <view class="add-group-btn" bindtap="onAddGroup">
+                <view class="add-group-icon"><text>+</text></view>
+                <text>添加分组</text>
+              </view>
+            </view>
+          </block>
+          <block wx:else>
+            <view wx:if="{{canManageGroups}}" class="groups-tab-toolbar groups-tab-toolbar--first">
+              <view class="add-group-btn" bindtap="onAddGroup">
+                <view class="add-group-icon"><text>+</text></view>
+                <text>添加分组</text>
+              </view>
+            </view>
+            <view wx:else class="groups-panel-empty">
+              <text class="groups-panel-empty__text">暂无分组信息</text>
+            </view>
+          </block>
         </view>
       </block>
 
@@ -476,7 +524,7 @@
 
   <!-- 报名/取消报名固定按钮：报名 TAB + 报名中赛事 -->
   <view
-    wx:if="{{activeTab === 'register' && matchStatus.isRegistering}}"
+    wx:if="{{activeTab === 'register' && matchStatus.isRegistering && !hideRegisterCTA}}"
     class="register-cta-bar"
   >
     <view
@@ -531,6 +579,15 @@
     </view>
 
     <view class="register-sheet__field">
+      <text class="register-sheet__label">性别</text>
+      <view class="register-sheet__groups register-sheet__groups--readonly">
+        <view class="register-sheet__group {{registerGenderDraft === '男' ? 'register-sheet__group--active' : ''}}">男</view>
+        <view class="register-sheet__group {{registerGenderDraft === '女' ? 'register-sheet__group--active' : ''}}">女</view>
+      </view>
+      <text class="register-sheet__hint">性别来自个人资料，报名弹窗不可修改</text>
+    </view>
+
+    <view class="register-sheet__field">
       <text class="register-sheet__label">手机号</text>
       <view class="register-sheet__readonly">{{registerPhone || '未绑定手机号'}}</view>
     </view>
@@ -552,6 +609,18 @@
           bindtap="confirmCancelRegister"
           class="register-cancel-dialog__btn register-cancel-dialog__btn--danger {{registerCancelSubmitting ? 'is-disabled' : ''}}"
         >确认取消</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 删除分组确认弹窗（页面态，不写 teamMatchStore） -->
+  <view wx:if="{{groupDeleteModalVisible}}" bindtap="closeGroupDeleteModal" class="register-cancel-modal">
+    <view catchtap="stopPropagation" class="register-cancel-dialog">
+      <text class="register-cancel-dialog__title">确认删除{{groupDeleteTargetName}}？</text>
+      <text class="register-cancel-dialog__desc">删除后该组球员配置将被移除。</text>
+      <view class="register-cancel-dialog__actions">
+        <view bindtap="closeGroupDeleteModal" class="register-cancel-dialog__btn">取消</view>
+        <view bindtap="confirmDeleteGroup" class="register-cancel-dialog__btn register-cancel-dialog__btn--danger">确认删除</view>
       </view>
     </view>
   </view>

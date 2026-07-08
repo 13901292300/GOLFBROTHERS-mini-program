@@ -351,19 +351,17 @@ page {
   border-bottom: 1px solid var(--border);
 }
 .register-ext__summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 20rpx 32rpx 12rpx;
 }
-.register-ext__summary-label {
+.register-ext__summary-text {
   color: var(--text-secondary);
   font-size: 26rpx;
   font-weight: 700;
+  line-height: 1.4;
 }
 .register-ext__summary-count {
   color: var(--champion-gold);
-  font-size: 32rpx;
+  font-size: 26rpx;
   font-weight: 900;
 }
 .register-subtabs-wrap {
@@ -380,7 +378,6 @@ page {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 10rpx;
   height: 80rpx;
   padding: 0 28rpx;
   background: transparent;
@@ -389,9 +386,9 @@ page {
   font-weight: 500;
   box-sizing: border-box;
 }
-.register-subtab__name,
-.register-subtab__count {
+.register-subtab__label {
   line-height: 1;
+  white-space: nowrap;
 }
 .register-subtab--active {
   color: var(--tour-blue);
@@ -407,10 +404,17 @@ page {
   background: var(--tour-blue);
   border-radius: 3rpx 3rpx 0 0;
 }
-.register-subtab--active .register-subtab__name,
-.register-subtab--active .register-subtab__count {
+.register-subtab--active .register-subtab__label {
   color: var(--tour-blue);
   font-weight: 700;
+}
+/* DARK 模式：子 TAB 文字使用浅色，指示器横线仍保持 tour-blue */
+.detail-page.dark-mode .register-subtab {
+  color: var(--text-secondary);
+}
+.detail-page.dark-mode .register-subtab--active,
+.detail-page.dark-mode .register-subtab--active .register-subtab__label {
+  color: var(--text-primary);
 }
 .register-tab-panel { padding: 0; }
 /* 空态复用名单卡片内部空间：占据表头以下剩余高度并垂直居中（min-height 由 style 动态注入，下方为兜底） */
@@ -435,9 +439,10 @@ page {
   margin-bottom: 180rpx;
 }
 .roster-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 15% 60% 25%;
   align-items: center;
-  padding: 24rpx 32rpx;
+  padding: 24rpx 32rpx 24rpx 0;
   background: var(--bg-subtle);
   border-bottom: 1px solid var(--border);
 }
@@ -451,28 +456,43 @@ page {
   display: block;
 }
 .roster-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 15% 60% 25%;
   align-items: center;
-  padding: 20rpx 32rpx;
+  padding: 20rpx 32rpx 20rpx 0;
   border-bottom: 1px solid var(--border);
 }
 .roster-row:last-child { border-bottom: none; }
+.roster-col--idx,
+.roster-col--handicap {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .roster-col--idx {
-  flex: 0 0 80rpx;
   color: var(--text-secondary);
   font-size: 26rpx;
   font-weight: 700;
 }
+.roster-head .roster-col--idx {
+  color: var(--text-muted);
+  font-size: 24rpx;
+}
+.roster-col--idx text,
+.roster-col--handicap text {
+  text-align: center;
+}
 .roster-col--player {
-  flex: 1 1 auto;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 16rpx;
   min-width: 0;
+  text-align: left;
 }
 .roster-col--handicap {
-  flex: 0 0 140rpx;
-  text-align: right;
   color: var(--champion-gold);
   font-size: 28rpx;
   font-weight: 800;
@@ -497,43 +517,58 @@ page {
   font-size: 24rpx;
   color: var(--data-blue, #00aeef);
 }
-/* ===== 报名弹窗（比赛名编辑，结构预留） ===== */
-.register-sheet__head { padding: 8rpx 8rpx 24rpx; }
+/* ===== 报名 bottom sheet（对齐详情页卡片体系：统一左右 40rpx、圆角 16rpx、输入高 88rpx、按钮高 88rpx）===== */
+.register-sheet {
+  padding-left: 40rpx;
+  padding-right: 40rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+}
+.register-sheet__head {
+  padding: 8rpx 0 32rpx;
+}
 .register-sheet__title {
   display: block;
-  font-size: 32rpx;
-  font-weight: 800;
+  font-size: 34rpx;
+  font-weight: 900;
   color: var(--text-primary);
 }
 .register-sheet__sub {
   display: block;
-  margin-top: 8rpx;
-  font-size: 22rpx;
+  margin-top: 10rpx;
+  font-size: 24rpx;
   color: var(--text-muted);
+  line-height: 1.4;
 }
-.register-sheet__field { padding: 0 8rpx 16rpx; }
+.register-sheet__field {
+  padding: 0 0 28rpx;
+}
 .register-sheet__label {
   display: block;
-  margin-bottom: 12rpx;
+  margin-bottom: 16rpx;
   font-size: 22rpx;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.register-sheet__input {
+/* 统一输入 / 只读展示高度 88rpx，与全局表单一致 */
+.register-sheet__input,
+.register-sheet__readonly {
   width: 100%;
   box-sizing: border-box;
-  padding: 20rpx 24rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 24rpx;
   border-radius: 16rpx;
   background: var(--bg-secondary, #f1f5f9);
   font-size: 30rpx;
   font-weight: 700;
   color: var(--text-primary);
 }
+.register-sheet__readonly { color: var(--text-secondary, #475569); }
 .register-sheet__hint {
   display: block;
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   font-size: 22rpx;
   color: var(--text-muted);
   line-height: 1.5;
@@ -543,11 +578,16 @@ page {
   flex-wrap: wrap;
   gap: 16rpx;
 }
+/* 性别只读：不可点击，仅展示个人资料中的性别 */
+.register-sheet__groups--readonly { pointer-events: none; }
+.register-sheet__groups--readonly .register-sheet__group { opacity: 0.9; }
 .register-sheet__group {
-  padding: 14rpx 32rpx;
-  border-radius: 999rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  padding: 0 40rpx;
+  border-radius: 16rpx;
   background: var(--bg-secondary, #f1f5f9);
-  font-size: 26rpx;
+  font-size: 28rpx;
   font-weight: 700;
   color: var(--text-secondary, #475569);
   border: 2rpx solid transparent;
@@ -560,37 +600,29 @@ page {
 .detail-page.dark-mode .register-sheet__group--active {
   background: rgba(200, 162, 74, 0.16);
 }
-.register-sheet__readonly {
-  padding: 20rpx 24rpx;
-  border-radius: 16rpx;
-  background: var(--bg-secondary, #f1f5f9);
-  font-size: 30rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-}
 .register-sheet__actions {
   display: flex;
   gap: 20rpx;
-  padding: 24rpx 8rpx 8rpx;
+  padding: 12rpx 0 0;
+}
+.register-sheet__cancel,
+.register-sheet__confirm {
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  font-size: 30rpx;
 }
 .register-sheet__cancel {
   flex: 1;
-  text-align: center;
-  padding: 24rpx 0;
-  border-radius: 16rpx;
   background: var(--bg-secondary, #f1f5f9);
-  font-size: 30rpx;
   font-weight: 800;
   color: var(--text-secondary, #475569);
 }
 .register-sheet__confirm {
   flex: 2;
-  text-align: center;
-  padding: 24rpx 0;
-  border-radius: 16rpx;
   background: var(--champion-gold, #c8a24a);
   color: #ffffff;
-  font-size: 30rpx;
   font-weight: 900;
   letter-spacing: 0.06em;
 }
@@ -675,10 +707,13 @@ page {
   text-align: center;
   padding: 22rpx 0;
   border-radius: 16rpx;
-  background: var(--bg-secondary, #f1f5f9);
   font-size: 28rpx;
   font-weight: 800;
-  color: var(--text-secondary, #475569);
+}
+/* 取消按钮：固定浅色底 + 深色字（BRIGHT/DARK 弹窗背景均保持一致对比） */
+.register-cancel-dialog__btn:not(.register-cancel-dialog__btn--danger) {
+  background: #f1f5f9;
+  color: #374151;
 }
 .register-cancel-dialog__btn--danger {
   background: #dc2626;
@@ -690,6 +725,56 @@ page {
   color: var(--text-primary);
   font-size: 28rpx;
   font-weight: 700;
+}
+
+/* ===== 分组 TAB 内容区（撑满主 TAB 以下首屏剩余空间） ===== */
+.groups-tab-panel {
+  padding: 0;
+  box-sizing: border-box;
+  min-height: calc(100vh - 92px - var(--tab-height) - 40rpx - env(safe-area-inset-bottom));
+  margin-bottom: 32rpx;
+}
+.groups-tab-header {
+  padding: 4rpx 0 12rpx;
+}
+.groups-tab-header__title {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.groups-tab-toolbar { margin-top: 24rpx; }
+.groups-tab-toolbar--first { margin-top: 12rpx; }
+.add-group-btn {
+  height: 72rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 16rpx;
+  color: var(--text-muted);
+  font-size: 28rpx;
+  font-weight: 700;
+  background: transparent;
+}
+.add-group-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  border: 1px solid var(--border-hover);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  flex-shrink: 0;
+}
+.groups-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180rpx;
+}
+.groups-panel-empty__text {
+  color: var(--text-muted);
+  font-size: 26rpx;
 }
 
 .detail-main { padding: 40rpx 32rpx 80rpx; }
@@ -811,14 +896,34 @@ page {
 
 /* ===== 出发表 ===== */
 .tee-group-card { position: relative; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border); border-top: 6rpx solid var(--tour-blue); border-radius: 24rpx; box-shadow: var(--shadow-card); padding: 96rpx 28rpx 32rpx; margin-bottom: 24rpx; }
+/* 分组 TAB 删除入口：沿用创建页全局 delete-group-btn 规范，定位于卡片右上角 */
+.tee-group-card .delete-group-btn {
+  position: absolute;
+  top: 18rpx;
+  right: 18rpx;
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+  background: var(--error, #ef4444);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  line-height: 1;
+  z-index: 4;
+  box-shadow: 0 8rpx 16rpx rgba(0, 0, 0, 0.16);
+}
 .tee-group-meta { position: absolute; left: 0; top: 0; right: 0; height: 72rpx; display: flex; align-items: center; gap: 20rpx; background: linear-gradient(90deg, rgba(0, 45, 98, 0.1), transparent 72%); }
 .detail-page.dark-mode .tee-group-meta { background: linear-gradient(90deg, rgba(0, 45, 98, 0.28), transparent 72%); }
 .tee-group-badge { height: 72rpx; line-height: 72rpx; display: inline-flex; align-items: center; background: var(--tour-blue); color: #fff; font-size: 26rpx; font-weight: 700; padding: 0 28rpx; border-bottom-right-radius: 20rpx; }
 .tee-start-info { display: inline-flex; align-items: center; gap: 12rpx; color: var(--text-secondary); font-size: 22rpx; font-weight: 500; white-space: nowrap; }
 .tee-clock { color: var(--champion-gold); font-size: 20rpx; }
 .tee-hole-pill { display: inline-flex; align-items: center; height: 36rpx; padding: 0 14rpx; border-radius: 9999rpx; background: rgba(206, 146, 36, 0.12); color: var(--champion-gold); border: 1px solid rgba(206, 146, 36, 0.22); font-size: 20rpx; font-weight: 700; }
-.tee-player-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx 8rpx; align-items: start; }
+.tee-player-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx 8rpx; align-items: start; overflow: visible; }
 .tee-player {
+  position: relative;
   display: grid;
   grid-template-columns: 88rpx minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -836,6 +941,14 @@ page {
   align-self: start;
 }
 .tee-avatar { width: 80rpx; height: 80rpx; border-radius: 9999rpx; border: 1px solid var(--border); background: var(--bg-subtle); display: block; }
+.tee-avatar-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 38rpx;
+  font-weight: 700;
+}
 .tee-v-badge { position: absolute; right: -4rpx; bottom: -4rpx; width: 40rpx; height: 40rpx; border-radius: 9999rpx; background: #fff; border: 1px solid rgba(206, 146, 36, 0.55); display: flex; align-items: center; justify-content: center; color: var(--champion-gold); font-size: 20rpx; font-weight: 900; box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.16); }
 .tee-player-name {
   grid-column: 2;
@@ -850,13 +963,18 @@ page {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 横向：两头像水平中点；纵向：与头像下半部分对齐 */
 .tee-marker-line {
-  grid-column: 2;
-  grid-row: 2;
+  position: absolute;
+  left: calc(50% + 44rpx);
+  top: 60rpx;
+  transform: translateX(-50%);
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 4rpx;
   line-height: 1;
+  pointer-events: none;
 }
 .tee-marker-dot { width: 10rpx; height: 10rpx; border-radius: 9999rpx; flex-shrink: 0; }
 .tee-marker-dot--female { background: #dc2626; }

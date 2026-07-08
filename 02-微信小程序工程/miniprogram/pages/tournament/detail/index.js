@@ -122,6 +122,21 @@ const FEATURES_PERMISSION = [
 ];
 
 const MORE_ACCESS = { isPrivilegedUser: true, permissions: ['leaderboard', 'stats', 'poster', 'feedback', 'theme'] };
+const TOURNAMENT_MANAGE_PERMISSIONS = FEATURES_PERMISSION.map((f) => f.permission);
+const GROUPS_TAB_PLAYER_SLOTS = 4;
+
+function createEmptyGroupPlayer(position) {
+  return { position: position, userId: '', avatar: '', displayName: '', gender: '', tee: '' };
+}
+
+function createEmptyGroup(groupIndex) {
+  const n = groupIndex + 1;
+  return {
+    groupId: 'group-tab-' + Date.now() + '-' + n,
+    groupName: '第' + n + '组',
+    players: Array.from({ length: GROUPS_TAB_PLAYER_SLOTS }, (_, i) => createEmptyGroupPlayer(i + 1))
+  };
+}
 const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
 const FAB_EDGE_GAP_RPX = 10;
@@ -189,11 +204,23 @@ Page({
     registerDisplayUsers: [],
     currentUserRegisterStatus: EMPTY_CURRENT_USER_REGISTER_STATUS,
     registerPermission: Object.assign({}, EMPTY_REGISTER_PERMISSION),
+    // 报名 TAB 底部 CTA：主 TAB 距屏幕底部 <=100px 时隐藏
+    hideRegisterCTA: false,
     // 报名名单卡片动态高度（px，随设备/尺寸计算；0 表示尚未计算，样式回退）
     rosterMinHeight: 0,
+    // 分组 TAB 内容区动态高度（px，随设备/尺寸计算）
+    groupsPanelMinHeight: 0,
+    // 分组 TAB：页面态分组数据（暂不写入 teamMatchStore）
+    groups: [],
+    groupsTabCards: [],
+    canManageGroups: false,
+    groupDeleteModalVisible: false,
+    groupDeleteTargetId: '',
+    groupDeleteTargetName: '',
     // 报名弹窗（立即报名流程：分组选择 + 比赛名 + 手机号）
     registerSheetVisible: false,
     registerCompetitionNameDraft: '',
+    registerGenderDraft: '',
     registerSheetGroupId: '',
     registerPhone: '',
     registerSubmitting: false,
@@ -262,7 +289,176 @@ Page({
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
       activeTab: tabs[0].id,
       eventInfoList: this._resolveEventInfoList(match)
-    }, this._buildRegisterStatePatch(match)));
+    }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)));
+  },
+
+  _buildGroupsTabStatePatch(match) {
+    return {
+      groups: [],
+      groupsTabCards: [],
+      canManageGroups: this._resolveCanManageGroups(match)
+    };
+  },
+
+  _resolveCanManageGroups(match) {
+    const user = gameStore.getCurrentUser();
+    const userId = user && user.userId;
+    const access = MORE_ACCESS;
+    const permSet = access.permissions || [];
+    const creatorId = match && (match.createdBy || match.creatorId);
+    const isCreator = !!(userId && creatorId && creatorId === userId);
+    const hasManagePermission = access.isPrivilegedUser ||
+      TOURNAMENT_MANAGE_PERMISSIONS.some((p) => permSet.indexOf(p) >= 0);
+    return isCreator || hasManagePermission;
+  },
+
+  _mapGroupsToTabCards(groups) {
+    return (groups || []).map((g) => ({
+      groupId: g.groupId,
+      badge: g.groupName,
+      players: (g.players || []).map((p) => {
+        const displayName = p.displayName
+          ? String(p.displayName)
+          : (p.competitionName ? String(p.competitionName) : '');
+        return {
+          position: p.position,
+          name: displayName,
+          avatar: p.avatar ? mockAvatars.resolveAvatar(p.avatar) : '',
+          teeLabel: p.tee ? 'T' : '',
+          teeMarkerClass: p.tee === 'RED_T'
+            ? 'tee-marker-dot--female'
+            : (p.tee === 'BLUE_T' ? 'tee-marker-dot--male' : '')
+        };
+      })
+    }));
+  },
+
+  onAddGroup() {
+    if (!this.data.canManageGroups) return;
+    const groups = (this.data.groups || []).slice();
+    groups.push(createEmptyGroup(groups.length));
+    this.setData({
+      groups: groups,
+      groupsTabCards: this._mapGroupsToTabCards(groups)
+    });
+  },
+
+  onDeleteGroupTap(e) {
+    if (!this.data.canManageGroups) return;
+    const groupId = String((e.currentTarget.dataset.groupId != null ? e.currentTarget.dataset.groupId : ''));
+    const groupName = String((e.currentTarget.dataset.groupName != null ? e.currentTarget.dataset.groupName : ''));
+    if (!groupId) return;
+    this.setData({
+      groupDeleteModalVisible: true,
+      groupDeleteTargetId: groupId,
+      groupDeleteTargetName: groupName || '该组'
+    });
+  },
+
+  closeGroupDeleteModal() {
+    this.setData({
+      groupDeleteModalVisible: false,
+      groupDeleteTargetId: '',
+      groupDeleteTargetName: ''
+    });
+  },
+
+  confirmDeleteGroup() {
+    if (!this.data.canManageGroups) {
+      this.closeGroupDeleteModal();
+      return;
+    }
+    const targetId = String(this.data.groupDeleteTargetId || '');
+    if (!targetId) {
+      this.closeGroupDeleteModal();
+      return;
+    }
+    const next = (this.data.groups || [])
+      .filter((g) => String(g && g.groupId) !== targetId)
+      .map((g, index) => Object.assign({}, g, {
+        groupName: '第' + (index + 1) + '组'
+      }));
+    this.setData({
+      groups: next,
+      groupsTabCards: this._mapGroupsToTabCards(next),
+      groupDeleteModalVisible: false,
+      groupDeleteTargetId: '',
+      groupDeleteTargetName: ''
+    });
+  },
+
+  onGroupCardTap(e) {
+    const groupId = String((e.currentTarget.dataset.groupId != null ? e.currentTarget.dataset.groupId : ''));
+    const groupName = String((e.currentTarget.dataset.groupName != null ? e.currentTarget.dataset.groupName : ''));
+    if (!groupId) return;
+    const currentGroup = (this.data.groups || []).find((g) => String(g.groupId) === groupId) || null;
+    const app = getApp();
+    app.globalData = app.globalData || {};
+    app.globalData.tournamentGroupPickResult = null;
+    app.globalData.tournamentGroupPickPayload = {
+      matchId: this.data.matchId || '',
+      groupId: groupId,
+      groupName: groupName,
+      players: currentGroup && Array.isArray(currentGroup.players) ? currentGroup.players : [],
+      groups: (this.data.groups || []).map((g) => ({
+        groupId: g && g.groupId ? String(g.groupId) : '',
+        groupName: g && g.groupName ? String(g.groupName) : '',
+        players: Array.isArray(g && g.players)
+          ? g.players.map((p) => ({
+            userId: p && p.userId ? String(p.userId) : '',
+            position: Number(p && p.position) || 0
+          }))
+          : []
+      })),
+      registerInfo: this.data.registerInfo || { totalCount: 0, users: [] },
+      registerSubTabs: this.data.registerSubTabs || []
+    };
+    wx.navigateTo({
+      url: '/pages/tournament/group-pick/index?matchId=' + encodeURIComponent(this.data.matchId || '') +
+        '&groupId=' + encodeURIComponent(groupId) +
+        '&groupName=' + encodeURIComponent(groupName)
+    });
+  },
+
+  /** 接收 group-pick 页面态确认结果（不写 teamMatchStore） */
+  _applyGroupPickResultIfAny() {
+    const app = getApp();
+    const result = app && app.globalData ? app.globalData.tournamentGroupPickResult : null;
+    if (!result || !result.groupId) return;
+    if (app && app.globalData) app.globalData.tournamentGroupPickResult = null;
+
+    const groups = (this.data.groups || []).slice();
+    const idx = groups.findIndex((g) => String(g.groupId) === String(result.groupId));
+    if (idx < 0) return;
+
+    const players = Array.from({ length: 4 }, (_, i) => {
+      const position = i + 1;
+      const found = Array.isArray(result.players)
+        ? result.players.find((p) => Number(p && p.position) === position)
+        : null;
+      if (!found || !found.userId) {
+        return createEmptyGroupPlayer(position);
+      }
+      return {
+        position: position,
+        userId: found.userId ? String(found.userId) : '',
+        avatar: found.avatar ? String(found.avatar) : '',
+        displayName: found.displayName
+          ? String(found.displayName)
+          : (found.competitionName ? String(found.competitionName) : ''),
+        gender: found.gender ? String(found.gender) : '',
+        tee: found.tee ? String(found.tee) : ''
+      };
+    });
+
+    groups[idx] = Object.assign({}, groups[idx], {
+      groupName: result.groupName || groups[idx].groupName,
+      players: players
+    });
+    this.setData({
+      groups: groups,
+      groupsTabCards: this._mapGroupsToTabCards(groups)
+    });
   },
 
   // 赛事生命周期：读取 teamMatchStore.match.status，归一化为 registering | ongoing | completed
@@ -388,6 +584,8 @@ Page({
         userId: user && user.userId ? String(user.userId) : '',
         // 赛事显示名唯一来源 competitionName；兼容旧数据回退 nickname
         competitionName: user && user.competitionName ? String(user.competitionName) : (user && user.nickname ? String(user.nickname) : ''),
+        gender: user && user.gender ? String(user.gender) : '',
+        handicap: user && user.handicap != null ? user.handicap : '',
         avatar: user && user.avatar ? String(user.avatar) : '',
         phone: user && user.phone ? String(user.phone) : '',
         groupId: user && user.groupId != null ? String(user.groupId) : '',
@@ -412,6 +610,9 @@ Page({
         listKey: user.userId || ('register-user-' + groupId + '-' + index),
         userId: user.userId || '',
         competitionName: user.competitionName || '',
+        gender: user.gender || '',
+        // 江湖差点空值统一显示 "-"（0 为有效差点，需保留）
+        handicap: (user.handicap != null && user.handicap !== '') ? String(user.handicap) : '-',
         avatar: user.avatar || '',
         phone: user.phone || '',
         groupId: user.groupId || '',
@@ -492,6 +693,8 @@ Page({
       registerSheetVisible: true,
       registerSheetGroupId: subTabs.length ? subTabs[0].id : '',
       registerCompetitionNameDraft: userProfileStore.getRegisterCompetitionNameDefault(profile),
+      // 性别唯一来源：个人资料 gender（弹窗内只读展示，不可编辑）
+      registerGenderDraft: profile.gender || '',
       registerPhone: user.phone ? String(user.phone) : ''
     });
   },
@@ -563,6 +766,7 @@ Page({
       match.registerInfo.users.push({
         userId: userId,
         competitionName: competitionName,
+        gender: this.data.registerGenderDraft ? String(this.data.registerGenderDraft) : '',
         avatar: user.avatar ? String(user.avatar) : '',
         phone: this.data.registerPhone ? String(this.data.registerPhone) : (user.phone ? String(user.phone) : ''),
         groupId: groupId,
@@ -668,6 +872,8 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    // group-pick 确认结果：页面态回传，优先于其它首页刷新逻辑前合入
+    this._applyGroupPickResultIfAny();
     // 显示偏好可能在记分页被切换 → 同步最新值
     this.loadScoreDisplayMode();
     // 出发表 groups 可能在记分页被更新 → 重算出发表视图与领先榜（均派生自 groups）
@@ -685,6 +891,7 @@ Page({
     wx.nextTick(() => this.measureTabOverflow());
     if (this.data.activeTab === 'discussion') wx.nextTick(() => this.measureWatchersTop());
     if (this.data.activeTab === 'register') wx.nextTick(() => this.measureRegisterExtTop());
+    if (this.data.activeTab === 'groups') wx.nextTick(() => this.computeGroupsPanelMinHeight());
     wx.nextTick(() => this._refreshFabHitZones());
   },
 
@@ -699,8 +906,18 @@ Page({
 
   onResize() {
     this.measureTabTop();
+    try {
+      const sys = wx.getSystemInfoSync();
+      if (sys && sys.windowHeight) this._fabWindowH = sys.windowHeight;
+    } catch (e) { /* ignore */ }
     if (this.data.activeTab === 'register') {
-      wx.nextTick(() => this.computeRosterMinHeight());
+      wx.nextTick(() => {
+        this.computeRosterMinHeight();
+        this._syncStickyByScroll(this.data.scrollYState || 0);
+      });
+    }
+    if (this.data.activeTab === 'groups') {
+      wx.nextTick(() => this.computeGroupsPanelMinHeight());
     }
   },
 
@@ -829,6 +1046,7 @@ Page({
             this.updateTabContentSpacer();
             if (this.data.activeTab === 'discussion') this.measureWatchersTop();
             if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+            if (this.data.activeTab === 'groups') this.computeGroupsPanelMinHeight();
             wx.nextTick(() => this.measureTabOverflow());
           }
         }
@@ -942,6 +1160,37 @@ Page({
       });
   },
 
+  /**
+   * 分组 TAB 内容区动态最小高度：
+   * groupsPanelMinHeight = 窗口高 - HEADER - 主TAB - 必要间距 - safe-area
+   * 无二级扩展区/底部 CTA；撑满主 TAB 以下剩余空间以触发吸顶。
+   */
+  computeGroupsPanelMinHeight() {
+    if (this.data.activeTab !== 'groups') return;
+    let sys = { windowWidth: 375, windowHeight: 667 };
+    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    const winH = sys.windowHeight || 667;
+    const rpx2px = (sys.windowWidth || 375) / 750;
+    let safeBottom = 0;
+    if (sys.safeArea && typeof sys.screenHeight === 'number') {
+      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
+    }
+    this.createSelectorQuery()
+      .in(this)
+      .select('.gb-header').boundingClientRect()
+      .select('.tab-scroll-wrap--inflow').boundingClientRect()
+      .exec((res) => {
+        res = res || [];
+        const headerH = res[0] && res[0].height ? res[0].height : (this.data.headerTotalHeight || 92);
+        const mainTabH = res[1] && res[1].height ? res[1].height : (this.data.tabBarHeight || 50);
+        const gap = 40 * rpx2px;
+        let h = winH - headerH - mainTabH - gap - safeBottom;
+        if (!(h > 0)) h = 0;
+        h = Math.round(h);
+        if (h !== this.data.groupsPanelMinHeight) this.setData({ groupsPanelMinHeight: h });
+      });
+  },
+
   measureRegisterExtTop() {
     if (this.data.activeTab !== 'register') return;
     this.computeRosterMinHeight();
@@ -1024,6 +1273,12 @@ Page({
     if (registerExtSticky !== this.data.isStickyRegisterExt) {
       patch.isStickyRegisterExt = registerExtSticky;
     }
+    if (this.data.activeTab === 'register') {
+      const hideCTA = this._calcHideRegisterCTA(scrollTop, sticky);
+      if (hideCTA !== this.data.hideRegisterCTA) {
+        patch.hideRegisterCTA = hideCTA;
+      }
+    }
     if (patch.isStickyTab === true && !this.data.isStickyTab) {
       patch.tabHScrollLeft = this._lastTabScrollLeft || 0;
     }
@@ -1051,6 +1306,26 @@ Page({
     const extThreshold = this.data.registerExtOffsetTop || 0;
     const stickyTop = this.data.stickyRegisterExtTop || 0;
     return extThreshold > 0 && scrollTop >= extThreshold - stickyTop;
+  },
+
+  /**
+   * 报名 TAB 底部 CTA 显隐：screenHeight - tabBottom <= 100px 时隐藏
+   * tabBottom 由 tabOffsetTop / scrollTop / tabBarHeight / headerTotalHeight 推导（与吸顶同一套测量）
+   */
+  _calcHideRegisterCTA(scrollTop, isStickyTab) {
+    const tabOffsetTop = this.data.tabOffsetTop || 0;
+    if (tabOffsetTop <= 0) return false;
+
+    const screenH = this._fabWindowH || 667;
+    const tabBarH = this.data.tabBarHeight || 50;
+    const headerH = this.data.headerTotalHeight || 92;
+    let tabBottom;
+    if (isStickyTab) {
+      tabBottom = headerH + tabBarH;
+    } else {
+      tabBottom = headerH + tabOffsetTop - scrollTop + tabBarH;
+    }
+    return (screenH - tabBottom) <= 100;
   },
 
   _syncStickyRegisterExtByScroll(scrollTop) {
@@ -1082,11 +1357,18 @@ Page({
     if (tab !== 'register' && this.data.isStickyRegisterExt) {
       patch.isStickyRegisterExt = false;
     }
+    if (tab !== 'register') {
+      patch.hideRegisterCTA = false;
+    }
     this.setData(patch);
     wx.nextTick(() => {
       this.updateTabContentSpacer();
       if (tab === 'discussion') this.measureWatchersTop();
-      if (tab === 'register') this.measureRegisterExtTop();
+      if (tab === 'register') {
+        this.measureRegisterExtTop();
+        this._syncStickyByScroll(this.data.scrollYState || 0);
+      }
+      if (tab === 'groups') this.computeGroupsPanelMinHeight();
     });
     if (tab === 'tee-sheet') {
       // 进入出发表：DOM 渲染后绑定"第一组卡片"视口观察器（按钮初始隐藏，由可见性触发）
