@@ -1440,6 +1440,12 @@ page {
   z-index: 100;
 }
 
+/* 人员来源弹层挂在添加/删除内：抬高层级，避免被底栏(z-index:100)遮挡 */
+.group-manage-source-sheet {
+  position: relative;
+  z-index: 200;
+}
+
 .section-card {
   width: 100%;
   box-sizing: border-box;

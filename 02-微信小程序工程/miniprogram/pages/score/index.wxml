@@ -529,18 +529,20 @@
         </view>
       </view>
     </view>
-  </view>
 
-  <!-- 点击空位：人员来源选择（player-source-sheet） -->
-  <player-source-sheet
-    visible="{{addSheetVisible}}"
-    theme-class="{{themeClass}}"
-    overline="ADD PLAYER"
-    title="选择添加方式"
-    options="{{playerSourceOptions}}"
-    bind:close="closeAddSheet"
-    bind:select="onPlayerSourceSelect"
-  />
+    <!-- 点击空位：人员来源选择（仅添加/删除流程内弹层；包装层抬高至底栏之上） -->
+    <view class="group-manage-source-sheet">
+      <player-source-sheet
+        visible="{{addSheetVisible}}"
+        theme-class="{{themeClass}}"
+        overline="ADD PLAYER"
+        title="选择添加方式"
+        options="{{playerSourceOptions}}"
+        bind:close="closeAddSheet"
+        bind:select="onPlayerSourceSelect"
+      />
+    </view>
+  </view>
 
   <!-- 信息继承型展开面板（Context Panel）：根级 fixed 浮层，与记分表完全解耦，不挤压 TAB / HOLE / score grid -->
   <view wx:if="{{gameInfoOpen}}" class="game-info-mask" bindtap="closeGameInfo"></view>

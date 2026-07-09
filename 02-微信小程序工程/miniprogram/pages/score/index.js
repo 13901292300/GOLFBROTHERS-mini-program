@@ -2087,12 +2087,7 @@ Page({
     wx.showToast({ title: '比赛已取消', icon: 'success', duration: 1500 });
 
     setTimeout(() => {
-      const pages = getCurrentPages();
-      if (pages.length > 1) {
-        wx.navigateBack({ delta: 1 });
-      } else {
-        wx.reLaunch({ url: '/pages/home/index?tab=my' });
-      }
+      wx.reLaunch({ url: '/pages/home/index?tab=my' });
     }, 300);
   },
 
@@ -2105,7 +2100,8 @@ Page({
   },
 
   closeGroupManagePage() {
-    this.setData({ showGroupManage: false });
+    this._targetSlotIdx = null;
+    this.setData({ showGroupManage: false, addSheetVisible: false });
   },
 
   // 是否绑定真实记分数据源（个人比杆赛走 groupsStore，以 playerId 为成绩主键）
