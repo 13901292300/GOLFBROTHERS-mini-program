@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>队际系列赛创建引擎</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+
+/* ================= THEME VARIABLES (Based on V3.0) ================= */
+:root {
+  --tour-blue: #002D62;
+  --champion-gold: #CE9224;
+  --data-blue: #00AEEF;
+  --bg-primary: #FCFCFC;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F3F4F6;
+  --border: #E5E7EB;
+  --border-hover: #D1D5DB;
+  --text-primary: #002D62;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+}
+
+/* ================= BASE ================= */
+body{
+  margin:0;
+  font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ================= HEADER (fixed + top layer) ================= */
+.header{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:9999;
+  background: var(--tour-blue);
+  color: #fff;
+  padding: 14px 16px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--champion-gold);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 56px;
+}
+
+.header-left{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  font-size: 18px;
+}
+
+.back{
+  font-size: 20px;
+  cursor:pointer;
+}
+
+.capsule{
+  width:70px;
+  height:26px;
+  background:rgba(255,255,255,0.15);
+  border-radius:999px;
+}
+
+/* ================= APP ================= */
+.app{
+  max-width: 448px;
+  margin: 0 auto;
+  padding: 88px 16px 100px;
+  overflow-y: visible;
+}
+
+/* ================= CARD (V3.0 Design) ================= */
+.card{
+  background: var(--bg-card);
+  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 16px 16px 16px;
+  border: 1px solid var(--border);
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  margin-top: 4px; /* Ensure space for the top line when scrolled */
+}
+
+.card::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:3px;
+  background: var(--tour-blue);
+  border-radius: 8px 8px 0 0;
+}
+
+.title{
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+            cursor: pointer;
+            background: var(--bg-card);
+        }
+        .option:hover { border-color: var(--border-hover); }
+        .option.active {
+            border-color: var(--tour-blue);
+            background: rgba(0, 45, 98, 0.05);
+            color: var(--tour-blue);
+            font-weight: 700;
+        }
+        .ds-radio {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .ds-radio:checked {
+            border-color: var(--tour-blue);
+            background: var(--tour-blue);
+        }
+        .ds-radio:checked::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+/* ================= INLINE INPUT ================= */
+.inline{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top: 8px;
+  gap: 12px;
+}
+
+input{
+  width: 56px;
+  text-align: center;
+  padding: 8px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+input:focus {
+  border-color: var(--tour-blue);
+}
+
+/* ================= BLOCK (ROUND / COURSE) ================= */
+.block{
+  background: var(--bg-card);
+  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.block::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:3px;
+  background: var(--tour-blue);
+  border-radius: 8px 8px 0 0;
+}
+
+.block-title{
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+/* ================= TAGS (Badge style) ================= */
+.tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tag{
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.tag.active{
+  background: var(--tour-blue);
+  color: #fff;
+  border-color: var(--tour-blue);
+}
+
+/* ================= BOTTOM ================= */
+.bottom{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding: 16px;
+  z-index: 999;
+}
+
+.btn{
+  max-width: 448px;
+  margin: 0 auto;
+  background: var(--tour-blue);
+  color: #fff;
+  text-align: center;
+  padding: 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.btn:active {
+  opacity: 0.9;
+}
+
+.hidden { display: none !important; }
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="back" onclick="prevStep()">‹</div>
+    <div>队际系列赛创建</div>
+  </div>
+  <div class="capsule"></div>
+</div>
+
+<div class="app">
+
+  <!-- STEP 1: CONFIG -->
+  <div id="step-config">
+    <!-- 1 STRUCTURE -->
+    <div class="card">
+    <div class="title">1. 赛事结构</div>
+
+    <label class="option active" onclick="setStructure('time')">
+      <input type="radio" name="structure" class="ds-radio" checked>
+      <span>不同日期多轮次比杆赛</span>
+    </label>
+
+    <label class="option" onclick="setStructure('space')">
+      <input type="radio" name="structure" class="ds-radio">
+      <span>同日期不同场地比杆赛</span>
+    </label>
+  </div>
+
+  <!-- 2 SCORING -->
+  <div class="card">
+    <div class="title">2. 计分方式</div>
+
+    <label class="option active" onclick="setMode('global')">
+      <input type="radio" name="mode" class="ds-radio" checked>
+      <span>取所有轮次的前N名（所有轮次的成绩在一起进行比较）</span>
+      <input value="10" class="!mt-0 text-center ml-auto" onclick="event.stopPropagation()">
+    </label>
+
+    <label class="option" onclick="setMode('round')">
+      <input type="radio" name="mode" class="ds-radio">
+      <span>取每一轮的前N名（N的数值可在每一场中配置）</span>
+    </label>
+
+  </div>
+
+  <!-- 3 R / S -->
+  <div class="card">
+    <div class="title" id="labelTitle">3. 轮次数 R</div>
+
+    <div class="inline flex items-center justify-between">
+      <div id="labelRS">R</div>
+      <input id="count" type="number" min="2" value="2" oninput="render()" class="!mt-0 text-center ml-auto">
+    </div>
+  </div>
+
+  <!-- DYNAMIC -->
+  <div id="container"></div>
+
+  <!-- 4 REUSE -->
+  <div class="card">
+    <div class="title">4. 同一球员跨轮次重复上场</div>
+
+    <label class="option active" onclick="setReuse(true)">
+      <input type="radio" name="reuse" class="ds-radio" checked>
+      <span>允许</span>
+    </label>
+    <label class="option" onclick="setReuse(false)">
+      <input type="radio" name="reuse" class="ds-radio">
+      <span>不允许</span>
+    </label>
+  </div>
+  </div>
+
+  <!-- STEP 2: DETAILS (HIDDEN BY DEFAULT) -->
+  <div id="step-details" class="hidden">
+    <div class="card">
+      <div class="title">赛事名称</div>
+      <input type="text" placeholder="请输入赛事名称" class="w-full border border-[var(--border)] rounded-md px-4 py-4 text-sm font-medium focus:border-[var(--tour-blue)] outline-none bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-hover">
+    </div>
+
+    <div class="card">
+      <div class="title">组织机构</div>
+      <div class="option flex items-center justify-between" onclick="alert('选择组织机构')">
+        <span class="ds-text-muted">请选择组织机构</span>
+        <i class="fas fa-chevron-right text-xs"></i>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">球队选择</div>
+      <div class="option flex items-center justify-between" onclick="alert('选择球队')">
+        <span class="ds-text-muted">请选择参赛球队</span>
+        <i class="fas fa-chevron-right text-xs"></i>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">赛事信息</div>
+      <button class="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-tour-blue hover:text-tour-blue transition-all flex items-center justify-center gap-2">
+        <i class="fas fa-plus-circle"></i>
+        <span class="text-sm font-bold">添加赛事信息</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- BUTTON -->
+<div class="bottom">
+  <div class="btn" id="main-btn" onclick="nextStep()">下一步</div>
+</div>
+
+<script>
+
+let structure = "time";
+let mode = "global";
+let currentStep = 1;
+
+function nextStep() {
+  if (currentStep === 1) {
+    document.getElementById('step-config').classList.add('hidden');
+    document.getElementById('step-details').classList.remove('hidden');
+    document.getElementById('main-btn').innerText = '确定创建';
+    document.querySelector('.header-left div:last-child').innerText = '完善赛事信息';
+    currentStep = 2;
+    window.scrollTo(0,0);
+  } else {
+    alert('赛事创建成功！');
+  }
+}
+
+function prevStep() {
+  if (currentStep === 2) {
+    document.getElementById('step-details').classList.add('hidden');
+    document.getElementById('step-config').classList.remove('hidden');
+    document.getElementById('main-btn').innerText = '下一步';
+    document.querySelector('.header-left div:last-child').innerText = '队际系列赛创建';
+    currentStep = 1;
+    window.scrollTo(0,0);
+  } else {
+    // 已经在第一步，可以执行物理返回或其他逻辑
+    history.back();
+  }
+}
+
+function setStructure(type){
+  structure = type;
+  const card = document.querySelectorAll('.card')[0];
+  card.querySelectorAll('.option').forEach(o => o.classList.remove('active'));
+  const selectedOption = event.currentTarget;
+  selectedOption.classList.add('active');
+  selectedOption.querySelector('.ds-radio').checked = true;
+
+  updateLabels();
+  render();
+}
+
+function updateLabels(){
+
+  if(structure === "space"){
+    document.getElementById('labelTitle').innerText = "3. 场地数 S";
+    document.getElementById('labelRS').innerText = "S";
+  }else{
+    document.getElementById('labelTitle').innerText = "3. 轮次数 R";
+    document.getElementById('labelRS').innerText = "R";
+  }
+}
+
+function setMode(m){
+  mode = m;
+  const isGlobal = mode === 'global';
+  const options = document.querySelectorAll('.card')[1].querySelectorAll('.option');
+  
+  options.forEach((o, i) => {
+    const active = (i === 0 && isGlobal) || (i === 1 && !isGlobal);
+    o.classList.toggle('active', active);
+    const radio = o.querySelector('.ds-radio');
+    if (radio) radio.checked = active;
+    
+    // Manage input visibility
+    const existingInput = o.querySelector('input:not([type="radio"])');
+    if (i === 0) {
+      if (!isGlobal && existingInput) existingInput.remove();
+      else if (isGlobal && !existingInput) {
+        const input = document.createElement('input');
+        input.value = "10";
+        input.className = "!mt-0 text-center ml-auto";
+        input.onclick = (e) => e.stopPropagation();
+        o.appendChild(input);
+      }
+    } else if (i === 1) {
+      if (existingInput) existingInput.remove();
+    }
+  });
+
+  render();
+}
+
+function render(){
+
+  const count = Math.max(2, parseInt(document.getElementById('count').value || 2));
+  const container = document.getElementById('container');
+
+  container.innerHTML = '';
+
+  for(let i=1;i<=count;i++){
+
+    const div = document.createElement('div');
+    div.className = 'block';
+
+    const title = structure === "space"
+      ? `COURSE ${i}`
+      : `ROUND ${i}`;
+
+    div.innerHTML = `
+      <div class="block-title">${title}</div>
+
+      <div class="option">开球时间</div>
+      <div class="option">球场</div>
+
+      <div class="tags">
+        <div class="tag active" onclick="selectTag(this)">个人比杆赛</div>
+        <div class="tag" onclick="selectTag(this)">四人四球比杆赛</div>
+        <div class="tag" onclick="selectTag(this)">四人两球比杆赛</div>
+        <div class="tag" onclick="selectTag(this)">最佳球位比杆赛</div>
+      </div>
+
+      ${mode === "round" ? `
+      <div class="option flex items-center justify-between">
+        <span>取本轮次的前</span>
+        <div class="flex items-center gap-2">
+          <input value="5" class="!mt-0 !w-12 text-center">
+          <span class="text-sm">名</span>
+        </div>
+      </div>
+      ` : ``}
+    `;
+
+    container.appendChild(div);
+  }
+}
+
+function setReuse(val) {
+  const options = document.querySelectorAll('.card')[3].querySelectorAll('.option');
+  options.forEach((o, i) => {
+    const active = (i === 0 && val) || (i === 1 && !val);
+    o.classList.toggle('active', active);
+    const radio = o.querySelector('.ds-radio');
+    if (radio) radio.checked = active;
+  });
+}
+
+function selectTag(el){
+  const group = el.parentNode.querySelectorAll('.tag');
+  group.forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+updateLabels();
+render();
+
+</script>
+
+</body>
+</html>

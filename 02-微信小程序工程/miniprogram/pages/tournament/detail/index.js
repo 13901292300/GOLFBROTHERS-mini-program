@@ -13,6 +13,7 @@ const partnerConfigUtil = require('../../../utils/partnerConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const gameStore = require('../../../utils/gameStore.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
+const teamDirectory = require('../../../utils/teamDirectory.js');
 
 /* ===== 赛事详情页 match 视图对象（顶部信息区数据框架） ===== */
 const MATCH_TYPE_LABELS = {
@@ -120,6 +121,50 @@ const FEATURES_PERMISSION = [
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
   { permission: 'finish_match', glyph: '⏻', label: '结束比赛', tone: 'warning' }
 ];
+
+/* 报名中球队赛 M 面板菜单（结构/图标规范与 game/hub 多组面板一致） */
+const REGISTERING_FEATURES_COMMON = [
+  { permission: 'register_for_other', glyph: '📝', label: '替他人报名' },
+  { permission: 'invite_friends_register', glyph: '📤', label: '邀请好友报名' }
+];
+const REGISTERING_FEATURES_PERMISSION = [
+  { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
+  { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
+  { permission: 'players', glyph: '⚙️', label: '选手管理', tone: '' },
+  { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
+  { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
+  { permission: 'close_registration', glyph: '🔒', label: '关闭报名', tone: '' },
+  { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
+  { permission: 'start_match', glyph: '▶', label: '开始比赛', tone: 'warning' }
+];
+const FEATURE_SECTION_DEFAULT = {
+  commonMain: '常用功能',
+  commonSub: '普通用户可用',
+  permissionMain: '管理功能',
+  permissionSub: '需权限'
+};
+const FEATURE_SECTION_REGISTERING = {
+  commonMain: '普通功能',
+  commonSub: '',
+  permissionMain: '赛事管理',
+  permissionSub: ''
+};
+
+/** 替他人报名：来源三选一（阶段一，仅弹屏入口） */
+const REGISTER_FOR_OTHER_SOURCE_OPTIONS = [
+  { source: 'friends', glyph: '👥', label: '从好友列表选择', desc: '选择微信好友或历史联系人' },
+  { source: 'team_members', glyph: '🏌️', label: '从球队成员列表选择', desc: '选择本赛事参赛球队成员' },
+  { source: 'manual', glyph: '✏️', label: '手工添加', desc: '输入姓名和手机号添加人员' }
+];
+const REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST = '仅赛事管理员或球队成员可使用';
+
+/** 当前用户是否属于本赛事参赛球队（teamDirectory mock：isMine 表示我的球队） */
+function resolveIsEventTeamMember(match) {
+  const teamId = match && match.teamId ? String(match.teamId).trim() : '';
+  if (!teamId) return false;
+  const team = teamDirectory.getTeamById(teamId);
+  return !!(team && team.isMine);
+}
 
 const MORE_ACCESS = { isPrivilegedUser: true, permissions: ['leaderboard', 'stats', 'poster', 'feedback', 'theme'] };
 const TOURNAMENT_MANAGE_PERMISSIONS = FEATURES_PERMISSION.map((f) => f.permission);
@@ -259,7 +304,13 @@ Page({
     halfSheetVisible: false,
     showWatchers: false,
     featuresCommon: [],
-    featuresPermission: []
+    featuresPermission: [],
+    featuresSectionCommonMain: FEATURE_SECTION_DEFAULT.commonMain,
+    featuresSectionCommonSub: FEATURE_SECTION_DEFAULT.commonSub,
+    featuresSectionPermissionMain: FEATURE_SECTION_DEFAULT.permissionMain,
+    featuresSectionPermissionSub: FEATURE_SECTION_DEFAULT.permissionSub,
+    registerForOtherSheetVisible: false,
+    registerForOtherSourceOptions: REGISTER_FOR_OTHER_SOURCE_OPTIONS.slice()
   },
 
   onLoad(options) {
@@ -289,7 +340,9 @@ Page({
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
       activeTab: tabs[0].id,
       eventInfoList: this._resolveEventInfoList(match)
-    }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)));
+    }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
+      this.applyMoreAccess();
+    });
   },
 
   _buildGroupsTabStatePatch(match) {
@@ -1502,13 +1555,31 @@ Page({
 
   /* ===== 更多功能面板 ===== */
   applyMoreAccess() {
+    const isRegistering = !!(this.data.matchStatus && this.data.matchStatus.isRegistering);
+    if (isRegistering) {
+      const section = FEATURE_SECTION_REGISTERING;
+      this.setData({
+        featuresCommon: REGISTERING_FEATURES_COMMON.slice(),
+        featuresPermission: REGISTERING_FEATURES_PERMISSION.slice(),
+        featuresSectionCommonMain: section.commonMain,
+        featuresSectionCommonSub: section.commonSub,
+        featuresSectionPermissionMain: section.permissionMain,
+        featuresSectionPermissionSub: section.permissionSub
+      });
+      return;
+    }
     const access = MORE_ACCESS;
     const permSet = access.permissions || [];
     const visible = (scope, permission) =>
       access.isPrivilegedUser || scope === 'common' || permSet.indexOf(permission) >= 0;
+    const section = FEATURE_SECTION_DEFAULT;
     this.setData({
       featuresCommon: FEATURES_COMMON.filter((f) => visible('common', f.permission)),
-      featuresPermission: FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
+      featuresPermission: FEATURES_PERMISSION.filter((f) => visible('permission', f.permission)),
+      featuresSectionCommonMain: section.commonMain,
+      featuresSectionCommonSub: section.commonSub,
+      featuresSectionPermissionMain: section.permissionMain,
+      featuresSectionPermissionSub: section.permissionSub
     });
   },
 
@@ -1526,6 +1597,23 @@ Page({
 
   onFeatureTap(e) {
     const permission = e.currentTarget.dataset.permission;
+    if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
+      if (permission === 'register_for_other') {
+        this.setData({ showMoreSheet: false, moreFabExpanded: false });
+        this.openRegisterForOtherSheet();
+        return;
+      }
+      if (permission === 'invite_friends_register') {
+        this.setData({ showMoreSheet: false, moreFabExpanded: false });
+        this.shareTournamentInvite();
+        return;
+      }
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      const all = REGISTERING_FEATURES_COMMON.concat(REGISTERING_FEATURES_PERMISSION);
+      const item = all.find((f) => f.permission === permission);
+      wx.showToast({ title: item ? item.label : '功能开发中', icon: 'none' });
+      return;
+    }
     if (permission === 'theme') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this.openStyleSheet();
@@ -1540,6 +1628,86 @@ Page({
       return;
     }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  openRegisterForOtherSheet() {
+    this.setData({
+      registerForOtherSourceOptions: this._buildRegisterForOtherSourceOptions(),
+      registerForOtherSheetVisible: true
+    });
+  },
+
+  /**
+   * 邀请好友报名：微信分享入口（阶段占位）
+   * 所有注册用户可用；与 registerStatus 无关（关闭报名后仍可邀请）
+   */
+  shareTournamentInvite() {
+    const matchId = this.data.matchId || '';
+    const match = this.data.match || {};
+    const title = match.titleMain || match.roundName || '球队赛';
+    console.log('[invite-friends-register] share tournament invite', {
+      matchId: matchId,
+      title: title,
+      registerStatus: (this.data.registerPermission && this.data.registerPermission.registerStatus) || ''
+    });
+    this._inviteShareFromPanel = true;
+    try {
+      wx.showShareMenu({ withShareTicket: true, menus: ['shareAppMessage', 'shareTimeline'] });
+    } catch (e) { /* ignore */ }
+    wx.showToast({ title: '请点击右上角分享给好友', icon: 'none' });
+  },
+
+  onShareAppMessage() {
+    const matchId = this.data.matchId || '';
+    const match = this.data.match || {};
+    const title = match.titleMain || match.roundName || '球队赛';
+    if (this._inviteShareFromPanel) {
+      this._inviteShareFromPanel = false;
+    }
+    return {
+      title: '邀请你报名：' + title,
+      path: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+    };
+  },
+
+  closeRegisterForOtherSheet() {
+    this.setData({ registerForOtherSheetVisible: false });
+  },
+
+  _buildRegisterForOtherSourceOptions() {
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    const canPickTeamMembers =
+      this._resolveCanManageGroups(match) || resolveIsEventTeamMember(match);
+    return REGISTER_FOR_OTHER_SOURCE_OPTIONS.map((opt) => {
+      if (opt.source !== 'team_members') {
+        return Object.assign({}, opt, { disabled: false, locked: false });
+      }
+      const enabled = canPickTeamMembers;
+      return Object.assign({}, opt, { disabled: !enabled, locked: !enabled });
+    });
+  },
+
+  onRegisterForOtherSourceTap(e) {
+    const source = e.currentTarget.dataset.source;
+    const options = this.data.registerForOtherSourceOptions || [];
+    const item = options.find((opt) => opt.source === source);
+    if (item && item.disabled) {
+      if (source === 'team_members') {
+        wx.showToast({ title: REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST, icon: 'none' });
+      }
+      return;
+    }
+    if (source === 'friends') {
+      console.log('[register-for-other] pick from friends list');
+      return;
+    }
+    if (source === 'team_members') {
+      console.log('[register-for-other] pick from team members list');
+      return;
+    }
+    if (source === 'manual') {
+      console.log('[register-for-other] manual add');
+    }
   },
 
   closeHalfSheet() {

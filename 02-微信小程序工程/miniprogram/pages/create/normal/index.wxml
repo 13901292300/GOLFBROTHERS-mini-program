@@ -270,43 +270,15 @@
     bind:confirm="confirmTeeTime"
   />
 
-  <!-- 底部弹层：空位 → 选择添加方式（好友列表 / 老牌组合 / 手工添加） -->
-  <view class="sheet-mask {{showAddPlayer ? 'show' : ''}}" bindtap="closeAddPlayer"></view>
-  <view class="bottom-sheet {{showAddPlayer ? 'show' : ''}}" catchtap="noop">
-    <view class="sheet-handle"></view>
-    <view class="sheet-header">
-      <view>
-        <text class="sheet-overline">ADD PLAYER</text>
-        <text class="sheet-header__h3">选择添加方式</text>
-      </view>
-      <view class="sheet-close" bindtap="closeAddPlayer"><text>×</text></view>
-    </view>
-    <view class="game-mode-list">
-      <view class="game-mode-option" bindtap="addFromFriends">
-        <view class="mode-icon"><text>👥</text></view>
-        <view class="mode-text">
-          <text class="mode-text__strong">好友列表</text>
-          <text class="mode-text__em ds-desc-text">从我的好友中选择球员</text>
-        </view>
-        <text class="mode-arrow">›</text>
-      </view>
-      <view class="game-mode-option" bindtap="addFromCombo">
-        <view class="mode-icon"><text>★</text></view>
-        <view class="mode-text">
-          <text class="mode-text__strong">老牌组合</text>
-          <text class="mode-text__em ds-desc-text">常用四人组 / 上次比赛组合</text>
-        </view>
-        <text class="mode-arrow">›</text>
-      </view>
-      <view class="game-mode-option" bindtap="addManual">
-        <view class="mode-icon"><text>✎</text></view>
-        <view class="mode-text">
-          <text class="mode-text__strong">手工添加</text>
-          <text class="mode-text__em ds-desc-text">手动输入姓名加入该位置</text>
-        </view>
-        <text class="mode-arrow">›</text>
-      </view>
-    </view>
-  </view>
+  <!-- 空位 → 选择添加方式（player-source-sheet） -->
+  <player-source-sheet
+    visible="{{showAddPlayer}}"
+    theme-class="{{themeClass}}"
+    overline="ADD PLAYER"
+    title="选择添加方式"
+    options="{{playerSourceOptions}}"
+    bind:close="closeAddPlayer"
+    bind:select="onPlayerSourceSelect"
+  />
 
 </view>

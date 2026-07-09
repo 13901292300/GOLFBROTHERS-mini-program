@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>创建系列赛</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+<style>
+:root {
+  --tour-blue: #002D62;
+  --champion-gold: #CE9224;
+  --data-blue: #00AEEF;
+  --bg-primary: #FCFCFC;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F3F4F6;
+  --bg-hover: #F9FAFB;
+  --border: #E5E7EB;
+  --border-hover: #D1D5DB;
+  --text-primary: #002D62;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+  --text-disabled: #9CA3AF;
+  --radius: 8px;
+}
+
+body.dark {
+  --bg-primary: #000000;
+  --bg-card: #111111;
+  --bg-subtle: #0A0A0A;
+  --bg-hover: #1A1A1A;
+  --border: #222222;
+  --border-hover: #333333;
+  --text-primary: #F1F5F9;
+  --text-secondary: #E5E7F9;
+  --text-muted: #888888;
+  --text-disabled: #555555;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+body.dark .card {
+  box-shadow: none;
+}
+
+.card.active {
+  border-color: var(--tour-blue);
+}
+
+.card-top-line {
+  height: 3px;
+  background-color: var(--tour-blue);
+  width: 100%;
+  opacity: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.card.active .card-top-line {
+  opacity: 1;
+}
+
+.ds-radio {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.card.active .ds-radio {
+  border-color: var(--tour-blue);
+  background-color: var(--tour-blue);
+}
+
+.card.active .ds-radio::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background-color: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.mode-switch {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.mode-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.mode-btn.active {
+  background: white;
+  color: var(--tour-blue);
+}
+
+.btn-primary {
+  background-color: var(--tour-blue);
+  color: white;
+  border-radius: 6px;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+</style>
+
+</head>
+<body class="bright-mode">
+
+<div class="max-w-[390px] mx-auto min-h-screen flex flex-col relative">
+  <!-- HEADER -->
+  <header class="bg-[#002D62] text-white p-4 border-b-2 border-[#CE9224] flex items-center justify-between sticky top-0 z-10">
+    <div>
+      <h1 class="text-lg font-bold">创建系列赛</h1>
+      <p class="text-xs opacity-80 mt-0.5">请选择赛事类型</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="mode-switch flex">
+        <div id="b" class="mode-btn active" onclick="setMode('bright')">☀️</div>
+        <div id="d" class="mode-btn" onclick="setMode('dark')">🌙</div>
+      </div>
+      <div class="flex bg-white/10 rounded-full border border-white/10 overflow-hidden">
+        <div class="w-7 h-6 flex items-center justify-center text-[10px] border-r border-white/10">‹</div>
+        <div class="w-7 h-6 flex items-center justify-center text-[10px] border-r border-white/10">⌂</div>
+        <div class="w-7 h-6 flex items-center justify-center text-[10px]">···</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <main class="flex-1 p-4 pb-24">
+    <!-- CARD 1 -->
+    <div class="card active mb-4 cursor-pointer relative overflow-hidden group" onclick="select(this)">
+      <div class="card-top-line absolute top-0 left-0"></div>
+      <div class="p-5 flex gap-4 pt-6">
+        <div class="ds-radio group-hover:border-[#D1D5DB]"></div>
+        <div>
+          <h3 class="card-title text-base font-bold transition-colors">莱德杯</h3>
+          <p class="card-sub text-sm opacity-60 mt-1 transition-colors">两队对抗 · 多轮比洞赛</p>
+          <span class="text-[10px] font-black tracking-widest text-[#00AEEF] uppercase mt-3 block">MATCH PLAY</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 2 -->
+    <div class="card mb-4 cursor-pointer relative overflow-hidden group" onclick="select(this)">
+      <div class="card-top-line absolute top-0 left-0"></div>
+      <div class="p-5 flex gap-4 pt-6">
+        <div class="ds-radio group-hover:border-[#D1D5DB]"></div>
+        <div>
+          <h3 class="card-title text-base font-bold transition-colors">个人巡回赛</h3>
+          <p class="card-sub text-sm opacity-60 mt-1 transition-colors">多轮个人比杆赛</p>
+          <span class="text-[10px] font-black tracking-widest text-[#00AEEF] uppercase mt-3 block">STROKE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 3 -->
+    <div class="card mb-4 cursor-pointer relative overflow-hidden group" onclick="select(this)">
+      <div class="card-top-line absolute top-0 left-0"></div>
+      <div class="p-5 flex gap-4 pt-6">
+        <div class="ds-radio group-hover:border-[#D1D5DB]"></div>
+        <div>
+          <h3 class="card-title text-base font-bold transition-colors">队际系列赛</h3>
+          <p class="card-sub text-sm opacity-60 mt-1 transition-colors">多轮/多场队际比杆赛</p>
+          <span class="text-[10px] font-black tracking-widest text-[#00AEEF] uppercase mt-3 block">TEAM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 4 -->
+    <div class="card mb-4 cursor-pointer relative overflow-hidden group" onclick="select(this)">
+      <div class="card-top-line absolute top-0 left-0"></div>
+      <div class="p-5 flex gap-4 pt-6">
+        <div class="ds-radio group-hover:border-[#D1D5DB]"></div>
+        <div>
+          <h3 class="card-title text-base font-bold transition-colors">自定义系列赛</h3>
+          <p class="card-sub text-sm opacity-60 mt-1 transition-colors">自由配置赛事结构</p>
+          <span class="text-[10px] font-black tracking-widest text-[#00AEEF] uppercase mt-3 block">CUSTOM</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER BUTTON -->
+  <div class="fixed bottom-0 left-0 right-0 p-4 pointer-events-none">
+    <div class="max-w-[390px] mx-auto w-full">
+      <button class="w-full btn-primary py-4 rounded-lg font-bold text-sm pointer-events-auto shadow-lg">下一步</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function select(el) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setMode(mode) {
+  if (mode === 'dark') {
+    document.body.classList.add('dark');
+    document.getElementById('d').classList.add('active');
+    document.getElementById('b').classList.remove('active');
+  } else {
+    document.body.classList.remove('dark');
+    document.getElementById('b').classList.add('active');
+    document.getElementById('d').classList.remove('active');
+  }
+}
+</script>
+
+</body>
+</html>

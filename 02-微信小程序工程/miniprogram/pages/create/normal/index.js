@@ -15,6 +15,13 @@ const GAME_MODES = [
   { name: '四人两球赛', desc: '两人一队，每队使用一颗球', icon: '👥' }
 ];
 
+/** 空位补位：人员来源选择（player-source-sheet 选项） */
+const PLAYER_SOURCE_OPTIONS = [
+  { key: 'friends', glyph: '👥', label: '好友列表', desc: '从我的好友中选择球员' },
+  { key: 'combo', glyph: '★', label: '老牌组合', desc: '常用四人组 / 上次比赛组合' },
+  { key: 'manual', glyph: '✎', label: '手工添加', desc: '手动输入姓名加入该位置' }
+];
+
 // 需要二次「组合类型」确认的赛制（团队类）
 const COMPOSITION_MODES = { '最好成绩赛': true, '最佳球位赛': true };
 
@@ -128,6 +135,7 @@ Page({
 
     // 空位补位：仅一级 Action Sheet（入口）；好友/组合/手工均跳转独立页面
     showAddPlayer: false,
+    playerSourceOptions: PLAYER_SOURCE_OPTIONS,
 
     // 开球时间滚轮
     teeYear: 2026,
@@ -298,6 +306,13 @@ Page({
 
   closeAddPlayer() {
     this.setData({ showAddPlayer: false });
+  },
+
+  onPlayerSourceSelect(e) {
+    const key = e.detail && e.detail.key;
+    if (key === 'friends') this.addFromFriends();
+    else if (key === 'combo') this.addFromCombo();
+    else if (key === 'manual') this.addManual();
   },
 
   // 本 Game 已占用 playerId（全局唯一去重）；excludeGIdx 不为 null 时排除该组（用于好友页本组成员→可取消）

@@ -306,7 +306,8 @@
 
   <!-- More Menu Bottom Sheet（视觉与中间页 M 按钮功能面板一致） -->
   <view wx:if="{{showMoreSheet}}" bindtap="toggleSheet" class="sheet-overlay"></view>
-  <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="noop">
+  <view wx:if="{{showMoreSheet}}" class="bottom-sheet bottom-sheet--more-menu" catchtap="noop">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="feature-section feature-section--menu">
       <view class="feature-section-title">
@@ -530,39 +531,16 @@
     </view>
   </view>
 
-  <!-- 点击空位：底部动作弹窗（好友列表 / 老牌组合 / 手工添加） -->
-  <view wx:if="{{addSheetVisible}}" class="add-sheet" bindtap="closeAddSheet">
-      <view class="add-sheet__panel" catchtap="noop">
-        <view class="add-sheet__title">选择添加方式</view>
-        <view class="add-sheet__list">
-          <view class="add-sheet__item" bindtap="addMethodFriend">
-            <view class="add-sheet__icon add-sheet__icon--friend">👥</view>
-            <view class="add-sheet__main">
-              <text class="add-sheet__name">好友列表</text>
-              <text class="add-sheet__sub">从我的好友中选择球员</text>
-            </view>
-            <text class="add-sheet__arrow">›</text>
-          </view>
-          <view class="add-sheet__item" bindtap="addMethodCombo">
-            <view class="add-sheet__icon add-sheet__icon--combo">⭐</view>
-            <view class="add-sheet__main">
-              <text class="add-sheet__name">老牌组合</text>
-              <text class="add-sheet__sub">常用四人组 / 上次比赛组合</text>
-            </view>
-            <text class="add-sheet__arrow">›</text>
-          </view>
-          <view class="add-sheet__item" bindtap="addMethodManual">
-            <view class="add-sheet__icon add-sheet__icon--manual">✎</view>
-            <view class="add-sheet__main">
-              <text class="add-sheet__name">手工添加</text>
-              <text class="add-sheet__sub">手动创建球员并加入该位置</text>
-            </view>
-            <text class="add-sheet__arrow">›</text>
-          </view>
-        </view>
-        <view class="add-sheet__cancel" bindtap="closeAddSheet">取消</view>
-      </view>
-    </view>
+  <!-- 点击空位：人员来源选择（player-source-sheet） -->
+  <player-source-sheet
+    visible="{{addSheetVisible}}"
+    theme-class="{{themeClass}}"
+    overline="ADD PLAYER"
+    title="选择添加方式"
+    options="{{playerSourceOptions}}"
+    bind:close="closeAddSheet"
+    bind:select="onPlayerSourceSelect"
+  />
 
   <!-- 信息继承型展开面板（Context Panel）：根级 fixed 浮层，与记分表完全解耦，不挤压 TAB / HOLE / score grid -->
   <view wx:if="{{gameInfoOpen}}" class="game-info-mask" bindtap="closeGameInfo"></view>

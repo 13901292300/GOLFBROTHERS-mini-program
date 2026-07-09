@@ -1,0 +1,157 @@
+/* 人员来源选择弹窗 — 对齐 create/normal「添加人员」视觉规范 */
+.pss-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.46);
+  z-index: 80;
+}
+
+.pss-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 32rpx 32rpx 0 0;
+  box-shadow: 0 -16rpx 36rpx rgba(0, 0, 0, 0.24);
+  padding: 20rpx 32rpx calc(36rpx + env(safe-area-inset-bottom));
+  z-index: 90;
+  color: var(--text-primary);
+}
+
+.pss-handle {
+  width: 80rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: var(--border-hover);
+  margin: 0 auto 28rpx;
+}
+
+.pss-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.pss-overline {
+  display: block;
+  font-size: 20rpx;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: var(--data-blue, #00aeef);
+}
+
+.pss-title {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 36rpx;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pss-close {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.pss-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.pss-option {
+  width: 100%;
+  min-height: 128rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.pss-option:active {
+  opacity: 0.72;
+}
+
+.pss-option--disabled .pss-text__strong,
+.pss-option--disabled .pss-text__desc {
+  color: var(--text-muted);
+}
+
+.pss-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: var(--tour-blue, #002d62);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 30rpx;
+}
+
+.pss-icon--locked {
+  background: #b0b8c4;
+  color: #f8fafc;
+}
+
+.pss-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.pss-text__strong {
+  font-size: 28rpx;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pss-text__desc {
+  font-size: 24rpx;
+  line-height: 36rpx;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.pss-arrow {
+  color: var(--text-muted);
+  font-size: 40rpx;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* DARK 模式（依赖页面根 themeClass 继承的 CSS 变量） */
+.pss-sheet.dark-mode {
+  box-shadow: 0 -16rpx 36rpx rgba(0, 0, 0, 0.48);
+}
+
+.pss-sheet.dark-mode .pss-icon--locked {
+  background: var(--border);
+  color: var(--text-muted);
+}

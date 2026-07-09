@@ -448,7 +448,7 @@
   <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="stopPropagation">
     <view class="sheet-handle"></view>
     <view class="feature-section">
-      <view class="feature-section-title"><text class="fst-main">常用功能</text><text class="fst-sub">普通用户可用</text></view>
+      <view class="feature-section-title"><text class="fst-main">{{featuresSectionCommonMain}}</text><text wx:if="{{featuresSectionCommonSub}}" class="fst-sub">{{featuresSectionCommonSub}}</text></view>
       <view class="feature-grid">
         <view wx:for="{{featuresCommon}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
           <view class="feature-icon"><text>{{item.glyph}}</text></view>
@@ -457,7 +457,7 @@
       </view>
     </view>
     <view class="feature-section">
-      <view class="feature-section-title"><text class="fst-main">管理功能</text><text class="fst-sub">需权限</text></view>
+      <view class="feature-section-title"><text class="fst-main">{{featuresSectionPermissionMain}}</text><text wx:if="{{featuresSectionPermissionSub}}" class="fst-sub">{{featuresSectionPermissionSub}}</text></view>
       <view class="feature-grid">
         <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
@@ -467,6 +467,38 @@
     </view>
     <view class="sheet-cancel-wrap">
       <view bindtap="closeMoreSheet" class="sheet-cancel-btn">取 消</view>
+    </view>
+  </view>
+
+  <!-- 替他人报名：来源三选一 bottom sheet（对齐创建普通球局「添加人员」弹窗） -->
+  <view wx:if="{{registerForOtherSheetVisible}}" bindtap="closeRegisterForOtherSheet" class="sheet-overlay"></view>
+  <view wx:if="{{registerForOtherSheetVisible}}" class="bottom-sheet register-for-other-sheet" catchtap="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">ADD PLAYER</text>
+        <text class="sheet-header__h3">选择添加方式</text>
+      </view>
+      <view class="sheet-close" bindtap="closeRegisterForOtherSheet"><text>×</text></view>
+    </view>
+    <view class="game-mode-list">
+      <view
+        wx:for="{{registerForOtherSourceOptions}}"
+        wx:key="source"
+        bindtap="onRegisterForOtherSourceTap"
+        data-source="{{item.source}}"
+        class="game-mode-option {{item.disabled ? 'game-mode-option--disabled' : ''}}"
+      >
+        <view class="mode-icon {{item.locked ? 'mode-icon--locked' : ''}}">
+          <text wx:if="{{!item.locked}}">{{item.glyph}}</text>
+          <text wx:else>🔒</text>
+        </view>
+        <view class="mode-text">
+          <text class="mode-text__strong">{{item.label}}</text>
+          <text class="mode-text__em ds-desc-text">{{item.desc}}</text>
+        </view>
+        <text class="mode-arrow">›</text>
+      </view>
     </view>
   </view>
 
@@ -573,6 +605,7 @@
         value="{{registerCompetitionNameDraft}}"
         bindinput="onRegisterCompetitionNameInput"
         placeholder="请输入比赛名"
+        placeholder-class="register-sheet__placeholder"
         maxlength="32"
       />
       <text class="register-sheet__hint">优先使用资料中的比赛名；未设置时默认取昵称</text>

@@ -134,6 +134,13 @@ const MORE_MENU_ITEMS_LEGACY = MORE_MENU_ITEMS_LEGACY_MAIN
   .concat([MORE_MENU_LEGACY_PLACEHOLDER])
   .concat(MORE_MENU_ITEMS_LEGACY_FOOTER);
 
+/** 空位补位：人员来源选择（player-source-sheet 选项） */
+const PLAYER_SOURCE_OPTIONS = [
+  { key: 'friends', glyph: '👥', label: '好友列表', desc: '从我的好友中选择球员' },
+  { key: 'combo', glyph: '⭐', label: '老牌组合', desc: '常用四人组 / 上次比赛组合' },
+  { key: 'manual', glyph: '✎', label: '手工添加', desc: '手动创建球员并加入该位置' }
+];
+
 function resolveMoreMenuPanels(mode, options) {
   const opts = options || {};
   const groupCount = opts.groupCount != null ? Number(opts.groupCount) : 1;
@@ -618,6 +625,7 @@ Page({
     groupSlots: [],
     // 空位补位：仅一级底部动作弹窗（入口选择器）；好友/组合/手工均跳转独立页面
     addSheetVisible: false,
+    playerSourceOptions: PLAYER_SOURCE_OPTIONS,
 
     activePlayerIdx: 0,
     sheetHoleLabel: 'A1',
@@ -2303,6 +2311,13 @@ Page({
 
   closeAddSheet() {
     this.setData({ addSheetVisible: false });
+  },
+
+  onPlayerSourceSelect(e) {
+    const key = e.detail && e.detail.key;
+    if (key === 'friends') this.addMethodFriend();
+    else if (key === 'combo') this.addMethodCombo();
+    else if (key === 'manual') this.addMethodManual();
   },
 
   // 当前目标 slot 的上下文（matchId + slotId），随 URL 传给二级页面

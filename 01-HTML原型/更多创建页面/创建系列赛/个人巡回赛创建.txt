@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>莱德杯 - 轮次配置</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+
+<style>
+:root {
+  --tour-blue: #002D62;
+  --champion-gold: #CE9224;
+  --data-blue: #00AEEF;
+  --bg-primary: #F5F7FB;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F3F4F6;
+  --border: #E5E7EB;
+  --text-primary: #002D62;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.phone {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.header {
+  background: var(--tour-blue);
+  color: #fff;
+  padding: 16px;
+  border-bottom: 3px solid var(--champion-gold);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.capsule {
+  display: flex;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.capsule div {
+  width: 32px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fff;
+}
+
+.content {
+  flex: 1;
+  padding-bottom: 120px;
+}
+
+.card {
+  margin: 16px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--tour-blue);
+}
+
+.row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.row-input {
+  width: 64px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.section {
+  padding: 16px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.ds-select-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ds-select-card:active {
+  background: var(--bg-subtle);
+}
+
+.ds-select-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.ds-select-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-style: normal;
+}
+
+.ds-select-value.empty {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.ds-select-action {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.ds-select-value.is-time {
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tag.active {
+  background: var(--tour-blue);
+  color: #fff;
+  border-color: var(--tour-blue);
+}
+
+.bottom-btn {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 16px 34px;
+  background: linear-gradient(to top, var(--bg-primary) 80%, transparent);
+  z-index: 10;
+}
+
+.bottom-btn-inner {
+  max-width: 358px;
+  margin: 0 auto;
+  background: var(--tour-blue);
+  color: #fff;
+  text-align: center;
+  padding: 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 45, 98, 0.3);
+  cursor: pointer;
+}
+.wheel-container {
+  height: 200px;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+}
+
+.wheel-column {
+  flex: 1;
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  position: relative;
+  z-index: 2;
+}
+
+.wheel-column::-webkit-scrollbar {
+  display: none;
+}
+
+.wheel-item {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.wheel-column:focus-within .wheel-item, 
+.wheel-item {
+  transition: all 0.2s ease;
+}
+
+/* Relying on scroll-snap for "selection" look via intersection observer or simple CSS if possible, 
+   but for the prompt's "no JS distance calc", we keep visual sync in the scroll handler without complex offsets. */
+.data-value {
+  font-size: 20px;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.meta-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.wheel-item.active-scroll {
+  color: var(--champion-gold);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.wheel-highlight {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 40px;
+  transform: translateY(-50%);
+  background: rgba(206, 146, 36, 0.08);
+  border-top: 1px solid rgba(206, 146, 36, 0.2);
+  border-bottom: 1px solid rgba(206, 146, 36, 0.2);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wheel-spacer {
+  height: 80px;
+}
+
+.wheel-year-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.year-arrow {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  color: var(--tour-blue);
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.year-text {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--tour-blue);
+  min-width: 60px;
+  text-align: center;
+}
+
+.wheel-title-row {
+  display: flex;
+  padding: 0 4px;
+  margin-bottom: 8px;
+}
+
+.wheel-title-item {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="header">
+    <div>
+      <div class="text-lg font-black italic uppercase leading-none">Tour Championship</div>
+      <div class="text-[11px] opacity-80 font-medium">个人巡回赛</div>
+    </div>
+    <div class="capsule">
+      <div>‹</div>
+      <div>⌂</div>
+      <div>···</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- 基础配置卡片 -->
+    <div class="card mb-4">
+      <div class="row-header">
+        <div class="font-bold text-sm">比赛轮次（最少2轮）</div>
+        <input class="row-input" type="number" min="2" value="2" onblur="if(this.value<2) { this.value=2; renderRounds(2); }" oninput="renderRounds(this.value)">
+      </div>
+    </div>
+
+    <!-- 动态生成的 Round 列表 -->
+    <div id="roundList" class="px-4"></div>
+
+    <!-- 晋级线独立选项 -->
+    <div class="px-4 mb-6">
+      <div class="bg-white rounded-xl border border-[#E5E7EB] shadow-sm relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-[3px] bg-[#002D62]"></div>
+        <div class="p-4 pt-5">
+          <div class="ds-select-label mb-3">🏆 晋级规则设置</div>
+          <div class="space-y-2">
+            <div class="flex flex-col gap-2">
+              <div id="cutline-yes" class="flex items-center justify-between p-3 rounded-lg border border-[#E5E7EB] bg-[#F3F4F6] cursor-pointer" onclick="toggleGlobalCutline(true)">
+                <span class="text-sm font-bold">划分晋级线</span>
+                <i class="fas fa-check text-white opacity-0"></i>
+              </div>
+              <div id="global-cutline-input" class="hidden flex flex-col gap-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-yellow-800">晋级轮次</span>
+                  <input type="number" class="w-20 h-9 text-center text-sm font-bold border border-yellow-300 rounded bg-white outline-none focus:border-yellow-500" value="1" min="1" onblur="validateCutlineRound(this)">
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-yellow-800">晋级线 前</span>
+                  <input type="number" class="w-20 h-9 text-center text-sm font-bold border border-yellow-300 rounded bg-white outline-none focus:border-yellow-500" value="60" min="1">
+                  <span class="text-xs font-bold text-yellow-800">名</span>
+                </div>
+              </div>
+            </div>
+            <div id="cutline-no" class="flex items-center justify-between p-3 rounded-lg border border-[#002D62] bg-[#002D62] text-white cursor-pointer" onclick="toggleGlobalCutline(false)">
+              <span class="text-sm font-bold">不划分晋级线</span>
+              <i class="fas fa-check text-white"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-btn" onclick="goToBasicInfo()">
+    <div class="bottom-btn-inner">下一步</div>
+  </div>
+</div>
+
+<div id="timePicker" class="fixed inset-0 hidden z-50">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onclick="closeTimePicker()"></div>
+  <div class="absolute left-0 right-0 bottom-0 bg-white rounded-t-[32px] shadow-2xl p-6 pb-10 transition-transform duration-300">
+    <div class="flex items-center justify-between mb-8">
+      <button class="text-sm font-bold text-[#6B7280] px-2" onclick="closeTimePicker()">取消</button>
+      <div class="text-sm font-black text-[#002D62] tracking-widest uppercase">选择开球时间</div>
+      <button class="text-sm font-bold text-[#CE9224] px-2" onclick="confirmTimePicker()">确定</button>
+    </div>
+    
+    <div class="wheel-year-bar">
+      <button class="year-arrow" onclick="changeYear(-1)">‹</button>
+      <div id="currentYearDisplay" class="year-text">2024</div>
+      <button class="year-arrow" onclick="changeYear(1)">›</button>
+    </div>
+
+    <div class="wheel-title-row">
+      <div class="wheel-title-item">月</div>
+      <div class="wheel-title-item">日</div>
+      <div class="wheel-title-item">时</div>
+      <div class="wheel-title-item">分</div>
+    </div>
+
+    <div class="wheel-container">
+      <div class="wheel-highlight"></div>
+      <div id="wheel-month" class="wheel-column" onscroll="syncWheelActive(this)"></div>
+      <div id="wheel-day" class="wheel-column" onscroll="syncWheelActive(this)"></div>
+      <div id="wheel-hour" class="wheel-column" onscroll="syncWheelActive(this)"></div>
+      <div id="wheel-minute" class="wheel-column" onscroll="syncWheelActive(this)"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function validateCutlineRound(input) {
+  const totalRounds = parseInt(document.querySelector('.row-input').value || 2);
+  const val = parseInt(input.value);
+  if (isNaN(val) || val < 1 || val >= totalRounds) {
+    input.value = Math.round(totalRounds / 2);
+  }
+}
+
+function selectTag(el){
+  const siblings = el.parentNode.querySelectorAll('.tag');
+  siblings.forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+let roundTimes = {};
+
+function renderRounds(count){
+  count = parseInt(count || 2);
+  if(count < 2) count = 2;
+  
+  const box = document.getElementById('roundList');
+  if(!box) return;
+
+  // 更新晋级轮次默认值：总轮次一半四舍五入
+  const cutlineRoundInput = document.querySelector('#global-cutline-input input[type="number"]:first-of-type');
+  if(cutlineRoundInput) {
+    cutlineRoundInput.value = Math.round(count / 2);
+  }
+  
+  box.innerHTML = "";
+  const options = ["四人四球比洞", "四人两球比洞", "最佳球位比洞", "个人比洞"];
+
+  for(let i=0;i<count;i++){
+    const roundKey = `round_${i}`;
+    const displayTime = roundTimes[roundKey] || '未选择';
+    const isTimeEmpty = !roundTimes[roundKey];
+    
+    box.innerHTML += `
+      <div class="bg-white rounded-xl border border-[#E5E7EB] p-4 mb-3 shadow-sm relative overflow-hidden" data-round-index="${i}">
+        <!-- 侧边蓝条装饰 -->
+        <div class="absolute top-0 left-0 bottom-0 w-1 bg-[#002D62]"></div>
+        
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <div class="text-[16px] font-extrabold text-[#CE9224]">ROUND ${i+1}</div>
+            <div class="text-[12px] text-[#6B7280]">第${i+1}轮 · 比赛轮次配置</div>
+          </div>
+        </div>
+
+        <!-- 开球时间容器 -->
+        <div class="mb-3">
+          <div class="ds-select-card" onclick="openTimePicker(this, ${i})">
+            <div class="ds-select-main">
+              <div class="ds-select-label">开球时间</div>
+              <div class="ds-select-value is-time ${isTimeEmpty ? 'empty' : ''}">${displayTime}</div>
+            </div>
+            <div class="ds-select-action">
+              <i class="fas fa-chevron-right"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- 球场选择容器 -->
+        <div class="mb-3">
+          <div class="ds-select-card" onclick="alert('球场选择功能暂未开启')">
+            <div class="ds-select-main">
+              <div class="ds-select-label">⛳ 球场选择</div>
+              <div class="ds-select-value empty">请选择比赛球场</div>
+            </div>
+            <div class="ds-select-action">
+              <i class="fas fa-chevron-right"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function toggleGlobalCutline(isYes) {
+  const yesBtn = document.getElementById('cutline-yes');
+  const noBtn = document.getElementById('cutline-no');
+  const inputDiv = document.getElementById('global-cutline-input');
+  
+  if (isYes) {
+    yesBtn.classList.remove('bg-[#F3F4F6]', 'text-[#374151]', 'border-[#E5E7EB]');
+    yesBtn.classList.add('bg-[#002D62]', 'text-white', 'border-[#002D62]');
+    yesBtn.querySelector('i').classList.remove('opacity-0');
+    
+    noBtn.classList.add('bg-[#F3F4F6]', 'text-[#374151]', 'border-[#E5E7EB]');
+    noBtn.classList.remove('bg-[#002D62]', 'text-white', 'border-[#002D62]');
+    noBtn.querySelector('i').classList.add('opacity-0');
+    
+    inputDiv.classList.remove('hidden');
+  } else {
+    noBtn.classList.remove('bg-[#F3F4F6]', 'text-[#374151]', 'border-[#E5E7EB]');
+    noBtn.classList.add('bg-[#002D62]', 'text-white', 'border-[#002D62]');
+    noBtn.querySelector('i').classList.remove('opacity-0');
+    
+    yesBtn.classList.add('bg-[#F3F4F6]', 'text-[#374151]', 'border-[#E5E7EB]');
+    yesBtn.classList.remove('bg-[#002D62]', 'text-white', 'border-[#002D62]');
+    yesBtn.querySelector('i').classList.add('opacity-0');
+    
+    inputDiv.classList.add('hidden');
+  }
+}
+
+let activeTimeButton = null;
+let activeRoundIndex = null;
+let currentSelectedYear = new Date().getFullYear();
+
+function populateWheel(id, values, labelSuffix = '') {
+  const wheel = document.getElementById(id);
+  let html = '<div class="wheel-spacer"></div>';
+  values.forEach(v => {
+    const display = String(v).padStart(2, '0');
+    html += `<div class="wheel-item" data-value="${display}">${display}${labelSuffix}</div>`;
+  });
+  html += '<div class="wheel-spacer"></div>';
+  wheel.innerHTML = html;
+}
+
+function syncWheelActive(wheel) {
+  const items = wheel.querySelectorAll('.wheel-item');
+  const index = Math.round(wheel.scrollTop / 40);
+  items.forEach((item, i) => {
+    item.classList.toggle('active-scroll', i === index);
+  });
+}
+
+function scrollWheelToValue(id, value) {
+  const wheel = document.getElementById(id);
+  const items = Array.from(wheel.querySelectorAll('.wheel-item'));
+  const targetIndex = items.findIndex(item => item.getAttribute('data-value') === String(value).padStart(2, '0'));
+  if (targetIndex !== -1) {
+    wheel.scrollTop = targetIndex * 40;
+    syncWheelActive(wheel);
+  }
+}
+
+function changeYear(delta) {
+  currentSelectedYear += delta;
+  document.getElementById('currentYearDisplay').textContent = currentSelectedYear;
+}
+
+function initTimePicker(roundIndex){
+  const months = Array.from({length: 12}, (_, i) => i + 1);
+  const days = Array.from({length: 31}, (_, i) => i + 1);
+  const hours = Array.from({length: 24}, (_, i) => i);
+  const minutes = [0, 10, 20, 30, 40, 50];
+
+  populateWheel('wheel-month', months);
+  populateWheel('wheel-day', days);
+  populateWheel('wheel-hour', hours);
+  populateWheel('wheel-minute', minutes);
+  
+  let targetDate = new Date();
+  
+  // If editing an existing time, start there
+  if (roundTimes[`round_${roundIndex}`]) {
+    const parts = roundTimes[`round_${roundIndex}`].match(/(\d+)-(\d+)-(\d+) (\d+):(\d+)/);
+    if (parts) {
+      targetDate = new Date(parts[1], parts[2]-1, parts[3], parts[4], parts[5]);
+    }
+  }
+
+  currentSelectedYear = targetDate.getFullYear();
+  document.getElementById('currentYearDisplay').textContent = currentSelectedYear;
+
+  const currentMin = targetDate.getMinutes();
+  const roundedMin = Math.round(currentMin / 10) * 10 % 60;
+
+  setTimeout(() => {
+    scrollWheelToValue('wheel-month', targetDate.getMonth() + 1);
+    scrollWheelToValue('wheel-day', targetDate.getDate());
+    scrollWheelToValue('wheel-hour', targetDate.getHours());
+    scrollWheelToValue('wheel-minute', roundedMin);
+  }, 10);
+}
+
+function openTimePicker(btn, index){
+  activeTimeButton = btn;
+  activeRoundIndex = index;
+  document.getElementById('timePicker').classList.remove('hidden');
+  initTimePicker(index);
+}
+
+function closeTimePicker(){
+  document.getElementById('timePicker').classList.add('hidden');
+}
+
+function confirmTimePicker(){
+  const getSelectedValue = (id) => {
+    const wheel = document.getElementById(id);
+    const index = Math.round(wheel.scrollTop / 40);
+    const items = wheel.querySelectorAll('.wheel-item');
+    return items[index] ? items[index].getAttribute('data-value') : '00';
+  };
+
+  const pad = (n) => String(n).padStart(2,'0');
+  const y = currentSelectedYear;
+  const m = getSelectedValue('wheel-month');
+  const d = getSelectedValue('wheel-day');
+  const h = getSelectedValue('wheel-hour');
+  const min = getSelectedValue('wheel-minute');
+  
+  const formattedDate = `${y}-${pad(m)}-${pad(d)} ${pad(h)}:${pad(min)}`;
+  
+  roundTimes[`round_${activeRoundIndex}`] = formattedDate;
+
+  // Logic: When any round is confirmed, propagate to subsequent rounds
+  let baseDateStr = roundTimes[`round_${activeRoundIndex}`];
+  if (baseDateStr) {
+    const parts = baseDateStr.match(/(\d+)-(\d+)-(\d+) (\d+):(\d+)/);
+    let currentDate = new Date(parts[1], parts[2]-1, parts[3], parts[4], parts[5]);
+    
+    // Propagate to all subsequent rounds
+    const totalRounds = parseInt(document.querySelector('.row-input').value || 2);
+    for (let i = activeRoundIndex + 1; i < totalRounds; i++) {
+      currentDate = new Date(currentDate.getTime() + (24 * 60 * 60 * 1000));
+      const y = currentDate.getFullYear();
+      const m = pad(currentDate.getMonth() + 1);
+      const d = pad(currentDate.getDate());
+      const h = pad(currentDate.getHours());
+      const min = pad(currentDate.getMinutes());
+      roundTimes[`round_${i}`] = `${y}-${m}-${d} ${h}:${min}`;
+    }
+  }
+
+  // Refresh display
+  renderRounds(document.querySelector('.row-input').value);
+  closeTimePicker();
+}
+function goToBasicInfo() {
+  document.body.innerHTML = `
+<style>
+:root {
+  --tour-blue: #002D62;
+  --champion-gold: #CE9224;
+  --data-blue: #00AEEF;
+  --bg-primary: #F5F7FB;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F3F4F6;
+  --border: #E5E7EB;
+  --text-primary: #002D62;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+}
+body {
+  margin: 0;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.phone {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+.header {
+  background: var(--tour-blue);
+  color: #fff;
+  padding: 16px;
+  border-bottom: 3px solid var(--champion-gold);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.capsule {
+  display: flex;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px;
+}
+.capsule div {
+  width: 32px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fff;
+}
+.content {
+  flex: 1;
+  padding-bottom: 120px;
+}
+.card {
+  margin: 16px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--tour-blue);
+}
+.section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.section:last-child {
+  border-bottom: none;
+}
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: block;
+}
+input, select {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  outline: none;
+  font-weight: 600;
+}
+.team-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.add-btn:active {
+  background: var(--bg-subtle);
+}
+.bottom-btn-fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 16px 34px;
+  background: linear-gradient(to top, var(--bg-primary) 80%, transparent);
+  z-index: 10;
+}
+.bottom-btn-inner-final {
+  max-width: 358px;
+  margin: 0 auto;
+  background: var(--tour-blue);
+  color: #fff;
+  text-align: center;
+  padding: 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 45, 98, 0.3);
+  cursor: pointer;
+}
+</style>
+<div class="phone">
+  <div class="header">
+    <div class="flex items-center gap-3">
+      <div onclick="location.reload()" class="cursor-pointer text-2xl font-bold">‹</div>
+      <div>
+        <div class="text-lg font-black italic uppercase leading-none">Tour Championship</div>
+        <div class="text-[11px] opacity-80 font-medium">个人巡回赛</div>
+      </div>
+    </div>
+    <div class="capsule">
+      <div onclick="location.reload()">‹</div>
+      <div onclick="location.reload()">⌂</div>
+      <div>···</div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="card">
+      <div class="section">
+        <label class="label">赛事名称</label>
+        <input placeholder="请输入赛事名称">
+      </div>
+      <div class="section">
+        <label class="label">组织机构</label>
+        <select>
+          <option>联谊赛组委会（默认）</option>
+          <option>长江商学院高尔夫协会</option>
+          <option>保时捷球友会</option>
+        </select>
+      </div>
+      <div class="section">
+        <label class="label">联谊球队</label>
+        <div class="flex flex-col gap-3">
+          <div class="ds-select-card" onclick="alert('选择红队')">
+            <div class="ds-select-main">
+              <div class="ds-select-label">红队</div>
+              <div class="ds-select-value empty">请选择红队</div>
+            </div>
+            <div class="ds-select-action">
+              <i class="fas fa-chevron-right"></i>
+            </div>
+          </div>
+          <div class="ds-select-card" onclick="alert('选择蓝队')">
+            <div class="ds-select-main">
+              <div class="ds-select-label">蓝队</div>
+              <div class="ds-select-value empty">请选择蓝队</div>
+            </div>
+            <div class="ds-select-action">
+              <i class="fas fa-chevron-right"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <label class="label">赛事信息</label>
+        <div class="add-btn">＋ 添加赛事信息</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="bottom-btn-fixed">
+  <div class="bottom-btn-inner-final">确定创建</div>
+</div>
+  `;
+  window.scrollTo(0,0);
+}
+
+renderRounds(2);
+</script>
+
+</body>
+</html>

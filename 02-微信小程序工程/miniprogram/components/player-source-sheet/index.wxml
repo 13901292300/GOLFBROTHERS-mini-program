@@ -1,0 +1,32 @@
+<block wx:if="{{visible}}">
+  <view class="pss-mask" bindtap="onMaskTap"></view>
+  <view class="pss-sheet {{themeClass}}" catchtap="noop">
+    <view class="pss-handle"></view>
+    <view class="pss-header">
+      <view>
+        <text class="pss-overline">{{overline}}</text>
+        <text class="pss-title">{{title}}</text>
+      </view>
+      <view class="pss-close" bindtap="onCloseTap"><text>×</text></view>
+    </view>
+    <view class="pss-list">
+      <view
+        wx:for="{{options}}"
+        wx:key="key"
+        class="pss-option {{item.disabled ? 'pss-option--disabled' : ''}}"
+        bindtap="onOptionTap"
+        data-key="{{item.key}}"
+      >
+        <view class="pss-icon {{item.locked ? 'pss-icon--locked' : ''}}">
+          <text wx:if="{{!item.locked}}">{{item.glyph}}</text>
+          <text wx:else>🔒</text>
+        </view>
+        <view class="pss-text">
+          <text class="pss-text__strong">{{item.label}}</text>
+          <text class="pss-text__desc">{{item.desc}}</text>
+        </view>
+        <text class="pss-arrow">›</text>
+      </view>
+    </view>
+  </view>
+</block>
