@@ -9,6 +9,12 @@ const MAX_PARTNER_LOGOS = 8;
 const COS_PARTNER_BASE =
   'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com';
 
+/**
+ * COS 同名覆盖换图时，只改此版本号即可强制刷新缓存。
+ * 例：20260710 → 20260711
+ */
+const PARTNER_ASSET_VERSION = '20260710';
+
 /** 旧本地资源，加载失败时回退（暂不删除磁盘文件） */
 const LOCAL_PARTNER_ASSETS = [
   '/assets/partners/partner-g-one-golf.png',
@@ -16,6 +22,18 @@ const LOCAL_PARTNER_ASSETS = [
   '/assets/partners/partner-vivata-1872.png',
   '/assets/partners/partner-ailiai-golf.png'
 ];
+
+/**
+ * 仅为 COS HTTPS 地址追加 ?v= / &v= 版本参数；本地路径原样返回。
+ */
+function withPartnerAssetVersion(url) {
+  const s = String(url || '').trim();
+  if (!s) return '';
+  if (s.indexOf('/assets/') === 0 || s.indexOf('assets/') === 0) return s;
+  if (s.indexOf('https://') !== 0 && s.indexOf('http://') !== 0) return s;
+  const sep = s.indexOf('?') >= 0 ? '&' : '?';
+  return s + sep + 'v=' + PARTNER_ASSET_VERSION;
+}
 
 function createDualLogo(bright, dark) {
   return {
@@ -26,20 +44,20 @@ function createDualLogo(bright, dark) {
 
 const DEFAULT_PARTNER_LOGOS = [
   createDualLogo(
-    COS_PARTNER_BASE + '/partner-01-bright.jpg',
-    COS_PARTNER_BASE + '/partner-01-dark.jpg'
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-01-bright.jpg'),
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-01-dark.jpg')
   ),
   createDualLogo(
-    COS_PARTNER_BASE + '/partner-02-bright.jpg',
-    COS_PARTNER_BASE + '/partner-02-dark.jpg'
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-02-bright.jpg'),
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-02-dark.jpg')
   ),
   createDualLogo(
-    COS_PARTNER_BASE + '/partner-03-bright.jpg',
-    COS_PARTNER_BASE + '/partner-03-dark.jpg'
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-03-bright.jpg'),
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-03-dark.jpg')
   ),
   createDualLogo(
-    COS_PARTNER_BASE + '/partner-04-bright.jpg',
-    COS_PARTNER_BASE + '/partner-04-dark.jpg'
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-04-bright.jpg'),
+    withPartnerAssetVersion(COS_PARTNER_BASE + '/partner-04-dark.jpg')
   )
 ];
 
@@ -51,6 +69,11 @@ const PARTNER_LOGO_FALLBACK_BY_URL = (function buildFallbackMap() {
     if (!local) return;
     if (logo.bright) map[logo.bright] = local;
     if (logo.dark) map[logo.dark] = local;
+    // 无版本号的裸 COS URL 也可命中（兼容旧缓存）
+    const baseBright = String(logo.bright || '').split('?')[0];
+    const baseDark = String(logo.dark || '').split('?')[0];
+    if (baseBright) map[baseBright] = local;
+    if (baseDark) map[baseDark] = local;
   });
   return map;
 })();
@@ -64,7 +87,9 @@ function getPartnerLogoLocalFallback(src) {
   if (s.indexOf('/assets/partners/') === 0 || s.indexOf('assets/partners/') === 0) {
     return s.charAt(0) === '/' ? s : '/' + s;
   }
-  return PARTNER_LOGO_FALLBACK_BY_URL[s] || '';
+  if (PARTNER_LOGO_FALLBACK_BY_URL[s]) return PARTNER_LOGO_FALLBACK_BY_URL[s];
+  const base = s.split('?')[0];
+  return PARTNER_LOGO_FALLBACK_BY_URL[base] || '';
 }
 
 function buildPartnerTitle(teamName) {
@@ -181,6 +206,7 @@ module.exports = {
   STORAGE_KEY,
   MAX_PARTNER_LOGOS,
   COS_PARTNER_BASE,
+  PARTNER_ASSET_VERSION,
   LOCAL_PARTNER_ASSETS,
   DEFAULT_PARTNER_LOGOS,
   buildPartnerTitle,
@@ -189,6 +215,7 @@ module.exports = {
   normalizePartnerConfig,
   buildPartnerLogoRows,
   getPartnerLogoLocalFallback,
+  withPartnerAssetVersion,
   savePartnerConfig,
   loadPartnerConfig
 };

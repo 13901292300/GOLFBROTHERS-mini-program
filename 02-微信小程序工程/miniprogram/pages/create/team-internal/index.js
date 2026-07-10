@@ -1,6 +1,7 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
+const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
@@ -64,22 +65,22 @@ const DEFAULT_TEAM_GROUPS = [
 ];
 const ROUND_NAME_SUFFIX = '月例赛';
 
-const DEFAULT_EVENT_SPONSOR_IMAGE_1 = '/assets/partners/partner-g-one-golf.png';
-const DEFAULT_EVENT_SPONSOR_IMAGE_2 = '/assets/partners/partner-vivata-1872.png';
 const DEFAULT_EVENT_RULES_TEXT =
   '本次比赛采用国际高尔夫球联合会最新颁布的《高尔夫球规则》以及竞赛委员会制定的"比赛条件"和"当地规则"。比赛为单轮18洞个人比杆赛。';
 const DEFAULT_EVENT_NOTICE_TEXT =
   '参赛球员需在开球前30分钟到达签到处领取记分卡，并准时在指定发球台出发。比赛过程中请保持良好的礼仪及球场速度。';
 
 function createDefaultEventInfoList() {
+  const sponsor1 = eventSponsorConfig.getDefaultEventSponsorSlot(0);
+  const sponsor2 = eventSponsorConfig.getDefaultEventSponsorSlot(1);
   return [
     {
       id: 'evt-default-1',
       title: '广告图片1',
       type: 'image',
       content: '',
-      brightImage: DEFAULT_EVENT_SPONSOR_IMAGE_1,
-      darkImage: DEFAULT_EVENT_SPONSOR_IMAGE_1,
+      brightImage: sponsor1.bright,
+      darkImage: sponsor1.dark,
       status: '已设置'
     },
     {
@@ -96,8 +97,8 @@ function createDefaultEventInfoList() {
       title: '广告图片2',
       type: 'image',
       content: '',
-      brightImage: DEFAULT_EVENT_SPONSOR_IMAGE_2,
-      darkImage: DEFAULT_EVENT_SPONSOR_IMAGE_2,
+      brightImage: sponsor2.bright,
+      darkImage: sponsor2.dark,
       status: '已设置'
     },
     {

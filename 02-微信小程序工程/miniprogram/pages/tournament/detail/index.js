@@ -10,6 +10,7 @@ const groupsStore = require('../../../utils/groupsStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
+const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const gameStore = require('../../../utils/gameStore.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
@@ -641,6 +642,19 @@ Page({
       imageData: this._resolveEventInfoImage(item, resolvedTheme),
       status: item && item.status ? String(item.status) : ''
     }));
+  },
+
+  /** COS 默认广告图加载失败 → 回退本地 assets/partners */
+  onEventSponsorImageError(e) {
+    const id = e.currentTarget.dataset.id;
+    const list = (this.data.eventInfoList || []).slice();
+    const idx = list.findIndex((item) => item && String(item.id) === String(id));
+    if (idx < 0) return;
+    const current = String((list[idx] && list[idx].imageData) || '').trim();
+    const fallback = eventSponsorConfig.getEventSponsorLocalFallback(current);
+    if (!fallback || fallback === current) return;
+    list[idx] = Object.assign({}, list[idx], { imageData: fallback });
+    this.setData({ eventInfoList: list });
   },
 
   _resolveRegisterSubTabs(match, registerInfo) {

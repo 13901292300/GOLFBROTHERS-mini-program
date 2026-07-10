@@ -135,7 +135,13 @@
       <block wx:if="{{activeTab === 'details'}}">
         <block wx:for="{{eventInfoList}}" wx:key="id">
           <view wx:if="{{item.type === 'image'}}" class="ad-image">
-            <image src="{{item.imageData}}" mode="widthFix" class="ad-image__img"></image>
+            <image
+              src="{{item.imageData}}"
+              mode="widthFix"
+              class="ad-image__img"
+              data-id="{{item.id}}"
+              binderror="onEventSponsorImageError"
+            ></image>
           </view>
           <view wx:else class="ds-card pad-card">
             <view class="card-head"><text class="card-title">{{item.title}}</text></view>
