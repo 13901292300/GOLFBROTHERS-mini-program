@@ -470,35 +470,73 @@
     </view>
   </view>
 
-  <!-- 替他人报名：来源三选一 bottom sheet（对齐创建普通球局「添加人员」弹窗） -->
-  <view wx:if="{{registerForOtherSheetVisible}}" bindtap="closeRegisterForOtherSheet" class="sheet-overlay"></view>
-  <view wx:if="{{registerForOtherSheetVisible}}" class="bottom-sheet register-for-other-sheet" catchtap="stopPropagation">
-    <view class="sheet-handle"></view>
-    <view class="sheet-header">
+  <!-- 替他人报名：人员来源选择（复用 player-source-sheet，无老牌组合） -->
+  <player-source-sheet
+    visible="{{registerForOtherSheetVisible}}"
+    theme-class="{{themeClass}}"
+    overline="ADD PLAYER"
+    title="选择添加方式"
+    options="{{registerForOtherSourceOptions}}"
+    bind:close="closeRegisterForOtherSheet"
+    bind:select="onRegisterForOtherSourceSelect"
+    bind:denied="onRegisterForOtherSourceDenied"
+  />
+
+  <!-- 替他人报名 · 手工添加（对齐记分页 manual-sheet，仅 console 不写盘） -->
+  <view wx:if="{{registerForOtherManualVisible}}" class="manual-sheet-mask" bindtap="closeRegisterForOtherManualSheet"></view>
+  <view wx:if="{{registerForOtherManualVisible}}" class="manual-sheet {{themeClass}}" catchtap="stopPropagation">
+    <view class="manual-sheet__handle"></view>
+    <view class="manual-sheet__header">
       <view>
-        <text class="sheet-overline">ADD PLAYER</text>
-        <text class="sheet-header__h3">选择添加方式</text>
+        <text class="manual-sheet__overline">Add Player</text>
+        <text class="manual-sheet__title">添加人员</text>
       </view>
-      <view class="sheet-close" bindtap="closeRegisterForOtherSheet"><text>×</text></view>
+      <view class="manual-sheet__close" bindtap="closeRegisterForOtherManualSheet"><text>×</text></view>
     </view>
-    <view class="game-mode-list">
-      <view
-        wx:for="{{registerForOtherSourceOptions}}"
-        wx:key="source"
-        bindtap="onRegisterForOtherSourceTap"
-        data-source="{{item.source}}"
-        class="game-mode-option {{item.disabled ? 'game-mode-option--disabled' : ''}}"
-      >
-        <view class="mode-icon {{item.locked ? 'mode-icon--locked' : ''}}">
-          <text wx:if="{{!item.locked}}">{{item.glyph}}</text>
-          <text wx:else>🔒</text>
-        </view>
-        <view class="mode-text">
-          <text class="mode-text__strong">{{item.label}}</text>
-          <text class="mode-text__em ds-desc-text">{{item.desc}}</text>
-        </view>
-        <text class="mode-arrow">›</text>
+    <view class="manual-sheet__body">
+      <view class="manual-field">
+        <text class="manual-field__label">选手姓名（必填）</text>
+        <input
+          class="manual-field__input"
+          type="text"
+          maxlength="20"
+          placeholder="请输入选手姓名"
+          placeholder-class="manual-field__placeholder"
+          value="{{registerForOtherManualName}}"
+          bindinput="onRegisterForOtherManualNameInput"
+        />
       </view>
+      <view class="manual-field">
+        <text class="manual-field__label">手机号码（选填）</text>
+        <input
+          class="manual-field__input"
+          type="number"
+          maxlength="11"
+          placeholder="请输入手机号码"
+          placeholder-class="manual-field__placeholder"
+          value="{{registerForOtherManualPhone}}"
+          bindinput="onRegisterForOtherManualPhoneInput"
+        />
+      </view>
+      <view class="manual-field">
+        <text class="manual-field__label">性别</text>
+        <view class="manual-gender">
+          <view
+            class="manual-gender__tag {{registerForOtherManualGender === 'male' ? 'is-active' : ''}}"
+            data-gender="male"
+            bindtap="onRegisterForOtherManualGenderSelect"
+          >男</view>
+          <view
+            class="manual-gender__tag {{registerForOtherManualGender === 'female' ? 'is-active' : ''}}"
+            data-gender="female"
+            bindtap="onRegisterForOtherManualGenderSelect"
+          >女</view>
+        </view>
+      </view>
+    </view>
+    <view class="manual-sheet__footer">
+      <view class="manual-sheet__btn manual-sheet__btn--cancel" bindtap="closeRegisterForOtherManualSheet">取消</view>
+      <view class="manual-sheet__btn manual-sheet__btn--confirm" bindtap="confirmRegisterForOtherManualSheet">确定</view>
     </view>
   </view>
 
@@ -554,9 +592,9 @@
     </view>
   </view>
 
-  <!-- 报名/取消报名固定按钮：报名 TAB + 报名中赛事 -->
+  <!-- 报名/取消报名固定按钮：报名 TAB + 报名中赛事；替他人报名相关弹窗打开时隐藏，避免盖住来源弹窗 -->
   <view
-    wx:if="{{activeTab === 'register' && matchStatus.isRegistering && !hideRegisterCTA}}"
+    wx:if="{{activeTab === 'register' && matchStatus.isRegistering && !hideRegisterCTA && !registerForOtherSheetVisible && !proxyGroupSheetVisible && !registerForOtherManualVisible}}"
     class="register-cta-bar"
   >
     <view
@@ -628,6 +666,33 @@
     <view class="register-sheet__actions">
       <view bindtap="closeRegisterSheet" class="register-sheet__cancel">取 消</view>
       <view bindtap="confirmRegister" class="register-sheet__confirm {{registerSubmitting ? 'is-disabled' : ''}}">确认报名</view>
+    </view>
+  </view>
+
+  <!-- Patch 3：替他人报名 · 选择代表分队（复用报名弹窗分队标签视觉，不写盘） -->
+  <view wx:if="{{proxyGroupSheetVisible}}" bindtap="cancelProxyGroupSheet" class="sheet-overlay"></view>
+  <view wx:if="{{proxyGroupSheetVisible}}" class="bottom-sheet register-sheet proxy-group-sheet" catchtap="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">Select Group</text>
+      <text class="register-sheet__title">选择代表分队</text>
+      <text class="register-sheet__sub">本次选择的选手将统一报名到同一个分队</text>
+    </view>
+    <view class="register-sheet__field">
+      <text class="register-sheet__label">代表分队</text>
+      <view class="register-sheet__groups">
+        <view
+          wx:for="{{proxyGroupOptions}}"
+          wx:key="id"
+          bindtap="selectProxyGroup"
+          data-id="{{item.id}}"
+          class="register-sheet__group {{proxyGroupId === item.id ? 'register-sheet__group--active' : ''}}"
+        >{{item.name}}</view>
+      </view>
+    </view>
+    <view class="register-sheet__actions">
+      <view bindtap="cancelProxyGroupSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="confirmProxyGroupSheet" class="register-sheet__confirm">确定</view>
     </view>
   </view>
 

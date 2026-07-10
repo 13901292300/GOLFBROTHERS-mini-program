@@ -623,9 +623,14 @@ Page({
     groupPlayers: GROUP_PLAYERS,
     // 占位：真正展示前由 openGroupManagePage() 用当前记分页面球员快照覆盖（唯一数据源）
     groupSlots: [],
-    // 空位补位：仅一级底部动作弹窗（入口选择器）；好友/组合/手工均跳转独立页面
+    // 空位补位：一级来源选择；好友/组合仍跳转独立页；手工改为本页底部弹窗
     addSheetVisible: false,
     playerSourceOptions: PLAYER_SOURCE_OPTIONS,
+    // 手工添加底部弹窗（不跳转 pages/player/manual）
+    manualSheetVisible: false,
+    manualName: '',
+    manualPhone: '',
+    manualGender: 'male',
 
     activePlayerIdx: 0,
     sheetHoleLabel: 'A1',
@@ -2091,17 +2096,579 @@ Page({
     }, 300);
   },
 
+  // 添加/删除草稿：深拷贝槽位快照（仅 roster 展示字段，不共享引用）
+  _cloneGroupSlots(slots) {
+    return (slots || []).map((s) => {
+      if (!s) return s;
+      const player = s.player
+        ? {
+            playerId: s.player.playerId,
+            name: s.player.name,
+            avatar: s.player.avatar,
+            source: s.player.source
+          }
+        : null;
+      return {
+        slotId: s.slotId,
+        player: player,
+        playerId: s.playerId != null ? s.playerId : player && player.playerId,
+        status: s.status,
+        source: s.source != null ? s.source : player && player.source,
+        hasCache: !!s.hasCache
+      };
+    });
+  },
+
+  // 槽位 roster 签名：用于 dirty 判断（空位 / playerId 序列）
+  _groupSlotsRosterSignature(slots) {
+    return (slots || [])
+      .map((s) => {
+        if (!s || s.status !== 'occupied') return '-';
+        const pid = (s.player && s.player.playerId) || s.playerId || '';
+        return String(pid);
+      })
+      .join('|');
+  },
+
+  _isGroupManageDirty() {
+    if (!this._originalSlots) return false;
+    return (
+      this._groupSlotsRosterSignature(this._originalSlots) !==
+      this._groupSlotsRosterSignature(this._draftSlots)
+    );
+  },
+
+  _clearGroupManageDraft() {
+    this._originalSlots = null;
+    this._draftSlots = null;
+    this._draftSlotCache = null;
+  },
+
+  // 添加/删除 UI 唯一展示源：始终从 _draftSlots 刷新 groupSlots（不碰真实 store）
+  _refreshGroupManageFromDraft() {
+    const slots = this._cloneGroupSlots(this._draftSlots || []);
+    let occupied = 0;
+    slots.forEach((s) => {
+      if (s && s.status === 'occupied') occupied += 1;
+    });
+    this.setData({
+      groupSlots: slots,
+      playerCount: occupied
+    });
+  },
+
+  // draft：槽位是否提示可继承（只读 cache，不初始化/不写 _demoSlots）
+  _draftSlotHasCache(idx) {
+    if (this._draftSlotCache && this._draftSlotCache[idx]) return true;
+    const draft = this._draftSlots && this._draftSlots[idx];
+    if (draft && draft.hasCache) return true;
+    if (this._boundToStore()) return !!groupsStore.getSlotCache(this.data.groupId, idx);
+    return !!(this._demoSlotCache && this._demoSlotCache[idx]);
+  },
+
+  // draft 专用删除：只改 _draftSlots，供添加/删除编辑期使用
+  _removeDraftSlotAt(idx) {
+    if (!this._draftSlots || idx == null || idx < 0) return;
+    const slots = this._cloneGroupSlots(this._draftSlots);
+    const cur = slots[idx];
+    if (!cur || cur.status !== 'occupied') return;
+
+    this._draftSlotCache = this._draftSlotCache || [];
+    this._draftSlotCache[idx] = {
+      playerId: (cur.player && cur.player.playerId) || cur.playerId,
+      name: (cur.player && cur.player.name) || '',
+      avatar: (cur.player && cur.player.avatar) || ''
+    };
+
+    slots[idx] = {
+      slotId: cur.slotId,
+      player: null,
+      playerId: null,
+      status: 'empty',
+      source: null,
+      hasCache: true
+    };
+    this._draftSlots = slots;
+    this._refreshGroupManageFromDraft();
+  },
+
+  // draft 专用补位入口（可弹继承确认）；确认后只写 draft
+  _bindDraftPlayerToSlot(idx, player, source) {
+    const p = Object.assign({}, player, { source: source || 'manual' });
+    if (this._draftSlotHasCache(idx)) {
+      wx.showModal({
+        title: '该位置有历史成绩',
+        content: '是否让新球员继承上一位球员的成绩？\n选择「从零开始」将以空成绩记分（旧成绩不会被删除）。',
+        confirmText: '继承成绩',
+        cancelText: '从零开始',
+        success: (res) => this._doBindDraftPlayerToSlot(idx, p, source, !!res.confirm)
+      });
+      return;
+    }
+    this._doBindDraftPlayerToSlot(idx, p, source, false);
+  },
+
+  // draft 专用执行绑定：只改 _draftSlots，不写 gameStore / groupsStore / _demoSlots
+  _doBindDraftPlayerToSlot(idx, p, source, inherit) {
+    if (!this._draftSlots || idx == null || idx < 0) return;
+    const slots = this._cloneGroupSlots(this._draftSlots);
+    if (!slots[idx]) return;
+    const player = {
+      playerId: p.playerId,
+      name: p.name,
+      avatar: p.avatar || '',
+      source: source || p.source || 'manual'
+    };
+    slots[idx] = {
+      slotId: slots[idx].slotId,
+      player: player,
+      playerId: player.playerId,
+      status: 'occupied',
+      source: player.source,
+      hasCache: false,
+      inherit: !!inherit
+    };
+    if (this._draftSlotCache) this._draftSlotCache[idx] = null;
+    this._draftSlots = slots;
+    this._refreshGroupManageFromDraft();
+  },
+
+  // draft 第一个空位（编辑期以 _draftSlots 为准）
+  _firstDraftEmptySlotIndex() {
+    return (this._draftSlots || []).findIndex((s) => s && s.status === 'empty');
+  },
+
+  _finalizeCloseGroupManage() {
+    this._targetSlotIdx = null;
+    this._clearGroupManageDraft();
+    this.setData({
+      showGroupManage: false,
+      addSheetVisible: false,
+      manualSheetVisible: false,
+      manualName: '',
+      manualPhone: '',
+      manualGender: 'male'
+    });
+  },
+
   openGroupManagePage() {
     if (this.data.gameFinished) {
       wx.showToast({ title: '比赛已结束，不可修改球员', icon: 'none' });
       return;
     }
-    this.setData({ showGroupManage: true, groupSlots: this._groupSlotsForCurrent() });
+    const snapshot = this._cloneGroupSlots(this._groupSlotsForCurrent());
+    this._originalSlots = this._cloneGroupSlots(snapshot);
+    this._draftSlots = this._cloneGroupSlots(snapshot);
+    this._draftSlotCache = [];
+    this.setData({ showGroupManage: true });
+    this._refreshGroupManageFromDraft();
   },
 
   closeGroupManagePage() {
-    this._targetSlotIdx = null;
-    this.setData({ showGroupManage: false, addSheetVisible: false });
+    if (this._isGroupManageDirty()) {
+      wx.showModal({
+        title: '有未保存的修改',
+        content: '离开将丢弃未提交的人员修改（确认提交尚未启用）。是否离开？',
+        cancelText: '继续编辑',
+        confirmText: '离开',
+        success: (res) => {
+          if (res.confirm) this._finalizeCloseGroupManage();
+        }
+      });
+      return;
+    }
+    this._finalizeCloseGroupManage();
+  },
+
+  // footer「取消」：丢弃 draft、清理状态、关闭添加/删除（不提示）
+  onCancelGroupManage() {
+    this.setData({ addSheetVisible: false });
+    this._finalizeCloseGroupManage();
+  },
+
+  // footer「确认」：进入 commit（Phase 3B-2A：gameStore/demoSession 真实写盘）
+  _onConfirmGroupManage() {
+    this._commitDraftSlots();
+  },
+
+  // 槽位 occupied 的 playerId（空位返回 ''）
+  _slotOccupiedPlayerId(slot) {
+    if (!slot || slot.status !== 'occupied') return '';
+    return (slot.player && slot.player.playerId) || slot.playerId || '';
+  },
+
+  // 识别添加/删除确认后的提交路径
+  _resolveGroupManageCommitPath() {
+    if (this._boundToStore()) {
+      return {
+        path: 'groupsStore',
+        label: 'groupsStore提交路径',
+        mode: this.data.mode || '',
+        groupId: this.data.groupId || ''
+      };
+    }
+    if (this._isGameStoreContext()) {
+      return {
+        path: 'gameStore',
+        label: 'gameStore提交路径',
+        mode: this.data.mode || '',
+        gameId: this.data.gameId || '',
+        groupIndex: this._gameGroupIndex || 0
+      };
+    }
+    return {
+      path: 'demoSession',
+      label: 'demoSession提交路径',
+      mode: this.data.mode || '',
+      note: '无 gameId / 非 individual_stroke：写 scoreSessions'
+    };
+  },
+
+  // 比较 original vs draft，生成增删替换变化列表（不写 store）
+  _buildGroupManageCommitDiff() {
+    const original = this._originalSlots || [];
+    const draft = this._draftSlots || [];
+    const n = Math.max(original.length, draft.length);
+    const added = [];
+    const removed = [];
+    const replaced = [];
+    const unchanged = [];
+
+    for (let i = 0; i < n; i++) {
+      const o = original[i];
+      const d = draft[i];
+      const fromId = this._slotOccupiedPlayerId(o);
+      const toId = this._slotOccupiedPlayerId(d);
+      const slotId = (d && d.slotId) || (o && o.slotId) || i + 1;
+      const base = {
+        slotIndex: i,
+        slotId: slotId,
+        fromPlayerId: fromId || null,
+        toPlayerId: toId || null,
+        from: o
+          ? {
+              status: o.status,
+              playerId: fromId || null,
+              name: (o.player && o.player.name) || null
+            }
+          : null,
+        to: d
+          ? {
+              status: d.status,
+              playerId: toId || null,
+              name: (d.player && d.player.name) || null,
+              source: d.source || (d.player && d.player.source) || null,
+              inherit: d.inherit != null ? !!d.inherit : null
+            }
+          : null
+      };
+
+      if (!fromId && toId) {
+        added.push(
+          Object.assign({}, base, {
+            type: 'add',
+            preserveScores: false,
+            inheritSlotCache: d && d.inherit != null ? !!d.inherit : false
+          })
+        );
+      } else if (fromId && !toId) {
+        removed.push(
+          Object.assign({}, base, {
+            type: 'remove',
+            preserveScores: false
+          })
+        );
+      } else if (fromId && toId && fromId !== toId) {
+        replaced.push(
+          Object.assign({}, base, {
+            type: 'replace',
+            // 换人规则：playerId 替换不清除成绩
+            preserveScores: true,
+            inheritSlotCache: d && d.inherit != null ? !!d.inherit : true
+          })
+        );
+      } else {
+        unchanged.push({ slotIndex: i, slotId: slotId, playerId: fromId || null, type: 'unchanged' });
+      }
+    }
+
+    return {
+      added: added,
+      removed: removed,
+      replaced: replaced,
+      unchanged: unchanged,
+      changeCount: added.length + removed.length + replaced.length
+    };
+  },
+
+  /**
+   * Phase 3B-2A：将 draft diff 应用到 _demoSlots（gameStore / demoSession）。
+   * - remove → 成绩进 _demoSlotCache，槽位置空
+   * - replace → 原地换 playerId，保留该槽 scores/putts（禁止先删后增）
+   * - add → 按 inherit 从 cache 取成绩或空成绩
+   * 不调用 groupsStore；成功后由 _commitDraftSlots 统一 persist / rebind / 关闭。
+   */
+  _applyGameOrDemoCommitDiff(diff) {
+    try {
+      this._ensureDemoSlots();
+      this._demoSlotCache = this._demoSlotCache || [];
+      const draft = this._draftSlots || [];
+      const needLen = Math.max(
+        this._demoSlots.length,
+        draft.length,
+        playerSlots.DEFAULT_SLOT_SIZE
+      );
+      while (this._demoSlots.length < needLen) this._demoSlots.push(null);
+
+      // 1) remove
+      (diff.removed || []).forEach((ch) => {
+        const idx = ch.slotIndex;
+        if (idx == null || idx < 0) return;
+        const cur = this._demoSlots[idx];
+        if (cur) {
+          this._demoSlotCache[idx] = {
+            playerId: cur.playerId || cur.id,
+            name: cur.name,
+            avatar: cur.avatar,
+            scores: (cur.scores || []).slice(),
+            putts: (cur.putts || []).slice()
+          };
+        }
+        this._demoSlots[idx] = null;
+      });
+
+      // 2) replace：原地替换身份，保留原 slot 成绩（禁止 remove+add）
+      (diff.replaced || []).forEach((ch) => {
+        const idx = ch.slotIndex;
+        if (idx == null || idx < 0 || !ch.toPlayerId) return;
+        const draftSlot = draft[idx] || {};
+        const player = draftSlot.player || {};
+        const cur = this._demoSlots[idx] || {};
+        const scores = (cur.scores || []).slice();
+        const putts = (cur.putts || []).slice();
+        this._demoSlots[idx] = {
+          id: ch.toPlayerId,
+          playerId: ch.toPlayerId,
+          name: player.name || (ch.to && ch.to.name) || '球员',
+          avatar: player.avatar || '',
+          source: draftSlot.source || (player && player.source) || 'manual',
+          colorClass: cur.colorClass || 'border-white',
+          scores: scores,
+          putts: putts
+        };
+        this._demoSlotCache[idx] = null;
+      });
+
+      // 3) add
+      (diff.added || []).forEach((ch) => {
+        const idx = ch.slotIndex;
+        if (idx == null || idx < 0 || !ch.toPlayerId) return;
+        const draftSlot = draft[idx] || {};
+        const player = draftSlot.player || {};
+        const inherit = !!(ch.inheritSlotCache || draftSlot.inherit);
+        const cache = this._demoSlotCache[idx];
+        this._demoSlots[idx] = {
+          id: ch.toPlayerId,
+          playerId: ch.toPlayerId,
+          name: player.name || (ch.to && ch.to.name) || '球员',
+          avatar: player.avatar || '',
+          source: draftSlot.source || (player && player.source) || 'manual',
+          colorClass: 'border-white',
+          scores: inherit && cache ? (cache.scores || []).slice() : [],
+          putts: inherit && cache ? (cache.putts || []).slice() : []
+        };
+        this._demoSlotCache[idx] = null;
+      });
+
+      // 由 _demoSlots 派生记分列表（此处不 persist / rebind，交给 commit 收尾）
+      this._playersSource = (this._demoSlots || []).filter(Boolean).map((p) => ({
+        id: p.playerId || p.id,
+        playerId: p.playerId || p.id,
+        name: p.name,
+        avatar: p.avatar,
+        source: p.source || 'manual',
+        colorClass: p.colorClass || 'border-white',
+        scores: (p.scores || []).slice(),
+        putts: (p.putts || []).slice()
+      }));
+      const patch = { playerCount: this._playersSource.length || 4 };
+      if (this.data.activePlayerIdx >= this._playersSource.length) patch.activePlayerIdx = 0;
+      this.setData(patch);
+      return true;
+    } catch (err) {
+      console.error('[GROUP_MANAGE_COMMIT_FAIL]', err);
+      return false;
+    }
+  },
+
+  /**
+   * Phase 3B-2B：将 draft diff 应用到 groupsStore（individual_stroke）。
+   * - remove → removePlayerSlot（holes 进 slotCache）
+   * - replace → 原地换 playerId，保留 holes 与 slotCache（禁止 remove+add）
+   * - add → bindPlayerToSlot（按 inherit 消费 slotCache）
+   */
+  _applyGroupsStoreCommitDiff(diff) {
+    const groupId = this.data.groupId;
+    if (!groupId) return false;
+    try {
+      // 先把当前记分成绩 flush 进 groups，避免提交时 holes 过期
+      this.persistSession();
+      const group = groupsStore.getGroup(groupId);
+      if (!group || !Array.isArray(group.players)) return false;
+      const draft = this._draftSlots || [];
+
+      // 1) remove
+      (diff.removed || []).forEach((ch) => {
+        const idx = ch.slotIndex;
+        if (idx == null || idx < 0) return;
+        groupsStore.removePlayerSlot(groupId, idx);
+      });
+
+      // 2) replace：原地替换身份，保留 holes；不碰 slotCache
+      (diff.replaced || []).forEach((ch) => {
+        const idx = ch.slotIndex;
+        if (idx == null || idx < 0 || !ch.toPlayerId) return;
+        if (idx >= group.players.length) return;
+        const existing = group.players[idx];
+        if (!existing) return;
+        const draftSlot = draft[idx] || {};
+        const player = draftSlot.player || {};
+        const holes = (existing.holes || []).map((h) => Object.assign({}, h));
+        group.players[idx] = Object.assign({}, existing, {
+          playerId: ch.toPlayerId,
+          name: player.name || (ch.to && ch.to.name) || existing.name || '球员',
+          avatar: player.avatar != null ? player.avatar : existing.avatar || '',
+          source: draftSlot.source || (player && player.source) || existing.source || 'manual',
+          holes: holes
+        });
+        // slotCache[idx] 故意不清理，满足「保留 slotCache」
+      });
+
+      // 3) add
+      (diff.added || []).forEach((ch) => {
+        const idx = ch.slotIndex;
+        if (idx == null || idx < 0 || !ch.toPlayerId) return;
+        const draftSlot = draft[idx] || {};
+        const player = draftSlot.player || {};
+        const inherit = !!(ch.inheritSlotCache || draftSlot.inherit);
+        const result = groupsStore.bindPlayerToSlot(
+          groupId,
+          idx,
+          {
+            playerId: ch.toPlayerId,
+            name: player.name || (ch.to && ch.to.name) || '球员',
+            avatar: player.avatar || '',
+            source: draftSlot.source || (player && player.source) || 'manual'
+          },
+          inherit
+        );
+        if (!result || !result.ok) {
+          throw new Error('bindPlayerToSlot failed at slot ' + idx + ': ' + ((result && result.reason) || 'unknown'));
+        }
+      });
+
+      return true;
+    } catch (err) {
+      console.error('[GROUP_MANAGE_GROUPS_COMMIT_FAIL]', err);
+      return false;
+    }
+  },
+
+  /**
+   * 确认提交：
+   * - 生成 diff + COMMIT_PLAN 日志
+   * - gameStore / demoSession：真实写盘（Phase 3B-2A）
+   * - groupsStore：真实写盘（Phase 3B-2B）
+   */
+  _commitDraftSlots() {
+    const dirty = this._isGroupManageDirty();
+    const commitPath = this._resolveGroupManageCommitPath();
+    const diff = this._buildGroupManageCommitDiff();
+    const plan = {
+      dirty: dirty,
+      commitPath: commitPath,
+      originalSig: this._groupSlotsRosterSignature(this._originalSlots),
+      draftSig: this._groupSlotsRosterSignature(this._draftSlots),
+      diff: diff,
+      rules: {
+        replacePreservesScores: true,
+        addUsesInheritFlag: true,
+        removeCachesSlotScoresForLaterInherit: true
+      },
+      applyOrder: ['remove', 'replace', 'add'],
+      deferredWrites: {
+        gameStore: false,
+        groupsStore: false,
+        persistSession: false,
+        rebindScoreContext: false
+      }
+    };
+
+    console.log('[GROUP_MANAGE_COMMIT_PLAN]', plan);
+
+    if (!dirty) {
+      wx.showToast({ title: '没有修改', icon: 'none' });
+      this._finalizeCloseGroupManage();
+      return plan;
+    }
+
+    if (commitPath.path === 'groupsStore') {
+      const ok = this._applyGroupsStoreCommitDiff(diff);
+      if (!ok) {
+        wx.showToast({ title: '提交失败', icon: 'none' });
+        return plan;
+      }
+      plan.deferredWrites = {
+        gameStore: false,
+        groupsStore: true,
+        persistSession: true,
+        rebindScoreContext: true
+      };
+      console.log('[GROUP_MANAGE_COMMIT_APPLIED]', {
+        path: 'groupsStore',
+        groupId: this.data.groupId,
+        changeCount: diff.changeCount,
+        players: ((groupsStore.getGroup(this.data.groupId) || {}).players || []).map((p) =>
+          p ? { playerId: p.playerId, name: p.name, holes: (p.holes || []).length } : null
+        )
+      });
+      this._reloadFromStore();
+      this.rebindScoreContext();
+      this._finalizeCloseGroupManage();
+      wx.showToast({ title: '已保存', icon: 'success' });
+      return plan;
+    }
+
+    if (commitPath.path !== 'gameStore' && commitPath.path !== 'demoSession') {
+      wx.showToast({ title: '未知提交路径', icon: 'none' });
+      return plan;
+    }
+
+    const ok = this._applyGameOrDemoCommitDiff(diff);
+    if (!ok) {
+      wx.showToast({ title: '提交失败', icon: 'none' });
+      return plan;
+    }
+
+    plan.deferredWrites = {
+      gameStore: commitPath.path === 'gameStore',
+      groupsStore: false,
+      persistSession: true,
+      rebindScoreContext: true
+    };
+    console.log('[GROUP_MANAGE_COMMIT_APPLIED]', {
+      path: commitPath.path,
+      changeCount: diff.changeCount,
+      demoSlots: (this._demoSlots || []).map((p) =>
+        p ? { playerId: p.playerId || p.id, name: p.name, scoreLen: (p.scores || []).length } : null
+      )
+    });
+
+    this.persistSession();
+    this.rebindScoreContext();
+    this._finalizeCloseGroupManage();
+    wx.showToast({ title: '已保存', icon: 'success' });
+    return plan;
   },
 
   // 是否绑定真实记分数据源（个人比杆赛走 groupsStore，以 playerId 为成绩主键）
@@ -2209,14 +2776,14 @@ Page({
     this.rebindScoreContext();
   },
 
-  // 删除球员：槽位置空(status=empty)、顺序不变；成绩不删除而是缓存到该 slot，供后续新球员继承
+  // 删除球员：编辑期只改 draft；真实写盘留给后续 commit（_removeSlotAt）
   removeGroupSlot(e) {
     const idx = Number(e.currentTarget.dataset.index);
     if (isNaN(idx)) return;
-    this._removeSlotAt(idx);
+    this._removeDraftSlotAt(idx);
   },
 
-  // 按下标移出某槽位（供删除按钮 / 好友取消选中复用）：置空、顺序不变、成绩缓存到该 slot
+  // 按下标移出某槽位（commit 用）：置空、顺序不变、成绩缓存到该 slot
   _removeSlotAt(idx) {
     if (idx == null || idx < 0) return;
     if (this._boundToStore()) {
@@ -2291,8 +2858,11 @@ Page({
     }
   },
 
-  // 当前第一个空位索引（footer 的「手工添加/好友选择」补第一个空位）
+  // 当前第一个空位索引（编辑期读 draft；无 draft 时回退 data.groupSlots）
   _firstEmptySlotIndex() {
+    if (this.data.showGroupManage && this._draftSlots) {
+      return this._firstDraftEmptySlotIndex();
+    }
     return (this.data.groupSlots || []).findIndex((s) => s && s.status === 'empty');
   },
 
@@ -2319,7 +2889,10 @@ Page({
   // 当前目标 slot 的上下文（matchId + slotId），随 URL 传给二级页面
   _buildSlotCtx() {
     const idx = this._targetSlotIdx;
-    const slots = this.data.groupSlots || [];
+    const slots =
+      this.data.showGroupManage && this._draftSlots
+        ? this._draftSlots
+        : this.data.groupSlots || [];
     const slot = idx != null && idx >= 0 ? slots[idx] : null;
     const slotId = slot ? slot.slotId : idx != null && idx >= 0 ? idx + 1 : '';
     return { matchId: this.data.groupId || 'demo-match', slotId: slotId };
@@ -2339,10 +2912,14 @@ Page({
     return ids;
   },
 
-  // 当前组已占用 playerId（组合/手工补空位时不可与本组重复）
+  // 当前组已占用 playerId（组合/手工补空位时不可与本组重复；编辑期以 draft 为准）
   _currentGroupUsedIds() {
     const ids = [];
-    (this.data.groupSlots || []).forEach((s) => {
+    const slots =
+      this.data.showGroupManage && this._draftSlots
+        ? this._draftSlots
+        : this.data.groupSlots || [];
+    slots.forEach((s) => {
       if (s && s.status === 'occupied' && s.player && s.player.playerId) ids.push(s.player.playerId);
     });
     return ids;
@@ -2351,7 +2928,10 @@ Page({
   // 【1】好友列表：第二层 → 跳转「好友选择页」（多选，已在组默认选中、可取消）
   addMethodFriend() {
     this.setData({ addSheetVisible: false });
-    const slots = this.data.groupSlots || [];
+    const slots =
+      this.data.showGroupManage && this._draftSlots
+        ? this._draftSlots
+        : this.data.groupSlots || [];
     const groupPlayerIds = [];
     let emptyCount = 0;
     slots.forEach((s) => {
@@ -2384,32 +2964,38 @@ Page({
     });
   },
 
-  // 好友选择返回：调和「新增（补空位，从前往后）+ 取消（移出已在组好友）」，只动当前比赛 slot
+  // 好友选择返回：只写 draft（新增补空位 + 取消选中移出）
   _onFriendsSelected(friends) {
     if (!Array.isArray(friends)) return;
+    if (!this._draftSlots) return;
     const otherUsed = {};
     this._otherGroupsUsedIds().forEach((id) => { otherUsed[id] = true; });
     const selectedSet = {};
     friends.forEach((f) => { selectedSet[f.playerId] = f; });
-    const slots = this.data.groupSlots || [];
+    const slots = this._draftSlots || [];
     const currentGroupSlots = {};
     slots.forEach((s, i) => {
       if (s && s.status === 'occupied' && s.player && s.player.playerId) {
         currentGroupSlots[s.player.playerId] = i;
       }
     });
-    // 1) 取消选中 → 移出（置空、顺序不变；含「我」与普通好友）
+    // 1) 取消选中 → draft 移出
     Object.keys(currentGroupSlots).forEach((pid) => {
-      if (!selectedSet[pid]) this._removeSlotAt(currentGroupSlots[pid]);
+      if (!selectedSet[pid]) this._removeDraftSlotAt(currentGroupSlots[pid]);
     });
-    // 2) 新增选中 → 从前往后补空位（playerId 强绑定；全局去重：跳过其它组已用）
+    // 2) 新增选中 → draft 从前往后补空位
     friends
       .filter((f) => currentGroupSlots[f.playerId] == null && !otherUsed[f.playerId])
       .forEach((f) => {
-        const idx = this._firstEmptySlotIndex();
+        const idx = this._firstDraftEmptySlotIndex();
         if (idx < 0) return;
         const source = f.playerId === 'me' ? 'host' : 'friend';
-        this._doBindPlayerToSlot(idx, { playerId: f.playerId, name: f.name, avatar: f.avatar }, source, false);
+        this._doBindDraftPlayerToSlot(
+          idx,
+          { playerId: f.playerId, name: f.name, avatar: f.avatar },
+          source,
+          false
+        );
       });
   },
 
@@ -2433,13 +3019,14 @@ Page({
     });
   },
 
-  // 组合选择返回：按 slot 顺序批量补当前比赛空位（不动已占用、不改顺序；全局去重跳过已用）
+  // 组合选择返回：只写 draft，按空位顺序批量补位
   _onComboSelected(combo) {
     if (!combo || !Array.isArray(combo.players)) return;
+    if (!this._draftSlots) return;
     const used = {};
     this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => { used[id] = true; });
     const emptyIdx = [];
-    (this.data.groupSlots || []).forEach((s, i) => {
+    (this._draftSlots || []).forEach((s, i) => {
       if (s && s.status === 'empty') emptyIdx.push(i);
     });
     if (!emptyIdx.length) {
@@ -2449,56 +3036,106 @@ Page({
     let slot = 0;
     combo.players.forEach((pl) => {
       const pid = pl.playerId || 'cb-' + Date.now() + '-' + slot;
-      if (used[pid]) return; // 全局去重：跳过本场已用
+      if (used[pid]) return;
       if (slot >= emptyIdx.length) return;
-      this._doBindPlayerToSlot(emptyIdx[slot], { playerId: pid, name: pl.name, avatar: pl.avatar }, 'combo', false);
+      this._doBindDraftPlayerToSlot(
+        emptyIdx[slot],
+        { playerId: pid, name: pl.name, avatar: pl.avatar },
+        'combo',
+        false
+      );
       used[pid] = true;
       slot += 1;
     });
   },
 
-  // 【3】手工添加：第二层 → 跳转「手工添加页」（搜索/新建，单人绑定当前 slot 或第一个空位）
+  // 【3】手工添加：本页底部弹窗（姓名必填 / 手机选填 / 性别），不跳转独立页
   addMethodManual() {
-    this.setData({ addSheetVisible: false });
-    const target = this._targetSlotIdx;
-    const ctx = this._buildSlotCtx();
-    const usedIds = this._otherGroupsUsedIds().concat(this._currentGroupUsedIds());
-    wx.navigateTo({
-      url:
-        '/pages/player/manual/index?matchId=' +
-        encodeURIComponent(ctx.matchId) +
-        '&slotId=' +
-        encodeURIComponent(ctx.slotId) +
-        '&used=' +
-        encodeURIComponent(usedIds.join(',')),
-      events: {
-        playerPicked: (payload) => this._onPlayerPicked(payload && payload.player, target)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    this.setData({
+      addSheetVisible: false,
+      manualSheetVisible: true,
+      manualName: '',
+      manualPhone: '',
+      manualGender: 'male'
     });
   },
 
-  // 手工添加返回：单人绑定到目标 slot（被占用则退到第一个空位；全局去重拦截）
+  closeManualSheet() {
+    this.setData({
+      manualSheetVisible: false,
+      manualName: '',
+      manualPhone: '',
+      manualGender: 'male'
+    });
+  },
+
+  onManualNameInput(e) {
+    this.setData({ manualName: (e.detail && e.detail.value) || '' });
+  },
+
+  onManualPhoneInput(e) {
+    this.setData({ manualPhone: (e.detail && e.detail.value) || '' });
+  },
+
+  onManualGenderSelect(e) {
+    const gender = e.currentTarget.dataset.gender;
+    if (gender !== 'male' && gender !== 'female') return;
+    this.setData({ manualGender: gender });
+  },
+
+  confirmManualSheet() {
+    const name = (this.data.manualName || '').trim();
+    const phone = (this.data.manualPhone || '').trim();
+    const gender = this.data.manualGender === 'female' ? 'female' : 'male';
+    if (!name) {
+      wx.showToast({ title: '请输入选手姓名', icon: 'none' });
+      return;
+    }
+    if (phone && !/^1\d{10}$/.test(phone)) {
+      wx.showToast({ title: '手机号格式不正确', icon: 'none' });
+      return;
+    }
+    const target = this._targetSlotIdx;
+    const player = {
+      playerId: 'm-' + Date.now(),
+      name: name,
+      phone: phone || '',
+      gender: gender,
+      avatar: mockAvatars.pickMockAvatar(name),
+      source: 'manual'
+    };
+    this.closeManualSheet();
+    this._onPlayerPicked(player, target);
+  },
+
+  // 手工添加返回：只写 draft（目标 slot 或第一个空位）
   _onPlayerPicked(player, target) {
     if (!player) return;
+    if (!this._draftSlots) return;
     const used = {};
     this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => { used[id] = true; });
-    if (player.playerId && used[player.playerId]) return; // 已在本场使用：拦截
-    const slots = this.data.groupSlots || [];
-    let idx = target != null && target >= 0 ? target : this._firstEmptySlotIndex();
-    if (idx < 0 || (slots[idx] && slots[idx].status === 'occupied')) idx = this._firstEmptySlotIndex();
+    if (player.playerId && used[player.playerId]) return;
+    const slots = this._draftSlots || [];
+    let idx = target != null && target >= 0 ? target : this._firstDraftEmptySlotIndex();
+    if (idx < 0 || (slots[idx] && slots[idx].status === 'occupied')) idx = this._firstDraftEmptySlotIndex();
     if (idx < 0) {
       wx.showToast({ title: '本组已满（4 人）', icon: 'none' });
       return;
     }
-    this._bindPlayerToSlot(
+    this._bindDraftPlayerToSlot(
       idx,
-      { playerId: player.playerId, name: player.name, avatar: player.avatar },
+      {
+        playerId: player.playerId,
+        name: player.name,
+        avatar: player.avatar,
+        phone: player.phone || '',
+        gender: player.gender || ''
+      },
       player.source || 'manual'
     );
   },
 
-  // footer「手工添加」：统一跳转「手工添加页」，目标=第一个空位
+  // 兼容旧 footer 入口（若仍被调用）：打开手工弹窗，目标=第一个空位
   addGroupPlayer() {
     this._targetSlotIdx = this._firstEmptySlotIndex();
     if (this._targetSlotIdx < 0) {
@@ -2508,7 +3145,7 @@ Page({
     this.addMethodManual();
   },
 
-  // footer「好友选择」：统一跳转「好友选择页」
+  // footer「好友选择」遗留入口（底部已改为取消/确认，保留方法以免其它调用报错）
   onFooterFriend() {
     if (this._firstEmptySlotIndex() < 0) {
       wx.showToast({ title: '本组已满（4 人）', icon: 'none' });

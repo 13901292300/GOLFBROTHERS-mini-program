@@ -1446,6 +1446,163 @@ page {
   z-index: 200;
 }
 
+/* 手工添加底部弹窗：高于来源选择与底栏 */
+.manual-sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.46);
+  z-index: 700;
+}
+
+.manual-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 710;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-bottom: 0;
+  border-radius: 32rpx 32rpx 0 0;
+  box-shadow: 0 -16rpx 36rpx rgba(0, 0, 0, 0.24);
+  padding: 20rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  color: var(--text-primary);
+}
+
+.manual-sheet__handle {
+  width: 80rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: var(--border-hover, var(--border-color));
+  margin: 0 auto 28rpx;
+}
+
+.manual-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-bottom: 28rpx;
+}
+
+.manual-sheet__overline {
+  display: block;
+  font-size: 20rpx;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--data-blue, #00aeef);
+}
+
+.manual-sheet__title {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 36rpx;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.manual-sheet__close {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle, var(--bg-card));
+  color: var(--text-muted, var(--text-secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.manual-sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+}
+
+.manual-field__label {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 12rpx;
+}
+
+.manual-field__input {
+  width: 100%;
+  height: 88rpx;
+  box-sizing: border-box;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle, var(--bg-primary));
+  color: var(--text-primary);
+  font-size: 28rpx;
+}
+
+.manual-field__placeholder {
+  color: var(--text-muted, #9ca3af);
+}
+
+.manual-gender {
+  display: flex;
+  flex-direction: row;
+  gap: 16rpx;
+}
+
+.manual-gender__tag {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle, var(--bg-card));
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.manual-gender__tag.is-active {
+  color: #000000;
+  background: var(--champion-gold, #ce9224);
+  border-color: var(--champion-gold, #ce9224);
+}
+
+.manual-sheet__footer {
+  display: flex;
+  flex-direction: row;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+
+.manual-sheet__btn {
+  flex: 1;
+  height: 96rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.manual-sheet__btn--cancel {
+  color: var(--text-secondary);
+  background: var(--bg-subtle, var(--bg-card));
+  border: 1px solid var(--border-color);
+}
+
+.manual-sheet__btn--confirm {
+  color: #000000;
+  background: var(--champion-gold, #ce9224);
+  border: 1px solid var(--champion-gold, #ce9224);
+}
+
 .section-card {
   width: 100%;
   box-sizing: border-box;
@@ -1827,7 +1984,7 @@ page {
   margin: 24rpx 0;
 }
 
-/* 复刻原型 .actions / .action-btn：横向并列、卡片底 + 描边、文字着色（非实心通用按钮） */
+/* 复刻原型 .actions / .action-btn：横向并列、卡片底 + 描边 */
 .group-actions {
   display: flex;
   flex-direction: row;
@@ -1848,23 +2005,17 @@ page {
   font-weight: 900;
 }
 
-.group-action-btn__icon {
-  font-size: 26rpx;
-  font-weight: 900;
+/* 取消：次要描边按钮 */
+.group-action-btn--cancel {
+  color: var(--text-secondary);
+  background: var(--bg-subtle, var(--bg-card));
 }
 
-/* 手工添加：金色文字 */
-.group-action-btn--manual {
-  color: #ce9224;
-}
-
-/* 好友选择：DARK 用湖蓝、BRIGHT 用 PGA 蓝（与原型一致） */
-.group-action-btn--friends {
-  color: #00aeef;
-}
-
-.score-page.bright-mode .group-action-btn--friends {
-  color: #002d62;
+/* 确认：金色主按钮 */
+.group-action-btn--confirm {
+  color: #000000;
+  background: var(--champion-gold, #ce9224);
+  border-color: var(--champion-gold, #ce9224);
 }
 
 /* 主题切换完全由 .dark-mode / .bright-mode 上的 Theme Token 驱动，

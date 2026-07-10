@@ -150,13 +150,20 @@ const FEATURE_SECTION_REGISTERING = {
   permissionSub: ''
 };
 
-/** 替他人报名：来源三选一（阶段一，仅弹屏入口） */
+/** 替他人报名：人员来源（player-source-sheet；无老牌组合） */
 const REGISTER_FOR_OTHER_SOURCE_OPTIONS = [
-  { source: 'friends', glyph: '👥', label: '从好友列表选择', desc: '选择微信好友或历史联系人' },
-  { source: 'team_members', glyph: '🏌️', label: '从球队成员列表选择', desc: '选择本赛事参赛球队成员' },
-  { source: 'manual', glyph: '✏️', label: '手工添加', desc: '输入姓名和手机号添加人员' }
+  { key: 'friends', glyph: '👥', label: '从好友列表选择', desc: '选择微信好友或历史联系人' },
+  {
+    key: 'team_members',
+    glyph: '🏌️',
+    label: '从球队成员列表选择',
+    desc: '选择本赛事参赛球队成员',
+    disabled: true,
+    locked: true
+  },
+  { key: 'manual', glyph: '✏️', label: '手工添加', desc: '输入姓名和手机号添加人员' }
 ];
-const REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST = '仅赛事管理员或球队成员可使用';
+const REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST = '仅赛事管理员或参赛球队成员可使用';
 
 /** 当前用户是否属于本赛事参赛球队（teamDirectory mock：isMine 表示我的球队） */
 function resolveIsEventTeamMember(match) {
@@ -167,6 +174,13 @@ function resolveIsEventTeamMember(match) {
 }
 
 const MORE_ACCESS = { isPrivilegedUser: true, permissions: ['leaderboard', 'stats', 'poster', 'feedback', 'theme'] };
+
+/** Patch 7：是否可使用「球队成员列表」代报名渠道 */
+function resolveCanUseTeamMembersChannel(match) {
+  if (resolveIsEventTeamMember(match)) return true;
+  if (MORE_ACCESS && MORE_ACCESS.isPrivilegedUser) return true;
+  return false;
+}
 const TOURNAMENT_MANAGE_PERMISSIONS = FEATURES_PERMISSION.map((f) => f.permission);
 const GROUPS_TAB_PLAYER_SLOTS = 4;
 
@@ -310,7 +324,17 @@ Page({
     featuresSectionPermissionMain: FEATURE_SECTION_DEFAULT.permissionMain,
     featuresSectionPermissionSub: FEATURE_SECTION_DEFAULT.permissionSub,
     registerForOtherSheetVisible: false,
-    registerForOtherSourceOptions: REGISTER_FOR_OTHER_SOURCE_OPTIONS.slice()
+    registerForOtherSourceOptions: REGISTER_FOR_OTHER_SOURCE_OPTIONS.slice(),
+    // 替他人报名 · 手工添加弹窗（仅 UI / console，不写 registerInfo）
+    registerForOtherManualVisible: false,
+    registerForOtherManualName: '',
+    registerForOtherManualPhone: '',
+    registerForOtherManualGender: 'male',
+    // Patch 3：代报名待确认人员 + 分队选择弹窗（不写盘）
+    pendingProxyPlayers: [],
+    proxyGroupSheetVisible: false,
+    proxyGroupOptions: [],
+    proxyGroupId: ''
   },
 
   onLoad(options) {
@@ -639,24 +663,33 @@ Page({
 
   _resolveRegisterInfo(match) {
     if (!match || !match.registerInfo) return Object.assign({}, EMPTY_REGISTER_INFO);
-    const info = match.registerInfo || {};
-    const users = Array.isArray(info.users)
-      ? info.users.map((user) => ({
-        userId: user && user.userId ? String(user.userId) : '',
-        // 赛事显示名唯一来源 competitionName；兼容旧数据回退 nickname
-        competitionName: user && user.competitionName ? String(user.competitionName) : (user && user.nickname ? String(user.nickname) : ''),
-        gender: user && user.gender ? String(user.gender) : '',
-        handicap: user && user.handicap != null ? user.handicap : '',
-        avatar: user && user.avatar ? String(user.avatar) : '',
-        phone: user && user.phone ? String(user.phone) : '',
-        groupId: user && user.groupId != null ? String(user.groupId) : '',
-        groupName: user && user.groupName ? String(user.groupName) : '',
-        registeredAt: user && user.registeredAt != null ? user.registeredAt : ''
-      }))
-      : [];
-    const totalCount = info.totalCount != null ? Number(info.totalCount) : users.length;
+    // 旧报名记录缺省字段在 store.normalize 中按「本人报名」补齐
+    const normalized = teamMatchStore.normalizeRegisterInfo(match.registerInfo);
+    const users = (normalized.users || []).map((user) => ({
+      userId: user.userId || '',
+      // 赛事显示名唯一来源 competitionName；兼容旧数据回退 nickname
+      competitionName: user.competitionName || user.nickname || '',
+      gender: user.gender || '',
+      handicap: user.handicap != null ? user.handicap : '',
+      avatar: user.avatar || '',
+      phone: user.phone || '',
+      groupId: user.groupId != null ? String(user.groupId) : '',
+      groupName: user.groupName || '',
+      registeredAt: user.registeredAt != null ? user.registeredAt : '',
+      source: user.source || 'self',
+      registeredBy: user.registeredBy || '',
+      registeredByName: user.registeredByName || '',
+      subjectType: user.subjectType || 'self',
+      pickChannel: user.pickChannel || '',
+      canSelfCancel: user.canSelfCancel !== false,
+      locked: !!user.locked,
+      // Patch 8：手工代报名预留字段，与 store.normalize 对齐
+      userType: user.userType || '',
+      realName: user.realName || '',
+      remarkName: user.remarkName || ''
+    }));
     return {
-      totalCount: Number.isFinite(totalCount) ? totalCount : users.length,
+      totalCount: normalized.totalCount,
       users: users
     };
   },
@@ -678,7 +711,17 @@ Page({
         phone: user.phone || '',
         groupId: user.groupId || '',
         groupName: user.groupName || '',
-        registeredAt: user.registeredAt != null ? user.registeredAt : ''
+        registeredAt: user.registeredAt != null ? user.registeredAt : '',
+        source: user.source || 'self',
+        registeredBy: user.registeredBy || '',
+        registeredByName: user.registeredByName || '',
+        subjectType: user.subjectType || 'self',
+        pickChannel: user.pickChannel || '',
+        canSelfCancel: user.canSelfCancel !== false,
+        locked: !!user.locked,
+        userType: user.userType || '',
+        realName: user.realName || '',
+        remarkName: user.remarkName || ''
       }));
   },
 
@@ -824,6 +867,8 @@ Page({
     // 防重：同一 userId 不重复写入
     const already = match.registerInfo.users.some((item) => String(item && item.userId) === userId);
     if (!already) {
+      const registeredByName =
+        (user.name && String(user.name).trim()) || competitionName || '';
       match.registerInfo.users.push({
         userId: userId,
         competitionName: competitionName,
@@ -832,7 +877,15 @@ Page({
         phone: this.data.registerPhone ? String(this.data.registerPhone) : (user.phone ? String(user.phone) : ''),
         groupId: groupId,
         groupName: selectedGroup.name || '',
-        registeredAt: Date.now()
+        registeredAt: Date.now(),
+        // Patch 1：本人立即报名元数据（替他人报名流程后续再写 proxy/admin）
+        source: 'self',
+        registeredBy: userId,
+        registeredByName: registeredByName,
+        subjectType: 'self',
+        pickChannel: '',
+        canSelfCancel: true,
+        locked: false
       });
     }
     // 4. 更新总人数
@@ -1599,7 +1652,14 @@ Page({
     const permission = e.currentTarget.dataset.permission;
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
       if (permission === 'register_for_other') {
+        // Patch 8：关闭报名后禁用替他人报名（邀请好友报名不受影响）
+        const registerClosed =
+          !(this.data.registerPermission && this.data.registerPermission.isOpen);
         this.setData({ showMoreSheet: false, moreFabExpanded: false });
+        if (registerClosed) {
+          wx.showToast({ title: '报名已关闭', icon: 'none' });
+          return;
+        }
         this.openRegisterForOtherSheet();
         return;
       }
@@ -1631,10 +1691,933 @@ Page({
   },
 
   openRegisterForOtherSheet() {
+    // Patch 8：二次拦截，避免其它入口绕过 onFeatureTap
+    if (!(this.data.registerPermission && this.data.registerPermission.isOpen)) {
+      wx.showToast({ title: '报名已关闭', icon: 'none' });
+      return;
+    }
     this.setData({
       registerForOtherSourceOptions: this._buildRegisterForOtherSourceOptions(),
       registerForOtherSheetVisible: true
     });
+  },
+
+  closeRegisterForOtherSheet() {
+    this.setData({ registerForOtherSheetVisible: false });
+  },
+
+  /** Patch 7：球队成员渠道按管理员 / 参赛球队成员解禁 */
+  _buildRegisterForOtherSourceOptions() {
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    const canTeamMembers = resolveCanUseTeamMembersChannel(match);
+    return REGISTER_FOR_OTHER_SOURCE_OPTIONS.map((opt) => {
+      if (opt.key === 'team_members') {
+        return Object.assign({}, opt, {
+          disabled: !canTeamMembers,
+          locked: !canTeamMembers
+        });
+      }
+      return Object.assign({}, opt, { disabled: false, locked: false });
+    });
+  },
+
+  onRegisterForOtherSourceSelect(e) {
+    const key = e.detail && e.detail.key;
+    this.setData({ registerForOtherSheetVisible: false });
+    if (key === 'friends') {
+      this._openRegisterForOtherFriendsPicker();
+      return;
+    }
+    if (key === 'manual') {
+      this.openRegisterForOtherManualSheet();
+      return;
+    }
+    if (key === 'team_members') {
+      const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+      if (!resolveCanUseTeamMembersChannel(match)) {
+        wx.showToast({ title: REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST, icon: 'none' });
+        return;
+      }
+      this._openRegisterForOtherTeamMembersPicker();
+    }
+  },
+
+  onRegisterForOtherSourceDenied(e) {
+    const key = e.detail && e.detail.key;
+    if (key === 'team_members') {
+      wx.showToast({ title: REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST, icon: 'none' });
+    }
+  },
+
+  /**
+   * 好友选择（proxy_register）：
+   * - URL 传 mode + matchId + operatorUserId
+   * - EventChannel 传 registerUsers（当前赛事报名名单）
+   * - 返回 addedPlayers / removedPlayers
+   * - Patch 5A/5B/5C：生成 commit plan → 分队确认后统一写盘
+   */
+  _openRegisterForOtherFriendsPicker() {
+    const matchId = this.data.matchId || '';
+    const operator = gameStore.getCurrentUser() || {};
+    const operatorUserId = String(operator.userId || '');
+    const registerUsers = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
+    const url =
+      '/pages/player/friends/index?mode=' +
+      encodeURIComponent('proxy_register') +
+      '&matchId=' +
+      encodeURIComponent(matchId) +
+      '&operatorUserId=' +
+      encodeURIComponent(operatorUserId) +
+      '&slotId=' +
+      encodeURIComponent('register-for-other');
+    wx.navigateTo({
+      url: url,
+      success: (res) => {
+        try {
+          if (res && res.eventChannel && res.eventChannel.emit) {
+            res.eventChannel.emit('proxyRegisterContext', {
+              registerUsers: registerUsers,
+              operatorUserId: operatorUserId,
+              matchId: matchId
+            });
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      },
+      events: {
+        friendsSelected: (payload) => {
+          this._onProxyFriendsSelected(payload || {});
+        }
+      },
+      fail: (err) =>
+        wx.showToast({
+          title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''),
+          icon: 'none'
+        })
+    });
+  },
+
+  /**
+   * Patch 7：球队成员选择（proxy_register_team）
+   * - 列表数据源：teamDirectory.getTeamMembers(match.teamId)
+   * - 三态权威：store.registerInfo.users（选择页内读取，避免 EventChannel 竞态）
+   */
+  _openRegisterForOtherTeamMembersPicker() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const teamId = match && match.teamId ? String(match.teamId).trim() : '';
+    if (!teamId) {
+      wx.showToast({ title: '本赛事未关联球队', icon: 'none' });
+      return;
+    }
+    const operator = gameStore.getCurrentUser() || {};
+    const operatorUserId = String(operator.userId || '');
+    const registerUsers = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
+    const url =
+      '/pages/player/friends/index?mode=' +
+      encodeURIComponent('proxy_register_team') +
+      '&matchId=' +
+      encodeURIComponent(matchId) +
+      '&operatorUserId=' +
+      encodeURIComponent(operatorUserId) +
+      '&teamId=' +
+      encodeURIComponent(teamId) +
+      '&slotId=' +
+      encodeURIComponent('register-for-other-team');
+    wx.navigateTo({
+      url: url,
+      success: (res) => {
+        try {
+          if (res && res.eventChannel && res.eventChannel.emit) {
+            res.eventChannel.emit('proxyRegisterContext', {
+              registerUsers: registerUsers,
+              operatorUserId: operatorUserId,
+              matchId: matchId,
+              teamId: teamId
+            });
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      },
+      events: {
+        friendsSelected: (payload) => {
+          this._onProxyFriendsSelected(payload || {});
+        }
+      },
+      fail: (err) =>
+        wx.showToast({
+          title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''),
+          icon: 'none'
+        })
+    });
+  },
+
+  /**
+   * Patch 5A/5B/5C/7：处理好友/球队成员页差异返回。
+   * - removedPlayers → remove plan
+   * - addedPlayers → 打开「选择代表分队」；确定后生成 add plan 并统一写盘
+   * - 仅取消（无新增）→ 直接 _applyProxyCommitPlan
+   */
+  _onProxyFriendsSelected(payload) {
+    const data = payload || {};
+    const matchId = this.data.matchId || '';
+    const addedPlayers = Array.isArray(data.addedPlayers) ? data.addedPlayers : [];
+    const removedPlayers = Array.isArray(data.removedPlayers) ? data.removedPlayers : [];
+    const mode = data.mode === 'proxy_register_team' ? 'proxy_register_team' : 'proxy_register';
+    const pickChannel = mode === 'proxy_register_team' ? 'team_members' : 'friends';
+
+    console.log('[register-for-other] friends diff', {
+      matchId: matchId,
+      mode: mode,
+      addedPlayers: addedPlayers,
+      removedPlayers: removedPlayers
+    });
+
+    const removePlan = this._buildProxyRemovePlan(removedPlayers);
+    console.log('[register-for-other] remove plan', removePlan);
+
+    this._proxyCommitPlan = {
+      matchId: matchId,
+      mode: mode,
+      pickChannel: pickChannel,
+      removes: removePlan.removable,
+      skippedRemoves: removePlan.skipped,
+      pendingAdds: addedPlayers.slice(),
+      adds: [],
+      skippedAdds: [],
+      group: null,
+      applied: false,
+      saved: false
+    };
+    console.log('[register-for-other] unified commit plan (pending)', this._proxyCommitPlan);
+
+    // 有新增：先进分队弹窗，确定后再补全 adds 并写盘
+    if (addedPlayers.length > 0) {
+      this._openProxyGroupSheet(addedPlayers, pickChannel);
+      return;
+    }
+
+    // 仅取消 / 无变更：直接统一提交
+    this._applyProxyCommitPlan();
+  },
+
+  /**
+   * 仅允许取消「当前用户代报名」记录：
+   * source === 'proxy' && registeredBy === operatorUserId && userId 匹配
+   * 禁止：self / 他人代报 / admin / 旧数据 self
+   * @returns {{ removable: Array, skipped: Array }}
+   */
+  _buildProxyRemovePlan(removedPlayers) {
+    const operator = gameStore.getCurrentUser() || {};
+    const operatorUserId = String(operator.userId || '');
+    const users = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
+    const byId = {};
+    users.forEach((u) => {
+      const id = u && u.userId != null ? String(u.userId) : '';
+      if (id) byId[id] = u;
+    });
+
+    const list = Array.isArray(removedPlayers) ? removedPlayers : [];
+    const removable = [];
+    const skipped = [];
+
+    list.forEach((player) => {
+      const userId = String((player && (player.userId || player.playerId)) || '').trim();
+      if (!userId) {
+        skipped.push({
+          player: player,
+          reason: 'missing_userId'
+        });
+        return;
+      }
+      const registration = byId[userId];
+      if (!registration) {
+        skipped.push({
+          userId: userId,
+          player: player,
+          reason: 'not_registered'
+        });
+        return;
+      }
+      const source = String(registration.source || 'self');
+      const registeredBy = String(registration.registeredBy || '');
+      const canRemove =
+        source === 'proxy' &&
+        !!operatorUserId &&
+        registeredBy === operatorUserId &&
+        String(registration.userId) === userId;
+
+      if (!canRemove) {
+        skipped.push({
+          userId: userId,
+          player: player,
+          registration: {
+            source: source,
+            registeredBy: registeredBy,
+            subjectType: registration.subjectType || ''
+          },
+          reason:
+            source !== 'proxy'
+              ? 'not_proxy'
+              : registeredBy !== operatorUserId
+                ? 'not_registered_by_me'
+                : 'forbidden'
+        });
+        return;
+      }
+
+      removable.push({
+        action: 'remove',
+        userId: userId,
+        competitionName: registration.competitionName || '',
+        groupId: registration.groupId != null ? String(registration.groupId) : '',
+        groupName: registration.groupName || '',
+        source: 'proxy',
+        registeredBy: registeredBy,
+        registeredByName: registration.registeredByName || '',
+        subjectType: registration.subjectType || 'other',
+        pickChannel: registration.pickChannel || 'friends',
+        player: player
+      });
+    });
+
+    return {
+      matchId: this.data.matchId || '',
+      operatorUserId: operatorUserId,
+      removable: removable,
+      skipped: skipped,
+      removableCount: removable.length,
+      skippedCount: skipped.length
+    };
+  },
+
+  /**
+   * Patch 5B/6：根据 pendingProxyPlayers + 代表分队生成 add plan（不写盘）
+   * 去重：
+   * - 缺 userId → skippedAdds reason=missing_userId
+   * - userId 已报名 → already_registered
+   * - manual 且手机号非空且 phone 已存在 → already_registered_phone
+   * @returns {{ adds: Array, skippedAdds: Array, group: {id,name} }}
+   */
+  _buildProxyAddPlan(players, group) {
+    const operator = gameStore.getCurrentUser() || {};
+    const registeredBy = String(operator.userId || '');
+    let registeredByName = (operator.name && String(operator.name).trim()) || '';
+    if (!registeredByName) {
+      try {
+        const profile = userProfileStore.loadProfile() || {};
+        registeredByName =
+          (profile.competitionName && String(profile.competitionName).trim()) ||
+          (profile.nickname && String(profile.nickname).trim()) ||
+          '';
+      } catch (e) {
+        registeredByName = '';
+      }
+    }
+
+    const users = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
+    const existingIds = {};
+    const existingPhones = {};
+    users.forEach((u) => {
+      const id = u && u.userId != null ? String(u.userId) : '';
+      if (id) existingIds[id] = true;
+      const phone = u && u.phone != null ? String(u.phone).trim() : '';
+      if (phone) existingPhones[phone] = true;
+    });
+
+    const groupId = group && group.id != null ? String(group.id) : '';
+    const groupName = group && group.name ? String(group.name) : '';
+    const list = Array.isArray(players) ? players : [];
+    const adds = [];
+    const skippedAdds = [];
+    const registeredAt = Date.now();
+    const channelHint = String(this._proxyPickChannel || '').trim();
+
+    list.forEach((player) => {
+      const p = player || {};
+      const pickChannelRaw = String(p.pickChannel || channelHint || 'friends').trim();
+      const pickChannel =
+        pickChannelRaw === 'manual'
+          ? 'manual'
+          : pickChannelRaw === 'team_members'
+            ? 'team_members'
+            : 'friends';
+      const userId = String(p.userId || p.playerId || '').trim();
+      if (!userId) {
+        skippedAdds.push({
+          player: player,
+          reason: 'missing_userId'
+        });
+        return;
+      }
+      if (existingIds[userId]) {
+        skippedAdds.push({
+          userId: userId,
+          player: player,
+          reason: 'already_registered'
+        });
+        return;
+      }
+      const phone = p.phone != null ? String(p.phone).trim() : '';
+      // Patch 6：手工添加按 phone 去重（仅 manual + 非空手机号）
+      if (pickChannel === 'manual' && phone && existingPhones[phone]) {
+        skippedAdds.push({
+          userId: userId,
+          phone: phone,
+          player: player,
+          reason: 'already_registered_phone'
+        });
+        return;
+      }
+      const competitionName = String(
+        p.competitionName || p.name || p.realName || ''
+      ).trim();
+      // Patch 6：手工字段；好友路径保持空串，不改写好友语义
+      let userType = '';
+      let realName = '';
+      let remarkName = '';
+      if (pickChannel === 'manual') {
+        userType =
+          p.userType != null && String(p.userType).trim() !== ''
+            ? String(p.userType).trim()
+            : phone
+              ? 'phone_pending'
+              : 'non_registered';
+        realName = String(
+          p.realName != null && String(p.realName).trim() !== ''
+            ? p.realName
+            : competitionName
+        ).trim();
+        remarkName = p.remarkName != null ? String(p.remarkName) : '';
+      }
+      adds.push({
+        action: 'add',
+        userId: userId,
+        competitionName: competitionName,
+        gender: p.gender != null ? String(p.gender) : '',
+        avatar: p.avatar != null ? String(p.avatar) : '',
+        phone: phone,
+        groupId: groupId,
+        groupName: groupName,
+        registeredAt: registeredAt,
+        source: 'proxy',
+        registeredBy: registeredBy,
+        registeredByName: registeredByName,
+        subjectType: 'other',
+        pickChannel: pickChannel,
+        canSelfCancel: true,
+        locked: false,
+        userType: userType,
+        realName: realName,
+        remarkName: remarkName,
+        player: player
+      });
+      // 同批内去重
+      existingIds[userId] = true;
+      if (pickChannel === 'manual' && phone) existingPhones[phone] = true;
+    });
+
+    return {
+      adds: adds,
+      skippedAdds: skippedAdds,
+      group: { id: groupId, name: groupName },
+      addCount: adds.length,
+      skippedCount: skippedAdds.length
+    };
+  },
+
+  openRegisterForOtherManualSheet() {
+    this.setData({
+      registerForOtherManualVisible: true,
+      registerForOtherManualName: '',
+      registerForOtherManualPhone: '',
+      registerForOtherManualGender: 'male'
+    });
+  },
+
+  closeRegisterForOtherManualSheet() {
+    this.setData({
+      registerForOtherManualVisible: false,
+      registerForOtherManualName: '',
+      registerForOtherManualPhone: '',
+      registerForOtherManualGender: 'male'
+    });
+  },
+
+  onRegisterForOtherManualNameInput(e) {
+    this.setData({ registerForOtherManualName: (e.detail && e.detail.value) || '' });
+  },
+
+  onRegisterForOtherManualPhoneInput(e) {
+    this.setData({ registerForOtherManualPhone: (e.detail && e.detail.value) || '' });
+  },
+
+  onRegisterForOtherManualGenderSelect(e) {
+    const gender = e.currentTarget.dataset.gender;
+    if (gender !== 'male' && gender !== 'female') return;
+    this.setData({ registerForOtherManualGender: gender });
+  },
+
+  /**
+   * Patch 6：手工添加确定 → 构建 pending 选手 → 打开「选择代表分队」
+   * 手机号非空时提前按 phone 去重；写盘在分队确认后走 _applyProxyCommitPlan
+   */
+  confirmRegisterForOtherManualSheet() {
+    const name = (this.data.registerForOtherManualName || '').trim();
+    const phone = (this.data.registerForOtherManualPhone || '').trim();
+    const gender = this.data.registerForOtherManualGender === 'female' ? 'female' : 'male';
+    if (!name) {
+      wx.showToast({ title: '请输入选手姓名', icon: 'none' });
+      return;
+    }
+    if (phone && !/^1\d{10}$/.test(phone)) {
+      wx.showToast({ title: '手机号格式不正确', icon: 'none' });
+      return;
+    }
+
+    // 手机号非空：按 phone 去重（当前阶段不做后台校验）
+    if (phone) {
+      const users = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
+      const phoneExists = users.some((u) => String((u && u.phone) || '').trim() === phone);
+      if (phoneExists) {
+        wx.showToast({ title: '已报名', icon: 'none' });
+        return;
+      }
+    }
+
+    const ts = Date.now();
+    const userType = phone ? 'phone_pending' : 'non_registered';
+    const userId = phone ? 'phone_pending_' + ts : 'nonreg_' + ts;
+    const player = {
+      playerId: userId,
+      userId: userId,
+      name: name,
+      competitionName: name,
+      realName: name,
+      remarkName: '',
+      phone: phone || '',
+      gender: gender,
+      avatar: mockAvatars.pickMockAvatar(userId || name),
+      pickChannel: 'manual',
+      source: 'proxy',
+      userType: userType
+    };
+    console.log('[register-for-other] manual player', {
+      matchId: this.data.matchId || '',
+      pickChannel: 'manual',
+      userType: userType,
+      player: player
+    });
+    this.closeRegisterForOtherManualSheet();
+    this._openProxyGroupSheet([player], 'manual');
+  },
+
+  /** 从 match.teamGroups 解析分队选项（展示 name） */
+  _resolveProxyGroupOptions() {
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    const groups =
+      match && Array.isArray(match.teamGroups) && match.teamGroups.length
+        ? match.teamGroups
+        : DEFAULT_REGISTER_GROUPS;
+    return (groups || [])
+      .map((g, index) => ({
+        id: g && g.id != null ? String(g.id) : String(index + 1),
+        name: g && g.name ? String(g.name) : ''
+      }))
+      .filter((g) => g.name);
+  },
+
+  /**
+   * Patch 3：选人完成后打开「选择代表分队」弹窗
+   * @param {Array} players pendingProxyPlayers
+   * @param {string} pickChannel friends | team_members | manual
+   */
+  _openProxyGroupSheet(players, pickChannel) {
+    const list = Array.isArray(players) ? players.slice() : [];
+    if (!list.length) {
+      wx.showToast({ title: '未选择人员', icon: 'none' });
+      return;
+    }
+    const options = this._resolveProxyGroupOptions();
+    if (!options.length) {
+      wx.showToast({ title: '暂无分队可选', icon: 'none' });
+      return;
+    }
+    this.setData({
+      pendingProxyPlayers: list,
+      proxyGroupOptions: options,
+      proxyGroupId: '',
+      proxyGroupSheetVisible: true
+    });
+    this._proxyPickChannel = pickChannel || '';
+  },
+
+  selectProxyGroup(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    this.setData({ proxyGroupId: String(id) });
+  },
+
+  /** 取消分队选择：关弹窗 + 清空 pending / commit plan，不写盘 */
+  cancelProxyGroupSheet() {
+    this.setData({
+      proxyGroupSheetVisible: false,
+      pendingProxyPlayers: [],
+      proxyGroupOptions: [],
+      proxyGroupId: ''
+    });
+    this._proxyPickChannel = '';
+    this._proxyCommitPlan = null;
+  },
+
+  _clearProxyRegistrationTempState() {
+    this.setData({
+      proxyGroupSheetVisible: false,
+      pendingProxyPlayers: [],
+      proxyGroupOptions: [],
+      proxyGroupId: ''
+    });
+    this._proxyPickChannel = '';
+  },
+
+  /** 代报名人员 → registerInfo.users 记录（Patch 4） */
+  _buildProxyRegisterUserRecord(player, group, operator) {
+    const p = player || {};
+    const userId = String(p.userId || p.playerId || '').trim();
+    const competitionName = String(
+      p.competitionName || p.name || p.realName || ''
+    ).trim();
+    const pickChannelRaw = String(
+      p.pickChannel || this._proxyPickChannel || ''
+    ).trim();
+    const pickChannel =
+      pickChannelRaw === 'friends' ||
+      pickChannelRaw === 'manual' ||
+      pickChannelRaw === 'team_members'
+        ? pickChannelRaw
+        : '';
+    const registeredBy = String((operator && operator.userId) || '');
+    const registeredByName = String(
+      (operator && (operator.name || operator.competitionName || operator.nickname)) || ''
+    ).trim();
+    return {
+      userId: userId,
+      competitionName: competitionName,
+      gender: p.gender != null ? String(p.gender) : '',
+      avatar: p.avatar != null ? String(p.avatar) : '',
+      phone: p.phone != null ? String(p.phone) : '',
+      groupId: group && group.id != null ? String(group.id) : '',
+      groupName: group && group.name ? String(group.name) : '',
+      registeredAt: Date.now(),
+      source: 'proxy',
+      registeredBy: registeredBy,
+      registeredByName: registeredByName,
+      subjectType: 'other',
+      pickChannel: pickChannel,
+      canSelfCancel: true,
+      locked: false
+    };
+  },
+
+  /**
+   * Patch 4：将 pendingProxyPlayers 写入 match.registerInfo.users（按 userId 去重）
+   * @returns {{ ok: boolean, addedCount: number, skippedCount: number, groupId: string }}
+   */
+  _commitProxyRegistrations(players, group) {
+    const match = teamMatchStore.getMatchById(this.data.matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return { ok: false, addedCount: 0, skippedCount: 0, groupId: '' };
+    }
+    const operator = gameStore.getCurrentUser() || {};
+    const operatorId = String(operator.userId || '');
+    if (!operatorId) {
+      wx.showToast({ title: '用户信息缺失', icon: 'none' });
+      return { ok: false, addedCount: 0, skippedCount: 0, groupId: '' };
+    }
+    // registeredByName：优先当前用户 name，其次资料 competitionName / nickname
+    let registeredByName = (operator.name && String(operator.name).trim()) || '';
+    if (!registeredByName) {
+      try {
+        const profile = userProfileStore.loadProfile() || {};
+        registeredByName =
+          (profile.competitionName && String(profile.competitionName).trim()) ||
+          (profile.nickname && String(profile.nickname).trim()) ||
+          '';
+      } catch (e) {
+        registeredByName = '';
+      }
+    }
+    const operatorMeta = {
+      userId: operatorId,
+      name: registeredByName,
+      competitionName: registeredByName,
+      nickname: registeredByName
+    };
+
+    if (!match.registerInfo || typeof match.registerInfo !== 'object') {
+      match.registerInfo = { totalCount: 0, users: [] };
+    }
+    if (!Array.isArray(match.registerInfo.users)) {
+      match.registerInfo.users = [];
+    }
+
+    const existingIds = {};
+    match.registerInfo.users.forEach((u) => {
+      const id = u && u.userId != null ? String(u.userId) : '';
+      if (id) existingIds[id] = true;
+    });
+
+    let addedCount = 0;
+    let skippedCount = 0;
+    const list = Array.isArray(players) ? players : [];
+    list.forEach((player) => {
+      const record = this._buildProxyRegisterUserRecord(player, group, operatorMeta);
+      if (!record.userId) {
+        skippedCount += 1;
+        return;
+      }
+      if (existingIds[record.userId]) {
+        skippedCount += 1;
+        return;
+      }
+      match.registerInfo.users.push(record);
+      existingIds[record.userId] = true;
+      addedCount += 1;
+    });
+
+    match.registerInfo.totalCount = match.registerInfo.users.length;
+    teamMatchStore.saveMatch(match);
+
+    const groupId = group && group.id != null ? String(group.id) : '';
+    const patch = this._buildRegisterStatePatch(match, groupId);
+    Object.assign(patch, {
+      proxyGroupSheetVisible: false,
+      pendingProxyPlayers: [],
+      proxyGroupOptions: [],
+      proxyGroupId: ''
+    });
+    this._proxyPickChannel = '';
+    this.setData(patch, () => {
+      if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+    });
+
+    return { ok: true, addedCount: addedCount, skippedCount: skippedCount, groupId: groupId };
+  },
+
+  /**
+   * Patch 5C：将 this._proxyCommitPlan 正式写入 match.registerInfo.users
+   * - removes：再次校验 source===proxy && registeredBy===当前用户
+   * - adds：按 userId 去重后写入（不含 player 原始对象）
+   * - saveMatch + 刷新报名 TAB + 清理 pending
+   * @returns {{ ok: boolean, removedCount: number, addedCount: number }}
+   */
+  _applyProxyCommitPlan() {
+    const plan = this._proxyCommitPlan;
+    if (!plan) {
+      this._clearProxyRegistrationTempState();
+      this._proxyCommitPlan = null;
+      wx.showToast({ title: '没有可更新的报名', icon: 'none' });
+      return { ok: false, removedCount: 0, addedCount: 0 };
+    }
+
+    const matchId = plan.matchId || this.data.matchId || '';
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return { ok: false, removedCount: 0, addedCount: 0 };
+    }
+
+    const operator = gameStore.getCurrentUser() || {};
+    const operatorUserId = String(operator.userId || '');
+    if (!operatorUserId) {
+      wx.showToast({ title: '用户信息缺失', icon: 'none' });
+      return { ok: false, removedCount: 0, addedCount: 0 };
+    }
+
+    if (!match.registerInfo || typeof match.registerInfo !== 'object') {
+      match.registerInfo = { totalCount: 0, users: [] };
+    }
+    if (!Array.isArray(match.registerInfo.users)) {
+      match.registerInfo.users = [];
+    }
+
+    let users = match.registerInfo.users.slice();
+    let removedCount = 0;
+    let addedCount = 0;
+
+    // 1) 应用 removes（再次校验：仅本人代报名可删）
+    const removeIds = {};
+    const removes = Array.isArray(plan.removes) ? plan.removes : [];
+    removes.forEach((item) => {
+      const userId = String((item && item.userId) || '').trim();
+      if (!userId) return;
+      const registration = users.find((u) => String(u && u.userId) === userId);
+      if (!registration) return;
+      const source = String(registration.source || 'self');
+      const registeredBy = String(registration.registeredBy || '');
+      const canRemove =
+        source === 'proxy' &&
+        registeredBy === operatorUserId &&
+        String(registration.userId) === userId;
+      if (canRemove) removeIds[userId] = true;
+    });
+    if (Object.keys(removeIds).length) {
+      const before = users.length;
+      users = users.filter((u) => !removeIds[String((u && u.userId) || '')]);
+      removedCount = before - users.length;
+    }
+
+    // 2) 应用 adds（按 userId 去重；manual 另按 phone 去重；不写 player 原始对象）
+    const existingIds = {};
+    const existingPhones = {};
+    users.forEach((u) => {
+      const id = u && u.userId != null ? String(u.userId) : '';
+      if (id) existingIds[id] = true;
+      const phone = u && u.phone != null ? String(u.phone).trim() : '';
+      if (phone) existingPhones[phone] = true;
+    });
+    const adds = Array.isArray(plan.adds) ? plan.adds : [];
+    adds.forEach((item) => {
+      const userId = String((item && item.userId) || '').trim();
+      if (!userId || existingIds[userId]) return;
+      const pickChannel =
+        String((item && item.pickChannel) || '').trim() === 'manual'
+          ? 'manual'
+          : String((item && item.pickChannel) || '').trim() === 'team_members'
+            ? 'team_members'
+            : 'friends';
+      const phone = item.phone != null ? String(item.phone).trim() : '';
+      // Patch 6：手工添加写盘前再次按 phone 去重
+      if (pickChannel === 'manual' && phone && existingPhones[phone]) return;
+      const record = {
+        userId: userId,
+        competitionName: item.competitionName != null ? String(item.competitionName) : '',
+        gender: item.gender != null ? String(item.gender) : '',
+        avatar: item.avatar != null ? String(item.avatar) : '',
+        phone: phone,
+        groupId: item.groupId != null ? String(item.groupId) : '',
+        groupName: item.groupName != null ? String(item.groupName) : '',
+        registeredAt: item.registeredAt != null ? item.registeredAt : Date.now(),
+        source: item.source || 'proxy',
+        registeredBy: item.registeredBy != null ? String(item.registeredBy) : '',
+        registeredByName: item.registeredByName != null ? String(item.registeredByName) : '',
+        subjectType: item.subjectType || 'other',
+        pickChannel: pickChannel,
+        canSelfCancel: item.canSelfCancel !== false,
+        locked: !!item.locked
+      };
+      // Patch 6：手工添加写入 userType / realName / remarkName
+      if (pickChannel === 'manual') {
+        record.userType = item.userType != null ? String(item.userType) : '';
+        record.realName = item.realName != null ? String(item.realName) : '';
+        record.remarkName = item.remarkName != null ? String(item.remarkName) : '';
+      }
+      users.push(record);
+      existingIds[userId] = true;
+      if (pickChannel === 'manual' && phone) existingPhones[phone] = true;
+      addedCount += 1;
+    });
+
+    // 3) totalCount + saveMatch
+    match.registerInfo.users = users;
+    match.registerInfo.totalCount = users.length;
+    teamMatchStore.saveMatch(match);
+
+    console.log('[register-for-other] apply commit plan', {
+      matchId: matchId,
+      removedCount: removedCount,
+      addedCount: addedCount,
+      totalCount: match.registerInfo.totalCount
+    });
+
+    // 4) 刷新报名 TAB + 清理 pending / plan
+    const preferredGroup =
+      (plan.group && plan.group.id) || this.data.activeRegisterSubTab || '';
+    const patch = this._buildRegisterStatePatch(match, preferredGroup);
+    Object.assign(patch, {
+      proxyGroupSheetVisible: false,
+      pendingProxyPlayers: [],
+      proxyGroupOptions: [],
+      proxyGroupId: ''
+    });
+    this._proxyPickChannel = '';
+    this._proxyCommitPlan = null;
+    this.setData(patch, () => {
+      if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+    });
+
+    // 5) toast
+    if (removedCount > 0 || addedCount > 0) {
+      wx.showToast({ title: '代报名已更新', icon: 'success' });
+    } else {
+      wx.showToast({ title: '没有可更新的报名', icon: 'none' });
+    }
+
+    return { ok: true, removedCount: removedCount, addedCount: addedCount };
+  },
+
+  /**
+   * 确定分队：
+   * - friends / team_members / manual → add plan → _applyProxyCommitPlan 写盘
+   */
+  confirmProxyGroupSheet() {
+    const groupId = String(this.data.proxyGroupId || '');
+    const options = this.data.proxyGroupOptions || [];
+    const group = options.find((g) => String(g.id) === groupId);
+    if (!group) {
+      wx.showToast({ title: '请选择分队', icon: 'none' });
+      return;
+    }
+    const players = this.data.pendingProxyPlayers || [];
+    if (!players.length) {
+      wx.showToast({ title: '未选择人员', icon: 'none' });
+      this._clearProxyRegistrationTempState();
+      return;
+    }
+
+    const channelRaw = String(this._proxyPickChannel || '').trim();
+    const pickChannel =
+      channelRaw === 'manual'
+        ? 'manual'
+        : channelRaw === 'team_members'
+          ? 'team_members'
+          : 'friends';
+
+    // 生成 add plan → 统一写盘
+    const addPlan = this._buildProxyAddPlan(players, group);
+    console.log('[register-for-other] add plan', addPlan);
+
+    // 手工添加：手机号已报名时优先提示「已报名」
+    if (
+      pickChannel === 'manual' &&
+      !addPlan.addCount &&
+      (addPlan.skippedAdds || []).some((s) => s && s.reason === 'already_registered_phone')
+    ) {
+      this._clearProxyRegistrationTempState();
+      this._proxyCommitPlan = null;
+      wx.showToast({ title: '已报名', icon: 'none' });
+      return;
+    }
+
+    const prev = this._proxyCommitPlan || {};
+    this._proxyCommitPlan = {
+      matchId: prev.matchId || this.data.matchId || '',
+      mode: prev.mode || (pickChannel === 'team_members' ? 'proxy_register_team' : 'proxy_register'),
+      pickChannel: pickChannel,
+      removes: Array.isArray(prev.removes) ? prev.removes : [],
+      skippedRemoves: Array.isArray(prev.skippedRemoves) ? prev.skippedRemoves : [],
+      pendingAdds: Array.isArray(prev.pendingAdds) ? prev.pendingAdds : players.slice(),
+      adds: addPlan.adds,
+      skippedAdds: addPlan.skippedAdds,
+      group: addPlan.group,
+      applied: false,
+      saved: false
+    };
+    console.log('[register-for-other] unified commit plan (before apply)', this._proxyCommitPlan);
+    this._applyProxyCommitPlan();
   },
 
   /**
@@ -1668,46 +2651,6 @@ Page({
       title: '邀请你报名：' + title,
       path: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
     };
-  },
-
-  closeRegisterForOtherSheet() {
-    this.setData({ registerForOtherSheetVisible: false });
-  },
-
-  _buildRegisterForOtherSourceOptions() {
-    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
-    const canPickTeamMembers =
-      this._resolveCanManageGroups(match) || resolveIsEventTeamMember(match);
-    return REGISTER_FOR_OTHER_SOURCE_OPTIONS.map((opt) => {
-      if (opt.source !== 'team_members') {
-        return Object.assign({}, opt, { disabled: false, locked: false });
-      }
-      const enabled = canPickTeamMembers;
-      return Object.assign({}, opt, { disabled: !enabled, locked: !enabled });
-    });
-  },
-
-  onRegisterForOtherSourceTap(e) {
-    const source = e.currentTarget.dataset.source;
-    const options = this.data.registerForOtherSourceOptions || [];
-    const item = options.find((opt) => opt.source === source);
-    if (item && item.disabled) {
-      if (source === 'team_members') {
-        wx.showToast({ title: REGISTER_FOR_OTHER_TEAM_MEMBERS_DENIED_TOAST, icon: 'none' });
-      }
-      return;
-    }
-    if (source === 'friends') {
-      console.log('[register-for-other] pick from friends list');
-      return;
-    }
-    if (source === 'team_members') {
-      console.log('[register-for-other] pick from team members list');
-      return;
-    }
-    if (source === 'manual') {
-      console.log('[register-for-other] manual add');
-    }
   },
 
   closeHalfSheet() {

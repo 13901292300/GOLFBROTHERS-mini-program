@@ -530,6 +530,15 @@ page {
 .register-sheet__head {
   padding: 8rpx 0 32rpx;
 }
+.register-sheet__overline {
+  display: block;
+  font-size: 20rpx;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--data-blue, #00aeef);
+  margin-bottom: 8rpx;
+}
 .register-sheet__title {
   display: block;
   font-size: 34rpx;
@@ -1151,38 +1160,55 @@ page {
 .sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
 .sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
 
-/* 替他人报名来源选择：复用创建普通球局「添加人员」弹窗结构 */
-.register-for-other-sheet.bottom-sheet {
+/* 替他人报名 · 手工添加底部弹窗（对齐记分页 manual-sheet） */
+.manual-sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.46);
+  z-index: 700;
+}
+
+.manual-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 710;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color, var(--border));
   border-bottom: 0;
   border-radius: 32rpx 32rpx 0 0;
-  padding: 20rpx 32rpx calc(36rpx + env(safe-area-inset-bottom));
-  color: var(--text-primary);
   box-shadow: 0 -16rpx 36rpx rgba(0, 0, 0, 0.24);
+  padding: 20rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  color: var(--text-primary);
 }
-.register-for-other-sheet .sheet-handle {
+
+.manual-sheet__handle {
   width: 80rpx;
   height: 8rpx;
-  background: var(--border-hover);
+  border-radius: 999rpx;
+  background: var(--border-hover, var(--border-color, var(--border)));
   margin: 0 auto 28rpx;
 }
-.register-for-other-sheet .sheet-header {
+
+.manual-sheet__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 28rpx;
 }
-.register-for-other-sheet .sheet-overline {
+
+.manual-sheet__overline {
   display: block;
   font-size: 20rpx;
   line-height: 1.2;
   font-weight: 900;
-  letter-spacing: 0.15em;
-  color: var(--data-blue);
+  letter-spacing: 0.12em;
+  color: var(--data-blue, #00aeef);
 }
-.register-for-other-sheet .sheet-header__h3 {
+
+.manual-sheet__title {
   display: block;
   margin-top: 4rpx;
   font-size: 36rpx;
@@ -1190,94 +1216,105 @@ page {
   font-weight: 700;
   color: var(--text-primary);
 }
-.register-for-other-sheet .sheet-close {
+
+.manual-sheet__close {
   width: 72rpx;
   height: 72rpx;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
+  border: 1px solid var(--border-color, var(--border));
+  background: var(--bg-subtle, var(--bg-card));
+  color: var(--text-muted, var(--text-secondary));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 32rpx;
   flex-shrink: 0;
 }
-.register-for-other-sheet .game-mode-list {
+
+.manual-sheet__body {
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
+  gap: 28rpx;
 }
-.register-for-other-sheet .game-mode-option {
+
+.manual-field__label {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 12rpx;
+}
+
+.manual-field__input {
   width: 100%;
-  min-height: 128rpx;
-  border-radius: 16rpx;
-  border: 1px solid var(--border);
-  background: var(--bg-subtle);
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 24rpx;
+  height: 88rpx;
   box-sizing: border-box;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border-color, var(--border));
+  background: var(--bg-subtle, var(--bg-primary));
+  color: var(--text-primary);
+  font-size: 28rpx;
 }
-.register-for-other-sheet .game-mode-option:active { opacity: 0.72; }
-.register-for-other-sheet .game-mode-option--disabled .mode-text__strong,
-.register-for-other-sheet .game-mode-option--disabled .mode-text__em {
-  color: var(--text-muted);
+
+.manual-field__placeholder {
+  color: var(--text-muted, #9ca3af);
 }
-.register-for-other-sheet .mode-icon {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  background: var(--tour-blue);
-  color: #fff;
+
+.manual-gender {
+  display: flex;
+  flex-direction: row;
+  gap: 16rpx;
+}
+
+.manual-gender__tag {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border-color, var(--border));
+  background: var(--bg-subtle, var(--bg-card));
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-size: 30rpx;
-}
-.register-for-other-sheet .mode-icon--locked {
-  background: #b0b8c4;
-  color: #f8fafc;
-}
-.register-for-other-sheet .mode-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-.register-for-other-sheet .mode-text__strong {
   font-size: 28rpx;
-  line-height: 1.2;
   font-weight: 700;
-  color: var(--text-primary);
 }
-.register-for-other-sheet .mode-text__em,
-.register-for-other-sheet .ds-desc-text {
-  font-size: 24rpx;
-  line-height: 36rpx;
+
+.manual-gender__tag.is-active {
+  color: #000000;
+  background: var(--champion-gold, #ce9224);
+  border-color: var(--champion-gold, #ce9224);
+}
+
+.manual-sheet__footer {
+  display: flex;
+  flex-direction: row;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+
+.manual-sheet__btn {
+  flex: 1;
+  height: 96rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.manual-sheet__btn--cancel {
   color: var(--text-secondary);
-  font-weight: 400;
+  background: var(--bg-subtle, var(--bg-card));
+  border: 1px solid var(--border-color, var(--border));
 }
-.register-for-other-sheet .mode-arrow {
-  color: var(--text-muted);
-  font-size: 40rpx;
-  line-height: 1;
-  flex-shrink: 0;
-  opacity: 0.6;
-}
-.detail-page.dark-mode .register-for-other-sheet.bottom-sheet {
-  box-shadow: 0 -16rpx 36rpx rgba(0, 0, 0, 0.48);
-}
-.detail-page.dark-mode .register-for-other-sheet .mode-icon--locked {
-  background: var(--border);
-  color: var(--text-muted);
-}
-.detail-page.dark-mode .register-for-other-sheet .mode-arrow {
-  color: var(--text-muted);
+
+.manual-sheet__btn--confirm {
+  color: #000000;
+  background: var(--champion-gold, #ce9224);
+  border: 1px solid var(--champion-gold, #ce9224);
 }
 
 /* Bottom sheet — DARK 模式（页面根 .detail-page.dark-mode 继承 themeClass） */

@@ -47,10 +47,12 @@ page { height: 100%; background: var(--bg-primary); }
 .friend-sub { font-size: 22rpx; font-weight: 600; color: var(--text-muted); }
 .friend-tag { font-size: 20rpx; font-weight: 700; color: var(--champion-gold); }
 .friend-tag--used { color: var(--text-muted); }
+.friend-tag--proxy { color: var(--data-blue); }
 .friend-row.is-disabled { opacity: 0.42; }
 .friend-row.is-disabled .friend-name { color: var(--text-muted); }
 .friend-check { width: 48rpx; height: 48rpx; border-radius: 50%; border: 2rpx solid var(--border-hover); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 28rpx; flex-shrink: 0; }
 .friend-check.on { background: var(--data-blue); border-color: var(--data-blue); }
+.friend-check.on.is-locked { background: var(--text-muted); border-color: var(--text-muted); opacity: 0.9; }
 
 .page-footer { flex-shrink: 0; padding: 16rpx 32rpx calc(20rpx + env(safe-area-inset-bottom)); background: var(--bg-primary); border-top: 1px solid var(--border); }
 .confirm-btn { width: 100%; height: 92rpx; line-height: 92rpx; border: 0; border-radius: 14rpx; background: var(--tour-blue); color: #fff; font-size: 30rpx; font-weight: 800; padding: 0; }

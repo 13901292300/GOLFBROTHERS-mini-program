@@ -841,8 +841,6 @@ feat: add bright dark theme resources and enhance group management
 回滚节点：
 v0.4-theme-resource-bright-dark
 
-
-
 # v0.4-player-source-sheet
 
 日期：
@@ -960,3 +958,29 @@ player-source-sheet。
 手工添加
 
 不使用老牌组合。
+
+
+
+## v0.4.2-group-manage-source-sheet-fix
+
+修复记分页“添加/删除”人员来源弹窗显示错误问题。
+
+完成：
+
+- player-source-sheet移动至group-manage流程内部；
+- 修复弹窗被管理层遮挡；
+- 修复关闭管理页面后弹窗状态残留。
+
+未修改：
+
+- 人员选择逻辑；
+- 成绩逻辑；
+- playerSlots；
+- groupsStore。
+
+测试：
+
+- 普通创建3人进入记分；
+- 添加/删除补人；
+- 弹窗关闭；
+- 返回页面。

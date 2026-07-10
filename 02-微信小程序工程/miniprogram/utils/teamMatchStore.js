@@ -88,23 +88,117 @@ function createDefaultRegisterInfo() {
   };
 }
 
-function cloneRegisterInfo(info) {
-  if (!info || typeof info !== 'object') return createDefaultRegisterInfo();
-  const users = Array.isArray(info.users)
-    ? info.users.map((user) => ({
-      userId: user && user.userId ? String(user.userId) : '',
-      nickname: user && user.nickname ? String(user.nickname) : '',
-      avatar: user && user.avatar ? String(user.avatar) : '',
-      groupId: user && user.groupId != null ? user.groupId : '',
-      groupName: user && user.groupName ? String(user.groupName) : '',
-      registeredAt: user && user.registeredAt != null ? user.registeredAt : ''
-    }))
-    : [];
-  const totalCount = info.totalCount != null ? Number(info.totalCount) : users.length;
+const REGISTER_SOURCES = { SELF: 'self', PROXY: 'proxy', ADMIN: 'admin' };
+const REGISTER_SUBJECT_TYPES = { SELF: 'self', OTHER: 'other' };
+const REGISTER_PICK_CHANNELS = {
+  FRIENDS: 'friends',
+  TEAM_MEMBERS: 'team_members',
+  MANUAL: 'manual',
+  NONE: ''
+};
+
+function _normalizeRegisterSource(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === REGISTER_SOURCES.PROXY || v === REGISTER_SOURCES.ADMIN || v === REGISTER_SOURCES.SELF) {
+    return v;
+  }
+  return REGISTER_SOURCES.SELF;
+}
+
+function _normalizeSubjectType(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return v === REGISTER_SUBJECT_TYPES.OTHER ? REGISTER_SUBJECT_TYPES.OTHER : REGISTER_SUBJECT_TYPES.SELF;
+}
+
+function _normalizePickChannel(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (
+    v === REGISTER_PICK_CHANNELS.FRIENDS ||
+    v === REGISTER_PICK_CHANNELS.TEAM_MEMBERS ||
+    v === REGISTER_PICK_CHANNELS.MANUAL
+  ) {
+    return v;
+  }
+  return REGISTER_PICK_CHANNELS.NONE;
+}
+
+/**
+ * 报名记录 normalize（旧数据兼容）：
+ * 缺省字段一律按「本人报名」补齐，不改动已有显式值语义。
+ */
+function normalizeRegisterUser(user) {
+  const raw = user && typeof user === 'object' ? user : {};
+  const userId = raw.userId != null ? String(raw.userId) : '';
+  const competitionName = raw.competitionName != null ? String(raw.competitionName) : '';
+  const nickname = raw.nickname != null ? String(raw.nickname) : '';
+  const name = raw.name != null ? String(raw.name) : '';
+  const displayFallback = competitionName || nickname || name || '';
+
+  const hasSource = raw.source != null && String(raw.source).trim() !== '';
+  const source = hasSource ? _normalizeRegisterSource(raw.source) : REGISTER_SOURCES.SELF;
+
+  const registeredBy =
+    raw.registeredBy != null && String(raw.registeredBy).trim() !== ''
+      ? String(raw.registeredBy)
+      : userId;
+
+  const registeredByName =
+    raw.registeredByName != null && String(raw.registeredByName).trim() !== ''
+      ? String(raw.registeredByName)
+      : displayFallback;
+
+  const hasSubjectType = raw.subjectType != null && String(raw.subjectType).trim() !== '';
+  const subjectType = hasSubjectType
+    ? _normalizeSubjectType(raw.subjectType)
+    : REGISTER_SUBJECT_TYPES.SELF;
+
+  const pickChannel =
+    raw.pickChannel != null ? _normalizePickChannel(raw.pickChannel) : REGISTER_PICK_CHANNELS.NONE;
+
+  const canSelfCancel = raw.canSelfCancel != null ? !!raw.canSelfCancel : true;
+  const locked = raw.locked != null ? !!raw.locked : false;
+
+  // Patch 6：手工代报名预留字段（旧数据缺省为空串）
+  const userType = raw.userType != null ? String(raw.userType) : '';
+  const realName = raw.realName != null ? String(raw.realName) : '';
+  const remarkName = raw.remarkName != null ? String(raw.remarkName) : '';
+
   return {
-    totalCount: Number.isFinite(totalCount) ? totalCount : users.length,
+    userId: userId,
+    nickname: nickname,
+    competitionName: competitionName,
+    gender: raw.gender != null ? String(raw.gender) : '',
+    handicap: raw.handicap != null ? raw.handicap : '',
+    avatar: raw.avatar != null ? String(raw.avatar) : '',
+    phone: raw.phone != null ? String(raw.phone) : '',
+    groupId: raw.groupId != null ? raw.groupId : '',
+    groupName: raw.groupName != null ? String(raw.groupName) : '',
+    registeredAt: raw.registeredAt != null ? raw.registeredAt : '',
+    source: source,
+    registeredBy: registeredBy,
+    registeredByName: registeredByName,
+    subjectType: subjectType,
+    pickChannel: pickChannel,
+    canSelfCancel: canSelfCancel,
+    locked: locked,
+    userType: userType,
+    realName: realName,
+    remarkName: remarkName
+  };
+}
+
+function normalizeRegisterInfo(info) {
+  if (!info || typeof info !== 'object') return createDefaultRegisterInfo();
+  const users = Array.isArray(info.users) ? info.users.map(normalizeRegisterUser) : [];
+  // Patch 8：totalCount 始终以 users.length 为准，避免旧数据/脏数据漂移
+  return {
+    totalCount: users.length,
     users: users
   };
+}
+
+function cloneRegisterInfo(info) {
+  return normalizeRegisterInfo(info);
 }
 
 /**
@@ -189,10 +283,16 @@ function toTournamentCard(match) {
 
 module.exports = {
   STORAGE_KEY,
+  REGISTER_SOURCES,
+  REGISTER_SUBJECT_TYPES,
+  REGISTER_PICK_CHANNELS,
   buildMatchFromCreatePage,
   saveMatch,
   listMatches,
   getMatchById,
   toTournamentCard,
-  formatClubDate
+  formatClubDate,
+  normalizeRegisterUser,
+  normalizeRegisterInfo,
+  createDefaultRegisterInfo
 };

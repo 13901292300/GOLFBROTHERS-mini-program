@@ -516,17 +516,11 @@
       </view>
     </scroll-view>
 
-    <!-- 固定底部操作栏：贴底、不随内容滚动、不被二维码区域影响 -->
+    <!-- 固定底部操作栏：取消 / 确认（空位点击为唯一添加入口） -->
     <view class="group-manage-footer">
       <view class="group-actions">
-        <view bindtap="addGroupPlayer" class="group-action-btn group-action-btn--manual">
-          <text class="group-action-btn__icon">✎</text>
-          <text>手工添加</text>
-        </view>
-        <view bindtap="onFooterFriend" class="group-action-btn group-action-btn--friends">
-          <text class="group-action-btn__icon">＋</text>
-          <text>好友选择</text>
-        </view>
+        <view bindtap="onCancelGroupManage" class="group-action-btn group-action-btn--cancel">取消</view>
+        <view bindtap="_onConfirmGroupManage" class="group-action-btn group-action-btn--confirm">确认</view>
       </view>
     </view>
 
@@ -541,6 +535,66 @@
         bind:close="closeAddSheet"
         bind:select="onPlayerSourceSelect"
       />
+    </view>
+
+    <!-- 手工添加：底部弹窗（姓名/手机/性别），不跳转独立页 -->
+    <view wx:if="{{manualSheetVisible}}" class="manual-sheet-mask" bindtap="closeManualSheet"></view>
+    <view wx:if="{{manualSheetVisible}}" class="manual-sheet {{themeClass}}" catchtap="noop">
+      <view class="manual-sheet__handle"></view>
+      <view class="manual-sheet__header">
+        <view>
+          <text class="manual-sheet__overline">Add Player</text>
+          <text class="manual-sheet__title">添加人员</text>
+        </view>
+        <view class="manual-sheet__close" bindtap="closeManualSheet"><text>×</text></view>
+      </view>
+
+      <view class="manual-sheet__body">
+        <view class="manual-field">
+          <text class="manual-field__label">选手姓名（必填）</text>
+          <input
+            class="manual-field__input"
+            type="text"
+            maxlength="20"
+            placeholder="请输入选手姓名"
+            placeholder-class="manual-field__placeholder"
+            value="{{manualName}}"
+            bindinput="onManualNameInput"
+          />
+        </view>
+        <view class="manual-field">
+          <text class="manual-field__label">手机号码（选填）</text>
+          <input
+            class="manual-field__input"
+            type="number"
+            maxlength="11"
+            placeholder="请输入手机号码"
+            placeholder-class="manual-field__placeholder"
+            value="{{manualPhone}}"
+            bindinput="onManualPhoneInput"
+          />
+        </view>
+        <view class="manual-field">
+          <text class="manual-field__label">性别</text>
+          <view class="manual-gender">
+            <view
+              class="manual-gender__tag {{manualGender === 'male' ? 'is-active' : ''}}"
+              data-gender="male"
+              bindtap="onManualGenderSelect"
+            >男</view>
+            <view
+              class="manual-gender__tag {{manualGender === 'female' ? 'is-active' : ''}}"
+              data-gender="female"
+              bindtap="onManualGenderSelect"
+            >女</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="manual-sheet__footer">
+        <view class="manual-sheet__btn manual-sheet__btn--cancel" bindtap="closeManualSheet">取消</view>
+        <view class="manual-sheet__btn manual-sheet__btn--confirm" bindtap="confirmManualSheet">确定</view>
+      </view>
     </view>
   </view>
 

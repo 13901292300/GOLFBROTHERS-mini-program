@@ -6,8 +6,8 @@
           <text class="gb-header__chevron">‹</text>
         </view>
         <view>
-          <text class="gb-header__eyebrow">FRIENDS</text>
-          <text class="gb-header__title">好友选择</text>
+          <text class="gb-header__eyebrow">{{isProxyTeamMode ? 'TEAM' : 'FRIENDS'}}</text>
+          <text class="gb-header__title">{{isProxyRegisterMode ? (isProxyTeamMode ? '球队成员代报名' : '替他人报名') : '好友选择'}}</text>
         </view>
       </view>
     </view>
@@ -20,7 +20,7 @@
         class="search-bar__input"
         type="text"
         value="{{keyword}}"
-        placeholder="搜索好友昵称/手机号"
+        placeholder="{{isProxyTeamMode ? '搜索成员姓名/手机号' : '搜索好友昵称/手机号'}}"
         placeholder-class="search-bar__ph"
         bindinput="onSearchInput"
       />
@@ -28,7 +28,7 @@
     </view>
   </view>
 
-  <view class="me-row-wrap">
+  <view wx:if="{{!isProxyRegisterMode}}" class="me-row-wrap">
     <view class="friend-row me-row" bindtap="toggleMe">
       <image class="friend-avatar" src="{{currentUser.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="me"></image>
       <view class="friend-meta">
@@ -49,14 +49,31 @@
     <block wx:else>
     <view wx:for="{{sections}}" wx:key="letter" class="letter-section">
       <view class="letter-head">{{item.letter}}</view>
-      <view wx:for="{{item.items}}" wx:for-item="f" wx:key="playerId" class="friend-row {{disabledMap[f.playerId] ? 'is-disabled' : ''}}" bindtap="toggleFriend" data-id="{{f.playerId}}">
+      <view
+        wx:for="{{item.items}}"
+        wx:for-item="f"
+        wx:key="playerId"
+        class="friend-row {{disabledMap[f.playerId] ? 'is-disabled' : ''}}"
+        bindtap="toggleFriend"
+        data-id="{{f.playerId}}"
+      >
         <image class="friend-avatar" src="{{f.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="friend" data-id="{{f.playerId}}"></image>
         <view class="friend-meta">
           <text class="friend-name">{{f.name}}</text>
-          <text wx:if="{{disabledMap[f.playerId]}}" class="friend-tag friend-tag--used">已在本场比赛中使用</text>
-          <text wx:elif="{{preselectedMap[f.playerId]}}" class="friend-tag">已在本组</text>
+          <block wx:if="{{isProxyRegisterMode}}">
+            <text wx:if="{{f.registrationState === 'registered_locked'}}" class="friend-tag friend-tag--used">已报名</text>
+            <text wx:elif="{{f.registrationState === 'registered_by_me'}}" class="friend-tag friend-tag--proxy">我代报名</text>
+          </block>
+          <block wx:else>
+            <text wx:if="{{disabledMap[f.playerId]}}" class="friend-tag friend-tag--used">已在本场比赛中使用</text>
+            <text wx:elif="{{preselectedMap[f.playerId]}}" class="friend-tag">已在本组</text>
+          </block>
         </view>
-        <view wx:if="{{!disabledMap[f.playerId]}}" class="friend-check {{selectedMap[f.playerId] ? 'on' : ''}}">
+        <!-- 代报名：锁定态也显示已勾选复选框，明确不可取消 -->
+        <view
+          wx:if="{{isProxyRegisterMode || !disabledMap[f.playerId]}}"
+          class="friend-check {{selectedMap[f.playerId] ? 'on' : ''}} {{f.registrationState === 'registered_locked' ? 'is-locked' : ''}}"
+        >
           <text wx:if="{{selectedMap[f.playerId]}}">✓</text>
         </view>
       </view>

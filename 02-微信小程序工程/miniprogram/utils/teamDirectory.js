@@ -14,6 +14,38 @@ const TEAMS = [
 /** 用户在前端 mock 创建的球队（插入列表顶部） */
 let createdTeams = [];
 
+/**
+ * Patch 7：球队成员 mock 花名册（按 teamId）
+ * 稳定 userId/playerId；与 teamGroups / create.normal teams[].members 无关
+ */
+const TEAM_MEMBERS_BY_TEAM_ID = {
+  '1': [
+    { playerId: 'tm-1001', name: '周启明', phone: '13800001001', gender: 'male', pinyin: 'zhouqiming' },
+    { playerId: 'tm-1002', name: '林晓雯', phone: '13800001002', gender: 'female', pinyin: 'linxiaowen' },
+    { playerId: 'tm-1003', name: '韩磊', phone: '13800001003', gender: 'male', pinyin: 'hanlei' },
+    { playerId: 'tm-1004', name: '苏晴', phone: '13800001004', gender: 'female', pinyin: 'suqing' },
+    { playerId: 'tm-1005', name: '马俊杰', phone: '13800001005', gender: 'male', pinyin: 'majunjie' },
+    { playerId: 'tm-1006', name: '何雨桐', phone: '13800001006', gender: 'female', pinyin: 'heyutong' },
+    { playerId: 'tm-1007', name: '邓凯', phone: '13800001007', gender: 'male', pinyin: 'dengkai' },
+    { playerId: 'tm-1008', name: '曹一凡', phone: '13800001008', gender: 'male', pinyin: 'caoyifan' }
+  ],
+  '2': [
+    { playerId: 'tm-2001', name: '沈浩', phone: '13800002001', gender: 'male', pinyin: 'shenhao' },
+    { playerId: 'tm-2002', name: '顾婉清', phone: '13800002002', gender: 'female', pinyin: 'guwanqing' },
+    { playerId: 'tm-2003', name: '陆明远', phone: '13800002003', gender: 'male', pinyin: 'lumingyuan' },
+    { playerId: 'tm-2004', name: '叶知秋', phone: '13800002004', gender: 'female', pinyin: 'yezhiqiu' },
+    { playerId: 'tm-2005', name: '方正', phone: '13800002005', gender: 'male', pinyin: 'fangzheng' },
+    { playerId: 'tm-2006', name: '蒋南', phone: '13800002006', gender: 'male', pinyin: 'jiangnan' }
+  ],
+  '3': [
+    { playerId: 'tm-3001', name: '唐伟', phone: '13800003001', gender: 'male', pinyin: 'tangwei' },
+    { playerId: 'tm-3002', name: '许佳', phone: '13800003002', gender: 'female', pinyin: 'xujia' },
+    { playerId: 'tm-3003', name: '冯博', phone: '13800003003', gender: 'male', pinyin: 'fengbo' },
+    { playerId: 'tm-3004', name: '程思远', phone: '13800003004', gender: 'male', pinyin: 'chengsiyuan' },
+    { playerId: 'tm-3005', name: '潘悦', phone: '13800003005', gender: 'female', pinyin: 'panyue' }
+  ]
+};
+
 function buildListMeta(team) {
   const parts = [];
   if (team.isMine) parts.push('我的球队');
@@ -77,9 +109,39 @@ function addCreatedTeam(payload) {
   return Object.assign({}, team, { logo: resolveLogo(team) });
 }
 
+/**
+ * Patch 7：按 teamId 返回 mock 球队成员（稳定 id）
+ * @param {string} teamId
+ * @returns {Array<{playerId,userId,name,competitionName,avatar,phone,gender,teamId,source,pinyin}>}
+ */
+function getTeamMembers(teamId) {
+  const id = String(teamId || '').trim();
+  if (!id) return [];
+  const raw = TEAM_MEMBERS_BY_TEAM_ID[id];
+  if (!Array.isArray(raw) || !raw.length) return [];
+  return raw.map((m, index) => {
+    const playerId = String(m.playerId || '').trim();
+    const name = String(m.name || '').trim();
+    return {
+      playerId: playerId,
+      userId: playerId,
+      name: name,
+      competitionName: name,
+      avatar: mockAvatars.pickMockAvatar(playerId || name || index),
+      phone: m.phone != null ? String(m.phone) : '',
+      gender: m.gender != null ? String(m.gender) : '',
+      pinyin: m.pinyin != null ? String(m.pinyin) : name,
+      teamId: id,
+      source: 'team_member',
+      pickChannel: 'team_members'
+    };
+  });
+}
+
 module.exports = {
   TEAMS,
   getTeamById,
   listTeamsForSelect,
-  addCreatedTeam
+  addCreatedTeam,
+  getTeamMembers
 };
