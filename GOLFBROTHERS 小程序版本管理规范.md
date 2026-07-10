@@ -959,8 +959,6 @@ player-source-sheet。
 
 不使用老牌组合。
 
-
-
 ## v0.4.2-group-manage-source-sheet-fix
 
 修复记分页“添加/删除”人员来源弹窗显示错误问题。
@@ -984,3 +982,13 @@ player-source-sheet。
 - 添加/删除补人；
 - 弹窗关闭；
 - 返回页面。
+
+
+
+v0.5.5-sponsor-cos-images
+
+赛事广告默认图已从本地 partners 图拆分出来
+广告位使用独立 COS sponsor 图片
+广告位支持 BRIGHT / DARK
+带版本号缓存刷新机制
+PARTNERS 配置未受影响

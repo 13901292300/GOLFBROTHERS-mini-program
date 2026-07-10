@@ -11,6 +11,7 @@ const matchStateUtil = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
 const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
+const bannerConfig = require('../../../utils/bannerConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const gameStore = require('../../../utils/gameStore.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
@@ -566,7 +567,7 @@ Page({
       matchId: match.matchId || '',
       statusLabel: match.statusLabel || '',
       logo: this._resolveMatchLogo(match),
-      bannerImage: match.bannerImage || '',
+      bannerImage: bannerConfig.resolveMatchDetailBanner(match.bannerImage),
       dateText: teamMatchStore.formatClubDate(match.teeTime) || '',
       titleMain: match.roundName || match.teamName || '',
       titleSub: match.teamName || '',
@@ -655,6 +656,18 @@ Page({
     if (!fallback || fallback === current) return;
     list[idx] = Object.assign({}, list[idx], { imageData: fallback });
     this.setData({ eventInfoList: list });
+  },
+
+  /** 默认赛事 BANNER 加载失败：无远程 fallback 时清空，避免反复 error */
+  onMatchBannerError() {
+    const match = this.data.match || {};
+    const current = String(match.bannerImage || '').trim();
+    const fallback = bannerConfig.getBannerLocalFallback(current, 'matchDetail');
+    if (!fallback || fallback === current) {
+      // 默认 COS 图失败且无 fallback：保持现状即可
+      return;
+    }
+    this.setData({ 'match.bannerImage': fallback });
   },
 
   _resolveRegisterSubTabs(match, registerInfo) {

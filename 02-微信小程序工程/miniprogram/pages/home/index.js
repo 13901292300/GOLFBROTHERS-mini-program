@@ -6,6 +6,7 @@ const quickCreate = require('../../utils/quickCreate.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const userProfileStore = require('../../utils/userProfileStore.js');
+const bannerConfig = require('../../utils/bannerConfig.js');
 
 function formatGameDate(ts) {
   const d = ts ? new Date(ts) : new Date();
@@ -88,6 +89,7 @@ Page({
     profileEditDraft: { nickname: '', competitionName: '' },
     bannerPickerVisible: false,
     profileBannerImg: 'https://cdn.screenshottocode.com/fjGiYQjgxR_OzO3H9s1OQ.png',
+    homeBannerImg: bannerConfig.getHomeBanner(),
     calendarMonthYear: '',
     calendarDays: [],
     scheduleCards: [
@@ -715,6 +717,14 @@ Page({
       this.setData({ profileBannerImg: url });
     }
     this.toggleBannerPicker(false);
+  },
+
+  /** 首页默认 BANNER 加载失败 → 回退旧 CDN */
+  onHomeBannerError() {
+    const current = String(this.data.homeBannerImg || '').trim();
+    const fallback = bannerConfig.getBannerLocalFallback(current, 'home');
+    if (!fallback || fallback === current) return;
+    this.setData({ homeBannerImg: fallback });
   },
 
   renderCalendar() {

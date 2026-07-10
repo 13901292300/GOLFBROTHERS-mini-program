@@ -36,7 +36,12 @@
     <view class="ds-scroll-main no-scrollbar z-10">
       <!-- Background Banner -->
       <view wx:if="{{heroTabsVisible}}" id="main-banner" class="relative w-full h-banner overflow-hidden mt-neg-20">
-        <image src="https://cdn.screenshottocode.com/eMlt4raQ2b_sRTivrb5v4.jpg" class="w-full h-full object-cover object-top" mode="aspectFill"></image>
+        <image
+          src="{{homeBannerImg}}"
+          class="w-full h-full object-cover object-top"
+          mode="aspectFill"
+          binderror="onHomeBannerError"
+        ></image>
       </view>
 
       <!-- Top Navigation Tabs -->

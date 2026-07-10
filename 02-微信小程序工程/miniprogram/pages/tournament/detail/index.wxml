@@ -67,7 +67,12 @@
     <!-- Hero -->
     <view class="hero-wrap">
       <view class="hero">
-        <image class="hero__img" src="{{match.bannerImage}}" mode="aspectFill"></image>
+        <image
+          class="hero__img"
+          src="{{match.bannerImage}}"
+          mode="aspectFill"
+          binderror="onMatchBannerError"
+        ></image>
         <view class="hero__overlay"></view>
         <view class="registered-chip">{{match.statusLabel}}</view>
       </view>
