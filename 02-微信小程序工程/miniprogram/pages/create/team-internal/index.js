@@ -328,7 +328,6 @@ Page({
     if (!payload) return;
     const hadTeam = this._hasSelectedTeam();
     const prevTeamName = hadTeam ? this.data.teamName : '';
-    const prevDefaultTitle = partnerConfigUtil.buildPartnerTitle(prevTeamName);
     const currentTitle = String((this.data.partnerConfig && this.data.partnerConfig.partnerTitle) || '').trim();
     const updates = {
       teamId: payload.teamId || '',
@@ -336,7 +335,8 @@ Page({
       teamLogo: payload.teamLogo || mockAvatars.pickMockAvatar(payload.teamName || ''),
       teamRole: payload.teamRole || ''
     };
-    if (!hadTeam || !currentTitle || currentTitle === prevDefaultTitle) {
+    // PARTNER 标题仍为默认值时，随球队名自动更新；用户手改后不覆盖
+    if (partnerConfigUtil.isDefaultPartnerTitle(currentTitle, prevTeamName)) {
       updates['partnerConfig.partnerTitle'] = partnerConfigUtil.buildPartnerTitle(payload.teamName);
     }
     if (!this._roundNameManual) {

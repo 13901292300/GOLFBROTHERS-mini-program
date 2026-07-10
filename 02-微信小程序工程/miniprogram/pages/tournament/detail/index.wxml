@@ -148,15 +148,15 @@
             <view
               wx:for="{{partnerLogoRows}}"
               wx:key="index"
-              class="partner-row {{item.single ? 'partner-row--single' : ''}}"
+              class="partner-row"
             >
               <view class="partner-cell partner-cell--logo">
-                <view class="partner-item">
+                <view wx:if="{{item.left.url}}" class="partner-item">
                   <image class="partner-item__img" src="{{item.left.url}}" mode="aspectFit" />
                 </view>
               </view>
-              <view wx:if="{{!item.single}}" class="partner-cell partner-cell--logo partner-cell--with-divider">
-                <view class="partner-item">
+              <view class="partner-cell partner-cell--logo partner-cell--with-divider">
+                <view wx:if="{{item.right.url}}" class="partner-item">
                   <image class="partner-item__img" src="{{item.right.url}}" mode="aspectFit" />
                 </view>
               </view>

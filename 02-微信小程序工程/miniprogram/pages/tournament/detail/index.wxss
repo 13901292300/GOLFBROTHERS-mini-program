@@ -169,6 +169,8 @@ page {
   flex-direction: column;
   border-top: none;
   border-left: none;
+  border-right: none;
+  border-bottom: none;
 }
 .partners-grid--placeholder .partner-cell {
   height: 176rpx;
@@ -184,14 +186,15 @@ page {
   font-weight: 900;
   font-style: italic;
 }
+/* 两列布局：无左右外边框；列间竖线 + 行间横线 */
 .partner-row {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  border-top: 1px solid var(--border);
+  border: none;
 }
-.partner-row--single {
-  justify-content: center;
+.partner-row + .partner-row {
+  border-top: 1px solid var(--border);
 }
 .partner-cell--logo {
   flex: 1;
@@ -200,11 +203,10 @@ page {
   align-items: center;
   justify-content: center;
   background: var(--bg-card);
+  border: none;
+  box-sizing: border-box;
 }
-.partner-row--single .partner-cell--logo {
-  flex: none;
-  width: 50%;
-}
+/* 仅两列中间垂直细线（右侧栏左边框） */
 .partner-cell--with-divider {
   border-left: 1px solid var(--border);
 }

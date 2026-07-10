@@ -21,7 +21,26 @@ const DEFAULT_PARTNER_LOGOS = [
 
 function buildPartnerTitle(teamName) {
   const name = String(teamName || '').trim();
-  return name ? name + ' Partner' : 'GOLFBROTHERS PARTNER';
+  // 未选球队：占位默认；已选：【球队名】 Partners
+  return name ? name + ' Partners' : '球队 Partners';
+}
+
+/**
+ * 判断 PARTNER 标题是否仍为「随球队自动生成」的默认值（含历史默认文案）
+ * 用于选队/换队时决定是否自动覆盖；用户手改后返回 false
+ */
+function isDefaultPartnerTitle(title, teamName) {
+  const t = String(title || '').trim();
+  if (!t) return true;
+  const name = String(teamName || '').trim();
+  // 当前规则默认值
+  if (t === buildPartnerTitle(name)) return true;
+  if (t === buildPartnerTitle('')) return true;
+  // 历史默认：GOLFBROTHERS PARTNER(S) / 单数 Partner
+  if (t === 'GOLFBROTHERS PARTNER' || t === 'GOLFBROTHERS PARTNERS') return true;
+  if (t === '球队 Partner') return true;
+  if (name && t === name + ' Partner') return true;
+  return false;
 }
 
 function normalizePartnerConfig(config, teamName) {
@@ -79,12 +98,12 @@ function buildPartnerLogoRows(urls) {
   const rows = [];
   for (let i = 0; i < list.length; i += 2) {
     const left = list[i];
-    const right = list[i + 1];
-    if (right) {
-      rows.push({ single: false, left: { url: left }, right: { url: right } });
-    } else {
-      rows.push({ single: true, left: { url: left } });
-    }
+    const right = list[i + 1] || '';
+    // 始终两列：右侧无图时留空占位，不做 single 居中
+    rows.push({
+      left: { url: left },
+      right: { url: right }
+    });
   }
   return rows;
 }
@@ -115,6 +134,7 @@ module.exports = {
   MAX_PARTNER_LOGOS,
   DEFAULT_PARTNER_LOGOS,
   buildPartnerTitle,
+  isDefaultPartnerTitle,
   createDefaultPartnerConfig,
   normalizePartnerConfig,
   buildPartnerLogoRows,
