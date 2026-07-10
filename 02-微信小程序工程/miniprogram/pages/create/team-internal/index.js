@@ -1117,6 +1117,25 @@ Page({
     this.setData({ 'partnerConfig.partnerLogos': logos });
   },
 
+  /** COS 默认图加载失败 → 回退本地 assets/partners */
+  onPartnerLogoError(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const theme = String(e.currentTarget.dataset.theme || '');
+    if (Number.isNaN(idx) || (theme !== 'bright' && theme !== 'dark')) return;
+    const logos = ((this.data.partnerConfig && this.data.partnerConfig.partnerLogos) || []).slice();
+    const current = logos[idx];
+    if (!current) return;
+    const normalized = typeof current === 'string'
+      ? { bright: current, dark: current }
+      : Object.assign(this._createEmptyPartnerLogo(), current || {});
+    const failedSrc = String(normalized[theme] || (theme === 'bright' ? normalized.dark : normalized.bright) || '').trim();
+    const fallback = partnerConfigUtil.getPartnerLogoLocalFallback(failedSrc);
+    if (!fallback || fallback === failedSrc) return;
+    normalized[theme] = fallback;
+    logos[idx] = normalized;
+    this.setData({ 'partnerConfig.partnerLogos': logos });
+  },
+
   openGameModeSheet() {
     this.setData({ showGameModeSheet: true });
   },

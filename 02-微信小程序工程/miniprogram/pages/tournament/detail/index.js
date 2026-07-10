@@ -967,6 +967,23 @@ Page({
     });
   },
 
+  /** COS 默认图加载失败 → 回退本地 assets/partners */
+  onPartnerLogoError(e) {
+    const row = Number(e.currentTarget.dataset.row);
+    const side = e.currentTarget.dataset.side;
+    if (side !== 'left' && side !== 'right') return;
+    const rows = (this.data.partnerLogoRows || []).slice();
+    const rowData = rows[row];
+    if (!rowData || !rowData[side] || !rowData[side].url) return;
+    const current = String(rowData[side].url || '').trim();
+    const fallback = partnerConfigUtil.getPartnerLogoLocalFallback(current);
+    if (!fallback || fallback === current) return;
+    const nextRow = Object.assign({}, rowData);
+    nextRow[side] = { url: fallback };
+    rows[row] = nextRow;
+    this.setData({ partnerLogoRows: rows });
+  },
+
   // 读取记分页记忆的显示偏好（与记分页同一缓存键，逐洞详情据此显示总杆/杆差）
   loadScoreDisplayMode() {
     const saved = wx.getStorageSync('scoreDisplayMode_global');

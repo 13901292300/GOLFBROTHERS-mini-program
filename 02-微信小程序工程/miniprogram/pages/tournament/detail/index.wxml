@@ -152,12 +152,26 @@
             >
               <view class="partner-cell partner-cell--logo">
                 <view wx:if="{{item.left.url}}" class="partner-item">
-                  <image class="partner-item__img" src="{{item.left.url}}" mode="aspectFit" />
+                  <image
+                    class="partner-item__img"
+                    src="{{item.left.url}}"
+                    mode="aspectFit"
+                    data-row="{{index}}"
+                    data-side="left"
+                    binderror="onPartnerLogoError"
+                  />
                 </view>
               </view>
               <view class="partner-cell partner-cell--logo partner-cell--with-divider">
                 <view wx:if="{{item.right.url}}" class="partner-item">
-                  <image class="partner-item__img" src="{{item.right.url}}" mode="aspectFit" />
+                  <image
+                    class="partner-item__img"
+                    src="{{item.right.url}}"
+                    mode="aspectFit"
+                    data-row="{{index}}"
+                    data-side="right"
+                    binderror="onPartnerLogoError"
+                  />
                 </view>
               </view>
             </view>

@@ -5,6 +5,18 @@
 const STORAGE_KEY = 'gb_match_partner_config_v1';
 const MAX_PARTNER_LOGOS = 8;
 
+/** COS 默认 PARTNER 图（HTTPS） */
+const COS_PARTNER_BASE =
+  'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com';
+
+/** 旧本地资源，加载失败时回退（暂不删除磁盘文件） */
+const LOCAL_PARTNER_ASSETS = [
+  '/assets/partners/partner-g-one-golf.png',
+  '/assets/partners/partner-bentley.png',
+  '/assets/partners/partner-vivata-1872.png',
+  '/assets/partners/partner-ailiai-golf.png'
+];
+
 function createDualLogo(bright, dark) {
   return {
     bright: String(bright || '').trim(),
@@ -13,11 +25,47 @@ function createDualLogo(bright, dark) {
 }
 
 const DEFAULT_PARTNER_LOGOS = [
-  createDualLogo('/assets/partners/partner-g-one-golf.png', '/assets/partners/partner-g-one-golf.png'),
-  createDualLogo('/assets/partners/partner-bentley.png', '/assets/partners/partner-bentley.png'),
-  createDualLogo('/assets/partners/partner-vivata-1872.png', '/assets/partners/partner-vivata-1872.png'),
-  createDualLogo('/assets/partners/partner-ailiai-golf.png', '/assets/partners/partner-ailiai-golf.png')
+  createDualLogo(
+    COS_PARTNER_BASE + '/partner-01-bright.jpg',
+    COS_PARTNER_BASE + '/partner-01-dark.jpg'
+  ),
+  createDualLogo(
+    COS_PARTNER_BASE + '/partner-02-bright.jpg',
+    COS_PARTNER_BASE + '/partner-02-dark.jpg'
+  ),
+  createDualLogo(
+    COS_PARTNER_BASE + '/partner-03-bright.jpg',
+    COS_PARTNER_BASE + '/partner-03-dark.jpg'
+  ),
+  createDualLogo(
+    COS_PARTNER_BASE + '/partner-04-bright.jpg',
+    COS_PARTNER_BASE + '/partner-04-dark.jpg'
+  )
 ];
+
+/** COS URL → 对应本地 fallback（bright/dark 同槽位共用一张旧本地图） */
+const PARTNER_LOGO_FALLBACK_BY_URL = (function buildFallbackMap() {
+  const map = {};
+  DEFAULT_PARTNER_LOGOS.forEach((logo, i) => {
+    const local = LOCAL_PARTNER_ASSETS[i] || '';
+    if (!local) return;
+    if (logo.bright) map[logo.bright] = local;
+    if (logo.dark) map[logo.dark] = local;
+  });
+  return map;
+})();
+
+/**
+ * 云图加载失败时，回退到旧本地路径；已是本地路径则原样返回。
+ */
+function getPartnerLogoLocalFallback(src) {
+  const s = String(src || '').trim();
+  if (!s) return '';
+  if (s.indexOf('/assets/partners/') === 0 || s.indexOf('assets/partners/') === 0) {
+    return s.charAt(0) === '/' ? s : '/' + s;
+  }
+  return PARTNER_LOGO_FALLBACK_BY_URL[s] || '';
+}
 
 function buildPartnerTitle(teamName) {
   const name = String(teamName || '').trim();
@@ -132,12 +180,15 @@ function loadPartnerConfig(fallbackTeamName) {
 module.exports = {
   STORAGE_KEY,
   MAX_PARTNER_LOGOS,
+  COS_PARTNER_BASE,
+  LOCAL_PARTNER_ASSETS,
   DEFAULT_PARTNER_LOGOS,
   buildPartnerTitle,
   isDefaultPartnerTitle,
   createDefaultPartnerConfig,
   normalizePartnerConfig,
   buildPartnerLogoRows,
+  getPartnerLogoLocalFallback,
   savePartnerConfig,
   loadPartnerConfig
 };
