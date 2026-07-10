@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/home/index",
+    "pages/index/index",
     "pages/score/index",
     "pages/tournament/detail/index",
     "pages/tournament/group-pick/index",

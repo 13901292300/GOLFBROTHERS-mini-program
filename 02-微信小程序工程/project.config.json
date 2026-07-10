@@ -69,11 +69,7 @@
   "srcMiniprogramRoot": "miniprogram/",
   "packOptions": {
     "ignore": [
-      { "type": "folder", "value": "scripts" },
-      { "type": "folder", "value": "images" },
-      { "type": "folder", "value": "pages/index" },
-      { "type": "folder", "value": "pages/example" },
-      { "type": "folder", "value": "components/cloudTipModal" }
+      { "type": "folder", "value": "scripts" }
     ],
     "include": []
   },
