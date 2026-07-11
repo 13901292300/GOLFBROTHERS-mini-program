@@ -232,6 +232,7 @@ function buildMatchFromCreatePage(pageData) {
     teamGroups: cloneTeamGroups(data.teamGroups),
     registerInfo: createDefaultRegisterInfo(),
     groups: [],
+    pairings: {},
     feeSet: !!data.feeSet,
     isDiamondMode: !!data.isDiamondMode,
     bannerImage: data.bannerImage || '',
@@ -257,10 +258,14 @@ function buildMatchFromCreatePage(pageData) {
 
 /**
  * 编辑保存：用创建页表单更新赛事基础配置，保留报名/状态等运行中数据。
+ * @param {object} existing
+ * @param {object} pageData
+ * @param {{ clearGroups?: boolean }} [options] clearGroups=true 时清空正式 groups 及派生字段
  */
-function updateMatchFromCreatePage(existing, pageData) {
+function updateMatchFromCreatePage(existing, pageData, options) {
   if (!existing || !existing.matchId) return null;
   const data = pageData || {};
+  const opts = options || {};
   const next = Object.assign({}, existing);
   next.teamId = data.teamId || '';
   next.teamName = data.teamName || '';
@@ -300,6 +305,7 @@ function updateMatchFromCreatePage(existing, pageData) {
   next.matchId = existing.matchId;
   next.registerInfo = existing.registerInfo;
   next.groups = existing.groups;
+  next.pairings = clonePairings(existing.pairings);
   next.registerStatus = existing.registerStatus;
   next.status = existing.status;
   next.statusLabel = existing.statusLabel;
@@ -307,8 +313,138 @@ function updateMatchFromCreatePage(existing, pageData) {
   next.creatorId = existing.creatorId;
   next.createdAt = existing.createdAt;
   next.updatedAt = Date.now();
+
+  if (opts.clearGroups) {
+    clearFormalGroupsOnMatch(next);
+  } else if (opts.clearPairings) {
+    clearFormalPairingsOnMatch(next);
+  }
   return next;
 }
+
+/** 个人比杆赛：任意赛制改为此项时保留已有分组 */
+const INDIVIDUAL_STROKE_MODE = '个人比杆赛';
+
+/**
+ * 组合比杆赛（系统内部统一类型）
+ * 四人四球比杆赛 / 最佳球位比杆赛 逻辑完全相同，仅展示文案不同
+ */
+const PAIRING_STROKE_FORMAT_SET = {
+  '四人四球比杆赛': true,
+  '最佳球位比杆赛': true
+};
+
+const PAIRING_STROKE_LABELS = {
+  '四人四球比杆赛': '四人四球组合',
+  '最佳球位比杆赛': '最佳球位组合'
+};
+
+function isPairingStrokeFormat(format) {
+  return !!PAIRING_STROKE_FORMAT_SET[String(format || '')];
+}
+
+function getPairingStrokeLabel(format) {
+  const key = String(format || '');
+  return PAIRING_STROKE_LABELS[key] || '组合';
+}
+
+/** 需要组内组合分配的赛制（含组合比杆及其它组合类，用于赛制切换清空 groups） */
+const COMBO_GAME_MODE_SET = {
+  '四人四球比杆赛': true,
+  '最佳球位比杆赛': true,
+  '四人两球比杆赛': true,
+  '四人四球比洞赛': true,
+  '最佳球位比洞赛': true,
+  '四人两球比洞赛': true
+};
+
+function isComboGameMode(mode) {
+  return !!COMBO_GAME_MODE_SET[String(mode || '')];
+}
+
+function hasFormalGroups(match) {
+  return !!(match && Array.isArray(match.groups) && match.groups.length > 0);
+}
+
+function clonePairings(pairings) {
+  const src = pairings && typeof pairings === 'object' && !Array.isArray(pairings) ? pairings : {};
+  const out = {};
+  Object.keys(src).forEach((groupId) => {
+    const list = Array.isArray(src[groupId]) ? src[groupId] : [];
+    out[String(groupId)] = list.map((p, idx) => ({
+      id: p && p.id != null ? String(p.id) : ('pairing_' + (idx + 1)),
+      playerIds: Array.isArray(p && p.playerIds)
+        ? p.playerIds.map((id) => String(id || '').trim()).filter(Boolean)
+        : []
+    }));
+  });
+  return out;
+}
+
+/** 去掉空组合（无 playerIds） */
+function sanitizePairings(pairings) {
+  const cloned = clonePairings(pairings);
+  const out = {};
+  Object.keys(cloned).forEach((groupId) => {
+    const list = (cloned[groupId] || []).filter((p) => p && Array.isArray(p.playerIds) && p.playerIds.length > 0);
+    if (list.length) out[groupId] = list;
+  });
+  return out;
+}
+
+/**
+ * 赛制变更是否会导致分组/组合关系失效而需要清空正式 groups。
+ * 规则：
+ * 1. 任意 → 个人比杆赛：不清空 groups
+ * 2. 个人比杆赛 → 组合赛制：清空
+ * 3. 组合赛制 ↔ 组合赛制：清空
+ * 4. 无正式分组：由调用方跳过提示
+ */
+function shouldClearGroupsOnGameModeChange(fromMode, toMode) {
+  const from = String(fromMode || '');
+  const to = String(toMode || '');
+  if (!to || from === to) return false;
+  if (to === INDIVIDUAL_STROKE_MODE) return false;
+  if (to === '个人比洞赛') return false;
+  if (!isComboGameMode(to)) return false;
+  return true;
+}
+
+/**
+ * 赛制变更是否需要清空正式 pairings（可保留 groups）
+ * - 组合比杆赛 → 个人比杆赛：保留 groups，清空 pairings
+ * - 清空 groups 时一并清空 pairings（由 clearFormalGroupsOnMatch 处理）
+ */
+function shouldClearPairingsOnGameModeChange(fromMode, toMode) {
+  const from = String(fromMode || '');
+  const to = String(toMode || '');
+  if (!from || !to || from === to) return false;
+  if (shouldClearGroupsOnGameModeChange(from, to)) return true;
+  if (isPairingStrokeFormat(from) && !isPairingStrokeFormat(to)) return true;
+  return false;
+}
+
+/** 清空正式分组及与 groups 强绑定的派生字段（不碰报名/赛事基础信息） */
+function clearFormalGroupsOnMatch(match) {
+  if (!match || typeof match !== 'object') return match;
+  match.groups = [];
+  match.pairings = {};
+  if (Object.prototype.hasOwnProperty.call(match, 'groupCount')) match.groupCount = 0;
+  if (Object.prototype.hasOwnProperty.call(match, 'teeGroups')) match.teeGroups = [];
+  if (Object.prototype.hasOwnProperty.call(match, 'groupSummary')) match.groupSummary = null;
+  if (Object.prototype.hasOwnProperty.call(match, 'pairingMap')) match.pairingMap = {};
+  return match;
+}
+
+function clearFormalPairingsOnMatch(match) {
+  if (!match || typeof match !== 'object') return match;
+  match.pairings = {};
+  if (Object.prototype.hasOwnProperty.call(match, 'pairingMap')) match.pairingMap = {};
+  return match;
+}
+
+const GAME_MODE_CHANGE_CLEAR_GROUPS_TIP = '修改赛制后，需要重新分配组合，已有分组将被清空。';
+
 
 /**
  * 将已存赛事回填为创建页表单字段（缺省用空/默认，由页面再兜底）
@@ -400,6 +536,18 @@ module.exports = {
   REGISTER_SOURCES,
   REGISTER_SUBJECT_TYPES,
   REGISTER_PICK_CHANNELS,
+  INDIVIDUAL_STROKE_MODE,
+  GAME_MODE_CHANGE_CLEAR_GROUPS_TIP,
+  isPairingStrokeFormat,
+  getPairingStrokeLabel,
+  isComboGameMode,
+  hasFormalGroups,
+  clonePairings,
+  sanitizePairings,
+  shouldClearGroupsOnGameModeChange,
+  shouldClearPairingsOnGameModeChange,
+  clearFormalGroupsOnMatch,
+  clearFormalPairingsOnMatch,
   buildMatchFromCreatePage,
   updateMatchFromCreatePage,
   hydrateCreatePageFromMatch,

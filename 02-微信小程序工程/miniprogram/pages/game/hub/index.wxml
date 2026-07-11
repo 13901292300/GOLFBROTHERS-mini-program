@@ -132,16 +132,18 @@
           <view class="tee-group-meta">
             <text class="tee-group-badge">{{item.name}}</text>
           </view>
-          <view class="tee-player-grid">
-            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="tee-player">
-              <view class="tee-avatar-wrap">
-                <image class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+          <view class="gb-group-player-grid">
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="gb-group-player">
+              <view class="gb-group-player-avatar-wrap">
+                <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
                 <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
               </view>
-              <text class="tee-player-name">{{pl.name}}</text>
-              <view class="tee-marker-line">
-                <view class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
-                <text class="tee-marker-letter">T</text>
+              <view class="gb-group-player-meta">
+                <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
+                  <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                  <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || 'T'}}</text>
+                </view>
               </view>
             </view>
           </view>

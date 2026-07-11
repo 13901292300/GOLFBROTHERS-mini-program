@@ -16,36 +16,91 @@
   <scroll-view class="editor-scroll" scroll-y>
     <view class="editor-body">
       <block wx:if="{{draftCards.length > 0}}">
-        <view
-          wx:for="{{draftCards}}"
-          wx:key="groupId"
-          class="tee-group-card"
-          bindtap="onGroupCardTap"
-          data-group-id="{{item.groupId}}"
-          data-group-name="{{item.badge}}"
-        >
+        <view wx:for="{{draftCards}}" wx:key="groupId" class="group-block">
           <view
-            catchtap="onDeleteGroupTap"
+            class="tee-group-card"
+            bindtap="onGroupCardTap"
             data-group-id="{{item.groupId}}"
             data-group-name="{{item.badge}}"
-            class="delete-group-btn"
           >
-            <text>×</text>
-          </view>
-          <view class="tee-group-meta">
-            <text class="tee-group-badge">{{item.badge}}</text>
-          </view>
-          <view class="tee-player-grid">
-            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="tee-player">
-              <view class="tee-avatar-wrap">
-                <image wx:if="{{pl.avatar}}" class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
-                <view wx:else class="tee-avatar tee-avatar-plus">+</view>
+            <view
+              catchtap="onDeleteGroupTap"
+              data-group-id="{{item.groupId}}"
+              data-group-name="{{item.badge}}"
+              class="delete-group-btn"
+            >
+              <text>×</text>
+            </view>
+            <view class="tee-group-meta">
+              <text class="tee-group-badge">{{item.badge}}</text>
+            </view>
+            <view class="gb-group-player-grid">
+              <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="gb-group-player">
+                <view class="gb-group-player-avatar-wrap">
+                  <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                  <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                </view>
+                <view class="gb-group-player-meta">
+                  <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
+                  <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
+                    <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                    <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel}}</text>
+                  </view>
+                </view>
               </view>
-              <text class="tee-player-name">{{pl.name}}</text>
-              <view class="tee-marker-line">
-                <view wx:if="{{pl.teeMarkerClass}}" class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
-                <text class="tee-marker-letter">{{pl.teeLabel}}</text>
+            </view>
+          </view>
+
+          <!-- 组合比杆赛：组合分配区域 -->
+          <view wx:if="{{showPairingSection && item.pairingBlock}}" class="pairing-section" catchtap="stopPropagation">
+            <view class="pairing-section__head">
+              <text class="pairing-section__title">{{item.pairingBlock.title}}</text>
+            </view>
+
+            <block wx:if="{{item.pairingBlock.pairings.length}}">
+              <view
+                wx:for="{{item.pairingBlock.pairings}}"
+                wx:for-item="pr"
+                wx:key="id"
+                class="pairing-card"
+              >
+                <view class="pairing-card__row">
+                  <text class="pairing-card__label">{{pr.label}}</text>
+                  <view class="pairing-card__actions">
+                    <text
+                      class="pairing-card__action"
+                      catchtap="onEditPairingTap"
+                      data-group-id="{{item.groupId}}"
+                      data-pairing-id="{{pr.id}}"
+                    >修改</text>
+                    <text
+                      class="pairing-card__action pairing-card__action--danger"
+                      catchtap="onDeletePairingTap"
+                      data-group-id="{{item.groupId}}"
+                      data-pairing-id="{{pr.id}}"
+                    >删除</text>
+                  </view>
+                </view>
+                <text class="pairing-card__names">{{pr.namesText}}</text>
               </view>
+            </block>
+
+            <view wx:if="{{item.pairingBlock.hasIncomplete}}" class="pairing-incomplete">
+              <text class="pairing-incomplete__label">未完成组合：</text>
+              <text class="pairing-incomplete__names">{{item.pairingBlock.incompleteNamesText}}</text>
+            </view>
+
+            <view class="pairing-toolbar">
+              <view
+                class="pairing-tool-btn"
+                catchtap="onAutoPairTap"
+                data-group-id="{{item.groupId}}"
+              >自动组合</view>
+              <view
+                class="pairing-tool-btn pairing-tool-btn--ghost"
+                catchtap="onAddPairingTap"
+                data-group-id="{{item.groupId}}"
+              >添加组合</view>
             </view>
           </view>
         </view>
@@ -75,6 +130,37 @@
       <view class="editor-dialog__actions">
         <view bindtap="closeGroupDeleteModal" class="editor-dialog__btn">取消</view>
         <view bindtap="confirmDeleteGroup" class="editor-dialog__btn editor-dialog__btn--danger">确认删除</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 修改组合：选择球员（临时 editingPairingSelectedIds，确定前不写 pairingDraft） -->
+  <view wx:if="{{pairingEditVisible}}" bindtap="closePairingEditSheet" class="editor-modal">
+    <view catchtap="stopPropagation" class="pairing-edit-sheet">
+      <text class="pairing-edit-sheet__title">{{pairingEditTitle}}</text>
+      <scroll-view class="pairing-edit-sheet__list" scroll-y>
+        <view
+          wx:for="{{pairingEditOptions}}"
+          wx:key="userId"
+          class="pairing-edit-row {{item.disabled ? 'is-disabled' : ''}} {{item.checked ? 'is-checked' : ''}}"
+          catchtap="onTogglePairingEditPlayer"
+          data-index="{{item.index}}"
+        >
+          <view class="pairing-edit-check {{item.checked ? 'is-on' : ''}}">
+            <text wx:if="{{item.checked}}">✓</text>
+          </view>
+          <image wx:if="{{item.avatar}}" class="pairing-edit-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view wx:else class="pairing-edit-avatar pairing-edit-avatar--empty"></view>
+          <view class="pairing-edit-meta">
+            <text class="pairing-edit-name">{{item.name}}</text>
+            <text wx:if="{{item.occupiedTip}}" class="pairing-edit-tip">{{item.occupiedTip}}</text>
+          </view>
+        </view>
+        <view wx:if="{{!pairingEditOptions.length}}" class="pairing-edit-empty">当前组暂无球员</view>
+      </scroll-view>
+      <view class="pairing-edit-sheet__actions">
+        <view catchtap="closePairingEditSheet" class="editor-dialog__btn">取消</view>
+        <view catchtap="confirmPairingEdit" class="editor-dialog__btn editor-dialog__btn--primary">确定</view>
       </view>
     </view>
   </view>

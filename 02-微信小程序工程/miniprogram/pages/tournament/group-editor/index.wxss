@@ -174,78 +174,7 @@ page {
   border-bottom-right-radius: 20rpx;
 }
 
-.tee-player-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12rpx 8rpx;
-  align-items: start;
-}
-.tee-player {
-  position: relative;
-  display: grid;
-  grid-template-columns: 88rpx minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  column-gap: 4rpx;
-  row-gap: 4rpx;
-  align-items: start;
-  min-width: 0;
-}
-.tee-avatar-wrap {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  position: relative;
-  width: 88rpx;
-  height: 96rpx;
-  align-self: start;
-}
-.tee-avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 9999rpx;
-  border: 1px solid var(--border);
-  background: var(--bg-subtle);
-  display: block;
-}
-.tee-avatar-plus {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 36rpx;
-  font-weight: 300;
-}
-.tee-player-name {
-  grid-column: 2;
-  grid-row: 1;
-  font-size: 22rpx;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-.tee-marker-line {
-  grid-column: 2;
-  grid-row: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6rpx;
-  min-height: 24rpx;
-}
-.tee-marker-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-}
-.tee-marker-dot--male { background: #3b82f6; }
-.tee-marker-dot--female { background: #ef4444; }
-.tee-marker-letter {
-  font-size: 18rpx;
-  font-weight: 700;
-  color: var(--text-muted);
-}
+/* 球员项已统一为全局 .gb-group-player*（app.wxss） */
 
 .editor-cta-bar {
   position: fixed;
@@ -333,3 +262,176 @@ page {
   color: #fff;
   border-color: var(--error, #ef4444);
 }
+.editor-dialog__btn--primary {
+  background: var(--champion-gold, #c8a24a);
+  color: #fff;
+  border-color: var(--champion-gold, #c8a24a);
+}
+
+.group-block { margin-bottom: 8rpx; }
+
+.pairing-section {
+  margin: -8rpx 0 28rpx;
+  padding: 20rpx 24rpx 8rpx;
+  background: var(--bg-subtle, #f3f4f6);
+  border: 1px solid var(--border);
+  border-radius: 0 0 20rpx 20rpx;
+  border-top: none;
+}
+.pairing-section__head { margin-bottom: 12rpx; }
+.pairing-section__title {
+  font-size: 26rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.pairing-card {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border);
+  border-radius: 14rpx;
+  padding: 18rpx 20rpx;
+  margin-bottom: 12rpx;
+}
+.pairing-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+.pairing-card__label {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--tour-blue, #002d62);
+}
+.pairing-card__actions { display: flex; gap: 20rpx; }
+.pairing-card__action {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--champion-gold, #c8a24a);
+}
+.pairing-card__action--danger { color: var(--error, #ef4444); }
+.pairing-card__names {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.pairing-incomplete {
+  padding: 8rpx 4rpx 16rpx;
+}
+.pairing-incomplete__label {
+  font-size: 24rpx;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.pairing-incomplete__names {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.pairing-toolbar {
+  display: flex;
+  gap: 16rpx;
+  padding: 8rpx 0 16rpx;
+}
+.pairing-tool-btn {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  border-radius: 12rpx;
+  background: var(--champion-gold, #c8a24a);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+.pairing-tool-btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 2rpx solid var(--border);
+}
+
+.pairing-edit-sheet {
+  width: 100%;
+  max-width: 640rpx;
+  max-height: 80vh;
+  background: var(--bg-card, #fff);
+  border-radius: 24rpx;
+  padding: 32rpx 28rpx 24rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.pairing-edit-sheet__title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 20rpx;
+}
+.pairing-edit-sheet__list {
+  flex: 1;
+  max-height: 52vh;
+  min-height: 200rpx;
+}
+.pairing-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 18rpx 8rpx;
+  border-bottom: 1px solid var(--border);
+}
+.pairing-edit-row.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.pairing-edit-row.is-checked {
+  /* 仅标记选中，不置灰、不禁用 */
+}
+.pairing-edit-check {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid var(--border-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: #fff;
+  flex-shrink: 0;
+}
+.pairing-edit-check.is-on {
+  background: var(--champion-gold, #c8a24a);
+  border-color: var(--champion-gold, #c8a24a);
+}
+.pairing-edit-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 9999rpx;
+  background: var(--bg-subtle);
+  flex-shrink: 0;
+}
+.pairing-edit-avatar--empty { border: 1px solid var(--border); }
+.pairing-edit-meta { min-width: 0; flex: 1; }
+.pairing-edit-name {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.pairing-edit-tip {
+  display: block;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  margin-top: 4rpx;
+}
+.pairing-edit-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 26rpx;
+  padding: 48rpx 0;
+}
+.pairing-edit-sheet__actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+

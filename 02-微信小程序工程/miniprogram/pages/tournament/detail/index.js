@@ -16,6 +16,8 @@ const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const gameStore = require('../../../utils/gameStore.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
 const teamDirectory = require('../../../utils/teamDirectory.js');
+const playerDirectory = require('../../../utils/playerDirectory.js');
+const tPosition = require('../../../utils/tPosition.js');
 
 /* ===== 赛事详情页 match 视图对象（顶部信息区数据框架） ===== */
 const MATCH_TYPE_LABELS = {
@@ -189,10 +191,10 @@ const TOURNAMENT_MANAGE_PERMISSIONS = FEATURES_PERMISSION.map((f) => f.permissio
 const GROUPS_TAB_PLAYER_SLOTS = 4;
 
 function createEmptyGroupPlayer(position) {
-  return { position: position, userId: '', avatar: '', displayName: '', gender: '', tee: '' };
+  return { position: position, userId: '' };
 }
 
-/** 只读展示用：从正式 groups 规范化克隆（详情页不持有 groupDraft） */
+/** 只读展示用：从正式 groups 规范化克隆（详情页不持有 groupDraft；正式位只保留 userId/position） */
 function cloneTournamentGroups(list) {
   if (!Array.isArray(list)) return [];
   return list.map((g, index) => ({
@@ -201,18 +203,19 @@ function cloneTournamentGroups(list) {
     players: Array.from({ length: GROUPS_TAB_PLAYER_SLOTS }, (_, i) => {
       const position = i + 1;
       const found = Array.isArray(g && g.players)
-        ? g.players.find((p) => Number(p && p.position) === position)
+        ? g.players.find((p) => {
+          if (!p) return false;
+          const pos = Number(p.position != null ? p.position : p.slotIndex);
+          return pos === position;
+        })
         : null;
-      if (!found || !found.userId) return createEmptyGroupPlayer(position);
+      const userId = found
+        ? String(found.userId || found.playerId || found.id || '').trim()
+        : '';
+      if (!userId) return createEmptyGroupPlayer(position);
       return {
         position: position,
-        userId: found.userId ? String(found.userId) : '',
-        avatar: found.avatar ? String(found.avatar) : '',
-        displayName: found.displayName
-          ? String(found.displayName)
-          : (found.competitionName ? String(found.competitionName) : ''),
-        gender: found.gender ? String(found.gender) : '',
-        tee: found.tee ? String(found.tee) : ''
+        userId: userId
       };
     })
   }));
@@ -296,6 +299,9 @@ Page({
     groupsTabCards: [],
     hasFormalGroups: false,
     canManageGroups: false,
+    // 报名但未进入正式分组：未安排出场（展示用，不阻止操作）
+    unscheduledPlayerCount: 0,
+    showGroupPairings: false,
     // 报名弹窗（立即报名流程：分组选择 + 比赛名 + 手机号）
     registerSheetVisible: false,
     registerCompetitionNameDraft: '',
@@ -412,12 +418,166 @@ Page({
 
   _buildGroupsTabStatePatch(match) {
     const formal = cloneTournamentGroups(match && Array.isArray(match.groups) ? match.groups : []);
+    const unscheduled = this._resolveUnscheduledPlayers(match, formal);
+    const gameMode = match && match.gameMode ? String(match.gameMode) : '';
+    const showPairings = teamMatchStore.isPairingStrokeFormat(gameMode);
+    const pairings = showPairings ? teamMatchStore.clonePairings(match && match.pairings) : {};
+    const playerLookup = this._buildGroupPlayerLookup(match);
+    const groupsTabCards = this._mapGroupsToTabCards(formal, {
+      showPairings: showPairings,
+      pairings: pairings,
+      pairingTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
+      playerLookup: playerLookup
+    });
     return {
       groups: formal,
-      groupsTabCards: this._mapGroupsToTabCards(formal),
+      groupsTabCards: groupsTabCards,
       hasFormalGroups: formal.length > 0,
-      canManageGroups: this._resolveCanManageGroups(match)
+      canManageGroups: this._resolveCanManageGroups(match),
+      unscheduledPlayerCount: unscheduled.length,
+      showGroupPairings: showPairings
     };
+  },
+
+  /** 报名/参赛记录上的球员 id（多字段兼容） */
+  _resolveAnyPlayerId(raw) {
+    if (!raw || typeof raw !== 'object') return '';
+    const id = raw.userId || raw.playerId || raw.id || raw.uid || raw.openid;
+    return id != null ? String(id).trim() : '';
+  },
+
+  /** 报名记录展示名（多字段兼容） */
+  _resolveAnyPlayerNickname(raw) {
+    if (!raw || typeof raw !== 'object') return '';
+    const name = raw.competitionName
+      || raw.displayName
+      || raw.nickname
+      || raw.name
+      || raw.realName
+      || raw.remarkName
+      || '';
+    return String(name).trim();
+  },
+
+  /**
+   * 收集报名/参赛名单原始列表（兼容 users / players / participants）
+   */
+  _collectRegisterPlayerSources(match) {
+    const lists = [];
+    const pushList = (arr) => {
+      if (Array.isArray(arr) && arr.length) lists.push(arr);
+    };
+    const registerInfo = this._resolveRegisterInfo(match);
+    pushList(registerInfo && registerInfo.users);
+    const rawInfo = match && match.registerInfo;
+    if (rawInfo && typeof rawInfo === 'object') {
+      pushList(rawInfo.users);
+      pushList(rawInfo.players);
+    }
+    pushList(match && match.participants);
+    pushList(match && match.players);
+    return lists;
+  },
+
+  /**
+   * 分组展示用球员字典：正式 groups 只存 userId/position，昵称/头像/T台从报名名单解析
+   */
+  _buildGroupPlayerLookup(match) {
+    const map = {};
+    const lists = this._collectRegisterPlayerSources(match);
+    lists.forEach((users) => {
+      users.forEach((u) => {
+        if (!u || typeof u !== 'object') return;
+        const primaryId = this._resolveAnyPlayerId(u);
+        if (!primaryId) return;
+        const gender = playerDirectory.getGenderById(primaryId, u.gender || '');
+        const teeCode = tPosition.defaultFromGender(gender);
+        const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
+        const entry = {
+          userId: primaryId,
+          nickname: this._resolveAnyPlayerNickname(u) || '未知球员',
+          avatar: u.avatar || u.avatarUrl || '',
+          gender: gender,
+          handicap: u.handicap != null ? u.handicap : '',
+          tee: teeCode,
+          teeText: teeText
+        };
+        // 同一人多 id 字段都挂到 lookup，避免 groups.userId 与报名 id 字段不一致
+        const aliasIds = [u.userId, u.playerId, u.id, u.uid, u.openid]
+          .map((v) => (v != null ? String(v).trim() : ''))
+          .filter(Boolean);
+        if (aliasIds.indexOf(primaryId) < 0) aliasIds.push(primaryId);
+        aliasIds.forEach((id) => {
+          if (!map[id]) map[id] = entry;
+        });
+      });
+    });
+    return map;
+  },
+
+  /**
+   * 展示层 hydrate：不改写正式 groups，仅生成 displayPlayers
+   */
+  hydrateGroupDisplayPlayers(group, playerLookup) {
+    const lookup = playerLookup || {};
+    const list = (group && Array.isArray(group.players) ? group.players : [])
+      .map((p) => {
+        const userId = this._resolveAnyPlayerId(p);
+        if (!userId) return null;
+        const src = lookup[userId] || {};
+        const gender = src.gender || p.gender || playerDirectory.getGenderById(userId, '');
+        const teeRaw = src.tee || p.tee || p.tPosition || tPosition.defaultFromGender(gender);
+        const teeCode = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
+        const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
+        const nickname = src.nickname
+          || this._resolveAnyPlayerNickname(p)
+          || '未知球员';
+        const avatarSrc = src.avatar
+          || (p.avatar ? String(p.avatar) : '')
+          || (p.avatarUrl ? String(p.avatarUrl) : '')
+          || '';
+        const slotIndex = Number(p.position != null ? p.position : p.slotIndex) || 0;
+        return {
+          playerId: userId,
+          userId: userId,
+          slotIndex: slotIndex,
+          position: slotIndex,
+          nickname: nickname,
+          name: nickname,
+          displayName: nickname,
+          avatar: mockAvatars.resolveAvatar(avatarSrc, userId),
+          tee: teeText,
+          teeText: teeText,
+          teeLabel: teeText,
+          teeCode: teeCode,
+          teeMarkerClass: teeCode === tPosition.RED_T
+            ? 'tee-marker-dot--female'
+            : 'tee-marker-dot--male',
+          handicap: src.handicap != null && src.handicap !== '' ? src.handicap : (p.handicap != null ? p.handicap : '')
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
+    return list;
+  },
+
+  /**
+   * 未安排出场 = 报名名单 − 已进入正式 groups 的球员（仅展示，不视为错误）
+   */
+  _resolveUnscheduledPlayers(match, groups) {
+    const registerInfo = this._resolveRegisterInfo(match);
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    const assigned = {};
+    (groups || []).forEach((g) => {
+      (g.players || []).forEach((p) => {
+        const id = this._resolveAnyPlayerId(p);
+        if (id) assigned[id] = true;
+      });
+    });
+    return users.filter((u) => {
+      const id = this._resolveAnyPlayerId(u);
+      return id && !assigned[id];
+    });
   },
 
   /** 进入分组 TAB / 从编辑页返回：刷新正式分组展示 */
@@ -438,25 +598,101 @@ Page({
     return isCreator || hasManagePermission;
   },
 
-  _mapGroupsToTabCards(groups) {
-    return (groups || []).map((g) => ({
-      groupId: g.groupId,
-      badge: g.groupName,
-      players: (g.players || []).map((p) => {
-        const displayName = p.displayName
-          ? String(p.displayName)
-          : (p.competitionName ? String(p.competitionName) : '');
+  _mapGroupsToTabCards(groups, options) {
+    const opts = options || {};
+    const showPairings = !!opts.showPairings;
+    const pairings = opts.pairings || {};
+    const pairingTitle = opts.pairingTitle || '组合';
+    const playerLookup = opts.playerLookup || {};
+    return (groups || []).map((g) => {
+      // 正式位号保留在 g.players；展示层 hydrate 生成 displayPlayers（过滤空位，按 slotIndex 升序）
+      const displayPlayers = this.hydrateGroupDisplayPlayers(g, playerLookup);
+      const card = {
+        groupId: g.groupId,
+        badge: g.groupName,
+        displayPlayers: displayPlayers,
+        hasDisplayPlayers: displayPlayers.length > 0
+      };
+      if (showPairings) {
+        card.pairingBlock = this._mapGroupPairingBlock(g, pairings, pairingTitle, playerLookup);
+      }
+      return card;
+    });
+  },
+
+  _resolveGroupedPlayerName(userId, slotPlayer, playerLookup) {
+    const id = userId != null ? String(userId).trim() : '';
+    const src = (playerLookup && id && playerLookup[id]) || null;
+    if (src && src.nickname) return src.nickname;
+    const fromSlot = this._resolveAnyPlayerNickname(slotPlayer);
+    if (fromSlot) return fromSlot;
+    return '未知球员';
+  },
+
+  _resolveGroupedPlayerAvatar(userId, slotPlayer, playerLookup) {
+    const id = userId != null ? String(userId).trim() : '';
+    const src = (playerLookup && id && playerLookup[id]) || null;
+    const avatarSrc = (src && src.avatar)
+      || (slotPlayer && slotPlayer.avatar ? String(slotPlayer.avatar) : '')
+      || (slotPlayer && slotPlayer.avatarUrl ? String(slotPlayer.avatarUrl) : '')
+      || '';
+    return mockAvatars.resolveAvatar(avatarSrc, id);
+  },
+
+  _mapGroupPairingBlock(group, pairings, pairingTitle, playerLookup) {
+    const groupId = String(group.groupId || '');
+    const lookup = playerLookup || {};
+    const playerMap = {};
+    ((group.players || [])).forEach((p) => {
+      const id = this._resolveAnyPlayerId(p);
+      if (!id) return;
+      playerMap[id] = p;
+    });
+    const list = Array.isArray(pairings[groupId]) ? pairings[groupId] : [];
+    const pairingViews = list.map((pr, idx) => {
+      const ids = Array.isArray(pr.playerIds) ? pr.playerIds.map(String) : [];
+      const members = ids.map((id) => {
+        const p = playerMap[id];
         return {
-          position: p.position,
-          name: displayName,
-          avatar: p.avatar ? mockAvatars.resolveAvatar(p.avatar) : '',
-          teeLabel: p.tee ? 'T' : '',
-          teeMarkerClass: p.tee === 'RED_T'
-            ? 'tee-marker-dot--female'
-            : (p.tee === 'BLUE_T' ? 'tee-marker-dot--male' : '')
+          userId: id,
+          name: this._resolveGroupedPlayerName(id, p, lookup),
+          displayName: this._resolveGroupedPlayerName(id, p, lookup),
+          avatar: this._resolveGroupedPlayerAvatar(id, p, lookup)
         };
-      })
-    }));
+      }).filter((m) => m.userId);
+      return {
+        id: pr.id || ('pairing_' + (idx + 1)),
+        label: '组合' + (idx + 1),
+        members: members,
+        namesText: members.map((m) => m.name).join(' / ')
+      };
+    }).filter((pr) => pr.members && pr.members.length);
+
+    const paired = {};
+    pairingViews.forEach((pr) => {
+      (pr.members || []).forEach((m) => { paired[m.userId] = true; });
+    });
+    const incomplete = ((group.players || [])
+      .filter((p) => p && this._resolveAnyPlayerId(p) && !paired[this._resolveAnyPlayerId(p)])
+      .map((p) => {
+        const id = this._resolveAnyPlayerId(p);
+        const name = this._resolveGroupedPlayerName(id, p, lookup);
+        return {
+          userId: id,
+          name: name,
+          displayName: name,
+          avatar: this._resolveGroupedPlayerAvatar(id, p, lookup)
+        };
+      }));
+
+    return {
+      title: pairingTitle,
+      pairings: pairingViews,
+      hasPairings: pairingViews.length > 0,
+      incompletePlayers: incomplete,
+      incompleteNamesText: incomplete.map((p) => p.name).filter(Boolean).join('、'),
+      hasIncomplete: incomplete.length > 0
+    };
   },
 
   /** 跳转独立分组编辑页（开始分组 / 修改分组） */
@@ -657,12 +893,13 @@ Page({
     // 旧报名记录缺省字段在 store.normalize 中按「本人报名」补齐
     const normalized = teamMatchStore.normalizeRegisterInfo(match.registerInfo);
     const users = (normalized.users || []).map((user) => ({
-      userId: user.userId || '',
-      // 赛事显示名唯一来源 competitionName；兼容旧数据回退 nickname
-      competitionName: user.competitionName || user.nickname || '',
+      userId: user.userId || user.playerId || user.id || user.uid || user.openid || '',
+      // 赛事显示名：competitionName 优先，兼容 nickname / name / realName
+      competitionName: user.competitionName || user.displayName || user.nickname || user.name || user.realName || user.remarkName || '',
+      nickname: user.nickname || '',
       gender: user.gender || '',
       handicap: user.handicap != null ? user.handicap : '',
-      avatar: user.avatar || '',
+      avatar: user.avatar || user.avatarUrl || '',
       phone: user.phone || '',
       groupId: user.groupId != null ? String(user.groupId) : '',
       groupName: user.groupName || '',

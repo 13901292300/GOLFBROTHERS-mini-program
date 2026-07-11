@@ -52,3 +52,102 @@ page {
 .tab-inactive {
   color: var(--tab-inactive-color);
 }
+
+/* ===== gb-group-player：多组 GAME 分组卡片球员统一标准 ===== */
+/* 基准：修改分组页（group-editor）正确视觉 —— 头像左，昵称/T台右 */
+.gb-group-player-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12rpx 8rpx;
+  align-items: start;
+  overflow: visible;
+}
+.gb-group-player {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+}
+.gb-group-player-avatar-wrap {
+  position: relative;
+  width: 80rpx;
+  height: 80rpx;
+  flex-shrink: 0;
+}
+.gb-group-player-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 9999rpx;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-subtle, #f3f4f6);
+  display: block;
+  flex-shrink: 0;
+}
+.gb-group-player-avatar--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #6b7280);
+  font-size: 36rpx;
+  font-weight: 300;
+}
+.gb-group-player-meta {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4rpx;
+}
+.gb-group-player-name {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--text-primary, #002d62);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-group-player-tee {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6rpx;
+  max-width: 100%;
+  min-height: 24rpx;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-group-player-tee-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gb-group-player-tee-dot--male,
+.gb-group-player-tee-dot.tee-marker-dot--male {
+  background: #3b82f6;
+}
+.gb-group-player-tee-dot--female,
+.gb-group-player-tee-dot.tee-marker-dot--female {
+  background: #ef4444;
+}
+.gb-group-player-tee-text {
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--text-muted, #6b7280);
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

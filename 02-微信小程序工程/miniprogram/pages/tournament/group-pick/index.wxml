@@ -15,16 +15,18 @@
 
   <view class="slots-fixed">
     <view class="group-title">{{groupName}}</view>
-    <view class="tee-player-grid">
-      <view wx:for="{{slots}}" wx:key="position" class="tee-player slot-item">
-        <view class="tee-avatar-wrap">
-          <image wx:if="{{item.avatar}}" class="tee-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
-          <view wx:else class="tee-avatar tee-avatar-plus">+</view>
+    <view class="gb-group-player-grid">
+      <view wx:for="{{slots}}" wx:key="position" class="gb-group-player slot-item">
+        <view class="gb-group-player-avatar-wrap">
+          <image wx:if="{{item.avatar}}" class="gb-group-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
         </view>
-        <text class="tee-player-name">{{item.displayName}}</text>
-        <view wx:if="{{item.teeLabel}}" class="tee-marker-line">
-          <view wx:if="{{item.teeMarkerClass}}" class="tee-marker-dot {{item.teeMarkerClass}}"></view>
-          <text class="tee-marker-letter">{{item.teeLabel}}</text>
+        <view class="gb-group-player-meta">
+          <text class="gb-group-player-name">{{item.displayName || item.nickname || item.name || ''}}</text>
+          <view wx:if="{{item.teeText || item.teeLabel}}" class="gb-group-player-tee">
+            <view wx:if="{{item.teeMarkerClass}}" class="gb-group-player-tee-dot {{item.teeMarkerClass}}"></view>
+            <text class="gb-group-player-tee-text">{{item.teeText || item.teeLabel}}</text>
+          </view>
         </view>
       </view>
     </view>
@@ -56,6 +58,7 @@
       >
         <view class="roster-checkbox {{item.isSelected ? 'roster-checkbox--checked' : ''}} {{item.isOccupied ? 'roster-checkbox--occupied' : ''}}">
           <text wx:if="{{item.isSelected}}" class="roster-checkbox__mark">✓</text>
+          <text wx:elif="{{item.isOccupied}}" class="roster-checkbox__mark">✓</text>
         </view>
         <view class="roster-col roster-col--player">
           <image class="roster-avatar" src="{{item.avatar}}" mode="aspectFill"></image>

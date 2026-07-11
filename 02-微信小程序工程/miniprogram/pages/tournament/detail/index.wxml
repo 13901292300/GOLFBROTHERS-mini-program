@@ -155,11 +155,11 @@
             data-url="{{item.content}}"
           >
             <view class="card-head"><text class="card-title">照片直播</text></view>
-            <text class="card-text">点击复制链接</text>
+            <text class="card-text event-info-card-desc photo-live-card__desc">点击复制链接</text>
           </view>
           <view wx:else class="ds-card pad-card">
             <view class="card-head"><text class="card-title">{{item.title}}</text></view>
-            <text class="card-text">{{item.content}}</text>
+            <text class="card-text event-info-card-desc">{{item.content}}</text>
           </view>
         </block>
         <view class="partners-section">
@@ -242,23 +242,55 @@
             <text class="groups-tab-header__title">分组</text>
           </view>
           <block wx:if="{{hasFormalGroups}}">
-            <view wx:for="{{groupsTabCards}}" wx:key="groupId" class="tee-group-card">
-              <view class="tee-group-meta">
-                <text class="tee-group-badge">{{item.badge}}</text>
-              </view>
-              <view class="tee-player-grid">
-                <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="tee-player">
-                  <view class="tee-avatar-wrap">
-                    <image wx:if="{{pl.avatar}}" class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
-                    <view wx:else class="tee-avatar tee-avatar-plus">+</view>
-                  </view>
-                  <text class="tee-player-name">{{pl.name}}</text>
-                  <view class="tee-marker-line">
-                    <view wx:if="{{pl.teeMarkerClass}}" class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
-                    <text class="tee-marker-letter">{{pl.teeLabel}}</text>
+            <view wx:for="{{groupsTabCards}}" wx:key="groupId" class="groups-tab-group-block">
+              <view class="tee-group-card">
+                <view class="tee-group-meta">
+                  <text class="tee-group-badge">{{item.badge}}</text>
+                </view>
+                <view wx:if="{{item.hasDisplayPlayers}}" class="gb-group-player-grid">
+                  <view wx:for="{{item.displayPlayers}}" wx:for-item="pl" wx:key="userId" class="gb-group-player">
+                    <view class="gb-group-player-avatar-wrap">
+                      <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                      <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                    </view>
+                    <view class="gb-group-player-meta">
+                      <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                      <view wx:if="{{pl.teeText || pl.teeLabel || pl.tee}}" class="gb-group-player-tee">
+                        <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                        <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || pl.tee}}</text>
+                      </view>
+                    </view>
                   </view>
                 </view>
+                <view wx:else class="groups-tab-no-players">
+                  <text class="groups-tab-no-players__text">暂无球员</text>
+                </view>
               </view>
+
+              <view wx:if="{{showGroupPairings && item.pairingBlock && (item.pairingBlock.hasPairings || item.pairingBlock.hasIncomplete)}}" class="groups-pairing-block">
+                <text wx:if="{{item.pairingBlock.hasPairings}}" class="groups-pairing-block__title">{{item.pairingBlock.title}}</text>
+                <view
+                  wx:for="{{item.pairingBlock.pairings}}"
+                  wx:for-item="pr"
+                  wx:key="id"
+                  class="groups-pairing-card"
+                >
+                  <text class="groups-pairing-card__label">{{pr.label}}</text>
+                  <view class="groups-pairing-card__members">
+                    <view wx:for="{{pr.members}}" wx:for-item="m" wx:key="userId" class="groups-pairing-member">
+                      <image wx:if="{{m.avatar}}" class="groups-pairing-member__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
+                      <text class="groups-pairing-member__name">{{m.name}}</text>
+                    </view>
+                  </view>
+                </view>
+                <view wx:if="{{item.pairingBlock.hasIncomplete}}" class="groups-pairing-incomplete">
+                  <text class="groups-pairing-incomplete__label">未完成组合：</text>
+                  <text class="groups-pairing-incomplete__names">{{item.pairingBlock.incompleteNamesText}}</text>
+                </view>
+              </view>
+            </view>
+            <view wx:if="{{unscheduledPlayerCount > 0}}" class="groups-unscheduled">
+              <text class="groups-unscheduled__text">未安排出场（{{unscheduledPlayerCount}}人）</text>
             </view>
           </block>
           <block wx:else>
@@ -364,16 +396,18 @@
             <text class="tee-group-badge">{{item.badge}}</text>
             <view class="tee-start-info"><text class="tee-clock">🕘</text>{{item.time}} 出发 <text class="tee-hole-pill">{{item.hole}}</text></view>
           </view>
-          <view class="tee-player-grid">
-            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="tee-player">
-              <view class="tee-avatar-wrap">
-                <image class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+          <view class="gb-group-player-grid">
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="gb-group-player">
+              <view class="gb-group-player-avatar-wrap">
+                <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
                 <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
               </view>
-              <text class="tee-player-name">{{pl.name}}</text>
-              <view class="tee-marker-line">
-                <view class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
-                <text class="tee-marker-letter">T</text>
+              <view class="gb-group-player-meta">
+                <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
+                  <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                  <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || 'T'}}</text>
+                </view>
               </view>
             </view>
           </view>

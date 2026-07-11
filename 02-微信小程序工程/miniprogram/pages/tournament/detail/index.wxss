@@ -149,7 +149,18 @@ page {
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; }
 .card-title { color: var(--text-primary); font-size: 28rpx; font-weight: 900; letter-spacing: -0.02em; }
 .card-kicker { font-size: 20rpx; font-weight: 900; font-style: italic; color: var(--champion-gold); letter-spacing: 0.18em; }
-.photo-live-card .card-text {
+/* 赛事信息卡片正文：对齐 HTML 原型 .card-text（12px / muted），避免继承默认大字号 */
+.card-text,
+.event-info-card-desc {
+  display: block;
+  color: var(--text-muted);
+  font-size: 24rpx;
+  line-height: 1.75;
+  font-weight: 400;
+}
+.photo-live-card .card-text,
+.photo-live-card .event-info-card-desc,
+.photo-live-card__desc {
   color: var(--cloud-blue, #002d62);
   font-weight: 700;
 }
@@ -867,6 +878,88 @@ page {
 .groups-panel-empty__text {
   color: var(--text-muted);
   font-size: 26rpx;
+}
+.groups-unscheduled {
+  margin-top: 8rpx;
+  margin-bottom: 16rpx;
+  padding: 20rpx 8rpx 8rpx;
+}
+.groups-unscheduled__text {
+  color: var(--text-muted);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+.groups-tab-group-block { margin-bottom: 8rpx; }
+/* 分组 TAB 球员项：全局 .gb-group-player*（app.wxss） */
+.groups-tab-no-players {
+  padding: 24rpx 8rpx 8rpx;
+}
+.groups-tab-no-players__text {
+  color: var(--text-muted);
+  font-size: 24rpx;
+}
+.groups-pairing-block {
+  margin: -8rpx 0 24rpx;
+  padding: 20rpx 24rpx 16rpx;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 20rpx 20rpx;
+}
+.groups-pairing-block__title {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 12rpx;
+}
+.groups-pairing-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12rpx;
+  padding: 16rpx 18rpx;
+  margin-bottom: 12rpx;
+}
+.groups-pairing-card__label {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 800;
+  color: var(--tour-blue);
+  margin-bottom: 10rpx;
+}
+.groups-pairing-card__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx 24rpx;
+}
+.groups-pairing-member {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+.groups-pairing-member__avatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 9999rpx;
+  background: var(--bg-subtle);
+}
+.groups-pairing-member__name {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.groups-pairing-incomplete {
+  padding-top: 4rpx;
+}
+.groups-pairing-incomplete__label {
+  font-size: 24rpx;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.groups-pairing-incomplete__names {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .detail-main { padding: 40rpx 32rpx 80rpx; }

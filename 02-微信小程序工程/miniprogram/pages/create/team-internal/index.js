@@ -1453,24 +1453,7 @@ Page({
     partnerConfigUtil.savePartnerConfig(this.data.partnerConfig, this.data.teamName);
 
     if (this.data.isEditMode) {
-      const matchId = this.data.editMatchId || this._editMatchId;
-      const existing = teamMatchStore.getMatchById(matchId);
-      if (!existing) {
-        wx.showToast({ title: '未找到比赛信息', icon: 'none' });
-        return;
-      }
-      const updated = teamMatchStore.updateMatchFromCreatePage(existing, this.data);
-      teamMatchStore.saveMatch(updated);
-      wx.showToast({ title: '已保存修改', icon: 'success' });
-      setTimeout(() => {
-        if (getCurrentPages().length > 1) {
-          wx.navigateBack({ delta: 1 });
-        } else {
-          wx.redirectTo({
-            url: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
-          });
-        }
-      }, 400);
+      this._submitEditMatch();
       return;
     }
 
@@ -1492,5 +1475,66 @@ Page({
         });
       }
     });
+  },
+
+  /**
+   * 编辑保存：赛制变更仅在导致组合关系失效且已有正式分组时提示并清空 groups
+   */
+  _submitEditMatch() {
+    const matchId = this.data.editMatchId || this._editMatchId;
+    const existing = teamMatchStore.getMatchById(matchId);
+    if (!existing) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      return;
+    }
+
+    const fromMode = existing.gameMode || '';
+    const toMode = this.data.gameMode || this.data.selectedGameMode || '';
+    const willClear = teamMatchStore.hasFormalGroups(existing) &&
+      teamMatchStore.shouldClearGroupsOnGameModeChange(fromMode, toMode);
+    const clearPairingsOnly = !willClear &&
+      teamMatchStore.shouldClearPairingsOnGameModeChange(fromMode, toMode);
+
+    if (willClear) {
+      wx.showModal({
+        title: '提示',
+        content: teamMatchStore.GAME_MODE_CHANGE_CLEAR_GROUPS_TIP,
+        confirmText: '确认',
+        cancelText: '取消',
+        success: (res) => {
+          if (!res.confirm) return;
+          this._persistEditMatch(existing, { clearGroups: true });
+        }
+      });
+      return;
+    }
+
+    this._persistEditMatch(existing, { clearPairings: clearPairingsOnly });
+  },
+
+  _persistEditMatch(existing, options) {
+    const opts = options || {};
+    const matchId = existing && existing.matchId
+      ? existing.matchId
+      : (this.data.editMatchId || this._editMatchId);
+    const updated = teamMatchStore.updateMatchFromCreatePage(existing, this.data, {
+      clearGroups: !!opts.clearGroups,
+      clearPairings: !!opts.clearPairings
+    });
+    if (!updated) {
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+    teamMatchStore.saveMatch(updated);
+    wx.showToast({ title: '已保存修改', icon: 'success' });
+    setTimeout(() => {
+      if (getCurrentPages().length > 1) {
+        wx.navigateBack({ delta: 1 });
+      } else {
+        wx.redirectTo({
+          url: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+        });
+      }
+    }, 400);
   }
 });

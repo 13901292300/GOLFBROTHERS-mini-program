@@ -37,12 +37,27 @@ function defaultTeeFromRegisterGender(gender) {
 function teeDisplayFields(tee) {
   const value = String(tee || '');
   if (value === TEE_RED) {
-    return { tee: TEE_RED, teeLabel: 'T', teeMarkerClass: 'tee-marker-dot--female' };
+    return {
+      tee: TEE_RED,
+      teeLabel: '红T',
+      teeText: '红T',
+      teeMarkerClass: 'tee-marker-dot--female'
+    };
   }
   if (value === TEE_BLUE) {
-    return { tee: TEE_BLUE, teeLabel: 'T', teeMarkerClass: 'tee-marker-dot--male' };
+    return {
+      tee: TEE_BLUE,
+      teeLabel: '蓝T',
+      teeText: '蓝T',
+      teeMarkerClass: 'tee-marker-dot--male'
+    };
   }
-  return { tee: value, teeLabel: value ? 'T' : '', teeMarkerClass: '' };
+  return {
+    tee: value,
+    teeLabel: value ? String(value) : '',
+    teeText: value ? String(value) : '',
+    teeMarkerClass: ''
+  };
 }
 
 /** 赛事显示名：仅 competitionName / displayName，禁止 nickname */
@@ -99,6 +114,13 @@ function snapshotSlots(slots) {
   })));
 }
 
+/** 从 slots 得到临时选中 id 列表（等价 editingGroupSelectedIds） */
+function slotsToSelectedIds(slots) {
+  return (slots || [])
+    .map((s) => String((s && s.userId) || '').trim())
+    .filter(Boolean);
+}
+
 Page({
   data: {
     themeClass: 'bright-mode',
@@ -106,6 +128,7 @@ Page({
     headerBarStyle: '',
     groupId: '',
     groupName: '',
+    editingGroupIndex: -1,
     slots: createSlots(),
     registerSubTabs: [],
     activeSubTabId: '',
@@ -122,6 +145,11 @@ Page({
     this._registerInfo = payload.registerInfo || { totalCount: 0, users: [] };
     this._allGroups = payload.groups || [];
     this._leavingConfirmed = false;
+
+    const editingGroupIndex = (this._allGroups || []).findIndex(
+      (g) => String((g && g.groupId) || '') === String(groupId)
+    );
+
     const tabs = this._resolveTabs(payload.match, payload.registerSubTabs, payload.registerInfo);
     const activeSubTabId = tabs.length ? tabs[0].id : '';
     const slots = hydrateSlotsFromPlayers(payload.players);
@@ -129,10 +157,11 @@ Page({
     this.setData({
       groupId: groupId,
       groupName: groupName || '分组',
+      editingGroupIndex: editingGroupIndex,
       slots: slots,
       registerSubTabs: tabs,
       activeSubTabId: activeSubTabId,
-      displayUsers: this._buildDisplayUsers(this._registerInfo, activeSubTabId, slots)
+      displayUsers: this._buildDisplayUsers(this._registerInfo, activeSubTabId, slots, groupId, editingGroupIndex)
     });
   },
 
@@ -185,53 +214,30 @@ Page({
     });
   },
 
-  _buildDisplayUsers(registerInfo, groupId, slots) {
-    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
-    const selectedMap = this._buildSelectedMap(slots || []);
-    const occupiedMap = this._buildOccupiedMap(groupId);
-    const selectedCount = Object.keys(selectedMap).length;
-    const groupFull = selectedCount >= 4;
-    return users
-      .map(normalizeUser)
-      .filter((u) => String(u.groupId) === String(groupId || ''))
-      .map((u) => {
-        const uid = String(u.userId || '');
-        const selectedSlot = selectedMap[uid] || 0;
-        const occupiedGroupName = occupiedMap[uid] || '';
-        const isSelectedInCurrentGroup = !!selectedSlot;
-        const isOccupied = !isSelectedInCurrentGroup && !!occupiedGroupName;
-        const isSelected = isSelectedInCurrentGroup || isOccupied;
-        let isDisabled = false;
-        if (isSelectedInCurrentGroup) {
-          isDisabled = false;
-        } else if (isOccupied) {
-          isDisabled = true;
-        } else if (groupFull) {
-          isDisabled = true;
-        }
-        return Object.assign({}, u, {
-          isSelected: isSelected,
-          selectedSlot: selectedSlot,
-          isOccupied: isOccupied,
-          occupiedGroupName: occupiedGroupName,
-          isDisabled: isDisabled
-        });
-      })
-      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en', { sensitivity: 'base' }));
-  },
-
-  _buildOccupiedMap(currentGroupId) {
+  /**
+   * 其它出发组占用表：必须排除当前正在编辑的出发组
+   * 排除条件：group.groupId === editingGroupId 或 index === editingGroupIndex
+   */
+  _buildOccupiedMap(editingGroupId, editingGroupIndex) {
     const map = {};
     const groups = this._allGroups || [];
-    groups.forEach((group) => {
+    const editId = String(editingGroupId || '');
+    const editIdx = editingGroupIndex != null ? Number(editingGroupIndex) : -1;
+
+    groups.forEach((group, index) => {
       const gid = String((group && group.groupId) || '');
-      if (!gid || gid === String(currentGroupId || '')) return;
-      const groupName = String((group && group.groupName) || '');
+      const isEditingGroup =
+        (!!editId && gid === editId) ||
+        (editIdx >= 0 && Number(index) === editIdx);
+      if (isEditingGroup) return;
+
+      const groupName = String((group && group.groupName) || '') || ('第' + (index + 1) + '组');
       const players = Array.isArray(group && group.players) ? group.players : [];
       players.forEach((player) => {
-        const uid = String((player && player.userId) || '');
-        if (!uid || map[uid]) return;
-        map[uid] = groupName || '其他分组';
+        const uid = player && (player.userId != null ? player.userId : player.id);
+        const id = String(uid || '').trim();
+        if (!id || map[id]) return;
+        map[id] = groupName;
       });
     });
     return map;
@@ -247,13 +253,63 @@ Page({
     return map;
   },
 
+  /**
+   * 弹窗列表状态：
+   * checked  = 是否在当前 slots（临时选中）
+   * disabled = 是否在其它出发组（与 checked / 当前组原始名单无关）
+   */
+  _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    const editId = editingGroupId != null ? editingGroupId : this.data.groupId;
+    const editIdx = editingGroupIndex != null ? editingGroupIndex : this.data.editingGroupIndex;
+    const selectedMap = this._buildSelectedMap(slots || []);
+    const occupiedMap = this._buildOccupiedMap(editId, editIdx);
+    const selectedCount = Object.keys(selectedMap).length;
+    const groupFull = selectedCount >= 4;
+    const selectedIds = slotsToSelectedIds(slots);
+
+    return users
+      .map(normalizeUser)
+      .filter((u) => String(u.groupId) === String(registerSubTabId || ''))
+      .map((u) => {
+        const uid = String(u.userId || '');
+        const checked = !!selectedMap[uid];
+        const occupiedGroupName = occupiedMap[uid] || '';
+        const isOccupied = !!occupiedGroupName;
+        // disabled 只看其它出发组占用；满员时仅未选中者不可再选
+        let isDisabled = false;
+        if (isOccupied) {
+          isDisabled = true;
+        } else if (!checked && groupFull) {
+          isDisabled = true;
+        } else {
+          isDisabled = false;
+        }
+        return Object.assign({}, u, {
+          isSelected: checked,
+          checked: checked,
+          selectedSlot: selectedMap[uid] || 0,
+          isOccupied: isOccupied,
+          occupiedGroupName: occupiedGroupName,
+          isDisabled: isDisabled
+        });
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en', { sensitivity: 'base' }));
+  },
+
   _countFilledSlots(slots) {
     return (slots || []).filter((s) => !!String((s && s.userId) || '')).length;
   },
 
-  _refreshDisplayUsers(activeSubTabId, slots) {
+  _refreshDisplayUsers(registerSubTabId, slots) {
     this.setData({
-      displayUsers: this._buildDisplayUsers(this._registerInfo, activeSubTabId, slots)
+      displayUsers: this._buildDisplayUsers(
+        this._registerInfo,
+        registerSubTabId,
+        slots,
+        this.data.groupId,
+        this.data.editingGroupIndex
+      )
     });
   },
 
@@ -324,27 +380,40 @@ Page({
     });
   },
 
-  /** 复选框切换：勾选填入首个空位；取消仅清空对应位，不自动补位 */
+  /**
+   * 勾选/取消：只改 slots（临时选中），再重建列表。
+   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap 判断。
+   */
   onTogglePlayer(e) {
     const user = e.currentTarget.dataset.user || null;
     if (!user) return;
-    if (user.isOccupied) return;
     const pickedUserId = String(user.userId || '');
     if (!pickedUserId) return;
 
     const slots = (this.data.slots || []).slice();
+    const editingGroupId = this.data.groupId;
+    const editingGroupIndex = this.data.editingGroupIndex;
+    const occupiedMap = this._buildOccupiedMap(editingGroupId, editingGroupIndex);
+
+    // 其它出发组占用：不可选
+    if (occupiedMap[pickedUserId]) return;
+
     const selectedIndex = slots.findIndex((s) => String((s && s.userId) || '') === pickedUserId);
 
-    // 取消勾选：清空该位置，其余位置保持原序
+    // 取消勾选：清空该位置
     if (selectedIndex >= 0) {
       slots[selectedIndex] = createEmptySlot(slots[selectedIndex].position || (selectedIndex + 1));
-      this.setData({ slots: slots }, () => {
-        this._refreshDisplayUsers(this.data.activeSubTabId, slots);
-      });
+      const displayUsers = this._buildDisplayUsers(
+        this._registerInfo,
+        this.data.activeSubTabId,
+        slots,
+        editingGroupId,
+        editingGroupIndex
+      );
+      this.setData({ slots: slots, displayUsers: displayUsers });
       return;
     }
 
-    // 已满 4 人：其余未选不可再勾
     if (this._countFilledSlots(slots) >= 4) {
       wx.showToast({ title: '每组最多4人', icon: 'none' });
       return;
@@ -357,7 +426,6 @@ Page({
     }
 
     const gender = user.gender || '';
-    // 首次勾选：按报名性别写入赛事球员配置 player.tee
     const teeFields = teeDisplayFields(defaultTeeFromRegisterGender(gender));
     slots[emptyIndex] = Object.assign({}, slots[emptyIndex], {
       userId: pickedUserId,
@@ -366,8 +434,14 @@ Page({
       gender: gender,
       handicap: user.handicap || '-'
     }, teeFields);
-    this.setData({ slots: slots }, () => {
-      this._refreshDisplayUsers(this.data.activeSubTabId, slots);
-    });
+
+    const displayUsers = this._buildDisplayUsers(
+      this._registerInfo,
+      this.data.activeSubTabId,
+      slots,
+      editingGroupId,
+      editingGroupIndex
+    );
+    this.setData({ slots: slots, displayUsers: displayUsers });
   }
 });
