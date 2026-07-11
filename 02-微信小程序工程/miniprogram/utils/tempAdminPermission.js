@@ -47,11 +47,17 @@ const MANAGE_SCORING_FEATURE = {
 /**
  * 添加临时管理员时的默认勾选（须出现在可授权列表中）
  * 分组管理 + 记分权限必选默认；出发管理若存在则一并默认。
+ * 出发管理能力等价 permission（展示 / 校验统一为 manage_tee_sheet，兼容历史 tee_management）
  */
+const TEE_SHEET_CAPABILITY_PERMISSIONS = {
+  manage_tee_sheet: true,
+  tee_management: true
+};
+
 const PREFERRED_DEFAULT_PERMISSIONS = [
   'manage_groups',
   'manage_scoring',
-  'tee_management'
+  'manage_tee_sheet'
 ];
 
 /** 始终保留在可授权列表、且 normalize 始终允许的稳定权限 */
@@ -66,6 +72,10 @@ function isGroupCapabilityPermission(permission) {
 
 function isScoringCapabilityPermission(permission) {
   return !!SCORING_CAPABILITY_PERMISSIONS[String(permission || '').trim()];
+}
+
+function isTeeSheetCapabilityPermission(permission) {
+  return !!TEE_SHEET_CAPABILITY_PERMISSIONS[String(permission || '').trim()];
 }
 
 function isDangerOrLifecyclePermission(feature) {
@@ -125,6 +135,19 @@ function buildGrantableFeatures(featureList) {
       return;
     }
 
+    // 出发管理：历史 tee_management 合并为 manage_tee_sheet
+    if (isTeeSheetCapabilityPermission(key)) {
+      if (!seen.manage_tee_sheet) {
+        seen.manage_tee_sheet = true;
+        out.push({
+          key: 'manage_tee_sheet',
+          label: f.label != null ? String(f.label) : '出发管理',
+          tone: f.tone ? String(f.tone) : ''
+        });
+      }
+      return;
+    }
+
     seen[key] = true;
     out.push({
       key: key,
@@ -138,7 +161,7 @@ function buildGrantableFeatures(featureList) {
   if (groupsIdx < 0) {
     let insertAt = out.length;
     const afterHalf = out.findIndex((item) => item.key === 'edit_half');
-    const beforeTee = out.findIndex((item) => item.key === 'tee_management');
+    const beforeTee = out.findIndex((item) => item.key === 'manage_tee_sheet');
     if (beforeTee >= 0) insertAt = beforeTee;
     else if (afterHalf >= 0) insertAt = afterHalf + 1;
     groupsIdx = _insertBeforeDanger(out, insertAt, MANAGE_GROUPS_FEATURE);
@@ -196,6 +219,7 @@ function normalizePermissionList(list, grantableFeatures) {
   const seen = {};
   let needManageGroups = false;
   let needManageScoring = false;
+  let needManageTeeSheet = false;
 
   src.forEach((raw) => {
     const key = String(raw || '').trim();
@@ -206,6 +230,10 @@ function normalizePermissionList(list, grantableFeatures) {
     }
     if (isScoringCapabilityPermission(key)) {
       needManageScoring = true;
+      return;
+    }
+    if (isTeeSheetCapabilityPermission(key)) {
+      needManageTeeSheet = true;
       return;
     }
     if (allowed && !allowed[key] && !STABLE_EXTRA_PERMISSIONS[key]) return;
@@ -225,6 +253,13 @@ function normalizePermissionList(list, grantableFeatures) {
     if (!allowed || allowed.manage_scoring || STABLE_EXTRA_PERMISSIONS.manage_scoring) {
       out.push('manage_scoring');
       seen.manage_scoring = true;
+    }
+  }
+
+  if (needManageTeeSheet && !seen.manage_tee_sheet) {
+    if (!allowed || allowed.manage_tee_sheet || allowed.tee_management) {
+      out.push('manage_tee_sheet');
+      seen.manage_tee_sheet = true;
     }
   }
 
@@ -338,12 +373,18 @@ function _adminHasScoringCapability(permissions) {
   return list.some((p) => isScoringCapabilityPermission(p));
 }
 
+function _adminHasTeeSheetCapability(permissions) {
+  const list = Array.isArray(permissions) ? permissions : [];
+  return list.some((p) => isTeeSheetCapabilityPermission(p));
+}
+
 /**
  * 临时管理员是否拥有某功能权限。
  * - 普通项：permissions.includes(permission)
  * - 分组相关：拥有 manage_groups（或任一分组等价项）即通过
  * - 记分相关：拥有 manage_scoring（或任一记分等价项）即通过
  *   → 表示可为本场任意参赛球员记分
+ * - 出发管理：拥有 manage_tee_sheet / tee_management 即通过
  */
 function hasTempAdminPermission(matchOrGame, userId, permission) {
   const uid = String(userId || '').trim();
@@ -366,6 +407,7 @@ function hasTempAdminPermission(matchOrGame, userId, permission) {
   if (list.indexOf(perm) >= 0) return true;
   if (isGroupCapabilityPermission(perm) && _adminHasGroupCapability(list)) return true;
   if (isScoringCapabilityPermission(perm) && _adminHasScoringCapability(list)) return true;
+  if (isTeeSheetCapabilityPermission(perm) && _adminHasTeeSheetCapability(list)) return true;
   return false;
 }
 
@@ -379,11 +421,13 @@ module.exports = {
   TEMP_ADMIN_EXCLUDED_PERMISSIONS,
   GROUP_CAPABILITY_PERMISSIONS,
   SCORING_CAPABILITY_PERMISSIONS,
+  TEE_SHEET_CAPABILITY_PERMISSIONS,
   MANAGE_GROUPS_FEATURE,
   MANAGE_SCORING_FEATURE,
   PREFERRED_DEFAULT_PERMISSIONS,
   isGroupCapabilityPermission,
   isScoringCapabilityPermission,
+  isTeeSheetCapabilityPermission,
   buildGrantableFeatures,
   resolveDefaultPermissions,
   normalizePermissionList,

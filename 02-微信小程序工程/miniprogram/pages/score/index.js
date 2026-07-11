@@ -15,6 +15,8 @@ const gameLifecycle = require('../../utils/gameLifecycle.js');
 const halfCourseEdit = require('../../utils/halfCourseEdit.js');
 const holeLayout = require('../../utils/holeLayout.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
+const teamMatchStore = require('../../utils/teamMatchStore.js');
+const teeSheetManage = require('../../utils/teeSheetManage.js');
 
 // 单组 Game 球员行配色（按槽位顺序）
 const GAME_COLOR_CLASSES = ['border-red', 'border-gold', 'border-white', 'border-light'];
@@ -1164,6 +1166,7 @@ Page({
   // 个人比杆赛模式：从出发表 groups 加载本组球员与 holes 成绩（唯一数据源）
   initIndividualStrokeMode(groupId) {
     groupsStore.ensureInitialized();
+    const ms = this._matchState || this._readMatchState();
     const group = groupsStore.getGroup(groupId);
     const loaded = groupsStore.loadGroupForScoring(groupId);
     this._playersSource = loaded.length
@@ -1176,9 +1179,19 @@ Page({
           scores: (p.scores || []).slice(),
           putts: (p.putts || []).slice()
         }))
-      : PLAYER_SEEDS.map((p) =>
-          Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [] })
-        );
+      : (ms && Array.isArray(ms.players) && ms.players.length
+          ? ms.players.map((p) => ({
+              id: p.playerId || p.id,
+              playerId: p.playerId || p.id,
+              name: p.name || '球员',
+              avatar: p.avatar || '',
+              colorClass: 'border-white',
+              scores: [],
+              putts: []
+            }))
+          : PLAYER_SEEDS.map((p) =>
+              Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [] })
+            ));
     this.setData({
       mode: 'individual_stroke',
       groupId: groupId || '',
@@ -1189,7 +1202,6 @@ Page({
       playerCount: this._playersSource.length || 4,
       'match.format': '个人比杆赛'
     });
-    const ms = this._matchState || this._readMatchState();
     if (ms) this.buildGameContextFromMatchState(ms);
     this.refreshPlayers();
   },
@@ -1484,6 +1496,23 @@ Page({
     this._syncMatchStatePlayers(playersSlots);
   },
 
+  _inferFormalMatchStartHoleFromScores() {
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = ms.matchId || '';
+    const groupId = this.data.groupId || ms.groupId || '';
+    if (!matchId || !groupId) return;
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) return;
+    const result = teeSheetManage.inferStartHoleIfNeededForFormalGroup(
+      match,
+      groupId,
+      this._playersSource
+    );
+    if (result && result.updated) {
+      teamMatchStore.saveMatch(match);
+    }
+  },
+
   // 将当前本地 state 写入会话：个人比杆赛 → 出发表 groups；其他模式 → scoreSessions
   persistSession() {
     if (this._isGameStoreContext()) {
@@ -1499,6 +1528,7 @@ Page({
     }
     if (this.data.mode === 'individual_stroke' && this.data.groupId) {
       groupsStore.syncGroupFromScoring(this.data.groupId, this._playersSource);
+      this._inferFormalMatchStartHoleFromScores();
       return;
     }
     const app = getApp();

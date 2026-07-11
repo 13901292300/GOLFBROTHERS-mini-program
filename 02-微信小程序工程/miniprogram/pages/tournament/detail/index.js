@@ -25,6 +25,7 @@ const caddieScoringAccess = require('../../../utils/caddieScoringAccess.js');
 const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
 const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../utils/playerManage.js');
+const teeSheetManage = require('../../../utils/teeSheetManage.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
 const DEFAULT_SCORECARD_AD_IMAGE =
@@ -131,10 +132,10 @@ const FEATURES_COMMON = [
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
   { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
-  { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
-  { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
-  { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'manage_players', glyph: '👤', label: '选手管理', tone: '' },
+  { permission: 'manage_tee_sheet', glyph: '🚩', label: '出发管理', tone: '' },
+  { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
+  { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
   { permission: 'net_score', glyph: '🧩', label: '生成净杆', tone: '' },
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
@@ -152,7 +153,7 @@ const REGISTERING_FEATURES_PERMISSION = [
   { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'manage_players', glyph: '👤', label: '选手管理', tone: '' },
-  { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
+  { permission: 'manage_tee_sheet', glyph: '🚩', label: '出发管理', tone: '' },
   { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
   { permission: 'close_registration', glyph: '🔒', label: '关闭报名', tone: '' },
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
@@ -238,28 +239,36 @@ function createEmptyGroupPlayer(position) {
 /** 只读展示用：从正式 groups 规范化克隆（详情页不持有 groupDraft；正式位只保留 userId/position） */
 function cloneTournamentGroups(list) {
   if (!Array.isArray(list)) return [];
-  return list.map((g, index) => ({
-    groupId: g && g.groupId != null ? String(g.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)),
-    groupName: g && g.groupName ? String(g.groupName) : ('第' + (index + 1) + '组'),
-    players: Array.from({ length: GROUPS_TAB_PLAYER_SLOTS }, (_, i) => {
-      const position = i + 1;
-      const found = Array.isArray(g && g.players)
-        ? g.players.find((p) => {
-          if (!p) return false;
-          const pos = Number(p.position != null ? p.position : p.slotIndex);
-          return pos === position;
-        })
-        : null;
-      const userId = found
-        ? String(found.userId || found.playerId || found.id || '').trim()
-        : '';
-      if (!userId) return createEmptyGroupPlayer(position);
-      return {
-        position: position,
-        userId: userId
-      };
-    })
-  }));
+  return list.map((g, index) => {
+    const out = {
+      groupId: g && g.groupId != null ? String(g.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)),
+      groupName: g && g.groupName ? String(g.groupName) : ('第' + (index + 1) + '组'),
+      players: Array.from({ length: GROUPS_TAB_PLAYER_SLOTS }, (_, i) => {
+        const position = i + 1;
+        const found = Array.isArray(g && g.players)
+          ? g.players.find((p) => {
+            if (!p) return false;
+            const pos = Number(p.position != null ? p.position : p.slotIndex);
+            return pos === position;
+          })
+          : null;
+        const userId = found
+          ? String(found.userId || found.playerId || found.id || '').trim()
+          : '';
+        if (!userId) return createEmptyGroupPlayer(position);
+        return {
+          position: position,
+          userId: userId
+        };
+      })
+    };
+    // 保留组级出发信息，供分组 TAB / 出发表回显
+    const teeTime = teeSheetManage.resolveGroupTeeTime(g);
+    const startHole = teeSheetManage.resolveGroupStartHole(g);
+    if (teeTime) out.teeTime = teeTime;
+    if (startHole != null) out.startHole = startHole;
+    return out;
+  });
 }
 const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
@@ -395,6 +404,18 @@ Page({
     playerTeamPickOptions: [],
     playerManageFilterPickVisible: false,
     playerManageFilterPickOptions: [],
+    // 出发管理
+    teeSheetManageSheetVisible: false,
+    teeSheetManageHasGroups: false,
+    teeSheetManageTimeMode: 'uniform',
+    teeSheetManageIntervalMinutes: 10,
+    teeSheetManageIntervalInput: '10',
+    teeSheetManageUnifiedTime: '08:00',
+    teeSheetManageUnifiedTimeIndex: 0,
+    teeSheetManageHoleMode: 'manual',
+    teeSheetManageGroups: [],
+    teeSheetTimeOptions: [],
+    teeSheetHoleLabels: [],
 
     // 领先榜
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
@@ -778,7 +799,8 @@ Page({
       showPairings: showPairings,
       pairings: pairings,
       pairingTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
-      playerLookup: playerLookup
+      playerLookup: playerLookup,
+      matchTeeTime: teeSheetManage.resolveMatchTeeTime(match)
     });
     return {
       groups: formal,
@@ -948,14 +970,21 @@ Page({
     const pairings = opts.pairings || {};
     const pairingTitle = opts.pairingTitle || '组合';
     const playerLookup = opts.playerLookup || {};
+    const matchTeeTime = opts.matchTeeTime || '';
     return (groups || []).map((g) => {
       // 正式位号保留在 g.players；展示层 hydrate 生成 displayPlayers（过滤空位，按 slotIndex 升序）
       const displayPlayers = this.hydrateGroupDisplayPlayers(g, playerLookup);
+      const teeTime = teeSheetManage.resolveGroupTeeTime(g) || matchTeeTime;
+      const startHole = teeSheetManage.resolveGroupStartHole(g);
       const card = {
         groupId: g.groupId,
         badge: g.groupName,
         displayPlayers: displayPlayers,
-        hasDisplayPlayers: displayPlayers.length > 0
+        hasDisplayPlayers: displayPlayers.length > 0,
+        teeTime: teeTime,
+        startHole: startHole,
+        teeMetaLine: teeSheetManage.formatTeeMetaLine(teeTime, startHole),
+        hasTeeInfo: !!(teeTime || startHole != null)
       };
       if (showPairings) {
         card.pairingBlock = this._mapGroupPairingBlock(g, pairings, pairingTitle, playerLookup);
@@ -2386,18 +2415,32 @@ Page({
   // 出发表：点击任意组 → 个人比杆赛记分页。先写好该组 matchState，再统一 enterScorePage。
   onEnterGroup(e) {
     const groupId = e.currentTarget.dataset.groupId || '';
+    const matchId = this.data.matchId || '';
     groupsStore.ensureInitialized();
-    const players = groupsStore.loadGroupForScoring(groupId).map((p) => ({
+    let players = groupsStore.loadGroupForScoring(groupId).map((p) => ({
       playerId: p.playerId,
       name: p.name,
       avatar: p.avatar || ''
     }));
+    if (!players.length && matchId) {
+      const match = teamMatchStore.getMatchById(matchId);
+      const group = match && Array.isArray(match.groups)
+        ? match.groups.find((g) => String(g && g.groupId) === String(groupId))
+        : null;
+      const lookup = this._buildGroupPlayerLookup(match);
+      players = this.hydrateGroupDisplayPlayers(group, lookup).map((p) => ({
+        playerId: p.userId || p.playerId,
+        name: p.displayName || p.name,
+        avatar: p.avatar || ''
+      }));
+    }
     const groupCount = (groupsStore.getGroups() || []).length || 2;
     const courseMeta = groupsStore.getTournamentCourseMeta();
     matchStateUtil.setMatchState({
       mode: 'individual_stroke',
       formatType: 'individual_stroke',
       gameId: '',
+      matchId: matchId,
       groupIndex: 0,
       groupId: groupId,
       players: players,
@@ -2431,8 +2474,23 @@ Page({
   refreshGroupsDerived() {
     this._syncTournamentHoleLayout();
     groupsStore.ensureInitialized();
+    const matchId = this.data.matchId || '';
+    let teeGroups = [];
+    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      teeGroups = groupsStore.getTeeGroupsView();
+    } else {
+      const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      if (match && Array.isArray(match.groups) && match.groups.length) {
+        teeGroups = teeSheetManage.buildTeeSheetTabView(match, {
+          playerLookup: this._buildGroupPlayerLookup(match),
+          source: 'match'
+        });
+      } else {
+        teeGroups = [];
+      }
+    }
     this.setData({
-      teeGroups: groupsStore.getTeeGroupsView(),
+      teeGroups: teeGroups,
       leaderboard: groupsStore.buildLeaderboard(this.data.scoringDisplay, this.data.openIndex)
     });
   },
@@ -2563,6 +2621,11 @@ Page({
     if (permission === 'manage_players' || permission === 'players') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this.openPlayerManageSheet();
+      return;
+    }
+    if (permission === 'manage_tee_sheet' || permission === 'tee_management') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.openTeeSheetManageSheet();
       return;
     }
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
@@ -3064,6 +3127,203 @@ Page({
     this.loadMatch(matchId);
     this._refreshFormalGroupsDisplay();
     wx.showToast({ title: '选手信息已保存', icon: 'success' });
+  },
+
+  /* ===== 出发管理（组级 teeTime / startHole，draft 机制） ===== */
+  _canOpenTeeSheetManage(match) {
+    const user = gameStore.getCurrentUser() || {};
+    return teeSheetManage.canManageTeeSheet(
+      match,
+      user.userId,
+      !!(MORE_ACCESS && MORE_ACCESS.isPrivilegedUser)
+    );
+  },
+
+  _buildTeeSheetPlayerLookup(match) {
+    return this._buildGroupPlayerLookup(match);
+  },
+
+  openTeeSheetManageSheet() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    if (!this._canOpenTeeSheetManage(match)) {
+      wx.showToast({ title: '暂无出发管理权限', icon: 'none' });
+      return;
+    }
+    const timeOptions = teeSheetManage.buildTimeOptions();
+    const holeOpts = teeSheetManage.buildHoleOptions();
+    const draft = teeSheetManage.buildTeeSheetDraft(
+      match,
+      this._buildTeeSheetPlayerLookup(match)
+    );
+    this._teeSheetDraft = draft;
+    this.setData(
+      {
+        teeSheetManageSheetVisible: true,
+        teeSheetTimeOptions: timeOptions,
+        teeSheetHoleLabels: holeOpts.map((h) => h.label)
+      },
+      () => this._syncTeeSheetManageDisplay()
+    );
+  },
+
+  _syncTeeSheetManageDisplay(extra) {
+    const draft = this._teeSheetDraft;
+    if (!draft) return;
+    const timeOptions = this.data.teeSheetTimeOptions || teeSheetManage.buildTimeOptions();
+    let unifiedIdx = timeOptions.indexOf(draft.unifiedTime);
+    if (unifiedIdx < 0) unifiedIdx = timeOptions.indexOf('08:00');
+    if (unifiedIdx < 0) unifiedIdx = 0;
+    const groups = (draft.groups || []).map((g, index) => {
+      let timeIdx = timeOptions.indexOf(g.teeTime);
+      if (timeIdx < 0) timeIdx = 0;
+      const holeIdx =
+        g.startHole != null && g.startHole >= 1 && g.startHole <= 18
+          ? g.startHole - 1
+          : 0;
+      return Object.assign({}, g, {
+        index: index,
+        timeIndex: timeIdx,
+        holeIndex: holeIdx
+      });
+    });
+    this.setData(
+      Object.assign(
+        {
+          teeSheetManageHasGroups: !!draft.hasGroups,
+          teeSheetManageTimeMode: draft.timeMode,
+          teeSheetManageIntervalMinutes: draft.intervalMinutes,
+          teeSheetManageIntervalInput: String(draft.intervalMinutes),
+          teeSheetManageUnifiedTime: draft.unifiedTime,
+          teeSheetManageUnifiedTimeIndex: unifiedIdx,
+          teeSheetManageHoleMode: draft.holeMode,
+          teeSheetManageGroups: groups
+        },
+        extra || {}
+      )
+    );
+  },
+
+  closeTeeSheetManageSheet() {
+    this._teeSheetDraft = null;
+    this.setData({
+      teeSheetManageSheetVisible: false,
+      teeSheetManageHasGroups: false,
+      teeSheetManageGroups: []
+    });
+  },
+
+  cancelTeeSheetManageSheet() {
+    this.closeTeeSheetManageSheet();
+  },
+
+  onTeeSheetTimeModeTap(e) {
+    const mode = String((e.currentTarget.dataset && e.currentTarget.dataset.mode) || '');
+    if (!this._teeSheetDraft || !mode) return;
+    this._teeSheetDraft = teeSheetManage.setTimeMode(this._teeSheetDraft, mode);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetUnifiedTimeChange(e) {
+    const idx = Number(e.detail && e.detail.value);
+    const timeOptions = this.data.teeSheetTimeOptions || [];
+    const t = timeOptions[idx];
+    if (!t || !this._teeSheetDraft) return;
+    this._teeSheetDraft = teeSheetManage.setUnifiedTime(this._teeSheetDraft, t);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetIntervalInput(e) {
+    const raw = e && e.detail ? String(e.detail.value || '') : '';
+    this.setData({ teeSheetManageIntervalInput: raw });
+  },
+
+  onTeeSheetIntervalBlur() {
+    if (!this._teeSheetDraft) return;
+    const n = teeSheetManage.normalizeIntervalMinutes(this.data.teeSheetManageIntervalInput);
+    this._teeSheetDraft = teeSheetManage.setIntervalMinutes(this._teeSheetDraft, n);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetHoleModeTap(e) {
+    const mode = String((e.currentTarget.dataset && e.currentTarget.dataset.mode) || '');
+    if (!this._teeSheetDraft || !mode) return;
+    this._teeSheetDraft = teeSheetManage.setHoleMode(this._teeSheetDraft, mode);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetGroupTimeChange(e) {
+    const idx = Number(e.currentTarget.dataset && e.currentTarget.dataset.index);
+    const timeIdx = Number(e.detail && e.detail.value);
+    const timeOptions = this.data.teeSheetTimeOptions || [];
+    const t = timeOptions[timeIdx];
+    if (!this._teeSheetDraft || !t || !Number.isFinite(idx)) return;
+    this._teeSheetDraft = teeSheetManage.setGroupTeeTime(this._teeSheetDraft, idx, t);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetGroupHoleChange(e) {
+    const idx = Number(e.currentTarget.dataset && e.currentTarget.dataset.index);
+    const holeIdx = Number(e.detail && e.detail.value);
+    const hole = holeIdx + 1;
+    if (!this._teeSheetDraft || !Number.isFinite(idx)) return;
+    this._teeSheetDraft = teeSheetManage.setGroupStartHole(this._teeSheetDraft, idx, hole);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  saveTeeSheetManageSheet() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || !this._teeSheetDraft) {
+      this.closeTeeSheetManageSheet();
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    if (!this._teeSheetDraft.hasGroups) {
+      this.closeTeeSheetManageSheet();
+      return;
+    }
+    const result = teeSheetManage.commitTeeSheetDraft(match, this._teeSheetDraft);
+    if (!result || !result.ok) {
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+    teamMatchStore.saveMatch(match);
+    this.closeTeeSheetManageSheet();
+    // 用刚写入的 match 立即刷新分组卡 + 出发表（避免仅关弹屏不回显）
+    this._refreshTeeSheetDisplayFromMatch(match);
+    wx.showToast({ title: '出发安排已保存', icon: 'success' });
+  },
+
+  /** 出发管理保存后：同步 groupsTabCards / teeGroups */
+  _refreshTeeSheetDisplayFromMatch(match) {
+    if (!match) {
+      this.refreshMatchData(this.data.matchId);
+      this.refreshGroupsDerived();
+      return;
+    }
+    const teeGroups = Array.isArray(match.groups) && match.groups.length
+      ? teeSheetManage.buildTeeSheetTabView(match, {
+          playerLookup: this._buildGroupPlayerLookup(match),
+          source: 'match'
+        })
+      : [];
+    this.setData(
+      Object.assign(this._buildGroupsTabStatePatch(match), {
+        teeGroups: teeGroups
+      })
+    );
   },
 
   toggleAdminQrExpanded() {

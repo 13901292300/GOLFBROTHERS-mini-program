@@ -1027,8 +1027,6 @@ v0.5.13-half-editor-register-sticky-fixes
 - 报名 TAB 改为：TAB 先吸顶，再按内容是否溢出决定是否锁定
 - 移除报名 TAB 固定 7 人阈值逻辑
 
-
-
 v0.5.14-qr-permission-management
 
 - 新增权限管理底部弹屏
@@ -1043,3 +1041,18 @@ v0.5.14-qr-permission-management
 - 新增手机号绑定拦截组件与二维码授权校验工具
 - 权限判断统一接入临时权限体系
 - 新增我的页面 HTML 原型目录
+
+
+
+v0.5.15-player-management-tools
+
+- 新增 M 面板「选手管理」
+- 新增 manage_players 权限
+- 支持管理本场选手比赛名、性别、分队
+- 性别仅支持男 / 女
+- 分队使用选择器，支持大量分队
+- 删除选手复用取消报名清理逻辑，清理 groups / pairings
+- 选手列表支持搜索、分队筛选、已分组 / 未分组筛选
+- 中文拼音首字母与英文首字母统一排序
+- 选手管理内显示完整手机号，点击可拨打
+- 手机号仅在选手管理内对 manage_players 权限人员可见

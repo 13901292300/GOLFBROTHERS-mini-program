@@ -26,6 +26,7 @@
 const STORAGE_KEY = 'gb_games_v1';
 const matchStatus = require('./matchStatus.js');
 const mockAvatars = require('./mockAvatars.js');
+const teeSheetManage = require('./teeSheetManage.js');
 
 // 当前登录用户（占位；接入真实账号体系后替换）
 const CURRENT_USER = {
@@ -161,12 +162,14 @@ function setGroupPlayerScores(gameId, groupIndex, playerId, scores, putts) {
     // 旧结构：写顶层
     game.scoresByPlayer = game.scoresByPlayer || {};
     game.scoresByPlayer[playerId] = { scores: (scores || []).slice(), putts: (putts || []).slice() };
+    teeSheetManage.inferStartHoleIfNeededForGameGroup(game);
   } else {
     const gi = groupIndex || 0;
     const grp = game.groups[gi];
     if (!grp) return null;
     grp.scoresByPlayer = grp.scoresByPlayer || {};
     grp.scoresByPlayer[playerId] = { scores: (scores || []).slice(), putts: (putts || []).slice() };
+    teeSheetManage.inferStartHoleIfNeededForGameGroup(grp);
   }
   list[idx] = game;
   _writeAll(list);

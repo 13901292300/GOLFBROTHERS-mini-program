@@ -20,6 +20,7 @@ const caddieScoringAccess = require('../../../utils/caddieScoringAccess.js');
 const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
 const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../utils/playerManage.js');
+const teeSheetManage = require('../../../utils/teeSheetManage.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -51,10 +52,10 @@ const FEATURES_COMMON = [
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
   { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
-  { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
-  { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
-  { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'manage_players', glyph: '👤', label: '选手管理', tone: '' },
+  { permission: 'manage_tee_sheet', glyph: '🚩', label: '出发管理', tone: '' },
+  { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
+  { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
   { permission: 'net_score', glyph: '🧩', label: '生成净杆', tone: '' },
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
@@ -282,6 +283,17 @@ Page({
     playerTeamPickOptions: [],
     playerManageFilterPickVisible: false,
     playerManageFilterPickOptions: [],
+    teeSheetManageSheetVisible: false,
+    teeSheetManageHasGroups: false,
+    teeSheetManageTimeMode: 'uniform',
+    teeSheetManageIntervalMinutes: 10,
+    teeSheetManageIntervalInput: '10',
+    teeSheetManageUnifiedTime: '08:00',
+    teeSheetManageUnifiedTimeIndex: 0,
+    teeSheetManageHoleMode: 'manual',
+    teeSheetManageGroups: [],
+    teeSheetTimeOptions: [],
+    teeSheetHoleLabels: [],
     featuresCommon: [],
     featuresPermission: [],
     featuresPermissionFooterPad: [],
@@ -598,10 +610,20 @@ Page({
 
   // 分组表 / 游戏：组卡片（球员列表 + 状态 + 进入记分）
   _buildGroupCards(game) {
-    return groupsStore.buildGameTeeSheetView(game).map((card) => ({
-      ...card,
-      statusText: matchStatus.getMatchStatusLabelZh(card.statusKey)
-    }));
+    const matchTeeTime = teeSheetManage.resolveMatchTeeTime(game);
+    return groupsStore.buildGameTeeSheetView(game).map((card) => {
+      const teeTime = teeSheetManage.resolveGroupTeeTime(card) || matchTeeTime;
+      const startHole = teeSheetManage.resolveGroupStartHole(card);
+      return Object.assign({}, card, {
+        statusText: matchStatus.getMatchStatusLabelZh(card.statusKey),
+        time: teeTime || '待设置',
+        hole: startHole != null ? startHole + '号洞' : '待分配',
+        teeTime: teeTime,
+        startHole: startHole,
+        teeMetaLine: teeSheetManage.formatTeeMetaLine(teeTime, startHole),
+        hasTeeInfo: !!(teeTime || startHole != null)
+      });
+    });
   },
 
   // ===== 吸顶（与赛事详情页一致） =====
@@ -808,6 +830,11 @@ Page({
     if (permission === 'manage_players' || permission === 'players') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this.openPlayerManageSheet();
+      return;
+    }
+    if (permission === 'manage_tee_sheet' || permission === 'tee_management') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.openTeeSheetManageSheet();
       return;
     }
     wx.showToast({ title: '功能开发中', icon: 'none' });
@@ -1274,6 +1301,176 @@ Page({
     this.closePlayerManageSheet();
     if (typeof this.refreshGame === 'function') this.refreshGame();
     wx.showToast({ title: '选手信息已保存', icon: 'success' });
+  },
+
+  /* ===== 出发管理（组级 teeTime / startHole，draft 机制） ===== */
+  _canOpenTeeSheetManage(game) {
+    const user = gameStore.getCurrentUser() || {};
+    return teeSheetManage.canManageTeeSheet(
+      game,
+      user.userId,
+      !!(MORE_ACCESS && MORE_ACCESS.isPrivilegedUser)
+    );
+  },
+
+  openTeeSheetManageSheet() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    if (!this._canOpenTeeSheetManage(game)) {
+      wx.showToast({ title: '暂无出发管理权限', icon: 'none' });
+      return;
+    }
+    const timeOptions = teeSheetManage.buildTimeOptions();
+    const holeOpts = teeSheetManage.buildHoleOptions();
+    const draft = teeSheetManage.buildTeeSheetDraft(game, {});
+    this._teeSheetDraft = draft;
+    this.setData(
+      {
+        teeSheetManageSheetVisible: true,
+        teeSheetTimeOptions: timeOptions,
+        teeSheetHoleLabels: holeOpts.map((h) => h.label)
+      },
+      () => this._syncTeeSheetManageDisplay()
+    );
+  },
+
+  _syncTeeSheetManageDisplay(extra) {
+    const draft = this._teeSheetDraft;
+    if (!draft) return;
+    const timeOptions = this.data.teeSheetTimeOptions || teeSheetManage.buildTimeOptions();
+    let unifiedIdx = timeOptions.indexOf(draft.unifiedTime);
+    if (unifiedIdx < 0) unifiedIdx = timeOptions.indexOf('08:00');
+    if (unifiedIdx < 0) unifiedIdx = 0;
+    const groups = (draft.groups || []).map((g, index) => {
+      let timeIdx = timeOptions.indexOf(g.teeTime);
+      if (timeIdx < 0) timeIdx = 0;
+      const holeIdx =
+        g.startHole != null && g.startHole >= 1 && g.startHole <= 18
+          ? g.startHole - 1
+          : 0;
+      return Object.assign({}, g, {
+        index: index,
+        timeIndex: timeIdx,
+        holeIndex: holeIdx
+      });
+    });
+    this.setData(
+      Object.assign(
+        {
+          teeSheetManageHasGroups: !!draft.hasGroups,
+          teeSheetManageTimeMode: draft.timeMode,
+          teeSheetManageIntervalMinutes: draft.intervalMinutes,
+          teeSheetManageIntervalInput: String(draft.intervalMinutes),
+          teeSheetManageUnifiedTime: draft.unifiedTime,
+          teeSheetManageUnifiedTimeIndex: unifiedIdx,
+          teeSheetManageHoleMode: draft.holeMode,
+          teeSheetManageGroups: groups
+        },
+        extra || {}
+      )
+    );
+  },
+
+  closeTeeSheetManageSheet() {
+    this._teeSheetDraft = null;
+    this.setData({
+      teeSheetManageSheetVisible: false,
+      teeSheetManageHasGroups: false,
+      teeSheetManageGroups: []
+    });
+  },
+
+  cancelTeeSheetManageSheet() {
+    this.closeTeeSheetManageSheet();
+  },
+
+  onTeeSheetTimeModeTap(e) {
+    const mode = String((e.currentTarget.dataset && e.currentTarget.dataset.mode) || '');
+    if (!this._teeSheetDraft || !mode) return;
+    this._teeSheetDraft = teeSheetManage.setTimeMode(this._teeSheetDraft, mode);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetUnifiedTimeChange(e) {
+    const idx = Number(e.detail && e.detail.value);
+    const timeOptions = this.data.teeSheetTimeOptions || [];
+    const t = timeOptions[idx];
+    if (!t || !this._teeSheetDraft) return;
+    this._teeSheetDraft = teeSheetManage.setUnifiedTime(this._teeSheetDraft, t);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetIntervalInput(e) {
+    const raw = e && e.detail ? String(e.detail.value || '') : '';
+    this.setData({ teeSheetManageIntervalInput: raw });
+  },
+
+  onTeeSheetIntervalBlur() {
+    if (!this._teeSheetDraft) return;
+    const n = teeSheetManage.normalizeIntervalMinutes(this.data.teeSheetManageIntervalInput);
+    this._teeSheetDraft = teeSheetManage.setIntervalMinutes(this._teeSheetDraft, n);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetHoleModeTap(e) {
+    const mode = String((e.currentTarget.dataset && e.currentTarget.dataset.mode) || '');
+    if (!this._teeSheetDraft || !mode) return;
+    this._teeSheetDraft = teeSheetManage.setHoleMode(this._teeSheetDraft, mode);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetGroupTimeChange(e) {
+    const idx = Number(e.currentTarget.dataset && e.currentTarget.dataset.index);
+    const timeIdx = Number(e.detail && e.detail.value);
+    const timeOptions = this.data.teeSheetTimeOptions || [];
+    const t = timeOptions[timeIdx];
+    if (!this._teeSheetDraft || !t || !Number.isFinite(idx)) return;
+    this._teeSheetDraft = teeSheetManage.setGroupTeeTime(this._teeSheetDraft, idx, t);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  onTeeSheetGroupHoleChange(e) {
+    const idx = Number(e.currentTarget.dataset && e.currentTarget.dataset.index);
+    const holeIdx = Number(e.detail && e.detail.value);
+    const hole = holeIdx + 1;
+    if (!this._teeSheetDraft || !Number.isFinite(idx)) return;
+    this._teeSheetDraft = teeSheetManage.setGroupStartHole(this._teeSheetDraft, idx, hole);
+    this._syncTeeSheetManageDisplay();
+  },
+
+  saveTeeSheetManageSheet() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId || !this._teeSheetDraft) {
+      this.closeTeeSheetManageSheet();
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    if (!this._teeSheetDraft.hasGroups) {
+      this.closeTeeSheetManageSheet();
+      return;
+    }
+    const result = teeSheetManage.commitTeeSheetDraft(game, this._teeSheetDraft);
+    if (!result || !result.ok) {
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+    gameStore.saveGame(game);
+    this.closeTeeSheetManageSheet();
+    // 立即用已保存 game 刷新分组卡展示
+    if (typeof this.refreshGame === 'function') this.refreshGame();
+    wx.showToast({ title: '出发安排已保存', icon: 'success' });
   },
 
   toggleAdminQrExpanded() {

@@ -47,33 +47,42 @@ function buildRegisterPlayerLookup(registerInfo) {
 /** 编辑草稿：从报名名单补齐展示字段（不写回正式 groups） */
 function hydrateDraftPlayers(list, registerInfo) {
   const lookup = buildRegisterPlayerLookup(registerInfo);
-  return (Array.isArray(list) ? list : []).map((g, index) => ({
-    groupId: g && g.groupId != null ? String(g.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)),
-    groupName: g && g.groupName ? String(g.groupName) : ('第' + (index + 1) + '组'),
-    players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
-      const position = i + 1;
-      const found = Array.isArray(g && g.players)
-        ? g.players.find((p) => Number(p && p.position) === position)
-        : null;
-      if (!found || !found.userId) return createEmptyGroupPlayer(position);
-      const userId = String(found.userId);
-      const src = lookup[userId] || {};
-      const gender = src.gender || found.gender || playerDirectory.getGenderById(userId, '');
-      const teeRaw = found.tee || src.tee || tPosition.defaultFromGender(gender);
-      const tee = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
-      return {
-        position: position,
-        userId: userId,
-        avatar: src.avatar || (found.avatar ? String(found.avatar) : '') || '',
-        displayName: src.displayName
-          || (found.displayName ? String(found.displayName) : '')
-          || (found.competitionName ? String(found.competitionName) : '')
-          || '',
-        gender: gender,
-        tee: tee
-      };
-    })
-  }));
+  return (Array.isArray(list) ? list : []).map((g, index) => {
+    const out = {
+      groupId: g && g.groupId != null ? String(g.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)),
+      groupName: g && g.groupName ? String(g.groupName) : ('第' + (index + 1) + '组'),
+      players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
+        const position = i + 1;
+        const found = Array.isArray(g && g.players)
+          ? g.players.find((p) => Number(p && p.position) === position)
+          : null;
+        if (!found || !found.userId) return createEmptyGroupPlayer(position);
+        const userId = String(found.userId);
+        const src = lookup[userId] || {};
+        const gender = src.gender || found.gender || playerDirectory.getGenderById(userId, '');
+        const teeRaw = found.tee || src.tee || tPosition.defaultFromGender(gender);
+        const tee = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
+        return {
+          position: position,
+          userId: userId,
+          avatar: src.avatar || (found.avatar ? String(found.avatar) : '') || '',
+          displayName: src.displayName
+            || (found.displayName ? String(found.displayName) : '')
+            || (found.competitionName ? String(found.competitionName) : '')
+            || '',
+          gender: gender,
+          tee: tee
+        };
+      })
+    };
+    const teeTime = g && g.teeTime != null ? String(g.teeTime).trim() : '';
+    if (teeTime) out.teeTime = teeTime;
+    const startHole = Number(g && g.startHole);
+    if (Number.isFinite(startHole) && startHole >= 1 && startHole <= 18) {
+      out.startHole = Math.floor(startHole);
+    }
+    return out;
+  });
 }
 
 function cloneTournamentGroups(list) {
@@ -101,21 +110,30 @@ function cloneTournamentGroups(list) {
   }));
 }
 
-/** 正式 groups：只保存 position + userId（位号保留，含空位） */
+/** 正式 groups：只保存 position + userId（位号保留，含空位）；保留 teeTime / startHole */
 function toFormalGroups(list) {
   if (!Array.isArray(list)) return [];
-  return list.map((g, index) => ({
-    groupId: g && g.groupId != null ? String(g.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)),
-    groupName: g && g.groupName ? String(g.groupName) : ('第' + (index + 1) + '组'),
-    players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
-      const position = i + 1;
-      const found = Array.isArray(g && g.players)
-        ? g.players.find((p) => Number(p && p.position) === position)
-        : null;
-      const userId = found && found.userId ? String(found.userId).trim() : '';
-      return { position: position, userId: userId };
-    })
-  }));
+  return list.map((g, index) => {
+    const out = {
+      groupId: g && g.groupId != null ? String(g.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)),
+      groupName: g && g.groupName ? String(g.groupName) : ('第' + (index + 1) + '组'),
+      players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
+        const position = i + 1;
+        const found = Array.isArray(g && g.players)
+          ? g.players.find((p) => Number(p && p.position) === position)
+          : null;
+        const userId = found && found.userId ? String(found.userId).trim() : '';
+        return { position: position, userId: userId };
+      })
+    };
+    const teeTime = g && g.teeTime != null ? String(g.teeTime).trim() : '';
+    if (teeTime) out.teeTime = teeTime;
+    const startHole = Number(g && g.startHole);
+    if (Number.isFinite(startHole) && startHole >= 1 && startHole <= 18) {
+      out.startHole = Math.floor(startHole);
+    }
+    return out;
+  });
 }
 
 function hasFormalGroups(match) {
@@ -848,7 +866,12 @@ Page({
     const sanitized = this._sanitizeGroupDraft(rawDraft);
     const isClear = sanitized.length === 0;
     // 正式 groups 只持久化 position + userId；展示字段由详情页 hydrate
-    const formal = isClear ? [] : toFormalGroups(sanitized);
+    // 按 groupId 合并保留已有出发信息（teeTime / startHole）
+    const teeSheetManage = require('../../../utils/teeSheetManage.js');
+    let formal = isClear ? [] : toFormalGroups(sanitized);
+    if (!isClear) {
+      formal = teeSheetManage.mergeTeeFieldsByGroupId(match.groups, formal);
+    }
 
     let formalPairings = {};
     if (!isClear && this.data.showPairingSection) {

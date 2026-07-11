@@ -2237,3 +2237,133 @@ page {
   z-index: 240;
 }
 
+/* ===== 出发管理弹屏 ===== */
+.tee-sheet-manage-sheet {
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  z-index: 220;
+}
+.tee-sheet-manage-sheet__body {
+  flex: 1;
+  min-height: 0;
+  height: 0;
+  padding: 0 0 16rpx;
+  box-sizing: border-box;
+}
+.tee-sheet-manage-sheet__footer {
+  flex-shrink: 0;
+}
+.tee-sheet-manage-empty {
+  padding: 80rpx 24rpx;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.tee-sheet-manage-config {
+  margin-bottom: 24rpx;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.tee-sheet-manage-config__title {
+  display: block;
+  margin-bottom: 16rpx;
+  color: var(--text-primary);
+  font-size: 26rpx;
+  font-weight: 800;
+}
+.tee-sheet-manage-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+.tee-sheet-manage-radio {
+  padding: 14rpx 22rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.tee-sheet-manage-radio.is-active {
+  border-color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00aeef);
+  background: rgba(0, 174, 239, 0.08);
+}
+.tee-sheet-manage-field {
+  margin-top: 16rpx;
+}
+.tee-sheet-manage-field--interval {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.tee-sheet-manage-field__label {
+  display: block;
+  margin-bottom: 8rpx;
+  color: var(--text-muted);
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.tee-sheet-manage-field--interval .tee-sheet-manage-field__label {
+  margin-bottom: 0;
+}
+.tee-sheet-manage-picker {
+  height: 80rpx;
+  padding: 0 20rpx;
+  border-radius: 12rpx;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.tee-sheet-manage-interval-input {
+  width: 120rpx;
+  height: 72rpx;
+  padding: 0 12rpx;
+  border-radius: 12rpx;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 800;
+  text-align: center;
+  box-sizing: border-box;
+}
+.tee-sheet-manage-group {
+  margin-bottom: 20rpx;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.tee-sheet-manage-group__name {
+  display: block;
+  color: var(--text-primary);
+  font-size: 30rpx;
+  font-weight: 800;
+}
+.tee-sheet-manage-group__players {
+  display: block;
+  margin-top: 8rpx;
+  margin-bottom: 4rpx;
+  color: var(--text-secondary);
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+

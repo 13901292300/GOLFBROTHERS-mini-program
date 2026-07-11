@@ -85,6 +85,7 @@ const TOURNAMENT_SEED = [
 ];
 
 const matchStatus = require('./matchStatus');
+const teeSheetManage = require('./teeSheetManage.js');
 
 function isFilledScore(s) {
   return matchStatus.isFilledScore(s);
@@ -192,6 +193,7 @@ function syncGroupFromScoring(groupId, playersSource) {
       hole.diff = isFilledScore(hole.score) ? hole.score - HOLE_PARS[hi] : null;
     });
   });
+  teeSheetManage.inferStartHoleIfNeededForGroupsStoreGroup(group);
   return true;
 }
 
@@ -333,7 +335,9 @@ function buildGameTeeSheetView(game) {
       statusKey: ms.statusKey,
       matchStatus: ms.status,
       playerCount: players.length,
-      players: players
+      players: players,
+      teeTime: grp.teeTime || '',
+      startHole: grp.startHole != null ? grp.startHole : null
     };
   });
 }
@@ -343,11 +347,16 @@ function getTeeGroupsView() {
   const tPositionUtil = require('./tPosition');
   return getGroups().map((g) => {
     const ms = matchStatus.getMatchStatus(g, { source: 'groups' });
+    const teeTime = teeSheetManage.resolveGroupTeeTime(g);
+    const startHole = teeSheetManage.resolveGroupStartHole(g);
     return {
       id: g.groupId,
       badge: g.groupName,
-      time: g.time,
-      hole: g.hole,
+      time: teeTime || g.time,
+      hole: startHole != null ? startHole + '号洞' : '待分配',
+      teeTime: teeTime || g.time,
+      startHole: startHole,
+      teeMetaLine: teeSheetManage.formatTeeMetaLine(teeTime || g.time, startHole),
       status: g.status,
       statusBadge: ms.statusBadge,
       statusKey: ms.statusKey,
