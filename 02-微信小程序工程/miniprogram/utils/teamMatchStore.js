@@ -166,13 +166,35 @@ function normalizeRegisterUser(user) {
   return {
     userId: userId,
     nickname: nickname,
-    competitionName: competitionName,
+    competitionName: competitionName || (raw.matchNickname != null ? String(raw.matchNickname) : ''),
+    matchNickname:
+      raw.matchNickname != null && String(raw.matchNickname).trim() !== ''
+        ? String(raw.matchNickname).trim()
+        : competitionName,
     gender: raw.gender != null ? String(raw.gender) : '',
+    matchGender:
+      raw.matchGender != null && String(raw.matchGender).trim() !== ''
+        ? String(raw.matchGender).trim()
+        : raw.gender != null
+          ? String(raw.gender)
+          : '',
     handicap: raw.handicap != null ? raw.handicap : '',
     avatar: raw.avatar != null ? String(raw.avatar) : '',
     phone: raw.phone != null ? String(raw.phone) : '',
     groupId: raw.groupId != null ? raw.groupId : '',
     groupName: raw.groupName != null ? String(raw.groupName) : '',
+    matchTeamId:
+      raw.matchTeamId != null && String(raw.matchTeamId).trim() !== ''
+        ? String(raw.matchTeamId).trim()
+        : raw.groupId != null
+          ? String(raw.groupId)
+          : '',
+    matchTeamName:
+      raw.matchTeamName != null && String(raw.matchTeamName).trim() !== ''
+        ? String(raw.matchTeamName).trim()
+        : raw.groupName != null
+          ? String(raw.groupName)
+          : '',
     registeredAt: raw.registeredAt != null ? raw.registeredAt : '',
     source: source,
     registeredBy: registeredBy,
@@ -466,11 +488,16 @@ function isUserInFormalGroups(match, userId) {
   const uid = String(userId || '').trim();
   if (!uid || !match || !Array.isArray(match.groups)) return false;
   for (let i = 0; i < match.groups.length; i++) {
-    const players = match.groups[i] && Array.isArray(match.groups[i].players)
-      ? match.groups[i].players
-      : [];
-    for (let j = 0; j < players.length; j++) {
-      if (resolveGroupSlotPlayerId(players[j]) === uid) return true;
+    const g = match.groups[i];
+    if (!g) continue;
+    const lists = [];
+    if (Array.isArray(g.players)) lists.push(g.players);
+    if (Array.isArray(g.playersSlots)) lists.push(g.playersSlots);
+    for (let li = 0; li < lists.length; li++) {
+      const players = lists[li];
+      for (let j = 0; j < players.length; j++) {
+        if (resolveGroupSlotPlayerId(players[j]) === uid) return true;
+      }
     }
   }
   return false;

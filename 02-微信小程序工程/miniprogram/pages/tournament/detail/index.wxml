@@ -750,6 +750,7 @@
     <view class="register-sheet__field">
       <text class="register-sheet__label">手机号</text>
       <view class="register-sheet__readonly">{{registerPhone || '未绑定手机号'}}</view>
+      <text class="register-sheet__hint">手机号仅用于本场赛事组织者联系、报名确认、出发安排等赛事管理用途，不会公开展示。</text>
     </view>
 
     <view class="register-sheet__actions">
@@ -976,4 +977,192 @@
     bind:cancel="onPhoneBindSheetCancel"
     bind:success="onPhoneBindSheetSuccess"
   />
+
+  <!-- 选手管理（本场报名快照） -->
+  <view wx:if="{{playerManageSheetVisible}}" bindtap="cancelPlayerManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view wx:if="{{playerManageSheetVisible}}" class="bottom-sheet register-sheet player-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">PLAYERS</text>
+      <text class="register-sheet__title">选手管理</text>
+      <text class="register-sheet__sub">仅修改本场比赛中的选手信息，不会同步修改用户资料。手机号仅用于本场赛事组织者联系、报名确认、出发安排等赛事管理用途。</text>
+    </view>
+    <view class="player-manage-sheet__toolbar">
+      <view class="player-manage-search">
+        <input
+          class="player-manage-search__input"
+          value="{{playerManageSearchKeyword}}"
+          placeholder="搜索选手姓名 / 昵称 / 手机号"
+          placeholder-class="player-manage-search__ph"
+          confirm-type="search"
+          bindinput="onPlayerManageSearchInput"
+        />
+        <view
+          wx:if="{{playerManageSearchKeyword}}"
+          class="player-manage-search__clear"
+          bindtap="clearPlayerManageSearch"
+        >×</view>
+      </view>
+      <view class="player-manage-team-select player-manage-filter-select" bindtap="openPlayerManageFilterPicker">
+        <text class="player-manage-team-select__value">{{playerManageTeamFilterLabel || '全部分队'}}</text>
+        <text class="player-manage-team-select__arrow">›</text>
+      </view>
+      <view class="player-manage-status-tabs">
+        <view
+          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'all' ? 'is-active' : ''}}"
+          data-status="all"
+          bindtap="onPlayerManageGroupStatusTap"
+        >全部</view>
+        <view
+          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'grouped' ? 'is-active' : ''}}"
+          data-status="grouped"
+          bindtap="onPlayerManageGroupStatusTap"
+        >已分组</view>
+        <view
+          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'ungrouped' ? 'is-active' : ''}}"
+          data-status="ungrouped"
+          bindtap="onPlayerManageGroupStatusTap"
+        >未分组</view>
+      </view>
+      <text wx:if="{{playerManageCountTip}}" class="player-manage-sheet__count">{{playerManageCountTip}}</text>
+    </view>
+    <scroll-view scroll-y class="player-manage-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view wx:if="{{!playerManageDisplayUsers.length}}" class="player-manage-sheet__empty">{{playerManageEmptyText}}</view>
+      <view
+        wx:for="{{playerManageDisplayUsers}}"
+        wx:key="userId"
+        class="player-manage-row"
+      >
+        <view
+          class="player-manage-row__head"
+          data-userid="{{item.userId}}"
+          bindtap="togglePlayerManageExpand"
+        >
+          <image class="player-manage-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view class="player-manage-row__meta">
+            <view class="player-manage-row__name-row">
+              <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
+              <text class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
+            </view>
+            <view class="player-manage-row__sub">
+              <text
+                class="player-manage-row__phone {{item.hasPhone ? 'is-callable' : ''}}"
+                data-userid="{{item.userId}}"
+                data-phone="{{item.phone}}"
+                catchtap="onPlayerManageCallPhone"
+              >{{item.phone || '暂无手机号'}}</text>
+              <text class="player-manage-row__sub-rest"> · {{item.matchGenderLabel || '男'}}{{item.matchTeamName ? ' · ' + item.matchTeamName : ''}}</text>
+            </view>
+          </view>
+          <text class="player-manage-row__expand {{item.expanded ? 'is-open' : ''}}">›</text>
+        </view>
+        <view wx:if="{{item.expanded}}" class="player-manage-row__body">
+          <text class="register-sheet__label">比赛名</text>
+          <input
+            class="player-manage-row__input"
+            maxlength="20"
+            placeholder="请输入本场比赛名"
+            value="{{item.matchNickname}}"
+            data-userid="{{item.userId}}"
+            bindinput="onPlayerManageNicknameInput"
+          />
+          <text class="register-sheet__label player-manage-row__label-gap">手机号</text>
+          <view class="player-manage-phone-row">
+            <text
+              class="player-manage-phone-row__value {{item.hasPhone ? 'is-callable' : ''}}"
+              data-userid="{{item.userId}}"
+              data-phone="{{item.phone}}"
+              catchtap="onPlayerManageCallPhone"
+            >{{item.phoneDisplay}}</text>
+            <view
+              class="player-manage-phone-row__copy"
+              data-userid="{{item.userId}}"
+              data-phone="{{item.phone}}"
+              catchtap="onPlayerManageCopyPhone"
+            >复制手机号</view>
+          </view>
+          <text class="register-sheet__label player-manage-row__label-gap">性别</text>
+          <view class="register-sheet__groups">
+            <view
+              wx:for="{{item.genderOptions}}"
+              wx:for-item="g"
+              wx:key="key"
+              class="register-sheet__group {{g.selected ? 'register-sheet__group--active' : ''}}"
+              data-userid="{{item.userId}}"
+              data-gender="{{g.key}}"
+              bindtap="onPlayerManageGenderTap"
+            >{{g.label}}</view>
+          </view>
+          <text class="register-sheet__label player-manage-row__label-gap">分队</text>
+          <view
+            class="player-manage-team-select"
+            data-userid="{{item.userId}}"
+            bindtap="openPlayerManageTeamPicker"
+          >
+            <text class="player-manage-team-select__value">{{item.matchTeamName}}</text>
+            <text class="player-manage-team-select__arrow">›</text>
+          </view>
+          <view
+            class="player-manage-row__remove"
+            data-userid="{{item.userId}}"
+            bindtap="onPlayerManageRemove"
+          >删除选手</view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions player-manage-sheet__footer">
+      <view bindtap="cancelPlayerManageSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="savePlayerManageSheet" class="register-sheet__confirm">保存</view>
+    </view>
+  </view>
+
+  <!-- 选手管理 · 分队筛选 -->
+  <view wx:if="{{playerManageFilterPickVisible}}" bindtap="closePlayerManageFilterPicker" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{playerManageFilterPickVisible}}" class="bottom-sheet register-sheet player-team-pick-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">FILTER</text>
+      <text class="register-sheet__title">筛选分队</text>
+    </view>
+    <scroll-view scroll-y class="player-team-pick-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view
+        wx:for="{{playerManageFilterPickOptions}}"
+        wx:key="optionKey"
+        class="player-team-pick-item {{item.selected ? 'is-selected' : ''}}"
+        data-filter="{{item.optionKey}}"
+        bindtap="onPlayerManageFilterPick"
+      >
+        <text class="player-team-pick-item__name">{{item.name}}</text>
+        <text wx:if="{{item.selected}}" class="player-team-pick-item__check">✓</text>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions">
+      <view bindtap="closePlayerManageFilterPicker" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
+
+  <!-- 选手管理 · 选择分队 -->
+  <view wx:if="{{playerTeamPickVisible}}" bindtap="closePlayerManageTeamPicker" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{playerTeamPickVisible}}" class="bottom-sheet register-sheet player-team-pick-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">TEAM</text>
+      <text class="register-sheet__title">选择分队</text>
+    </view>
+    <scroll-view scroll-y class="player-team-pick-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view
+        wx:for="{{playerTeamPickOptions}}"
+        wx:key="id"
+        class="player-team-pick-item {{item.selected ? 'is-selected' : ''}}"
+        data-teamid="{{item.id}}"
+        bindtap="onPlayerManageTeamPick"
+      >
+        <text class="player-team-pick-item__name">{{item.name}}</text>
+        <text wx:if="{{item.selected}}" class="player-team-pick-item__check">✓</text>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions">
+      <view bindtap="closePlayerManageTeamPicker" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
 </view>

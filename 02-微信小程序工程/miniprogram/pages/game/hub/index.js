@@ -19,6 +19,7 @@ const tempAdminPermission = require('../../../utils/tempAdminPermission.js');
 const caddieScoringAccess = require('../../../utils/caddieScoringAccess.js');
 const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
 const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
+const playerManage = require('../../../utils/playerManage.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -53,7 +54,7 @@ const FEATURES_PERMISSION = [
   { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
   { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
-  { permission: 'players', glyph: '⚙️', label: '选手管理', tone: '' },
+  { permission: 'manage_players', glyph: '👤', label: '选手管理', tone: '' },
   { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
   { permission: 'net_score', glyph: '🧩', label: '生成净杆', tone: '' },
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
@@ -266,6 +267,21 @@ Page({
     phoneBindSheetVisible: false,
     phoneBindEntryType: 'admin_qr',
     phoneBindHint: '',
+    playerManageSheetVisible: false,
+    playerManageDisplayUsers: [],
+    playerManageTeamOptions: [],
+    playerManageSearchKeyword: '',
+    playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
+    playerManageTeamFilterLabel: '全部分队',
+    playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
+    playerManageCountTip: '',
+    playerManageEmptyText: '暂无报名选手',
+    expandedPlayerManageUserId: '',
+    playerTeamPickVisible: false,
+    playerTeamPickUserId: '',
+    playerTeamPickOptions: [],
+    playerManageFilterPickVisible: false,
+    playerManageFilterPickOptions: [],
     featuresCommon: [],
     featuresPermission: [],
     featuresPermissionFooterPad: [],
@@ -789,6 +805,11 @@ Page({
       this.openTempAdminSheet();
       return;
     }
+    if (permission === 'manage_players' || permission === 'players') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.openPlayerManageSheet();
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
   },
 
@@ -869,6 +890,390 @@ Page({
       caddieManageSheetVisible: false,
       caddieManageTarget: null
     });
+  },
+
+  _canOpenPlayerManage(game) {
+    const user = gameStore.getCurrentUser() || {};
+    return playerManage.canManagePlayers(
+      game,
+      user.userId,
+      !!(MORE_ACCESS && MORE_ACCESS.isPrivilegedUser)
+    );
+  },
+
+  openPlayerManageSheet() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    if (!this._canOpenPlayerManage(game)) {
+      wx.showToast({ title: '暂无选手管理权限', icon: 'none' });
+      return;
+    }
+    if (this._playerManageSearchTimer) {
+      clearTimeout(this._playerManageSearchTimer);
+      this._playerManageSearchTimer = null;
+    }
+    let scratch = game;
+    try {
+      scratch = JSON.parse(JSON.stringify(game));
+    } catch (e) {
+      scratch = game;
+    }
+    playerManage.ensureRegisterUsersFromGroups(scratch);
+    const draft = playerManage.buildPlayerManageDraft(scratch);
+    this._playerManageDraft = draft;
+    this.setData(
+      {
+        playerManageSheetVisible: true,
+        playerManageTeamOptions: draft.teamOptions || [],
+        playerManageSearchKeyword: '',
+        playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
+        playerManageTeamFilterLabel: '全部分队',
+        playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
+        expandedPlayerManageUserId: '',
+        playerTeamPickVisible: false,
+        playerManageFilterPickVisible: false
+      },
+      () => this._syncPlayerManageDisplay()
+    );
+  },
+
+  _syncPlayerManageDisplay(extra) {
+    const draft = this._playerManageDraft;
+    const view = playerManage.buildPlayerManageDisplay(draft ? draft.players : [], {
+      keyword: this.data.playerManageSearchKeyword,
+      teamFilter: this.data.playerManageTeamFilter,
+      groupStatusFilter: this.data.playerManageGroupStatusFilter,
+      groups: draft ? draft.groupsDraft : [],
+      expandedUserId: this.data.expandedPlayerManageUserId
+    });
+    this.setData(
+      Object.assign(
+        {
+          playerManageDisplayUsers: view.list,
+          playerManageCountTip: view.countTip,
+          playerManageEmptyText: view.emptyText
+        },
+        extra || {}
+      )
+    );
+  },
+
+  _patchPlayerManageDraft(userId, patch) {
+    if (!this._playerManageDraft || !userId) return;
+    this._playerManageDraft.players = playerManage.updatePlayerField(
+      this._playerManageDraft.players,
+      userId,
+      patch,
+      this.data.playerManageTeamOptions
+    );
+    this._syncPlayerManageDisplay();
+  },
+
+  closePlayerManageSheet() {
+    if (this._playerManageSearchTimer) {
+      clearTimeout(this._playerManageSearchTimer);
+      this._playerManageSearchTimer = null;
+    }
+    this._playerManageDraft = null;
+    this.setData({
+      playerManageSheetVisible: false,
+      playerManageDisplayUsers: [],
+      playerManageTeamOptions: [],
+      playerManageSearchKeyword: '',
+      playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
+      playerManageTeamFilterLabel: '全部分队',
+      playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
+      playerManageCountTip: '',
+      playerManageEmptyText: '暂无报名选手',
+      expandedPlayerManageUserId: '',
+      playerTeamPickVisible: false,
+      playerTeamPickUserId: '',
+      playerTeamPickOptions: [],
+      playerManageFilterPickVisible: false,
+      playerManageFilterPickOptions: []
+    });
+  },
+
+  cancelPlayerManageSheet() {
+    this.closePlayerManageSheet();
+  },
+
+  onPlayerManageSearchInput(e) {
+    const value = e && e.detail ? String(e.detail.value || '') : '';
+    this.setData({ playerManageSearchKeyword: value });
+    if (this._playerManageSearchTimer) {
+      clearTimeout(this._playerManageSearchTimer);
+    }
+    this._playerManageSearchTimer = setTimeout(() => {
+      this._playerManageSearchTimer = null;
+      this._syncPlayerManageDisplay();
+    }, 150);
+  },
+
+  clearPlayerManageSearch() {
+    if (this._playerManageSearchTimer) {
+      clearTimeout(this._playerManageSearchTimer);
+      this._playerManageSearchTimer = null;
+    }
+    this.setData({ playerManageSearchKeyword: '' }, () => this._syncPlayerManageDisplay());
+  },
+
+  openPlayerManageFilterPicker() {
+    const options = playerManage.buildTeamFilterOptions(
+      this.data.playerManageTeamOptions,
+      this.data.playerManageTeamFilter
+    );
+    this.setData({
+      playerManageFilterPickVisible: true,
+      playerManageFilterPickOptions: options,
+      playerTeamPickVisible: false
+    });
+  },
+
+  closePlayerManageFilterPicker() {
+    this.setData({
+      playerManageFilterPickVisible: false,
+      playerManageFilterPickOptions: []
+    });
+  },
+
+  onPlayerManageFilterPick(e) {
+    const key = String((e.currentTarget.dataset && e.currentTarget.dataset.filter) || '');
+    let filter = playerManage.TEAM_FILTER_ALL;
+    if (key && key !== playerManage.TEAM_FILTER_ALL) filter = key;
+    const label = playerManage.resolveTeamFilterLabel(
+      this.data.playerManageTeamOptions,
+      filter
+    );
+    this.setData(
+      {
+        playerManageTeamFilter: filter,
+        playerManageTeamFilterLabel: label,
+        playerManageFilterPickVisible: false,
+        playerManageFilterPickOptions: []
+      },
+      () => this._syncPlayerManageDisplay()
+    );
+  },
+
+  onPlayerManageGroupStatusTap(e) {
+    const status = String((e.currentTarget.dataset && e.currentTarget.dataset.status) || '');
+    if (
+      status !== playerManage.GROUP_STATUS_ALL &&
+      status !== playerManage.GROUP_STATUS_GROUPED &&
+      status !== playerManage.GROUP_STATUS_UNGROUPED
+    ) {
+      return;
+    }
+    if (String(this.data.playerManageGroupStatusFilter || '') === status) return;
+    this.setData({ playerManageGroupStatusFilter: status }, () =>
+      this._syncPlayerManageDisplay()
+    );
+  },
+
+  togglePlayerManageExpand(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId) return;
+    const next =
+      String(this.data.expandedPlayerManageUserId || '') === userId ? '' : userId;
+    this.setData(
+      {
+        expandedPlayerManageUserId: next,
+        playerTeamPickVisible: false,
+        playerManageFilterPickVisible: false
+      },
+      () => this._syncPlayerManageDisplay()
+    );
+  },
+
+  onPlayerManageNicknameInput(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    const value = e && e.detail ? String(e.detail.value || '') : '';
+    if (!userId) return;
+    this._patchPlayerManageDraft(userId, { matchNickname: value });
+  },
+
+  onPlayerManageCopyPhone(e) {
+    const phone = this._resolvePlayerManagePhone(e);
+    if (!phone) {
+      wx.showToast({ title: '暂无手机号', icon: 'none' });
+      return;
+    }
+    wx.setClipboardData({
+      data: phone,
+      success: () => {
+        wx.showToast({ title: '手机号已复制', icon: 'success' });
+      }
+    });
+  },
+
+  _resolvePlayerManagePhone(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    let phone = String(ds.phone || '').trim();
+    if (!phone && this._playerManageDraft) {
+      const userId = String(ds.userid || '');
+      const player = (this._playerManageDraft.players || []).find(
+        (p) => p && String(p.userId) === userId
+      );
+      phone = playerManage.resolvePhone(player) || (player && player.phone) || '';
+    }
+    return String(phone || '').trim();
+  },
+
+  /** 选手管理：点击手机号拨打（使用完整号码，catchtap 阻止展开冒泡） */
+  onPlayerManageCallPhone(e) {
+    const phone = this._resolvePlayerManagePhone(e);
+    this.callPlayerPhone(phone);
+  },
+
+  callPlayerPhone(phone) {
+    const raw = String(phone || '').trim();
+    if (!raw) {
+      wx.showToast({ title: '暂无手机号', icon: 'none' });
+      return;
+    }
+    const phoneNumber = raw.replace(/[^\d+]/g, '');
+    if (!phoneNumber) {
+      wx.showToast({ title: '暂无手机号', icon: 'none' });
+      return;
+    }
+    wx.makePhoneCall({
+      phoneNumber: phoneNumber,
+      fail: (err) => {
+        const msg = err && err.errMsg ? String(err.errMsg) : '';
+        if (msg.indexOf('cancel') >= 0 || msg.indexOf('取消') >= 0) return;
+        wx.showToast({ title: '无法拨打电话', icon: 'none' });
+      }
+    });
+  },
+
+  onPlayerManageGenderTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    const userId = String(ds.userid || '');
+    const gender = String(ds.gender || '');
+    if (!userId || !gender) return;
+    this._patchPlayerManageDraft(userId, { matchGender: gender });
+  },
+
+  openPlayerManageTeamPicker(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId || !this._playerManageDraft) return;
+    const player = (this._playerManageDraft.players || []).find(
+      (p) => p && String(p.userId) === userId
+    );
+    const currentId = player ? String(player.matchTeamId || '') : '';
+    const options = (this.data.playerManageTeamOptions || [])
+      .filter(
+        (t) =>
+          t &&
+          String(t.id != null ? t.id : '').trim() &&
+          !playerManage.isPlaceholderTeamLabel(t.name)
+      )
+      .map((t) => ({
+        id: String(t.id != null ? t.id : ''),
+        name: t.name || '未命名分队',
+        selected: String(t.id != null ? t.id : '') === currentId
+      }));
+    if (!options.length) {
+      wx.showToast({ title: '暂无可选分队', icon: 'none' });
+      return;
+    }
+    this.setData({
+      playerTeamPickVisible: true,
+      playerTeamPickUserId: userId,
+      playerTeamPickOptions: options,
+      playerManageFilterPickVisible: false
+    });
+  },
+
+  closePlayerManageTeamPicker() {
+    this.setData({
+      playerTeamPickVisible: false,
+      playerTeamPickUserId: '',
+      playerTeamPickOptions: []
+    });
+  },
+
+  onPlayerManageTeamPick(e) {
+    const teamId = String((e.currentTarget.dataset && e.currentTarget.dataset.teamid) || '');
+    const userId = String(this.data.playerTeamPickUserId || '');
+    if (!userId || !teamId) {
+      this.closePlayerManageTeamPicker();
+      return;
+    }
+    this.setData({
+      playerTeamPickVisible: false,
+      playerTeamPickUserId: '',
+      playerTeamPickOptions: []
+    });
+    this._patchPlayerManageDraft(userId, { matchTeamId: teamId });
+  },
+
+  onPlayerManageRemove(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId || !this._playerManageDraft) return;
+    wx.showModal({
+      title: '删除选手',
+      content: '确定将该选手从本场比赛中删除吗？',
+      cancelText: '取消',
+      confirmText: '确认删除',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (!res.confirm) return;
+        const result = playerManage.removePlayerFromDraft(this._playerManageDraft, userId);
+        if (!result || !result.ok) {
+          wx.showToast({ title: '删除失败', icon: 'none' });
+          return;
+        }
+        this._playerManageDraft = result.draft;
+        const nextExpanded =
+          String(this.data.expandedPlayerManageUserId || '') === userId
+            ? ''
+            : String(this.data.expandedPlayerManageUserId || '');
+        this.setData({ expandedPlayerManageUserId: nextExpanded }, () =>
+          this._syncPlayerManageDisplay()
+        );
+        wx.showToast({ title: '已从本场选手列表移除，保存后生效', icon: 'none' });
+      }
+    });
+  },
+
+  savePlayerManageSheet() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId || !this._playerManageDraft) {
+      this.closePlayerManageSheet();
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    // 若本场尚无 registerInfo（从分组派生），先落地再按 userId 合并
+    if (
+      !game.registerInfo ||
+      !Array.isArray(game.registerInfo.users) ||
+      !game.registerInfo.users.length
+    ) {
+      playerManage.ensureRegisterUsersFromGroups(game);
+    }
+    const result = playerManage.commitPlayerManageDraft(game, this._playerManageDraft);
+    if (!result || !result.ok) {
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+    gameStore.saveGame(game);
+    this.closePlayerManageSheet();
+    if (typeof this.refreshGame === 'function') this.refreshGame();
+    wx.showToast({ title: '选手信息已保存', icon: 'success' });
   },
 
   toggleAdminQrExpanded() {
