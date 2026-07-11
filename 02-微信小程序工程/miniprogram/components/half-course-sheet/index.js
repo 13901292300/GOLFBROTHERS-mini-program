@@ -10,6 +10,10 @@ Component({
       type: String,
       value: ''
     },
+    matchId: {
+      type: String,
+      value: ''
+    },
     mode: {
       type: String,
       value: ''
@@ -37,6 +41,7 @@ Component({
     _ctx() {
       return halfCourseEdit.buildContext({
         gameId: this.properties.gameId,
+        matchId: this.properties.matchId,
         mode: this.properties.mode,
         source: this.properties.source
       });

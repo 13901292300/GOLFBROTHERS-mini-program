@@ -14,6 +14,7 @@ const groupsStore = require('../../../utils/groupsStore.js');
 const matchStatus = require('../../../utils/matchStatus.js');
 const gameLifecycle = require('../../../utils/gameLifecycle.js');
 const holeLayout = require('../../../utils/holeLayout.js');
+const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -44,7 +45,7 @@ const FEATURES_COMMON = [
 ];
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
-  { permission: 'edit_half', glyph: '🗺️', label: '修改半场', tone: '' },
+  { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
   { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
   { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
@@ -54,6 +55,33 @@ const FEATURES_PERMISSION = [
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
   { permission: 'finish_match', glyph: '⏻', label: '结束比赛', tone: 'warning' }
 ];
+
+/** M 面板管理区底部独立行：取消 / 结束（不混入上方网格） */
+const FEATURES_PERMISSION_FOOTER_KEYS = {
+  cancel_match: true,
+  start_match: true,
+  finish_match: true
+};
+
+function splitPermissionFeatures(list) {
+  const items = Array.isArray(list) ? list : [];
+  const main = items.filter((f) => f && !FEATURES_PERMISSION_FOOTER_KEYS[f.permission]);
+  const footer = items.filter((f) => f && FEATURES_PERMISSION_FOOTER_KEYS[f.permission]);
+  // 与记分页普通创建一致：用空位把底部操作顶到下一行左侧，不居中、无特殊底栏
+  const cols = 4;
+  const rem = main.length % cols;
+  const padCount = footer.length > 0 && rem !== 0 ? (cols - rem) : 0;
+  const pad = [];
+  for (let i = 0; i < padCount; i++) {
+    pad.push({ empty: true, permission: '__pad_' + i, label: '__placeholder__' });
+  }
+  return {
+    featuresPermission: main,
+    featuresPermissionFooterPad: pad,
+    featuresPermissionFooter: footer
+  };
+}
+
 const MORE_ACCESS = { isPrivilegedUser: true, permissions: ['leaderboard', 'stats', 'poster', 'feedback', 'theme', 'export_groups'] };
 const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
@@ -206,6 +234,8 @@ Page({
     openIndex: -1,
     openScorecard: null,
     scoreDisplayMode: 'gross', // gross | diff，跟随记分页全局记忆
+    // 领先榜逐洞面板下方广告：广告图片1 BRIGHT/DARK
+    scorecardAdImage: '',
     // 更多功能面板（与球队比赛一致）
     showMoreSheet: false,
     moreFabExpanded: false,
@@ -217,6 +247,8 @@ Page({
     halfSheetVisible: false,
     featuresCommon: [],
     featuresPermission: [],
+    featuresPermissionFooterPad: [],
+    featuresPermissionFooter: [],
     scoringDisplay: 'gross', // gross | strokeDiff（风格选择用）
     scorePanel: 'technical', // technical | quick
     watchers: WATCHERS,
@@ -422,7 +454,10 @@ Page({
   },
 
   applyTheme(theme) {
-    this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
+    this.setData({
+      themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode',
+      scorecardAdImage: eventSponsorConfig.resolveScorecardAdImageByTheme(theme)
+    });
   },
 
   initHeaderNav() {
@@ -650,11 +685,21 @@ Page({
   applyMoreAccess() {
     const access = MORE_ACCESS;
     const permSet = access.permissions || [];
-    const visible = (scope, permission) =>
-      access.isPrivilegedUser || scope === 'common' || permSet.indexOf(permission) >= 0;
+    const visible = (scope, permission) => {
+      if (access.isPrivilegedUser || scope === 'common') return true;
+      if (permission === 'edit_half') {
+        return permSet.indexOf('edit_match') >= 0 || permSet.indexOf('edit_half') >= 0;
+      }
+      return permSet.indexOf(permission) >= 0;
+    };
+    const split = splitPermissionFeatures(
+      FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
+    );
     this.setData({
       featuresCommon: FEATURES_COMMON.filter((f) => visible('common', f.permission)),
-      featuresPermission: FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
+      featuresPermission: split.featuresPermission,
+      featuresPermissionFooterPad: split.featuresPermissionFooterPad,
+      featuresPermissionFooter: split.featuresPermissionFooter
     });
   },
   openMoreSheet() {

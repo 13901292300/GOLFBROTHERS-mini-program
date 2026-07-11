@@ -118,7 +118,7 @@
                   <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
                   <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
                 </view>
-                <image class="sc-ad" src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85" mode="widthFix"></image>
+                <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
               </view>
             </view>
           </block>
@@ -241,6 +241,21 @@
       <view class="feature-section-title"><text class="fst-main">管理功能</text><text class="fst-sub">需权限</text></view>
       <view class="feature-grid">
         <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+        <view
+          wx:for="{{featuresPermissionFooterPad}}"
+          wx:key="permission"
+          class="feature-item feature-item--empty"
+        ></view>
+        <view
+          wx:for="{{featuresPermissionFooter}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          class="feature-item"
+        >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
         </view>

@@ -475,6 +475,16 @@ page {
   min-height: calc(100vh - 92px - var(--tab-height) - 152rpx - 116rpx - env(safe-area-inset-bottom));
   margin-bottom: 180rpx;
 }
+/* 吸顶后内容未溢出锁定标记：不改高度/margin，避免内容变矮把 scrollTop 拉回未吸顶 */
+.register-tab-panel.is-locked-after-sticky {
+  /* marker class only */
+}
+/* 吸顶前安全占位：不可见，仅增加可滚距离（与人数无关） */
+.register-sticky-spacer {
+  width: 100%;
+  pointer-events: none;
+  visibility: hidden;
+}
 .roster-head {
   display: grid;
   grid-template-columns: 15% 60% 25%;
@@ -1276,6 +1286,7 @@ page {
 .fst-sub { font-style: normal; font-size: 20rpx; color: #9ca3af; letter-spacing: 0.08em; }
 .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24rpx; row-gap: 32rpx; }
 .feature-item { display: flex; flex-direction: column; align-items: center; min-height: 156rpx; }
+.feature-item--empty { visibility: hidden; pointer-events: none; }
 .feature-icon { width: 112rpx; height: 112rpx; border-radius: 24rpx; background: var(--tour-blue); color: var(--champion-gold); display: flex; align-items: center; justify-content: center; margin-bottom: 16rpx; font-size: 44rpx; box-shadow: 0 12rpx 24rpx rgba(0, 45, 98, 0.18); }
 .feature-icon.danger { background: #ff5722; color: #fff; }
 .feature-icon.warning { background: #ffc107; color: var(--tour-blue); }

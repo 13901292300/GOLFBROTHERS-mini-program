@@ -165,7 +165,7 @@ Page({
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
         views: '256',
         type: 'club',
-        navUrl: '/pages/tournament/detail/index'
+        navUrl: '/pages/tournament/detail/index?matchId=demo-jiaobei-beer'
       }
     ],
     tournamentCards: [
@@ -178,7 +178,7 @@ Page({
         teamName: '江湖业余球员巡回赛',
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
         views: '168',
-        navUrl: '/pages/tournament/detail/index'
+        navUrl: '/pages/tournament/detail/index?matchId=demo-jiaobei-beer'
       },
       {
         id: 'tour-2',

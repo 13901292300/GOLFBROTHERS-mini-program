@@ -65,6 +65,19 @@ function formatCourseHalfText(combo) {
   return combo ? '（' + combo + '）' : '';
 }
 
+/** 从「（A/B）」类文案解析前九/后九（兼容仅有 courseHalfText 的旧球队赛） */
+function parseCourseHalfText(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return { front9Course: null, back9Course: null };
+  const inner = raw.replace(/^[（(]/, '').replace(/[）)]$/, '').trim();
+  if (!inner) return { front9Course: null, back9Course: null };
+  const parts = inner.split(/[/／]/).map((s) => String(s || '').trim()).filter(Boolean);
+  return {
+    front9Course: parts[0] || null,
+    back9Course: parts[1] || null
+  };
+}
+
 function resolveHalfCourseRecord(courseId, courseName) {
   return findCourseById(courseId) || findCourseByName(courseName);
 }
@@ -79,6 +92,7 @@ module.exports = {
   findCourseByName,
   formatHalfCombo,
   formatCourseHalfText,
+  parseCourseHalfText,
   resolveHalfCourseRecord,
   canEditHalfCourse
 };

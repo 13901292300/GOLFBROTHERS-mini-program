@@ -61,7 +61,14 @@
     </view>
   </view>
 
-  <scroll-view class="detail-scroll" scroll-y scroll-into-view="{{scrollToTopView}}" bindscroll="onScroll">
+  <scroll-view
+    class="detail-scroll"
+    scroll-y
+    scroll-top="{{detailScrollTop}}"
+    scroll-with-animation="{{false}}"
+    scroll-into-view="{{scrollToTopView}}"
+    bindscroll="onScroll"
+  >
     <!-- 顶部哨兵：切 TAB 时滚动回此处，确保每个 TAB 从「信息区域」开始，吸顶仅由后续 scroll 触发 -->
     <view id="ds-page-top"></view>
     <!-- Hero -->
@@ -207,7 +214,7 @@
 
       <!-- 报名 -->
       <block wx:if="{{activeTab === 'register'}}">
-        <view class="register-tab-panel">
+        <view class="register-tab-panel {{registrationContentLocked ? 'is-locked-after-sticky' : ''}}">
           <view class="register-roster-card ds-card" style="{{rosterMinHeight ? 'min-height:' + rosterMinHeight + 'px;' : ''}}">
             <view class="roster-head">
               <view class="roster-col roster-col--idx"><text>序号</text></view>
@@ -232,6 +239,12 @@
               </view>
             </view>
           </view>
+          <!-- 吸顶前安全占位：仅保证能滚到 TAB 吸顶，不参与吸顶后视觉空滑 -->
+          <view
+            wx:if="{{registrationStickySpacerHeight > 0}}"
+            class="register-sticky-spacer"
+            style="height:{{registrationStickySpacerHeight}}px;"
+          ></view>
         </view>
       </block>
 
@@ -381,7 +394,7 @@
                   <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
                   <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
                 </view>
-                <image class="sc-ad" src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85" mode="widthFix"></image>
+                <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
               </view>
             </view>
           </block>
@@ -513,6 +526,21 @@
       <view class="feature-section-title"><text class="fst-main">{{featuresSectionPermissionMain}}</text><text wx:if="{{featuresSectionPermissionSub}}" class="fst-sub">{{featuresSectionPermissionSub}}</text></view>
       <view class="feature-grid">
         <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+        <view
+          wx:for="{{featuresPermissionFooterPad}}"
+          wx:key="permission"
+          class="feature-item feature-item--empty"
+        ></view>
+        <view
+          wx:for="{{featuresPermissionFooter}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          class="feature-item"
+        >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
         </view>
@@ -774,8 +802,8 @@
 
   <half-course-sheet
     visible="{{halfSheetVisible}}"
-    source="tournament"
-    mode="individual_stroke"
+    match-id="{{matchId}}"
+    source="team_match"
     bind:close="closeHalfSheet"
     bind:confirm="onHalfCourseConfirmed"
   />

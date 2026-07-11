@@ -240,6 +240,8 @@ function buildMatchFromCreatePage(pageData) {
     courseName: data.courseName || '',
     courseLocation: data.courseLocation || '',
     courseHalfText: data.courseHalfText || '',
+    front9Course: data.front9Course || null,
+    back9Course: data.back9Course || null,
     teeTime: data.teeTime || '',
     teeTimeText: data.teeTimeText || '',
     deadlineTime: data.deadlineTime || '',
@@ -294,6 +296,8 @@ function updateMatchFromCreatePage(existing, pageData, options) {
   next.courseName = data.courseName || '';
   next.courseLocation = data.courseLocation || '';
   next.courseHalfText = data.courseHalfText || '';
+  next.front9Course = data.front9Course != null ? data.front9Course : (existing.front9Course || null);
+  next.back9Course = data.back9Course != null ? data.back9Course : (existing.back9Course || null);
   next.teeTime = data.teeTime || '';
   next.teeTimeText = data.teeTimeText || '';
   next.deadlineTime = data.deadlineTime || '';
@@ -474,6 +478,8 @@ function hydrateCreatePageFromMatch(match) {
     courseName: match.courseName || '',
     courseLocation: match.courseLocation || '',
     courseHalfText: match.courseHalfText || '',
+    front9Course: match.front9Course || null,
+    back9Course: match.back9Course || null,
     teeTime: match.teeTime || '',
     teeTimeText: match.teeTimeText || '',
     deadlineTime: match.deadlineTime || '',

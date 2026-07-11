@@ -186,11 +186,19 @@
   color: var(--text-secondary);
 }
 
+/* 选中态：对齐普通创建 course/select（蓝框 + 浅蓝底）
+ * 组件内无 bright-mode/dark-mode 祖先时也必须生效（修改半场弹窗） */
+.par-row.active {
+  opacity: 1;
+  background: rgba(0, 45, 98, 0.08);
+  border-color: var(--cloud-blue);
+}
+.par-row.active .par-row__code { color: var(--cloud-blue); }
 .bright-mode .par-row.active {
   background: rgba(0, 45, 98, 0.08);
-  border-color: var(--tour-blue);
+  border-color: var(--cloud-blue);
 }
-.bright-mode .par-row.active .par-row__code { color: var(--tour-blue); }
+.bright-mode .par-row.active .par-row__code { color: var(--cloud-blue); }
 .dark-mode .par-row.active {
   background: rgba(0, 174, 239, 0.12);
   border-color: var(--data-blue);

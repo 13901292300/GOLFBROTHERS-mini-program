@@ -90,5 +90,11 @@ module.exports = {
   DEFAULT_EVENT_SPONSOR_IMAGES,
   withEventSponsorAssetVersion,
   getEventSponsorLocalFallback,
-  getDefaultEventSponsorSlot
+  getDefaultEventSponsorSlot,
+  /** 领先榜逐洞面板下方广告：广告图片1，按主题取 BRIGHT / DARK */
+  resolveScorecardAdImageByTheme: function resolveScorecardAdImageByTheme(theme) {
+    const slot = getDefaultEventSponsorSlot(0);
+    const dark = theme === 'dark';
+    return dark ? (slot.dark || slot.bright || '') : (slot.bright || slot.dark || '');
+  }
 };

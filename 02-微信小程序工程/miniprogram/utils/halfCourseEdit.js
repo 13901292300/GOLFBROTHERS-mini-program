@@ -6,6 +6,7 @@
 const halfCourse = require('./halfCourse.js');
 const gameStore = require('./gameStore.js');
 const groupsStore = require('./groupsStore.js');
+const teamMatchStore = require('./teamMatchStore.js');
 const matchState = require('./matchState.js');
 const holeLayout = require('./holeLayout.js');
 
@@ -18,6 +19,19 @@ function readMatchState() {
   }
 }
 
+/** 从球队赛记录解析前九/后九（优先显式字段，其次 courseHalfText） */
+function resolveTeamMatchHalves(match) {
+  if (!match) return { front9Course: null, back9Course: null };
+  let front9 = match.front9Course || null;
+  let back9 = match.back9Course || null;
+  if (!front9 && !back9) {
+    const parsed = halfCourse.parseCourseHalfText(match.courseHalfText);
+    front9 = parsed.front9Course;
+    back9 = parsed.back9Course;
+  }
+  return { front9Course: front9, back9Course: back9 };
+}
+
 /** 解析当前比赛的半场编辑上下文 */
 function buildContext(opts) {
   const o = opts || {};
@@ -26,6 +40,7 @@ function buildContext(opts) {
     if (game) {
       return {
         gameId: o.gameId,
+        matchId: '',
         mode: 'game',
         source: 'game',
         courseId: game.courseId,
@@ -36,10 +51,29 @@ function buildContext(opts) {
       };
     }
   }
+  // 球队赛详情：以 teamMatchStore 为真源（须优先于演示用 tournament meta）
+  if (o.matchId) {
+    const match = teamMatchStore.getMatchById(o.matchId);
+    if (match) {
+      const halves = resolveTeamMatchHalves(match);
+      return {
+        gameId: '',
+        matchId: o.matchId,
+        mode: 'team_match',
+        source: 'team_match',
+        courseId: match.courseId,
+        courseName: match.courseName,
+        courseLocation: match.courseLocation,
+        front9Course: halves.front9Course,
+        back9Course: halves.back9Course
+      };
+    }
+  }
   if (o.source === 'tournament' || o.mode === 'individual_stroke') {
     const meta = groupsStore.getTournamentCourseMeta();
     return {
       gameId: '',
+      matchId: '',
       mode: 'individual_stroke',
       source: 'tournament',
       courseId: meta.courseId,
@@ -53,6 +87,7 @@ function buildContext(opts) {
   const c = (ms && ms.course) || {};
   return {
     gameId: (ms && ms.gameId) || o.gameId || '',
+    matchId: o.matchId || '',
     mode: (ms && ms.mode) || o.mode || '',
     source: o.source || 'matchState',
     courseId: c.courseId,
@@ -87,7 +122,7 @@ function prepareSheet(ctx) {
 }
 
 /**
- * 确认修改半场：更新 game / 赛事 meta / matchState + 全局 holeLayout
+ * 确认修改半场：更新 game / 球队赛 / 赛事 meta / matchState + 全局 holeLayout
  * 不触碰 scores / putts 数组
  */
 function apply(ctx, front9, back9) {
@@ -107,7 +142,18 @@ function apply(ctx, front9, back9) {
     }
   }
 
-  if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
+  if (ctx.matchId) {
+    const match = teamMatchStore.getMatchById(ctx.matchId);
+    if (match) {
+      teamMatchStore.saveMatch(
+        Object.assign({}, match, {
+          front9Course: front9 || null,
+          back9Course: back9 || null,
+          courseHalfText: courseHalfText
+        })
+      );
+    }
+  } else if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
     const meta = groupsStore.getTournamentCourseMeta();
     groupsStore.setTournamentCourseHalf({
       courseId: meta.courseId,
@@ -134,6 +180,14 @@ function apply(ctx, front9, back9) {
         c.courseLocation = game.courseLocation || c.courseLocation;
       }
     }
+    if (ctx.matchId) {
+      const match = teamMatchStore.getMatchById(ctx.matchId);
+      if (match) {
+        c.courseId = match.courseId || c.courseId;
+        c.courseName = match.courseName || c.courseName;
+        c.courseLocation = match.courseLocation || c.courseLocation;
+      }
+    }
     matchState.setMatchState(Object.assign({}, ms, { course: c }));
   }
 
@@ -143,7 +197,7 @@ function apply(ctx, front9, back9) {
   });
   const layout = holeLayout.resolveLayoutFromContext(layoutCtx);
   holeLayout.applyLayout(layout);
-  if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
+  if (!ctx.matchId && (ctx.mode === 'individual_stroke' || ctx.source === 'tournament')) {
     groupsStore.setHolePars(layout.holePars);
   }
 
@@ -154,5 +208,6 @@ module.exports = {
   buildContext,
   prepareSheet,
   apply,
-  readMatchState
+  readMatchState,
+  resolveTeamMatchHalves
 };

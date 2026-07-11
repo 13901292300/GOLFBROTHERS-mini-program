@@ -1,8 +1,10 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
-const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const {
+  createDefaultEventInfoList
+} = require('../../../utils/eventInfoDefaults.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -79,54 +81,6 @@ const DEFAULT_TEAM_GROUPS = [
   { id: 2, renderKey: 'team-group-2', name: '嘉宾' }
 ];
 const ROUND_NAME_SUFFIX = '月例赛';
-
-const DEFAULT_EVENT_RULES_TEXT =
-  '本次比赛采用国际高尔夫球联合会最新颁布的《高尔夫球规则》以及竞赛委员会制定的"比赛条件"和"当地规则"。比赛为单轮18洞个人比杆赛。';
-const DEFAULT_EVENT_NOTICE_TEXT =
-  '参赛球员需在开球前30分钟到达签到处领取记分卡，并准时在指定发球台出发。比赛过程中请保持良好的礼仪及球场速度。';
-
-function createDefaultEventInfoList() {
-  const sponsor1 = eventSponsorConfig.getDefaultEventSponsorSlot(0);
-  const sponsor2 = eventSponsorConfig.getDefaultEventSponsorSlot(1);
-  return [
-    {
-      id: 'evt-default-1',
-      title: '广告图片1',
-      type: 'image',
-      content: '',
-      brightImage: sponsor1.bright,
-      darkImage: sponsor1.dark,
-      status: '已设置'
-    },
-    {
-      id: 'evt-default-2',
-      title: '赛事规则',
-      type: 'text',
-      content: DEFAULT_EVENT_RULES_TEXT,
-      brightImage: '',
-      darkImage: '',
-      status: '已设置'
-    },
-    {
-      id: 'evt-default-3',
-      title: '广告图片2',
-      type: 'image',
-      content: '',
-      brightImage: sponsor2.bright,
-      darkImage: sponsor2.dark,
-      status: '已设置'
-    },
-    {
-      id: 'evt-default-4',
-      title: '参赛须知',
-      type: 'text',
-      content: DEFAULT_EVENT_NOTICE_TEXT,
-      brightImage: '',
-      darkImage: '',
-      status: '已设置'
-    }
-  ];
-}
 
 function buildEventTitleMapForList(list) {
   const map = {};
@@ -215,6 +169,8 @@ Page({
     courseId: '',
     courseLocation: '',
     courseHalfText: '',
+    front9Course: null,
+    back9Course: null,
 
     teeTime: '2026-06-03 17:10',
     deadlineTime: '2026-06-02 18:00',
@@ -382,6 +338,8 @@ Page({
         courseName: form.courseName || '',
         courseLocation: form.courseLocation || '',
         courseHalfText: form.courseHalfText || '',
+        front9Course: form.front9Course || null,
+        back9Course: form.back9Course || null,
         teeTime: form.teeTime || formatDateTime(teeDraft),
         teeTimeText: teeTimeText,
         deadlineTime: form.deadlineTime || formatDateTime(deadlineDraft),
@@ -493,7 +451,9 @@ Page({
             courseId: payload.courseId || '',
             courseName: payload.courseName || '',
             courseLocation: payload.courseLocation || '',
-            courseHalfText: payload.halfText ? '（' + payload.halfText + '）' : ''
+            courseHalfText: payload.halfText ? '（' + payload.halfText + '）' : '',
+            front9Course: payload.front9Course || null,
+            back9Course: payload.back9Course || null
           });
         }
       },

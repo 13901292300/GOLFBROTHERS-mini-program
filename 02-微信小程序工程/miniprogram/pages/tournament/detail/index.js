@@ -13,11 +13,16 @@ const partnerConfigUtil = require('../../../utils/partnerConfig.js');
 const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 const bannerConfig = require('../../../utils/bannerConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const demoJiaobeiMatch = require('../../../utils/demoJiaobeiMatch.js');
 const gameStore = require('../../../utils/gameStore.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
 const teamDirectory = require('../../../utils/teamDirectory.js');
 const playerDirectory = require('../../../utils/playerDirectory.js');
 const tPosition = require('../../../utils/tPosition.js');
+
+/** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
+const DEFAULT_SCORECARD_AD_IMAGE =
+  'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=900&q=85';
 
 /* ===== 赛事详情页 match 视图对象（顶部信息区数据框架） ===== */
 const MATCH_TYPE_LABELS = {
@@ -25,6 +30,9 @@ const MATCH_TYPE_LABELS = {
   'inter-team': '队际赛',
   series: '系列赛'
 };
+
+/** 报名内容高度与可视区比较时的容差（px），避免四舍五入误判溢出 */
+const REGISTER_CONTENT_LOCK_EPS = 4;
 
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
 
@@ -116,7 +124,7 @@ const FEATURES_COMMON = [
 ];
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
-  { permission: 'edit_half', glyph: '🗺️', label: '修改半场', tone: '' },
+  { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
   { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
   { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
@@ -135,6 +143,7 @@ const REGISTERING_FEATURES_COMMON = [
 ];
 const REGISTERING_FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
+  { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'players', glyph: '⚙️', label: '选手管理', tone: '' },
   { permission: 'tee_management', glyph: '🚩', label: '出发管理', tone: '' },
@@ -143,6 +152,32 @@ const REGISTERING_FEATURES_PERMISSION = [
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
   { permission: 'start_match', glyph: '▶', label: '开始比赛', tone: 'warning' }
 ];
+
+/** M 面板管理区底部独立行：取消 / 开始 / 结束（不混入上方网格） */
+const FEATURES_PERMISSION_FOOTER_KEYS = {
+  cancel_match: true,
+  start_match: true,
+  finish_match: true
+};
+
+function splitPermissionFeatures(list) {
+  const items = Array.isArray(list) ? list : [];
+  const main = items.filter((f) => f && !FEATURES_PERMISSION_FOOTER_KEYS[f.permission]);
+  const footer = items.filter((f) => f && FEATURES_PERMISSION_FOOTER_KEYS[f.permission]);
+  // 与记分页普通创建一致：用空位把底部操作顶到下一行左侧，不居中、无特殊底栏
+  const cols = 4;
+  const rem = main.length % cols;
+  const padCount = footer.length > 0 && rem !== 0 ? (cols - rem) : 0;
+  const pad = [];
+  for (let i = 0; i < padCount; i++) {
+    pad.push({ empty: true, permission: '__pad_' + i, label: '__placeholder__' });
+  }
+  return {
+    featuresPermission: main,
+    featuresPermissionFooterPad: pad,
+    featuresPermissionFooter: footer
+  };
+}
 const FEATURE_SECTION_DEFAULT = {
   commonMain: '常用功能',
   commonSub: '普通用户可用',
@@ -268,6 +303,12 @@ Page({
     tabHScrollLeft: 0,
     contentSpacerHeight: 0,
     scrollToTopView: '',
+    // 报名 TAB：吸顶后按「内容高度是否超出可视区」锁定，不按人数
+    registrationContentLocked: false,
+    registrationStickySpacerHeight: 0,
+    registerContentHeight: 0,
+    availableRegisterViewportHeight: 0,
+    detailScrollTop: 0,
 
     activeTab: 'details',
     // TAB 列表（流内 + 吸顶共用；默认进行中集合，loadMatch 后按状态重建）
@@ -321,6 +362,8 @@ Page({
     scoreDisplayMode: 'gross',
     openScorecard: null,
     courseName: 'COURSE', // 逐洞详情标题：当前球场名称（来自 groupsStore，单一数据源）
+    // 领先榜逐洞面板下方广告（交杯鲜啤演示按主题切广告图片1）
+    scorecardAdImage: DEFAULT_SCORECARD_AD_IMAGE,
 
     teeGroups: [],
     // 快捷入口按钮显隐：仅当"第一组卡片完全进入视口"时为 true（基于 IntersectionObserver，非 TAB 状态/非固定常驻）
@@ -345,6 +388,8 @@ Page({
     showWatchers: false,
     featuresCommon: [],
     featuresPermission: [],
+    featuresPermissionFooterPad: [],
+    featuresPermissionFooter: [],
     featuresSectionCommonMain: FEATURE_SECTION_DEFAULT.commonMain,
     featuresSectionCommonSub: FEATURE_SECTION_DEFAULT.commonSub,
     featuresSectionPermissionMain: FEATURE_SECTION_DEFAULT.permissionMain,
@@ -379,7 +424,12 @@ Page({
 
   /* ===== 顶部赛事信息数据接入（teamMatchStore） ===== */
   loadMatch(matchId) {
-    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    let match = null;
+    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      match = demoJiaobeiMatch.getJiaobeiDemoMatch();
+    } else if (matchId) {
+      match = teamMatchStore.getMatchById(matchId);
+    }
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
     this.setData(Object.assign({
@@ -389,14 +439,20 @@ Page({
       tabs: tabs,
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
       activeTab: tabs[0].id,
-      eventInfoList: this._resolveEventInfoList(match)
+      eventInfoList: this._resolveEventInfoList(match),
+      scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
     }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
       this.applyMoreAccess();
     });
   },
 
   refreshMatchData(matchId) {
-    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    let match = null;
+    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      match = demoJiaobeiMatch.getJiaobeiDemoMatch();
+    } else if (matchId) {
+      match = teamMatchStore.getMatchById(matchId);
+    }
     if (!match) return;
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
@@ -969,9 +1025,18 @@ Page({
   switchRegisterSubTab(e) {
     const id = e.currentTarget.dataset.id;
     if (!id || id === this.data.activeRegisterSubTab) return;
+    const registerDisplayUsers = this._filterRegisterUsers(this.data.registerInfo, id);
     this.setData({
       activeRegisterSubTab: id,
-      registerDisplayUsers: this._filterRegisterUsers(this.data.registerInfo, id)
+      registerDisplayUsers: registerDisplayUsers,
+      // 列表变化后高度需重测；吸顶前保持未锁定
+      registrationContentLocked: this._resolveRegistrationContentLocked({
+        isStickyTab: this.data.isStickyTab,
+        activeTab: 'register'
+      })
+    }, () => {
+      this.updateRegisterStickySpacer();
+      this.updateRegisterContentLockMetrics();
     });
   },
 
@@ -989,15 +1054,183 @@ Page({
     } else if (registerSubTabs.length) {
       activeRegisterSubTab = registerSubTabs[0].id;
     }
+    const registerDisplayUsers = this._filterRegisterUsers(registerInfo, activeRegisterSubTab);
     return {
       registerInfo: registerInfo,
       registerTotalCount: registerInfo.totalCount,
       registerSubTabs: registerSubTabs,
       activeRegisterSubTab: activeRegisterSubTab,
-      registerDisplayUsers: this._filterRegisterUsers(registerInfo, activeRegisterSubTab),
+      registerDisplayUsers: registerDisplayUsers,
+      registrationContentLocked: this._resolveRegistrationContentLocked({
+        isStickyTab: this.data.isStickyTab,
+        activeTab: this.data.activeTab
+      }),
       currentUserRegisterStatus: this._resolveCurrentUserRegisterStatus(registerInfo),
       registerPermission: this._resolveRegisterPermission(match)
     };
+  },
+
+  /**
+   * 报名内容锁定：activeTab===register && isStickyTab && 内容高度未超出吸顶后可视区。
+   * 吸顶前恒为 false；高度未测出前不锁，避免提前禁滚。
+   */
+  _resolveRegistrationContentLocked(opts) {
+    const o = opts || {};
+    const activeTab = o.activeTab != null ? o.activeTab : this.data.activeTab;
+    if (activeTab !== 'register') return false;
+    const isStickyTab = o.isStickyTab != null ? !!o.isStickyTab : !!this.data.isStickyTab;
+    if (!isStickyTab) return false;
+    const contentH = o.contentH != null
+      ? Number(o.contentH)
+      : Number(this._registerContentHeight != null
+        ? this._registerContentHeight
+        : this.data.registerContentHeight);
+    const availableH = o.availableH != null
+      ? Number(o.availableH)
+      : Number(this._availableRegisterViewportHeight != null
+        ? this._availableRegisterViewportHeight
+        : this.data.availableRegisterViewportHeight);
+    if (!(availableH > 0) || !(contentH > 0)) return false;
+    return contentH <= availableH + REGISTER_CONTENT_LOCK_EPS;
+  },
+
+  /**
+   * 吸顶后允许的最大 scrollTop（主 TAB 吸顶阈值）。
+   * 仅用于「已吸顶且内容未溢出」时阻止继续上推，绝不把 scrollTop 拉回阈值以下。
+   */
+  _getRegisterScrollLockMax() {
+    const tabThreshold = this.data.tabOffsetTop || 0;
+    const extThreshold = this.data.registerExtOffsetTop || 0;
+    const stickyTop = this.data.stickyRegisterExtTop || 0;
+    const forTab = tabThreshold > 0 ? tabThreshold : 0;
+    const forExt = extThreshold > 0 ? Math.max(0, extThreshold - stickyTop) : forTab;
+    return Math.max(forTab, forExt);
+  },
+
+  /**
+   * 吸顶后内容未溢出：仅当 scrollTop 越过锁点时回写到锁点（不低于吸顶阈值）。
+   * 不改内容高度，避免「吸顶又弹回」。
+   */
+  _clampRegisterScrollAfterSticky(scrollTop, forcedLocked) {
+    const locked = forcedLocked != null ? !!forcedLocked : !!this.data.registrationContentLocked;
+    if (!locked) return scrollTop;
+    const max = this._getRegisterScrollLockMax();
+    if (!(max > 0) || scrollTop <= max + 2) return scrollTop;
+    if (this._registerScrollClamping) return max;
+    this._registerScrollClamping = true;
+    // scroll-top 需值变化才生效
+    const tick = (this._detailScrollTick = (this._detailScrollTick || 0) + 1);
+    const next = max + (tick % 2) * 0.01;
+    this.setData({ detailScrollTop: next }, () => {
+      this._registerScrollClamping = false;
+    });
+    return max;
+  },
+
+  /**
+   * 测量报名内容高度与吸顶后可用可视高度，并据此更新 registrationContentLocked。
+   * registerContentHeight：.register-roster-card 实际渲染高度（含空态/min-height 撑高后的视觉高度）。
+   * availableRegisterViewportHeight：窗口 - HEADER - 主TAB - 报名扩展区 - CTA/安全区 - 间距。
+   * @param {{ forceSticky?: boolean }} [opts] forceSticky：刚吸顶时 setData 尚未落地，显式按已吸顶计算
+   */
+  updateRegisterContentLockMetrics(opts) {
+    if (this.data.activeTab !== 'register') return;
+    const forceSticky = !!(opts && opts.forceSticky);
+    let sys = { windowWidth: 375, windowHeight: 667 };
+    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    const winH = sys.windowHeight || 667;
+    const rpx2px = (sys.windowWidth || 375) / 750;
+    let safeBottom = 0;
+    if (sys.safeArea && typeof sys.screenHeight === 'number') {
+      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
+    }
+    this.createSelectorQuery()
+      .in(this)
+      .select('.gb-header').boundingClientRect()
+      .select('.tab-scroll-wrap--inflow').boundingClientRect()
+      .select('.register-ext-wrap--inflow').boundingClientRect()
+      .select('.register-cta-bar').boundingClientRect()
+      .select('.register-roster-card').boundingClientRect()
+      .exec((res) => {
+        res = res || [];
+        const headerH = res[0] && res[0].height ? res[0].height : (this.data.headerTotalHeight || 92);
+        const mainTabH = res[1] && res[1].height ? res[1].height : (this.data.tabBarHeight || 50);
+        const extH = res[2] && res[2].height ? res[2].height : 116 * rpx2px;
+        const ctaH = res[3] && res[3].height ? res[3].height : 0;
+        const cardRect = res[4];
+        const bottomReserve = ctaH > 0 ? ctaH : safeBottom;
+        const gap = 40 * rpx2px;
+        let availableH = winH - headerH - mainTabH - extH - bottomReserve - gap;
+        if (!(availableH > 0)) availableH = 0;
+        availableH = Math.round(availableH);
+        const contentH = cardRect && cardRect.height ? Math.round(cardRect.height) : 0;
+        this._availableRegisterViewportHeight = availableH;
+        this._registerContentHeight = contentH;
+        const stickyNow = forceSticky || !!this.data.isStickyTab;
+        const locked = this._resolveRegistrationContentLocked({
+          activeTab: 'register',
+          isStickyTab: stickyNow,
+          contentH: contentH,
+          availableH: availableH
+        });
+        const patch = {};
+        if (availableH !== this.data.availableRegisterViewportHeight) {
+          patch.availableRegisterViewportHeight = availableH;
+        }
+        if (contentH !== this.data.registerContentHeight) {
+          patch.registerContentHeight = contentH;
+        }
+        if (locked !== this.data.registrationContentLocked) {
+          patch.registrationContentLocked = locked;
+        }
+        const applyClamp = () => {
+          if (locked) {
+            this._clampRegisterScrollAfterSticky(this.data.scrollYState || 0, true);
+          }
+        };
+        if (Object.keys(patch).length) {
+          this.setData(patch, applyClamp);
+        } else {
+          applyClamp();
+        }
+      });
+  },
+
+  /**
+   * 内容不足以滚到 TAB 吸顶时补齐 spacer（与人数无关）。
+   * 只服务吸顶可达；吸顶后短内容由 scrollTop 钳制，不靠 spacer 制造空滑。
+   */
+  updateRegisterStickySpacer() {
+    if (this.data.activeTab !== 'register') {
+      if (this.data.registrationStickySpacerHeight) {
+        this.setData({ registrationStickySpacerHeight: 0 });
+      }
+      return;
+    }
+    const tabOffsetTop = this.data.tabOffsetTop || 0;
+    if (!(tabOffsetTop > 0)) return;
+    wx.createSelectorQuery()
+      .in(this)
+      .select('.detail-scroll')
+      .boundingClientRect()
+      .select('.detail-scroll')
+      .scrollOffset()
+      .exec((res) => {
+        const view = res && res[0];
+        const off = res && res[1];
+        if (!view || !off) return;
+        const viewportH = view.height || 0;
+        const scrollH = off.scrollHeight || 0;
+        const spacerNow = this.data.registrationStickySpacerHeight || 0;
+        const contentWithoutSpacer = Math.max(0, scrollH - spacerNow);
+        // 需要能滚到 TAB 吸顶阈值，再留一点 buffer
+        const needMaxScroll = tabOffsetTop + 16;
+        const needContentH = viewportH + needMaxScroll;
+        const spacer = Math.max(0, Math.ceil(needContentH - contentWithoutSpacer));
+        if (spacer !== spacerNow) {
+          this.setData({ registrationStickySpacerHeight: spacer });
+        }
+      });
   },
 
   /**
@@ -1365,10 +1598,28 @@ Page({
     }
   },
 
+  /** 领先榜逐洞下方广告：仅交杯鲜啤演示用广告图片1 BRIGHT/DARK，其它赛事保持原 Unsplash */
+  _resolveScorecardAdImage(theme, matchId) {
+    const id = matchId != null ? matchId : this.data.matchId;
+    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(id)) {
+      return demoJiaobeiMatch.resolveJiaobeiScorecardAdImage(theme || getApp().getTheme())
+        || DEFAULT_SCORECARD_AD_IMAGE;
+    }
+    return DEFAULT_SCORECARD_AD_IMAGE;
+  },
+
   applyTheme(theme) {
     const dark = theme === 'dark';
-    const patch = { themeClass: dark ? 'dark-mode' : 'bright-mode' };
-    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    const patch = {
+      themeClass: dark ? 'dark-mode' : 'bright-mode',
+      scorecardAdImage: this._resolveScorecardAdImage(theme, this.data.matchId)
+    };
+    let match = null;
+    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(this.data.matchId)) {
+      match = demoJiaobeiMatch.getJiaobeiDemoMatch();
+    } else if (this.data.matchId) {
+      match = teamMatchStore.getMatchById(this.data.matchId);
+    }
     if (match) {
       patch.eventInfoList = this._resolveEventInfoList(match, theme);
     }
@@ -1527,7 +1778,13 @@ Page({
         let h = winH - headerH - mainTabH - extH - bottomReserve - gap;
         if (!(h > 0)) h = 0;
         h = Math.round(h);
-        if (h !== this.data.rosterMinHeight) this.setData({ rosterMinHeight: h });
+        this._availableRegisterViewportHeight = h;
+        const patch = {};
+        if (h !== this.data.rosterMinHeight) patch.rosterMinHeight = h;
+        if (h !== this.data.availableRegisterViewportHeight) {
+          patch.availableRegisterViewportHeight = h;
+        }
+        if (Object.keys(patch).length) this.setData(patch);
       });
   },
 
@@ -1581,9 +1838,12 @@ Page({
             const top = extRect.top - scrollRect.top + scrollOff.scrollTop;
             if (top > 0) {
               this.setData({ registerExtOffsetTop: top });
-              this._syncStickyRegisterExtByScroll(scrollOff.scrollTop || 0);
+              this._syncStickyByScroll(scrollOff.scrollTop || 0);
             }
           }
+          // rosterMinHeight / 布局稳定后：补齐吸顶可达距离，并按内容高度刷新锁定
+          this.updateRegisterStickySpacer();
+          this.updateRegisterContentLockMetrics();
         });
     });
   },
@@ -1650,10 +1910,28 @@ Page({
         patch.hideRegisterCTA = hideCTA;
       }
     }
-    if (patch.isStickyTab === true && !this.data.isStickyTab) {
+    // 报名列表锁定：仅 isStickyTab 后 + 内容未超出可视区；吸顶前恒 false
+    const contentLocked = this._resolveRegistrationContentLocked({
+      isStickyTab: sticky,
+      activeTab: this.data.activeTab
+    });
+    if (contentLocked !== this.data.registrationContentLocked) {
+      patch.registrationContentLocked = contentLocked;
+    }
+    const justStuck = patch.isStickyTab === true && !this.data.isStickyTab;
+    const ctaVisibilityChanged = Object.prototype.hasOwnProperty.call(patch, 'hideRegisterCTA');
+    if (justStuck) {
       patch.tabHScrollLeft = this._lastTabScrollLeft || 0;
     }
     if (Object.keys(patch).length) this.setData(patch);
+    // 刚吸顶或底部 CTA 显隐变化：重测可用高度（CTA 占位影响 availableH）
+    if (this.data.activeTab === 'register' && (justStuck || ctaVisibilityChanged)) {
+      this.updateRegisterContentLockMetrics({ forceSticky: sticky });
+    }
+    // 吸顶后才钳制「继续上滑」；不改内容高度、不把 scrollTop 拉回阈值以下
+    if (contentLocked) {
+      this._clampRegisterScrollAfterSticky(scrollTop, true);
+    }
   },
 
   _calcStickyWatchers(scrollTop, isStickyTab) {
@@ -1708,6 +1986,7 @@ Page({
 
   onScroll(e) {
     const scrollTop = e.detail.scrollTop || 0;
+    // 先同步吸顶状态；吸顶后再由 _syncStickyByScroll 按内容是否溢出钳制列表
     this._syncStickyByScroll(scrollTop);
     // 注意：scroll 不再控制输入栏显隐（避免错误卸载/消失）；输入栏仅由 activeTab 决定 show/hide
   },
@@ -1727,6 +2006,10 @@ Page({
     }
     if (tab !== 'register' && this.data.isStickyRegisterExt) {
       patch.isStickyRegisterExt = false;
+    }
+    if (tab !== 'register') {
+      patch.registrationContentLocked = false;
+      patch.registrationStickySpacerHeight = 0;
     }
     if (tab !== 'register' && tab !== 'groups') {
       patch.hideRegisterCTA = false;
@@ -1866,9 +2149,12 @@ Page({
     const isRegistering = !!(this.data.matchStatus && this.data.matchStatus.isRegistering);
     if (isRegistering) {
       const section = FEATURE_SECTION_REGISTERING;
+      const split = splitPermissionFeatures(REGISTERING_FEATURES_PERMISSION);
       this.setData({
         featuresCommon: REGISTERING_FEATURES_COMMON.slice(),
-        featuresPermission: REGISTERING_FEATURES_PERMISSION.slice(),
+        featuresPermission: split.featuresPermission,
+        featuresPermissionFooterPad: split.featuresPermissionFooterPad,
+        featuresPermissionFooter: split.featuresPermissionFooter,
         featuresSectionCommonMain: section.commonMain,
         featuresSectionCommonSub: section.commonSub,
         featuresSectionPermissionMain: section.permissionMain,
@@ -1878,12 +2164,23 @@ Page({
     }
     const access = MORE_ACCESS;
     const permSet = access.permissions || [];
-    const visible = (scope, permission) =>
-      access.isPrivilegedUser || scope === 'common' || permSet.indexOf(permission) >= 0;
+    const visible = (scope, permission) => {
+      if (access.isPrivilegedUser || scope === 'common') return true;
+      // 修改半场与修改比赛同权
+      if (permission === 'edit_half') {
+        return permSet.indexOf('edit_match') >= 0 || permSet.indexOf('edit_half') >= 0;
+      }
+      return permSet.indexOf(permission) >= 0;
+    };
     const section = FEATURE_SECTION_DEFAULT;
+    const split = splitPermissionFeatures(
+      FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
+    );
     this.setData({
       featuresCommon: FEATURES_COMMON.filter((f) => visible('common', f.permission)),
-      featuresPermission: FEATURES_PERMISSION.filter((f) => visible('permission', f.permission)),
+      featuresPermission: split.featuresPermission,
+      featuresPermissionFooterPad: split.featuresPermissionFooterPad,
+      featuresPermissionFooter: split.featuresPermissionFooter,
       featuresSectionCommonMain: section.commonMain,
       featuresSectionCommonSub: section.commonSub,
       featuresSectionPermissionMain: section.permissionMain,
@@ -1925,6 +2222,10 @@ Page({
       });
       return;
     }
+    if (permission === 'edit_half') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false, halfSheetVisible: true });
+      return;
+    }
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
       if (permission === 'register_for_other') {
         // Patch 8：关闭报名后禁用替他人报名（邀请好友报名不受影响）
@@ -1956,10 +2257,6 @@ Page({
     }
     if (permission === 'leaderboard') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false, activeTab: 'leaderboard' });
-      return;
-    }
-    if (permission === 'edit_half') {
-      this.setData({ showMoreSheet: false, moreFabExpanded: false, halfSheetVisible: true });
       return;
     }
     wx.showToast({ title: '功能开发中', icon: 'none' });
@@ -2933,8 +3230,15 @@ Page({
   },
 
   onHalfCourseConfirmed() {
-    this.setData({ halfSheetVisible: false, courseName: groupsStore.getCourseName() });
-    this.refreshGroupsDerived();
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    this.setData({
+      halfSheetVisible: false,
+      courseName: (match && match.courseName) || groupsStore.getCourseName()
+    });
+    if (matchId) {
+      this.refreshMatchData(matchId);
+    }
   },
 
   /* ===== 风格选择 ===== */
