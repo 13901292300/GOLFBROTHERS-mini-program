@@ -43,9 +43,24 @@ const RECOMMENDED_EVENT_INFO = [
   { title: '赛事规则', type: 'text' },
   { title: '奖项设置', type: 'text' },
   { title: '赞助商广告', type: 'image' },
-  { title: '交通说明', type: 'text' },
+  { title: '照片直播', type: 'text' },
   { title: '晚宴安排', type: 'text' }
 ];
+
+const PHOTO_LIVE_TITLE = '照片直播';
+const PHOTO_LIVE_LEGACY_TITLE = '交通说明';
+
+function isPhotoLiveEventTitle(title) {
+  const t = String(title || '').trim();
+  return t === PHOTO_LIVE_TITLE || t === PHOTO_LIVE_LEGACY_TITLE;
+}
+
+function isValidPhotoLiveHttpsUrl(url) {
+  const s = String(url || '').trim();
+  if (!s) return false;
+  if (/^http:\/\//i.test(s)) return false;
+  return /^https:\/\/.+/i.test(s);
+}
 
 const EVENT_INFO_ROW_GAP_RPX = 16;
 const EVENT_INFO_ROW_HEIGHT_RPX = 128;
@@ -118,6 +133,11 @@ function buildEventTitleMapForList(list) {
   (list || []).forEach((item) => {
     if (item && item.title) map[item.title] = true;
   });
+  // 照片直播 ↔ 交通说明 视为同一项，避免重复添加
+  if (map[PHOTO_LIVE_TITLE] || map[PHOTO_LIVE_LEGACY_TITLE]) {
+    map[PHOTO_LIVE_TITLE] = true;
+    map[PHOTO_LIVE_LEGACY_TITLE] = true;
+  }
   return map;
 }
 
@@ -181,6 +201,9 @@ Page({
 
     pageEyebrow: 'CREATE',
     pageTitle: '队内赛创建',
+    submitButtonText: '创建并开启报名',
+    isEditMode: false,
+    editMatchId: '',
 
     teamId: '',
     teamName: EMPTY_TEAM_LABEL,
@@ -241,7 +264,8 @@ Page({
       content: '',
       brightImage: '',
       darkImage: '',
-      status: '未设置'
+      status: '未设置',
+      isPhotoLive: false
     },
     eventDetailEditLabel: '',
     deleteConfirming: false,
@@ -277,10 +301,15 @@ Page({
     wheelIndex: [5, 2, 17, 1]
   },
 
-  onLoad() {
+  onLoad(options) {
     this._roundNameManual = false;
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
+
+    if (options && options.mode === 'edit' && options.matchId) {
+      this._initEditMode(decodeURIComponent(options.matchId));
+      return;
+    }
 
     this._tee = parseTimeToDraft('2026-06-03 17:10');
     this._deadline = parseTimeToDraft('2026-06-02 18:00');
@@ -288,6 +317,102 @@ Page({
     this._activeTimeTarget = 'tee';
     this._freeModeTeamGroups = this._cloneTeamGroups(this.data.teamGroups);
     this.setData(this._buildEventInfoSortMeta(this.data.eventInfoList));
+  },
+
+  _initEditMode(matchId) {
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      setTimeout(() => this.onBack(), 600);
+      return;
+    }
+    const form = teamMatchStore.hydrateCreatePageFromMatch(match);
+    if (!form) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      setTimeout(() => this.onBack(), 600);
+      return;
+    }
+
+    const teeDraft = parseTimeToDraft(form.teeTime || '2026-06-03 17:10');
+    const deadlineDraft = parseTimeToDraft(form.deadlineTime || '2026-06-02 18:00');
+    this._tee = teeDraft;
+    this._deadline = deadlineDraft;
+    this._editingTime = Object.assign({}, teeDraft);
+    this._activeTimeTarget = 'tee';
+    this._editMatchId = matchId;
+    this._roundNameManual = true;
+
+    const teamGroups = (form.teamGroups && form.teamGroups.length)
+      ? this._cloneTeamGroups(form.teamGroups)
+      : this._defaultTeamGroups();
+    const feeList = (form.feeList && form.feeList.length)
+      ? form.feeList.slice()
+      : DEFAULT_FEE_LIST.slice();
+    const eventInfoList = (form.eventInfoList && form.eventInfoList.length)
+      ? form.eventInfoList.slice()
+      : DEFAULT_EVENT_INFO_LIST.slice();
+    const gameMode = form.gameMode || '个人比杆赛';
+    const matchPlay = isMatchPlayMode(gameMode);
+    const maxGroupId = teamGroups.reduce((max, g) => Math.max(max, Number(g.id) || 0), 0);
+    const maxFeeId = feeList.reduce((max, f) => Math.max(max, Number(f.id) || 0), 0);
+
+    const partnerConfig = partnerConfigUtil.loadPartnerConfig(form.teamName || '');
+    const teeTimeText = form.teeTimeText || formatDisplayDateTime(teeDraft);
+    const deadlineTimeText = form.deadlineTimeText || formatDisplayDateTime(deadlineDraft);
+
+    if (!matchPlay) {
+      this._freeModeTeamGroups = this._cloneTeamGroups(teamGroups);
+    } else {
+      this._freeModeTeamGroups = this._defaultTeamGroups();
+    }
+
+    const patch = Object.assign(
+      {
+        isEditMode: true,
+        editMatchId: matchId,
+        pageEyebrow: 'EDIT',
+        pageTitle: '修改队内赛',
+        submitButtonText: '保存修改',
+        teamId: form.teamId || '',
+        teamName: form.teamName || EMPTY_TEAM_LABEL,
+        teamLogo: form.teamLogo || EMPTY_TEAM_LOGO,
+        teamRole: '',
+        roundName: form.roundName || '',
+        courseId: form.courseId || '',
+        courseName: form.courseName || '',
+        courseLocation: form.courseLocation || '',
+        courseHalfText: form.courseHalfText || '',
+        teeTime: form.teeTime || formatDateTime(teeDraft),
+        teeTimeText: teeTimeText,
+        deadlineTime: form.deadlineTime || formatDateTime(deadlineDraft),
+        deadlineTimeText: deadlineTimeText,
+        selectedGameMode: gameMode,
+        gameMode: gameMode,
+        isMatchPlayMode: matchPlay,
+        teamGroupMode: matchPlay ? 'fixed-2' : 'free',
+        teamGroupSheetDesc: getTeamGroupSheetDesc(matchPlay),
+        teamGroups: teamGroups,
+        teamGroupSummary: this.getTeamGroupSummary(teamGroups),
+        nextTeamGroupId: maxGroupId + 1,
+        feeList: feeList,
+        nextFeeId: maxFeeId + 1,
+        isDiamondMode: !!form.isDiamondMode,
+        feeSet: form.feeSet != null ? !!form.feeSet : feeList.length > 0,
+        groupPermission: form.groupPermission === 'player' ? 'player' : 'admin',
+        visibility: form.visibility === 'private' ? 'private' : 'public',
+        accessCode: form.accessCode || '',
+        logoConfig: form.logoConfig || { type: 'default', url: '', source: 'team' },
+        partnerConfig: partnerConfig,
+        bannerImage: form.bannerImage || ''
+      },
+      this._buildEventInfoSortMeta(eventInfoList),
+      {
+        eventInfoList: eventInfoList,
+        eventTitleAddedMap: this._buildEventTitleMap(eventInfoList)
+      }
+    );
+
+    this.setData(patch);
   },
 
   onShow() {
@@ -671,11 +796,7 @@ Page({
   },
 
   _buildEventTitleMap(list) {
-    const map = {};
-    (list || []).forEach((item) => {
-      if (item && item.title) map[item.title] = true;
-    });
-    return map;
+    return buildEventTitleMapForList(list);
   },
 
   _getEventInfoRowStepPx() {
@@ -810,9 +931,10 @@ Page({
     let newItem = null;
 
     if (customTitle) {
+      const normalizedTitle = isPhotoLiveEventTitle(customTitle) ? PHOTO_LIVE_TITLE : customTitle;
       newItem = {
         id: 'evt-' + Date.now(),
-        title: customTitle,
+        title: normalizedTitle,
         type: this.data.manualInfoType || 'text',
         content: '',
         brightImage: '',
@@ -839,7 +961,11 @@ Page({
       return;
     }
 
-    if (this.data.eventInfoList.some((item) => item.title === newItem.title)) {
+    if (this.data.eventInfoList.some((item) => {
+      if (item.title === newItem.title) return true;
+      if (isPhotoLiveEventTitle(newItem.title) && isPhotoLiveEventTitle(item.title)) return true;
+      return false;
+    })) {
       wx.showToast({ title: '该赛事信息已添加', icon: 'none' });
       return;
     }
@@ -860,19 +986,22 @@ Page({
       clearTimeout(this._deleteConfirmTimer);
       this._deleteConfirmTimer = null;
     }
+    const photoLive = isPhotoLiveEventTitle(item.title);
+    const displayTitle = photoLive ? PHOTO_LIVE_TITLE : item.title;
     this.setData({
       showEventDetailSheet: true,
       editingEventInfoIndex: index,
       deleteConfirming: false,
       deleteBtnText: '删除本项',
-      eventDetailEditLabel: item.title + '（' + this.getInfoTypeLabel(item.type) + '）',
+      eventDetailEditLabel: displayTitle + '（' + this.getInfoTypeLabel(item.type) + '）',
       eventDetailDraft: {
-        title: item.title,
+        title: displayTitle,
         type: item.type,
         content: item.content || '',
         brightImage: item.brightImage || item.imageData || '',
         darkImage: item.darkImage || item.imageData || '',
-        status: item.status || '未设置'
+        status: item.status || '未设置',
+        isPhotoLive: photoLive
       }
     });
   },
@@ -936,6 +1065,19 @@ Page({
       item.darkImage = draft.darkImage || '';
       item.status = (item.brightImage || item.darkImage) ? '已设置' : '未设置';
       delete item.imageData;
+    } else if (draft.isPhotoLive || isPhotoLiveEventTitle(item.title)) {
+      const link = String(draft.content || '').trim();
+      if (!link) {
+        wx.showToast({ title: '请输入照片直播链接', icon: 'none' });
+        return;
+      }
+      if (!isValidPhotoLiveHttpsUrl(link)) {
+        wx.showToast({ title: '请输入有效的 HTTPS 链接', icon: 'none' });
+        return;
+      }
+      item.title = PHOTO_LIVE_TITLE;
+      item.content = link;
+      item.status = '已设置';
     } else {
       item.content = (draft.content || '').trim();
       item.status = item.content ? '已设置' : '未设置';
@@ -1288,6 +1430,16 @@ Page({
   },
 
   onSubmit() {
+    if (!this._hasSelectedTeam()) {
+      wx.showModal({
+        title: '提示',
+        content: '请选择参赛球队',
+        showCancel: false,
+        confirmText: '确认'
+      });
+      return;
+    }
+
     if (!String(this.data.courseName || '').trim()) {
       wx.showModal({
         title: '提示',
@@ -1299,6 +1451,28 @@ Page({
     }
 
     partnerConfigUtil.savePartnerConfig(this.data.partnerConfig, this.data.teamName);
+
+    if (this.data.isEditMode) {
+      const matchId = this.data.editMatchId || this._editMatchId;
+      const existing = teamMatchStore.getMatchById(matchId);
+      if (!existing) {
+        wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+        return;
+      }
+      const updated = teamMatchStore.updateMatchFromCreatePage(existing, this.data);
+      teamMatchStore.saveMatch(updated);
+      wx.showToast({ title: '已保存修改', icon: 'success' });
+      setTimeout(() => {
+        if (getCurrentPages().length > 1) {
+          wx.navigateBack({ delta: 1 });
+        } else {
+          wx.redirectTo({
+            url: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+          });
+        }
+      }, 400);
+      return;
+    }
 
     const match = teamMatchStore.buildMatchFromCreatePage(this.data);
     teamMatchStore.saveMatch(match);

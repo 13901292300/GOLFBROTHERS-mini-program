@@ -165,8 +165,8 @@
             <view class="event-info-row-left">
               <text class="event-info-drag-handle">☰</text>
               <view class="field-main">
-                <text class="field-value">{{eventInfo.title}}</text>
-                <text class="field-subvalue ds-desc-text">{{eventInfo.type === 'image' ? '图片信息' : '文本信息'}}</text>
+                <text class="field-value">{{eventInfo.title === '交通说明' ? '照片直播' : eventInfo.title}}</text>
+                <text class="field-subvalue ds-desc-text">{{eventInfo.type === 'image' ? '图片信息' : ((eventInfo.title === '照片直播' || eventInfo.title === '交通说明') ? '链接信息' : '文本信息')}}</text>
               </view>
             </view>
             <view class="field-right">
@@ -323,7 +323,7 @@
   </scroll-view>
 
   <view class="footer">
-    <button class="submit-btn" bindtap="onSubmit">创建并开启报名</button>
+    <button class="submit-btn" bindtap="onSubmit">{{submitButtonText}}</button>
   </view>
 
   <!-- 底部弹层：费用设置 -->
@@ -559,7 +559,7 @@
         class="custom-info-input"
         type="text"
         value="{{customEventInfoTitle}}"
-        placeholder="例如：晚宴安排、交通说明、着装要求"
+        placeholder="例如：晚宴安排、照片直播、着装要求"
         bindinput="handleCustomEventInfoTitleInput"
       />
     </view>
@@ -577,12 +577,12 @@
     <view class="sheet-header">
       <view>
         <text class="sheet-overline">EDIT EVENT INFO</text>
-        <text class="sheet-header__h3">编辑赛事信息</text>
+        <text class="sheet-header__h3">{{eventDetailDraft.isPhotoLive ? '照片直播' : '编辑赛事信息'}}</text>
       </view>
       <view class="sheet-close" bindtap="closeEventDetailEditor"><text>×</text></view>
     </view>
 
-    <view class="event-detail-title ds-desc-text">
+    <view wx:if="{{!eventDetailDraft.isPhotoLive}}" class="event-detail-title ds-desc-text">
       <text>当前编辑：</text>
       <text class="event-detail-title-strong">{{eventDetailEditLabel}}</text>
     </view>
@@ -625,8 +625,23 @@
       </view>
     </block>
 
+    <block wx:elif="{{eventDetailDraft.isPhotoLive}}">
+      <view class="event-detail-photo-live-desc">
+        <text class="event-detail-photo-live-desc__main">请输入摄影团队提供的照片直播链接。</text>
+        <text class="event-detail-photo-live-desc__hint">请复制粘贴完整 HTTPS 链接。</text>
+        <text class="event-detail-photo-live-desc__example">例如：https://example.com/live/xxxxx</text>
+      </view>
+      <input
+        class="event-detail-link-input"
+        type="text"
+        value="{{eventDetailDraft.content}}"
+        placeholder="请输入照片直播 HTTPS 链接"
+        bindinput="handleEventDetailTextInput"
+      />
+    </block>
+
     <textarea
-      wx:if="{{eventDetailDraft.type === 'text'}}"
+      wx:elif="{{eventDetailDraft.type === 'text'}}"
       class="event-detail-textarea"
       value="{{eventDetailDraft.content}}"
       placeholder="请输入详细内容"

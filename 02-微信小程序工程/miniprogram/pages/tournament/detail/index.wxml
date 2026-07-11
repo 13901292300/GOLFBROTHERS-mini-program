@@ -148,6 +148,15 @@
               binderror="onEventSponsorImageError"
             ></image>
           </view>
+          <view
+            wx:elif="{{item.isPhotoLive}}"
+            class="ds-card pad-card photo-live-card"
+            bindtap="onCopyPhotoLiveLink"
+            data-url="{{item.content}}"
+          >
+            <view class="card-head"><text class="card-title">照片直播</text></view>
+            <text class="card-text">点击复制链接</text>
+          </view>
           <view wx:else class="ds-card pad-card">
             <view class="card-head"><text class="card-title">{{item.title}}</text></view>
             <text class="card-text">{{item.content}}</text>
@@ -226,17 +235,14 @@
         </view>
       </block>
 
-      <!-- 分组 TAB：管理态可添加空分组卡片（复用出发表 tee-group-card 结构） -->
+      <!-- 分组 TAB：只读展示正式 groups；编辑入口在底部 CTA -->
       <block wx:if="{{activeTab === 'groups'}}">
-        <view class="groups-tab-panel" style="{{groupsPanelMinHeight ? 'min-height:' + groupsPanelMinHeight + 'px;' : ''}}">
+        <view class="groups-tab-panel {{canManageGroups ? 'groups-tab-panel--with-cta' : ''}}" style="{{groupsPanelMinHeight ? 'min-height:' + groupsPanelMinHeight + 'px;' : ''}}">
           <view class="groups-tab-header">
             <text class="groups-tab-header__title">分组</text>
           </view>
-          <block wx:if="{{groupsTabCards.length > 0}}">
-            <view wx:for="{{groupsTabCards}}" wx:key="groupId" class="tee-group-card" bindtap="onGroupCardTap" data-group-id="{{item.groupId}}" data-group-name="{{item.badge}}">
-              <view wx:if="{{canManageGroups}}" catchtap="onDeleteGroupTap" data-group-id="{{item.groupId}}" data-group-name="{{item.badge}}" class="delete-group-btn">
-                <text>×</text>
-              </view>
+          <block wx:if="{{hasFormalGroups}}">
+            <view wx:for="{{groupsTabCards}}" wx:key="groupId" class="tee-group-card">
               <view class="tee-group-meta">
                 <text class="tee-group-badge">{{item.badge}}</text>
               </view>
@@ -254,22 +260,10 @@
                 </view>
               </view>
             </view>
-            <view wx:if="{{canManageGroups}}" class="groups-tab-toolbar">
-              <view class="add-group-btn" bindtap="onAddGroup">
-                <view class="add-group-icon"><text>+</text></view>
-                <text>添加分组</text>
-              </view>
-            </view>
           </block>
           <block wx:else>
-            <view wx:if="{{canManageGroups}}" class="groups-tab-toolbar groups-tab-toolbar--first">
-              <view class="add-group-btn" bindtap="onAddGroup">
-                <view class="add-group-icon"><text>+</text></view>
-                <text>添加分组</text>
-              </view>
-            </view>
-            <view wx:else class="groups-panel-empty">
-              <text class="groups-panel-empty__text">暂无分组信息</text>
+            <view class="groups-panel-empty">
+              <text class="groups-panel-empty__text">暂无分组</text>
             </view>
           </block>
         </view>
@@ -638,6 +632,14 @@
     >立即报名</view>
   </view>
 
+  <!-- 分组 TAB 底部操作：与「立即报名」共用 hideRegisterCTA 显隐 -->
+  <view
+    wx:if="{{activeTab === 'groups' && canManageGroups && !hideRegisterCTA}}"
+    class="register-cta-bar"
+  >
+    <view bindtap="onOpenGroupEditor" class="register-cta-btn">{{hasFormalGroups ? '修改分组' : '开始分组'}}</view>
+  </view>
+
   <!-- 报名弹窗：分组选择 + 比赛名 + 手机号 + 确认报名 -->
   <view wx:if="{{registerSheetVisible}}" bindtap="closeRegisterSheet" class="sheet-overlay"></view>
   <view wx:if="{{registerSheetVisible}}" class="bottom-sheet register-sheet" catchtap="stopPropagation">
@@ -732,18 +734,6 @@
           bindtap="confirmCancelRegister"
           class="register-cancel-dialog__btn register-cancel-dialog__btn--danger {{registerCancelSubmitting ? 'is-disabled' : ''}}"
         >确认取消</view>
-      </view>
-    </view>
-  </view>
-
-  <!-- 删除分组确认弹窗（页面态，不写 teamMatchStore） -->
-  <view wx:if="{{groupDeleteModalVisible}}" bindtap="closeGroupDeleteModal" class="register-cancel-modal">
-    <view catchtap="stopPropagation" class="register-cancel-dialog">
-      <text class="register-cancel-dialog__title">确认删除{{groupDeleteTargetName}}？</text>
-      <text class="register-cancel-dialog__desc">删除后该组球员配置将被移除。</text>
-      <view class="register-cancel-dialog__actions">
-        <view bindtap="closeGroupDeleteModal" class="register-cancel-dialog__btn">取消</view>
-        <view bindtap="confirmDeleteGroup" class="register-cancel-dialog__btn register-cancel-dialog__btn--danger">确认删除</view>
       </view>
     </view>
   </view>

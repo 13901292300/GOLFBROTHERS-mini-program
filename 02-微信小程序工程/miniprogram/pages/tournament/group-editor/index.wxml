@@ -1,0 +1,81 @@
+<view class="group-editor-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TOURNAMENT</text>
+          <text class="gb-header__title">{{headerTitle}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="editor-scroll" scroll-y>
+    <view class="editor-body">
+      <block wx:if="{{draftCards.length > 0}}">
+        <view
+          wx:for="{{draftCards}}"
+          wx:key="groupId"
+          class="tee-group-card"
+          bindtap="onGroupCardTap"
+          data-group-id="{{item.groupId}}"
+          data-group-name="{{item.badge}}"
+        >
+          <view
+            catchtap="onDeleteGroupTap"
+            data-group-id="{{item.groupId}}"
+            data-group-name="{{item.badge}}"
+            class="delete-group-btn"
+          >
+            <text>×</text>
+          </view>
+          <view class="tee-group-meta">
+            <text class="tee-group-badge">{{item.badge}}</text>
+          </view>
+          <view class="tee-player-grid">
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="tee-player">
+              <view class="tee-avatar-wrap">
+                <image wx:if="{{pl.avatar}}" class="tee-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                <view wx:else class="tee-avatar tee-avatar-plus">+</view>
+              </view>
+              <text class="tee-player-name">{{pl.name}}</text>
+              <view class="tee-marker-line">
+                <view wx:if="{{pl.teeMarkerClass}}" class="tee-marker-dot {{pl.teeMarkerClass}}"></view>
+                <text class="tee-marker-letter">{{pl.teeLabel}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="editor-empty">
+        <text class="editor-empty__text">暂无分组</text>
+      </view>
+
+      <view class="groups-tab-toolbar">
+        <view class="add-group-btn" bindtap="onAddGroup">
+          <view class="add-group-icon"><text>+</text></view>
+          <text>添加分组</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="editor-cta-bar">
+    <view bindtap="onCancel" class="editor-cta-btn editor-cta-btn--cancel">取消</view>
+    <view bindtap="onConfirm" class="editor-cta-btn {{saving ? 'editor-cta-btn--disabled' : ''}}">确定</view>
+  </view>
+
+  <view wx:if="{{groupDeleteModalVisible}}" bindtap="closeGroupDeleteModal" class="editor-modal">
+    <view catchtap="stopPropagation" class="editor-dialog">
+      <text class="editor-dialog__title">确认删除{{groupDeleteTargetName}}？</text>
+      <text class="editor-dialog__desc">删除后该组球员配置将被移除。</text>
+      <view class="editor-dialog__actions">
+        <view bindtap="closeGroupDeleteModal" class="editor-dialog__btn">取消</view>
+        <view bindtap="confirmDeleteGroup" class="editor-dialog__btn editor-dialog__btn--danger">确认删除</view>
+      </view>
+    </view>
+  </view>
+</view>

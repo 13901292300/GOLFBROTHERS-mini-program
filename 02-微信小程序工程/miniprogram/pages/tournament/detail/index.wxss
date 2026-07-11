@@ -149,8 +149,10 @@ page {
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; }
 .card-title { color: var(--text-primary); font-size: 28rpx; font-weight: 900; letter-spacing: -0.02em; }
 .card-kicker { font-size: 20rpx; font-weight: 900; font-style: italic; color: var(--champion-gold); letter-spacing: 0.18em; }
-.card-text { color: var(--text-muted); font-size: 24rpx; line-height: 1.75; }
-.card-text--mt { display: block; margin-top: 12rpx; }
+.photo-live-card .card-text {
+  color: var(--cloud-blue, #002d62);
+  font-weight: 700;
+}
 
 .ad-image { border-radius: 16rpx; border: 1px solid var(--border); box-shadow: var(--shadow-card); overflow: hidden; background: var(--bg-card); margin-bottom: 32rpx; }
 .ad-image__img { width: 100%; display: block; }
@@ -816,6 +818,10 @@ page {
   min-height: calc(100vh - 92px - var(--tab-height) - 40rpx - env(safe-area-inset-bottom));
   margin-bottom: 32rpx;
 }
+.groups-tab-panel--with-cta {
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+  margin-bottom: 0;
+}
 .groups-tab-header {
   padding: 4rpx 0 12rpx;
 }
@@ -850,9 +856,13 @@ page {
 }
 .groups-panel-empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 180rpx;
+  gap: 28rpx;
+  min-height: 280rpx;
+  padding: 40rpx 32rpx;
+  box-sizing: border-box;
 }
 .groups-panel-empty__text {
   color: var(--text-muted);

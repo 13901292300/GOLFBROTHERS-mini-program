@@ -39,7 +39,8 @@ const FEATURES_COMMON = [
   { permission: 'stats', glyph: '📈', label: '统计数据' },
   { permission: 'poster', glyph: '🪪', label: '海报' },
   { permission: 'feedback', glyph: '💬', label: '反馈' },
-  { permission: 'theme', glyph: '🎨', label: '风格选择' }
+  { permission: 'theme', glyph: '🎨', label: '风格选择' },
+  { permission: 'export_groups', glyph: '📋', label: '导出分组表' }
 ];
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
@@ -53,7 +54,7 @@ const FEATURES_PERMISSION = [
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
   { permission: 'finish_match', glyph: '⏻', label: '结束比赛', tone: 'warning' }
 ];
-const MORE_ACCESS = { isPrivilegedUser: true, permissions: ['leaderboard', 'stats', 'poster', 'feedback', 'theme'] };
+const MORE_ACCESS = { isPrivilegedUser: true, permissions: ['leaderboard', 'stats', 'poster', 'feedback', 'theme', 'export_groups'] };
 const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
 const FAB_EDGE_GAP_RPX = 10;
@@ -669,6 +670,11 @@ Page({
   },
   onFeatureTap(e) {
     const permission = e.currentTarget.dataset.permission;
+    if (permission === 'export_groups') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      wx.showToast({ title: '分组表导出功能开发中', icon: 'none' });
+      return;
+    }
     if (permission === 'theme') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this.openStyleSheet();

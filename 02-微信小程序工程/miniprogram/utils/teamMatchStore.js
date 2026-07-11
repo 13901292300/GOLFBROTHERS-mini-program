@@ -216,6 +216,13 @@ function buildMatchFromCreatePage(pageData) {
     teamName: data.teamName || '',
     teamLogo: data.teamLogo || '',
     matchLogo: resolveMatchLogo(data),
+    logoConfig: data.logoConfig && typeof data.logoConfig === 'object'
+      ? {
+          type: data.logoConfig.type === 'custom' ? 'custom' : 'default',
+          url: data.logoConfig.url ? String(data.logoConfig.url) : '',
+          source: data.logoConfig.source ? String(data.logoConfig.source) : 'team'
+        }
+      : { type: 'default', url: '', source: 'team' },
     roundName: data.roundName || '',
     gameMode: data.gameMode || data.selectedGameMode || '',
     matchType: data.matchType || 'team-internal',
@@ -224,6 +231,7 @@ function buildMatchFromCreatePage(pageData) {
     eventInfoList: cloneEventInfoList(data.eventInfoList),
     teamGroups: cloneTeamGroups(data.teamGroups),
     registerInfo: createDefaultRegisterInfo(),
+    groups: [],
     feeSet: !!data.feeSet,
     isDiamondMode: !!data.isDiamondMode,
     bannerImage: data.bannerImage || '',
@@ -234,12 +242,118 @@ function buildMatchFromCreatePage(pageData) {
     teeTime: data.teeTime || '',
     teeTimeText: data.teeTimeText || '',
     deadlineTime: data.deadlineTime || '',
+    deadlineTimeText: data.deadlineTimeText || '',
+    visibility: data.visibility === 'private' ? 'private' : 'public',
+    accessCode: data.accessCode || '',
+    groupPermission: data.groupPermission === 'player' ? 'player' : 'admin',
     registerStatus: data.registerStatus === 'closed' ? 'closed' : 'open',
     status: 'registering',
     statusLabel: '报名中',
     createdBy: creatorId,
     creatorId: creatorId,
     createdAt: Date.now()
+  };
+}
+
+/**
+ * 编辑保存：用创建页表单更新赛事基础配置，保留报名/状态等运行中数据。
+ */
+function updateMatchFromCreatePage(existing, pageData) {
+  if (!existing || !existing.matchId) return null;
+  const data = pageData || {};
+  const next = Object.assign({}, existing);
+  next.teamId = data.teamId || '';
+  next.teamName = data.teamName || '';
+  next.teamLogo = data.teamLogo || '';
+  next.matchLogo = resolveMatchLogo(data);
+  next.logoConfig = data.logoConfig && typeof data.logoConfig === 'object'
+    ? {
+        type: data.logoConfig.type === 'custom' ? 'custom' : 'default',
+        url: data.logoConfig.url ? String(data.logoConfig.url) : '',
+        source: data.logoConfig.source ? String(data.logoConfig.source) : 'team'
+      }
+    : (existing.logoConfig || { type: 'default', url: '', source: 'team' });
+  next.roundName = data.roundName || '';
+  next.gameMode = data.gameMode || data.selectedGameMode || existing.gameMode || '';
+  next.matchType = existing.matchType || data.matchType || 'team-internal';
+  next.organizationName = data.organizationName != null
+    ? data.organizationName
+    : (existing.organizationName || '');
+  next.feeList = cloneFeeList(data.feeList);
+  next.eventInfoList = cloneEventInfoList(data.eventInfoList);
+  next.teamGroups = cloneTeamGroups(data.teamGroups);
+  next.feeSet = !!data.feeSet;
+  next.isDiamondMode = !!data.isDiamondMode;
+  next.bannerImage = data.bannerImage != null ? data.bannerImage : (existing.bannerImage || '');
+  next.courseId = data.courseId || '';
+  next.courseName = data.courseName || '';
+  next.courseLocation = data.courseLocation || '';
+  next.courseHalfText = data.courseHalfText || '';
+  next.teeTime = data.teeTime || '';
+  next.teeTimeText = data.teeTimeText || '';
+  next.deadlineTime = data.deadlineTime || '';
+  next.deadlineTimeText = data.deadlineTimeText || '';
+  next.visibility = data.visibility === 'private' ? 'private' : 'public';
+  next.accessCode = data.accessCode || '';
+  next.groupPermission = data.groupPermission === 'player' ? 'player' : 'admin';
+  // 保留运行中数据
+  next.matchId = existing.matchId;
+  next.registerInfo = existing.registerInfo;
+  next.groups = existing.groups;
+  next.registerStatus = existing.registerStatus;
+  next.status = existing.status;
+  next.statusLabel = existing.statusLabel;
+  next.createdBy = existing.createdBy;
+  next.creatorId = existing.creatorId;
+  next.createdAt = existing.createdAt;
+  next.updatedAt = Date.now();
+  return next;
+}
+
+/**
+ * 将已存赛事回填为创建页表单字段（缺省用空/默认，由页面再兜底）
+ */
+function hydrateCreatePageFromMatch(match) {
+  if (!match) return null;
+  const gameMode = match.gameMode || '个人比杆赛';
+  let logoConfig = match.logoConfig && typeof match.logoConfig === 'object'
+    ? {
+        type: match.logoConfig.type === 'custom' ? 'custom' : 'default',
+        url: match.logoConfig.url ? String(match.logoConfig.url) : '',
+        source: match.logoConfig.source ? String(match.logoConfig.source) : 'team'
+      }
+    : null;
+  if (!logoConfig) {
+    const matchLogo = match.matchLogo ? String(match.matchLogo).trim() : '';
+    logoConfig = matchLogo
+      ? { type: 'custom', url: matchLogo, source: 'custom' }
+      : { type: 'default', url: '', source: 'team' };
+  }
+  return {
+    teamId: match.teamId || '',
+    teamName: match.teamName || '',
+    teamLogo: match.teamLogo || '',
+    roundName: match.roundName || '',
+    courseId: match.courseId || '',
+    courseName: match.courseName || '',
+    courseLocation: match.courseLocation || '',
+    courseHalfText: match.courseHalfText || '',
+    teeTime: match.teeTime || '',
+    teeTimeText: match.teeTimeText || '',
+    deadlineTime: match.deadlineTime || '',
+    deadlineTimeText: match.deadlineTimeText || '',
+    selectedGameMode: gameMode,
+    gameMode: gameMode,
+    feeList: cloneFeeList(match.feeList),
+    eventInfoList: cloneEventInfoList(match.eventInfoList),
+    teamGroups: cloneTeamGroups(match.teamGroups),
+    feeSet: match.feeSet != null ? !!match.feeSet : true,
+    isDiamondMode: !!match.isDiamondMode,
+    bannerImage: match.bannerImage || '',
+    visibility: match.visibility === 'private' ? 'private' : 'public',
+    accessCode: match.accessCode || '',
+    groupPermission: match.groupPermission === 'player' ? 'player' : 'admin',
+    logoConfig: logoConfig
   };
 }
 
@@ -287,6 +401,8 @@ module.exports = {
   REGISTER_SUBJECT_TYPES,
   REGISTER_PICK_CHANNELS,
   buildMatchFromCreatePage,
+  updateMatchFromCreatePage,
+  hydrateCreatePageFromMatch,
   saveMatch,
   listMatches,
   getMatchById,
