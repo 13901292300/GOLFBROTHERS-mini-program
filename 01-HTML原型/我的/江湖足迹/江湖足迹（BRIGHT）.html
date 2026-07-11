@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高尔夫江湖 - 历史足迹</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        'golf-dark': '#ffffff',
+        'golf-green': '#004438',
+        'golf-light': '#0078d4',
+        'golf-gold': '#b8860b',
+        'golf-card': '#f8f9fa',
+        'golf-border': '#e5e7eb',
+        'golf-muted': '#6b7280',
+        'pga-blue': '#002d62',
+        'pga-gold': '#ce9224'
+      },
+      fontFamily: {
+        'sans': ['Inter', 'Noto Sans SC', 'sans-serif'],
+      }
+    }
+  }
+}
+</script>
+<style>
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f3f4f6; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+  .stat-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-top: 3px solid #002d62;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .stat-card:hover {
+    border-color: #0078d4;
+    transform: none;
+    background: #fafafa;
+  }
+
+  .hero-gradient {
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.95) 100%);
+  }
+
+  .glow-line {
+    background: #e5e7eb;
+    height: 1px;
+  }
+
+  .progress-bar {
+    background: #002d62;
+  }
+
+  .tab-active {
+    color: #0078d4;
+    border-bottom: 2px solid #0078d4;
+  }
+
+  .course-row:hover {
+    background: #f9fafb;
+  }
+
+  .avatar-ring {
+    background: #ffffff;
+    padding: 2px;
+    border-radius: 50%;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .milestone-line::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #f3f4f6;
+  }
+</style>
+
+  .rival-bar {
+    transition: width 0.8s ease;
+  }
+  
+  .map-bg {
+    background: #f8fafc;
+  }
+</style>
+</head>
+<body class="bg-[#fcfcfc] text-[#1a1a1a] font-sans min-h-screen">
+
+<!-- Top Nav Bar -->
+<nav class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded bg-pga-blue flex items-center justify-center">
+        <i class="fas fa-walking text-white text-sm"></i>
+      </div>
+      <span class="text-lg font-black tracking-tighter italic uppercase text-pga-blue">Tour Profile</span>
+    </div>
+    <div class="flex items-center gap-6 text-xs font-bold uppercase tracking-widest text-golf-muted">
+      <a href="#" class="hidden sm:block hover:text-pga-blue transition">Overview</a>
+      <a href="#" class="hidden sm:block hover:text-pga-blue transition">Stats</a>
+      <a href="#" class="text-pga-blue border-b-2 border-pga-gold pb-1">Footprints</a>
+      <a href="#" class="hidden sm:block hover:text-pga-blue transition">Courses</a>
+      <div class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center">
+        <i class="fas fa-user text-gray-400 text-xs"></i>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero Section -->
+<section class="relative pt-14">
+  <div class="h-72 sm:h-80 relative overflow-hidden">
+    <img src="https://cdn.screenshottocode.com/KKn6QVTGbZo0FPcFl0wXA.png" alt="Golf Course" class="w-full h-full object-cover">
+    <div class="absolute inset-0 hero-gradient"></div>
+    <div class="absolute inset-0 bg-gradient-to-r from-white/60 via-white/20 to-transparent"></div>
+  </div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 -mt-28 relative z-10">
+    <div class="flex flex-col sm:flex-row items-start sm:items-end gap-5">
+      <div class="avatar-ring shrink-0">
+        <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white flex items-center justify-center text-4xl font-black text-pga-blue border-4 border-pga-blue">
+          LI
+        </div>
+      </div>
+      <div class="flex-1 pb-1">
+        <div class="flex items-center gap-3 flex-wrap">
+          <h1 class="text-3xl sm:text-4xl font-black tracking-tighter uppercase italic text-pga-blue">LI MINGYUAN</h1>
+          <span class="px-2.5 py-0.5 bg-pga-gold text-white text-[10px] font-black uppercase tracking-tighter rounded">
+            FEDEXCUP RANK: 12
+          </span>
+          <span class="px-2.5 py-0.5 bg-pga-blue text-white text-[10px] font-black uppercase tracking-tighter rounded">
+            HANDICAP: 12.4
+          </span>
+        </div>
+        <p class="text-golf-muted text-xs font-bold uppercase tracking-widest mt-2">Active Since 2017 · <span class="text-pga-blue">2,847 Days on Tour</span></p>
+      </div>
+      <div class="flex gap-2 pb-1">
+        <button class="px-6 py-2.5 bg-pga-blue hover:bg-blue-800 text-white text-[10px] font-black uppercase tracking-widest rounded transition">
+          Follow
+        </button>
+        <button class="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-pga-blue rounded transition border border-gray-200">
+          <i class="fas fa-share-alt"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Divider -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+  <div class="glow-line"></div>
+</div>
+
+<!-- Key Stats Cards -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+    <div class="stat-card rounded-xl p-4 sm:p-5 text-center">
+      <div class="text-golf-muted text-xs uppercase tracking-wider mb-2">总轮次</div>
+      <div class="text-2xl sm:text-3xl font-extrabold text-pga-blue">486</div>
+      <div class="text-golf-light text-xs mt-1">+23 本年</div>
+    </div>
+    <div class="stat-card rounded-xl p-4 sm:p-5 text-center">
+      <div class="text-golf-muted text-xs uppercase tracking-wider mb-2">登录天数</div>
+      <div class="text-2xl sm:text-3xl font-extrabold text-pga-blue">1,342</div>
+      <div class="text-golf-light text-xs mt-1">活跃度 47%</div>
+    </div>
+    <div class="stat-card rounded-xl p-4 sm:p-5 text-center">
+      <div class="text-golf-muted text-xs uppercase tracking-wider mb-2">历史均杆</div>
+      <div class="text-2xl sm:text-3xl font-extrabold text-golf-light">84.6</div>
+      <div class="text-golf-gold text-xs mt-1">最佳 72</div>
+    </div>
+    <div class="stat-card rounded-xl p-4 sm:p-5 text-center">
+      <div class="text-golf-muted text-xs uppercase tracking-wider mb-2">一切一推</div>
+      <div class="text-2xl sm:text-3xl font-extrabold text-pga-blue">127</div>
+      <div class="text-golf-light text-xs mt-1">占比 26%</div>
+    </div>
+    <div class="stat-card rounded-xl p-4 sm:p-5 text-center">
+      <div class="text-golf-muted text-xs uppercase tracking-wider mb-2">打过球场</div>
+      <div class="text-2xl sm:text-3xl font-extrabold text-pga-blue">38</div>
+      <div class="text-golf-light text-xs mt-1">5 个国家</div>
+    </div>
+    <div class="stat-card rounded-xl p-4 sm:p-5 text-center">
+      <div class="text-golf-muted text-xs uppercase tracking-wider mb-2">球友数</div>
+      <div class="text-2xl sm:text-3xl font-extrabold text-pga-blue">156</div>
+      <div class="text-golf-light text-xs mt-1">同组 89 人</div>
+    </div>
+  </div>
+</section>
+
+<!-- Yearly Performance Chart -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-10">
+  <div class="stat-card rounded-2xl p-5 sm:p-7">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div>
+        <h2 class="text-lg font-bold text-pga-blue">成绩走势</h2>
+        <p class="text-golf-muted text-sm mt-0.5">历年平均杆数 & 轮次统计</p>
+      </div>
+      <div class="flex gap-1 bg-gray-100 rounded-lg p-1 text-xs">
+        <button onclick="setChartRange('all')" id="btn-all" class="px-3 py-1.5 rounded-md bg-white text-pga-blue shadow-sm font-medium transition">全部</button>
+        <button onclick="setChartRange('5y')" id="btn-5y" class="px-3 py-1.5 rounded-md text-golf-muted hover:text-pga-blue transition">近5年</button>
+        <button onclick="setChartRange('3y')" id="btn-3y" class="px-3 py-1.5 rounded-md text-golf-muted hover:text-pga-blue transition">近3年</button>
+      </div>
+    </div>
+    <div class="h-64 sm:h-72">
+      <canvas id="performanceChart"></canvas>
+    </div>
+    <!-- Yearly Stats Grid -->
+    <div class="grid grid-cols-4 sm:grid-cols-8 gap-2 mt-6 pt-5 border-t border-gray-100">
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2017</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">92.3</div>
+        <div class="text-golf-muted text-xs">28轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2018</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">89.1</div>
+        <div class="text-golf-muted text-xs">52轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2019</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">87.4</div>
+        <div class="text-golf-muted text-xs">64轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2020</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">86.2</div>
+        <div class="text-golf-muted text-xs">41轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2021</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">85.0</div>
+        <div class="text-golf-muted text-xs">72轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2022</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">83.8</div>
+        <div class="text-golf-muted text-xs">78轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2023</div>
+        <div class="text-pga-blue font-bold text-sm mt-1">82.1</div>
+        <div class="text-golf-muted text-xs">85轮</div>
+      </div>
+      <div class="text-center">
+        <div class="text-golf-muted text-xs">2024</div>
+        <div class="text-golf-light font-bold text-sm mt-1">80.5</div>
+        <div class="text-golf-light text-xs">66轮</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Scoring Distribution & Best Rounds -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Scoring Distribution -->
+    <div class="stat-card rounded-2xl p-5 sm:p-7">
+      <h2 class="text-lg font-bold mb-1 text-pga-blue">成绩分布</h2>
+      <p class="text-golf-muted text-sm mb-5">各杆数区间占比</p>
+      <div class="space-y-3.5">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-golf-muted w-16 text-right shrink-0">70-75</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full flex items-center justify-end pr-2 rival-bar" style="width: 5%">
+              <span class="text-xs font-semibold text-white">2%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-golf-muted w-16 text-right shrink-0">76-80</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full flex items-center justify-end pr-2 rival-bar" style="width: 18%">
+              <span class="text-xs font-semibold text-white">15%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-golf-muted w-16 text-right shrink-0">81-85</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full flex items-center justify-end pr-2 rival-bar" style="width: 42%">
+              <span class="text-xs font-semibold text-white">38%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-golf-muted w-16 text-right shrink-0">86-90</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full flex items-center justify-end pr-2 rival-bar" style="width: 32%">
+              <span class="text-xs font-semibold text-white">28%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-golf-muted w-16 text-right shrink-0">91-95</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full flex items-center justify-end pr-2 rival-bar" style="width: 15%">
+              <span class="text-xs font-semibold text-white">12%</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-golf-muted w-16 text-right shrink-0">96+</span>
+          <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+            <div class="progress-bar h-full rounded-full flex items-center justify-end pr-2 rival-bar" style="width: 8%">
+              <span class="text-xs font-semibold text-white">5%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Best Rounds -->
+    <div class="stat-card rounded-2xl p-5 sm:p-7">
+      <h2 class="text-lg font-bold mb-1 text-pga-blue">巅峰时刻</h2>
+      <p class="text-golf-muted text-sm mb-5">个人最佳成绩 TOP 5</p>
+      <div class="space-y-3">
+        <div class="flex items-center gap-4 p-3 rounded-xl bg-gray-50 border border-golf-gold/20">
+          <div class="w-10 h-10 rounded-lg bg-golf-gold/10 flex items-center justify-center shrink-0">
+            <i class="fas fa-trophy text-golf-gold"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate text-pga-blue">观澜湖高尔夫球会 · 奥拉沙宝场</div>
+            <div class="text-xs text-golf-muted mt-0.5">2024年3月16日</div>
+          </div>
+          <div class="text-2xl font-extrabold text-golf-gold">72</div>
+        </div>
+        <div class="flex items-center gap-4 p-3 rounded-xl bg-gray-50">
+          <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 text-sm font-bold text-golf-muted">2</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate text-pga-blue">南山国际高尔夫球会</div>
+            <div class="text-xs text-golf-muted mt-0.5">2023年11月8日</div>
+          </div>
+          <div class="text-2xl font-extrabold text-pga-blue">74</div>
+        </div>
+        <div class="flex items-center gap-4 p-3 rounded-xl bg-gray-50">
+          <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 text-sm font-bold text-golf-muted">3</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate text-pga-blue">清迈 Alpine Golf Resort</div>
+            <div class="text-xs text-golf-muted mt-0.5">2023年7月22日</div>
+          </div>
+          <div class="text-2xl font-extrabold text-pga-blue">76</div>
+        </div>
+        <div class="flex items-center gap-4 p-3 rounded-xl bg-gray-50">
+          <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 text-sm font-bold text-golf-muted">4</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate text-pga-blue">佘山国际高尔夫俱乐部</div>
+            <div class="text-xs text-golf-muted mt-0.5">2024年5月3日</div>
+          </div>
+          <div class="text-2xl font-extrabold text-pga-blue">77</div>
+        </div>
+        <div class="flex items-center gap-4 p-3 rounded-xl bg-gray-50">
+          <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 text-sm font-bold text-golf-muted">5</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate text-pga-blue">Spring City Golf & Lake Resort</div>
+            <div class="text-xs text-golf-muted mt-0.5">2022年12月10日</div>
+          </div>
+          <div class="text-2xl font-extrabold text-pga-blue">78</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Head-to-Head Records -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+  <div class="stat-card rounded-2xl p-5 sm:p-7">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-lg font-bold text-pga-blue">江湖对决</h2>
+        <p class="text-golf-muted text-sm mt-0.5">与常约球友的交锋战绩</p>
+      </div>
+      <button class="text-golf-light text-sm hover:underline">查看全部 →</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <!-- Rival 1 -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-600">王</div>
+          <div>
+            <div class="text-sm font-semibold text-pga-blue">王大鹏</div>
+            <div class="text-xs text-golf-muted">同组 42 轮 · 差点 10.8</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-golf-light font-semibold w-10">18胜</span>
+          <div class="flex-1 flex h-3 rounded-full overflow-hidden bg-gray-200">
+            <div class="bg-golf-light" style="width:42.8%"></div>
+            <div class="bg-gray-300" style="width:14.4%"></div>
+            <div class="bg-red-400" style="width:42.8%"></div>
+          </div>
+          <span class="text-xs text-red-500 font-semibold w-10 text-right">18负</span>
+        </div>
+        <div class="text-center text-xs text-golf-muted">6 平</div>
+      </div>
+      <!-- Rival 2 -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-sm font-bold text-purple-600">张</div>
+          <div>
+            <div class="text-sm font-semibold text-pga-blue">张志强</div>
+            <div class="text-xs text-golf-muted">同组 38 轮 · 差点 15.2</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-golf-light font-semibold w-10">25胜</span>
+          <div class="flex-1 flex h-3 rounded-full overflow-hidden bg-gray-200">
+            <div class="bg-golf-light" style="width:65.8%"></div>
+            <div class="bg-gray-300" style="width:7.9%"></div>
+            <div class="bg-red-400" style="width:26.3%"></div>
+          </div>
+          <span class="text-xs text-red-500 font-semibold w-10 text-right">10负</span>
+        </div>
+        <div class="text-center text-xs text-golf-muted">3 平</div>
+      </div>
+      <!-- Rival 3 -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-sm font-bold text-amber-600">陈</div>
+          <div>
+            <div class="text-sm font-semibold text-pga-blue">陈家豪</div>
+            <div class="text-xs text-golf-muted">同组 35 轮 · 差点 8.5</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-golf-light font-semibold w-10">12胜</span>
+          <div class="flex-1 flex h-3 rounded-full overflow-hidden bg-gray-200">
+            <div class="bg-golf-light" style="width:34.3%"></div>
+            <div class="bg-gray-300" style="width:8.6%"></div>
+            <div class="bg-red-400" style="width:57.1%"></div>
+          </div>
+          <span class="text-xs text-red-500 font-semibold w-10 text-right">20负</span>
+        </div>
+        <div class="text-center text-xs text-golf-muted">3 平</div>
+      </div>
+      <!-- Rival 4 -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-bold text-emerald-600">林</div>
+          <div>
+            <div class="text-sm font-semibold text-pga-blue">林伟明</div>
+            <div class="text-xs text-golf-muted">同组 31 轮 · 差点 13.1</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-golf-light font-semibold w-10">20胜</span>
+          <div class="flex-1 flex h-3 rounded-full overflow-hidden bg-gray-200">
+            <div class="bg-golf-light" style="width:64.5%"></div>
+            <div class="bg-gray-300" style="width:9.7%"></div>
+            <div class="bg-red-400" style="width:25.8%"></div>
+          </div>
+          <span class="text-xs text-red-500 font-semibold w-10 text-right">8负</span>
+        </div>
+        <div class="text-center text-xs text-golf-muted">3 平</div>
+      </div>
+      <!-- Rival 5 -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-sm font-bold text-rose-600">赵</div>
+          <div>
+            <div class="text-sm font-semibold text-pga-blue">赵国庆</div>
+            <div class="text-xs text-golf-muted">同组 28 轮 · 差点 11.6</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-golf-light font-semibold w-10">15胜</span>
+          <div class="flex-1 flex h-3 rounded-full overflow-hidden bg-gray-200">
+            <div class="bg-golf-light" style="width:53.6%"></div>
+            <div class="bg-gray-300" style="width:10.7%"></div>
+            <div class="bg-red-400" style="width:35.7%"></div>
+          </div>
+          <span class="text-xs text-red-500 font-semibold w-10 text-right">10负</span>
+        </div>
+        <div class="text-center text-xs text-golf-muted">3 平</div>
+      </div>
+      <!-- Rival 6 -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-sm font-bold text-cyan-600">刘</div>
+          <div>
+            <div class="text-sm font-semibold text-pga-blue">刘思远</div>
+            <div class="text-xs text-golf-muted">同组 26 轮 · 差点 14.7</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs text-golf-light font-semibold w-10">19胜</span>
+          <div class="flex-1 flex h-3 rounded-full overflow-hidden bg-gray-200">
+            <div class="bg-golf-light" style="width:73.1%"></div>
+            <div class="bg-gray-300" style="width:3.8%"></div>
+            <div class="bg-red-400" style="width:23.1%"></div>
+          </div>
+          <span class="text-xs text-red-500 font-semibold w-10 text-right">6负</span>
+        </div>
+        <div class="text-center text-xs text-golf-muted">1 平</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footprint Map & Courses -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+    <!-- Map -->
+    <div class="lg:col-span-3 stat-card rounded-2xl p-5 sm:p-7">
+      <h2 class="text-lg font-bold mb-1 text-pga-blue">足迹地图</h2>
+      <p class="text-golf-muted text-sm mb-5">跨越 5 个国家 · 38 座球场</p>
+      <div class="relative bg-slate-50 rounded-xl overflow-hidden border border-gray-100" style="height: 320px;">
+        <!-- SVG World Map -->
+        <svg viewBox="0 0 1000 500" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <!-- Simplified continents -->
+          <!-- Asia -->
+          <path d="M580 80 Q620 60 680 70 Q740 65 780 80 Q820 70 850 90 Q870 110 860 140 Q850 170 830 190 Q810 210 780 220 Q750 230 720 225 Q700 240 680 250 Q660 240 640 230 Q610 240 590 230 Q570 220 560 200 Q550 180 555 160 Q550 140 560 120 Q565 100 580 80Z" fill="#cbd5e1" opacity="0.6"/>
+          <!-- Europe -->
+          <path d="M440 70 Q460 55 480 60 Q500 55 520 65 Q540 60 550 75 Q560 90 555 110 Q550 130 535 145 Q520 155 500 150 Q480 155 465 145 Q450 135 445 115 Q440 95 440 70Z" fill="#cbd5e1" opacity="0.6"/>
+          <!-- Africa -->
+          <path d="M440 180 Q460 170 480 175 Q500 170 520 180 Q535 195 540 220 Q545 250 535 280 Q525 310 510 330 Q495 345 480 350 Q465 345 455 330 Q445 310 440 280 Q435 250 438 220 Q437 200 440 180Z" fill="#cbd5e1" opacity="0.6"/>
+          <!-- Americas -->
+          <path d="M150 60 Q170 50 200 55 Q230 50 260 60 Q280 70 290 90 Q300 110 295 130 Q290 150 275 165 Q260 175 240 180 Q230 200 225 220 Q220 245 230 270 Q235 290 225 310 Q215 330 200 340 Q185 345 175 335 Q165 320 160 300 Q155 275 160 250 Q158 230 155 210 Q150 190 145 170 Q140 145 142 120 Q143 90 150 60Z" fill="#cbd5e1" opacity="0.6"/>
+          <!-- Oceania -->
+          <path d="M750 300 Q780 290 820 295 Q860 300 880 320 Q890 340 875 355 Q860 365 835 370 Q810 370 785 360 Q765 350 755 335 Q748 320 750 300Z" fill="#cbd5e1" opacity="0.6"/>
+
+          <!-- Map dots - China locations -->
+          <circle cx="720" cy="140" r="5" fill="#0078d4" class="map-dot" opacity="0.9"/>
+          <circle cx="740" cy="155" r="4" fill="#0078d4" class="map-dot" style="animation-delay:0.3s"/>
+          <circle cx="710" cy="160" r="4" fill="#0078d4" class="map-dot" style="animation-delay:0.5s"/>
+          <circle cx="735" cy="170" r="5" fill="#0078d4" class="map-dot" style="animation-delay:0.7s"/>
+          <circle cx="725" cy="180" r="4" fill="#0078d4" class="map-dot" style="animation-delay:0.2s"/>
+          <circle cx="745" cy="175" r="3" fill="#0078d4" class="map-dot" style="animation-delay:0.4s"/>
+          
+          <!-- Thailand -->
+          <circle cx="695" cy="210" r="4" fill="#b8860b" class="map-dot" style="animation-delay:0.6s"/>
+          
+          <!-- Japan -->
+          <circle cx="790" cy="135" r="4" fill="#b8860b" class="map-dot" style="animation-delay:0.8s"/>
+          
+          <!-- Korea -->
+          <circle cx="770" cy="130" r="3" fill="#b8860b" class="map-dot" style="animation-delay:1s"/>
+          
+          <!-- Australia -->
+          <circle cx="810" cy="330" r="4" fill="#b8860b" class="map-dot" style="animation-delay:1.2s"/>
+
+          <!-- Labels -->
+          <text x="720" y="125" fill="#0078d4" font-size="11" font-weight="600" text-anchor="middle">中国 · 28场</text>
+          <text x="695" y="228" fill="#b8860b" font-size="9" text-anchor="middle">泰国 · 4场</text>
+          <text x="790" y="120" fill="#b8860b" font-size="9" text-anchor="middle">日本 · 3场</text>
+          <text x="770" y="118" fill="#b8860b" font-size="9" text-anchor="end">韩国 · 2场</text>
+          <text x="810" y="350" fill="#b8860b" font-size="9" text-anchor="middle">澳大利亚 · 1场</text>
+        </svg>
+      </div>
+      <!-- Country Badges -->
+      <div class="flex flex-wrap gap-2 mt-4">
+        <span class="px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-xs font-medium text-pga-blue">🇨🇳 中国 28场</span>
+        <span class="px-3 py-1.5 bg-yellow-50 border border-yellow-100 rounded-full text-xs font-medium text-golf-gold">🇹🇭 泰国 4场</span>
+        <span class="px-3 py-1.5 bg-yellow-50 border border-yellow-100 rounded-full text-xs font-medium text-golf-gold">🇯🇵 日本 3场</span>
+        <span class="px-3 py-1.5 bg-yellow-50 border border-yellow-100 rounded-full text-xs font-medium text-golf-gold">🇰🇷 韩国 2场</span>
+        <span class="px-3 py-1.5 bg-yellow-50 border border-yellow-100 rounded-full text-xs font-medium text-golf-gold">🇦🇺 澳大利亚 1场</span>
+      </div>
+    </div>
+
+    <!-- Course List -->
+    <div class="lg:col-span-2 stat-card rounded-2xl p-5 sm:p-7">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-pga-blue">常去球场</h2>
+          <p class="text-golf-muted text-sm mt-0.5">按打球次数排列</p>
+        </div>
+      </div>
+      <div class="space-y-1 max-h-[400px] overflow-y-auto pr-1">
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-gold">01</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">观澜湖高尔夫球会</div>
+            <div class="text-xs text-golf-muted">深圳 · 最佳 72</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">52轮</div>
+            <div class="text-xs text-golf-muted">均杆 83.2</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">02</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">南山国际高尔夫球会</div>
+            <div class="text-xs text-golf-muted">深圳 · 最佳 74</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">45轮</div>
+            <div class="text-xs text-golf-muted">均杆 84.1</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">03</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">佘山国际高尔夫俱乐部</div>
+            <div class="text-xs text-golf-muted">上海 · 最佳 77</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">38轮</div>
+            <div class="text-xs text-golf-muted">均杆 85.6</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">04</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">Spring City 春城</div>
+            <div class="text-xs text-golf-muted">昆明 · 最佳 78</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">32轮</div>
+            <div class="text-xs text-golf-muted">均杆 84.8</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">05</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">清迈 Alpine Golf Resort</div>
+            <div class="text-xs text-golf-muted">泰国 · 最佳 76</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">18轮</div>
+            <div class="text-xs text-golf-muted">均杆 82.9</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">06</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">海口美视五月花</div>
+            <div class="text-xs text-golf-muted">海口 · 最佳 79</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">16轮</div>
+            <div class="text-xs text-golf-muted">均杆 86.3</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">07</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">川奈ホテルゴルフコース</div>
+            <div class="text-xs text-golf-muted">日本 · 最佳 82</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">8轮</div>
+            <div class="text-xs text-golf-muted">均杆 87.5</div>
+          </div>
+        </div>
+        <div class="course-row flex items-center gap-3 p-3 rounded-lg transition cursor-pointer">
+          <div class="w-8 text-center text-xs font-bold text-golf-muted">08</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate text-pga-blue">济州岛 Nine Bridges</div>
+            <div class="text-xs text-golf-muted">韩国 · 最佳 81</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-bold text-pga-blue">6轮</div>
+            <div class="text-xs text-golf-muted">均杆 86.2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Monthly Activity Heatmap -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+  <div class="stat-card rounded-2xl p-5 sm:p-7">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+      <div>
+        <h2 class="text-lg font-bold text-pga-blue">打球热力图</h2>
+        <p class="text-golf-muted text-sm mt-0.5">2024年每月打球频次</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-golf-muted">
+        <span>少</span>
+        <div class="flex gap-0.5">
+          <div class="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200"></div>
+          <div class="w-3 h-3 rounded-sm bg-blue-100"></div>
+          <div class="w-3 h-3 rounded-sm bg-blue-200"></div>
+          <div class="w-3 h-3 rounded-sm bg-blue-400"></div>
+          <div class="w-3 h-3 rounded-sm bg-pga-blue"></div>
+        </div>
+        <span>多</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-6 sm:grid-cols-12 gap-2">
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">1月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-100 flex items-center justify-center text-sm font-bold text-pga-blue">4</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">2月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-50 flex items-center justify-center text-sm font-bold text-pga-blue">3</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">3月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-400 flex items-center justify-center text-sm font-bold text-white">8</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">4月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-pga-blue flex items-center justify-center text-sm font-bold text-white">10</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">5月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-400 flex items-center justify-center text-sm font-bold text-white">9</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">6月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-200 flex items-center justify-center text-sm font-bold text-pga-blue">6</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">7月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-100 flex items-center justify-center text-sm font-bold text-pga-blue">3</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">8月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-50 flex items-center justify-center text-sm font-bold text-pga-blue">2</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">9月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-200 flex items-center justify-center text-sm font-bold text-pga-blue">5</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">10月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-pga-blue flex items-center justify-center text-sm font-bold text-white">11</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">11月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-blue-200 flex items-center justify-center text-sm font-bold text-pga-blue">5</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-golf-muted mb-2">12月</div>
+        <div class="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-sm font-bold text-golf-muted">—</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Milestones Timeline -->
+<section class="max-w-7xl mx-auto px-4 sm:px-6 mt-6 mb-16">
+  <div class="stat-card rounded-2xl p-5 sm:p-7">
+    <h2 class="text-lg font-bold mb-1 text-pga-blue">江湖大事记</h2>
+    <p class="text-golf-muted text-sm mb-6">你的高尔夫之旅重要节点</p>
+    <div class="relative milestone-line pl-10 space-y-6">
+      <div class="relative fade-in-up">
+        <div class="absolute left-[-25px] w-8 h-8 rounded-full bg-blue-50 border-2 border-pga-blue flex items-center justify-center">
+          <i class="fas fa-flag text-pga-blue text-xs"></i>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-pga-blue">加入高尔夫江湖</span>
+            <span class="text-xs text-golf-muted">2017年3月15日</span>
+          </div>
+          <p class="text-xs text-golf-muted mt-1">正式注册，开启江湖之路</p>
+        </div>
+      </div>
+      <div class="relative fade-in-up" style="animation-delay: 0.1s">
+        <div class="absolute left-[-25px] w-8 h-8 rounded-full bg-yellow-50 border-2 border-pga-gold flex items-center justify-center">
+          <i class="fas fa-star text-pga-gold text-xs"></i>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-pga-blue">首次破90</span>
+            <span class="text-xs text-golf-muted">2018年6月22日</span>
+          </div>
+          <p class="text-xs text-golf-muted mt-1">在南山国际球会打出 88 杆</p>
+        </div>
+      </div>
+      <div class="relative fade-in-up" style="animation-delay: 0.2s">
+        <div class="absolute left-[-25px] w-8 h-8 rounded-full bg-blue-50 border-2 border-blue-400 flex items-center justify-center">
+          <i class="fas fa-plane text-blue-400 text-xs"></i>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-pga-blue">首次海外打球</span>
+            <span class="text-xs text-golf-muted">2019年2月14日</span>
+          </div>
+          <p class="text-xs text-golf-muted mt-1">清迈 Alpine Golf Resort，开启国际征程</p>
+        </div>
+      </div>
+      <div class="relative fade-in-up" style="animation-delay: 0.3s">
+        <div class="absolute left-[-25px] w-8 h-8 rounded-full bg-yellow-50 border-2 border-pga-gold flex items-center justify-center">
+          <i class="fas fa-fire text-pga-gold text-xs"></i>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-pga-blue">首次破80</span>
+            <span class="text-xs text-golf-muted">2022年12月10日</span>
+          </div>
+          <p class="text-xs text-golf-muted mt-1">春城球会山景场打出 78 杆，突破里程碑</p>
+        </div>
+      </div>
+      <div class="relative fade-in-up" style="animation-delay: 0.4s">
+        <div class="absolute left-[-25px] w-8 h-8 rounded-full bg-purple-50 border-2 border-purple-400 flex items-center justify-center">
+          <i class="fas fa-users text-purple-400 text-xs"></i>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-pga-blue">累计 100 位球友</span>
+            <span class="text-xs text-golf-muted">2023年5月18日</span>
+          </div>
+          <p class="text-xs text-golf-muted mt-1">江湖人脉破百，结识第 100 位球友</p>
+        </div>
+      </div>
+      <div class="relative fade-in-up" style="animation-delay: 0.5s">
+        <div class="absolute left-[-25px] w-8 h-8 rounded-full bg-blue-50 border-2 border-pga-blue flex items-center justify-center">
+          <i class="fas fa-trophy text-pga-blue text-xs"></i>
+        </div>
+        <div class="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold text-pga-blue">个人最佳 72 杆！</span>
+            <span class="text-xs text-golf-muted">2024年3月16日</span>
+          </div>
+          <p class="text-xs text-golf-muted mt-1">观澜湖奥拉沙宝场，平标准杆，创造个人历史</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Visual Specification Document Overlay -->
+<div id="spec-overlay" class="fixed inset-0 z-[100] bg-white hidden overflow-y-auto">
+  <div class="max-w-4xl mx-auto px-6 py-12">
+    <div class="flex justify-between items-center mb-12 border-b pb-6">
+      <div>
+        <h1 class="text-3xl font-black tracking-tighter text-pga-blue uppercase italic">Visual Design Specification</h1>
+        <p class="text-golf-muted mt-2 uppercase tracking-widest text-xs font-bold">高尔夫江湖 · 历史足迹 视觉规范说明</p>
+      </div>
+      <button onclick="toggleSpec()" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <!-- Colors -->
+      <section>
+        <h2 class="text-sm font-black uppercase tracking-widest text-pga-blue mb-6 flex items-center gap-2">
+          <span class="w-2 h-6 bg-pga-gold inline-block"></span> 01. 色彩体系 (Colors)
+        </h2>
+        <div class="space-y-4">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded shadow-inner bg-[#002d62]"></div>
+            <div>
+              <div class="text-sm font-bold">PGA Blue (Primary)</div>
+              <div class="text-xs text-golf-muted">#002D62 - 用于标题、核心按钮、关键状态</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded shadow-inner bg-[#ce9224]"></div>
+            <div>
+              <div class="text-sm font-bold">PGA Gold (Accent)</div>
+              <div class="text-xs text-golf-muted">#CE9224 - 用于等级标识、荣誉勋章、重要强调</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded shadow-inner bg-[#0078d4]"></div>
+            <div>
+              <div class="text-sm font-bold">Golf Light (Action)</div>
+              <div class="text-xs text-golf-muted">#0078D4 - 用于链接、辅助交互、趋势指标</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded shadow-inner border bg-[#fcfcfc]"></div>
+            <div>
+              <div class="text-sm font-bold">Background Canvas</div>
+              <div class="text-xs text-golf-muted">#FCFCFC - 页面底色，营造轻量且专业的观感</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Typography -->
+      <section>
+        <h2 class="text-sm font-black uppercase tracking-widest text-pga-blue mb-6 flex items-center gap-2">
+          <span class="w-2 h-6 bg-pga-gold inline-block"></span> 02. 字体规范 (Typography)
+        </h2>
+        <div class="space-y-6">
+          <div>
+            <div class="text-2xl font-black italic tracking-tighter uppercase text-pga-blue">Inter Black Italic</div>
+            <p class="text-xs text-golf-muted mt-1">核心品牌标题与姓名 (Font-weight: 900)</p>
+          </div>
+          <div>
+            <div class="text-sm font-bold uppercase tracking-widest text-golf-muted">Noto Sans SC Bold</div>
+            <p class="text-xs text-golf-muted mt-1">辅助说明与标签 (Letter-spacing: 0.1em)</p>
+          </div>
+          <div>
+            <div class="text-lg font-bold text-pga-blue">中文字体层次说明</div>
+            <p class="text-sm text-gray-600 mt-1 leading-relaxed">正文采用 500/600 字重平衡可读性与专业感。数值展示统一使用加粗形态以增强视觉冲击力。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Components -->
+      <section>
+        <h2 class="text-sm font-black uppercase tracking-widest text-pga-blue mb-6 flex items-center gap-2">
+          <span class="w-2 h-6 bg-pga-gold inline-block"></span> 03. 组件语言 (UI Components)
+        </h2>
+        <ul class="space-y-3 text-sm text-gray-600">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-pga-blue mt-1"></i>
+            <span><strong>Card:</strong> 圆角 1rem (16px)，1px 浅灰描边，顶部 3px 品牌色条强调。</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-pga-blue mt-1"></i>
+            <span><strong>Progress:</strong> 胶囊形全圆角，使用对比色背景增强进度感知。</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check-circle text-pga-blue mt-1"></i>
+            <span><strong>Shadow:</strong> 仅在 Avatar 与 悬浮状态使用微投影 (Soft Shadow)，保持扁平干净的视觉基调。</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Strategy -->
+      <section>
+        <h2 class="text-sm font-black uppercase tracking-widest text-pga-blue mb-6 flex items-center gap-2">
+          <span class="w-2 h-6 bg-pga-gold inline-block"></span> 04. 设计策略 (Strategy)
+        </h2>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          采用 <strong>"PGA Pro-Style"</strong> 风格。强调数据可视化与专业运动感。通过大量的间距 (Whitespace) 与 严谨的网格系统 (Grid System) 展现高尔夫运动的秩序感与高端社交属性。
+        </p>
+      </section>
+    </div>
+
+    <div class="mt-16 pt-8 border-t flex justify-center">
+      <button onclick="toggleSpec()" class="px-8 py-3 bg-pga-blue text-white text-xs font-black uppercase tracking-widest rounded shadow-lg hover:shadow-xl transition">
+        返回预览界面
+      </button>
+    </div>
+  </div>
+</div>
+
+<button onclick="toggleSpec()" class="fixed bottom-6 right-6 z-[60] w-14 h-14 bg-pga-gold text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition active:scale-95 group">
+  <i class="fas fa-swatchbook text-xl"></i>
+  <span class="absolute right-full mr-4 px-3 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">查看视觉规范</span>
+</button>
+
+<script>
+function toggleSpec() {
+  const overlay = document.getElementById('spec-overlay');
+  overlay.classList.toggle('hidden');
+  document.body.style.overflow = overlay.classList.contains('hidden') ? 'auto' : 'hidden';
+}
+</script>
+
+<footer class="border-t border-gray-200 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded bg-pga-blue flex items-center justify-center">
+          <i class="fas fa-golf-ball text-white text-xs"></i>
+        </div>
+        <span class="text-sm font-semibold text-pga-blue">高尔夫江湖</span>
+        <span class="text-xs text-golf-muted ml-2">© 2024</span>
+      </div>
+      <div class="text-xs text-golf-muted">
+        数据截至 2024年11月15日 · 以上数据均来自真实打球记录
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Performance Chart
+const ctx = document.getElementById('performanceChart').getContext('2d');
+const allLabels = ['2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024'];
+const allScores = [92.3, 89.1, 87.4, 86.2, 85.0, 83.8, 82.1, 80.5];
+const allRounds = [28, 52, 64, 41, 72, 78, 85, 66];
+
+let performanceChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: allLabels,
+    datasets: [
+      {
+        label: 'SCORING AVG',
+        data: allScores,
+        borderColor: '#002d62',
+        backgroundColor: 'transparent',
+        borderWidth: 3,
+        tension: 0,
+        pointBackgroundColor: '#002d62',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        yAxisID: 'y'
+      },
+      {
+        label: 'ROUNDS',
+        data: allRounds,
+        type: 'bar',
+        backgroundColor: '#e5e7eb',
+        borderRadius: 4,
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        align: 'end',
+        labels: {
+          color: '#6b7280',
+          boxWidth: 12,
+          font: { weight: 'bold', size: 10, family: 'Inter' }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#6b7280', font: { weight: 'bold' } }
+      },
+      y: {
+        reverse: true,
+        min: 75,
+        max: 95,
+        grid: { color: '#f3f4f6' },
+        ticks: { color: '#6b7280' }
+      },
+      y1: {
+        position: 'right',
+        grid: { display: false },
+        ticks: { color: '#6b7280' }
+      }
+    }
+  }
+});
+
+function setChartRange(range) {
+  const buttons = ['btn-all', 'btn-5y', 'btn-3y'];
+  buttons.forEach(id => {
+    document.getElementById(id).className = 'px-3 py-1.5 rounded-md text-golf-muted hover:text-pga-blue transition';
+  });
+  document.getElementById('btn-' + range).className = 'px-3 py-1.5 rounded-md bg-white text-pga-blue shadow-sm font-medium transition';
+
+  let start = 0;
+  if (range === '5y') start = 3;
+  if (range === '3y') start = 5;
+
+  performanceChart.data.labels = allLabels.slice(start);
+  performanceChart.data.datasets[0].data = allScores.slice(start);
+  performanceChart.data.datasets[1].data = allRounds.slice(start);
+  performanceChart.update();
+}
+</script>
+
+</body>
+</html>

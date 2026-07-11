@@ -14,11 +14,16 @@ const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 const bannerConfig = require('../../../utils/bannerConfig.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const demoJiaobeiMatch = require('../../../utils/demoJiaobeiMatch.js');
+const gameLifecycle = require('../../../utils/gameLifecycle.js');
 const gameStore = require('../../../utils/gameStore.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
 const teamDirectory = require('../../../utils/teamDirectory.js');
 const playerDirectory = require('../../../utils/playerDirectory.js');
 const tPosition = require('../../../utils/tPosition.js');
+const tempAdminPermission = require('../../../utils/tempAdminPermission.js');
+const caddieScoringAccess = require('../../../utils/caddieScoringAccess.js');
+const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
+const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
 const DEFAULT_SCORECARD_AD_IMAGE =
@@ -352,6 +357,27 @@ Page({
     registerSubmitting: false,
     registerCancelModalVisible: false,
     registerCancelSubmitting: false,
+    registerCancelModalTitle: '确认取消报名？',
+    registerCancelModalDesc: '取消后，你将从本场赛事报名名单中移除。',
+    // 权限管理（临时管理员申请制 + 球童记分员二维码）
+    tempAdminSheetVisible: false,
+    adminQrHasQr: false,
+    adminQrUrl: '',
+    adminQrGenerating: false,
+    adminQrExpanded: true,
+    adminQrAdminList: [],
+    expandedAdminUserId: '',
+    caddieScoringQrUrl: '',
+    caddieScoringHasQr: false,
+    caddieScoringGenerating: false,
+    caddieQrExpanded: true,
+    caddieScorerList: [],
+    caddieManageSheetVisible: false,
+    caddieManageTarget: null,
+    // 二维码入口：手机号绑定闸门
+    phoneBindSheetVisible: false,
+    phoneBindEntryType: 'admin_qr',
+    phoneBindHint: '',
 
     // 领先榜
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
@@ -410,6 +436,10 @@ Page({
 
   onLoad(options) {
     const matchId = options && options.matchId ? decodeURIComponent(options.matchId) : '';
+    const caddieToken =
+      options && options.caddieToken ? decodeURIComponent(String(options.caddieToken)) : '';
+    const adminToken =
+      options && options.adminToken ? decodeURIComponent(String(options.adminToken)) : '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     groupsStore.ensureInitialized();
@@ -420,6 +450,254 @@ Page({
     this.applyMoreAccess();
     this.refreshPartnerSection();
     this.loadMatch(matchId);
+    if (caddieToken && matchId) {
+      wx.nextTick(() => this._tryClaimCaddieScoringAccess(caddieToken));
+    }
+    if (adminToken && matchId) {
+      wx.nextTick(() => this._tryClaimTempAdminAccess(adminToken));
+    }
+  },
+
+  /** 临时管理员扫码进入：先过注册/手机号闸门，再写入 pending */
+  _tryClaimTempAdminAccess(token) {
+    this._beginQrAccessClaim('admin_qr', token);
+  },
+
+  /** 球童扫码进入：先过注册/手机号闸门，再写入 manage_scoring */
+  _tryClaimCaddieScoringAccess(token) {
+    this._beginQrAccessClaim('caddie_qr', token);
+  },
+
+  _beginQrAccessClaim(entryType, token) {
+    const type = entryType === 'caddie_qr' ? 'caddie_qr' : 'admin_qr';
+    const tok = String(token || '').trim();
+    if (!tok) return;
+    this._pendingQrClaim = { entryType: type, token: tok };
+    const gate = qrAccessAuth.ensureRegisteredAndPhoneBound(type);
+    if (gate.ok) {
+      this._executePendingQrClaim(gate.user);
+      return;
+    }
+    const copy = gate.copy || qrAccessAuth.getCopy(type);
+    if (gate.reason === 'need_login') {
+      wx.showModal({
+        title: copy.needLoginTitle,
+        content: copy.needLoginContent,
+        cancelText: '取消',
+        confirmText: '去登录',
+        success: (res) => {
+          if (res.confirm) this._openPhoneBindForQrClaim(type);
+          else this._cancelPendingQrClaim(type);
+        }
+      });
+      return;
+    }
+    wx.showModal({
+      title: copy.needPhoneTitle,
+      content: copy.needPhoneContent,
+      cancelText: '取消',
+      confirmText: '去绑定',
+      success: (res) => {
+        if (res.confirm) this._openPhoneBindForQrClaim(type);
+        else this._cancelPendingQrClaim(type);
+      }
+    });
+  },
+
+  _openPhoneBindForQrClaim(entryType) {
+    const type = entryType === 'caddie_qr' ? 'caddie_qr' : 'admin_qr';
+    const copy = qrAccessAuth.getCopy(type);
+    this.setData({
+      phoneBindSheetVisible: true,
+      phoneBindEntryType: type,
+      phoneBindHint: copy.needPhoneContent
+    });
+  },
+
+  _cancelPendingQrClaim(entryType) {
+    const type =
+      entryType ||
+      (this._pendingQrClaim && this._pendingQrClaim.entryType) ||
+      'admin_qr';
+    this._pendingQrClaim = null;
+    this.setData({ phoneBindSheetVisible: false });
+    const copy = qrAccessAuth.getCopy(type);
+    wx.showToast({ title: copy.cancelToast, icon: 'none', duration: 2500 });
+  },
+
+  onPhoneBindSheetCancel() {
+    this._cancelPendingQrClaim(this.data.phoneBindEntryType);
+  },
+
+  onPhoneBindSheetSuccess() {
+    this.setData({ phoneBindSheetVisible: false });
+    const pending = this._pendingQrClaim;
+    if (!pending || !pending.token) return;
+    const gate = qrAccessAuth.ensureRegisteredAndPhoneBound(pending.entryType);
+    if (!gate.ok) {
+      this._cancelPendingQrClaim(pending.entryType);
+      return;
+    }
+    this._executePendingQrClaim(gate.user);
+  },
+
+  _executePendingQrClaim(profile) {
+    const pending = this._pendingQrClaim;
+    this._pendingQrClaim = null;
+    if (!pending || !pending.token) return;
+    if (pending.entryType === 'caddie_qr') {
+      this._claimCaddieAfterAuth(pending.token, profile);
+    } else {
+      this._claimAdminAfterAuth(pending.token, profile);
+    }
+  },
+
+  _claimAdminAfterAuth(token, profile) {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) return;
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) return;
+    const grantable = this._resolveTempAdminGrantableFeatures();
+    const user = profile || qrAccessAuth.buildClaimProfile('admin_qr');
+    if (!user.userId || !user.phone) return;
+    const result = tempAdminAccess.claimTempAdminAccess(match, token, user.userId, user);
+    if (!result || !result.ok) {
+      if (result && result.reason === 'invalid_token') {
+        wx.showToast({ title: '二维码无效或已失效', icon: 'none' });
+      } else if (result && result.reason === 'no_phone') {
+        wx.showToast({ title: '未绑定手机号，无法申请临时管理员权限', icon: 'none' });
+      }
+      return;
+    }
+    teamMatchStore.saveMatch(match);
+    if (this.data.tempAdminSheetVisible) {
+      this._mergeClaimedAdminIntoDraft(result.admin, grantable);
+    }
+    wx.showToast({
+      title: '已提交管理员申请，请等待管理员授权',
+      icon: 'none',
+      duration: 2500
+    });
+  },
+
+  _claimCaddieAfterAuth(token, profile) {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) return;
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) return;
+    const user = profile || qrAccessAuth.buildClaimProfile('caddie_qr');
+    if (!user.userId || !user.phone) return;
+    const result = caddieScoringAccess.claimCaddieScoringAccess(
+      match,
+      token,
+      user.userId,
+      user
+    );
+    if (!result || !result.ok) {
+      if (result && result.reason === 'invalid_token') {
+        wx.showToast({ title: '二维码无效或已失效', icon: 'none' });
+      } else if (result && result.reason === 'no_phone') {
+        wx.showToast({ title: '未绑定手机号，无法获得记分权限', icon: 'none' });
+      }
+      return;
+    }
+    teamMatchStore.saveMatch(match);
+    if (this.data.tempAdminSheetVisible) {
+      this._syncCaddieScorerList(match);
+    }
+    wx.showToast({
+      title: result.already ? '已拥有本场记分权限' : '已获得本场记分权限',
+      icon: 'success'
+    });
+  },
+
+  /** 开发态：模拟扫码申请（同样走手机号闸门） */
+  mockScanAdminQr() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const access = tempAdminAccess.normalizeTempAdminAccess(
+      match && match.tempAdminAccess
+    );
+    if (!access || !access.token) {
+      wx.showToast({ title: '请先生成临时管理员二维码', icon: 'none' });
+      return;
+    }
+    this._tryClaimTempAdminAccess(access.token);
+  },
+
+  mockScanCaddieQr() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const access = caddieScoringAccess.normalizeCaddieScoringAccess(
+      match && match.caddieScoringAccess
+    );
+    if (!access || !access.token) {
+      wx.showToast({ title: '请先生成球童记分二维码', icon: 'none' });
+      return;
+    }
+    this._tryClaimCaddieScoringAccess(access.token);
+  },
+
+  /** 开发态：切换当前用户是否视为已绑手机号 */
+  toggleMockPhoneBound() {
+    const state = qrAccessAuth.getAuthDebugState();
+    const bound = !!(state.phone && state.mockPhoneBound !== false);
+    if (bound) {
+      qrAccessAuth.setMockPhoneBound(false);
+      gameStore.setCurrentUserPhone('');
+      wx.showToast({ title: '已模拟未绑定手机号', icon: 'none' });
+    } else {
+      qrAccessAuth.bindPhone('13800000000');
+      wx.showToast({ title: '已模拟绑定手机号', icon: 'none' });
+    }
+  },
+
+  _syncCaddieScorerList(matchOrNull) {
+    const matchId = this.data.matchId || '';
+    const match =
+      matchOrNull ||
+      (matchId && !demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)
+        ? teamMatchStore.getMatchById(matchId)
+        : null);
+    this.setData({
+      caddieScorerList: caddieScoringAccess.listCaddieScorers(
+        match && match.tempAdmins ? match.tempAdmins : []
+      )
+    });
+  },
+
+  _withAdminExpandState(list) {
+    const expandedId = String(this.data.expandedAdminUserId || '');
+    return (Array.isArray(list) ? list : []).map((item) =>
+      Object.assign({}, item, {
+        expanded: !!(item && String(item.userId) === expandedId)
+      })
+    );
+  },
+
+  _mergeClaimedAdminIntoDraft(admin, grantable) {
+    if (!admin || !admin.userId) return;
+    const features = grantable || this._resolveTempAdminGrantableFeatures();
+    const draft = Array.isArray(this.data.adminQrAdminList)
+      ? this.data.adminQrAdminList.slice()
+      : [];
+    const uid = String(admin.userId);
+    if (draft.some((a) => a && String(a.userId) === uid)) {
+      this.setData({
+        caddieScorerList: caddieScoringAccess.listCaddieScorers(
+          (teamMatchStore.getMatchById(this.data.matchId) || {}).tempAdmins || []
+        )
+      });
+      return;
+    }
+    const rows = tempAdminAccess.listAdminQrAdmins([admin], features);
+    if (rows[0]) draft.push(rows[0]);
+    this.setData({
+      adminQrAdminList: this._withAdminExpandState(draft),
+      caddieScorerList: caddieScoringAccess.listCaddieScorers(
+        (teamMatchStore.getMatchById(this.data.matchId) || {}).tempAdmins || []
+      )
+    });
   },
 
   /* ===== 顶部赛事信息数据接入（teamMatchStore） ===== */
@@ -1369,25 +1647,53 @@ Page({
   openCancelRegisterModal() {
     if (!this.data.registerPermission.isOpen) return;
     if (!this.data.currentUserRegisterStatus.isRegistered) return;
-    this.setData({ registerCancelModalVisible: true });
+    const match = teamMatchStore.getMatchById(this.data.matchId);
+    const user = gameStore.getCurrentUser() || {};
+    const userId = String(user.userId || '');
+    const grouped = !!(match && userId && teamMatchStore.isUserInFormalGroups(match, userId));
+    this.setData({
+      registerCancelModalVisible: true,
+      registerCancelModalTitle: grouped ? '取消报名' : '确认取消报名？',
+      registerCancelModalDesc: grouped
+        ? '已经被分组，是否确认取消'
+        : '取消后，你将从本场赛事报名名单中移除。'
+    });
   },
 
   closeCancelRegisterModal() {
-    this.setData({ registerCancelModalVisible: false });
+    // 代报名取消：用户点「取消」时丢弃待提交 plan，不改数据
+    if (this._pendingProxyCommitAfterConfirm) {
+      this._pendingProxyCommitAfterConfirm = false;
+      this._proxyCommitPlan = null;
+      this._clearProxyRegistrationTempState();
+    }
+    this.setData({
+      registerCancelModalVisible: false,
+      registerCancelSubmitting: false
+    });
   },
 
   confirmCancelRegister() {
     if (this.data.registerCancelSubmitting) return;
+
+    // 代报名取消：确认后走统一 commit（已在 plan 中按权限筛过 targetUserId）
+    if (this._pendingProxyCommitAfterConfirm) {
+      this._pendingProxyCommitAfterConfirm = false;
+      this.setData({
+        registerCancelModalVisible: false,
+        registerCancelSubmitting: true
+      });
+      this._applyProxyCommitPlan();
+      this.setData({ registerCancelSubmitting: false });
+      return;
+    }
+
     if (!this.data.currentUserRegisterStatus.isRegistered) {
       this.setData({ registerCancelModalVisible: false });
       return;
     }
 
-    const match = teamMatchStore.getMatchById(this.data.matchId);
-    if (!match) {
-      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
-      return;
-    }
+    const matchId = this.data.matchId;
     const user = gameStore.getCurrentUser() || {};
     const userId = String(user.userId || '');
     if (!userId) {
@@ -1396,26 +1702,29 @@ Page({
     }
 
     this.setData({ registerCancelSubmitting: true });
-
-    if (!match.registerInfo || typeof match.registerInfo !== 'object') {
-      match.registerInfo = { totalCount: 0, users: [] };
+    const result = teamMatchStore.cancelRegistration(matchId, userId);
+    if (!result || !result.ok) {
+      this.setData({ registerCancelSubmitting: false });
+      wx.showToast({
+        title: result && result.reason === 'not_found' ? '赛事数据缺失' : '取消失败',
+        icon: 'none'
+      });
+      return;
     }
-    if (!Array.isArray(match.registerInfo.users)) {
-      match.registerInfo.users = [];
-    }
 
-    match.registerInfo.users = match.registerInfo.users.filter(
-      (item) => String(item && item.userId) !== userId
+    const match = result.match;
+    const patch = Object.assign(
+      {},
+      this._buildRegisterStatePatch(match, this.data.activeRegisterSubTab),
+      this._buildGroupsTabStatePatch(match),
+      {
+        registerCancelModalVisible: false,
+        registerCancelSubmitting: false
+      }
     );
-    match.registerInfo.totalCount = match.registerInfo.users.length;
-
-    teamMatchStore.saveMatch(match);
-
-    const patch = this._buildRegisterStatePatch(match, this.data.activeRegisterSubTab);
-    patch.registerCancelModalVisible = false;
-    patch.registerCancelSubmitting = false;
     this.setData(patch, () => {
       if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+      if (this.data.activeTab === 'groups') this.computeGroupsPanelMinHeight();
     });
     wx.showToast({ title: '已取消报名', icon: 'success' });
   },
@@ -2207,6 +2516,12 @@ Page({
       wx.showToast({ title: '分组表导出功能开发中', icon: 'none' });
       return;
     }
+    if (permission === 'cancel_match') {
+      // 与普通球局 / game hub 一致：先关 M 面板，再确认取消
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this._promptCancelMatch();
+      return;
+    }
     if (permission === 'edit_match') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       const matchId = this.data.matchId || '';
@@ -2224,6 +2539,11 @@ Page({
     }
     if (permission === 'edit_half') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false, halfSheetVisible: true });
+      return;
+    }
+    if (permission === 'permission_management') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.openTempAdminSheet();
       return;
     }
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
@@ -2260,6 +2580,452 @@ Page({
       return;
     }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  /**
+   * 取消比赛确认框（文案 / 按钮与普通球局 score、game/hub 一致）
+   */
+  _promptCancelMatch() {
+    const matchId = this.data.matchId || '';
+    if (
+      !matchId ||
+      demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId) ||
+      !teamMatchStore.getMatchById(matchId)
+    ) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '取消比赛',
+      content: '取消比赛将删除本场GAME所有数据，是否确认？',
+      cancelText: '取消',
+      confirmText: '确认',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (res.confirm) this._confirmCancelMatch();
+      }
+    });
+  },
+
+  /**
+   * 确认取消：硬删除球队赛（对齐普通球局 purgeGameCompletely），toast 后回首页「我的」
+   */
+  _confirmCancelMatch() {
+    const matchId = this.data.matchId;
+    if (!matchId) return;
+    const removed = gameLifecycle.purgeTeamMatchCompletely(matchId);
+    if (!removed) {
+      wx.showToast({ title: '比赛不存在或已删除', icon: 'none' });
+      return;
+    }
+    this.setData({
+      matchId: '',
+      showMoreSheet: false,
+      moreFabExpanded: false
+    });
+    wx.showToast({ title: '比赛已取消', icon: 'success', duration: 1500 });
+    setTimeout(() => {
+      wx.reLaunch({ url: '/pages/home/index?tab=my' });
+    }, 300);
+  },
+
+  /* ===== 本场临时管理员（权限管理 · 扫码申请制） ===== */
+  _resolveTempAdminGrantableFeatures() {
+    const isRegistering = !!(this.data.matchStatus && this.data.matchStatus.isRegistering);
+    const source = isRegistering ? REGISTERING_FEATURES_PERMISSION : FEATURES_PERMISSION;
+    return tempAdminPermission.buildGrantableFeatures(source);
+  },
+
+  openTempAdminSheet() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const grantable = this._resolveTempAdminGrantableFeatures();
+    this._tempAdminGrantableFeatures = grantable;
+    this._adminDraftDemotions = [];
+    const adminAccess = tempAdminAccess.normalizeTempAdminAccess(match.tempAdminAccess);
+    const caddieAccess = caddieScoringAccess.normalizeCaddieScoringAccess(
+      match.caddieScoringAccess
+    );
+    this.setData({
+      tempAdminSheetVisible: true,
+      adminQrHasQr: !!(adminAccess && adminAccess.qrCodeUrl && adminAccess.enabled),
+      adminQrUrl: adminAccess && adminAccess.qrCodeUrl ? adminAccess.qrCodeUrl : '',
+      adminQrGenerating: false,
+      adminQrExpanded: !adminAccess,
+      expandedAdminUserId: '',
+      adminQrAdminList: (tempAdminAccess.listAdminQrAdmins(match.tempAdmins, grantable) || []).map(
+        (item) => Object.assign({}, item, { expanded: false })
+      ),
+      caddieScoringHasQr: !!(caddieAccess && caddieAccess.qrCodeUrl && caddieAccess.enabled),
+      caddieScoringQrUrl: caddieAccess && caddieAccess.qrCodeUrl ? caddieAccess.qrCodeUrl : '',
+      caddieScoringGenerating: false,
+      caddieQrExpanded: !caddieAccess,
+      caddieScorerList: caddieScoringAccess.listCaddieScorers(match.tempAdmins),
+      caddieManageSheetVisible: false,
+      caddieManageTarget: null
+    });
+  },
+
+  toggleAdminQrExpanded() {
+    this.setData({ adminQrExpanded: !this.data.adminQrExpanded });
+  },
+
+  toggleAdminCandidateExpand(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId) return;
+    const next = String(this.data.expandedAdminUserId || '') === userId ? '' : userId;
+    this.setData({
+      expandedAdminUserId: next,
+      adminQrAdminList: (this.data.adminQrAdminList || []).map((item) =>
+        Object.assign({}, item, {
+          expanded: !!(item && String(item.userId) === next)
+        })
+      )
+    });
+  },
+
+  toggleAdminCandidatePermission(e) {
+    const ds = e.currentTarget.dataset || {};
+    const userId = String(ds.userid || '');
+    const perm = String(ds.perm || '');
+    if (!userId || !perm) return;
+    const list = (this.data.adminQrAdminList || []).map((item) => {
+      if (!item || String(item.userId) !== userId) return item;
+      const options = (item.permissionOptions || []).map((opt) => {
+        if (!opt || opt.key !== perm) return opt;
+        return Object.assign({}, opt, { selected: !opt.selected });
+      });
+      const permissions = tempAdminAccess.selectedKeysFromOptions(options);
+      const status = permissions.length > 0 ? 'approved' : 'pending';
+      return Object.assign({}, item, {
+        permissionOptions: options,
+        permissions: permissions,
+        status: status,
+        statusLabel: status === 'approved' ? '已授权' : '待授权'
+      });
+    });
+    this.setData({ adminQrAdminList: list });
+  },
+
+  generateTempAdminQr() {
+    this._createOrRefreshTempAdminQr(false);
+  },
+
+  regenerateTempAdminQr() {
+    wx.showModal({
+      title: '重新生成',
+      content: '重新生成后，旧二维码将失效。已扫码管理员申请与权限不变。是否继续？',
+      cancelText: '取消',
+      confirmText: '重新生成',
+      success: (res) => {
+        if (res.confirm) this._createOrRefreshTempAdminQr(true);
+      }
+    });
+  },
+
+  _createOrRefreshTempAdminQr() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    const prev = tempAdminAccess.normalizeTempAdminAccess(match.tempAdminAccess);
+    this.setData({ adminQrGenerating: true });
+    const access = tempAdminAccess.createTempAdminAccess({
+      source: 'team_match',
+      matchId: matchId,
+      createdBy: String(user.userId || '')
+    });
+    if (prev && Array.isArray(prev.claimedBy)) {
+      access.claimedBy = prev.claimedBy.slice();
+    }
+    match.tempAdminAccess = access;
+    teamMatchStore.saveMatch(match);
+    this.setData({
+      adminQrHasQr: true,
+      adminQrUrl: access.qrCodeUrl,
+      adminQrGenerating: false,
+      adminQrExpanded: true
+    });
+    wx.showToast({ title: '二维码已生成', icon: 'success' });
+  },
+
+  saveTempAdminQrImage() {
+    this._saveQrImageToAlbum(this.data.adminQrUrl);
+  },
+
+  toggleCaddieQrExpanded() {
+    this.setData({ caddieQrExpanded: !this.data.caddieQrExpanded });
+  },
+
+  _syncCaddieScoringQrView(access) {
+    const normalized = caddieScoringAccess.normalizeCaddieScoringAccess(access);
+    this.setData({
+      caddieScoringHasQr: !!(normalized && normalized.qrCodeUrl && normalized.enabled),
+      caddieScoringQrUrl: normalized && normalized.qrCodeUrl ? normalized.qrCodeUrl : '',
+      caddieScoringGenerating: false,
+      caddieQrExpanded: true
+    });
+  },
+
+  generateCaddieScoringQr() {
+    this._createOrRefreshCaddieScoringQr(false);
+  },
+
+  regenerateCaddieScoringQr() {
+    wx.showModal({
+      title: '重新生成',
+      content: '重新生成后，旧二维码将失效。是否继续？',
+      cancelText: '取消',
+      confirmText: '重新生成',
+      success: (res) => {
+        if (res.confirm) this._createOrRefreshCaddieScoringQr(true);
+      }
+    });
+  },
+
+  _createOrRefreshCaddieScoringQr() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    this.setData({ caddieScoringGenerating: true });
+    const access = caddieScoringAccess.createCaddieScoringAccess({
+      source: 'team_match',
+      matchId: matchId,
+      createdBy: String(user.userId || '')
+    });
+    match.caddieScoringAccess = access;
+    teamMatchStore.saveMatch(match);
+    this._syncCaddieScoringQrView(access);
+    wx.showToast({ title: '二维码已生成', icon: 'success' });
+  },
+
+  saveCaddieScoringQrImage() {
+    this._saveQrImageToAlbum(this.data.caddieScoringQrUrl);
+  },
+
+  _saveQrImageToAlbum(rawUrl) {
+    const url = String(rawUrl || '').trim();
+    if (!url) {
+      wx.showToast({ title: '请先生成二维码', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '保存中', mask: true });
+    wx.downloadFile({
+      url: url,
+      success: (res) => {
+        if (!res || res.statusCode !== 200 || !res.tempFilePath) {
+          wx.hideLoading();
+          wx.showToast({ title: '下载失败', icon: 'none' });
+          return;
+        }
+        wx.saveImageToPhotosAlbum({
+          filePath: res.tempFilePath,
+          success: () => {
+            wx.hideLoading();
+            wx.showToast({ title: '已保存到相册', icon: 'success' });
+          },
+          fail: (err) => {
+            wx.hideLoading();
+            const msg = err && err.errMsg ? String(err.errMsg) : '';
+            if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
+              wx.showModal({
+                title: '需要相册权限',
+                content: '请在设置中允许保存到相册后重试',
+                confirmText: '去设置',
+                success: (r) => {
+                  if (r.confirm) wx.openSetting({});
+                }
+              });
+              return;
+            }
+            wx.showToast({ title: '保存失败', icon: 'none' });
+          }
+        });
+      },
+      fail: () => {
+        wx.hideLoading();
+        wx.showToast({ title: '下载失败', icon: 'none' });
+      }
+    });
+  },
+
+  closeTempAdminSheet() {
+    this._tempAdminGrantableFeatures = null;
+    this._adminDraftDemotions = [];
+    this.setData({
+      tempAdminSheetVisible: false,
+      adminQrHasQr: false,
+      adminQrUrl: '',
+      adminQrGenerating: false,
+      adminQrExpanded: true,
+      adminQrAdminList: [],
+      expandedAdminUserId: '',
+      caddieScoringHasQr: false,
+      caddieScoringQrUrl: '',
+      caddieScoringGenerating: false,
+      caddieQrExpanded: true,
+      caddieScorerList: [],
+      caddieManageSheetVisible: false,
+      caddieManageTarget: null
+    });
+  },
+
+  cancelTempAdminSheet() {
+    this.closeTempAdminSheet();
+  },
+
+  saveTempAdminSheet() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      this.closeTempAdminSheet();
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const grantable =
+      this._tempAdminGrantableFeatures || this._resolveTempAdminGrantableFeatures();
+    tempAdminAccess.commitAdminQrDraft(
+      match,
+      this.data.adminQrAdminList,
+      this._adminDraftDemotions || [],
+      grantable
+    );
+    teamMatchStore.saveMatch(match);
+    this.closeTempAdminSheet();
+    wx.showToast({ title: '权限已保存', icon: 'success' });
+  },
+
+  onRemoveAdminQrTempAdmin(e) {
+    const userId = String(
+      (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.userid) ||
+        this.data.expandedAdminUserId ||
+        ''
+    );
+    if (!userId) return;
+    wx.showModal({
+      title: '移除临时管理员',
+      content: '确定移除该用户的本场临时管理员申请吗？',
+      cancelText: '取消',
+      confirmText: '确认移除',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (!res.confirm) return;
+        const matchId = this.data.matchId || '';
+        const match = teamMatchStore.getMatchById(matchId);
+        const result = tempAdminAccess.removeAdminQrFromDraftList(
+          this.data.adminQrAdminList,
+          userId,
+          match
+        );
+        if (!result || !result.ok) {
+          wx.showToast({ title: '移除失败', icon: 'none' });
+          return;
+        }
+        if (result.demoted) {
+          const demotions = Array.isArray(this._adminDraftDemotions)
+            ? this._adminDraftDemotions.slice()
+            : [];
+          const di = demotions.findIndex(
+            (d) => d && String(d.userId) === String(result.demoted.userId)
+          );
+          if (di >= 0) demotions[di] = result.demoted;
+          else demotions.push(result.demoted);
+          this._adminDraftDemotions = demotions;
+        }
+        const nextExpanded =
+          String(this.data.expandedAdminUserId || '') === userId
+            ? ''
+            : String(this.data.expandedAdminUserId || '');
+        this.setData({
+          expandedAdminUserId: nextExpanded,
+          adminQrAdminList: (result.list || []).map((item) =>
+            Object.assign({}, item, {
+              expanded: !!(item && String(item.userId) === nextExpanded)
+            })
+          )
+        });
+        wx.showToast({ title: '已从列表移除，保存后生效', icon: 'none' });
+      }
+    });
+  },
+
+  openCaddieScorerManage(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId) return;
+    const list = this.data.caddieScorerList || [];
+    const target = list.find((item) => item && String(item.userId) === userId) || null;
+    if (!target) return;
+    this.setData({
+      caddieManageSheetVisible: true,
+      caddieManageTarget: target
+    });
+  },
+
+  closeCaddieScorerManage() {
+    this.setData({
+      caddieManageSheetVisible: false,
+      caddieManageTarget: null
+    });
+  },
+
+  onRemoveCaddieScoringPermission() {
+    const target = this.data.caddieManageTarget;
+    if (!target || !target.userId) return;
+    const userId = String(target.userId);
+    wx.showModal({
+      title: '移除球童记分员',
+      content: '确定移除该球童的本场记分权限吗？',
+      cancelText: '取消',
+      confirmText: '确认移除',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (!res.confirm) return;
+        const matchId = this.data.matchId || '';
+        const match = teamMatchStore.getMatchById(matchId);
+        if (!match) {
+          wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+          return;
+        }
+        const result = caddieScoringAccess.removeCaddieScoringPermission(match, userId);
+        if (!result || !result.ok) {
+          wx.showToast({ title: '移除失败', icon: 'none' });
+          return;
+        }
+        teamMatchStore.saveMatch(match);
+        this.setData({
+          caddieManageSheetVisible: false,
+          caddieManageTarget: null,
+          caddieScorerList: caddieScoringAccess.listCaddieScorers(match.tempAdmins)
+        });
+        wx.showToast({ title: '已移除记分权限', icon: 'success' });
+      }
+    });
   },
 
   openRegisterForOtherSheet() {
@@ -2430,7 +3196,7 @@ Page({
    * Patch 5A/5B/5C/7：处理好友/球队成员页差异返回。
    * - removedPlayers → remove plan
    * - addedPlayers → 打开「选择代表分队」；确定后生成 add plan 并统一写盘
-   * - 仅取消（无新增）→ 直接 _applyProxyCommitPlan
+   * - 仅取消（无新增）→ _promptOrApplyProxyCommitPlan（已分组则先确认）
    */
   _onProxyFriendsSelected(payload) {
     const data = payload || {};
@@ -2471,8 +3237,42 @@ Page({
       return;
     }
 
-    // 仅取消 / 无变更：直接统一提交
-    this._applyProxyCommitPlan();
+    // 仅取消 / 无变更：若取消对象已分组则先确认，再统一提交
+    this._promptOrApplyProxyCommitPlan();
+  },
+
+  /**
+   * 代报名写盘前：若待取消的 targetUserId 已在正式 groups 中，先弹「已分组」确认。
+   * 判断对象是被取消的好友/队员，不是当前登录用户。
+   */
+  _promptOrApplyProxyCommitPlan() {
+    const plan = this._proxyCommitPlan;
+    if (!plan) {
+      this._clearProxyRegistrationTempState();
+      wx.showToast({ title: '没有可更新的报名', icon: 'none' });
+      return;
+    }
+    const removes = Array.isArray(plan.removes) ? plan.removes : [];
+    if (!removes.length) {
+      this._applyProxyCommitPlan();
+      return;
+    }
+    const match = teamMatchStore.getMatchById(plan.matchId || this.data.matchId || '');
+    const hasGroupedTarget = removes.some((item) => {
+      const uid = String((item && item.userId) || '').trim();
+      return !!(uid && match && teamMatchStore.isUserInFormalGroups(match, uid));
+    });
+    if (!hasGroupedTarget) {
+      this._applyProxyCommitPlan();
+      return;
+    }
+    this._pendingProxyCommitAfterConfirm = true;
+    this.setData({
+      registerCancelModalVisible: true,
+      registerCancelModalTitle: '取消报名',
+      registerCancelModalDesc: '已经被分组，是否确认取消',
+      registerCancelSubmitting: false
+    });
   },
 
   /**
@@ -3020,7 +3820,7 @@ Page({
     let removedCount = 0;
     let addedCount = 0;
 
-    // 1) 应用 removes（再次校验：仅本人代报名可删）
+    // 1) 应用 removes（再次校验：仅本人代报名可删；按 targetUserId 清理 groups/pairings）
     const removeIds = {};
     const removes = Array.isArray(plan.removes) ? plan.removes : [];
     removes.forEach((item) => {
@@ -3040,6 +3840,11 @@ Page({
       const before = users.length;
       users = users.filter((u) => !removeIds[String((u && u.userId) || '')]);
       removedCount = before - users.length;
+      // 与自己取消报名共用清理：按 targetUserId 清空 groups 位 + pairings
+      Object.keys(removeIds).forEach((uid) => {
+        teamMatchStore.clearUserFromFormalGroups(match, uid);
+        teamMatchStore.clearUserFromPairings(match, uid);
+      });
     }
 
     // 2) 应用 adds（按 userId 去重；manual 另按 phone 去重；不写 player 原始对象）
@@ -3105,20 +3910,28 @@ Page({
       totalCount: match.registerInfo.totalCount
     });
 
-    // 4) 刷新报名 TAB + 清理 pending / plan
+    // 4) 刷新报名 TAB + 分组 TAB + 清理 pending / plan
     const preferredGroup =
       (plan.group && plan.group.id) || this.data.activeRegisterSubTab || '';
-    const patch = this._buildRegisterStatePatch(match, preferredGroup);
-    Object.assign(patch, {
-      proxyGroupSheetVisible: false,
-      pendingProxyPlayers: [],
-      proxyGroupOptions: [],
-      proxyGroupId: ''
-    });
+    const patch = Object.assign(
+      {},
+      this._buildRegisterStatePatch(match, preferredGroup),
+      this._buildGroupsTabStatePatch(match),
+      {
+        proxyGroupSheetVisible: false,
+        pendingProxyPlayers: [],
+        proxyGroupOptions: [],
+        proxyGroupId: '',
+        registerCancelModalVisible: false,
+        registerCancelSubmitting: false
+      }
+    );
     this._proxyPickChannel = '';
     this._proxyCommitPlan = null;
+    this._pendingProxyCommitAfterConfirm = false;
     this.setData(patch, () => {
       if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+      if (this.data.activeTab === 'groups') this.computeGroupsPanelMinHeight();
     });
 
     // 5) toast
@@ -3189,7 +4002,7 @@ Page({
       saved: false
     };
     console.log('[register-for-other] unified commit plan (before apply)', this._proxyCommitPlan);
-    this._applyProxyCommitPlan();
+    this._promptOrApplyProxyCommitPlan();
   },
 
   /**

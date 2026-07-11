@@ -788,8 +788,8 @@
   <!-- 取消报名确认弹窗 -->
   <view wx:if="{{registerCancelModalVisible}}" bindtap="closeCancelRegisterModal" class="register-cancel-modal">
     <view catchtap="stopPropagation" class="register-cancel-dialog">
-      <text class="register-cancel-dialog__title">确认取消报名？</text>
-      <text class="register-cancel-dialog__desc">取消后，你将从本场赛事报名名单中移除。</text>
+      <text class="register-cancel-dialog__title">{{registerCancelModalTitle}}</text>
+      <text class="register-cancel-dialog__desc">{{registerCancelModalDesc}}</text>
       <view class="register-cancel-dialog__actions">
         <view bindtap="closeCancelRegisterModal" class="register-cancel-dialog__btn">取消</view>
         <view
@@ -800,11 +800,180 @@
     </view>
   </view>
 
+  <!-- 权限管理（临时管理员二维码 + 球童记分员二维码） -->
+  <view wx:if="{{tempAdminSheetVisible}}" bindtap="cancelTempAdminSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view wx:if="{{tempAdminSheetVisible}}" class="bottom-sheet register-sheet temp-admin-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">PERMISSION</text>
+      <text class="register-sheet__title">权限管理</text>
+      <text class="register-sheet__sub">通过二维码授权本场临时管理员与球童记分员，仅对当前 GAME 生效。</text>
+    </view>
+    <scroll-view scroll-y class="temp-admin-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <!-- 容器一：添加临时管理员（扫码申请 → 管理者授权） -->
+      <view class="perm-section-card">
+        <view class="perm-section-card__head" bindtap="toggleAdminQrExpanded">
+          <view class="perm-section-card__head-main">
+            <text class="perm-section-card__title">添加临时管理员</text>
+            <text class="perm-section-card__desc">生成申请二维码；扫码用户进入待审批列表，由你勾选权限后生效。</text>
+          </view>
+          <text class="perm-section-card__toggle">{{adminQrExpanded ? '收起' : '展开二维码'}}</text>
+        </view>
+
+        <view class="caddie-scorer-list">
+          <text class="register-sheet__hint caddie-scorer-list__title">已扫码临时管理员</text>
+          <view wx:if="{{!adminQrAdminList.length}}" class="caddie-scorer-list__empty">暂无临时管理员扫码加入</view>
+          <view wx:else class="temp-admin-candidate-list">
+            <view
+              wx:for="{{adminQrAdminList}}"
+              wx:key="userId"
+              class="temp-admin-row"
+            >
+              <view
+                class="temp-admin-row__head"
+                data-userid="{{item.userId}}"
+                bindtap="toggleAdminCandidateExpand"
+              >
+                <image class="temp-admin-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+                <view class="temp-admin-row__meta">
+                  <text class="temp-admin-row__name">{{item.nickname}}</text>
+                  <text class="temp-admin-row__badge {{item.status === 'approved' ? 'temp-admin-row__badge--approved' : 'temp-admin-row__badge--pending'}}">{{item.statusLabel}}</text>
+                </view>
+                <text class="temp-admin-row__expand {{item.expanded ? 'is-open' : ''}}">›</text>
+              </view>
+              <view wx:if="{{item.expanded}}" class="temp-admin-row__body">
+                <text class="register-sheet__hint temp-admin-row__perms-hint">勾选本场可授权权限</text>
+                <view class="register-sheet__groups">
+                  <view
+                    wx:for="{{item.permissionOptions}}"
+                    wx:for-item="perm"
+                    wx:key="key"
+                    class="register-sheet__group {{perm.selected ? 'register-sheet__group--active' : ''}}"
+                    data-userid="{{item.userId}}"
+                    data-perm="{{perm.key}}"
+                    bindtap="toggleAdminCandidatePermission"
+                  >{{perm.label}}</view>
+                </view>
+                <view
+                  class="temp-admin-row__remove-btn"
+                  data-userid="{{item.userId}}"
+                  bindtap="onRemoveAdminQrTempAdmin"
+                >移除临时管理员</view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{adminQrExpanded}}" class="perm-section-card__body">
+          <view wx:if="{{!adminQrHasQr}}" class="caddie-scoring-section__generate-wrap">
+            <view
+              class="register-sheet__confirm caddie-scoring-section__generate {{adminQrGenerating ? 'is-disabled' : ''}}"
+              bindtap="generateTempAdminQr"
+            >生成二维码</view>
+          </view>
+          <view wx:else class="caddie-scoring-card">
+            <image class="caddie-scoring-card__qr" src="{{adminQrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}"></image>
+            <text class="register-sheet__hint caddie-scoring-card__hint">扫码后提交管理员申请，需你授权后才生效</text>
+            <view class="register-sheet__actions caddie-scoring-card__actions">
+              <view class="register-sheet__cancel" bindtap="regenerateTempAdminQr">重新生成</view>
+              <view class="register-sheet__confirm" bindtap="saveTempAdminQrImage">保存图片</view>
+            </view>
+            <view class="qr-mock-actions">
+              <view class="qr-mock-actions__btn" bindtap="mockScanAdminQr">模拟扫码申请</view>
+              <view class="qr-mock-actions__btn qr-mock-actions__btn--ghost" bindtap="toggleMockPhoneBound">切换手机号绑定状态</view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 容器二：添加球童记分员 -->
+      <view class="perm-section-card">
+        <view class="perm-section-card__head" bindtap="toggleCaddieQrExpanded">
+          <view class="perm-section-card__head-main">
+            <text class="perm-section-card__title">添加球童记分员</text>
+            <text class="perm-section-card__desc">生成本场球童记分二维码，球童扫码后即可获得记分权限。</text>
+          </view>
+          <text class="perm-section-card__toggle">{{caddieQrExpanded ? '收起' : '展开二维码'}}</text>
+        </view>
+
+        <view class="caddie-scorer-list">
+          <text class="register-sheet__hint caddie-scorer-list__title">已扫码球童记分员</text>
+          <view wx:if="{{!caddieScorerList.length}}" class="caddie-scorer-list__empty">暂无球童记分员扫码加入</view>
+          <scroll-view wx:else scroll-x class="caddie-scorer-list__row" enable-flex="{{true}}">
+            <view
+              wx:for="{{caddieScorerList}}"
+              wx:key="userId"
+              class="caddie-scorer-item"
+              data-userid="{{item.userId}}"
+              bindtap="openCaddieScorerManage"
+            >
+              <image class="caddie-scorer-item__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <text class="caddie-scorer-item__name">{{item.nickname}}</text>
+              <text class="caddie-scorer-item__tag">记分员</text>
+            </view>
+          </scroll-view>
+        </view>
+
+        <view wx:if="{{caddieQrExpanded}}" class="perm-section-card__body">
+          <view wx:if="{{!caddieScoringHasQr}}" class="caddie-scoring-section__generate-wrap">
+            <view
+              class="register-sheet__confirm caddie-scoring-section__generate {{caddieScoringGenerating ? 'is-disabled' : ''}}"
+              bindtap="generateCaddieScoringQr"
+            >生成二维码</view>
+          </view>
+          <view wx:else class="caddie-scoring-card">
+            <image class="caddie-scoring-card__qr" src="{{caddieScoringQrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}"></image>
+            <text class="register-sheet__hint caddie-scoring-card__hint">扫码后获得本场记分权限（可为任意参赛球员记分）</text>
+            <view class="register-sheet__actions caddie-scoring-card__actions">
+              <view class="register-sheet__cancel" bindtap="regenerateCaddieScoringQr">重新生成</view>
+              <view class="register-sheet__confirm" bindtap="saveCaddieScoringQrImage">保存图片</view>
+            </view>
+            <view class="qr-mock-actions">
+              <view class="qr-mock-actions__btn" bindtap="mockScanCaddieQr">模拟球童扫码</view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions temp-admin-sheet__footer">
+      <view bindtap="cancelTempAdminSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="saveTempAdminSheet" class="register-sheet__confirm">保存</view>
+    </view>
+  </view>
+
+  <!-- 球童记分员管理 -->
+  <view wx:if="{{caddieManageSheetVisible}}" bindtap="closeCaddieScorerManage" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{caddieManageSheetVisible}}" class="bottom-sheet register-sheet caddie-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">CADDIE</text>
+      <text class="register-sheet__title">球童记分员</text>
+    </view>
+    <view class="caddie-manage-sheet__body" wx:if="{{caddieManageTarget}}">
+      <image class="caddie-manage-sheet__avatar" src="{{caddieManageTarget.avatar}}" mode="aspectFill"></image>
+      <text class="caddie-manage-sheet__name">{{caddieManageTarget.nickname}}</text>
+      <text class="register-sheet__hint caddie-manage-sheet__desc">该球童拥有本场比赛记分权限。</text>
+      <view class="caddie-manage-sheet__remove" bindtap="onRemoveCaddieScoringPermission">移除记分权限</view>
+    </view>
+    <view class="register-sheet__actions">
+      <view bindtap="closeCaddieScorerManage" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
+
   <half-course-sheet
     visible="{{halfSheetVisible}}"
     match-id="{{matchId}}"
     source="team_match"
     bind:close="closeHalfSheet"
     bind:confirm="onHalfCourseConfirmed"
+  />
+
+  <phone-bind-sheet
+    visible="{{phoneBindSheetVisible}}"
+    entry-type="{{phoneBindEntryType}}"
+    title="绑定手机号"
+    hint="{{phoneBindHint}}"
+    bind:cancel="onPhoneBindSheetCancel"
+    bind:success="onPhoneBindSheetSuccess"
   />
 </view>

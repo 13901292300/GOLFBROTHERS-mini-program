@@ -1491,3 +1491,391 @@ page {
 .watcher-name { font-size: 28rpx; }
 .watcher-hint { color: var(--text-muted); font-size: 22rpx; margin-top: 4rpx; }
 .watcher-at { margin-left: auto; color: var(--data-blue); font-size: 24rpx; font-weight: 700; }
+
+/* ===== 本场临时管理员 · 权限管理（复用 register-sheet，仅保留布局辅助） ===== */
+.temp-admin-sheet {
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.temp-admin-sheet__body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  height: 0;
+  padding: 0 0 8rpx;
+  box-sizing: border-box;
+}
+.temp-admin-sheet__footer {
+  flex-shrink: 0;
+  padding-top: 16rpx;
+}
+.temp-admin-sheet__empty {
+  color: var(--text-muted);
+  font-size: 24rpx;
+  padding: 8rpx 0 20rpx;
+  text-align: left;
+}
+/* 管理员行：对齐围观列表 / 报名名单头像行，非大卡片 */
+.temp-admin-row {
+  padding: 20rpx 0;
+  border-bottom: 1px solid var(--border);
+}
+.temp-admin-row:last-of-type {
+  border-bottom: none;
+}
+.temp-admin-row__head {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.temp-admin-row__avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+}
+.temp-admin-row__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.temp-admin-row__name {
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.temp-admin-row__badge {
+  color: var(--data-blue, #00aeef);
+  font-size: 22rpx;
+  font-weight: 600;
+}
+.temp-admin-row__badge--pending {
+  color: #d97706;
+}
+.temp-admin-row__badge--approved {
+  color: var(--data-blue, #00aeef);
+}
+.temp-admin-row__expand {
+  flex-shrink: 0;
+  width: 48rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 40rpx;
+  font-weight: 300;
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+.temp-admin-row__expand.is-open {
+  transform: rotate(-90deg);
+}
+.temp-admin-row__body {
+  padding: 8rpx 0 8rpx 84rpx;
+}
+.temp-admin-row__remove-btn {
+  margin-top: 20rpx;
+  color: var(--error, #dc2626);
+  font-size: 24rpx;
+  font-weight: 700;
+  opacity: 0.85;
+  padding: 8rpx 0;
+}
+.temp-admin-candidate-list {
+  width: 100%;
+}
+.temp-admin-row__remove {
+  flex-shrink: 0;
+  color: var(--error, #dc2626);
+  font-size: 24rpx;
+  font-weight: 800;
+  opacity: 0.78;
+  padding: 12rpx 0 12rpx 12rpx;
+}
+.temp-admin-row__perms-hint {
+  margin-top: 16rpx;
+  margin-bottom: 12rpx;
+}
+.temp-admin-sheet__add {
+  margin-top: 16rpx;
+  height: 88rpx;
+  border-radius: 16rpx;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+/* ===== 权限管理分区容器（对齐 register-sheet 卡片圆角 / 背景变量） ===== */
+.perm-section-card {
+  box-sizing: border-box;
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+}
+.perm-section-card:last-child {
+  margin-bottom: 8rpx;
+}
+.perm-section-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.perm-section-card__head-main {
+  flex: 1;
+  min-width: 0;
+}
+.perm-section-card__title {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.3;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.perm-section-card__desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.perm-section-card__toggle {
+  flex-shrink: 0;
+  margin-top: 4rpx;
+  padding: 4rpx 0 4rpx 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.perm-section-card__body {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1px solid var(--border);
+}
+.detail-page.dark-mode .perm-section-card {
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+.detail-page.dark-mode .perm-section-card__title {
+  color: var(--text-primary);
+}
+.detail-page.dark-mode .perm-section-card__desc,
+.detail-page.dark-mode .perm-section-card__toggle {
+  color: var(--text-muted);
+}
+
+/* 球童记分员区域（折叠 + 二维码，按钮复用 register-sheet） */
+.caddie-scoring-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.caddie-scoring-section__head-main {
+  flex: 1;
+  min-width: 0;
+}
+.caddie-scoring-section__head-main .register-sheet__label {
+  margin-bottom: 8rpx;
+}
+.caddie-scoring-section__head-main .register-sheet__hint {
+  margin-top: 0;
+}
+.caddie-scoring-section__toggle {
+  flex-shrink: 0;
+  margin-top: 2rpx;
+  color: var(--text-muted);
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 4rpx 0 4rpx 8rpx;
+}
+.caddie-scoring-section__qr-body {
+  margin-top: 20rpx;
+}
+.caddie-scoring-section__generate-wrap {
+  padding: 4rpx 0 8rpx;
+}
+.caddie-scoring-section__generate {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.caddie-scoring-section__generate.is-disabled {
+  opacity: 0.5;
+}
+.caddie-scoring-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16rpx;
+  padding: 28rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.caddie-scoring-card__qr {
+  width: 280rpx;
+  height: 280rpx;
+  background: #fff;
+  border-radius: 12rpx;
+}
+.caddie-scoring-card__hint {
+  margin-top: 14rpx;
+  text-align: center;
+}
+.caddie-scoring-card__actions {
+  margin-top: 20rpx;
+  width: 100%;
+  padding-top: 0;
+}
+.caddie-scoring-card__actions .register-sheet__confirm,
+.caddie-scoring-card__actions .register-sheet__cancel {
+  flex: 1;
+}
+
+/* 已扫码球童头像列表（对齐 roster-avatar 尺寸体系） */
+.caddie-scorer-list {
+  margin-top: 20rpx;
+  width: 100%;
+}
+.caddie-scorer-list__title {
+  display: block;
+  margin-bottom: 12rpx;
+}
+.caddie-scorer-list__empty {
+  color: var(--text-muted);
+  font-size: 22rpx;
+  line-height: 1.5;
+  padding: 4rpx 0;
+}
+.caddie-scorer-list__row {
+  width: 100%;
+  white-space: nowrap;
+}
+.caddie-scorer-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 112rpx;
+  margin-right: 16rpx;
+  vertical-align: top;
+}
+.caddie-scorer-item__avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+}
+.caddie-scorer-item__name {
+  margin-top: 8rpx;
+  width: 100%;
+  color: var(--text-primary);
+  font-size: 22rpx;
+  font-weight: 700;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.caddie-scorer-item__tag {
+  margin-top: 2rpx;
+  color: var(--data-blue, #00aeef);
+  font-size: 20rpx;
+  font-weight: 600;
+}
+.caddie-manage-sheet__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx 0 24rpx;
+}
+.caddie-manage-sheet__avatar {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+}
+.caddie-manage-sheet__name {
+  margin-top: 16rpx;
+  color: var(--text-primary);
+  font-size: 30rpx;
+  font-weight: 700;
+}
+.caddie-manage-sheet__desc {
+  margin-top: 10rpx;
+  text-align: center;
+  padding: 0 12rpx;
+}
+.caddie-manage-sheet__remove {
+  margin-top: 28rpx;
+  color: var(--error, #dc2626);
+  font-size: 28rpx;
+  font-weight: 800;
+  opacity: 0.85;
+  padding: 16rpx 0;
+}
+
+.qr-mock-actions {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.qr-mock-actions__btn {
+  height: 72rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--data-blue, #00aeef);
+  background: rgba(0, 174, 239, 0.08);
+  border: 1px dashed var(--data-blue, #00aeef);
+}
+.qr-mock-actions__btn--ghost {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: var(--border);
+}
+.temp-admin-add-sheet__options {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  padding: 0 0 24rpx;
+}
+.temp-admin-add-sheet__option {
+  height: 88rpx;
+  border-radius: 16rpx;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid transparent;
+}
+.sheet-overlay--top {
+  z-index: 230;
+}
+.temp-admin-add-sheet,
+.caddie-manage-sheet {
+  z-index: 240;
+}
+

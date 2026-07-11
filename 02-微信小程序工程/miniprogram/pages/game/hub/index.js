@@ -15,6 +15,10 @@ const matchStatus = require('../../../utils/matchStatus.js');
 const gameLifecycle = require('../../../utils/gameLifecycle.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
+const tempAdminPermission = require('../../../utils/tempAdminPermission.js');
+const caddieScoringAccess = require('../../../utils/caddieScoringAccess.js');
+const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
+const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -245,6 +249,23 @@ Page({
     fabTopPx: 0,
     showStyleSheet: false,
     halfSheetVisible: false,
+    tempAdminSheetVisible: false,
+    adminQrHasQr: false,
+    adminQrUrl: '',
+    adminQrGenerating: false,
+    adminQrExpanded: true,
+    adminQrAdminList: [],
+    expandedAdminUserId: '',
+    caddieScoringQrUrl: '',
+    caddieScoringHasQr: false,
+    caddieScoringGenerating: false,
+    caddieQrExpanded: true,
+    caddieScorerList: [],
+    caddieManageSheetVisible: false,
+    caddieManageTarget: null,
+    phoneBindSheetVisible: false,
+    phoneBindEntryType: 'admin_qr',
+    phoneBindHint: '',
     featuresCommon: [],
     featuresPermission: [],
     featuresPermissionFooterPad: [],
@@ -324,6 +345,16 @@ Page({
     this._syncHubHoleLayout();
     this.applyMoreAccess();
     this.refreshGame();
+
+    const caddieToken = opt.caddieToken ? decodeURIComponent(String(opt.caddieToken)) : '';
+    if (caddieToken) {
+      wx.nextTick(() => this._tryClaimCaddieScoringAccess(caddieToken));
+    }
+
+    const adminToken = opt.adminToken ? decodeURIComponent(String(opt.adminToken)) : '';
+    if (adminToken) {
+      wx.nextTick(() => this._tryClaimTempAdminAccess(adminToken));
+    }
 
     if (tab === 'group') {
       wx.nextTick(() => {
@@ -753,7 +784,647 @@ Page({
       this.setData({ showMoreSheet: false, moreFabExpanded: false, halfSheetVisible: true });
       return;
     }
+    if (permission === 'permission_management') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.openTempAdminSheet();
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  /* ===== 本场临时管理员（权限管理 · 扫码申请制） ===== */
+  _resolveTempAdminGrantableFeatures() {
+    return tempAdminPermission.buildGrantableFeatures(FEATURES_PERMISSION);
+  },
+
+  _withAdminExpandState(list) {
+    const expandedId = String(this.data.expandedAdminUserId || '');
+    return (Array.isArray(list) ? list : []).map((item) =>
+      Object.assign({}, item, {
+        expanded: !!(item && String(item.userId) === expandedId)
+      })
+    );
+  },
+
+  _mergeClaimedAdminIntoDraft(admin, grantable) {
+    if (!admin || !admin.userId) return;
+    const features = grantable || this._resolveTempAdminGrantableFeatures();
+    const draft = Array.isArray(this.data.adminQrAdminList)
+      ? this.data.adminQrAdminList.slice()
+      : [];
+    const uid = String(admin.userId);
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameId ? gameStore.getGame(gameId) : null;
+    if (draft.some((a) => a && String(a.userId) === uid)) {
+      this.setData({
+        caddieScorerList: caddieScoringAccess.listCaddieScorers(
+          (game && game.tempAdmins) || []
+        )
+      });
+      return;
+    }
+    const rows = tempAdminAccess.listAdminQrAdmins([admin], features);
+    if (rows[0]) draft.push(rows[0]);
+    this.setData({
+      adminQrAdminList: this._withAdminExpandState(draft),
+      caddieScorerList: caddieScoringAccess.listCaddieScorers(
+        (game && game.tempAdmins) || []
+      )
+    });
+  },
+
+  openTempAdminSheet() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    const grantable = this._resolveTempAdminGrantableFeatures();
+    this._tempAdminGrantableFeatures = grantable;
+    this._adminDraftDemotions = [];
+    const adminAccess = tempAdminAccess.normalizeTempAdminAccess(game.tempAdminAccess);
+    const caddieAccess = caddieScoringAccess.normalizeCaddieScoringAccess(
+      game.caddieScoringAccess
+    );
+    this.setData({
+      tempAdminSheetVisible: true,
+      adminQrHasQr: !!(adminAccess && adminAccess.qrCodeUrl && adminAccess.enabled),
+      adminQrUrl: adminAccess && adminAccess.qrCodeUrl ? adminAccess.qrCodeUrl : '',
+      adminQrGenerating: false,
+      adminQrExpanded: !adminAccess,
+      expandedAdminUserId: '',
+      adminQrAdminList: (tempAdminAccess.listAdminQrAdmins(game.tempAdmins, grantable) || []).map(
+        (item) => Object.assign({}, item, { expanded: false })
+      ),
+      caddieScoringHasQr: !!(caddieAccess && caddieAccess.qrCodeUrl && caddieAccess.enabled),
+      caddieScoringQrUrl: caddieAccess && caddieAccess.qrCodeUrl ? caddieAccess.qrCodeUrl : '',
+      caddieScoringGenerating: false,
+      caddieQrExpanded: !caddieAccess,
+      caddieScorerList: caddieScoringAccess.listCaddieScorers(game.tempAdmins),
+      caddieManageSheetVisible: false,
+      caddieManageTarget: null
+    });
+  },
+
+  toggleAdminQrExpanded() {
+    this.setData({ adminQrExpanded: !this.data.adminQrExpanded });
+  },
+
+  toggleAdminCandidateExpand(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId) return;
+    const next = String(this.data.expandedAdminUserId || '') === userId ? '' : userId;
+    this.setData({
+      expandedAdminUserId: next,
+      adminQrAdminList: (this.data.adminQrAdminList || []).map((item) =>
+        Object.assign({}, item, {
+          expanded: !!(item && String(item.userId) === next)
+        })
+      )
+    });
+  },
+
+  toggleAdminCandidatePermission(e) {
+    const ds = e.currentTarget.dataset || {};
+    const userId = String(ds.userid || '');
+    const perm = String(ds.perm || '');
+    if (!userId || !perm) return;
+    const list = (this.data.adminQrAdminList || []).map((item) => {
+      if (!item || String(item.userId) !== userId) return item;
+      const options = (item.permissionOptions || []).map((opt) => {
+        if (!opt || opt.key !== perm) return opt;
+        return Object.assign({}, opt, { selected: !opt.selected });
+      });
+      const permissions = tempAdminAccess.selectedKeysFromOptions(options);
+      const status = permissions.length > 0 ? 'approved' : 'pending';
+      return Object.assign({}, item, {
+        permissionOptions: options,
+        permissions: permissions,
+        status: status,
+        statusLabel: status === 'approved' ? '已授权' : '待授权'
+      });
+    });
+    this.setData({ adminQrAdminList: list });
+  },
+
+  generateTempAdminQr() {
+    this._createOrRefreshTempAdminQr(false);
+  },
+
+  regenerateTempAdminQr() {
+    wx.showModal({
+      title: '重新生成',
+      content: '重新生成后，旧二维码将失效。已扫码管理员申请与权限不变。是否继续？',
+      cancelText: '取消',
+      confirmText: '重新生成',
+      success: (res) => {
+        if (res.confirm) this._createOrRefreshTempAdminQr(true);
+      }
+    });
+  },
+
+  _createOrRefreshTempAdminQr() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    const prev = tempAdminAccess.normalizeTempAdminAccess(game.tempAdminAccess);
+    this.setData({ adminQrGenerating: true });
+    const access = tempAdminAccess.createTempAdminAccess({
+      source: 'game',
+      gameId: gameId,
+      createdBy: String(user.userId || '')
+    });
+    if (prev && Array.isArray(prev.claimedBy)) {
+      access.claimedBy = prev.claimedBy.slice();
+    }
+    game.tempAdminAccess = access;
+    gameStore.saveGame(game);
+    this.setData({
+      adminQrHasQr: true,
+      adminQrUrl: access.qrCodeUrl,
+      adminQrGenerating: false,
+      adminQrExpanded: true
+    });
+    wx.showToast({ title: '二维码已生成', icon: 'success' });
+  },
+
+  saveTempAdminQrImage() {
+    this._saveQrImageToAlbum(this.data.adminQrUrl);
+  },
+
+  toggleCaddieQrExpanded() {
+    this.setData({ caddieQrExpanded: !this.data.caddieQrExpanded });
+  },
+
+  _syncCaddieScoringQrView(access) {
+    const normalized = caddieScoringAccess.normalizeCaddieScoringAccess(access);
+    this.setData({
+      caddieScoringHasQr: !!(normalized && normalized.qrCodeUrl && normalized.enabled),
+      caddieScoringQrUrl: normalized && normalized.qrCodeUrl ? normalized.qrCodeUrl : '',
+      caddieScoringGenerating: false,
+      caddieQrExpanded: true
+    });
+  },
+
+  generateCaddieScoringQr() {
+    this._createOrRefreshCaddieScoringQr(false);
+  },
+
+  regenerateCaddieScoringQr() {
+    wx.showModal({
+      title: '重新生成',
+      content: '重新生成后，旧二维码将失效。是否继续？',
+      cancelText: '取消',
+      confirmText: '重新生成',
+      success: (res) => {
+        if (res.confirm) this._createOrRefreshCaddieScoringQr(true);
+      }
+    });
+  },
+
+  _createOrRefreshCaddieScoringQr() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    this.setData({ caddieScoringGenerating: true });
+    const access = caddieScoringAccess.createCaddieScoringAccess({
+      source: 'game',
+      gameId: gameId,
+      createdBy: String(user.userId || '')
+    });
+    game.caddieScoringAccess = access;
+    gameStore.saveGame(game);
+    this._syncCaddieScoringQrView(access);
+    wx.showToast({ title: '二维码已生成', icon: 'success' });
+  },
+
+  saveCaddieScoringQrImage() {
+    this._saveQrImageToAlbum(this.data.caddieScoringQrUrl);
+  },
+
+  _saveQrImageToAlbum(rawUrl) {
+    const url = String(rawUrl || '').trim();
+    if (!url) {
+      wx.showToast({ title: '请先生成二维码', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '保存中', mask: true });
+    wx.downloadFile({
+      url: url,
+      success: (res) => {
+        if (!res || res.statusCode !== 200 || !res.tempFilePath) {
+          wx.hideLoading();
+          wx.showToast({ title: '下载失败', icon: 'none' });
+          return;
+        }
+        wx.saveImageToPhotosAlbum({
+          filePath: res.tempFilePath,
+          success: () => {
+            wx.hideLoading();
+            wx.showToast({ title: '已保存到相册', icon: 'success' });
+          },
+          fail: (err) => {
+            wx.hideLoading();
+            const msg = err && err.errMsg ? String(err.errMsg) : '';
+            if (msg.indexOf('auth deny') >= 0 || msg.indexOf('authorize') >= 0) {
+              wx.showModal({
+                title: '需要相册权限',
+                content: '请在设置中允许保存到相册后重试',
+                confirmText: '去设置',
+                success: (r) => {
+                  if (r.confirm) wx.openSetting({});
+                }
+              });
+              return;
+            }
+            wx.showToast({ title: '保存失败', icon: 'none' });
+          }
+        });
+      },
+      fail: () => {
+        wx.hideLoading();
+        wx.showToast({ title: '下载失败', icon: 'none' });
+      }
+    });
+  },
+
+  /** 临时管理员扫码进入：先过注册/手机号闸门，再写入 pending */
+  _tryClaimTempAdminAccess(token) {
+    this._beginQrAccessClaim('admin_qr', token);
+  },
+
+  /** 球童扫码进入：先过注册/手机号闸门，再写入 manage_scoring */
+  _tryClaimCaddieScoringAccess(token) {
+    this._beginQrAccessClaim('caddie_qr', token);
+  },
+
+  _beginQrAccessClaim(entryType, token) {
+    const type = entryType === 'caddie_qr' ? 'caddie_qr' : 'admin_qr';
+    const tok = String(token || '').trim();
+    if (!tok) return;
+    this._pendingQrClaim = { entryType: type, token: tok };
+    const gate = qrAccessAuth.ensureRegisteredAndPhoneBound(type);
+    if (gate.ok) {
+      this._executePendingQrClaim(gate.user);
+      return;
+    }
+    const copy = gate.copy || qrAccessAuth.getCopy(type);
+    if (gate.reason === 'need_login') {
+      wx.showModal({
+        title: copy.needLoginTitle,
+        content: copy.needLoginContent,
+        cancelText: '取消',
+        confirmText: '去登录',
+        success: (res) => {
+          if (res.confirm) this._openPhoneBindForQrClaim(type);
+          else this._cancelPendingQrClaim(type);
+        }
+      });
+      return;
+    }
+    wx.showModal({
+      title: copy.needPhoneTitle,
+      content: copy.needPhoneContent,
+      cancelText: '取消',
+      confirmText: '去绑定',
+      success: (res) => {
+        if (res.confirm) this._openPhoneBindForQrClaim(type);
+        else this._cancelPendingQrClaim(type);
+      }
+    });
+  },
+
+  _openPhoneBindForQrClaim(entryType) {
+    const type = entryType === 'caddie_qr' ? 'caddie_qr' : 'admin_qr';
+    const copy = qrAccessAuth.getCopy(type);
+    this.setData({
+      phoneBindSheetVisible: true,
+      phoneBindEntryType: type,
+      phoneBindHint: copy.needPhoneContent
+    });
+  },
+
+  _cancelPendingQrClaim(entryType) {
+    const type =
+      entryType ||
+      (this._pendingQrClaim && this._pendingQrClaim.entryType) ||
+      'admin_qr';
+    this._pendingQrClaim = null;
+    this.setData({ phoneBindSheetVisible: false });
+    const copy = qrAccessAuth.getCopy(type);
+    wx.showToast({ title: copy.cancelToast, icon: 'none', duration: 2500 });
+  },
+
+  onPhoneBindSheetCancel() {
+    this._cancelPendingQrClaim(this.data.phoneBindEntryType);
+  },
+
+  onPhoneBindSheetSuccess() {
+    this.setData({ phoneBindSheetVisible: false });
+    const pending = this._pendingQrClaim;
+    if (!pending || !pending.token) return;
+    const gate = qrAccessAuth.ensureRegisteredAndPhoneBound(pending.entryType);
+    if (!gate.ok) {
+      this._cancelPendingQrClaim(pending.entryType);
+      return;
+    }
+    this._executePendingQrClaim(gate.user);
+  },
+
+  _executePendingQrClaim(profile) {
+    const pending = this._pendingQrClaim;
+    this._pendingQrClaim = null;
+    if (!pending || !pending.token) return;
+    if (pending.entryType === 'caddie_qr') {
+      this._claimCaddieAfterAuth(pending.token, profile);
+    } else {
+      this._claimAdminAfterAuth(pending.token, profile);
+    }
+  },
+
+  _claimAdminAfterAuth(token, profile) {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) return;
+    const game = gameStore.getGame(gameId);
+    if (!game) return;
+    const grantable = this._resolveTempAdminGrantableFeatures();
+    const user = profile || qrAccessAuth.buildClaimProfile('admin_qr');
+    if (!user.userId || !user.phone) return;
+    const result = tempAdminAccess.claimTempAdminAccess(game, token, user.userId, user);
+    if (!result || !result.ok) {
+      if (result && result.reason === 'invalid_token') {
+        wx.showToast({ title: '二维码无效或已失效', icon: 'none' });
+      } else if (result && result.reason === 'no_phone') {
+        wx.showToast({ title: '未绑定手机号，无法申请临时管理员权限', icon: 'none' });
+      }
+      return;
+    }
+    gameStore.saveGame(game);
+    if (this.data.tempAdminSheetVisible) {
+      this._mergeClaimedAdminIntoDraft(result.admin, grantable);
+    }
+    wx.showToast({
+      title: '已提交管理员申请，请等待管理员授权',
+      icon: 'none',
+      duration: 2500
+    });
+  },
+
+  _claimCaddieAfterAuth(token, profile) {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) return;
+    const game = gameStore.getGame(gameId);
+    if (!game) return;
+    const user = profile || qrAccessAuth.buildClaimProfile('caddie_qr');
+    if (!user.userId || !user.phone) return;
+    const result = caddieScoringAccess.claimCaddieScoringAccess(
+      game,
+      token,
+      user.userId,
+      user
+    );
+    if (!result || !result.ok) {
+      if (result && result.reason === 'invalid_token') {
+        wx.showToast({ title: '二维码无效或已失效', icon: 'none' });
+      } else if (result && result.reason === 'no_phone') {
+        wx.showToast({ title: '未绑定手机号，无法获得记分权限', icon: 'none' });
+      }
+      return;
+    }
+    gameStore.saveGame(game);
+    if (this.data.tempAdminSheetVisible) {
+      this._syncCaddieScorerList(game);
+    }
+    wx.showToast({
+      title: result.already ? '已拥有本场记分权限' : '已获得本场记分权限',
+      icon: 'success'
+    });
+  },
+
+  mockScanAdminQr() {
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameId ? gameStore.getGame(gameId) : null;
+    const access = tempAdminAccess.normalizeTempAdminAccess(
+      game && game.tempAdminAccess
+    );
+    if (!access || !access.token) {
+      wx.showToast({ title: '请先生成临时管理员二维码', icon: 'none' });
+      return;
+    }
+    this._tryClaimTempAdminAccess(access.token);
+  },
+
+  mockScanCaddieQr() {
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameId ? gameStore.getGame(gameId) : null;
+    const access = caddieScoringAccess.normalizeCaddieScoringAccess(
+      game && game.caddieScoringAccess
+    );
+    if (!access || !access.token) {
+      wx.showToast({ title: '请先生成球童记分二维码', icon: 'none' });
+      return;
+    }
+    this._tryClaimCaddieScoringAccess(access.token);
+  },
+
+  toggleMockPhoneBound() {
+    const state = qrAccessAuth.getAuthDebugState();
+    const bound = !!(state.phone && state.mockPhoneBound !== false);
+    if (bound) {
+      qrAccessAuth.setMockPhoneBound(false);
+      gameStore.setCurrentUserPhone('');
+      wx.showToast({ title: '已模拟未绑定手机号', icon: 'none' });
+    } else {
+      qrAccessAuth.bindPhone('13800000000');
+      wx.showToast({ title: '已模拟绑定手机号', icon: 'none' });
+    }
+  },
+
+  _syncCaddieScorerList(gameOrNull) {
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameOrNull || (gameId ? gameStore.getGame(gameId) : null);
+    this.setData({
+      caddieScorerList: caddieScoringAccess.listCaddieScorers(
+        game && game.tempAdmins ? game.tempAdmins : []
+      )
+    });
+  },
+
+  closeTempAdminSheet() {
+    this._tempAdminGrantableFeatures = null;
+    this._adminDraftDemotions = [];
+    this.setData({
+      tempAdminSheetVisible: false,
+      adminQrHasQr: false,
+      adminQrUrl: '',
+      adminQrGenerating: false,
+      adminQrExpanded: true,
+      adminQrAdminList: [],
+      expandedAdminUserId: '',
+      caddieScoringHasQr: false,
+      caddieScoringQrUrl: '',
+      caddieScoringGenerating: false,
+      caddieQrExpanded: true,
+      caddieScorerList: [],
+      caddieManageSheetVisible: false,
+      caddieManageTarget: null
+    });
+  },
+
+  cancelTempAdminSheet() {
+    this.closeTempAdminSheet();
+  },
+
+  saveTempAdminSheet() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      this.closeTempAdminSheet();
+      return;
+    }
+    const game = gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '比赛不存在', icon: 'none' });
+      return;
+    }
+    const grantable =
+      this._tempAdminGrantableFeatures || this._resolveTempAdminGrantableFeatures();
+    tempAdminAccess.commitAdminQrDraft(
+      game,
+      this.data.adminQrAdminList,
+      this._adminDraftDemotions || [],
+      grantable
+    );
+    gameStore.saveGame(game);
+    this.closeTempAdminSheet();
+    wx.showToast({ title: '权限已保存', icon: 'success' });
+  },
+
+  onRemoveAdminQrTempAdmin(e) {
+    const userId = String(
+      (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.userid) ||
+        this.data.expandedAdminUserId ||
+        ''
+    );
+    if (!userId) return;
+    wx.showModal({
+      title: '移除临时管理员',
+      content: '确定移除该用户的本场临时管理员申请吗？',
+      cancelText: '取消',
+      confirmText: '确认移除',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (!res.confirm) return;
+        const gameId = this._gameId || this.data.gameId || '';
+        const game = gameStore.getGame(gameId);
+        const result = tempAdminAccess.removeAdminQrFromDraftList(
+          this.data.adminQrAdminList,
+          userId,
+          game
+        );
+        if (!result || !result.ok) {
+          wx.showToast({ title: '移除失败', icon: 'none' });
+          return;
+        }
+        if (result.demoted) {
+          const demotions = Array.isArray(this._adminDraftDemotions)
+            ? this._adminDraftDemotions.slice()
+            : [];
+          const di = demotions.findIndex(
+            (d) => d && String(d.userId) === String(result.demoted.userId)
+          );
+          if (di >= 0) demotions[di] = result.demoted;
+          else demotions.push(result.demoted);
+          this._adminDraftDemotions = demotions;
+        }
+        const nextExpanded =
+          String(this.data.expandedAdminUserId || '') === userId
+            ? ''
+            : String(this.data.expandedAdminUserId || '');
+        this.setData({
+          expandedAdminUserId: nextExpanded,
+          adminQrAdminList: (result.list || []).map((item) =>
+            Object.assign({}, item, {
+              expanded: !!(item && String(item.userId) === nextExpanded)
+            })
+          )
+        });
+        wx.showToast({ title: '已从列表移除，保存后生效', icon: 'none' });
+      }
+    });
+  },
+
+  openCaddieScorerManage(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId) return;
+    const list = this.data.caddieScorerList || [];
+    const target = list.find((item) => item && String(item.userId) === userId) || null;
+    if (!target) return;
+    this.setData({
+      caddieManageSheetVisible: true,
+      caddieManageTarget: target
+    });
+  },
+
+  closeCaddieScorerManage() {
+    this.setData({
+      caddieManageSheetVisible: false,
+      caddieManageTarget: null
+    });
+  },
+
+  onRemoveCaddieScoringPermission() {
+    const target = this.data.caddieManageTarget;
+    if (!target || !target.userId) return;
+    const userId = String(target.userId);
+    wx.showModal({
+      title: '移除球童记分员',
+      content: '确定移除该球童的本场记分权限吗？',
+      cancelText: '取消',
+      confirmText: '确认移除',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (!res.confirm) return;
+        const gameId = this._gameId || this.data.gameId || '';
+        const game = gameStore.getGame(gameId);
+        if (!game) {
+          wx.showToast({ title: '比赛不存在', icon: 'none' });
+          return;
+        }
+        const result = caddieScoringAccess.removeCaddieScoringPermission(game, userId);
+        if (!result || !result.ok) {
+          wx.showToast({ title: '移除失败', icon: 'none' });
+          return;
+        }
+        gameStore.saveGame(game);
+        this.setData({
+          caddieManageSheetVisible: false,
+          caddieManageTarget: null,
+          caddieScorerList: caddieScoringAccess.listCaddieScorers(game.tempAdmins)
+        });
+        wx.showToast({ title: '已移除记分权限', icon: 'success' });
+      }
+    });
   },
 
   closeHalfSheet() {

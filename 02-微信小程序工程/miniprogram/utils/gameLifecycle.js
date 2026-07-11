@@ -1,7 +1,10 @@
 /**
- * 普通球局生命周期：硬删除比赛及所有本地关联数据。
+ * 比赛生命周期：硬删除比赛及所有本地关联数据。
+ * - 普通球局 / 多组 GAME → purgeGameCompletely
+ * - 队内赛 / 球队比赛 → purgeTeamMatchCompletely
  */
 const gameStore = require('./gameStore.js');
+const teamMatchStore = require('./teamMatchStore.js');
 const matchState = require('./matchState.js');
 
 /** 清除 globalData 中与 gameId 相关的会话缓存 */
@@ -46,6 +49,29 @@ function purgeGameCompletely(gameId) {
   return existed;
 }
 
+/**
+ * 硬删除球队赛 / 队内赛（与 purgeGameCompletely 同语义：删除实体，非 cancelled 状态标记）
+ */
+function purgeTeamMatchCompletely(matchId) {
+  if (!matchId) return false;
+
+  const existed = !!teamMatchStore.getMatchById(matchId);
+  teamMatchStore.removeMatch(matchId);
+
+  try {
+    const app = getApp();
+    if (app) {
+      app.globalData = app.globalData || {};
+      app.globalData.teamMatchesDirty = true;
+    }
+  } catch (e) {
+    // 忽略
+  }
+
+  return existed;
+}
+
 module.exports = {
-  purgeGameCompletely
+  purgeGameCompletely,
+  purgeTeamMatchCompletely
 };

@@ -1002,8 +1002,6 @@ v0.5.8-team-match-management-flow
 TAB 到底时隐藏底部操作按钮
 M 面板增加导出分组表入口
 
-
-
 v0.5.12-group-management-display-flow
 
 分组管理与展示流程增强
@@ -1018,3 +1016,13 @@ v0.5.12-group-management-display-flow
 - 未满 4 人分组展示时隐藏空位，但保留正式 position
 - 统一多组 GAME 分组卡片球员展示标准：头像左，昵称/T台右
 - 修复赛事信息 TAB 中参赛须知、赛事规则说明文字字号异常
+
+v0.5.13-half-editor-register-sticky-fixes
+
+- 普通创建多组「修改半场」弹窗对齐标准半场选择视觉
+- 选中半场对应标准 PAR 行同步高亮
+- 球队比赛「修改半场」对齐普通创建多组
+- 普通创建多组 Game Hub 逐洞广告替换为广告图片1 B/D
+- 交杯鲜啤演示赛事复用广告图片1与默认赛事信息
+- 报名 TAB 改为：TAB 先吸顶，再按内容是否溢出决定是否锁定
+- 移除报名 TAB 固定 7 人阈值逻辑

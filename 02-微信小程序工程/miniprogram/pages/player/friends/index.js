@@ -3,6 +3,7 @@
  * - 普通模式（创建/记分）：多选回填 slot，emit friendsSelected { friends }
  * - proxy_register（替他人报名·好友）：按报名状态回显，emit { addedPlayers, removedPlayers }
  * - proxy_register_team（替他人报名·球队成员）：数据源 teamDirectory.getTeamMembers，三态同好友
+ * - select_temp_admin（本场临时管理员）：多选，已存在管理员禁用，emit { mode, friends }
  */
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
@@ -14,9 +15,14 @@ const teamDirectory = require('../../../utils/teamDirectory.js');
 const MAX_GROUP_SIZE = 4;
 const PROXY_MODE = 'proxy_register';
 const PROXY_TEAM_MODE = 'proxy_register_team';
+const TEMP_ADMIN_MODE = 'select_temp_admin';
 
 function isProxyRegisterModeValue(mode) {
   return mode === PROXY_MODE || mode === PROXY_TEAM_MODE;
+}
+
+function isTempAdminModeValue(mode) {
+  return mode === TEMP_ADMIN_MODE;
 }
 
 function buildCurrentUser() {
@@ -109,10 +115,11 @@ Page({
     maxAdd: 4,
     selectedCount: 0,
     defaultAvatar: mockAvatars.DEFAULT_AVATAR,
-    // proxy_register / proxy_register_team
+    // proxy_register / proxy_register_team / select_temp_admin
     mode: '',
     isProxyRegisterMode: false,
     isProxyTeamMode: false,
+    isTempAdminSelectMode: false,
     registrationStateMap: {},
     operatorUserId: '',
     teamId: ''
@@ -129,7 +136,51 @@ Page({
       this._initProxyRegisterMode(opt, mode);
       return;
     }
+    if (isTempAdminModeValue(mode)) {
+      this._initTempAdminSelectMode(opt);
+      return;
+    }
     this._initNormalMode(opt);
+  },
+
+  /**
+   * 本场临时管理员多选：
+   * - 已是管理员的好友禁用（不可重复添加）
+   * - 无每组 4 人上限
+   * - emit friendsSelected { mode, friends }
+   */
+  _initTempAdminSelectMode(opt) {
+    const currentUser = buildCurrentUser();
+    const existingIds = parseIdList(opt.existing || opt.used || opt.preselected);
+    const disabledMap = {};
+    existingIds.forEach((id) => {
+      disabledMap[id] = true;
+    });
+
+    this._allFriends = (FRIEND_LIST || []).map(mapFriendRow);
+    this._mode = TEMP_ADMIN_MODE;
+    this._currentGroupPlayerIds = [];
+
+    this.setData({
+      mode: TEMP_ADMIN_MODE,
+      isProxyRegisterMode: false,
+      isProxyTeamMode: false,
+      isTempAdminSelectMode: true,
+      matchId: opt.matchId || '',
+      slotId: opt.slotId || '',
+      keyword: '',
+      currentUser: currentUser,
+      sections: buildSections(this._allFriends),
+      searchEmpty: false,
+      currentGroupPlayerIds: [],
+      preselectedMap: {},
+      selectedMap: {},
+      disabledMap: disabledMap,
+      maxAdd: 99,
+      selectedCount: 0,
+      registrationStateMap: {},
+      operatorUserId: currentUser.playerId || ''
+    });
   },
 
   _initNormalMode(opt) {
@@ -157,6 +208,7 @@ Page({
     this.setData({
       mode: '',
       isProxyRegisterMode: false,
+      isTempAdminSelectMode: false,
       matchId: opt.matchId || '',
       slotId: opt.slotId || '',
       keyword: '',
@@ -454,15 +506,21 @@ Page({
     if (this.data.disabledMap[id]) {
       if (this.data.isProxyRegisterMode) {
         wx.showToast({ title: '该选手已报名，不可取消', icon: 'none' });
+      } else if (this.data.isTempAdminSelectMode || this._mode === TEMP_ADMIN_MODE) {
+        wx.showToast({ title: '该用户已是本场临时管理员', icon: 'none' });
       }
       return;
     }
 
     const selectedMap = Object.assign({}, this.data.selectedMap);
     const isOn = !!selectedMap[id];
+    const unlimited =
+      this.data.isProxyRegisterMode ||
+      this.data.isTempAdminSelectMode ||
+      this._mode === TEMP_ADMIN_MODE;
     if (isOn) {
       delete selectedMap[id];
-    } else if (!this.data.isProxyRegisterMode && Object.keys(selectedMap).length >= MAX_GROUP_SIZE) {
+    } else if (!unlimited && Object.keys(selectedMap).length >= MAX_GROUP_SIZE) {
       wx.showToast({ title: '每组最多 ' + MAX_GROUP_SIZE + ' 人', icon: 'none' });
       return;
     } else {
@@ -558,13 +616,33 @@ Page({
     if (cu && cu.playerId && selectedMap[cu.playerId]) {
       selected.push({
         playerId: cu.playerId,
+        userId: cu.playerId,
         name: cu.name,
         avatar: cu.avatar || ''
       });
     }
     (this._allFriends || FRIEND_LIST).forEach((f) => {
-      if (selectedMap[f.playerId]) selected.push(f);
+      if (selectedMap[f.playerId]) {
+        selected.push(
+          Object.assign({}, f, {
+            userId: f.userId || f.playerId,
+            playerId: f.playerId || f.userId
+          })
+        );
+      }
     });
+
+    if (this.data.isTempAdminSelectMode || this._mode === TEMP_ADMIN_MODE) {
+      if (ch && ch.emit) {
+        ch.emit('friendsSelected', {
+          mode: TEMP_ADMIN_MODE,
+          friends: selected
+        });
+      }
+      this.onBack();
+      return;
+    }
+
     if (ch && ch.emit) ch.emit('friendsSelected', { friends: selected });
     this.onBack();
   },

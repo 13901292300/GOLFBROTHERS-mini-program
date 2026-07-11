@@ -252,6 +252,9 @@ function buildMatchFromCreatePage(pageData) {
     registerStatus: data.registerStatus === 'closed' ? 'closed' : 'open',
     status: 'registering',
     statusLabel: '报名中',
+    tempAdmins: [],
+    caddieScoringAccess: null,
+    tempAdminAccess: null,
     createdBy: creatorId,
     creatorId: creatorId,
     createdAt: Date.now()
@@ -447,6 +450,129 @@ function clearFormalPairingsOnMatch(match) {
   return match;
 }
 
+/** 分组位球员 id（兼容对象多字段 / 字符串） */
+function resolveGroupSlotPlayerId(player) {
+  if (player == null) return '';
+  if (typeof player === 'string' || typeof player === 'number') {
+    return String(player).trim();
+  }
+  if (typeof player !== 'object') return '';
+  const id = player.userId || player.playerId || player.id;
+  return id != null ? String(id).trim() : '';
+}
+
+/** 正式 groups 中是否已包含该 userId */
+function isUserInFormalGroups(match, userId) {
+  const uid = String(userId || '').trim();
+  if (!uid || !match || !Array.isArray(match.groups)) return false;
+  for (let i = 0; i < match.groups.length; i++) {
+    const players = match.groups[i] && Array.isArray(match.groups[i].players)
+      ? match.groups[i].players
+      : [];
+    for (let j = 0; j < players.length; j++) {
+      if (resolveGroupSlotPlayerId(players[j]) === uid) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 从正式 groups 清空该球员所在位（保留 position，不压缩、不删组）
+ */
+function clearUserFromFormalGroups(match, userId) {
+  const uid = String(userId || '').trim();
+  if (!uid || !match || !Array.isArray(match.groups)) return match;
+  match.groups = match.groups.map((g) => {
+    if (!g || !Array.isArray(g.players)) return g;
+    const players = g.players.map((p) => {
+      if (resolveGroupSlotPlayerId(p) !== uid) return p;
+      if (typeof p === 'string' || typeof p === 'number') return '';
+      const next = Object.assign({}, p);
+      next.userId = '';
+      if (Object.prototype.hasOwnProperty.call(next, 'playerId')) next.playerId = '';
+      if (Object.prototype.hasOwnProperty.call(next, 'id') && String(next.id) === uid) {
+        next.id = '';
+      }
+      return next;
+    });
+    return Object.assign({}, g, { players: players });
+  });
+  return match;
+}
+
+/**
+ * 从 pairings 移除该 userId；清空的组合删除；组下无组合则去掉该 group key
+ */
+function clearUserFromPairings(match, userId) {
+  const uid = String(userId || '').trim();
+  if (!uid || !match) return match;
+  const cloned = clonePairings(match.pairings);
+  const out = {};
+  Object.keys(cloned).forEach((groupId) => {
+    const list = (cloned[groupId] || [])
+      .map((p) => ({
+        id: p.id,
+        playerIds: (p.playerIds || []).filter((id) => String(id) !== uid)
+      }))
+      .filter((p) => p.playerIds.length > 0);
+    if (list.length) out[groupId] = list;
+  });
+  match.pairings = out;
+  if (Object.prototype.hasOwnProperty.call(match, 'pairingMap')) {
+    match.pairingMap = out;
+  }
+  return match;
+}
+
+/**
+ * 从报名名单移除 targetUserId，并同步清空正式 groups 位 / pairings（不写盘）。
+ * @returns {{ ok: boolean, reason?: string, wasGrouped?: boolean }}
+ */
+function removeRegisteredUserAndCleanupGroups(match, targetUserId) {
+  const uid = String(targetUserId || '').trim();
+  if (!match || typeof match !== 'object') return { ok: false, reason: 'no_match' };
+  if (!uid) return { ok: false, reason: 'no_user' };
+
+  const wasGrouped = isUserInFormalGroups(match, uid);
+
+  if (!match.registerInfo || typeof match.registerInfo !== 'object') {
+    match.registerInfo = createDefaultRegisterInfo();
+  }
+  if (!Array.isArray(match.registerInfo.users)) {
+    match.registerInfo.users = [];
+  }
+  match.registerInfo.users = match.registerInfo.users.filter((item) => {
+    if (!item) return false;
+    const id = String(item.userId || item.playerId || item.id || '').trim();
+    return id !== uid;
+  });
+  match.registerInfo.totalCount = match.registerInfo.users.length;
+
+  clearUserFromFormalGroups(match, uid);
+  clearUserFromPairings(match, uid);
+
+  return { ok: true, wasGrouped: wasGrouped };
+}
+
+/**
+ * 取消报名并同步清理正式 groups / pairings（写盘）。
+ * targetUserId = 真正被取消报名的球员（自己或代报名好友）。
+ * @returns {{ ok: boolean, reason?: string, match?: object, wasGrouped?: boolean }}
+ */
+function cancelRegistration(matchId, targetUserId) {
+  const uid = String(targetUserId || '').trim();
+  if (!matchId) return { ok: false, reason: 'no_match_id' };
+  if (!uid) return { ok: false, reason: 'no_user' };
+  const match = getMatchById(matchId);
+  if (!match) return { ok: false, reason: 'not_found' };
+
+  const result = removeRegisteredUserAndCleanupGroups(match, uid);
+  if (!result.ok) return result;
+  saveMatch(match);
+
+  return { ok: true, match: match, wasGrouped: !!result.wasGrouped };
+}
+
 const GAME_MODE_CHANGE_CLEAR_GROUPS_TIP = '修改赛制后，需要重新分配组合，已有分组将被清空。';
 
 
@@ -518,6 +644,16 @@ function getMatchById(matchId) {
   return _readAll().find((item) => item && item.matchId === matchId) || null;
 }
 
+/** 硬删除球队赛（与 gameStore.removeGame 对齐） */
+function removeMatch(matchId) {
+  if (!matchId) return false;
+  const list = _readAll();
+  const existed = list.some((item) => item && item.matchId === matchId);
+  if (!existed) return false;
+  _writeAll(list.filter((item) => item && item.matchId !== matchId));
+  return true;
+}
+
 /** 转为首页球队赛卡片（ds-card-club）数据结构 */
 function toTournamentCard(match) {
   if (!match) return null;
@@ -554,12 +690,18 @@ module.exports = {
   shouldClearPairingsOnGameModeChange,
   clearFormalGroupsOnMatch,
   clearFormalPairingsOnMatch,
+  isUserInFormalGroups,
+  clearUserFromFormalGroups,
+  clearUserFromPairings,
+  removeRegisteredUserAndCleanupGroups,
+  cancelRegistration,
   buildMatchFromCreatePage,
   updateMatchFromCreatePage,
   hydrateCreatePageFromMatch,
   saveMatch,
   listMatches,
   getMatchById,
+  removeMatch,
   toTournamentCard,
   formatClubDate,
   normalizeRegisterUser,

@@ -3,6 +3,7 @@
   "usingComponents": {
     "discussion": "/components/discussion/index",
     "leaderboard-player-identity": "/components/leaderboard-player-identity/index",
-    "half-course-sheet": "/components/half-course-sheet/index"
+    "half-course-sheet": "/components/half-course-sheet/index",
+    "phone-bind-sheet": "/components/phone-bind-sheet/index"
   }
 }

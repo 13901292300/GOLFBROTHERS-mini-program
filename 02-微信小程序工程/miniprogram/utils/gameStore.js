@@ -36,8 +36,37 @@ const CURRENT_USER = {
   avatar: mockAvatars.avatarByIndex(2)
 };
 
+const USER_PHONE_OVERRIDE_KEY = 'gb_current_user_phone_v1';
+
 function getCurrentUser() {
-  return CURRENT_USER;
+  const user = Object.assign({}, CURRENT_USER);
+  try {
+    const override = wx.getStorageSync(USER_PHONE_OVERRIDE_KEY);
+    if (override != null && override !== undefined) {
+      user.phone = String(override);
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return user;
+}
+
+/** 更新当前用户手机号（本地覆盖，供绑定流程写入） */
+function setCurrentUserPhone(phone) {
+  const p = phone != null ? String(phone).trim() : '';
+  CURRENT_USER.phone = p;
+  try {
+    wx.setStorageSync(USER_PHONE_OVERRIDE_KEY, p);
+  } catch (e) {
+    /* ignore */
+  }
+  return getCurrentUser();
+}
+
+/** 确保当前用户具备基础注册身份（无独立登录页时的本地兜底） */
+function ensureCurrentUserRegistered() {
+  if (!CURRENT_USER.userId) CURRENT_USER.userId = 'me';
+  return getCurrentUser();
 }
 
 function _readAll() {
@@ -276,6 +305,8 @@ function removeGame(gameId) {
 
 module.exports = {
   getCurrentUser,
+  setCurrentUserPhone,
+  ensureCurrentUserRegistered,
   listGames,
   getActiveGames,
   getGame,

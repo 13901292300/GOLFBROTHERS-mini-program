@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据统计 - 高尔夫江湖</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', 'Noto Sans SC', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body.dark-mode {
+            background-color: #000000;
+            color: #ffffff;
+        }
+        body.light-mode {
+            background-color: #f4f4f7;
+            color: #1a1a1a;
+        }
+        .chart-container {
+            position: relative;
+            height: 180px;
+            width: 100%;
+        }
+        .dark-mode .grid-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background-color: transparent;
+            border-top: 1px solid #222222;
+        }
+        .light-mode .grid-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background-color: transparent;
+            border-top: 1px solid #e0e0e0;
+        }
+        .dark-mode .grid-band {
+            position: absolute;
+            width: 100%;
+            background-color: #111111;
+            opacity: 0.5;
+        }
+        .light-mode .grid-band {
+            position: absolute;
+            width: 100%;
+            background-color: #ffffff;
+            opacity: 0.8;
+        }
+        .dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            transform: translate(-50%, 50%);
+            z-index: 10;
+            box-shadow: 0 0 8px currentColor;
+        }
+        .dot-label {
+            position: absolute;
+            font-size: 10px;
+            transform: translate(-50%, -100%);
+            margin-top: -4px;
+            white-space: nowrap;
+        }
+        .avg-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            border-top: 1px dashed #ce9224;
+            z-index: 5;
+            opacity: 0.6;
+        }
+        .dark-mode .stat-card {
+            background: #111111;
+            border: 1px solid #222222;
+            border-top: 3px solid #002d62;
+        }
+        .light-mode .stat-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-top: 3px solid #002d62;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        }
+        .dark-mode .tab-active {
+            background-color: #1a1a1a;
+            color: #00aeef;
+            border-left: 3px solid #00aeef;
+        }
+        .light-mode .tab-active {
+            background-color: #f0f9ff;
+            color: #00aeef;
+            border-left: 3px solid #00aeef;
+        }
+        .dark-mode .tab-inactive {
+            background-color: #0a0a0a;
+            color: #888888;
+        }
+        .light-mode .tab-inactive {
+            background-color: #fafafa;
+            color: #9ca3af;
+        }
+        .hero-glow {
+            background: linear-gradient(180deg, rgba(0,45,98,0.2) 0%, rgba(0,0,0,0) 100%);
+        }
+        .light-mode .hero-glow {
+            background: linear-gradient(180deg, rgba(0,45,98,0.1) 0%, rgba(244,244,247,0) 100%);
+        }
+    </style>
+</head>
+<body class="max-w-md mx-auto min-h-screen pb-10 dark-mode">
+
+    <!-- Header -->
+    <header class="bg-white/10 dark:bg-black/90 backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-50 border-b border-black/5 dark:border-white/10 transition-colors">
+        <div class="flex items-center space-x-4">
+            <div class="w-8 h-8 flex items-center justify-center bg-black/5 dark:bg-white/10 rounded-full cursor-pointer">
+                <i class="fas fa-chevron-left text-gray-800 dark:text-white"></i>
+            </div>
+            <h1 class="text-sm font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Tour Statistics</h1>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="themeToggle" class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <i class="fas fa-moon dark:hidden"></i>
+                <i class="fas fa-sun hidden dark:block"></i>
+            </button>
+            <div class="flex items-center space-x-2 border border-black/10 dark:border-white/20 rounded-full px-3 py-1 bg-black/5 dark:bg-white/5">
+                <i class="fas fa-ellipsis-h text-xs text-gray-500 dark:text-white/50"></i>
+            </div>
+        </div>
+    </header>
+
+    <div class="hero-glow h-4 w-full"></div>
+
+    <!-- Main Content -->
+    <main class="space-y-4 px-3">
+
+        <!-- Section 1: Total Strokes -->
+        <section class="stat-card rounded-xl p-4">
+            <div class="flex justify-between items-end mb-4">
+                <div>
+                    <h2 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Total Strokes</h2>
+                    <p class="text-lg font-black italic text-gray-900 dark:text-white">总杆趋势</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-gray-400 dark:text-gray-500 block uppercase">Average</span>
+                    <span class="text-lg font-black text-blue-500 dark:text-blue-400">76.3</span>
+                </div>
+            </div>
+            <div class="chart-container" id="totalStrokesChart"></div>
+            <p class="text-[10px] text-gray-400 dark:text-gray-600 mt-2 text-center uppercase tracking-tighter">Recent 10 Rounds Performance</p>
+        </section>
+
+        <!-- Section 2: Putter Strokes -->
+        <section class="stat-card rounded-xl p-4">
+            <div class="flex justify-between items-end mb-4">
+                <div>
+                    <h2 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Putting</h2>
+                    <p class="text-lg font-black italic text-gray-900 dark:text-white">推杆趋势</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-gray-400 dark:text-gray-500 block uppercase">Average</span>
+                    <span class="text-lg font-black text-blue-500 dark:text-blue-400">29.8</span>
+                </div>
+            </div>
+            <div class="chart-container" id="putterChart"></div>
+            <p class="text-[10px] text-gray-400 dark:text-gray-600 mt-2 text-center uppercase tracking-tighter">Putting Efficiency Tracking</p>
+        </section>
+
+        <!-- Section 3: PAR Average with Tabs -->
+        <section class="stat-card rounded-xl overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 flex justify-between items-center">
+                <h2 class="text-sm font-black italic uppercase tracking-tighter text-gray-900 dark:text-white">Par Performance</h2>
+                <div id="parChartAvg" class="text-xs font-bold text-blue-500 dark:text-blue-400">PAR3: 3.9</div>
+            </div>
+            <div class="flex min-h-[220px]">
+                <!-- Tabs Side -->
+                <div class="w-1/4 flex flex-col border-r border-black/5 dark:border-white/5">
+                    <button onclick="switchParTab(3)" id="tab-par3" class="flex-1 px-2 py-4 text-center text-[10px] font-black leading-tight tab-active uppercase italic">
+                        PAR 3
+                    </button>
+                    <button onclick="switchParTab(4)" id="tab-par4" class="flex-1 px-2 py-4 text-center text-[10px] font-black leading-tight tab-inactive border-t border-black/5 dark:border-white/5 uppercase italic">
+                        PAR 4
+                    </button>
+                    <button onclick="switchParTab(5)" id="tab-par5" class="flex-1 px-2 py-4 text-center text-[10px] font-black leading-tight tab-inactive border-t border-black/5 dark:border-white/5 uppercase italic">
+                        PAR 5
+                    </button>
+                </div>
+                <!-- Content Side -->
+                <div class="w-3/4 p-4 flex flex-col">
+                    <div class="chart-container flex-1 relative" id="parChart"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+
+        themeToggle.addEventListener('click', () => {
+            if (body.classList.contains('dark-mode')) {
+                body.classList.replace('dark-mode', 'light-mode');
+                document.documentElement.classList.remove('dark');
+            } else {
+                body.classList.replace('light-mode', 'dark-mode');
+                document.documentElement.classList.add('dark');
+            }
+            // Refresh charts to update label colors
+            refreshAllCharts();
+        });
+
+        function renderChart(containerId, data, colors = ['#00aeef', '#ce9224', '#4b5563']) {
+            const container = document.getElementById(containerId);
+            const isDarkMode = body.classList.contains('dark-mode');
+            const width = container.offsetWidth;
+            const height = container.offsetHeight;
+            container.innerHTML = '';
+
+            const actualMin = Math.min(...data);
+            const actualMax = Math.max(...data);
+            const range = Math.max(actualMax - actualMin, 1);
+            
+            const minVal = actualMin - (range * 0.3);
+            const maxVal = actualMax + (range * 0.3);
+            const displayRange = maxVal - minVal;
+
+            const gridCount = 4;
+            for(let i=0; i<=gridCount; i++) {
+                const val = minVal + (displayRange * (i/gridCount));
+                const pos = (i/gridCount) * 100;
+                
+                const line = document.createElement('div');
+                line.className = 'grid-line';
+                line.style.bottom = `${pos}%`;
+                container.appendChild(line);
+
+                const label = document.createElement('span');
+                label.className = `absolute left-0 -translate-y-1/2 text-[9px] font-bold z-20 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`;
+                label.style.bottom = `${pos}%`;
+                label.innerText = val.toFixed(displayRange < 10 ? 1 : 0);
+                container.appendChild(label);
+                
+                if (i % 2 === 0 && i < gridCount) {
+                    const band = document.createElement('div');
+                    band.className = 'grid-band';
+                    band.style.bottom = `${pos}%`;
+                    band.style.height = `${100/gridCount}%`;
+                    container.appendChild(band);
+                }
+            }
+
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            const avgPos = ((avg - minVal) / displayRange) * 100;
+            const avgLine = document.createElement('div');
+            avgLine.className = 'avg-line';
+            avgLine.style.bottom = `${avgPos}%`;
+            container.appendChild(avgLine);
+
+            const step = (width - 40) / (data.length - 1);
+            
+            data.forEach((val, i) => {
+                const x = 30 + (i * step);
+                const percentage = ((val - minVal) / displayRange) * 100;
+                const color = colors[i % colors.length];
+                
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                dot.style.left = `${x}px`;
+                dot.style.bottom = `${percentage}%`;
+                dot.style.backgroundColor = color;
+                dot.style.color = color;
+                container.appendChild(dot);
+
+                const label = document.createElement('div');
+                label.className = `dot-label font-black italic ${isDarkMode ? 'text-white' : 'text-gray-900'}`;
+                label.style.left = `${x}px`;
+                label.style.bottom = `${percentage}%`;
+                label.innerText = Number.isInteger(val) ? val : val.toFixed(1);
+                
+                if (val <= actualMin) label.style.color = '#ef4444';
+                container.appendChild(label);
+            });
+        }
+
+        const totalStrokesData = [80, 76, 84, 78, 74, 72, 68, 70, 77, 78];
+        const putterData = [30, 28, 33, 29, 36, 34, 25, 25, 28, 30];
+        let currentPar = 3;
+
+        function refreshAllCharts() {
+            renderChart('totalStrokesChart', totalStrokesData);
+            renderChart('putterChart', putterData);
+            switchParTab(currentPar);
+        }
+
+        function switchParTab(par) {
+            currentPar = par;
+            [3, 4, 5].forEach(num => {
+                const tab = document.getElementById(`tab-par${num}`);
+                if (num === par) {
+                    tab.classList.remove('tab-inactive');
+                    tab.classList.add('tab-active');
+                } else {
+                    tab.classList.remove('tab-active');
+                    tab.classList.add('tab-inactive');
+                }
+            });
+
+            const avgText = document.getElementById('parChartAvg');
+            let data, avg;
+            if (par === 3) {
+                data = [3.9, 3.6, 4.4, 3.8, 5.2, 4.8, 2.8, 2.9, 3.7, 3.9];
+                avg = 3.9;
+            } else if (par === 4) {
+                data = [4.5, 4.2, 4.8, 4.1, 5.5, 4.9, 3.8, 3.9, 4.7, 4.9];
+                avg = 4.6;
+            } else {
+                data = [5.5, 5.2, 5.8, 5.1, 6.5, 5.9, 4.8, 4.9, 5.7, 5.9];
+                avg = 5.6;
+            }
+            
+            avgText.innerText = `PAR${par}: ${avg}`;
+            renderChart('parChart', data);
+        }
+
+        refreshAllCharts();
+    </script>
+</body>
+</html>
