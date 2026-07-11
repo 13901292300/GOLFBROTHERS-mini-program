@@ -327,8 +327,9 @@
   </view>
 
   <!-- 底部弹层：费用设置 -->
-  <view class="sheet-mask {{showFeeSheet ? 'show' : ''}}" bindtap="cancelFeeSheet"></view>
-  <view class="bottom-sheet fee-sheet {{showFeeSheet ? 'show' : ''}}" catchtap="noop">
+  <block wx:if="{{showFeeSheet}}">
+  <view class="sheet-mask show" bindtap="cancelFeeSheet"></view>
+  <view class="bottom-sheet fee-sheet show" catchtap="noop">
     <view class="sheet-handle"></view>
     <view class="sheet-header fee-sheet-header">
       <view>
@@ -340,7 +341,7 @@
         <text class="fee-diamond-icon">💎</text>
         <switch
           class="fee-diamond-switch"
-          checked="{{isDiamondMode}}"
+          checked="{{draftIsDiamondMode}}"
           color="#ce9224"
           bindchange="onToggleDiamondMode"
         />
@@ -364,10 +365,10 @@
             value="{{draftFee.amount}}"
             data-index="{{draftFeeIndex}}"
             type="number"
-            placeholder="{{isDiamondMode ? '💎 0' : '￥0'}}"
+            placeholder="{{draftIsDiamondMode ? '💎 0' : '￥0'}}"
             bindinput="handleFeeAmountInput"
           />
-          <text wx:if="{{isDiamondMode}}" class="fee-amount-diamond">💎</text>
+          <text wx:if="{{draftIsDiamondMode}}" class="fee-amount-diamond">💎</text>
         </view>
         <view
           wx:if="{{draftFeeList.length > 1}}"
@@ -388,6 +389,7 @@
       <button class="sheet-confirm-btn sheet-confirm-btn--inline" bindtap="confirmFeeSheet">确定</button>
     </view>
   </view>
+  </block>
 
   <!-- 底部弹层：分队设置 -->
   <block wx:if="{{showTeamGroupSheet}}">

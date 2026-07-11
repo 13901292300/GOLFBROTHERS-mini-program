@@ -192,6 +192,7 @@ Page({
     teamGroupSummary: '正式队员 / 嘉宾',
     feeList: DEFAULT_FEE_LIST.slice(),
     draftFeeList: [],
+    draftIsDiamondMode: false,
     showFeeSheet: false,
     nextFeeId: 3,
     isDiamondMode: false,
@@ -670,6 +671,7 @@ Page({
       : (this.data.nextFeeId || 1) + 1;
     this.setData({
       draftFeeList: this._cloneFeeList(source),
+      draftIsDiamondMode: !!this.data.isDiamondMode,
       nextFeeId,
       showFeeSheet: true
     });
@@ -680,7 +682,11 @@ Page({
   },
 
   cancelFeeSheet() {
-    this.setData({ showFeeSheet: false });
+    this.setData({
+      showFeeSheet: false,
+      draftFeeList: [],
+      draftIsDiamondMode: false
+    });
   },
 
   addFeeItem() {
@@ -720,7 +726,7 @@ Page({
   },
 
   onToggleDiamondMode(e) {
-    this.setData({ isDiamondMode: !!e.detail.value });
+    this.setData({ draftIsDiamondMode: !!e.detail.value });
   },
 
   confirmFeeSheet() {
@@ -746,7 +752,10 @@ Page({
     this.setData({
       feeList: filled,
       feeSet: filled.length > 0,
-      showFeeSheet: false
+      isDiamondMode: !!this.data.draftIsDiamondMode,
+      showFeeSheet: false,
+      draftFeeList: [],
+      draftIsDiamondMode: false
     });
   },
 
