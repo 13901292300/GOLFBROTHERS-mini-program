@@ -688,6 +688,13 @@ function removeMatch(matchId) {
 }
 
 /** 转为首页球队赛卡片（ds-card-club）数据结构 */
+function resolveTournamentCardStatusLabel(match) {
+  const status = String((match && match.status) || '').trim().toLowerCase();
+  if (status === 'ongoing') return 'LIVE';
+  if (status === 'registering') return '报名中';
+  return (match && match.statusLabel) || '报名中';
+}
+
 function toTournamentCard(match) {
   if (!match) return null;
   const venue = buildVenueLabel(match.courseName, match.courseHalfText);
@@ -701,7 +708,7 @@ function toTournamentCard(match) {
     teamName: match.teamName || '',
     venue: venue,
     views: '0',
-    statusLabel: match.statusLabel || '报名中',
+    statusLabel: resolveTournamentCardStatusLabel(match),
     navUrl: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(match.matchId)
   };
 }

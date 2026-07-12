@@ -748,13 +748,18 @@ Page({
   },
 
   /* ===== 顶部赛事信息数据接入（teamMatchStore） ===== */
-  loadMatch(matchId) {
-    let match = null;
+  _resolveMatchData(matchId) {
+    if (!matchId) return null;
+    const realMatch = teamMatchStore.getMatchById(matchId);
+    if (realMatch) return realMatch;
     if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
-      match = demoJiaobeiMatch.getJiaobeiDemoMatch();
-    } else if (matchId) {
-      match = teamMatchStore.getMatchById(matchId);
+      return demoJiaobeiMatch.getJiaobeiDemoMatch();
     }
+    return null;
+  },
+
+  loadMatch(matchId) {
+    const match = this._resolveMatchData(matchId);
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
     this.setData(Object.assign({
@@ -772,12 +777,7 @@ Page({
   },
 
   refreshMatchData(matchId) {
-    let match = null;
-    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
-      match = demoJiaobeiMatch.getJiaobeiDemoMatch();
-    } else if (matchId) {
-      match = teamMatchStore.getMatchById(matchId);
-    }
+    const match = this._resolveMatchData(matchId);
     if (!match) return;
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
@@ -1655,13 +1655,41 @@ Page({
       wx.showToast({ title: '赛事数据缺失', icon: 'none' });
       return;
     }
+    console.log('[start-match-before]', {
+      matchId: matchId,
+      status: match.status || '',
+      statusLabel: match.statusLabel || '',
+      registrationStatus: match.registrationStatus || match.registerStatus || ''
+    });
     match.status = MATCH_LIFECYCLE.ONGOING;
-    match.statusLabel = '进行中';
+    match.statusLabel = '比赛进行中';
     match.updatedAt = Date.now();
     teamMatchStore.saveMatch(match);
+    const savedMatch = teamMatchStore.getMatchById(matchId) || match;
+    console.log('[start-match-after]', {
+      matchId: matchId,
+      status: savedMatch.status || '',
+      statusLabel: savedMatch.statusLabel || '',
+      registrationStatus: savedMatch.registrationStatus || savedMatch.registerStatus || ''
+    });
     this.loadMatch(matchId);
     this.applyMoreAccess();
-    wx.showToast({ title: '比赛已开始', icon: 'success' });
+    wx.showModal({
+      title: '提示',
+      content: '比赛已经进入开始阶段，请到‘赛事’菜单查看',
+      showCancel: false,
+      confirmText: '确认',
+      success: (res) => {
+        if (!res.confirm) return;
+        console.log('[start-match-navigate]');
+        wx.redirectTo({
+          url: '/pages/home/index?section=tournament',
+          fail: () => {
+            wx.reLaunch({ url: '/pages/home/index?section=tournament' });
+          }
+        });
+      }
+    });
   },
 
   /* ===== 立即报名流程：分组选择 + 比赛名 + 手机号 ===== */
@@ -2118,12 +2146,7 @@ Page({
       themeClass: dark ? 'dark-mode' : 'bright-mode',
       scorecardAdImage: this._resolveScorecardAdImage(theme, this.data.matchId)
     };
-    let match = null;
-    if (demoJiaobeiMatch.isJiaobeiDemoMatchId(this.data.matchId)) {
-      match = demoJiaobeiMatch.getJiaobeiDemoMatch();
-    } else if (this.data.matchId) {
-      match = teamMatchStore.getMatchById(this.data.matchId);
-    }
+    const match = this._resolveMatchData(this.data.matchId) || this.data.match;
     if (match) {
       patch.eventInfoList = this._resolveEventInfoList(match, theme);
     }
@@ -2611,7 +2634,7 @@ Page({
     matchStateUtil.enterScorePage();
   },
 
-  /* ===== 出发表 + 领先榜（均由 groups 派生，无独立数据源） ===== */
+  /* ===== 出发表 + 领先榜 ===== */
   _syncTournamentHoleLayout() {
     const meta = groupsStore.getTournamentCourseMeta();
     const layout = holeLayout.resolveLayoutFromContext({
@@ -2623,15 +2646,161 @@ Page({
     holeLayout.applyLayout(layout);
   },
 
+  _isFilledLeaderboardScore(score) {
+    return score !== null && score !== undefined && score !== '' && !Number.isNaN(Number(score));
+  },
+
+  _formatLeaderboardDiff(diff) {
+    if (diff > 0) return '+' + diff;
+    if (diff === 0) return '0';
+    return String(diff);
+  },
+
+  _resolveLeaderboardTotalClass(diff) {
+    if (diff < 0) return 'score-under';
+    if (diff === 0) return 'score-even';
+    return 'score-over';
+  },
+
+  _resolveLeaderboardThruLabel(thru) {
+    if (!thru) return '-';
+    return thru >= 18 ? 'F' : String(thru);
+  },
+
+  _resolveMatchPlayerHoles(group, player, playerId) {
+    if (Array.isArray(player && player.holes)) return player.holes;
+    if (Array.isArray(player && player.scores)) {
+      return player.scores.map((score, index) => ({ holeNo: index + 1, score: score }));
+    }
+    const scoreRecord = group && group.scoresByPlayer && playerId
+      ? group.scoresByPlayer[playerId]
+      : null;
+    if (scoreRecord && Array.isArray(scoreRecord.scores)) {
+      return scoreRecord.scores.map((score, index) => ({ holeNo: index + 1, score: score }));
+    }
+    return [];
+  },
+
+  _computeMatchLeaderboardStats(group, player, playerId) {
+    const holes = this._resolveMatchPlayerHoles(group, player, playerId);
+    const pars = groupsStore.getHolePars();
+    let total = 0;
+    let parThru = 0;
+    let thru = 0;
+    holes.forEach((hole, index) => {
+      const score = hole && hole.score;
+      if (!this._isFilledLeaderboardScore(score)) return;
+      total += Number(score);
+      parThru += Number(pars[index] || 0);
+      thru += 1;
+    });
+    return { total: total, diff: total - parThru, thru: thru };
+  },
+
+  _buildLeaderboardFromMatchGroups(match, openIndex) {
+    const groups = match && Array.isArray(match.groups) ? match.groups : [];
+    if (!groups.length) return null;
+    const playerLookup = this._buildGroupPlayerLookup(match);
+    const flat = [];
+    groups.forEach((group) => {
+      const displayPlayers = this.hydrateGroupDisplayPlayers(group, playerLookup);
+      const displayMap = {};
+      displayPlayers.forEach((player) => {
+        if (player && player.userId) displayMap[String(player.userId)] = player;
+      });
+      (Array.isArray(group && group.players) ? group.players : []).forEach((player) => {
+        const playerId = this._resolveAnyPlayerId(player);
+        if (!playerId) return;
+        const display = displayMap[playerId] || {};
+        const lookup = playerLookup[playerId] || {};
+        const genderDisplay = playerManage.getGenderDisplay(
+          Object.assign({}, lookup, player, { gender: lookup.gender || display.gender || player.gender })
+        );
+        const stat = this._computeMatchLeaderboardStats(group, player, playerId);
+        flat.push({
+          playerId: playerId,
+          name: display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
+          group: group.groupName || '',
+          groupId: group.groupId || '',
+          avatar: display.avatar || mockAvatars.resolveAvatar(player.avatar || player.avatarUrl || '', playerId),
+          isFemale: genderDisplay.gender === 'female',
+          genderIcon: genderDisplay.icon,
+          genderClass: genderDisplay.className,
+          flag: player.flag || '',
+          country: player.country || '',
+          age: player.age || '',
+          total: stat.total,
+          diff: stat.diff,
+          thru: stat.thru
+        });
+      });
+    });
+    if (!flat.length) return null;
+    flat.sort((a, b) => {
+      if (a.thru === 0 && b.thru === 0) return 0;
+      if (a.thru === 0) return 1;
+      if (b.thru === 0) return -1;
+      if (a.diff !== b.diff) return a.diff - b.diff;
+      return b.thru - a.thru;
+    });
+    return flat.map((player, index) => {
+      const started = player.thru > 0;
+      const firstIndex = flat.findIndex((item) => item.thru > 0 && item.diff === player.diff);
+      const tied = flat.filter((item) => item.thru > 0 && item.diff === player.diff).length > 1;
+      const pos = !started ? '-' : tied ? 'T' + (firstIndex + 1) : String(index + 1);
+      return {
+        pos: pos,
+        name: player.name,
+        group: player.group,
+        groupId: player.groupId,
+        playerId: player.playerId,
+        isFemale: player.isFemale,
+        genderIcon: player.genderIcon,
+        genderClass: player.genderClass,
+        thru: this._resolveLeaderboardThruLabel(player.thru),
+        total: player.total,
+        diff: player.diff,
+        scoreStr: started ? this._formatLeaderboardDiff(player.diff) : '-',
+        scoreClass: started ? this._resolveLeaderboardTotalClass(player.diff) : 'score-even',
+        avatar: player.avatar,
+        country: player.country,
+        age: player.age,
+        flag: player.flag,
+        expanded: index === openIndex
+      };
+    });
+  },
+
+  _buildLeaderboardView(match) {
+    const matchRows = this._buildLeaderboardFromMatchGroups(match, this.data.openIndex);
+    const source = matchRows ? 'match.groups' : 'groupsStore';
+    const rows = matchRows || groupsStore.buildLeaderboard(this.data.scoringDisplay, this.data.openIndex);
+    const matchGroups = match && Array.isArray(match.groups) ? match.groups : [];
+    const storeGroups = source === 'groupsStore' ? (groupsStore.getGroups() || []) : [];
+    const sourceGroups = source === 'match.groups' ? matchGroups : storeGroups;
+    const playerCount = sourceGroups.reduce((count, group) => {
+      const players = Array.isArray(group && group.players) ? group.players : [];
+      return count + players.filter((player) => player && this._resolveAnyPlayerId(player)).length;
+    }, 0);
+    console.log('[leaderboard-source]', {
+      matchId: this.data.matchId || '',
+      source: source,
+      groupCount: sourceGroups.length,
+      playerCount: playerCount
+    });
+    return rows;
+  },
+
   refreshGroupsDerived() {
     this._syncTournamentHoleLayout();
     groupsStore.ensureInitialized();
     const matchId = this.data.matchId || '';
     let teeGroups = [];
+    let match = null;
     if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
       teeGroups = groupsStore.getTeeGroupsView();
     } else {
-      const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      match = matchId ? teamMatchStore.getMatchById(matchId) : null;
       if (match && Array.isArray(match.groups) && match.groups.length) {
         teeGroups = teeSheetManage.buildTeeSheetTabView(match, {
           playerLookup: this._buildGroupPlayerLookup(match),
@@ -2643,13 +2812,17 @@ Page({
     }
     this.setData({
       teeGroups: teeGroups,
-      leaderboard: groupsStore.buildLeaderboard(this.data.scoringDisplay, this.data.openIndex)
+      leaderboard: this._buildLeaderboardView(match)
     });
   },
 
   refreshLeaderboard() {
+    const matchId = this.data.matchId || '';
+    const match = matchId && !demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)
+      ? teamMatchStore.getMatchById(matchId)
+      : null;
     this.setData({
-      leaderboard: groupsStore.buildLeaderboard(this.data.scoringDisplay, this.data.openIndex)
+      leaderboard: this._buildLeaderboardView(match)
     });
   },
 
