@@ -292,7 +292,7 @@ const EMPTY_CURRENT_USER_REGISTER_STATUS = {
 };
 
 const EMPTY_REGISTER_PERMISSION = {
-  registerStatus: 'closed',
+  registrationStatus: 'closed',
   isOpen: false,
   reason: ''
 };
@@ -462,6 +462,7 @@ Page({
     featuresPermission: [],
     featuresPermissionFooterPad: [],
     featuresPermissionFooter: [],
+    lifecycleActions: [],
     featuresSectionCommonMain: FEATURE_SECTION_DEFAULT.commonMain,
     featuresSectionCommonSub: FEATURE_SECTION_DEFAULT.commonSub,
     featuresSectionPermissionMain: FEATURE_SECTION_DEFAULT.permissionMain,
@@ -1577,17 +1578,90 @@ Page({
   },
 
   /**
-   * 报名开关判断（registerStatus 优先于用户报名状态；deadlineTime 不参与权限）
+   * 报名开关判断（registrationStatus 优先于用户报名状态；deadlineTime 不参与权限）
    */
+  _normalizeRegistrationStatus(match) {
+    const raw = String(
+      (match && (match.registrationStatus || match.registerStatus)) || 'open'
+    ).trim().toLowerCase();
+    return raw === 'closed' ? 'closed' : 'open';
+  },
+
   _resolveRegisterPermission(match) {
     if (!match) {
-      return { registerStatus: 'closed', isOpen: false, reason: '报名已关闭' };
+      return { registrationStatus: 'closed', isOpen: false, reason: '报名通道已关闭' };
     }
-    const registerStatus = String(match.registerStatus || 'open').trim().toLowerCase();
-    if (registerStatus === 'closed') {
-      return { registerStatus: 'closed', isOpen: false, reason: '报名已关闭' };
+    const registrationStatus = this._normalizeRegistrationStatus(match);
+    if (registrationStatus === 'closed') {
+      return { registrationStatus: 'closed', isOpen: false, reason: '报名通道已关闭' };
     }
-    return { registerStatus: 'open', isOpen: true, reason: '' };
+    return { registrationStatus: 'open', isOpen: true, reason: '' };
+  },
+
+  _showRegistrationClosedModal() {
+    wx.showModal({
+      title: '报名通道已关闭',
+      content: '报名通道已关闭，请联系组织者',
+      showCancel: false,
+      confirmText: '知道了'
+    });
+  },
+
+  _buildRegistrationLog(options) {
+    const opts = options || {};
+    const user = gameStore.getCurrentUser() || {};
+    const operatorId = String(user.userId || user.id || '').trim();
+    return {
+      action: 'registration_status_changed',
+      before: opts.before,
+      after: opts.after,
+      operatorId: operatorId,
+      operatorName: String(user.nickname || user.displayName || user.name || operatorId || '管理员'),
+      createdAt: Date.now()
+    };
+  },
+
+  toggleRegistrationStatus() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    const before = this._normalizeRegistrationStatus(match);
+    const after = before === 'closed' ? 'open' : 'closed';
+    match.registrationStatus = after;
+    match.registrationLogs = Array.isArray(match.registrationLogs) ? match.registrationLogs : [];
+    match.registrationLogs = match.registrationLogs.concat(this._buildRegistrationLog({
+      before: before,
+      after: after
+    }));
+    teamMatchStore.saveMatch(match);
+    const patch = this._buildRegisterStatePatch(match, this.data.activeRegisterSubTab);
+    this.setData(patch, () => {
+      this.applyMoreAccess();
+      if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+    });
+    wx.showToast({
+      title: after === 'closed' ? '报名已关闭' : '报名已打开',
+      icon: 'success'
+    });
+  },
+
+  startTournamentMatch() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    match.status = MATCH_LIFECYCLE.ONGOING;
+    match.statusLabel = '进行中';
+    match.updatedAt = Date.now();
+    teamMatchStore.saveMatch(match);
+    this.loadMatch(matchId);
+    this.applyMoreAccess();
+    wx.showToast({ title: '比赛已开始', icon: 'success' });
   },
 
   /* ===== 立即报名流程：分组选择 + 比赛名 + 手机号 ===== */
@@ -1623,6 +1697,10 @@ Page({
 
   confirmRegister() {
     if (this.data.registerSubmitting) return;
+    if (!(this.data.registerPermission && this.data.registerPermission.isOpen)) {
+      this.setData({ registerSheetVisible: false });
+      return;
+    }
     if (this.data.currentUserRegisterStatus.isRegistered) {
       this.setData({ registerSheetVisible: false });
       return;
@@ -1651,6 +1729,10 @@ Page({
     const match = teamMatchStore.getMatchById(this.data.matchId);
     if (!match) {
       wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    if (this._normalizeRegistrationStatus(match) === 'closed') {
+      this.setData({ registerSheetVisible: false, registerSubmitting: false });
       return;
     }
     const user = gameStore.getCurrentUser() || {};
@@ -2600,12 +2682,56 @@ Page({
     const isRegistering = !!(this.data.matchStatus && this.data.matchStatus.isRegistering);
     if (isRegistering) {
       const section = FEATURE_SECTION_REGISTERING;
-      const split = splitPermissionFeatures(REGISTERING_FEATURES_PERMISSION);
+      const access = MORE_ACCESS;
+      const permSet = access.permissions || [];
+      const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+      const user = gameStore.getCurrentUser() || {};
+      const userId = String(user.userId || '');
+      const registrationStatus = this._normalizeRegistrationStatus(match);
+      const visible = (scope, permission) => {
+        if (access.isPrivilegedUser || scope === 'common') return true;
+        if (permission === 'edit_half') {
+          return permSet.indexOf('edit_match') >= 0 || permSet.indexOf('edit_half') >= 0;
+        }
+        if (tempAdminPermission.hasTempAdminPermission(match, userId, permission)) return true;
+        return permSet.indexOf(permission) >= 0;
+      };
+      const lifecyclePermissionMap = {
+        cancel_match: true,
+        close_registration: true,
+        start_match: true
+      };
+      const visibleRegisteringPermissionFeatures = REGISTERING_FEATURES_PERMISSION
+        .filter((f) => visible('permission', f.permission))
+        .map((f) => {
+          if (f.permission !== 'close_registration') return Object.assign({}, f);
+          return Object.assign({}, f, {
+            glyph: registrationStatus === 'closed' ? '🔓' : '🔒',
+            label: registrationStatus === 'closed' ? '打开报名' : '关闭报名',
+            tone: registrationStatus === 'closed' ? 'success' : 'state'
+          });
+        });
+      const permissionFeatures = visibleRegisteringPermissionFeatures.filter(
+        (f) => !(f && lifecyclePermissionMap[f.permission])
+      );
+      const lifecycleActions = visibleRegisteringPermissionFeatures
+        .filter((f) => f && lifecyclePermissionMap[f.permission])
+        .map((f) => {
+          if (f.permission === 'cancel_match') return Object.assign({}, f, { tone: 'danger' });
+          if (f.permission === 'start_match') return Object.assign({}, f, { tone: 'success' });
+          return Object.assign({}, f);
+        })
+        .sort((a, b) => {
+          const order = { cancel_match: 1, close_registration: 2, start_match: 3 };
+          return (order[a.permission] || 99) - (order[b.permission] || 99);
+        });
+      const split = splitPermissionFeatures(permissionFeatures);
       this.setData({
-        featuresCommon: REGISTERING_FEATURES_COMMON.slice(),
+        featuresCommon: REGISTERING_FEATURES_COMMON.filter((f) => visible('common', f.permission)),
         featuresPermission: split.featuresPermission,
         featuresPermissionFooterPad: split.featuresPermissionFooterPad,
         featuresPermissionFooter: split.featuresPermissionFooter,
+        lifecycleActions: lifecycleActions,
         featuresSectionCommonMain: section.commonMain,
         featuresSectionCommonSub: section.commonSub,
         featuresSectionPermissionMain: section.permissionMain,
@@ -2636,6 +2762,7 @@ Page({
       featuresPermission: split.featuresPermission,
       featuresPermissionFooterPad: split.featuresPermissionFooterPad,
       featuresPermissionFooter: split.featuresPermissionFooter,
+      lifecycleActions: [],
       featuresSectionCommonMain: section.commonMain,
       featuresSectionCommonSub: section.commonSub,
       featuresSectionPermissionMain: section.permissionMain,
@@ -2707,14 +2834,23 @@ Page({
       this.openPaymentSheet();
       return;
     }
+    if (permission === 'close_registration') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.toggleRegistrationStatus();
+      return;
+    }
+    if (permission === 'start_match') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.startTournamentMatch();
+      return;
+    }
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
       if (permission === 'register_for_other') {
-        // Patch 8：关闭报名后禁用替他人报名（邀请好友报名不受影响）
         const registerClosed =
           !(this.data.registerPermission && this.data.registerPermission.isOpen);
         this.setData({ showMoreSheet: false, moreFabExpanded: false });
         if (registerClosed) {
-          wx.showToast({ title: '报名已关闭', icon: 'none' });
+          this._showRegistrationClosedModal();
           return;
         }
         this.openRegisterForOtherSheet();
@@ -4065,9 +4201,8 @@ Page({
   },
 
   openRegisterForOtherSheet() {
-    // Patch 8：二次拦截，避免其它入口绕过 onFeatureTap
     if (!(this.data.registerPermission && this.data.registerPermission.isOpen)) {
-      wx.showToast({ title: '报名已关闭', icon: 'none' });
+      this._showRegistrationClosedModal();
       return;
     }
     this.setData({
@@ -5043,7 +5178,7 @@ Page({
 
   /**
    * 邀请好友报名：微信分享入口（阶段占位）
-   * 所有注册用户可用；与 registerStatus 无关（关闭报名后仍可邀请）
+   * 所有注册用户可用；与 registrationStatus 无关（关闭报名后仍可邀请）
    */
   shareTournamentInvite() {
     const matchId = this.data.matchId || '';
@@ -5052,7 +5187,7 @@ Page({
     console.log('[invite-friends-register] share tournament invite', {
       matchId: matchId,
       title: title,
-      registerStatus: (this.data.registerPermission && this.data.registerPermission.registerStatus) || ''
+      registrationStatus: (this.data.registerPermission && this.data.registerPermission.registrationStatus) || ''
     });
     this._inviteShareFromPanel = true;
     try {

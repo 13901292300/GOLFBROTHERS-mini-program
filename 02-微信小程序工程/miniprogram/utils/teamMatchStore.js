@@ -275,7 +275,8 @@ function buildMatchFromCreatePage(pageData) {
     visibility: data.visibility === 'private' ? 'private' : 'public',
     accessCode: data.accessCode || '',
     groupPermission: data.groupPermission === 'player' ? 'player' : 'admin',
-    registerStatus: data.registerStatus === 'closed' ? 'closed' : 'open',
+    registrationStatus: data.registrationStatus === 'closed' || data.registerStatus === 'closed' ? 'closed' : 'open',
+    registrationLogs: [],
     status: 'registering',
     statusLabel: '报名中',
     tempAdmins: [],
@@ -339,7 +340,8 @@ function updateMatchFromCreatePage(existing, pageData, options) {
   next.registerInfo = existing.registerInfo;
   next.groups = existing.groups;
   next.pairings = clonePairings(existing.pairings);
-  next.registerStatus = existing.registerStatus;
+  next.registrationStatus = existing.registrationStatus === 'closed' || existing.registerStatus === 'closed' ? 'closed' : 'open';
+  next.registrationLogs = Array.isArray(existing.registrationLogs) ? existing.registrationLogs : [];
   next.status = existing.status;
   next.statusLabel = existing.statusLabel;
   next.createdBy = existing.createdBy;

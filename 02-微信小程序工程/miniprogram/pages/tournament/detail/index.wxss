@@ -1303,6 +1303,8 @@ page {
 .feature-icon { width: 112rpx; height: 112rpx; border-radius: 24rpx; background: var(--tour-blue); color: var(--champion-gold); display: flex; align-items: center; justify-content: center; margin-bottom: 16rpx; font-size: 44rpx; box-shadow: 0 12rpx 24rpx rgba(0, 45, 98, 0.18); }
 .feature-icon.danger { background: #ff5722; color: #fff; }
 .feature-icon.warning { background: #ffc107; color: var(--tour-blue); }
+.feature-icon.success { background: #16a34a; color: #fff; }
+.feature-icon.state { background: #f97316; color: #fff; }
 .feature-label { color: var(--tour-blue); font-size: 20rpx; line-height: 1.2; font-weight: 800; text-align: center; }
 .sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
 .sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }

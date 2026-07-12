@@ -553,6 +553,20 @@
         </view>
       </view>
     </view>
+    <view wx:if="{{lifecycleActions.length}}" class="feature-section">
+      <view class="feature-grid">
+        <view
+          wx:for="{{lifecycleActions}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          class="feature-item"
+        >
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
     <view class="sheet-cancel-wrap">
       <view bindtap="closeMoreSheet" class="sheet-cancel-btn">取 消</view>
     </view>
@@ -688,7 +702,7 @@
     <view
       wx:if="{{!registerPermission.isOpen}}"
       class="register-cta-btn register-cta-btn--disabled"
-    >报名已关闭</view>
+    >报名通道已关闭</view>
     <view
       wx:elif="{{currentUserRegisterStatus.isRegistered}}"
       bindtap="openCancelRegisterModal"
