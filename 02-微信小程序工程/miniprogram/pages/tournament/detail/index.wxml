@@ -219,6 +219,7 @@
             <view class="roster-head">
               <view class="roster-col roster-col--idx"><text>序号</text></view>
               <text class="roster-col roster-col--player">球员</text>
+              <view class="roster-col roster-col--payment"><text></text></view>
               <view class="roster-col roster-col--handicap"><text>江湖差点</text></view>
             </view>
             <view class="roster-content">
@@ -228,10 +229,14 @@
                   <view class="roster-col roster-col--player">
                     <image class="roster-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
                     <text class="roster-name">{{item.competitionName}}</text>
-                    <text wx:if="{{item.gender === '男'}}" class="roster-gender">♂</text>
-                    <text wx:elif="{{item.gender === '女'}}" class="roster-gender">♀</text>
+                    <text wx:if="{{item.genderIcon}}" class="roster-gender {{item.genderClass}}">{{item.genderIcon}}</text>
                   </view>
-                  <view class="roster-col roster-col--handicap"><text>{{item.handicap}}</text></view>
+                  <view class="roster-col roster-col--payment">
+                    <text wx:if="{{item.paymentConfirmed === true}}" class="roster-paid-badge">已付</text>
+                  </view>
+                  <view class="roster-col roster-col--handicap">
+                    <text>{{item.handicap}}</text>
+                  </view>
                 </view>
               </view>
               <view wx:else class="register-user-empty" style="{{rosterMinHeight ? 'min-height:calc(' + rosterMinHeight + 'px - 88rpx);' : ''}}">
@@ -330,7 +335,7 @@
               <text class="lr-pos pos-cell">{{item.pos}}</text>
               <view class="lr-player">
                 <text class="player-name">{{item.name}}</text>
-                <text class="gender-icon {{item.isFemale ? 'gender-f' : 'gender-m'}}">{{item.isFemale ? '♀' : '♂'}}</text>
+                <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
               </view>
               <text class="lr-thru">{{item.thru}}</text>
               <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
@@ -1044,6 +1049,7 @@
           <view class="player-manage-row__meta">
             <view class="player-manage-row__name-row">
               <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
+              <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
               <text class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
             </view>
             <view class="player-manage-row__sub">
@@ -1212,7 +1218,10 @@
         <view class="payment-user-card__head">
           <image class="payment-user-card__avatar" src="{{item.displayAvatar}}" mode="aspectFill"></image>
           <view class="payment-user-card__meta">
-            <text class="payment-user-card__name">{{item.displayName}}</text>
+            <view class="payment-user-card__name-row">
+              <text class="payment-user-card__name">{{item.displayName}}</text>
+              <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
+            </view>
             <text class="payment-user-card__status">{{item.paymentStatusLine}}</text>
           </view>
           <text class="payment-user-card__arrow {{item.expanded ? 'is-open' : ''}}">›</text>

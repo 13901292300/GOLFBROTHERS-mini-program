@@ -214,7 +214,6 @@ page {
 .roster-gender {
   flex-shrink: 0;
   font-size: 24rpx;
-  color: #00aeef;
 }
 .roster-occupied-tip {
   font-size: 22rpx;

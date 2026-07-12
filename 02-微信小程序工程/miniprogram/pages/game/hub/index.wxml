@@ -46,7 +46,7 @@
               <text class="lr-pos pos-cell">{{item.pos}}</text>
               <view class="lr-player">
                 <text class="player-name">{{item.name}}</text>
-                <text wx:if="{{!item.isTeam}}" class="gender-icon {{item.isFemale ? 'gender-f' : 'gender-m'}}">{{item.isFemale ? '♀' : '♂'}}</text>
+                <text wx:if="{{!item.isTeam && item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
               </view>
               <text class="lr-thru">{{item.thru}}</text>
               <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
@@ -536,6 +536,7 @@
           <view class="player-manage-row__meta">
             <view class="player-manage-row__name-row">
               <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
+              <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
               <text class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
             </view>
             <view class="player-manage-row__sub">

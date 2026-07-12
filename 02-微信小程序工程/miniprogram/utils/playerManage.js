@@ -46,6 +46,31 @@ function genderLabel(gender) {
   return normalizeGender(gender) === 'female' ? '女' : '男';
 }
 
+function resolveOptionalGender(raw) {
+  if (!raw || typeof raw !== 'object') return '';
+  if (raw.isFemale === true) return 'female';
+  const candidates = [raw.gender, raw.sex, raw.matchGender];
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    if (c === null || c === undefined || c === '') continue;
+    const v = String(c).trim().toLowerCase();
+    if (v === 'male' || v === 'm' || String(c).trim() === '男') return 'male';
+    if (v === 'female' || v === 'f' || String(c).trim() === '女') return 'female';
+  }
+  return '';
+}
+
+function getGenderDisplay(raw) {
+  const gender = resolveOptionalGender(raw);
+  if (gender === 'male') {
+    return { icon: '♂', className: 'gender-male', legacyClassName: 'gender-m', gender: gender };
+  }
+  if (gender === 'female') {
+    return { icon: '♀', className: 'gender-female', legacyClassName: 'gender-f', gender: gender };
+  }
+  return { icon: '', className: '', legacyClassName: '', gender: '' };
+}
+
 /** 本场比赛名：matchNickname 优先，再 competitionName / displayName / nickname */
 function resolveMatchNickname(raw) {
   if (!raw || typeof raw !== 'object') return '';
@@ -328,6 +353,7 @@ function buildPlayerManageRow(raw, teamOptions) {
   const phone = resolvePhone(raw);
   const phoneMasked = maskPhone(phone);
   const genderText = genderLabel(matchGender);
+  const genderDisplay = getGenderDisplay(raw);
   return {
     userId: userId,
     nickname: String((raw && raw.nickname) || '').trim(),
@@ -358,6 +384,8 @@ function buildPlayerManageRow(raw, teamOptions) {
     matchNickname: matchNickname,
     matchGender: matchGender,
     matchGenderLabel: genderText,
+    genderIcon: genderDisplay.icon,
+    genderClass: genderDisplay.className,
     matchTeamId: team.id,
     matchTeamName: team.name,
     // 兼容旧字段（与快照同步）
@@ -1027,6 +1055,7 @@ module.exports = {
   resolveUserId,
   normalizeGender,
   genderLabel,
+  getGenderDisplay,
   resolveMatchNickname,
   resolveMatchGender,
   resolveMatchTeamId,

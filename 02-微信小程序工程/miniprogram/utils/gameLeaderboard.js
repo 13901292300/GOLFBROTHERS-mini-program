@@ -1,9 +1,10 @@
 /**
  * 普通 GAME 领先榜：个人模式 / 组合（teams）模式派生
  */
-const { getProfileById } = require('./playerDirectory.js');
+const { getProfileById, FRIEND_ID_SET } = require('./playerDirectory.js');
 const mockAvatars = require('./mockAvatars.js');
 const holeLayout = require('./holeLayout.js');
+const playerManage = require('./playerManage.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -44,6 +45,9 @@ function getGroupComposition(game, group, groupIndex) {
 
 function enrichPlayerIdentity(m) {
   const prof = getProfileById(m.playerId, m);
+  const hasRawGender = !!(m && (m.gender || m.sex || m.matchGender));
+  const genderSource = hasRawGender || FRIEND_ID_SET[m.playerId] ? prof : m;
+  const genderDisplay = playerManage.getGenderDisplay(genderSource);
   return {
     playerId: m.playerId,
     name: m.name || '',
@@ -51,7 +55,9 @@ function enrichPlayerIdentity(m) {
     flag: prof.flag || '',
     country: prof.country || '',
     age: prof.age || '',
-    isFemale: prof.gender === 'female'
+    isFemale: genderDisplay.gender === 'female',
+    genderIcon: genderDisplay.icon,
+    genderClass: genderDisplay.className
   };
 }
 
@@ -188,13 +194,18 @@ function buildPlayerRows(game) {
       const scores = (rec.scores || []).slice();
       const agg = aggregateScores(scores);
       const prof = getProfileById(p.playerId, p);
+      const hasRawGender = !!(p && (p.gender || p.sex || p.matchGender));
+      const genderSource = hasRawGender || FRIEND_ID_SET[p.playerId] ? prof : p;
+      const genderDisplay = playerManage.getGenderDisplay(genderSource);
       flat.push({
         rowId: p.playerId,
         isTeam: false,
         playerId: p.playerId,
         name: p.name,
         avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
-        isFemale: prof.gender === 'female',
+        isFemale: genderDisplay.gender === 'female',
+        genderIcon: genderDisplay.icon,
+        genderClass: genderDisplay.className,
         flag: prof.flag,
         country: prof.country,
         age: prof.age,

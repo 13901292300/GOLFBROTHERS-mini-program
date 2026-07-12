@@ -84,10 +84,13 @@ function buildDisplayUser(rawUser, index) {
   const hasAmount = hasPaidAmountValue(user);
   const amount = hasAmount ? resolvePaidAmount(user) : '';
   const amountText = hasAmount ? formatAmount(amount) : '';
+  const genderDisplay = playerManage.getGenderDisplay(user);
   return Object.assign({}, user, {
     stableUserId: stableUserId,
     displayName: resolveDisplayName(user),
     displayAvatar: mockAvatars.resolveAvatar(user.avatar || user.avatarUrl || '', stableUserId),
+    genderIcon: genderDisplay.icon,
+    genderClass: genderDisplay.className,
     paymentConfirmed: confirmed,
     paidAmount: amount,
     cashPaidAmount: amount,

@@ -65,8 +65,7 @@
           <view class="roster-player-main">
             <view class="roster-player-line">
               <text class="roster-name">{{item.displayName}}</text>
-              <text wx:if="{{item.gender === '男'}}" class="roster-gender">♂</text>
-              <text wx:elif="{{item.gender === '女'}}" class="roster-gender">♀</text>
+              <text wx:if="{{item.genderIcon}}" class="roster-gender {{item.genderClass}}">{{item.genderIcon}}</text>
             </view>
             <text wx:if="{{item.isOccupied}}" class="roster-occupied-tip">已加入{{item.occupiedGroupName}}</text>
           </view>

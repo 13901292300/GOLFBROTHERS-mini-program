@@ -1,4 +1,5 @@
 const mockAvatars = require('./mockAvatars.js');
+const playerManage = require('./playerManage.js');
 /**
  * 出发表 groups — 领先榜唯一数据源（会话内 app.globalData.groups）
  * 结构：groups[].players[].holes[{ holeNo, score, putts, diff }]
@@ -505,13 +506,16 @@ function buildLeaderboard(_deprecatedDisplay, openIndex) {
     // 领先榜不直接依赖槽位：先 flatten 剔除空位再统计
     g.players.filter(Boolean).forEach((p) => {
       const stat = computePlayerStats(p);
+      const genderDisplay = playerManage.getGenderDisplay(p);
       flat.push({
         playerId: p.playerId,
         name: p.name,
         group: g.groupName,
         groupId: g.groupId,
         avatar: p.avatar,
-        isFemale: p.gender === 'female',
+        isFemale: genderDisplay.gender === 'female',
+        genderIcon: genderDisplay.icon,
+        genderClass: genderDisplay.className,
         flag: p.flag || '',
         country: p.country || '',
         age: p.age || '',
@@ -554,6 +558,8 @@ function buildLeaderboard(_deprecatedDisplay, openIndex) {
       groupId: p.groupId,
       playerId: p.playerId,
       isFemale: p.isFemale,
+      genderIcon: p.genderIcon,
+      genderClass: p.genderClass,
       thru: thruLabel(p.thru),
       total: p.total,
       diff: p.diff,

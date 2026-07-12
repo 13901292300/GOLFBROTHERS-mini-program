@@ -1042,8 +1042,6 @@ v0.5.14-qr-permission-management
 - 权限判断统一接入临时权限体系
 - 新增我的页面 HTML 原型目录
 
-
-
 v0.5.15-player-management-tools
 
 - 新增 M 面板「选手管理」
@@ -1056,3 +1054,11 @@ v0.5.15-player-management-tools
 - 中文拼音首字母与英文首字母统一排序
 - 选手管理内显示完整手机号，点击可拨打
 - 手机号仅在选手管理内对 manage_players 权限人员可见
+
+v0.5.18
+收费管理模型冻结：
+
+- 即时保存
+- 审计日志
+- 无 Draft
+- 管理操作可追溯

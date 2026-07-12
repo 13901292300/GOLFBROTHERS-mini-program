@@ -1273,34 +1273,41 @@ Page({
     if (!match || !match.registerInfo) return Object.assign({}, EMPTY_REGISTER_INFO);
     // 旧报名记录缺省字段在 store.normalize 中按「本人报名」补齐
     const normalized = teamMatchStore.normalizeRegisterInfo(match.registerInfo);
-    const users = (normalized.users || []).map((user) => ({
-      userId: user.userId || user.playerId || user.id || user.uid || user.openid || '',
-      // 本场比赛名：matchNickname 优先
-      competitionName: playerManage.resolveMatchNickname(user),
-      matchNickname: user.matchNickname || '',
-      nickname: user.nickname || '',
-      gender: playerManage.resolveMatchGender(user),
-      matchGender: user.matchGender || '',
-      handicap: user.handicap != null ? user.handicap : '',
-      avatar: user.avatar || user.avatarUrl || '',
-      phone: user.phone || '',
-      groupId: playerManage.resolveMatchTeamId(user),
-      groupName: playerManage.resolveMatchTeamName(user),
-      matchTeamId: user.matchTeamId || '',
-      matchTeamName: user.matchTeamName || '',
-      registeredAt: user.registeredAt != null ? user.registeredAt : '',
-      source: user.source || 'self',
-      registeredBy: user.registeredBy || '',
-      registeredByName: user.registeredByName || '',
-      subjectType: user.subjectType || 'self',
-      pickChannel: user.pickChannel || '',
-      canSelfCancel: user.canSelfCancel !== false,
-      locked: !!user.locked,
-      // Patch 8：手工代报名预留字段，与 store.normalize 对齐
-      userType: user.userType || '',
-      realName: user.realName || '',
-      remarkName: user.remarkName || ''
-    }));
+    const users = (normalized.users || []).map((user) => {
+      const genderDisplay = playerManage.getGenderDisplay(user);
+      return {
+        userId: user.userId || user.playerId || user.id || user.uid || user.openid || '',
+        // 本场比赛名：matchNickname 优先
+        competitionName: playerManage.resolveMatchNickname(user),
+        matchNickname: user.matchNickname || '',
+        nickname: user.nickname || '',
+        gender: playerManage.resolveMatchGender(user),
+        sex: user.sex || '',
+        genderIcon: genderDisplay.icon,
+        genderClass: genderDisplay.className,
+        matchGender: user.matchGender || '',
+        handicap: user.handicap != null ? user.handicap : '',
+        paymentConfirmed: user.paymentConfirmed === true,
+        avatar: user.avatar || user.avatarUrl || '',
+        phone: user.phone || '',
+        groupId: playerManage.resolveMatchTeamId(user),
+        groupName: playerManage.resolveMatchTeamName(user),
+        matchTeamId: user.matchTeamId || '',
+        matchTeamName: user.matchTeamName || '',
+        registeredAt: user.registeredAt != null ? user.registeredAt : '',
+        source: user.source || 'self',
+        registeredBy: user.registeredBy || '',
+        registeredByName: user.registeredByName || '',
+        subjectType: user.subjectType || 'self',
+        pickChannel: user.pickChannel || '',
+        canSelfCancel: user.canSelfCancel !== false,
+        locked: !!user.locked,
+        // Patch 8：手工代报名预留字段，与 store.normalize 对齐
+        userType: user.userType || '',
+        realName: user.realName || '',
+        remarkName: user.remarkName || ''
+      };
+    });
     return {
       totalCount: normalized.totalCount,
       users: users
@@ -1313,29 +1320,36 @@ Page({
     if (!groupId) return [];
     return users
       .filter((user) => String(user.groupId) === groupId)
-      .map((user, index) => ({
-        listKey: user.userId || ('register-user-' + groupId + '-' + index),
-        userId: user.userId || '',
-        competitionName: user.competitionName || '',
-        gender: user.gender || '',
-        // 江湖差点空值统一显示 "-"（0 为有效差点，需保留）
-        handicap: (user.handicap != null && user.handicap !== '') ? String(user.handicap) : '-',
-        avatar: user.avatar || '',
-        phone: user.phone || '',
-        groupId: user.groupId || '',
-        groupName: user.groupName || '',
-        registeredAt: user.registeredAt != null ? user.registeredAt : '',
-        source: user.source || 'self',
-        registeredBy: user.registeredBy || '',
-        registeredByName: user.registeredByName || '',
-        subjectType: user.subjectType || 'self',
-        pickChannel: user.pickChannel || '',
-        canSelfCancel: user.canSelfCancel !== false,
-        locked: !!user.locked,
-        userType: user.userType || '',
-        realName: user.realName || '',
-        remarkName: user.remarkName || ''
-      }));
+      .map((user, index) => {
+        const genderDisplay = playerManage.getGenderDisplay(user);
+        return {
+          listKey: user.userId || ('register-user-' + groupId + '-' + index),
+          userId: user.userId || '',
+          competitionName: user.competitionName || '',
+          gender: user.gender || '',
+          sex: user.sex || '',
+          genderIcon: user.genderIcon || genderDisplay.icon,
+          genderClass: user.genderClass || genderDisplay.className,
+          // 江湖差点空值统一显示 "-"（0 为有效差点，需保留）
+          handicap: (user.handicap != null && user.handicap !== '') ? String(user.handicap) : '-',
+          paymentConfirmed: user.paymentConfirmed === true,
+          avatar: user.avatar || '',
+          phone: user.phone || '',
+          groupId: user.groupId || '',
+          groupName: user.groupName || '',
+          registeredAt: user.registeredAt != null ? user.registeredAt : '',
+          source: user.source || 'self',
+          registeredBy: user.registeredBy || '',
+          registeredByName: user.registeredByName || '',
+          subjectType: user.subjectType || 'self',
+          pickChannel: user.pickChannel || '',
+          canSelfCancel: user.canSelfCancel !== false,
+          locked: !!user.locked,
+          userType: user.userType || '',
+          realName: user.realName || '',
+          remarkName: user.remarkName || ''
+        };
+      });
   },
 
   _resolveCurrentUserRegisterStatus(registerInfo) {
@@ -3386,7 +3400,39 @@ Page({
     const nextUsers = displayIndex >= 0
       ? source.map((user, index) => (index === displayIndex ? displayUser : user))
       : paymentManage.buildPaymentDraftUsers(match);
-    this.setData({ paymentUsers: nextUsers }, () => {
+    const paymentConfirmed = nextRawUser.paymentConfirmed === true;
+    const registerInfo = this.data.registerInfo && typeof this.data.registerInfo === 'object'
+      ? this.data.registerInfo
+      : null;
+    const registerUsersForDisplay = registerInfo && Array.isArray(registerInfo.users)
+      ? registerInfo.users
+      : [];
+    const registerInfoIndex = this._findPaymentUserIndex(registerUsersForDisplay, targetId);
+    const nextRegisterInfo = registerInfo && registerInfoIndex >= 0
+      ? Object.assign({}, registerInfo, {
+        users: registerUsersForDisplay.map((user, index) =>
+          index === registerInfoIndex
+            ? Object.assign({}, user, { paymentConfirmed: paymentConfirmed })
+            : user
+        )
+      })
+      : registerInfo;
+    const displayRegisterUsers = Array.isArray(this.data.registerDisplayUsers)
+      ? this.data.registerDisplayUsers
+      : [];
+    const registerDisplayIndex = this._findPaymentUserIndex(displayRegisterUsers, targetId);
+    const nextRegisterDisplayUsers = registerDisplayIndex >= 0
+      ? displayRegisterUsers.map((user, index) =>
+        index === registerDisplayIndex
+          ? Object.assign({}, user, { paymentConfirmed: paymentConfirmed })
+          : user
+      )
+      : displayRegisterUsers;
+    this.setData({
+      paymentUsers: nextUsers,
+      registerInfo: nextRegisterInfo,
+      registerDisplayUsers: nextRegisterDisplayUsers
+    }, () => {
       this.refreshPaymentManageView(this.data.paymentFilter || 'all');
     });
   },

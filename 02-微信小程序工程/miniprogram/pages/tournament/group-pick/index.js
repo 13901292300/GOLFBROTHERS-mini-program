@@ -1,5 +1,6 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const playerManage = require('../../../utils/playerManage.js');
 
 const TEE_BLUE = 'BLUE_T';
 const TEE_RED = 'RED_T';
@@ -73,11 +74,15 @@ function resolveRegisterDisplayName(user) {
 }
 
 function normalizeUser(user) {
+  const genderDisplay = playerManage.getGenderDisplay(user);
   return {
     userId: user && user.userId ? String(user.userId) : '',
     avatar: user && user.avatar ? String(user.avatar) : '',
     displayName: resolveRegisterDisplayName(user),
     gender: user && user.gender ? String(user.gender) : '',
+    sex: user && user.sex ? String(user.sex) : '',
+    genderIcon: genderDisplay.icon,
+    genderClass: genderDisplay.className,
     handicap: user && user.handicap != null && user.handicap !== '' ? String(user.handicap) : '-',
     groupId: user && user.groupId != null ? String(user.groupId) : ''
   };
