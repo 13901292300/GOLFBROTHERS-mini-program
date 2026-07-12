@@ -1168,6 +1168,95 @@
     </view>
   </view>
 
+  <!-- 收费管理（极简实收登记） -->
+  <view wx:if="{{showPaymentSheet}}" bindtap="closePaymentSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view wx:if="{{showPaymentSheet}}" class="bottom-sheet register-sheet payment-sheet" catchtap="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <view class="payment-sheet__close" bindtap="closePaymentSheet">×</view>
+      <text class="register-sheet__overline">PAYMENT</text>
+      <text class="register-sheet__title">收费管理</text>
+      <text class="register-sheet__sub">修改后即时保存，关闭面板不会撤销已保存内容。</text>
+    </view>
+
+    <view class="payment-summary">
+      <view class="payment-summary__item">
+        <text class="payment-summary__label">实收总额</text>
+        <text class="payment-summary__value">¥ {{paymentSummary.totalPaidText}}</text>
+      </view>
+      <view class="payment-summary__item">
+        <text class="payment-summary__label">已收</text>
+        <text class="payment-summary__value">{{paymentSummary.paidCount}}人</text>
+      </view>
+      <view class="payment-summary__item">
+        <text class="payment-summary__label">未收</text>
+        <text class="payment-summary__value">{{paymentSummary.unpaidCount}}人</text>
+      </view>
+    </view>
+
+    <view class="payment-filter-tabs">
+      <view class="payment-filter-tab {{paymentFilter === 'all' ? 'is-active' : ''}}" bindtap="showAllPaymentUsers">全部</view>
+      <view class="payment-filter-tab {{paymentFilter === 'paid' ? 'is-active' : ''}}" bindtap="showPaidPaymentUsers">已收</view>
+      <view class="payment-filter-tab {{paymentFilter === 'unpaid' ? 'is-active' : ''}}" bindtap="showUnpaidPaymentUsers">未收</view>
+    </view>
+
+    <scroll-view scroll-y class="payment-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view wx:if="{{!paymentFilteredUsers.length}}" class="payment-sheet__empty">暂无符合条件的报名用户</view>
+      <view
+        wx:for="{{paymentFilteredUsers}}"
+        wx:key="stableUserId"
+        class="payment-user-card {{item.expanded ? 'is-expanded' : ''}}"
+        data-userid="{{item.stableUserId}}"
+        bindtap="onPaymentUserCardTap"
+      >
+        <view class="payment-user-card__head">
+          <image class="payment-user-card__avatar" src="{{item.displayAvatar}}" mode="aspectFill"></image>
+          <view class="payment-user-card__meta">
+            <text class="payment-user-card__name">{{item.displayName}}</text>
+            <text class="payment-user-card__status">{{item.paymentStatusLine}}</text>
+          </view>
+          <text class="payment-user-card__arrow {{item.expanded ? 'is-open' : ''}}">›</text>
+        </view>
+        <view wx:if="{{item.expanded}}" class="payment-user-card__body" catchtap="stopPropagation">
+          <text class="register-sheet__label">收款状态</text>
+          <view class="register-sheet__groups payment-confirm-groups">
+            <view
+              class="register-sheet__group {{!item.paymentConfirmed ? 'register-sheet__group--active' : ''}}"
+              data-userid="{{item.stableUserId}}"
+              data-confirmed="false"
+              bindtap="onPaymentConfirmedTap"
+            >未收</view>
+            <view
+              class="register-sheet__group {{item.paymentConfirmed ? 'register-sheet__group--active' : ''}}"
+              data-userid="{{item.stableUserId}}"
+              data-confirmed="true"
+              bindtap="onPaymentConfirmedTap"
+            >已收</view>
+          </view>
+          <text class="register-sheet__label payment-field-label">实收金额</text>
+          <input
+            class="payment-input"
+            type="digit"
+            value="{{item.paidAmountInput}}"
+            placeholder="请输入实收金额"
+            placeholder-class="register-sheet__placeholder"
+            data-userid="{{item.stableUserId}}"
+            bindblur="onPaymentPaidAmountBlur"
+          />
+          <text class="register-sheet__label payment-field-label">备注</text>
+          <input
+            class="payment-input"
+            value="{{item.paymentRemark}}"
+            placeholder="备注，例如现金 / 微信 / 代付人"
+            placeholder-class="register-sheet__placeholder"
+            data-userid="{{item.stableUserId}}"
+            bindblur="onPaymentRemarkBlur"
+          />
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
   <!-- 出发管理 -->
   <view wx:if="{{teeSheetManageSheetVisible}}" bindtap="cancelTeeSheetManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
   <view wx:if="{{teeSheetManageSheetVisible}}" class="bottom-sheet register-sheet tee-sheet-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">

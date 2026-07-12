@@ -44,6 +44,12 @@ const MANAGE_SCORING_FEATURE = {
   tone: ''
 };
 
+const MANAGE_PAYMENT_FEATURE = {
+  key: 'manage_payment',
+  label: '收费管理',
+  tone: ''
+};
+
 /**
  * 添加临时管理员时的默认勾选（须出现在可授权列表中）
  * 分组管理 + 记分权限必选默认；出发管理若存在则一并默认。
@@ -63,7 +69,8 @@ const PREFERRED_DEFAULT_PERMISSIONS = [
 /** 始终保留在可授权列表、且 normalize 始终允许的稳定权限 */
 const STABLE_EXTRA_PERMISSIONS = {
   manage_groups: true,
-  manage_scoring: true
+  manage_scoring: true,
+  manage_payment: true
 };
 
 function isGroupCapabilityPermission(permission) {
@@ -173,6 +180,13 @@ function buildGrantableFeatures(featureList) {
   if (scoringIdx < 0) {
     _insertBeforeDanger(out, groupsIdx + 1, MANAGE_SCORING_FEATURE);
     seen.manage_scoring = true;
+  }
+
+  if (!seen.manage_payment && out.every((item) => item.key !== 'manage_payment')) {
+    const afterPlayers = out.findIndex((item) => item.key === 'manage_players');
+    const afterTee = out.findIndex((item) => item.key === 'manage_tee_sheet');
+    _insertBeforeDanger(out, Math.max(afterPlayers, afterTee) + 1, MANAGE_PAYMENT_FEATURE);
+    seen.manage_payment = true;
   }
 
   return out;
@@ -424,6 +438,7 @@ module.exports = {
   TEE_SHEET_CAPABILITY_PERMISSIONS,
   MANAGE_GROUPS_FEATURE,
   MANAGE_SCORING_FEATURE,
+  MANAGE_PAYMENT_FEATURE,
   PREFERRED_DEFAULT_PERMISSIONS,
   isGroupCapabilityPermission,
   isScoringCapabilityPermission,

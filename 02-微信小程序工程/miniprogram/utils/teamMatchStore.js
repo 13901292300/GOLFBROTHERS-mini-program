@@ -205,7 +205,11 @@ function normalizeRegisterUser(user) {
     locked: locked,
     userType: userType,
     realName: realName,
-    remarkName: remarkName
+    remarkName: remarkName,
+    paymentConfirmed: raw.paymentConfirmed,
+    paidAmount: raw.paidAmount != null ? raw.paidAmount : (raw.cashPaidAmount != null ? raw.cashPaidAmount : ''),
+    cashPaidAmount: raw.cashPaidAmount != null ? raw.cashPaidAmount : (raw.paidAmount != null ? raw.paidAmount : ''),
+    paymentRemark: raw.paymentRemark != null ? String(raw.paymentRemark) : ''
   };
 }
 

@@ -26,6 +26,7 @@ const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
 const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../utils/playerManage.js');
 const teeSheetManage = require('../../../utils/teeSheetManage.js');
+const paymentManage = require('../../../utils/paymentManage.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
 const DEFAULT_SCORECARD_AD_IMAGE =
@@ -136,7 +137,7 @@ const FEATURES_PERMISSION = [
   { permission: 'manage_tee_sheet', glyph: '🚩', label: '出发管理', tone: '' },
   { permission: 'edit_groups', glyph: '👥', label: '修改分组', tone: '' },
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
-  { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
+  { permission: 'manage_payment', glyph: '👛', label: '收费管理', tone: '' },
   { permission: 'net_score', glyph: '🧩', label: '生成净杆', tone: '' },
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
   { permission: 'finish_match', glyph: '⏻', label: '结束比赛', tone: 'warning' }
@@ -154,7 +155,7 @@ const REGISTERING_FEATURES_PERMISSION = [
   { permission: 'permission_management', glyph: '🛡️', label: '权限管理', tone: '' },
   { permission: 'manage_players', glyph: '👤', label: '选手管理', tone: '' },
   { permission: 'manage_tee_sheet', glyph: '🚩', label: '出发管理', tone: '' },
-  { permission: 'fees', glyph: '👛', label: '收费管理', tone: '' },
+  { permission: 'manage_payment', glyph: '👛', label: '收费管理', tone: '' },
   { permission: 'close_registration', glyph: '🔒', label: '关闭报名', tone: '' },
   { permission: 'cancel_match', glyph: '✖', label: '取消比赛', tone: 'danger' },
   { permission: 'start_match', glyph: '▶', label: '开始比赛', tone: 'warning' }
@@ -404,6 +405,13 @@ Page({
     playerTeamPickOptions: [],
     playerManageFilterPickVisible: false,
     playerManageFilterPickOptions: [],
+    // 收费管理（极简实收登记）
+    showPaymentSheet: false,
+    paymentUsers: [],
+    paymentFilteredUsers: [],
+    paymentFilter: paymentManage.FILTER_ALL,
+    expandedPaymentUserId: '',
+    paymentSummary: paymentManage.calculatePaymentSummary([]),
     // 出发管理
     teeSheetManageSheetVisible: false,
     teeSheetManageHasGroups: false,
@@ -1744,6 +1752,54 @@ Page({
       return;
     }
 
+    const match = teamMatchStore.getMatchById(matchId);
+    const registerUsers =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    const registerUser = registerUsers.find(
+      (item) => String((item && item.userId) || '') === userId
+    );
+    if (paymentManage.isUserPaymentConfirmed(registerUser)) {
+      this.setData({
+        registerCancelModalVisible: false,
+        registerCancelSubmitting: false
+      });
+      wx.showModal({
+        title: '已收款提醒',
+        content: '你已完成本场费用登记。取消报名后，请务必联系赛事组织方协商费用退还。',
+        cancelText: '我再想想',
+        confirmText: '继续取消',
+        success: (res) => {
+          if (!res.confirm) {
+            const log = paymentManage.createPaymentLog({
+              action: 'paid_user_cancel_aborted',
+              operator: this._buildPaymentLogOperator(match),
+              targetUser: registerUser,
+              diffText: playerManage.resolveMatchNickname(registerUser) + '尝试取消报名，系统提示已收款需协商退款，用户放弃取消。'
+            });
+            paymentManage.appendPaymentLogs(match, [log]);
+            teamMatchStore.saveMatch(match);
+            return;
+          }
+          const log = paymentManage.createPaymentLog({
+            action: 'paid_user_cancel_confirmed',
+            operator: this._buildPaymentLogOperator(match),
+            targetUser: registerUser,
+            diffText: playerManage.resolveMatchNickname(registerUser) + '在已收款状态下继续取消报名，系统已提醒其联系赛事组织方协商退款。'
+          });
+          paymentManage.appendPaymentLogs(match, [log]);
+          teamMatchStore.saveMatch(match);
+          this._performCancelRegistration(matchId, userId);
+        }
+      });
+      return;
+    }
+
+    this._performCancelRegistration(matchId, userId);
+  },
+
+  _performCancelRegistration(matchId, userId) {
     this.setData({ registerCancelSubmitting: true });
     const result = teamMatchStore.cancelRegistration(matchId, userId);
     if (!result || !result.ok) {
@@ -2545,12 +2601,16 @@ Page({
     }
     const access = MORE_ACCESS;
     const permSet = access.permissions || [];
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    const user = gameStore.getCurrentUser() || {};
+    const userId = String(user.userId || '');
     const visible = (scope, permission) => {
       if (access.isPrivilegedUser || scope === 'common') return true;
       // 修改半场与修改比赛同权
       if (permission === 'edit_half') {
         return permSet.indexOf('edit_match') >= 0 || permSet.indexOf('edit_half') >= 0;
       }
+      if (tempAdminPermission.hasTempAdminPermission(match, userId, permission)) return true;
       return permSet.indexOf(permission) >= 0;
     };
     const section = FEATURE_SECTION_DEFAULT;
@@ -2626,6 +2686,11 @@ Page({
     if (permission === 'manage_tee_sheet' || permission === 'tee_management') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this.openTeeSheetManageSheet();
+      return;
+    }
+    if (permission === 'manage_payment' || permission === 'fees') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.openPaymentSheet();
       return;
     }
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
@@ -3079,6 +3144,28 @@ Page({
   onPlayerManageRemove(e) {
     const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
     if (!userId || !this._playerManageDraft) return;
+    const row = (this._playerManageDraft.players || []).find(
+      (item) => String((item && item.userId) || '') === userId
+    );
+    const paymentUser = row && row._raw ? row._raw : row;
+    if (paymentManage.isUserPaymentConfirmed(paymentUser)) {
+      const match = teamMatchStore.getMatchById(this.data.matchId || '');
+      const log = paymentManage.createPaymentLog({
+        action: 'payment_protected_delete_blocked',
+        operator: this._buildPaymentLogOperator(match),
+        targetUser: paymentUser,
+        diffText: '管理员尝试删除已收用户' + playerManage.resolveMatchNickname(paymentUser) + '，系统已阻止。请先在收费管理中改为未收后再删除。'
+      });
+      paymentManage.appendPaymentLogs(match, [log]);
+      if (match) teamMatchStore.saveMatch(match);
+      wx.showModal({
+        title: '无法删除已收用户',
+        content: '该用户已登记收款。请先进入收费管理，将该用户改为未收后，再删除选手。',
+        showCancel: false,
+        confirmText: '我知道了'
+      });
+      return;
+    }
     wx.showModal({
       title: '删除选手',
       content: '确定将该选手从本场比赛中删除吗？',
@@ -3127,6 +3214,257 @@ Page({
     this.loadMatch(matchId);
     this._refreshFormalGroupsDisplay();
     wx.showToast({ title: '选手信息已保存', icon: 'success' });
+  },
+
+  /* ===== 收费管理（极简实收登记） ===== */
+  _buildPaymentLogOperator(match) {
+    const user = gameStore.getCurrentUser() || {};
+    const userId = String(user.userId || user.id || '').trim();
+    const creatorId = String((match && (match.createdBy || match.creatorId)) || '').trim();
+    return {
+      userId: userId,
+      operatorId: userId,
+      operatorName: user.nickname || user.displayName || user.name || userId || '管理员',
+      operatorRole: userId && creatorId && userId === creatorId ? 'creator' : 'admin'
+    };
+  },
+
+  _canOpenPaymentSheet(match) {
+    const user = gameStore.getCurrentUser() || {};
+    return paymentManage.canManagePayment(
+      match,
+      user.userId,
+      !!(MORE_ACCESS && MORE_ACCESS.isPrivilegedUser)
+    );
+  },
+
+  openPaymentSheet() {
+    const matchId = this.data.matchId || '';
+    if (!matchId || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    if (!this._canOpenPaymentSheet(match)) {
+      wx.showToast({ title: '暂无收费管理权限', icon: 'none' });
+      return;
+    }
+    const paymentUsers = paymentManage.buildPaymentDraftUsers(match);
+    this.setData({
+      showPaymentSheet: true,
+      paymentUsers: paymentUsers,
+      paymentFilter: paymentManage.FILTER_ALL,
+      expandedPaymentUserId: ''
+    });
+    this.refreshPaymentManageView(paymentManage.FILTER_ALL);
+  },
+
+  closePaymentSheet() {
+    this.setData({
+      showPaymentSheet: false,
+      paymentUsers: [],
+      paymentFilteredUsers: [],
+      paymentFilter: paymentManage.FILTER_ALL,
+      expandedPaymentUserId: '',
+      paymentSummary: paymentManage.calculatePaymentSummary([])
+    });
+  },
+
+  refreshPaymentManageView(forceFilter, callback) {
+    const source = Array.isArray(this.data.paymentUsers)
+      ? this.data.paymentUsers
+      : [];
+    const rawFilter = forceFilter || this.data.paymentFilter || 'all';
+    const filter = rawFilter === 'paid' || rawFilter === 'unpaid'
+      ? rawFilter
+      : 'all';
+    let filtered = source;
+    if (filter === 'paid') {
+      filtered = source.filter((user) => user && user.paymentConfirmed === true);
+    }
+    if (filter === 'unpaid') {
+      filtered = source.filter((user) => !(user && user.paymentConfirmed === true));
+    }
+    const displayUsers = filtered.map((user) => Object.assign({}, user, {
+      expanded: String(user.stableUserId || '') === String(this.data.expandedPaymentUserId || '')
+    }));
+    this.setData({
+      paymentFilter: filter,
+      paymentFilteredUsers: displayUsers,
+      paymentSummary: paymentManage.calculatePaymentSummary(source)
+    }, callback);
+  },
+
+  setPaymentFilterAndRefresh(filter) {
+    const nextFilter = filter === 'paid' || filter === 'unpaid' ? filter : 'all';
+    this.setData({
+      paymentFilter: nextFilter,
+      expandedPaymentUserId: ''
+    });
+    this.refreshPaymentManageView(nextFilter);
+  },
+
+  showAllPaymentUsers() {
+    this.setPaymentFilterAndRefresh('all');
+  },
+
+  showPaidPaymentUsers() {
+    this.setPaymentFilterAndRefresh('paid');
+  },
+
+  showUnpaidPaymentUsers() {
+    this.setPaymentFilterAndRefresh('unpaid');
+  },
+
+  onPaymentUserCardTap(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId) return;
+    const current = String(this.data.expandedPaymentUserId || '');
+    this.setData({
+      expandedPaymentUserId: current === userId ? '' : userId
+    }, () => this.refreshPaymentManageView());
+  },
+
+  _findPaymentUserIndex(users, userId) {
+    const targetId = String(userId || '');
+    return (Array.isArray(users) ? users : []).findIndex((user, index) => {
+      const stableId = paymentManage.resolveStableUserId(user, 'payment-user-' + (index + 1));
+      return (
+        String(stableId || '') === targetId ||
+        String(user && user.stableUserId || '') === targetId ||
+        String(user && user.userId || '') === targetId ||
+        String(user && user.id || '') === targetId
+      );
+    });
+  },
+
+  patchPaymentUser(userId, patch) {
+    const targetId = String(userId || '');
+    if (!targetId) return;
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const registerUsers =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    const rawIndex = this._findPaymentUserIndex(registerUsers, targetId);
+    if (!match || rawIndex < 0) {
+      wx.showToast({ title: '用户数据缺失', icon: 'none' });
+      return;
+    }
+    const beforeUser = JSON.parse(JSON.stringify(registerUsers[rawIndex] || {}));
+    const nextRawUser = Object.assign({}, registerUsers[rawIndex], patch || {});
+    if (nextRawUser.paymentConfirmed === false) {
+      nextRawUser.paidAmount = '';
+      nextRawUser.cashPaidAmount = '';
+      nextRawUser.diamondPaidAmount = '';
+    }
+    if (Object.prototype.hasOwnProperty.call(nextRawUser, 'cashPaidAmount')) {
+      nextRawUser.paidAmount = nextRawUser.cashPaidAmount;
+    }
+    registerUsers[rawIndex] = nextRawUser;
+    match.registerInfo.users = registerUsers;
+    match.registerInfo.totalCount = registerUsers.length;
+
+    const displayUser = paymentManage.normalizePaymentUserForDisplay(nextRawUser);
+    const logs = paymentManage.buildPaymentDiffLogs({
+      beforeUsers: [beforeUser],
+      afterUsers: [displayUser],
+      operator: this._buildPaymentLogOperator(match)
+    });
+    if (logs.length) {
+      paymentManage.appendPaymentLogs(match, logs);
+    }
+    teamMatchStore.saveMatch(match);
+
+    const source = Array.isArray(this.data.paymentUsers) ? this.data.paymentUsers : [];
+    const displayIndex = this._findPaymentUserIndex(source, targetId);
+    const nextUsers = displayIndex >= 0
+      ? source.map((user, index) => (index === displayIndex ? displayUser : user))
+      : paymentManage.buildPaymentDraftUsers(match);
+    this.setData({ paymentUsers: nextUsers }, () => {
+      this.refreshPaymentManageView(this.data.paymentFilter || 'all');
+    });
+  },
+
+  onPaymentConfirmedTap(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    const confirmed = String((e.currentTarget.dataset && e.currentTarget.dataset.confirmed) || '') === 'true';
+    if (!userId) return;
+    const paymentUsers = Array.isArray(this.data.paymentUsers) ? this.data.paymentUsers : [];
+    const target = paymentUsers.find((user) => String(user && user.stableUserId) === userId);
+    if (!target || target.paymentConfirmed === confirmed) return;
+    const before = target.paymentConfirmed;
+    const after = confirmed;
+
+    if (before === true && after === false) {
+      wx.showModal({
+        title: '确认改为未收？',
+        content: '改为未收将清除已登记金额，但保留备注。',
+        confirmText: '继续',
+        cancelText: '取消',
+        success: (res) => {
+          if (!res.confirm) {
+            return;
+          }
+          this.patchPaymentUser(userId, {
+            paymentConfirmed: false,
+            paidAmount: '',
+            cashPaidAmount: '',
+            diamondPaidAmount: ''
+          });
+        },
+        fail: (err) => {
+          console.error('[payment-unpaid-modal-fail]', err);
+        }
+      });
+      return;
+    }
+
+    if (confirmed) {
+      this.patchPaymentUser(userId, { paymentConfirmed: true });
+      return;
+    }
+  },
+
+  onPaymentPaidAmountBlur(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    const value = e && e.detail ? e.detail.value : '';
+    if (!userId) return;
+    const amount = value === '' || value === null || value === undefined
+      ? ''
+      : paymentManage.toAmount(value);
+    const patch = {
+      cashPaidAmount: amount
+    };
+    if (amount !== '') patch.paymentConfirmed = true;
+    this.patchPaymentUser(userId, patch);
+  },
+
+  onPaymentRemarkBlur(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    const value = e && e.detail ? e.detail.value : '';
+    if (!userId) return;
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const registerUsers =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    const rawIndex = this._findPaymentUserIndex(registerUsers, userId);
+    const beforeUser = rawIndex >= 0 ? registerUsers[rawIndex] : {};
+    const beforeRemark = beforeUser && beforeUser.paymentRemark != null
+      ? String(beforeUser.paymentRemark)
+      : '';
+    const afterRemark = String(value || '');
+    if (beforeRemark === afterRemark) return;
+    this.patchPaymentUser(userId, {
+      paymentRemark: afterRemark
+    });
   },
 
   /* ===== 出发管理（组级 teeTime / startHole，draft 机制） ===== */

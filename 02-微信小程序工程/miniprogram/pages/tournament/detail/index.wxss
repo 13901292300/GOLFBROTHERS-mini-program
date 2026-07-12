@@ -2163,6 +2163,174 @@ page {
   background: var(--bg-card);
 }
 
+/* ===== 收费管理（极简实收登记） ===== */
+.payment-sheet {
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.payment-sheet .register-sheet__head {
+  position: relative;
+  padding-right: 72rpx;
+}
+.payment-sheet__close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 36rpx;
+  font-weight: 700;
+}
+.payment-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+  flex-shrink: 0;
+}
+.payment-summary__item {
+  padding: 18rpx 14rpx;
+  border-radius: 16rpx;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+.payment-summary__label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 22rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}
+.payment-summary__value {
+  display: block;
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 900;
+}
+.payment-filter-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+  flex-shrink: 0;
+}
+.payment-filter-tab {
+  flex: 1;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 24rpx;
+  font-weight: 800;
+  border: 1px solid var(--border);
+}
+.payment-filter-tab.is-active {
+  background: var(--data-blue, #00aeef);
+  border-color: var(--data-blue, #00aeef);
+  color: #fff;
+}
+.payment-sheet__body {
+  flex: 1;
+  min-height: 0;
+  max-height: 52vh;
+  box-sizing: border-box;
+}
+.payment-sheet__empty {
+  color: var(--text-muted);
+  font-size: 24rpx;
+  padding: 28rpx 0;
+  text-align: center;
+}
+.payment-user-card {
+  padding: 20rpx 0;
+  border-bottom: 1px solid var(--border);
+}
+.payment-user-card:last-child {
+  border-bottom: none;
+}
+.payment-user-card__head {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.payment-user-card__avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  flex-shrink: 0;
+}
+.payment-user-card__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.payment-user-card__name {
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 800;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.payment-user-card__status {
+  color: var(--text-muted);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.payment-user-card__arrow {
+  width: 48rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 36rpx;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+.payment-user-card__arrow.is-open {
+  transform: rotate(-90deg);
+}
+.payment-user-card__body {
+  padding: 18rpx 0 6rpx 84rpx;
+}
+.payment-confirm-groups {
+  margin-bottom: 20rpx;
+}
+.payment-field-label {
+  margin-top: 20rpx;
+}
+.payment-input {
+  width: 100%;
+  height: 80rpx;
+  box-sizing: border-box;
+  border-radius: 16rpx;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0 24rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.detail-page.dark-mode .payment-summary__item,
+.detail-page.dark-mode .payment-filter-tab,
+.detail-page.dark-mode .payment-input {
+  background: var(--bg-card);
+}
+.detail-page.dark-mode .payment-filter-tab.is-active {
+  background: var(--data-blue, #00aeef);
+  color: #fff;
+}
+
 .player-team-pick-sheet {
   max-height: 70vh;
   display: flex;
