@@ -81,6 +81,19 @@ function cloneTeamGroups(list) {
   }));
 }
 
+function normalizeScoreData(scoreData) {
+  if (!scoreData || typeof scoreData !== 'object' || Array.isArray(scoreData)) return {};
+  return scoreData;
+}
+
+function normalizeStoredMatch(match) {
+  if (!match || typeof match !== 'object') return match;
+  if (!match.scoreData || typeof match.scoreData !== 'object' || Array.isArray(match.scoreData)) {
+    return Object.assign({}, match, { scoreData: {} });
+  }
+  return match;
+}
+
 function createDefaultRegisterInfo() {
   return {
     totalCount: 0,
@@ -259,6 +272,7 @@ function buildMatchFromCreatePage(pageData) {
     registerInfo: createDefaultRegisterInfo(),
     groups: [],
     pairings: {},
+    scoreData: {},
     feeSet: !!data.feeSet,
     isDiamondMode: !!data.isDiamondMode,
     bannerImage: data.bannerImage || '',
@@ -340,6 +354,7 @@ function updateMatchFromCreatePage(existing, pageData, options) {
   next.registerInfo = existing.registerInfo;
   next.groups = existing.groups;
   next.pairings = clonePairings(existing.pairings);
+  next.scoreData = normalizeScoreData(existing.scoreData);
   next.registrationStatus = existing.registrationStatus === 'closed' || existing.registerStatus === 'closed' ? 'closed' : 'open';
   next.registrationLogs = Array.isArray(existing.registrationLogs) ? existing.registrationLogs : [];
   next.status = existing.status;
@@ -660,6 +675,7 @@ function hydrateCreatePageFromMatch(match) {
 
 function saveMatch(match) {
   if (!match || !match.matchId) return null;
+  match.scoreData = normalizeScoreData(match.scoreData);
   const list = _readAll();
   const next = [match].concat(list.filter((item) => item && item.matchId !== match.matchId));
   _writeAll(next);
@@ -669,12 +685,13 @@ function saveMatch(match) {
 function listMatches() {
   return _readAll()
     .filter((item) => item && item.matchId)
+    .map(normalizeStoredMatch)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 function getMatchById(matchId) {
   if (!matchId) return null;
-  return _readAll().find((item) => item && item.matchId === matchId) || null;
+  return normalizeStoredMatch(_readAll().find((item) => item && item.matchId === matchId) || null);
 }
 
 /** 硬删除球队赛（与 gameStore.removeGame 对齐） */

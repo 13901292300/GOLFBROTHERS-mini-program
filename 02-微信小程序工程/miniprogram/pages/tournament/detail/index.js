@@ -2667,22 +2667,50 @@ Page({
     return thru >= 18 ? 'F' : String(thru);
   },
 
-  _resolveMatchPlayerHoles(group, player, playerId) {
-    if (Array.isArray(player && player.holes)) return player.holes;
-    if (Array.isArray(player && player.scores)) {
-      return player.scores.map((score, index) => ({ holeNo: index + 1, score: score }));
-    }
-    const scoreRecord = group && group.scoresByPlayer && playerId
-      ? group.scoresByPlayer[playerId]
+  _resolveMatchPlayerHoles(match, group, player, playerId) {
+    const groupId = group && group.groupId ? String(group.groupId) : '';
+    const scoreData = match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : null;
+    const groupScoreData = scoreData && groupId && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+      ? scoreData[groupId]
+      : null;
+    const scoreRecord = groupScoreData &&
+      groupScoreData.scoresByPlayer &&
+      typeof groupScoreData.scoresByPlayer === 'object' &&
+      playerId
+      ? groupScoreData.scoresByPlayer[playerId]
       : null;
     if (scoreRecord && Array.isArray(scoreRecord.scores)) {
-      return scoreRecord.scores.map((score, index) => ({ holeNo: index + 1, score: score }));
+      return {
+        source: 'teamMatch.scoreData',
+        holes: scoreRecord.scores.map((score, index) => ({ holeNo: index + 1, score: score }))
+      };
     }
-    return [];
+    if (Array.isArray(player && player.holes)) {
+      return { source: 'match.groups', holes: player.holes };
+    }
+    if (Array.isArray(player && player.scores)) {
+      return {
+        source: 'match.groups',
+        holes: player.scores.map((score, index) => ({ holeNo: index + 1, score: score }))
+      };
+    }
+    const groupScoreRecord = group && group.scoresByPlayer && playerId
+      ? group.scoresByPlayer[playerId]
+      : null;
+    if (groupScoreRecord && Array.isArray(groupScoreRecord.scores)) {
+      return {
+        source: 'match.groups',
+        holes: groupScoreRecord.scores.map((score, index) => ({ holeNo: index + 1, score: score }))
+      };
+    }
+    return { source: '', holes: [] };
   },
 
-  _computeMatchLeaderboardStats(group, player, playerId) {
-    const holes = this._resolveMatchPlayerHoles(group, player, playerId);
+  _computeMatchLeaderboardStats(match, group, player, playerId) {
+    const resolved = this._resolveMatchPlayerHoles(match, group, player, playerId);
+    const holes = resolved.holes || [];
     const pars = groupsStore.getHolePars();
     let total = 0;
     let parThru = 0;
@@ -2694,7 +2722,7 @@ Page({
       parThru += Number(pars[index] || 0);
       thru += 1;
     });
-    return { total: total, diff: total - parThru, thru: thru };
+    return { total: total, diff: total - parThru, thru: thru, source: resolved.source || '' };
   },
 
   _buildLeaderboardFromMatchGroups(match, openIndex) {
@@ -2716,7 +2744,7 @@ Page({
         const genderDisplay = playerManage.getGenderDisplay(
           Object.assign({}, lookup, player, { gender: lookup.gender || display.gender || player.gender })
         );
-        const stat = this._computeMatchLeaderboardStats(group, player, playerId);
+        const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
         flat.push({
           playerId: playerId,
           name: display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
@@ -2731,7 +2759,8 @@ Page({
           age: player.age || '',
           total: stat.total,
           diff: stat.diff,
-          thru: stat.thru
+          thru: stat.thru,
+          scoreSource: stat.source || ''
         });
       });
     });
@@ -2766,6 +2795,7 @@ Page({
         country: player.country,
         age: player.age,
         flag: player.flag,
+        scoreSource: player.scoreSource || '',
         expanded: index === openIndex
       };
     });
@@ -2773,7 +2803,12 @@ Page({
 
   _buildLeaderboardView(match) {
     const matchRows = this._buildLeaderboardFromMatchGroups(match, this.data.openIndex);
-    const source = matchRows ? 'match.groups' : 'groupsStore';
+    let source = 'groupsStore';
+    if (matchRows) {
+      source = matchRows.some((row) => row && row.scoreSource === 'teamMatch.scoreData')
+        ? 'teamMatch.scoreData'
+        : 'match.groups';
+    }
     const rows = matchRows || groupsStore.buildLeaderboard(this.data.scoringDisplay, this.data.openIndex);
     const matchGroups = match && Array.isArray(match.groups) ? match.groups : [];
     const storeGroups = source === 'groupsStore' ? (groupsStore.getGroups() || []) : [];
@@ -2782,7 +2817,7 @@ Page({
       const players = Array.isArray(group && group.players) ? group.players : [];
       return count + players.filter((player) => player && this._resolveAnyPlayerId(player)).length;
     }, 0);
-    console.log('[leaderboard-source]', {
+    console.log('[leaderboard-score-source]', {
       matchId: this.data.matchId || '',
       source: source,
       groupCount: sourceGroups.length,

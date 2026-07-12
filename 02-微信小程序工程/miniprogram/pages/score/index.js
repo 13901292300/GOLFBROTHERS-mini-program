@@ -1163,13 +1163,45 @@ Page({
     this.fetchWeather();
   },
 
+  _buildTeamMatchIndividualPlayersFromScoreData(match, groupId, ms) {
+    if (!match || !groupId) return null;
+    const scoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : null;
+    const groupScoreData = scoreData && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+      ? scoreData[groupId]
+      : null;
+    const scoresByPlayer = groupScoreData && groupScoreData.scoresByPlayer && typeof groupScoreData.scoresByPlayer === 'object'
+      ? groupScoreData.scoresByPlayer
+      : null;
+    if (!scoresByPlayer) return null;
+    const players = ms && Array.isArray(ms.players) ? ms.players : [];
+    if (!players.length) return null;
+    return players.map((player) => {
+      const playerId = player && (player.playerId || player.id);
+      const record = playerId ? (scoresByPlayer[playerId] || {}) : {};
+      return {
+        id: playerId || '',
+        playerId: playerId || '',
+        name: (player && player.name) || '球员',
+        avatar: (player && player.avatar) || '',
+        colorClass: 'border-white',
+        scores: (record.scores || []).slice(),
+        putts: (record.putts || []).slice()
+      };
+    });
+  },
+
   // 个人比杆赛模式：从出发表 groups 加载本组球员与 holes 成绩（唯一数据源）
   initIndividualStrokeMode(groupId) {
     groupsStore.ensureInitialized();
     const ms = this._matchState || this._readMatchState();
+    const matchId = (ms && ms.matchId) || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const matchPlayers = this._buildTeamMatchIndividualPlayersFromScoreData(match, groupId, ms);
     const group = groupsStore.getGroup(groupId);
     const loaded = groupsStore.loadGroupForScoring(groupId);
-    this._playersSource = loaded.length
+    this._playersSource = matchPlayers || (loaded.length
       ? loaded.map((p) => ({
           id: p.id,
           playerId: p.playerId || p.id,
@@ -1191,7 +1223,13 @@ Page({
             }))
           : PLAYER_SEEDS.map((p) =>
               Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [] })
-            ));
+            )));
+    console.log('[score-load-source]', {
+      matchId: matchId,
+      source: matchPlayers ? 'teamMatch.scoreData' : 'groupsStore',
+      groupId: groupId || '',
+      playerCount: (this._playersSource || []).length
+    });
     this.setData({
       mode: 'individual_stroke',
       groupId: groupId || '',
@@ -1513,6 +1551,35 @@ Page({
     }
   },
 
+  _persistTeamMatchIndividualScores(match, groupId) {
+    if (!match || !match.matchId || !groupId) return false;
+    match.scoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : {};
+    const groupScoreData = match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
+      ? match.scoreData[groupId]
+      : {};
+    const scoresByPlayer = groupScoreData.scoresByPlayer && typeof groupScoreData.scoresByPlayer === 'object'
+      ? groupScoreData.scoresByPlayer
+      : {};
+    (this._playersSource || []).forEach((player) => {
+      const playerId = player && (player.playerId || player.id);
+      if (!playerId) return;
+      scoresByPlayer[playerId] = {
+        scores: (player.scores || []).slice(),
+        putts: (player.putts || []).slice()
+      };
+    });
+    match.scoreData[groupId] = {
+      scoresByPlayer: scoresByPlayer,
+      teamScoresByEntity: Array.isArray(groupScoreData.teamScoresByEntity)
+        ? groupScoreData.teamScoresByEntity
+        : []
+    };
+    teamMatchStore.saveMatch(match);
+    return true;
+  },
+
   // 将当前本地 state 写入会话：个人比杆赛 → 出发表 groups；其他模式 → scoreSessions
   persistSession() {
     if (this._isGameStoreContext()) {
@@ -1527,7 +1594,27 @@ Page({
       return;
     }
     if (this.data.mode === 'individual_stroke' && this.data.groupId) {
+      const ms = this._matchState || this._readMatchState() || {};
+      const matchId = ms.matchId || '';
+      const groupId = this.data.groupId || ms.groupId || '';
+      const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      if (match && this._persistTeamMatchIndividualScores(match, groupId)) {
+        console.log('[score-save-source]', {
+          matchId: matchId,
+          source: 'teamMatch.scoreData',
+          groupId: groupId,
+          playerCount: (this._playersSource || []).length
+        });
+        this._inferFormalMatchStartHoleFromScores();
+        return;
+      }
       groupsStore.syncGroupFromScoring(this.data.groupId, this._playersSource);
+      console.log('[score-save-source]', {
+        matchId: matchId,
+        source: 'groupsStore',
+        groupId: this.data.groupId,
+        playerCount: (this._playersSource || []).length
+      });
       this._inferFormalMatchStartHoleFromScores();
       return;
     }
@@ -1668,7 +1755,35 @@ Page({
       route: this.route
     });
 
+    const matchStateForBack = this._readMatchState();
+    if (
+      matchStateForBack &&
+      matchStateForBack.matchId &&
+      this.data.mode === 'individual_stroke'
+    ) {
+      console.log('[score-back-source]', {
+        source: 'teamMatch',
+        matchId: matchStateForBack.matchId,
+        mode: this.data.mode
+      });
+      this.persistSession();
+      const pages = getCurrentPages();
+      if (pages.length > 1) {
+        wx.navigateBack();
+      } else {
+        wx.redirectTo({
+          url: '/pages/tournament/detail/index?matchId=' +
+            encodeURIComponent(matchStateForBack.matchId)
+        });
+      }
+      return;
+    }
+
     if (this.data.gameId && (this.data.mode === 'game' || this.data.mode === 'fourball_best')) {
+      console.log('[score-back-source]', {
+        source: 'game',
+        gameId: this.data.gameId
+      });
       this.persistSession();
     }
 

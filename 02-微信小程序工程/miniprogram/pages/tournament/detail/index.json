@@ -1,9 +1,18 @@
-{
-  "navigationStyle": "custom",
-  "usingComponents": {
-    "discussion": "/components/discussion/index",
-    "half-course-sheet": "/components/half-course-sheet/index",
-    "player-source-sheet": "/components/player-source-sheet/index",
-    "phone-bind-sheet": "/components/phone-bind-sheet/index"
-  }
-}
+{
+
+  "navigationStyle": "custom",
+
+  "usingComponents": {
+
+    "discussion": "/components/discussion/index",
+
+    "half-course-sheet": "/components/half-course-sheet/index",
+
+    "player-source-sheet": "/components/player-source-sheet/index",
+
+    "phone-bind-sheet": "/components/phone-bind-sheet/index"
+
+  }
+
+}
+
