@@ -790,7 +790,8 @@ Page({
       matchStatus: lifecycle,
       tabs: tabs,
       activeTab: activeTab,
-      eventInfoList: this._resolveEventInfoList(match)
+      eventInfoList: this._resolveEventInfoList(match),
+      scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
     }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
       this.applyMoreAccess();
       this.refreshPartnerSection();
@@ -2130,13 +2131,34 @@ Page({
     }
   },
 
-  /** 领先榜逐洞下方广告：仅交杯鲜啤演示用广告图片1 BRIGHT/DARK，其它赛事保持原 Unsplash */
+  /** 领先榜逐洞下方广告：demo 走专用图，真实赛事走赛事信息第一个广告图 */
   _resolveScorecardAdImage(theme, matchId) {
     const id = matchId != null ? matchId : this.data.matchId;
     if (demoJiaobeiMatch.isJiaobeiDemoMatchId(id)) {
+      console.log('[scorecard-ad-source]', {
+        source: 'demoJiaobei',
+        matchId: id
+      });
       return demoJiaobeiMatch.resolveJiaobeiScorecardAdImage(theme || getApp().getTheme())
         || DEFAULT_SCORECARD_AD_IMAGE;
     }
+    const match = this._resolveMatchData(id);
+    const firstImage = match && Array.isArray(match.eventInfoList)
+      ? match.eventInfoList.find((item) => item && String(item.type) === 'image')
+      : null;
+    const image = this._resolveEventInfoImage(firstImage, theme || getApp().getTheme());
+    if (image) {
+      console.log('[scorecard-ad-source]', {
+        source: 'match.eventInfoList',
+        matchId: id,
+        imageId: firstImage && firstImage.id
+      });
+      return image;
+    }
+    console.log('[scorecard-ad-source]', {
+      source: 'default',
+      matchId: id
+    });
     return DEFAULT_SCORECARD_AD_IMAGE;
   },
 
@@ -2667,6 +2689,105 @@ Page({
     return thru >= 18 ? 'F' : String(thru);
   },
 
+  _resolveScorecardMarker(status) {
+    switch (status) {
+      case 'eagle':
+      case 'birdie':
+        return { m: 'circle', c: status === 'eagle' ? 'score-eagle' : 'score-birdie' };
+      case 'bogey':
+        return { m: 'square', c: 'score-bogey' };
+      case 'double-bogey':
+        return { m: 'square', c: 'score-double-bogey' };
+      default:
+        return { m: '', c: '' };
+    }
+  },
+
+  _buildScorecardHoleCell(score, par, mode) {
+    if (!this._isFilledLeaderboardScore(score)) return { t: '-', m: '', c: '' };
+    const diff = Number(score) - Number(par || 0);
+    const marker = this._resolveScorecardMarker(groupsStore.getScoreStatus(diff));
+    return {
+      t: mode === 'diff' ? this._formatLeaderboardDiff(diff) : String(score),
+      m: marker.m,
+      c: marker.c
+    };
+  },
+
+  _buildScorecardSumCell(scores, pars, from, to, mode) {
+    let gross = 0;
+    let diff = 0;
+    let filled = 0;
+    for (let i = from; i < to; i++) {
+      const score = scores[i];
+      if (!this._isFilledLeaderboardScore(score)) continue;
+      gross += Number(score);
+      diff += Number(score) - Number(pars[i] || 0);
+      filled += 1;
+    }
+    if (!filled) return { t: '', m: '', c: '' };
+    return { t: mode === 'diff' ? this._formatLeaderboardDiff(diff) : String(gross), m: '', c: '' };
+  },
+
+  _sumScorecardPars(pars, from, to) {
+    let total = 0;
+    for (let i = from; i < to; i++) total += Number(pars[i] || 0);
+    return total;
+  },
+
+  _buildScorecardFromScoreRecord(record, mode) {
+    if (!record || !Array.isArray(record.scores)) return null;
+    const scores = record.scores || [];
+    const pars = groupsStore.getHolePars();
+    const parCell = (value) => ({ t: String(value), m: '', c: '' });
+    const blank = { t: '', m: '', c: '' };
+
+    const frontHead = ['Hole', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Out', ''];
+    const backHead = ['Hole', '10', '11', '12', '13', '14', '15', '16', '17', '18', 'In', 'Tot'];
+    const frontPar = [{ t: 'Par', m: '', c: '' }];
+    const backPar = [{ t: 'Par', m: '', c: '' }];
+    for (let i = 0; i < 9; i++) frontPar.push(parCell(pars[i]));
+    frontPar.push(parCell(this._sumScorecardPars(pars, 0, 9)));
+    frontPar.push(blank);
+    for (let i = 9; i < 18; i++) backPar.push(parCell(pars[i]));
+    backPar.push(parCell(this._sumScorecardPars(pars, 9, 18)));
+    backPar.push(parCell(this._sumScorecardPars(pars, 0, 18)));
+
+    const frontScore = [blank];
+    const backScore = [blank];
+    for (let i = 0; i < 9; i++) {
+      frontScore.push(this._buildScorecardHoleCell(scores[i], pars[i], mode));
+    }
+    frontScore.push(this._buildScorecardSumCell(scores, pars, 0, 9, mode));
+    frontScore.push(blank);
+    for (let i = 9; i < 18; i++) {
+      backScore.push(this._buildScorecardHoleCell(scores[i], pars[i], mode));
+    }
+    backScore.push(this._buildScorecardSumCell(scores, pars, 9, 18, mode));
+    backScore.push(this._buildScorecardSumCell(scores, pars, 0, 18, mode));
+
+    return { frontHead, frontPar, frontScore, backHead, backPar, backScore };
+  },
+
+  _resolveTeamMatchScorecard(match, row) {
+    const groupId = row && row.groupId ? String(row.groupId) : '';
+    const playerId = row && row.playerId ? String(row.playerId) : '';
+    if (!match || !groupId || !playerId) return null;
+    const scoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : null;
+    const groupScoreData = scoreData && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+      ? scoreData[groupId]
+      : null;
+    const scoresByPlayer = groupScoreData &&
+      groupScoreData.scoresByPlayer &&
+      typeof groupScoreData.scoresByPlayer === 'object'
+      ? groupScoreData.scoresByPlayer
+      : null;
+    const record = scoresByPlayer ? scoresByPlayer[playerId] : null;
+    return this._buildScorecardFromScoreRecord(record, this.data.scoreDisplayMode);
+  },
+
   _resolveMatchPlayerHoles(match, group, player, playerId) {
     const groupId = group && group.groupId ? String(group.groupId) : '';
     const scoreData = match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
@@ -2870,7 +2991,7 @@ Page({
     this.updateOpenScorecard();
   },
 
-  // 逐洞详情数据：通过 playerId 回到 groups 读取真实 holes 派生（只读，无 mock，无副本）
+  // 逐洞详情数据：真实球队赛优先读取 match.scoreData，演示/旧数据继续回退 groupsStore
   updateOpenScorecard() {
     const idx = this.data.openIndex;
     const row = idx >= 0 ? this.data.leaderboard[idx] : null;
@@ -2878,6 +2999,23 @@ Page({
       this.setData({ openScorecard: null });
       return;
     }
+    const matchId = this.data.matchId;
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const scorecard = this._resolveTeamMatchScorecard(match, row);
+    if (scorecard) {
+      console.log('[scorecard-source]', {
+        source: 'teamMatch.scoreData',
+        matchId,
+        groupId: row.groupId,
+        playerId: row.playerId
+      });
+      this.setData({ openScorecard: scorecard });
+      return;
+    }
+    console.log('[scorecard-source]', {
+      source: 'groupsStore',
+      playerId: row.playerId
+    });
     this.setData({
       openScorecard: groupsStore.buildPlayerScorecard(row.playerId, this.data.scoreDisplayMode)
     });

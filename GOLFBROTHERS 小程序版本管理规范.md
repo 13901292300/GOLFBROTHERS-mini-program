@@ -1062,3 +1062,81 @@ v0.5.18
 - 审计日志
 - 无 Draft
 - 管理操作可追溯
+
+## v0.5.23-live-score-flow
+
+完成：
+
+### 球队赛生命周期
+
+```
+创建比赛 ↓报名阶段 ↓关闭报名 ↓开始比赛 ↓LIVE状态
+```
+
+### 比赛运行
+
+```
+LIVE详情 ↓分组 ↓记分页 ↓保存成绩 ↓scoreData ↓领先榜
+```
+
+### 数据架构
+
+从：
+
+```
+demo:groupsStore
+```
+
+过渡到：
+
+```
+真实球队赛:teamMatchStore.match       |       ├ groups       |       └ scoreData
+```
+
+### 兼容性
+
+保持：
+
+```
+交杯鲜啤挑战赛       ↓groupsStore
+```
+
+不受影响。
+
+
+
+```
+## v0.5.24-live-scorecard-flow完成：### 真实逐洞详情
+```
+
+记分页  
+↓  
+teamMatch.scoreData  
+↓  
+领先榜  
+↓  
+逐洞详情
+
+```
+### 广告继承
+```
+
+match.eventInfoList  
+↓  
+第一个image广告  
+↓  
+scorecardAdImage  
+↓  
+逐洞底部广告
+
+```
+### 兼容性保持：
+```
+
+交杯鲜啤挑战赛  
+↓  
+groupsStore
+
+```
+原 demo 链路不变。
+```
