@@ -405,6 +405,10 @@ Page({
     playerTeamPickOptions: [],
     playerManageFilterPickVisible: false,
     playerManageFilterPickOptions: [],
+    playerSlotSelectVisible: false,
+    playerSlotSelectUserId: '',
+    playerSlotSelectGroupId: '',
+    playerSlotSelectOptions: [],
     // 收费管理（极简实收登记）
     showPaymentSheet: false,
     paymentUsers: [],
@@ -2735,7 +2739,7 @@ Page({
     return total;
   },
 
-  _buildScorecardFromScoreRecord(record, mode) {
+  _buildScorecardFromScoreRecord(record, mode, scorecardStatus) {
     if (!record || !Array.isArray(record.scores)) return null;
     const scores = record.scores || [];
     const pars = groupsStore.getHolePars();
@@ -2766,7 +2770,9 @@ Page({
     backScore.push(this._buildScorecardSumCell(scores, pars, 9, 18, mode));
     backScore.push(this._buildScorecardSumCell(scores, pars, 0, 18, mode));
 
-    return { frontHead, frontPar, frontScore, backHead, backPar, backScore };
+    const scorecard = { frontHead, frontPar, frontScore, backHead, backPar, backScore };
+    if (scorecardStatus) scorecard.scorecardStatus = scorecardStatus;
+    return scorecard;
   },
 
   _resolveTeamMatchScorecard(match, row) {
@@ -2785,6 +2791,11 @@ Page({
       ? groupScoreData.scoresByPlayer
       : null;
     const record = scoresByPlayer ? scoresByPlayer[playerId] : null;
+    const scores = record && Array.isArray(record.scores) ? record.scores : [];
+    const started = scores.some((score) => this._isFilledLeaderboardScore(score));
+    if (!started) {
+      return this._buildScorecardFromScoreRecord({ scores: [] }, this.data.scoreDisplayMode, 'not_started');
+    }
     return this._buildScorecardFromScoreRecord(record, this.data.scoreDisplayMode);
   },
 
@@ -3004,7 +3015,7 @@ Page({
     const scorecard = this._resolveTeamMatchScorecard(match, row);
     if (scorecard) {
       console.log('[scorecard-source]', {
-        source: 'teamMatch.scoreData',
+        source: scorecard.scorecardStatus === 'not_started' ? 'teamMatch.not_started' : 'teamMatch.scoreData',
         matchId,
         groupId: row.groupId,
         playerId: row.playerId
@@ -3396,6 +3407,20 @@ Page({
     this._syncPlayerManageDisplay();
   },
 
+  _findPlayerManageFirstAvailableGroupId() {
+    const groups = this._playerManageDraft && Array.isArray(this._playerManageDraft.groupsDraft)
+      ? this._playerManageDraft.groupsDraft
+      : [];
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
+      if (!group || !group.groupId) continue;
+      if (teamMatchStore.getAvailableSlots(group).length > 0) {
+        return String(group.groupId);
+      }
+    }
+    return '';
+  },
+
   closePlayerManageSheet() {
     if (this._playerManageSearchTimer) {
       clearTimeout(this._playerManageSearchTimer);
@@ -3417,7 +3442,11 @@ Page({
       playerTeamPickUserId: '',
       playerTeamPickOptions: [],
       playerManageFilterPickVisible: false,
-      playerManageFilterPickOptions: []
+      playerManageFilterPickOptions: [],
+      playerSlotSelectVisible: false,
+      playerSlotSelectUserId: '',
+      playerSlotSelectGroupId: '',
+      playerSlotSelectOptions: []
     });
   },
 
@@ -3507,6 +3536,7 @@ Page({
       {
         expandedPlayerManageUserId: next,
         playerTeamPickVisible: false,
+        playerSlotSelectVisible: false,
         playerManageFilterPickVisible: false
       },
       () => this._syncPlayerManageDisplay()
@@ -3663,10 +3693,10 @@ Page({
       return;
     }
     wx.showModal({
-      title: '删除选手',
-      content: '确定将该选手从本场比赛中删除吗？',
+      title: '移出分组',
+      content: '确定将该选手从当前出发组移出吗？该选手仍会保留在本场报名池中。',
       cancelText: '取消',
-      confirmText: '确认删除',
+      confirmText: '确认移出',
       confirmColor: '#dc2626',
       success: (res) => {
         if (!res.confirm) return;
@@ -3683,9 +3713,108 @@ Page({
         this.setData({ expandedPlayerManageUserId: nextExpanded }, () =>
           this._syncPlayerManageDisplay()
         );
-        wx.showToast({ title: '已从本场选手列表移除，保存后生效', icon: 'none' });
+        wx.showToast({ title: result.wasGrouped ? '已移出分组，保存后生效' : '该选手未在分组中', icon: 'none' });
       }
     });
+  },
+
+  onPlayerManageAddToSlot(e) {
+    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
+    if (!userId || !this._playerManageDraft) return;
+    const row = (this._playerManageDraft.players || []).find(
+      (item) => String((item && item.userId) || '') === userId
+    );
+    if (!row) {
+      wx.showToast({ title: '选手不存在', icon: 'none' });
+      return;
+    }
+    if (playerManage.isPlayerFormalGrouped(row, playerManage.collectFormalGroupedUserIds(this._playerManageDraft.groupsDraft))) {
+      wx.showToast({ title: '该选手已分组', icon: 'none' });
+      return;
+    }
+    const groupId = this._findPlayerManageFirstAvailableGroupId();
+    if (!groupId) {
+      wx.showToast({ title: '暂无可用空位', icon: 'none' });
+      return;
+    }
+    const result = playerManage.addPlayerToGroupsDraft(
+      this._playerManageDraft.groupsDraft || [],
+      groupId,
+      row,
+      { scoreData: this._playerManageDraft.scoreData || {} }
+    );
+    if (result && result.needsSlotSelection) {
+      const options = (result.availableSlots || []).map((slot) => ({
+        position: Number(slot.position) || 0,
+        title: '第' + (Number(slot.position) || 0) + '位',
+        desc: slot.hasHistoryScore ? '已有比赛成绩' : '无历史成绩',
+        hasHistoryScore: !!slot.hasHistoryScore
+      }));
+      this.setData({
+        playerSlotSelectVisible: true,
+        playerSlotSelectUserId: userId,
+        playerSlotSelectGroupId: groupId,
+        playerSlotSelectOptions: options,
+        playerTeamPickVisible: false,
+        playerManageFilterPickVisible: false
+      });
+      return;
+    }
+    if (!result || !result.ok) {
+      wx.showToast({ title: '加入失败', icon: 'none' });
+      return;
+    }
+    this._playerManageDraft = Object.assign({}, this._playerManageDraft, {
+      groupsDraft: result.groups || this._playerManageDraft.groupsDraft
+    });
+    this._syncPlayerManageDisplay();
+    wx.showToast({ title: '已加入空位，保存后生效', icon: 'none' });
+  },
+
+  closePlayerSlotSelectSheet() {
+    this.setData({
+      playerSlotSelectVisible: false,
+      playerSlotSelectUserId: '',
+      playerSlotSelectGroupId: '',
+      playerSlotSelectOptions: []
+    });
+  },
+
+  onPlayerSlotSelectOptionTap(e) {
+    const position = Number((e.currentTarget.dataset && e.currentTarget.dataset.position) || 0);
+    const userId = String(this.data.playerSlotSelectUserId || '');
+    const groupId = String(this.data.playerSlotSelectGroupId || '');
+    if (!position || !userId || !groupId || !this._playerManageDraft) {
+      this.closePlayerSlotSelectSheet();
+      return;
+    }
+    const row = (this._playerManageDraft.players || []).find(
+      (item) => String((item && item.userId) || '') === userId
+    );
+    if (!row) {
+      this.closePlayerSlotSelectSheet();
+      wx.showToast({ title: '选手不存在', icon: 'none' });
+      return;
+    }
+    const result = playerManage.addPlayerToGroupsDraft(
+      this._playerManageDraft.groupsDraft || [],
+      groupId,
+      row,
+      {
+        scoreData: this._playerManageDraft.scoreData || {},
+        slotPosition: position
+      }
+    );
+    if (!result || !result.ok) {
+      wx.showToast({ title: '加入失败', icon: 'none' });
+      return;
+    }
+    this._playerManageDraft = Object.assign({}, this._playerManageDraft, {
+      groupsDraft: result.groups || this._playerManageDraft.groupsDraft
+    });
+    this.closePlayerSlotSelectSheet();
+    this._syncPlayerManageDisplay();
+    wx.showToast({ title: '已加入指定位置，保存后生效', icon: 'none' });
   },
 
   savePlayerManageSheet() {

@@ -716,6 +716,10 @@ page {
   background: var(--champion-gold);
   color: #ffffff;
 }
+.badge-live {
+  background: var(--data-blue);
+  color: #ffffff;
+}
 .ds-card-club__avatar-img {
   flex-shrink: 0;
 }

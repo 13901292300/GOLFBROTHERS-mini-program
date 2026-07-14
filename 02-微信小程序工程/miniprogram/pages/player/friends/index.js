@@ -111,6 +111,7 @@ Page({
     selectedMap: {},
     currentGroupPlayerIds: [],
     preselectedMap: {},
+    occupiedMap: {},
     disabledMap: {},
     maxAdd: 4,
     selectedCount: 0,
@@ -174,6 +175,7 @@ Page({
       searchEmpty: false,
       currentGroupPlayerIds: [],
       preselectedMap: {},
+      occupiedMap: {},
       selectedMap: {},
       disabledMap: disabledMap,
       maxAdd: 99,
@@ -197,8 +199,12 @@ Page({
     });
 
     const disabledMap = {};
+    const occupiedMap = {};
     usedIds.forEach((id) => {
-      if (!preselectedMap[id]) disabledMap[id] = true;
+      if (!preselectedMap[id]) {
+        disabledMap[id] = true;
+        occupiedMap[id] = true;
+      }
     });
 
     this._allFriends = (FRIEND_LIST || []).map(mapFriendRow);
@@ -217,6 +223,7 @@ Page({
       searchEmpty: false,
       currentGroupPlayerIds: groupPlayerIds,
       preselectedMap,
+      occupiedMap,
       selectedMap,
       disabledMap,
       maxAdd: isNaN(emptyCount) ? 4 : emptyCount,
@@ -282,6 +289,7 @@ Page({
       searchEmpty: false,
       currentGroupPlayerIds: [],
       preselectedMap: {},
+      occupiedMap: {},
       selectedMap: {},
       disabledMap: {},
       maxAdd: 99,
@@ -443,6 +451,7 @@ Page({
       searchEmpty: false,
       currentGroupPlayerIds: [],
       preselectedMap: {},
+      occupiedMap: {},
       selectedMap: selectedMap,
       disabledMap: disabledMap,
       maxAdd: 99,

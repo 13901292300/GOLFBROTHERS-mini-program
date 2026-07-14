@@ -586,7 +586,27 @@ page {
   padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
 }
 .register-sheet__head {
+  position: relative;
   padding: 8rpx 0 32rpx;
+}
+.temp-admin-sheet .register-sheet__head,
+.player-manage-sheet .register-sheet__head,
+.tee-sheet-manage-sheet .register-sheet__head {
+  padding-right: 72rpx;
+}
+.register-sheet__close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 36rpx;
+  font-weight: 700;
 }
 .register-sheet__overline {
   display: block;
@@ -1518,14 +1538,16 @@ page {
 .temp-admin-sheet__body {
   flex: 1;
   min-height: 0;
-  max-height: none;
-  height: 0;
+  max-height: 52vh;
   padding: 0 0 8rpx;
   box-sizing: border-box;
 }
 .temp-admin-sheet__footer {
   flex-shrink: 0;
   padding-top: 16rpx;
+  position: relative;
+  z-index: 1;
+  background: var(--bg-card);
 }
 .temp-admin-sheet__empty {
   color: var(--text-muted);
@@ -1871,6 +1893,7 @@ page {
 
 /* ===== 选手管理弹屏 ===== */
 .player-manage-sheet {
+  height: 82vh;
   max-height: 82vh;
   display: flex;
   flex-direction: column;
@@ -1878,10 +1901,11 @@ page {
   box-sizing: border-box;
 }
 .player-manage-sheet__body {
-  flex: 1;
+  flex: none;
   min-height: 0;
-  height: 0;
-  padding: 0 0 8rpx;
+  height: calc(82vh - 680rpx - env(safe-area-inset-bottom));
+  max-height: calc(82vh - 680rpx - env(safe-area-inset-bottom));
+  padding: 0 0 16rpx;
   box-sizing: border-box;
 }
 .player-manage-sheet__toolbar {
@@ -2002,6 +2026,9 @@ page {
 .player-manage-sheet__footer {
   flex-shrink: 0;
   padding-top: 16rpx;
+  position: relative;
+  z-index: 1;
+  background: var(--bg-card);
 }
 .player-manage-sheet__empty {
   color: var(--text-muted);
@@ -2171,6 +2198,14 @@ page {
   font-size: 26rpx;
   font-weight: 800;
   opacity: 0.9;
+  padding: 8rpx 0;
+}
+.player-manage-row__add {
+  margin-top: 24rpx;
+  color: var(--data-blue, #00aeef);
+  font-size: 26rpx;
+  font-weight: 800;
+  opacity: 0.95;
   padding: 8rpx 0;
 }
 .detail-page.dark-mode .player-manage-row__input,
@@ -2401,6 +2436,54 @@ page {
   font-size: 28rpx;
   font-weight: 800;
 }
+.player-slot-select-sheet {
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  z-index: 12100;
+}
+.player-slot-select-sheet__body {
+  padding: 4rpx 0 16rpx;
+}
+.player-slot-select-item {
+  min-height: 96rpx;
+  padding: 18rpx 20rpx;
+  margin-top: 12rpx;
+  border-radius: 18rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  box-sizing: border-box;
+}
+.player-slot-select-item.has-history {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+}
+.player-slot-select-item__title {
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.player-slot-select-item__desc {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.player-slot-select-item.has-history .player-slot-select-item__desc {
+  color: #b45309;
+}
+.detail-page.dark-mode .player-slot-select-item {
+  background: var(--bg-card);
+}
+.detail-page.dark-mode .player-slot-select-item.has-history {
+  background: rgba(245, 158, 11, 0.16);
+}
 .temp-admin-add-sheet__options {
   display: flex;
   flex-direction: column;
@@ -2439,12 +2522,15 @@ page {
 .tee-sheet-manage-sheet__body {
   flex: 1;
   min-height: 0;
-  height: 0;
+  max-height: 52vh;
   padding: 0 0 16rpx;
   box-sizing: border-box;
 }
 .tee-sheet-manage-sheet__footer {
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  background: var(--bg-card);
 }
 .tee-sheet-manage-empty {
   padding: 80rpx 24rpx;

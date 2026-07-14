@@ -250,6 +250,7 @@ Page({
     this.refreshUserProfile();
     // 每次显示刷新进行中 GAME（持久化数据源 → 返回首页不丢失、刷新可恢复）
     this.refreshGames();
+    this.refreshTeamMatchCards();
   },
 
   refreshUserProfile() {
@@ -317,6 +318,18 @@ Page({
       views: '0',
       navUrl: navUrl
     };
+  },
+
+  refreshTeamMatchCards() {
+    const latestCards = teamMatchStore.listMatches()
+      .map(teamMatchStore.toTournamentCard)
+      .filter(Boolean);
+    this._myTournamentCards = latestCards;
+    if (this.data.currentMainSection === 'tournament' && this.data.primaryTabActive) {
+      this.setData({
+        tournamentCards: latestCards
+      });
+    }
   },
 
   initHeaderNav() {

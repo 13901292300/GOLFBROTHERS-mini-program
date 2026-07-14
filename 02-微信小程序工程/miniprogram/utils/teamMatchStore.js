@@ -374,6 +374,7 @@ function updateMatchFromCreatePage(existing, pageData, options) {
 
 /** 个人比杆赛：任意赛制改为此项时保留已有分组 */
 const INDIVIDUAL_STROKE_MODE = '个人比杆赛';
+const FORMAL_SLOT_COUNT = 4;
 
 /**
  * 组合比杆赛（系统内部统一类型）
@@ -502,6 +503,191 @@ function resolveGroupSlotPlayerId(player) {
   if (typeof player !== 'object') return '';
   const id = player.userId || player.playerId || player.id;
   return id != null ? String(id).trim() : '';
+}
+
+function resolveSlotPosition(raw, fallback) {
+  const n = Number(raw);
+  if (Number.isFinite(n) && n >= 1) return Math.floor(n);
+  return fallback;
+}
+
+function buildSlotId(groupId, position) {
+  const gid = String(groupId || '').trim();
+  const pos = Number(position) || 0;
+  return (gid || 'group') + '-slot-' + pos;
+}
+
+function createResolvedSlot(position, groupId, source) {
+  const raw = source && typeof source === 'object' ? source : {};
+  const userId = resolveGroupSlotPlayerId(source);
+  return {
+    slotId: raw.slotId != null && String(raw.slotId).trim()
+      ? String(raw.slotId).trim()
+      : buildSlotId(groupId, position),
+    position: position,
+    userId: userId,
+    playerId: userId
+  };
+}
+
+/**
+ * 将现有正式 players[] 转成 Slot 视图。
+ * Patch 1 只做转换：正式保存来源仍是 groups[].players[]。
+ */
+function playersToSlots(players, groupId) {
+  const slots = Array.from({ length: FORMAL_SLOT_COUNT }, (_, index) =>
+    createResolvedSlot(index + 1, groupId, null)
+  );
+  (Array.isArray(players) ? players : []).forEach((player, index) => {
+    const rawPosition = player && typeof player === 'object'
+      ? (player.position != null ? player.position : player.slotIndex)
+      : null;
+    const position = resolveSlotPosition(rawPosition, index + 1);
+    if (position < 1) return;
+    const slot = createResolvedSlot(position, groupId, player);
+    const slotIndex = position - 1;
+    if (slotIndex < slots.length) {
+      slots[slotIndex] = slot;
+    } else {
+      slots.push(slot);
+    }
+  });
+  return slots;
+}
+
+/**
+ * 从 group 解析 Slot 视图。当前阶段不把 slots 持久化为新真源。
+ */
+function resolveGroupSlots(group) {
+  const groupId = group && group.groupId != null ? String(group.groupId) : '';
+  const players = Array.isArray(group && group.players) ? group.players : [];
+  return playersToSlots(players, groupId);
+}
+
+/**
+ * Slot 视图回落到旧正式 players[] 结构。
+ */
+function slotsToPlayers(slots) {
+  return (Array.isArray(slots) ? slots : []).map((slot, index) => {
+    const position = resolveSlotPosition(
+      slot && slot.position != null ? slot.position : slot && slot.slotIndex,
+      index + 1
+    );
+    return {
+      position: position,
+      userId: resolveGroupSlotPlayerId(slot)
+    };
+  });
+}
+
+function resolveSlotPlayer(slot) {
+  const userId = resolveGroupSlotPlayerId(slot);
+  if (!userId) return null;
+  return {
+    userId: userId,
+    playerId: userId
+  };
+}
+
+function getAvailableSlots(group) {
+  return resolveGroupSlots(group).filter((slot) => !resolveGroupSlotPlayerId(slot));
+}
+
+function summarizeSlotsForVerify(slots) {
+  return (Array.isArray(slots) ? slots : []).map((slot) => ({
+    position: slot.position,
+    userId: slot.userId,
+    slotId: slot.slotId
+  }));
+}
+
+/**
+ * Patch 1.5 临时验证入口：仅手动调用时输出日志，不接入业务流程。
+ */
+function verifySlotHelperScenarios() {
+  const scenarios = [
+    {
+      name: 'normal_4_players',
+      group: {
+        groupId: 'verify-group-1',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: 'C' },
+          { position: 4, userId: 'D' }
+        ]
+      },
+      expectedUsers: ['A', 'B', 'C', 'D']
+    },
+    {
+      name: 'normal_3_players',
+      group: {
+        groupId: 'verify-group-2',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: 'C' }
+        ]
+      },
+      expectedUsers: ['A', 'B', 'C', '']
+    },
+    {
+      name: 'empty_after_remove',
+      group: {
+        groupId: 'verify-group-3',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: 'C' },
+          { position: 4, userId: '' }
+        ]
+      },
+      expectedUsers: ['A', 'B', 'C', '']
+    },
+    {
+      name: 'non_continuous_position',
+      group: {
+        groupId: 'verify-group-4',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 3, userId: 'C' }
+        ]
+      },
+      expectedUsers: ['A', '', 'C', '']
+    },
+    {
+      name: 'available_slots',
+      group: {
+        groupId: 'verify-group-5',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: '' },
+          { position: 4, userId: '' }
+        ]
+      },
+      expectedUsers: ['A', 'B', '', ''],
+      expectedAvailable: [3, 4]
+    }
+  ];
+
+  return scenarios.map((scenario) => {
+    const slots = resolveGroupSlots(scenario.group);
+    const users = slots.map((slot) => slot.userId);
+    const available = getAvailableSlots(scenario.group).map((slot) => slot.position);
+    const usersOk = JSON.stringify(users) === JSON.stringify(scenario.expectedUsers);
+    const availableOk = scenario.expectedAvailable
+      ? JSON.stringify(available) === JSON.stringify(scenario.expectedAvailable)
+      : true;
+    const result = {
+      name: scenario.name,
+      ok: usersOk && availableOk,
+      slots: summarizeSlotsForVerify(slots),
+      availableSlots: available
+    };
+    console.log('[slot-helper-verify]', result);
+    return result;
+  });
 }
 
 /** 正式 groups 中是否已包含该 userId */
@@ -747,6 +933,12 @@ module.exports = {
   shouldClearPairingsOnGameModeChange,
   clearFormalGroupsOnMatch,
   clearFormalPairingsOnMatch,
+  resolveGroupSlots,
+  playersToSlots,
+  slotsToPlayers,
+  resolveSlotPlayer,
+  getAvailableSlots,
+  verifySlotHelperScenarios,
   isUserInFormalGroups,
   clearUserFromFormalGroups,
   clearUserFromPairings,

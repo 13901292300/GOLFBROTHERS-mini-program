@@ -29,15 +29,16 @@
   </view>
 
   <view wx:if="{{!isProxyRegisterMode}}" class="me-row-wrap">
-    <view class="friend-row me-row" bindtap="toggleMe">
+    <view class="friend-row me-row {{occupiedMap[currentUser.playerId] ? 'is-disabled' : ''}}" bindtap="toggleMe">
       <image class="friend-avatar" src="{{currentUser.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="me"></image>
       <view class="friend-meta">
         <text class="friend-name">我</text>
         <text class="friend-sub">{{currentUser.name}}{{currentUser.phone ? ' · ' + currentUser.phone : ''}}</text>
-        <text wx:if="{{preselectedMap[currentUser.playerId]}}" class="friend-tag">已在本组</text>
+        <text wx:if="{{occupiedMap[currentUser.playerId]}}" class="friend-tag friend-tag--used">已在本场比赛中使用</text>
+        <text wx:elif="{{preselectedMap[currentUser.playerId]}}" class="friend-tag">已在本组</text>
       </view>
-      <view class="friend-check {{selectedMap[currentUser.playerId] ? 'on' : ''}}">
-        <text wx:if="{{selectedMap[currentUser.playerId]}}">✓</text>
+      <view class="friend-check {{(selectedMap[currentUser.playerId] || occupiedMap[currentUser.playerId]) ? 'on' : ''}} {{occupiedMap[currentUser.playerId] ? 'is-locked' : ''}}">
+        <text wx:if="{{selectedMap[currentUser.playerId] || occupiedMap[currentUser.playerId]}}">✓</text>
       </view>
     </view>
   </view>
@@ -71,10 +72,10 @@
         </view>
         <!-- 代报名：锁定态也显示已勾选复选框，明确不可取消 -->
         <view
-          wx:if="{{isProxyRegisterMode || !disabledMap[f.playerId]}}"
-          class="friend-check {{selectedMap[f.playerId] ? 'on' : ''}} {{f.registrationState === 'registered_locked' ? 'is-locked' : ''}}"
+          wx:if="{{isProxyRegisterMode || !disabledMap[f.playerId] || occupiedMap[f.playerId]}}"
+          class="friend-check {{(selectedMap[f.playerId] || occupiedMap[f.playerId]) ? 'on' : ''}} {{(f.registrationState === 'registered_locked' || occupiedMap[f.playerId]) ? 'is-locked' : ''}}"
         >
-          <text wx:if="{{selectedMap[f.playerId]}}">✓</text>
+          <text wx:if="{{selectedMap[f.playerId] || occupiedMap[f.playerId]}}">✓</text>
         </view>
       </view>
     </view>

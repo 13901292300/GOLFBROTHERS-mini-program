@@ -1,6 +1,6 @@
 /**
  * 选手管理：仅编辑本场 registerInfo.users 快照，不写回用户资料。
- * 删除复用 teamMatchStore.removeRegisteredUserAndCleanupGroups。
+ * 球队赛正式分组删除走 Slot 释放兼容层，报名池保持不变。
  */
 
 const teamMatchStore = require('./teamMatchStore.js');
@@ -424,6 +424,7 @@ function buildPlayerManageDraft(matchOrGame) {
     teamOptions: teamOptions,
     groupsDraft: _cloneJson(Array.isArray(m.groups) ? m.groups : []),
     pairingsDraft: _cloneJson(m.pairings && typeof m.pairings === 'object' ? m.pairings : {}),
+    scoreData: _cloneJson(m.scoreData && typeof m.scoreData === 'object' ? m.scoreData : {}),
     removedUserIds: []
   };
 }
@@ -801,13 +802,275 @@ function updatePlayerField(players, userId, patch, teamOptions) {
   });
 }
 
+function summarizeSlotBindings(slots) {
+  return (Array.isArray(slots) ? slots : []).map((slot) => ({
+    position: slot.position,
+    userId: slot.userId || '',
+    hasHistoryScore: !!slot.hasHistoryScore,
+    scorePlayerId: slot.scorePlayerId || ''
+  }));
+}
+
+function hasFormalPlayersGroups(groups) {
+  return (Array.isArray(groups) ? groups : []).some((group) =>
+    group && Array.isArray(group.players)
+  );
+}
+
+function hasFilledScoreRecord(record) {
+  if (!record || typeof record !== 'object') return false;
+  const scores = Array.isArray(record.scores) ? record.scores : [];
+  return scores.some((score) => score !== null && score !== undefined && score !== '');
+}
+
+function getGroupScoreData(scoreData, groupId) {
+  const gid = String(groupId || '');
+  if (!gid || !scoreData || typeof scoreData !== 'object' || Array.isArray(scoreData)) return null;
+  const groupScore = scoreData[gid];
+  return groupScore && typeof groupScore === 'object' && !Array.isArray(groupScore)
+    ? groupScore
+    : null;
+}
+
+function slotHistoryPlayerIdFromEntry(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const id = entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId || '';
+  return id != null ? String(id).trim() : '';
+}
+
+function findGroupPlayerEntryByPosition(group, position) {
+  const pos = Number(position) || 0;
+  const players = Array.isArray(group && group.players) ? group.players : [];
+  return players.find((player) => {
+    const rawPos = Number(player && (player.position != null ? player.position : player.slotIndex));
+    return rawPos === pos;
+  }) || null;
+}
+
+function enrichSlotsWithHistory(group, slots, scoreData) {
+  const groupId = group && group.groupId != null ? String(group.groupId) : '';
+  const groupScore = getGroupScoreData(scoreData, groupId);
+  const scoresByPlayer = groupScore && groupScore.scoresByPlayer && typeof groupScore.scoresByPlayer === 'object'
+    ? groupScore.scoresByPlayer
+    : {};
+  return (Array.isArray(slots) ? slots : []).map((slot) => {
+    const entry = findGroupPlayerEntryByPosition(group, slot && slot.position);
+    const historyPlayerId = slotHistoryPlayerIdFromEntry(entry);
+    const hasHistoryScore = !!(historyPlayerId && hasFilledScoreRecord(scoresByPlayer[historyPlayerId]));
+    return Object.assign({}, slot, {
+      scorePlayerId: historyPlayerId,
+      hasHistoryScore: hasHistoryScore
+    });
+  });
+}
+
+function slotsToPlayersWithHistory(slots) {
+  const players = teamMatchStore.slotsToPlayers(slots);
+  return players.map((player, index) => {
+    const slot = (Array.isArray(slots) ? slots : [])[index] || {};
+    const historyPlayerId = slot.scorePlayerId ? String(slot.scorePlayerId) : '';
+    if (!historyPlayerId) return player;
+    return Object.assign({}, player, { scorePlayerId: historyPlayerId });
+  });
+}
+
+function releasePlayerFromGroupSlots(group, userId, scoreData) {
+  const uid = String(userId || '').trim();
+  const slots = enrichSlotsWithHistory(group, teamMatchStore.resolveGroupSlots(group), scoreData);
+  let targetSlot = null;
+  const nextSlots = slots.map((slot) => {
+    const slotPlayer = teamMatchStore.resolveSlotPlayer(slot);
+    const slotUserId = slotPlayer && slotPlayer.userId ? String(slotPlayer.userId) : '';
+    if (!uid || slotUserId !== uid) return slot;
+    targetSlot = Object.assign({}, slot);
+    return Object.assign({}, slot, {
+      userId: '',
+      playerId: '',
+      scorePlayerId: slot.scorePlayerId || uid
+    });
+  });
+  return {
+    changed: !!targetSlot,
+    targetSlot: targetSlot,
+    beforeSlots: slots,
+    afterSlots: nextSlots,
+    group: targetSlot
+      ? Object.assign({}, group, { players: slotsToPlayersWithHistory(nextSlots) })
+      : group
+  };
+}
+
+function releasePlayerFromGroupsDraft(groups, userId, scoreData) {
+  let wasGrouped = false;
+  let target = null;
+  const nextGroups = (Array.isArray(groups) ? groups : []).map((group) => {
+    if (!group || !Array.isArray(group.players)) return group;
+    const result = releasePlayerFromGroupSlots(group, userId, scoreData);
+    if (result.changed) {
+      wasGrouped = true;
+      target = {
+        groupId: group.groupId || '',
+        groupName: group.groupName || '',
+        targetSlot: result.targetSlot,
+        beforeSlots: result.beforeSlots,
+        afterSlots: result.afterSlots
+      };
+    }
+    return result.group;
+  });
+  if (target) {
+    console.log('[slot-player-manage]', {
+      action: 'release_player_slot',
+      userId: String(userId || ''),
+      groupId: target.groupId,
+      groupName: target.groupName,
+      beforeSlots: summarizeSlotBindings(target.beforeSlots),
+      targetSlot: target.targetSlot
+        ? { position: target.targetSlot.position, userId: target.targetSlot.userId || '' }
+        : null,
+      afterSlots: summarizeSlotBindings(target.afterSlots)
+    });
+  }
+  return {
+    groups: nextGroups,
+    wasGrouped: wasGrouped
+  };
+}
+
+function resolveAddPlayerId(player) {
+  if (player == null) return '';
+  if (typeof player === 'string' || typeof player === 'number') return String(player).trim();
+  return resolveUserId(player);
+}
+
+function addPlayerToGroupSlots(group, player, options) {
+  const opts = options || {};
+  const userId = resolveAddPlayerId(player);
+  if (!group || !userId) {
+    return { ok: false, reason: 'invalid', group: group, availableSlots: [] };
+  }
+  const beforeSlots = enrichSlotsWithHistory(group, teamMatchStore.resolveGroupSlots(group), opts.scoreData);
+  const availableSlots = beforeSlots.filter((slot) => !teamMatchStore.resolveSlotPlayer(slot));
+  if (!availableSlots.length) {
+    return {
+      ok: false,
+      reason: 'no_available_slot',
+      group: group,
+      beforeSlots: beforeSlots,
+      availableSlots: availableSlots
+    };
+  }
+  const availableWithHistory = availableSlots.filter((slot) => slot.hasHistoryScore);
+  const selectedPosition = Number(opts.slotPosition || opts.position || 0);
+  if (availableSlots.length > 1 && availableWithHistory.length > 0 && !selectedPosition) {
+    console.log('[slot-select]', {
+      groupId: group.groupId || '',
+      availableSlots: summarizeSlotBindings(availableSlots),
+      historySlots: summarizeSlotBindings(availableWithHistory),
+      selectedSlot: null
+    });
+    return {
+      ok: false,
+      reason: 'slot_selection_required',
+      needsSlotSelection: true,
+      group: group,
+      beforeSlots: beforeSlots,
+      availableSlots: availableSlots,
+      historySlots: availableWithHistory
+    };
+  }
+  const targetPosition = selectedPosition || Number(availableSlots[0].position) || 0;
+  const targetAvailable = availableSlots.some((slot) => Number(slot && slot.position) === targetPosition);
+  if (!targetAvailable) {
+    return {
+      ok: false,
+      reason: 'slot_not_available',
+      group: group,
+      beforeSlots: beforeSlots,
+      availableSlots: availableSlots
+    };
+  }
+  const afterSlots = beforeSlots.map((slot) => {
+    if (Number(slot && slot.position) !== targetPosition) return slot;
+    return Object.assign({}, slot, {
+      userId: userId,
+      playerId: userId
+    });
+  });
+  const nextGroup = Object.assign({}, group, {
+    players: slotsToPlayersWithHistory(afterSlots)
+  });
+  console.log('[slot-select]', {
+    groupId: group.groupId || '',
+    availableSlots: summarizeSlotBindings(availableSlots),
+    historySlots: summarizeSlotBindings(availableWithHistory),
+    selectedSlot: targetPosition
+  });
+  console.log('[slot-player-add]', {
+    action: 'bind_player_slot',
+    userId: userId,
+    groupId: group.groupId || '',
+    groupName: group.groupName || '',
+    beforeSlots: summarizeSlotBindings(beforeSlots),
+    availableSlots: summarizeSlotBindings(availableSlots),
+    targetSlot: { position: targetPosition, userId: userId },
+    afterSlots: summarizeSlotBindings(afterSlots)
+  });
+  return {
+    ok: true,
+    group: nextGroup,
+    beforeSlots: beforeSlots,
+    afterSlots: afterSlots,
+    availableSlots: availableSlots,
+    targetSlot: afterSlots.find((slot) => Number(slot && slot.position) === targetPosition) || null
+  };
+}
+
+function addPlayerToGroupsDraft(groups, groupId, player, options) {
+  const gid = String(groupId || '').trim();
+  if (!gid) {
+    return { ok: false, reason: 'no_group', groups: groups, availableSlots: [] };
+  }
+  let addResult = null;
+  const nextGroups = (Array.isArray(groups) ? groups : []).map((group) => {
+    if (!group || String(group.groupId || '') !== gid) return group;
+    addResult = addPlayerToGroupSlots(group, player, options);
+    return addResult && addResult.ok ? addResult.group : group;
+  });
+  if (!addResult) {
+    return { ok: false, reason: 'group_not_found', groups: nextGroups, availableSlots: [] };
+  }
+  return Object.assign({}, addResult, {
+    groups: nextGroups
+  });
+}
+
 /**
- * 从 draft 删除选手，同步清理 groupsDraft / pairingsDraft（不写正式 match）
+ * 从 draft 移出当前组绑定（球队赛正式分组不删除报名池）。
  */
 function removePlayerFromDraft(draft, userId) {
   const uid = String(userId || '').trim();
   if (!draft || !uid) {
     return { ok: false, reason: 'no_user', draft: draft };
+  }
+  if (hasFormalPlayersGroups(draft.groupsDraft)) {
+    const released = releasePlayerFromGroupsDraft(
+      _cloneJson(draft.groupsDraft || []),
+      uid,
+      draft.scoreData
+    );
+    return {
+      ok: true,
+      wasGrouped: !!released.wasGrouped,
+      draft: {
+        players: Array.isArray(draft.players) ? draft.players.slice() : [],
+        teamOptions: draft.teamOptions || [],
+        groupsDraft: released.groups || [],
+        pairingsDraft: _cloneJson(draft.pairingsDraft || {}),
+        scoreData: _cloneJson(draft.scoreData || {}),
+        removedUserIds: Array.isArray(draft.removedUserIds) ? draft.removedUserIds.slice() : []
+      }
+    };
   }
   const stub = {
     registerInfo: {
@@ -836,6 +1099,217 @@ function removePlayerFromDraft(draft, userId) {
       removedUserIds: removedUserIds
     }
   };
+}
+
+function verifySlotPlayerManageScenarios() {
+  const scenarios = [
+    {
+      name: 'remove_d_from_4_players',
+      removeUserId: 'D',
+      draft: {
+        players: ['A', 'B', 'C', 'D'].map((id) => ({ userId: id, competitionName: id })),
+        teamOptions: [],
+        groupsDraft: [
+          {
+            groupId: 'verify-group-1',
+            groupName: '第1组',
+            players: [
+              { position: 1, userId: 'A' },
+              { position: 2, userId: 'B' },
+              { position: 3, userId: 'C' },
+              { position: 4, userId: 'D' }
+            ]
+          }
+        ],
+        pairingsDraft: {},
+        removedUserIds: []
+      },
+      expectedSlots: ['A', 'B', 'C', ''],
+      expectedRegisterUsers: ['A', 'B', 'C', 'D']
+    },
+    {
+      name: 'remove_b_from_3_players',
+      removeUserId: 'B',
+      draft: {
+        players: ['A', 'B', 'C'].map((id) => ({ userId: id, competitionName: id })),
+        teamOptions: [],
+        groupsDraft: [
+          {
+            groupId: 'verify-group-2',
+            groupName: '第1组',
+            players: [
+              { position: 1, userId: 'A' },
+              { position: 2, userId: 'B' },
+              { position: 3, userId: 'C' }
+            ]
+          }
+        ],
+        pairingsDraft: {},
+        removedUserIds: []
+      },
+      expectedSlots: ['A', '', 'C', ''],
+      expectedRegisterUsers: ['A', 'B', 'C']
+    }
+  ];
+
+  return scenarios.map((scenario) => {
+    const result = removePlayerFromDraft(_cloneJson(scenario.draft), scenario.removeUserId);
+    const group = result && result.draft && result.draft.groupsDraft
+      ? result.draft.groupsDraft[0]
+      : null;
+    const slots = teamMatchStore.resolveGroupSlots(group);
+    const availableSlots = teamMatchStore.getAvailableSlots(group).map((slot) => slot.position);
+    const slotUsers = slots.map((slot) => slot.userId || '');
+    const registerUsers = result && result.draft && Array.isArray(result.draft.players)
+      ? result.draft.players.map((player) => String((player && player.userId) || ''))
+      : [];
+    const ok =
+      !!(result && result.ok) &&
+      JSON.stringify(slotUsers) === JSON.stringify(scenario.expectedSlots) &&
+      JSON.stringify(registerUsers) === JSON.stringify(scenario.expectedRegisterUsers);
+    const verifyResult = {
+      name: scenario.name,
+      ok: ok,
+      slots: summarizeSlotBindings(slots),
+      availableSlots: availableSlots,
+      registerUsers: registerUsers
+    };
+    console.log('[slot-player-manage-verify]', verifyResult);
+    return verifyResult;
+  });
+}
+
+function verifySlotAddPlayerScenarios() {
+  const scenarios = [
+    {
+      name: 'add_d_to_last_empty_slot',
+      addUserId: 'D',
+      group: {
+        groupId: 'verify-add-group-1',
+        groupName: '第1组',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: 'C' },
+          { position: 4, userId: '' }
+        ]
+      },
+      expectedSlots: ['A', 'B', 'C', 'D'],
+      expectedAvailable: [4],
+      expectedTarget: 4
+    },
+    {
+      name: 'add_c_to_middle_empty_slot',
+      addUserId: 'C',
+      group: {
+        groupId: 'verify-add-group-2',
+        groupName: '第1组',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: '' },
+          { position: 4, userId: 'D' }
+        ]
+      },
+      expectedSlots: ['A', 'B', 'C', 'D'],
+      expectedAvailable: [3],
+      expectedTarget: 3
+    },
+    {
+      name: 'add_e_to_first_of_multiple_empty_slots',
+      addUserId: 'E',
+      group: {
+        groupId: 'verify-add-group-3',
+        groupName: '第1组',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: '' },
+          { position: 4, userId: '' }
+        ]
+      },
+      expectedSlots: ['A', 'B', 'E', ''],
+      expectedAvailable: [3, 4],
+      expectedTarget: 3
+    },
+    {
+      name: 'select_slot_with_history_score',
+      addUserId: 'E',
+      group: {
+        groupId: 'verify-add-group-4',
+        groupName: '第1组',
+        players: [
+          { position: 1, userId: 'A' },
+          { position: 2, userId: 'B' },
+          { position: 3, userId: '' },
+          { position: 4, userId: '', scorePlayerId: 'D' }
+        ]
+      },
+      scoreData: {
+        'verify-add-group-4': {
+          scoresByPlayer: {
+            D: { scores: [4, 5, 4], putts: [2, 2, 1] }
+          }
+        }
+      },
+      expectedNeedsSelection: true,
+      expectedSlots: ['A', 'B', '', 'E'],
+      expectedAvailable: [3, 4],
+      expectedTarget: 4,
+      expectedScorePlayerId: 'D'
+    }
+  ];
+
+  return scenarios.map((scenario) => {
+    let result = addPlayerToGroupSlots(
+      _cloneJson(scenario.group),
+      { userId: scenario.addUserId },
+      { scoreData: scenario.scoreData || {} }
+    );
+    const needsSelectionOk = scenario.expectedNeedsSelection
+      ? !!(result && result.needsSlotSelection)
+      : true;
+    if (scenario.expectedNeedsSelection) {
+      result = addPlayerToGroupSlots(
+        _cloneJson(scenario.group),
+        { userId: scenario.addUserId },
+        {
+          scoreData: scenario.scoreData || {},
+          slotPosition: scenario.expectedTarget
+        }
+      );
+    }
+    const slots = teamMatchStore.resolveGroupSlots(result && result.group);
+    const playerEntries = result && result.group && Array.isArray(result.group.players)
+      ? result.group.players
+      : [];
+    const targetEntry = playerEntries.find((entry) =>
+      Number(entry && entry.position) === Number(scenario.expectedTarget)
+    ) || {};
+    const slotUsers = slots.map((slot) => slot.userId || '');
+    const availableSlots = (result && result.availableSlots ? result.availableSlots : [])
+      .map((slot) => Number(slot && slot.position) || 0);
+    const targetPosition = result && result.targetSlot
+      ? Number(result.targetSlot.position) || 0
+      : 0;
+    const ok =
+      needsSelectionOk &&
+      !!(result && result.ok) &&
+      JSON.stringify(slotUsers) === JSON.stringify(scenario.expectedSlots) &&
+      JSON.stringify(availableSlots) === JSON.stringify(scenario.expectedAvailable) &&
+      targetPosition === scenario.expectedTarget &&
+      (!scenario.expectedScorePlayerId || String(targetEntry.scorePlayerId || '') === scenario.expectedScorePlayerId);
+    const verifyResult = {
+      name: scenario.name,
+      ok: ok,
+      slots: summarizeSlotBindings(slots),
+      availableSlots: availableSlots,
+      targetSlot: targetPosition,
+      scorePlayerId: targetEntry.scorePlayerId || ''
+    };
+    console.log('[slot-player-add-verify]', verifyResult);
+    return verifyResult;
+  });
 }
 
 function _rowToRegisterUser(row, teamOptions) {
@@ -1078,6 +1552,10 @@ module.exports = {
   applyExpandState,
   updatePlayerField,
   removePlayerFromDraft,
+  addPlayerToGroupSlots,
+  addPlayerToGroupsDraft,
+  verifySlotPlayerManageScenarios,
+  verifySlotAddPlayerScenarios,
   commitPlayerManageDraft,
   ensureRegisterUsersFromGroups,
   canManagePlayers,

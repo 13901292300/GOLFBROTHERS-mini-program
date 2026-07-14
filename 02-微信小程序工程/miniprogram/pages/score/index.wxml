@@ -596,6 +596,38 @@
         <view class="manual-sheet__btn manual-sheet__btn--confirm" bindtap="confirmManualSheet">确定</view>
       </view>
     </view>
+
+    <!-- 加入比赛：未加入本场的好友需先选择所属分队，再加入空位 -->
+    <view wx:if="{{joinMatchTeamSheetVisible}}" class="manual-sheet-mask" bindtap="closeJoinMatchTeamSheet"></view>
+    <view wx:if="{{joinMatchTeamSheetVisible}}" class="join-match-sheet {{themeClass}}" catchtap="noop">
+      <view class="manual-sheet__handle"></view>
+      <view class="manual-sheet__header">
+        <view>
+          <text class="manual-sheet__overline">JOIN MATCH</text>
+          <text class="manual-sheet__title">选择所属分队</text>
+        </view>
+        <view class="manual-sheet__close" bindtap="closeJoinMatchTeamSheet"><text>×</text></view>
+      </view>
+      <view class="join-match-sheet__body">
+        <text class="join-match-sheet__desc">{{joinMatchPlayerName}}尚未加入本场比赛，请先选择所属分队。</text>
+        <view class="join-match-team-list">
+          <view
+            wx:for="{{joinMatchTeamOptions}}"
+            wx:key="id"
+            class="join-match-team-item"
+            data-id="{{item.id}}"
+            data-name="{{item.name}}"
+            bindtap="onJoinMatchTeamSelect"
+          >
+            <text class="join-match-team-name">{{item.name}}</text>
+            <text class="join-match-team-action">选择</text>
+          </view>
+        </view>
+      </view>
+      <view class="manual-sheet__footer">
+        <view class="manual-sheet__btn manual-sheet__btn--cancel" bindtap="closeJoinMatchTeamSheet">取消</view>
+      </view>
+    </view>
   </view>
 
   <!-- 信息继承型展开面板（Context Panel）：根级 fixed 浮层，与记分表完全解耦，不挤压 TAB / HOLE / score grid -->

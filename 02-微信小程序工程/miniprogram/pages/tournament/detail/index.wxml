@@ -824,9 +824,10 @@
 
   <!-- 权限管理（临时管理员二维码 + 球童记分员二维码） -->
   <view wx:if="{{tempAdminSheetVisible}}" bindtap="cancelTempAdminSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
-  <view wx:if="{{tempAdminSheetVisible}}" class="bottom-sheet register-sheet temp-admin-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+  <view wx:if="{{tempAdminSheetVisible}}" class="bottom-sheet register-sheet temp-admin-sheet" catchtap="stopPropagation">
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
+      <view class="register-sheet__close" bindtap="cancelTempAdminSheet">×</view>
       <text class="register-sheet__overline">PERMISSION</text>
       <text class="register-sheet__title">权限管理</text>
       <text class="register-sheet__sub">通过二维码授权本场临时管理员与球童记分员，仅对当前 GAME 生效。</text>
@@ -1001,9 +1002,10 @@
 
   <!-- 选手管理（本场报名快照） -->
   <view wx:if="{{playerManageSheetVisible}}" bindtap="cancelPlayerManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
-  <view wx:if="{{playerManageSheetVisible}}" class="bottom-sheet register-sheet player-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+  <view wx:if="{{playerManageSheetVisible}}" class="bottom-sheet register-sheet player-manage-sheet" catchtap="stopPropagation">
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
+      <view class="register-sheet__close" bindtap="cancelPlayerManageSheet">×</view>
       <text class="register-sheet__overline">PLAYERS</text>
       <text class="register-sheet__title">选手管理</text>
       <text class="register-sheet__sub">仅修改本场比赛中的选手信息，不会同步修改用户资料。手机号仅用于本场赛事组织者联系、报名确认、出发安排等赛事管理用途。</text>
@@ -1125,10 +1127,17 @@
             <text class="player-manage-team-select__arrow">›</text>
           </view>
           <view
+            wx:if="{{!item.formalGrouped}}"
+            class="player-manage-row__add"
+            data-userid="{{item.userId}}"
+            bindtap="onPlayerManageAddToSlot"
+          >加入空位</view>
+          <view
+            wx:if="{{item.formalGrouped}}"
             class="player-manage-row__remove"
             data-userid="{{item.userId}}"
             bindtap="onPlayerManageRemove"
-          >删除选手</view>
+          >移出分组</view>
         </view>
       </view>
     </scroll-view>
@@ -1185,6 +1194,32 @@
     </scroll-view>
     <view class="register-sheet__actions">
       <view bindtap="closePlayerManageTeamPicker" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
+
+  <!-- 选手管理 · 选择加入位置 -->
+  <view wx:if="{{playerSlotSelectVisible}}" bindtap="closePlayerSlotSelectSheet" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{playerSlotSelectVisible}}" class="bottom-sheet register-sheet player-slot-select-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">SLOT</text>
+      <text class="register-sheet__title">请选择加入位置</text>
+      <text class="register-sheet__sub">空位中如已有比赛成绩，加入后会沿用该位置的历史成绩。</text>
+    </view>
+    <view class="player-slot-select-sheet__body">
+      <view
+        wx:for="{{playerSlotSelectOptions}}"
+        wx:key="position"
+        class="player-slot-select-item {{item.hasHistoryScore ? 'has-history' : ''}}"
+        data-position="{{item.position}}"
+        bindtap="onPlayerSlotSelectOptionTap"
+      >
+        <text class="player-slot-select-item__title">{{item.title}}</text>
+        <text class="player-slot-select-item__desc">{{item.desc}}</text>
+      </view>
+    </view>
+    <view class="register-sheet__actions">
+      <view bindtap="closePlayerSlotSelectSheet" class="register-sheet__cancel">取消</view>
     </view>
   </view>
 
@@ -1282,9 +1317,10 @@
 
   <!-- 出发管理 -->
   <view wx:if="{{teeSheetManageSheetVisible}}" bindtap="cancelTeeSheetManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
-  <view wx:if="{{teeSheetManageSheetVisible}}" class="bottom-sheet register-sheet tee-sheet-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+  <view wx:if="{{teeSheetManageSheetVisible}}" class="bottom-sheet register-sheet tee-sheet-manage-sheet" catchtap="stopPropagation">
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
+      <view class="register-sheet__close" bindtap="cancelTeeSheetManageSheet">×</view>
       <text class="register-sheet__overline">TEE SHEET</text>
       <text class="register-sheet__title">出发管理</text>
       <text class="register-sheet__sub">为每个分组设置开球时间和出发洞号，选手可在出发表中查看自己的出发安排。</text>

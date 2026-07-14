@@ -1603,6 +1603,59 @@ page {
   border: 1px solid var(--champion-gold, #ce9224);
 }
 
+.join-match-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 710;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  border-radius: 36rpx 36rpx 0 0;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.join-match-sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.join-match-sheet__desc {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.join-match-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.join-match-team-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 92rpx;
+  padding: 0 24rpx;
+  border-radius: 22rpx;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.join-match-team-name {
+  font-size: 28rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.join-match-team-action {
+  font-size: 24rpx;
+  font-weight: 900;
+  color: var(--champion-gold, #ce9224);
+}
+
 .section-card {
   width: 100%;
   box-sizing: border-box;
