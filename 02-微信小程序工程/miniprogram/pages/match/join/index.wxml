@@ -1,0 +1,78 @@
+<view class="join-page">
+  <view class="join-hero">
+    <view class="join-back" bindtap="onBack">‹</view>
+    <text class="join-overline">MATCH JOIN</text>
+    <text class="join-title">扫码加入比赛</text>
+    <text class="join-subtitle">{{message}}</text>
+  </view>
+
+  <view wx:if="{{status === 'ready'}}" class="join-card">
+    <view class="join-card__row">
+      <text class="join-card__label">赛事名称</text>
+      <text class="join-card__value">{{matchName}}</text>
+    </view>
+    <view class="join-card__row">
+      <text class="join-card__label">matchId</text>
+      <text class="join-card__value join-card__value--mono">{{matchId}}</text>
+    </view>
+    <view class="join-card__row">
+      <text class="join-card__label">分组名称</text>
+      <text class="join-card__value">{{groupName}}</text>
+    </view>
+    <view class="join-card__row">
+      <text class="join-card__label">groupId</text>
+      <text class="join-card__value join-card__value--mono">{{groupId}}</text>
+    </view>
+    <view class="join-action {{joinSubmitting ? 'join-action--disabled' : ''}}" bindtap="onJoinTap">
+      {{joinSubmitting ? '处理中...' : '加入比赛'}}
+    </view>
+  </view>
+
+  <view wx:elif="{{status === 'already_registered'}}" class="join-state">
+    <text class="join-state__icon">✓</text>
+    <text class="join-state__title">你已报名本场比赛</text>
+    <text class="join-state__desc">无需重复报名，请等待管理员安排出场。</text>
+  </view>
+
+  <view wx:elif="{{status === 'registered'}}" class="join-state">
+    <text class="join-state__icon">✓</text>
+    <text class="join-state__title">报名成功</text>
+    <text class="join-state__desc">已加入报名池，暂未进入出发 Slot。</text>
+  </view>
+
+  <view wx:elif="{{status === 'error'}}" class="join-state join-state--error">
+    <text class="join-state__icon">!</text>
+    <text class="join-state__title">{{message}}</text>
+    <text class="join-state__desc">请确认二维码是否来自当前比赛管理员。</text>
+  </view>
+
+  <view wx:else class="join-state">
+    <text class="join-state__icon">...</text>
+    <text class="join-state__title">正在识别二维码</text>
+  </view>
+
+  <view class="join-footer">
+    <view class="join-footer__hint">当前页面只完成报名，不执行入组或记分绑定。</view>
+  </view>
+
+  <view wx:if="{{teamGroupSheetVisible}}" class="join-sheet-mask" bindtap="closeTeamGroupSheet"></view>
+  <view wx:if="{{teamGroupSheetVisible}}" class="join-sheet">
+    <view class="join-sheet__handle"></view>
+    <text class="join-sheet__title">选择所属分队</text>
+    <text class="join-sheet__desc">球队赛加入比赛必须选择所属分队。</text>
+    <view class="join-team-list">
+      <view
+        wx:for="{{teamGroupOptions}}"
+        wx:key="id"
+        class="join-team-item"
+        data-id="{{item.id}}"
+        data-name="{{item.name}}"
+        bindtap="onTeamGroupSelect"
+      >
+        <text class="join-team-item__name">{{item.name}}</text>
+        <text class="join-team-item__id">{{item.id}}</text>
+      </view>
+    </view>
+    <view class="join-sheet__cancel" bindtap="closeTeamGroupSheet">取消</view>
+  </view>
+</view>

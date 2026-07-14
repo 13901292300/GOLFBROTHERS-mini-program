@@ -3,6 +3,7 @@
     "pages/home/index",
     "pages/index/index",
     "pages/score/index",
+    "pages/match/join/index",
     "pages/tournament/detail/index",
     "pages/tournament/group-editor/index",
     "pages/tournament/group-pick/index",

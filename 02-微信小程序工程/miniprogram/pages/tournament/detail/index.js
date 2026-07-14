@@ -27,6 +27,7 @@ const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../utils/playerManage.js');
 const teeSheetManage = require('../../../utils/teeSheetManage.js');
 const paymentManage = require('../../../utils/paymentManage.js');
+const contactStore = require('../../../utils/contactStore.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
 const DEFAULT_SCORECARD_AD_IMAGE =
@@ -60,6 +61,23 @@ const EMPTY_MATCH_VIEW = {
   priceTags: [],
   priceText: ''
 };
+
+function resolveIdentityLabel(userType) {
+  const value = String(userType || '').trim();
+  if (value === 'registered') return '注册用户';
+  if (value === 'phone') return '手机用户';
+  if (value === 'guest') return '临时用户';
+  return '';
+}
+
+function resolveIdentitySourceLabel(identitySource) {
+  const value = String(identitySource || '').trim();
+  if (value === 'mini_program') return '微信用户';
+  if (value === 'app_import') return 'APP导入';
+  if (value === 'manual_add') return '手工创建';
+  if (value === 'derived') return '系统派生';
+  return '';
+}
 
 /* ===== 赛事生命周期状态（teamMatchStore.match.status） ===== */
 const MATCH_LIFECYCLE = {
@@ -397,6 +415,8 @@ Page({
     playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
     playerManageTeamFilterLabel: '全部分队',
     playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
+    playerManageUserTypeFilter: playerManage.USER_TYPE_ALL,
+    playerManageIdentitySourceFilter: playerManage.IDENTITY_SOURCE_ALL,
     playerManageCountTip: '',
     playerManageEmptyText: '暂无报名选手',
     expandedPlayerManageUserId: '',
@@ -1281,6 +1301,8 @@ Page({
     const normalized = teamMatchStore.normalizeRegisterInfo(match.registerInfo);
     const users = (normalized.users || []).map((user) => {
       const genderDisplay = playerManage.getGenderDisplay(user);
+      const userType = user.userType || '';
+      const identitySource = user.identitySource || '';
       return {
         userId: user.userId || user.playerId || user.id || user.uid || user.openid || '',
         // 本场比赛名：matchNickname 优先
@@ -1309,7 +1331,10 @@ Page({
         canSelfCancel: user.canSelfCancel !== false,
         locked: !!user.locked,
         // Patch 8：手工代报名预留字段，与 store.normalize 对齐
-        userType: user.userType || '',
+        userType: userType,
+        identitySource: identitySource,
+        identityLabel: resolveIdentityLabel(userType),
+        identitySourceLabel: resolveIdentitySourceLabel(identitySource),
         realName: user.realName || '',
         remarkName: user.remarkName || ''
       };
@@ -1324,13 +1349,24 @@ Page({
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
     const groupId = String(activeRegisterSubTab || '');
     if (!groupId) return [];
+    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
     return users
       .filter((user) => String(user.groupId) === groupId)
       .map((user, index) => {
         const genderDisplay = playerManage.getGenderDisplay(user);
+        const userId = user.userId || '';
+        let contactRemark = '';
+        if (currentUserId && userId) {
+          try {
+            const contact = contactStore.findContact(currentUserId, userId);
+            contactRemark = contact && contact.remarkName ? String(contact.remarkName) : '';
+          } catch (e) {
+            contactRemark = '';
+          }
+        }
         return {
           listKey: user.userId || ('register-user-' + groupId + '-' + index),
-          userId: user.userId || '',
+          userId: userId,
           competitionName: user.competitionName || '',
           gender: user.gender || '',
           sex: user.sex || '',
@@ -1352,6 +1388,10 @@ Page({
           canSelfCancel: user.canSelfCancel !== false,
           locked: !!user.locked,
           userType: user.userType || '',
+          identitySource: user.identitySource || '',
+          identityLabel: user.identityLabel || resolveIdentityLabel(user.userType),
+          identitySourceLabel: user.identitySourceLabel || resolveIdentitySourceLabel(user.identitySource),
+          contactRemark: contactRemark,
           realName: user.realName || '',
           remarkName: user.remarkName || ''
         };
@@ -1790,7 +1830,11 @@ Page({
         (user.name && String(user.name).trim()) || competitionName || '';
       match.registerInfo.users.push({
         userId: userId,
+        userType: 'registered',
+        identitySource: 'mini_program',
+        nickname: user.name ? String(user.name) : '',
         competitionName: competitionName,
+        matchNickname: competitionName,
         gender: this.data.registerGenderDraft ? String(this.data.registerGenderDraft) : '',
         avatar: user.avatar ? String(user.avatar) : '',
         phone: this.data.registerPhone ? String(this.data.registerPhone) : (user.phone ? String(user.phone) : ''),
@@ -3368,6 +3412,8 @@ Page({
         playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
         playerManageTeamFilterLabel: '全部分队',
         playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
+        playerManageUserTypeFilter: playerManage.USER_TYPE_ALL,
+        playerManageIdentitySourceFilter: playerManage.IDENTITY_SOURCE_ALL,
         expandedPlayerManageUserId: '',
         playerTeamPickVisible: false,
         playerManageFilterPickVisible: false
@@ -3378,16 +3424,35 @@ Page({
 
   _syncPlayerManageDisplay(extra) {
     const draft = this._playerManageDraft;
-    const view = playerManage.buildPlayerManageDisplay(draft ? draft.players : [], {
+    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
+    const playersForDisplay = (draft && Array.isArray(draft.players) ? draft.players : []).map((item) => {
+      const userId = String((item && item.userId) || '').trim();
+      let contactRemark = '';
+      if (currentUserId && userId) {
+        try {
+          const contact = contactStore.findContact(currentUserId, userId);
+          contactRemark = contact && contact.remarkName ? String(contact.remarkName) : '';
+        } catch (e) {
+          contactRemark = '';
+        }
+      }
+      return Object.assign({}, item, { contactRemark: contactRemark });
+    });
+    const view = playerManage.buildPlayerManageDisplay(playersForDisplay, {
       keyword: this.data.playerManageSearchKeyword,
       teamFilter: this.data.playerManageTeamFilter,
       groupStatusFilter: this.data.playerManageGroupStatusFilter,
+      userTypeFilter: this.data.playerManageUserTypeFilter,
+      identitySourceFilter: this.data.playerManageIdentitySourceFilter,
       groups: draft ? draft.groupsDraft : [],
       expandedUserId: this.data.expandedPlayerManageUserId
     });
+    const displayUsers = (view.list || []).map((item) => {
+      return Object.assign({}, item, { contactRemark: item.contactRemark || '' });
+    });
     const patch = Object.assign(
       {
-        playerManageDisplayUsers: view.list,
+        playerManageDisplayUsers: displayUsers,
         playerManageCountTip: view.countTip,
         playerManageEmptyText: view.emptyText
       },
@@ -3435,6 +3500,8 @@ Page({
       playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
       playerManageTeamFilterLabel: '全部分队',
       playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
+      playerManageUserTypeFilter: playerManage.USER_TYPE_ALL,
+      playerManageIdentitySourceFilter: playerManage.IDENTITY_SOURCE_ALL,
       playerManageCountTip: '',
       playerManageEmptyText: '暂无报名选手',
       expandedPlayerManageUserId: '',
@@ -3523,6 +3590,26 @@ Page({
     }
     if (String(this.data.playerManageGroupStatusFilter || '') === status) return;
     this.setData({ playerManageGroupStatusFilter: status }, () =>
+      this._syncPlayerManageDisplay()
+    );
+  },
+
+  onPlayerManageUserTypeTap(e) {
+    const value = String((e.currentTarget.dataset && e.currentTarget.dataset.usertype) || '');
+    const allowed = ['all', 'registered', 'phone', 'guest'];
+    if (allowed.indexOf(value) < 0) return;
+    if (String(this.data.playerManageUserTypeFilter || '') === value) return;
+    this.setData({ playerManageUserTypeFilter: value }, () =>
+      this._syncPlayerManageDisplay()
+    );
+  },
+
+  onPlayerManageIdentitySourceTap(e) {
+    const value = String((e.currentTarget.dataset && e.currentTarget.dataset.identitysource) || '');
+    const allowed = ['all', 'mini_program', 'app_import', 'manual_add', 'derived'];
+    if (allowed.indexOf(value) < 0) return;
+    if (String(this.data.playerManageIdentitySourceFilter || '') === value) return;
+    this.setData({ playerManageIdentitySourceFilter: value }, () =>
       this._syncPlayerManageDisplay()
     );
   },
@@ -5093,7 +5180,10 @@ Page({
         p.competitionName || p.name || p.realName || ''
       ).trim();
       // Patch 6：手工字段；好友路径保持空串，不改写好友语义
-      let userType = '';
+      let userType =
+        p.userType != null && String(p.userType).trim() !== ''
+          ? String(p.userType).trim()
+          : 'registered';
       let realName = '';
       let remarkName = '';
       if (pickChannel === 'manual') {
@@ -5101,8 +5191,8 @@ Page({
           p.userType != null && String(p.userType).trim() !== ''
             ? String(p.userType).trim()
             : phone
-              ? 'phone_pending'
-              : 'non_registered';
+              ? 'phone'
+              : 'guest';
         realName = String(
           p.realName != null && String(p.realName).trim() !== ''
             ? p.realName
@@ -5113,7 +5203,18 @@ Page({
       adds.push({
         action: 'add',
         userId: userId,
+        userType: userType,
+        identitySource:
+          p.identitySource != null && String(p.identitySource).trim() !== ''
+            ? String(p.identitySource).trim()
+            : pickChannel === 'manual'
+              ? phone
+                ? 'manual_add'
+                : 'derived'
+              : 'proxy_add',
+        nickname: p.nickname != null ? String(p.nickname) : '',
         competitionName: competitionName,
+        matchNickname: p.matchNickname != null ? String(p.matchNickname) : competitionName,
         gender: p.gender != null ? String(p.gender) : '',
         avatar: p.avatar != null ? String(p.avatar) : '',
         phone: phone,
@@ -5127,7 +5228,6 @@ Page({
         pickChannel: pickChannel,
         canSelfCancel: true,
         locked: false,
-        userType: userType,
         realName: realName,
         remarkName: remarkName,
         player: player
@@ -5206,7 +5306,8 @@ Page({
     }
 
     const ts = Date.now();
-    const userType = phone ? 'phone_pending' : 'non_registered';
+    const userType = phone ? 'phone' : 'guest';
+    const identitySource = phone ? 'manual_add' : 'derived';
     const userId = phone ? 'phone_pending_' + ts : 'nonreg_' + ts;
     const player = {
       playerId: userId,
@@ -5220,7 +5321,8 @@ Page({
       avatar: mockAvatars.pickMockAvatar(userId || name),
       pickChannel: 'manual',
       source: 'proxy',
-      userType: userType
+      userType: userType,
+      identitySource: identitySource
     };
     console.log('[register-for-other] manual player', {
       matchId: this.data.matchId || '',
@@ -5322,7 +5424,23 @@ Page({
     ).trim();
     return {
       userId: userId,
+      userType: p.userType != null && String(p.userType).trim() !== ''
+        ? String(p.userType).trim()
+        : pickChannel === 'manual'
+          ? p.phone
+            ? 'phone'
+            : 'guest'
+          : 'registered',
+      identitySource: p.identitySource != null && String(p.identitySource).trim() !== ''
+        ? String(p.identitySource).trim()
+        : pickChannel === 'manual'
+          ? p.phone
+            ? 'manual_add'
+            : 'derived'
+          : 'proxy_add',
+      nickname: p.nickname != null ? String(p.nickname) : '',
       competitionName: competitionName,
+      matchNickname: p.matchNickname != null ? String(p.matchNickname) : competitionName,
       gender: p.gender != null ? String(p.gender) : '',
       avatar: p.avatar != null ? String(p.avatar) : '',
       phone: p.phone != null ? String(p.phone) : '',
@@ -5517,7 +5635,13 @@ Page({
       if (pickChannel === 'manual' && phone && existingPhones[phone]) return;
       const record = {
         userId: userId,
+        userType: item.userType != null && String(item.userType).trim() !== ''
+          ? String(item.userType).trim()
+          : 'registered',
+        identitySource: item.identitySource != null ? String(item.identitySource) : 'proxy_add',
+        nickname: item.nickname != null ? String(item.nickname) : '',
         competitionName: item.competitionName != null ? String(item.competitionName) : '',
+        matchNickname: item.matchNickname != null ? String(item.matchNickname) : (item.competitionName != null ? String(item.competitionName) : ''),
         gender: item.gender != null ? String(item.gender) : '',
         avatar: item.avatar != null ? String(item.avatar) : '',
         phone: phone,
@@ -5535,6 +5659,7 @@ Page({
       // Patch 6：手工添加写入 userType / realName / remarkName
       if (pickChannel === 'manual') {
         record.userType = item.userType != null ? String(item.userType) : '';
+        record.identitySource = item.identitySource != null ? String(item.identitySource) : 'manual_add';
         record.realName = item.realName != null ? String(item.realName) : '';
         record.remarkName = item.remarkName != null ? String(item.remarkName) : '';
       }

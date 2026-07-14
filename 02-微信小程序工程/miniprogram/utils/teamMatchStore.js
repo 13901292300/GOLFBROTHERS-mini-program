@@ -173,6 +173,7 @@ function normalizeRegisterUser(user) {
 
   // Patch 6：手工代报名预留字段（旧数据缺省为空串）
   const userType = raw.userType != null ? String(raw.userType) : '';
+  const identitySource = raw.identitySource != null ? String(raw.identitySource) : '';
   const realName = raw.realName != null ? String(raw.realName) : '';
   const remarkName = raw.remarkName != null ? String(raw.remarkName) : '';
 
@@ -217,6 +218,7 @@ function normalizeRegisterUser(user) {
     canSelfCancel: canSelfCancel,
     locked: locked,
     userType: userType,
+    identitySource: identitySource,
     realName: realName,
     remarkName: remarkName,
     paymentConfirmed: raw.paymentConfirmed,

@@ -17,6 +17,12 @@ const holeLayout = require('../../utils/holeLayout.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const teeSheetManage = require('../../utils/teeSheetManage.js');
+const userDirectory = require('../../utils/userDirectory.js');
+const userStore = require('../../utils/userStore.js');
+const contactStore = require('../../utils/contactStore.js');
+const userIdentityAlias = require('../../utils/userIdentityAlias.js');
+
+const MATCH_JOIN_PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
 
 // 单组 Game 球员行配色（按槽位顺序）
 const GAME_COLOR_CLASSES = ['border-red', 'border-gold', 'border-white', 'border-light'];
@@ -31,6 +37,37 @@ function columnLabels() {
 }
 function columnPars() {
   return holeLayout.getLayout().columnPars;
+}
+
+function resolveCanonicalUserId(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return '';
+  try {
+    return String(userIdentityAlias.resolveCanonicalUserId(id) || id).trim() || id;
+  } catch (e) {
+    return id;
+  }
+}
+
+function isSameUserIdentity(leftUserId, rightUserId) {
+  const left = String(leftUserId || '').trim();
+  const right = String(rightUserId || '').trim();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  return resolveCanonicalUserId(left) === resolveCanonicalUserId(right);
+}
+
+function createIdentitySuffix() {
+  return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function createGuestUserId(seed) {
+  const raw = String(seed || '').trim().replace(/[^A-Za-z0-9_]/g, '_');
+  return 'guest_' + (raw || createIdentitySuffix());
+}
+
+function createManualPlayerId() {
+  return 'm_' + createIdentitySuffix();
 }
 
 // pair 行 swipe indent：头像重叠块几何（用于居中 gap 计算，仅 progress>0 时启用）
@@ -726,6 +763,7 @@ Page({
     // 会话内本地状态回灌：同一会话再次进入该球局不丢失成绩
     this.hydrateFromSession();
     this._syncMoreMenuItems();
+    wx.nextTick(() => this._tryApplyPendingMatchJoinBind());
   },
 
   // formatType → 渲染模式（仅当 matchState.mode 缺省时的兜底推导）
@@ -2426,13 +2464,37 @@ Page({
 
   _findScoreTeamMatchRegisterUser(match, userId) {
     const uid = String(userId || '').trim();
+    const canonicalUid = resolveCanonicalUserId(uid);
     const users = match && match.registerInfo && Array.isArray(match.registerInfo.users)
       ? match.registerInfo.users
       : [];
+    if (!canonicalUid) return null;
     return users.find((user) => {
       const id = user && (user.userId || user.playerId || user.id);
-      return String(id || '').trim() === uid;
+      return isSameUserIdentity(id, canonicalUid);
     }) || null;
+  },
+
+  _findScoreTeamMatchGroupedPlayer(match, userId) {
+    const uid = String(userId || '').trim();
+    if (!uid || !match || !Array.isArray(match.groups)) return null;
+    for (let i = 0; i < match.groups.length; i++) {
+      const group = match.groups[i];
+      if (!group) continue;
+      const slots = teamMatchStore.resolveGroupSlots(group);
+      for (let j = 0; j < slots.length; j++) {
+        const slotPlayer = teamMatchStore.resolveSlotPlayer(slots[j]);
+        const slotUserId = slotPlayer && (slotPlayer.userId || slotPlayer.playerId);
+        if (isSameUserIdentity(slotUserId, uid)) {
+          return {
+            groupId: group.groupId || group.id || '',
+            groupName: group.groupName || group.name || ('第' + (i + 1) + '组'),
+            position: slots[j] && slots[j].position
+          };
+        }
+      }
+    }
+    return null;
   },
 
   _ensureMatchParticipant(player, options) {
@@ -2503,7 +2565,9 @@ Page({
       avatar: p.avatar || '',
       gender: p.gender || '',
       phone: p.phone || '',
-      source: p.source || opts.source || 'friend',
+      source: p.registrationSource || opts.registrationSource || 'self',
+      userType: p.userType || '',
+      identitySource: p.identitySource || '',
       registeredAt: Date.now(),
       groupId: selectedTeamGroupId,
       groupName: selectedTeamGroupName,
@@ -2587,16 +2651,18 @@ Page({
     }
     const player = registered.player || pending.player;
     this.closeJoinMatchTeamSheet();
-    this._doBindDraftPlayerToSlot(
-      pending.slotIndex,
-      {
-        playerId: player.playerId || player.userId,
-        name: player.name || player.matchNickname || player.nickname || '',
-        avatar: player.avatar || ''
-      },
-      pending.source,
-      !!pending.inherit
-    );
+    const bindPlayer = {
+      playerId: player.playerId || player.userId,
+      name: player.name || player.matchNickname || player.nickname || '',
+      avatar: player.avatar || '',
+      phone: player.phone || '',
+      gender: player.gender || ''
+    };
+    if (pending.bindMode === 'draftWithHistoryPrompt') {
+      this._bindDraftPlayerToSlot(pending.slotIndex, bindPlayer, pending.source);
+      return;
+    }
+    this._doBindDraftPlayerToSlot(pending.slotIndex, bindPlayer, pending.source, !!pending.inherit);
   },
 
   _buildScoreTeamMatchPlayerProfile(match, userId, fallback) {
@@ -2627,6 +2693,178 @@ Page({
       matchTeamId: user.matchTeamId != null ? user.matchTeamId : (user.groupId != null ? user.groupId : fb.matchTeamId || ''),
       matchTeamName: user.matchTeamName != null ? user.matchTeamName : (user.groupName != null ? user.groupName : fb.matchTeamName || '')
     };
+  },
+
+  _readPendingMatchJoinBind() {
+    try {
+      const pending = wx.getStorageSync(MATCH_JOIN_PENDING_BIND_KEY);
+      return pending && typeof pending === 'object' ? pending : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  _clearPendingMatchJoinBind() {
+    try {
+      wx.removeStorageSync(MATCH_JOIN_PENDING_BIND_KEY);
+    } catch (e) {
+      /* ignore */
+    }
+  },
+
+  _tryApplyPendingMatchJoinBind() {
+    const pending = this._readPendingMatchJoinBind();
+    const token = String((this._pageOptions && this._pageOptions.joinToken) || '').trim();
+    if (!pending || !pending.player) {
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'no_pending'
+      });
+      return;
+    }
+    if (token && String(pending.token || '') !== token) {
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'token_mismatch',
+        token: token,
+        pendingToken: String(pending.token || '')
+      });
+      return;
+    }
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = String(ms.matchId || '').trim();
+    const groupId = String(this.data.groupId || ms.groupId || '').trim();
+    if (
+      !matchId ||
+      !groupId ||
+      String(pending.matchId || '') !== matchId ||
+      String(pending.groupId || '') !== groupId
+    ) {
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'context_mismatch',
+        matchId: matchId,
+        groupId: groupId,
+        pendingMatchId: String(pending.matchId || ''),
+        pendingGroupId: String(pending.groupId || '')
+      });
+      return;
+    }
+    if (this.data.gameFinished) {
+      this._clearPendingMatchJoinBind();
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'game_finished',
+        matchId: matchId,
+        groupId: groupId
+      });
+      wx.showToast({ title: '比赛已结束，不可加入', icon: 'none' });
+      return;
+    }
+
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+    if (!match || !group) {
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'match_or_group_missing',
+        matchId: matchId,
+        groupId: groupId
+      });
+      return;
+    }
+    if (this._findScoreTeamMatchGroupedPlayer(match, pending.player.userId || pending.player.playerId)) {
+      this._clearPendingMatchJoinBind();
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'already_grouped',
+        userId: pending.player.userId || pending.player.playerId || '',
+        matchId: matchId,
+        groupId: groupId
+      });
+      wx.showToast({ title: '你已在本场比赛中', icon: 'none' });
+      return;
+    }
+
+    this.openGroupManagePage();
+    const slotIndex = this._firstDraftEmptySlotIndex();
+    if (slotIndex < 0) {
+      this._clearPendingMatchJoinBind();
+      this._finalizeCloseGroupManage();
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'no_empty_slot',
+        userId: pending.player.userId || pending.player.playerId || '',
+        matchId: matchId,
+        groupId: groupId
+      });
+      wx.showToast({ title: '本组暂无空位', icon: 'none' });
+      return;
+    }
+    console.log('[match-join-flow]', {
+      stage: 'pending_bind_consume',
+      ok: true,
+      userId: pending.player.userId || pending.player.playerId || '',
+      matchId: matchId,
+      groupId: groupId,
+      slotId: slotIndex + 1
+    });
+
+    const registered = this._registerMatchParticipantIfNeeded(pending.player, {
+      source: 'scan',
+      registrationSource: 'scan',
+      slotIndex: slotIndex,
+      teamGroup: pending.teamGroup || null
+    });
+    if (!registered || !registered.ok) {
+      this._clearPendingMatchJoinBind();
+      this._finalizeCloseGroupManage();
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_consume',
+        ok: false,
+        reason: 'register_failed',
+        userId: pending.player.userId || pending.player.playerId || '',
+        matchId: matchId,
+        groupId: groupId
+      });
+      wx.showToast({ title: '加入比赛失败', icon: 'none' });
+      return;
+    }
+
+    const player = registered.player || pending.player;
+    const bindPlayer = {
+      playerId: player.playerId || player.userId,
+      userId: player.userId || player.playerId,
+      name: player.name || player.matchNickname || player.competitionName || player.nickname || '',
+      matchNickname: player.matchNickname || player.competitionName || player.name || '',
+      nickname: player.nickname || '',
+      competitionName: player.competitionName || '',
+      avatar: player.avatar || '',
+      phone: player.phone || '',
+      gender: player.gender || '',
+      userType: player.userType || '',
+      identitySource: player.identitySource || '',
+      source: 'scan'
+    };
+    this._bindDraftPlayerToSlot(slotIndex, bindPlayer, 'scan', () => {
+      this._clearPendingMatchJoinBind();
+      this._commitDraftSlots();
+      console.log('[match-join-flow]', {
+        stage: 'pending_bind_commit',
+        ok: true,
+        userId: bindPlayer.userId || bindPlayer.playerId || '',
+        matchId: matchId,
+        groupId: groupId,
+        slotId: slotIndex + 1
+      });
+    });
   },
 
   _rebindTeamMatchScoreOwner(match, groupId, oldPlayerId, newPlayerId, slotPosition) {
@@ -2891,7 +3129,7 @@ Page({
   },
 
   // draft 专用补位入口（可弹继承确认）；确认后只写 draft
-  _bindDraftPlayerToSlot(idx, player, source) {
+  _bindDraftPlayerToSlot(idx, player, source, done) {
     const p = Object.assign({}, player, { source: source || 'manual' });
     if (this._draftSlotHasCache(idx)) {
       wx.showModal({
@@ -2899,11 +3137,15 @@ Page({
         content: '是否让新球员继承上一位球员的成绩？\n选择「从零开始」将以空成绩记分（旧成绩不会被删除）。',
         confirmText: '继承成绩',
         cancelText: '从零开始',
-        success: (res) => this._doBindDraftPlayerToSlot(idx, p, source, !!res.confirm)
+        success: (res) => {
+          this._doBindDraftPlayerToSlot(idx, p, source, !!res.confirm);
+          if (typeof done === 'function') done();
+        }
       });
       return;
     }
     this._doBindDraftPlayerToSlot(idx, p, source, false);
+    if (typeof done === 'function') done();
   },
 
   // draft 专用执行绑定：只改 _draftSlots，不写 gameStore / groupsStore / _demoSlots
@@ -2937,6 +3179,16 @@ Page({
     if (this._draftSlotCache) this._draftSlotCache[idx] = null;
     this._draftSlots = slots;
     this._refreshGroupManageFromDraft();
+    if (source === 'scan') {
+      console.log('[match-join-flow]', {
+        stage: 'draft_bind_result',
+        ok: true,
+        userId: player.playerId || '',
+        groupId: this.data.groupId || '',
+        slotId: idx + 1,
+        inherit: !!inherit
+      });
+    }
     console.log('[score-slot-migration]', {
       stage: 'add-after',
       groupId: this.data.groupId || '',
@@ -3889,14 +4141,14 @@ Page({
     if (!Array.isArray(friends)) return;
     if (!this._draftSlots) return;
     const otherUsed = {};
-    this._otherGroupsUsedIds().forEach((id) => { otherUsed[id] = true; });
+    this._otherGroupsUsedIds().forEach((id) => { otherUsed[resolveCanonicalUserId(id)] = true; });
     const selectedSet = {};
-    friends.forEach((f) => { selectedSet[f.playerId] = f; });
+    friends.forEach((f) => { selectedSet[resolveCanonicalUserId(f.playerId)] = f; });
     const slots = this._draftSlots || [];
     const currentGroupSlots = {};
     slots.forEach((s, i) => {
       if (s && s.status === 'occupied' && s.player && s.player.playerId) {
-        currentGroupSlots[s.player.playerId] = i;
+        currentGroupSlots[resolveCanonicalUserId(s.player.playerId)] = i;
       }
     });
     // 1) 取消选中 → draft 移出
@@ -3905,7 +4157,10 @@ Page({
     });
     // 2) 新增选中 → draft 从前往后补空位
     friends
-      .filter((f) => currentGroupSlots[f.playerId] == null && !otherUsed[f.playerId])
+      .filter((f) => {
+        const canonicalPlayerId = resolveCanonicalUserId(f.playerId);
+        return currentGroupSlots[canonicalPlayerId] == null && !otherUsed[canonicalPlayerId];
+      })
       .forEach((f) => {
         const idx = this._firstDraftEmptySlotIndex();
         if (idx < 0) return;
@@ -3955,7 +4210,9 @@ Page({
     if (!combo || !Array.isArray(combo.players)) return;
     if (!this._draftSlots) return;
     const used = {};
-    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => { used[id] = true; });
+    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => {
+      used[resolveCanonicalUserId(id)] = true;
+    });
     const emptyIdx = [];
     (this._draftSlots || []).forEach((s, i) => {
       if (s && s.status === 'empty') emptyIdx.push(i);
@@ -3967,7 +4224,8 @@ Page({
     let slot = 0;
     combo.players.forEach((pl) => {
       const pid = pl.playerId || 'cb-' + Date.now() + '-' + slot;
-      if (used[pid]) return;
+      const canonicalPid = resolveCanonicalUserId(pid);
+      if (used[canonicalPid]) return;
       if (slot >= emptyIdx.length) return;
       // TODO(Patch 2-F): call _ensureMatchParticipant(pl) before binding Slot.
       this._doBindDraftPlayerToSlot(
@@ -3976,7 +4234,7 @@ Page({
         'combo',
         false
       );
-      used[pid] = true;
+      used[canonicalPid] = true;
       slot += 1;
     });
   },
@@ -4015,6 +4273,50 @@ Page({
     this.setData({ manualGender: gender });
   },
 
+  _tryCreateManualContacts(targetUserId, phone, remarkName) {
+    const currentUser = gameStore.getCurrentUser() || {};
+    const ownerUserId = String(currentUser.userId || '').trim();
+    const targetId = String(targetUserId || '').trim();
+    if (!ownerUserId || !targetId) {
+      console.log('[contact-auto-create]', {
+        ownerUserId: ownerUserId,
+        targetUserId: targetId,
+        action: 'skip_missing_user'
+      });
+      return;
+    }
+    try {
+      const ownerContact = contactStore.addContact({
+        ownerUserId: ownerUserId,
+        targetUserId: targetId,
+        phone: phone || '',
+        remarkName: remarkName || '',
+        source: 'manual_add'
+      });
+      const targetContact = contactStore.addContact({
+        ownerUserId: targetId,
+        targetUserId: ownerUserId,
+        phone: currentUser.phone || '',
+        remarkName: '',
+        source: 'manual_add'
+      });
+      console.log('[contact-auto-create]', {
+        ownerUserId: ownerUserId,
+        targetUserId: targetId,
+        ownerContactId: ownerContact && ownerContact.contactId,
+        targetContactId: targetContact && targetContact.contactId,
+        action: 'upsert_bidirectional'
+      });
+    } catch (err) {
+      console.warn('[contact-auto-create]', {
+        ownerUserId: ownerUserId,
+        targetUserId: targetId,
+        action: 'failed',
+        error: err && err.message ? err.message : err
+      });
+    }
+  },
+
   confirmManualSheet() {
     const name = (this.data.manualName || '').trim();
     const phone = (this.data.manualPhone || '').trim();
@@ -4029,13 +4331,95 @@ Page({
     }
     const target = this._targetSlotIdx;
     const player = {
-      playerId: 'm-' + Date.now(),
+      userId: '',
+      playerId: createManualPlayerId(),
       name: name,
+      matchNickname: name,
       phone: phone || '',
       gender: gender,
       avatar: mockAvatars.pickMockAvatar(name),
-      source: 'manual'
+      source: 'manual',
+      _manualIdentity: {
+        phoneProvided: !!phone,
+        userFound: false
+      }
     };
+    if (phone) {
+      const identity = userDirectory.resolveUserIdentityByPhone(phone);
+      if (identity && identity.found && identity.source === 'mini_program' && identity.user) {
+        const user = identity.user;
+        const displayName = user.competitionName || user.nickname || user.userId;
+        player.userId = user.userId;
+        player.playerId = user.userId;
+        player.name = displayName;
+        player.matchNickname = displayName;
+        player.nickname = user.nickname || '';
+        player.competitionName = user.competitionName || '';
+        player.avatar = user.avatar || '';
+        player.phone = user.phone || phone;
+        player.gender = user.gender || gender;
+        player.userType = identity.userType || 'registered';
+        player.identitySource = identity.source || 'mini_program';
+        player._manualRemarkName = name;
+        player._manualIdentity.userFound = true;
+        player._manualIdentity.source = identity.source;
+        player._manualIdentity.userType = identity.userType;
+        console.log('[manual-user-identity]', {
+          phone: phone,
+          source: identity.source,
+          userType: identity.userType,
+          userId: user.userId,
+          action: 'use_mini_program_user'
+        });
+        this._tryCreateManualContacts(user.userId, phone, name);
+      } else {
+        const appUser = identity && identity.found && identity.source === 'app' && identity.user
+          ? identity.user
+          : null;
+        const phoneUser = userStore.createPhoneUser({
+          phone: phone,
+          nickname: appUser ? (appUser.nickname || phone) : name,
+          avatar: appUser ? (appUser.avatar || '') : '',
+          gender: appUser ? (appUser.gender || gender) : gender,
+          source: appUser ? 'app_import' : 'manual_add'
+        });
+        if (phoneUser) {
+          player.userId = phoneUser.userId;
+          player.playerId = phoneUser.userId;
+          player.name = phoneUser.nickname;
+          player.matchNickname = phoneUser.nickname;
+          player.nickname = phoneUser.nickname;
+          player.avatar = phoneUser.avatar || '';
+          player.phone = phoneUser.phone || phone;
+          player.gender = phoneUser.gender || gender;
+          player.userType = phoneUser.userType || 'phone';
+          player.identitySource = phoneUser.source || (appUser ? 'app_import' : 'manual_add');
+          player._manualRemarkName = appUser ? name : '';
+          player._manualIdentity.userFound = !!appUser;
+          player._manualIdentity.source = appUser ? 'app' : null;
+          player._manualIdentity.userType = phoneUser.userType || 'phone';
+          console.log('[manual-user-identity]', {
+            phone: phone,
+            source: appUser ? 'app' : null,
+            userType: phoneUser.userType || 'phone',
+            userId: phoneUser.userId,
+            action: appUser ? 'create_phone_user_from_app' : 'create_phone_user_manual'
+          });
+          this._tryCreateManualContacts(phoneUser.userId, phone, name);
+        }
+      }
+    } else {
+      player.userId = createGuestUserId(player.playerId);
+      player.userType = 'guest';
+      player.identitySource = 'manual_add';
+      console.log('[manual-user-identity]', {
+        phone: '',
+        source: null,
+        userType: 'guest',
+        userId: player.userId,
+        action: 'use_guest_user'
+      });
+    }
     this.closeManualSheet();
     this._onPlayerPicked(player, target);
   },
@@ -4044,9 +4428,43 @@ Page({
   _onPlayerPicked(player, target) {
     if (!player) return;
     if (!this._draftSlots) return;
+    let userId = String(player.userId || '').trim();
+    const slotPlayerId = String(player.playerId || player.id || userId || '').trim();
+    if (!userId && player.userType === 'guest') {
+      userId = createGuestUserId(slotPlayerId);
+      player.userId = userId;
+    }
+    const identityId = userId || slotPlayerId;
+    const identity = player._manualIdentity || {};
+    const match = this._readScoreTeamMatch();
+    const registeredUser = userId ? this._findScoreTeamMatchRegisterUser(match, userId) : null;
+    const groupedPlayer = userId ? this._findScoreTeamMatchGroupedPlayer(match, userId) : null;
     const used = {};
-    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => { used[id] = true; });
-    if (player.playerId && used[player.playerId]) return;
+    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => {
+      used[resolveCanonicalUserId(id)] = true;
+    });
+    const canonicalPlayerId = resolveCanonicalUserId(identityId);
+    if (identityId && (groupedPlayer || used[canonicalPlayerId])) {
+      console.log('[manual-player-identity]', {
+        source: player.source || 'manual',
+        phoneProvided: !!identity.phoneProvided || !!player.phone,
+        userFound: !!identity.userFound,
+        registered: !!registeredUser,
+        grouped: true,
+        action: 'block_grouped'
+      });
+      wx.showToast({ title: '该用户已经在本组或其他组比赛中', icon: 'none' });
+      return;
+    }
+    if (registeredUser && player.matchNickname && match && match.registerInfo && Array.isArray(match.registerInfo.users)) {
+      match.registerInfo.users = match.registerInfo.users.map((user) => {
+        const uid = String((user && (user.userId || user.playerId || user.id)) || '').trim();
+        return isSameUserIdentity(uid, userId)
+          ? Object.assign({}, user, { matchNickname: player.matchNickname })
+          : user;
+      });
+      teamMatchStore.saveMatch(match);
+    }
     const slots = this._draftSlots || [];
     let idx = target != null && target >= 0 ? target : this._firstDraftEmptySlotIndex();
     if (idx < 0 || (slots[idx] && slots[idx].status === 'occupied')) idx = this._firstDraftEmptySlotIndex();
@@ -4054,18 +4472,49 @@ Page({
       wx.showToast({ title: '本组已满（4 人）', icon: 'none' });
       return;
     }
-    // TODO(Patch 2-F): call _ensureMatchParticipant(player) before binding Slot.
-    this._bindDraftPlayerToSlot(
-      idx,
-      {
-        playerId: player.playerId,
-        name: player.name,
-        avatar: player.avatar,
-        phone: player.phone || '',
-        gender: player.gender || ''
-      },
-      player.source || 'manual'
-    );
+    const bindPlayer = {
+      playerId: slotPlayerId || userId,
+      userId: userId,
+      name: player.matchNickname || player.name,
+      matchNickname: player.matchNickname || player.name || '',
+      nickname: player.nickname || '',
+      competitionName: player.competitionName || '',
+      avatar: player.avatar,
+      phone: player.phone || '',
+      gender: player.gender || '',
+      userType: player.userType || '',
+      identitySource: player.identitySource || '',
+      source: player.source || 'manual'
+    };
+    const participant = userId
+      ? this._ensureMatchParticipant(bindPlayer)
+      : { ok: true, registered: false, skipped: true, reason: 'no_stable_user_id', player: bindPlayer };
+    if (participant && participant.needRegister) {
+      console.log('[manual-player-identity]', {
+        source: player.source || 'manual',
+        phoneProvided: !!identity.phoneProvided || !!player.phone,
+        userFound: !!identity.userFound,
+        registered: false,
+        grouped: false,
+        action: 'open_team_sheet'
+      });
+      this._openJoinMatchTeamSheet({
+        slotIndex: idx,
+        player: participant.player || bindPlayer,
+        source: player.source || 'manual',
+        bindMode: 'draftWithHistoryPrompt'
+      });
+      return;
+    }
+    console.log('[manual-player-identity]', {
+      source: player.source || 'manual',
+      phoneProvided: !!identity.phoneProvided || !!player.phone,
+      userFound: !!identity.userFound,
+      registered: !!(participant && participant.registered),
+      grouped: false,
+      action: 'bind_slot'
+    });
+    this._bindDraftPlayerToSlot(idx, bindPlayer, player.source || 'manual');
   },
 
   // 兼容旧 footer 入口（若仍被调用）：打开手工弹窗，目标=第一个空位

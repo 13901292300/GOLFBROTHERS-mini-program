@@ -28,8 +28,17 @@ function _cloneJson(value) {
 
 function resolveUserId(raw) {
   if (!raw || typeof raw !== 'object') return '';
+  // 兼容旧数据读取：playerId/id/uid/openid fallback 仅用于读取历史快照。
+  // 新写入 registerInfo.users 时必须优先提供稳定 userId，禁止依赖局内 playerId 提升为长期身份。
   const id = raw.userId || raw.playerId || raw.id || raw.uid || raw.openid;
   return id != null ? String(id).trim() : '';
+}
+
+function buildDerivedGuestUserId(seed) {
+  const raw = String(seed || '').trim();
+  if (raw.indexOf('guest_') === 0) return raw;
+  const normalized = raw.replace(/[^A-Za-z0-9_]/g, '_');
+  return 'guest_' + (normalized || (Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8)));
 }
 
 /**
@@ -234,6 +243,23 @@ function buildListSubLine(phoneText, genderText, teamName, groupStatusLabel) {
   return parts.join(' · ');
 }
 
+function resolveIdentityLabel(userType) {
+  const value = String(userType || '').trim();
+  if (value === 'registered') return '注册用户';
+  if (value === 'phone') return '手机用户';
+  if (value === 'guest') return '临时用户';
+  return '';
+}
+
+function resolveIdentitySourceLabel(identitySource) {
+  const value = String(identitySource || '').trim();
+  if (value === 'mini_program') return '微信用户';
+  if (value === 'app_import') return 'APP导入';
+  if (value === 'manual_add') return '手工创建';
+  if (value === 'derived') return '系统派生';
+  return '';
+}
+
 /**
  * 分队选项：仅比赛实际存在的真实分队（不含未分队占位）
  * 优先比赛级配置，再汇总报名用户已有分队；删除选手不会改比赛级分队配置。
@@ -376,6 +402,7 @@ function buildPlayerManageRow(raw, teamOptions) {
     canSelfCancel: raw && raw.canSelfCancel !== false,
     locked: !!(raw && raw.locked),
     userType: String((raw && raw.userType) || ''),
+    identitySource: String((raw && raw.identitySource) || ''),
     realName: String((raw && raw.realName) || ''),
     remarkName: String((raw && raw.remarkName) || ''),
     handicap: raw && raw.handicap != null ? raw.handicap : '',
@@ -559,6 +586,7 @@ function matchesSearchKeyword(player, keyword) {
     player.name,
     player.realName,
     player.remarkName,
+    player.contactRemark,
     player.userId
   ];
   for (let i = 0; i < fields.length; i++) {
@@ -666,6 +694,8 @@ function isPlayerFormalGrouped(player, groupedUserIds) {
 const GROUP_STATUS_ALL = 'all';
 const GROUP_STATUS_GROUPED = 'grouped';
 const GROUP_STATUS_UNGROUPED = 'ungrouped';
+const USER_TYPE_ALL = 'all';
+const IDENTITY_SOURCE_ALL = 'all';
 
 function matchesGroupStatusFilter(player, status, groupedUserIds) {
   const s = String(status || GROUP_STATUS_ALL);
@@ -674,6 +704,18 @@ function matchesGroupStatusFilter(player, status, groupedUserIds) {
   if (s === GROUP_STATUS_GROUPED) return grouped;
   if (s === GROUP_STATUS_UNGROUPED) return !grouped;
   return true;
+}
+
+function matchesUserTypeFilter(player, userTypeFilter) {
+  const filter = String(userTypeFilter || USER_TYPE_ALL);
+  if (!filter || filter === USER_TYPE_ALL) return true;
+  return String((player && player.userType) || '') === filter;
+}
+
+function matchesIdentitySourceFilter(player, identitySourceFilter) {
+  const filter = String(identitySourceFilter || IDENTITY_SOURCE_ALL);
+  if (!filter || filter === IDENTITY_SOURCE_ALL) return true;
+  return String((player && player.identitySource) || '') === filter;
 }
 
 /**
@@ -686,6 +728,8 @@ function buildPlayerManageDisplay(players, options) {
   const teamFilter =
     opts.teamFilter != null ? opts.teamFilter : TEAM_FILTER_ALL;
   const groupStatusFilter = opts.groupStatusFilter || GROUP_STATUS_ALL;
+  const userTypeFilter = opts.userTypeFilter || USER_TYPE_ALL;
+  const identitySourceFilter = opts.identitySourceFilter || IDENTITY_SOURCE_ALL;
   const expandedUserId = String(opts.expandedUserId || '');
   const groupedUserIds = collectFormalGroupedUserIds(opts.groups);
   const source = Array.isArray(players) ? players : [];
@@ -693,6 +737,8 @@ function buildPlayerManageDisplay(players, options) {
   filtered = filtered.filter((p) =>
     matchesGroupStatusFilter(p, groupStatusFilter, groupedUserIds)
   );
+  filtered = filtered.filter((p) => matchesUserTypeFilter(p, userTypeFilter));
+  filtered = filtered.filter((p) => matchesIdentitySourceFilter(p, identitySourceFilter));
   if (keyword) {
     filtered = filtered.filter((p) => matchesSearchKeyword(p, keyword));
   }
@@ -708,6 +754,8 @@ function buildPlayerManageDisplay(players, options) {
       phoneMasked: phoneMasked,
       hasPhone: !!phone,
       phoneDisplay: phone || '暂无手机号',
+      identityLabel: resolveIdentityLabel(p.userType),
+      identitySourceLabel: resolveIdentitySourceLabel(p.identitySource),
       formalGrouped: formalGrouped,
       formalGroupStatusLabel: statusLabel,
       listSubLine: buildListSubLine(
@@ -727,7 +775,9 @@ function buildPlayerManageDisplay(players, options) {
   const hasActiveFilter =
     !!keyword ||
     filterVal !== TEAM_FILTER_ALL ||
-    String(groupStatusFilter || GROUP_STATUS_ALL) !== GROUP_STATUS_ALL;
+    String(groupStatusFilter || GROUP_STATUS_ALL) !== GROUP_STATUS_ALL ||
+    String(userTypeFilter || USER_TYPE_ALL) !== USER_TYPE_ALL ||
+    String(identitySourceFilter || IDENTITY_SOURCE_ALL) !== IDENTITY_SOURCE_ALL;
   const countTip = hasActiveFilter
     ? '共 ' + totalCount + ' 人，当前显示 ' + displayCount + ' 人'
     : '共 ' + totalCount + ' 人';
@@ -1325,6 +1375,8 @@ function _rowToRegisterUser(row, teamOptions) {
     nickname: String((row && row.nickname) || base.nickname || '').trim(),
     avatar: (row && row.avatar) || base.avatar || '',
     phone: resolvePhone(row) || (row && row.phone) || base.phone || '',
+    userType: String((row && row.userType) || base.userType || '').trim(),
+    identitySource: String((row && row.identitySource) || base.identitySource || '').trim(),
     // 本场快照字段
     matchNickname: name,
     competitionName: name,
@@ -1471,20 +1523,29 @@ function ensureRegisterUsersFromGroups(matchOrGame) {
   const seen = {};
   const pushPlayer = (p) => {
     if (p == null) return;
-    const id =
+    const explicitUserId =
+      p && typeof p === 'object' && p.userId != null
+        ? String(p.userId).trim()
+        : '';
+    const sourceId =
       typeof p === 'string' || typeof p === 'number'
         ? String(p).trim()
-        : resolveUserId(p);
-    if (!id || seen[id]) return;
-    seen[id] = true;
+        : String((p && (p.playerId || p.id || p.uid || p.openid)) || '').trim();
+    const userId = explicitUserId || buildDerivedGuestUserId(sourceId);
+    if (!userId || seen[userId]) return;
+    seen[userId] = true;
     const name =
       typeof p === 'object'
         ? String(p.name || p.nickname || p.displayName || '').trim()
         : '';
     users.push({
-      userId: id,
-      competitionName: name || id,
-      matchNickname: name || id,
+      userId: userId,
+      userType: 'guest',
+      identitySource: 'derived',
+      phone: typeof p === 'object' ? p.phone || '' : '',
+      nickname: typeof p === 'object' ? p.nickname || '' : '',
+      competitionName: name || userId,
+      matchNickname: name || userId,
       gender: typeof p === 'object' ? p.gender || '' : '',
       matchGender: typeof p === 'object' ? p.gender || '' : '',
       avatar: typeof p === 'object' ? p.avatar || '' : '',
@@ -1526,6 +1587,8 @@ module.exports = {
   GROUP_STATUS_ALL,
   GROUP_STATUS_GROUPED,
   GROUP_STATUS_UNGROUPED,
+  USER_TYPE_ALL,
+  IDENTITY_SOURCE_ALL,
   resolveUserId,
   normalizeGender,
   genderLabel,
@@ -1547,6 +1610,8 @@ module.exports = {
   collectFormalGroupedUserIds,
   isPlayerFormalGrouped,
   matchesGroupStatusFilter,
+  matchesUserTypeFilter,
+  matchesIdentitySourceFilter,
   buildPlayerManageDraft,
   buildPlayerManageRow,
   applyExpandState,

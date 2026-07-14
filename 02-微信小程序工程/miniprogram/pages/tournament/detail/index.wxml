@@ -228,7 +228,14 @@
                   <view class="roster-col roster-col--idx"><text>{{index + 1}}</text></view>
                   <view class="roster-col roster-col--player">
                     <image class="roster-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
-                    <text class="roster-name">{{item.competitionName}}</text>
+                    <view>
+                      <text class="roster-name">{{item.competitionName}}</text>
+                      <text wx:if="{{item.contactRemark}}" class="roster-remark">{{item.contactRemark}}</text>
+                      <view wx:if="{{item.identityLabel || item.identitySourceLabel}}" class="roster-identity-tags">
+                        <text wx:if="{{item.identityLabel}}" class="roster-identity-tag">{{item.identityLabel}}</text>
+                        <text wx:if="{{item.identitySourceLabel}}" class="roster-identity-tag">{{item.identitySourceLabel}}</text>
+                      </view>
+                    </view>
                     <text wx:if="{{item.genderIcon}}" class="roster-gender {{item.genderClass}}">{{item.genderIcon}}</text>
                   </view>
                   <view class="roster-col roster-col--payment">
@@ -1047,6 +1054,55 @@
           bindtap="onPlayerManageGroupStatusTap"
         >未分组</view>
       </view>
+      <view class="player-manage-status-tabs">
+        <view
+          class="player-manage-status-tab {{playerManageUserTypeFilter === 'all' ? 'is-active' : ''}}"
+          data-usertype="all"
+          bindtap="onPlayerManageUserTypeTap"
+        >全部用户</view>
+        <view
+          class="player-manage-status-tab {{playerManageUserTypeFilter === 'registered' ? 'is-active' : ''}}"
+          data-usertype="registered"
+          bindtap="onPlayerManageUserTypeTap"
+        >注册用户</view>
+        <view
+          class="player-manage-status-tab {{playerManageUserTypeFilter === 'phone' ? 'is-active' : ''}}"
+          data-usertype="phone"
+          bindtap="onPlayerManageUserTypeTap"
+        >手机用户</view>
+        <view
+          class="player-manage-status-tab {{playerManageUserTypeFilter === 'guest' ? 'is-active' : ''}}"
+          data-usertype="guest"
+          bindtap="onPlayerManageUserTypeTap"
+        >临时用户</view>
+      </view>
+      <view class="player-manage-status-tabs">
+        <view
+          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'all' ? 'is-active' : ''}}"
+          data-identitysource="all"
+          bindtap="onPlayerManageIdentitySourceTap"
+        >全部来源</view>
+        <view
+          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'mini_program' ? 'is-active' : ''}}"
+          data-identitysource="mini_program"
+          bindtap="onPlayerManageIdentitySourceTap"
+        >微信用户</view>
+        <view
+          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'app_import' ? 'is-active' : ''}}"
+          data-identitysource="app_import"
+          bindtap="onPlayerManageIdentitySourceTap"
+        >APP导入</view>
+        <view
+          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'manual_add' ? 'is-active' : ''}}"
+          data-identitysource="manual_add"
+          bindtap="onPlayerManageIdentitySourceTap"
+        >手工创建</view>
+        <view
+          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'derived' ? 'is-active' : ''}}"
+          data-identitysource="derived"
+          bindtap="onPlayerManageIdentitySourceTap"
+        >系统派生</view>
+      </view>
       <text wx:if="{{playerManageCountTip}}" class="player-manage-sheet__count">{{playerManageCountTip}}</text>
     </view>
     <scroll-view scroll-y class="player-manage-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
@@ -1067,6 +1123,11 @@
               <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
               <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
               <text class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
+            </view>
+            <text wx:if="{{item.contactRemark}}" class="player-manage-row__remark">{{item.contactRemark}}</text>
+            <view wx:if="{{item.identityLabel || item.identitySourceLabel}}" class="player-manage-row__identity-tags">
+              <text wx:if="{{item.identityLabel}}" class="player-manage-row__identity-tag">{{item.identityLabel}}</text>
+              <text wx:if="{{item.identitySourceLabel}}" class="player-manage-row__identity-tag">{{item.identitySourceLabel}}</text>
             </view>
             <view class="player-manage-row__sub">
               <text

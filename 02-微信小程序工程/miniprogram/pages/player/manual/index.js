@@ -8,6 +8,18 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 
+function randomSuffix() {
+  return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function createGuestUserId() {
+  return 'guest_' + randomSuffix();
+}
+
+function createManualPlayerId() {
+  return 'm_' + randomSuffix();
+}
+
 Page({
   data: {
     themeClass: 'bright-mode',
@@ -89,7 +101,10 @@ Page({
       return;
     }
     this._return({
-      playerId: 'm-' + Date.now(),
+      userId: createGuestUserId(),
+      playerId: createManualPlayerId(),
+      userType: 'guest',
+      identitySource: 'manual_add',
       name,
       avatar: mockAvatars.pickMockAvatar(name),
       source: 'manual'

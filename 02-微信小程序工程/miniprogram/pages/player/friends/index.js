@@ -11,6 +11,7 @@ const mockAvatars = require('../../../utils/mockAvatars.js');
 const gameStore = require('../../../utils/gameStore.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const teamDirectory = require('../../../utils/teamDirectory.js');
+const contactStore = require('../../../utils/contactStore.js');
 
 const MAX_GROUP_SIZE = 4;
 const PROXY_MODE = 'proxy_register';
@@ -37,8 +38,104 @@ function buildCurrentUser() {
 
 function mapFriendRow(f) {
   return Object.assign({}, f, {
-    avatar: mockAvatars.resolveAvatar(f.avatar, f.playerId)
+    userId: f.userId || f.playerId,
+    playerId: f.playerId || f.userId,
+    nickname: f.nickname || f.name || '',
+    remarkName: f.remarkName || f.remark || '',
+    userType: f.userType || '',
+    identitySource: f.identitySource || '',
+    avatar: mockAvatars.resolveAvatar(f.avatar, f.playerId || f.userId)
   });
+}
+
+function normalizePhone(phone) {
+  return String(phone || '').replace(/\D/g, '').trim();
+}
+
+function resolveContactDisplayName(contact, fallback) {
+  const source = contact || {};
+  const fb = fallback || {};
+  return String(
+    source.remarkName ||
+      fb.nickname ||
+      fb.displayName ||
+      fb.name ||
+      fb.competitionName ||
+      source.targetUserId ||
+      ''
+  ).trim();
+}
+
+function contactToFriendRow(contact, fallback) {
+  const source = contact || {};
+  const fb = fallback || {};
+  const playerId = String(source.targetUserId || fb.playerId || fb.userId || '').trim();
+  if (!playerId) return null;
+  const phone = normalizePhone(source.phone || fb.phone);
+  const name = resolveContactDisplayName(source, fb);
+  return mapFriendRow({
+    userId: playerId,
+    playerId: playerId,
+    name: name || playerId,
+    displayName: name || playerId,
+    nickname: fb.nickname || fb.name || '',
+    remark: source.remarkName || fb.remark || '',
+    remarkName: source.remarkName || fb.remarkName || '',
+    phone: phone,
+    avatar: fb.avatar || '',
+    pinyin: fb.pinyin || name || playerId,
+    userType: fb.userType || '',
+    identitySource: fb.identitySource || '',
+    source: source.source || 'contact'
+  });
+}
+
+function mergeContactFriends(ownerUserId, fallbackList) {
+  const fallback = Array.isArray(fallbackList) ? fallbackList : [];
+  const fallbackById = {};
+  const fallbackByPhone = {};
+  fallback.forEach((item) => {
+    const row = mapFriendRow(item || {});
+    const id = String(row.playerId || row.userId || '').trim();
+    const phone = normalizePhone(row.phone);
+    if (id && !fallbackById[id]) fallbackById[id] = row;
+    if (phone && !fallbackByPhone[phone]) fallbackByPhone[phone] = row;
+  });
+
+  const merged = [];
+  const seenIds = {};
+  const seenPhones = {};
+  const contacts = contactStore.getContacts(ownerUserId);
+  contacts.forEach((contact) => {
+    const id = String(contact && contact.targetUserId || '').trim();
+    const phone = normalizePhone(contact && contact.phone);
+    const fallbackRow = (id && fallbackById[id]) || (phone && fallbackByPhone[phone]) || null;
+    const row = contactToFriendRow(contact, fallbackRow);
+    if (!row) return;
+    const rowId = String(row.playerId || row.userId || '').trim();
+    const rowPhone = normalizePhone(row.phone);
+    merged.push(row);
+    if (rowId) seenIds[rowId] = true;
+    if (rowPhone) seenPhones[rowPhone] = true;
+  });
+
+  fallback.forEach((item) => {
+    const row = mapFriendRow(item || {});
+    const id = String(row.playerId || row.userId || '').trim();
+    const phone = normalizePhone(row.phone);
+    if ((id && seenIds[id]) || (phone && seenPhones[phone])) return;
+    merged.push(row);
+    if (id) seenIds[id] = true;
+    if (phone) seenPhones[phone] = true;
+  });
+
+  console.log('[contact-friends-source]', {
+    source: contacts.length ? 'contactStore' : 'mock',
+    contactCount: contacts.length,
+    mockCount: fallback.length,
+    count: merged.length
+  });
+  return merged;
 }
 
 function parseIdList(raw) {
@@ -158,7 +255,7 @@ Page({
       disabledMap[id] = true;
     });
 
-    this._allFriends = (FRIEND_LIST || []).map(mapFriendRow);
+    this._allFriends = mergeContactFriends(currentUser.playerId, FRIEND_LIST || []);
     this._mode = TEMP_ADMIN_MODE;
     this._currentGroupPlayerIds = [];
 
@@ -207,7 +304,7 @@ Page({
       }
     });
 
-    this._allFriends = (FRIEND_LIST || []).map(mapFriendRow);
+    this._allFriends = mergeContactFriends(currentUser.playerId, FRIEND_LIST || []);
     this._currentGroupPlayerIds = groupPlayerIds.slice();
     this._mode = '';
 
@@ -247,7 +344,7 @@ Page({
       }
       return (teamDirectory.getTeamMembers(resolvedTeamId) || []).map(mapFriendRow);
     }
-    return (FRIEND_LIST || []).map(mapFriendRow);
+    return mergeContactFriends((buildCurrentUser() || {}).playerId, FRIEND_LIST || []);
   },
 
   /**
