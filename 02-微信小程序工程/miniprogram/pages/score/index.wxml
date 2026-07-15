@@ -537,6 +537,42 @@
       />
     </view>
 
+    <!-- 报名列表 / 球队列表：本页二级人员选择，不改 Slot 绑定流程 -->
+    <view wx:if="{{playerSourceListVisible}}" class="manual-sheet-mask" bindtap="closePlayerSourceListSheet"></view>
+    <view wx:if="{{playerSourceListVisible}}" class="player-source-list-sheet {{themeClass}}" catchtap="noop">
+      <view class="manual-sheet__handle"></view>
+      <view class="manual-sheet__header">
+        <view>
+          <text class="manual-sheet__overline">{{playerSourceListOverline}}</text>
+          <text class="manual-sheet__title">{{playerSourceListTitle}}</text>
+        </view>
+        <view class="manual-sheet__close" bindtap="closePlayerSourceListSheet"><text>×</text></view>
+      </view>
+
+      <scroll-view scroll-y class="player-source-list">
+        <view wx:if="{{!playerSourceListItems.length}}" class="player-source-list__empty">{{playerSourceListEmptyText}}</view>
+        <view
+          wx:for="{{playerSourceListItems}}"
+          wx:key="id"
+          wx:for-index="sourceIdx"
+          class="player-source-list__item"
+          data-index="{{sourceIdx}}"
+          bindtap="onPlayerSourceListItemTap"
+        >
+          <image class="player-source-list__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view class="player-source-list__main">
+            <text class="player-source-list__title">{{item.title}}</text>
+            <text class="player-source-list__subtitle">{{item.subtitle}}</text>
+          </view>
+          <text class="player-source-list__action">添加</text>
+        </view>
+      </scroll-view>
+
+      <view class="manual-sheet__footer">
+        <view class="manual-sheet__btn manual-sheet__btn--cancel" bindtap="closePlayerSourceListSheet">取消</view>
+      </view>
+    </view>
+
     <!-- 手工添加：底部弹窗（姓名/手机/性别），不跳转独立页 -->
     <view wx:if="{{manualSheetVisible}}" class="manual-sheet-mask" bindtap="closeManualSheet"></view>
     <view wx:if="{{manualSheetVisible}}" class="manual-sheet {{themeClass}}" catchtap="noop">

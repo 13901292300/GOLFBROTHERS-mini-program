@@ -1603,6 +1603,82 @@ page {
   border: 1px solid var(--champion-gold, #ce9224);
 }
 
+.player-source-list-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 710;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  border-radius: 36rpx 36rpx 0 0;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.player-source-list {
+  max-height: 56vh;
+}
+
+.player-source-list__empty {
+  padding: 48rpx 24rpx;
+  border-radius: 22rpx;
+  border: 1px dashed var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 26rpx;
+}
+
+.player-source-list__item {
+  min-height: 108rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+  border-radius: 24rpx;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  box-sizing: border-box;
+}
+
+.player-source-list__avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+
+.player-source-list__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.player-source-list__title {
+  font-size: 28rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.player-source-list__subtitle {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-source-list__action {
+  font-size: 24rpx;
+  font-weight: 900;
+  color: var(--champion-gold, #ce9224);
+  flex-shrink: 0;
+}
+
 .join-match-sheet {
   position: fixed;
   left: 0;
@@ -1811,45 +1887,6 @@ page {
 @keyframes slotPendingPulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
-}
-
-/* —— 老牌组合：组合列表项 —— */
-.combo-item {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  padding: 22rpx 12rpx;
-  border-bottom: 1px solid var(--border-color);
-}
-.combo-item__info {
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-  min-width: 0;
-}
-.combo-item__name {
-  font-size: 28rpx;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-.combo-item__desc {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-.combo-item__avatars {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-right: 12rpx;
-}
-.combo-item__avatar {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 999rpx;
-  margin-left: -14rpx;
-  border: 2rpx solid var(--bg-card);
-  background: var(--bg-page, rgba(255, 255, 255, 0.06));
 }
 
 .friend-sheet {

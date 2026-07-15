@@ -6,6 +6,7 @@ const { createHeaderStyle } = require('../../utils/headerEngine.js');
 const groupsStore = require('../../utils/groupsStore.js');
 const playerSlots = require('../../utils/playerSlots.js');
 const { FRIEND_ID_SET } = require('../../utils/playerDirectory.js');
+const teamDirectory = require('../../utils/teamDirectory.js');
 const gameStore = require('../../utils/gameStore.js');
 const weatherService = require('../../utils/weatherService.js');
 const matchState = require('../../utils/matchState.js');
@@ -175,8 +176,9 @@ const MORE_MENU_ITEMS_LEGACY = MORE_MENU_ITEMS_LEGACY_MAIN
 
 /** 空位补位：人员来源选择（player-source-sheet 选项） */
 const PLAYER_SOURCE_OPTIONS = [
-  { key: 'friends', glyph: '👥', label: '好友列表', desc: '从我的好友中选择球员' },
-  { key: 'combo', glyph: '⭐', label: '老牌组合', desc: '常用四人组 / 上次比赛组合' },
+  { key: 'register', glyph: '▤', label: '报名列表', desc: '从本场已报名人员中选择' },
+  { key: 'friend', glyph: '👥', label: '好友列表', desc: '从我的好友中选择球员' },
+  { key: 'team', glyph: '⚑', label: '球队列表', desc: '从现有球队成员中选择' },
   { key: 'manual', glyph: '✎', label: '手工添加', desc: '手动创建球员并加入该位置' }
 ];
 
@@ -662,9 +664,14 @@ Page({
     groupPlayers: GROUP_PLAYERS,
     // 占位：真正展示前由 openGroupManagePage() 用当前记分页面球员快照覆盖（唯一数据源）
     groupSlots: [],
-    // 空位补位：一级来源选择；好友/组合仍跳转独立页；手工改为本页底部弹窗
+    // 空位补位：一级来源选择；报名/球队走本页列表，好友跳转选择页，手工走本页弹窗
     addSheetVisible: false,
     playerSourceOptions: PLAYER_SOURCE_OPTIONS,
+    playerSourceListVisible: false,
+    playerSourceListTitle: '',
+    playerSourceListOverline: 'ADD PLAYER',
+    playerSourceListEmptyText: '',
+    playerSourceListItems: [],
     // 手工添加底部弹窗（不跳转 pages/player/manual）
     manualSheetVisible: false,
     manualName: '',
@@ -3209,6 +3216,11 @@ Page({
     this.setData({
       showGroupManage: false,
       addSheetVisible: false,
+      playerSourceListVisible: false,
+      playerSourceListTitle: '',
+      playerSourceListOverline: 'ADD PLAYER',
+      playerSourceListEmptyText: '',
+      playerSourceListItems: [],
       manualSheetVisible: false,
       manualName: '',
       manualPhone: '',
@@ -4007,7 +4019,7 @@ Page({
     return (this.data.groupSlots || []).findIndex((s) => s && s.status === 'empty');
   },
 
-  // 点击空位（status=empty）：弹出底部 Action Sheet（好友列表 / 老牌组合 / 手工添加）
+  // 点击空位（status=empty）：弹出底部 Action Sheet（报名列表 / 好友列表 / 球队列表 / 手工添加）
   // 记录目标 slot，所有补位方式都只回填「该」slot（仅当前 matchId 的 playersSlots）
   onEmptySlotTap(e) {
     const idx = Number(e.currentTarget.dataset.index);
@@ -4022,9 +4034,20 @@ Page({
 
   onPlayerSourceSelect(e) {
     const key = e.detail && e.detail.key;
-    if (key === 'friends') this.addMethodFriend();
-    else if (key === 'combo') this.addMethodCombo();
+    if (key === 'register') this.addMethodRegister();
+    else if (key === 'friend') this.addMethodFriend();
+    else if (key === 'team') this.addMethodTeam();
     else if (key === 'manual') this.addMethodManual();
+  },
+
+  closePlayerSourceListSheet() {
+    this.setData({
+      playerSourceListVisible: false,
+      playerSourceListTitle: '',
+      playerSourceListOverline: 'ADD PLAYER',
+      playerSourceListEmptyText: '',
+      playerSourceListItems: []
+    });
   },
 
   // 当前目标 slot 的上下文（matchId + slotId），随 URL 传给二级页面
@@ -4084,7 +4107,7 @@ Page({
     return ids;
   },
 
-  // 当前组已占用 playerId（组合/手工补空位时不可与本组重复；编辑期以 draft 为准）
+  // 当前组已占用 playerId（各来源补空位时不可与本组重复；编辑期以 draft 为准）
   _currentGroupUsedIds() {
     const ids = [];
     const slots =
@@ -4097,7 +4120,122 @@ Page({
     return ids;
   },
 
-  // 【1】好友列表：第二层 → 跳转「好友选择页」（多选，已在组默认选中、可取消）
+  _usedCanonicalPlayerMap() {
+    const used = {};
+    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => {
+      const canonicalId = resolveCanonicalUserId(id);
+      if (canonicalId) used[canonicalId] = true;
+    });
+    return used;
+  },
+
+  _sourcePlayerDisplayName(player) {
+    const p = player || {};
+    return p.matchNickname || p.competitionName || p.nickname || p.name || p.displayName || '';
+  },
+
+  _normalizeRegisterSourcePlayer(user) {
+    const u = user || {};
+    const userId = String(u.userId || u.playerId || u.id || '').trim();
+    if (!userId) return null;
+    const name = this._sourcePlayerDisplayName(u) || userId;
+    return {
+      userId: userId,
+      playerId: userId,
+      id: userId,
+      name: name,
+      matchNickname: u.matchNickname || u.competitionName || u.nickname || u.name || name,
+      nickname: u.nickname || '',
+      competitionName: u.competitionName || '',
+      avatar: u.avatar || u.avatarUrl || '',
+      phone: u.phone || '',
+      gender: u.gender || u.matchGender || '',
+      userType: u.userType || '',
+      identitySource: u.identitySource || '',
+      source: 'register'
+    };
+  },
+
+  _normalizeTeamSourcePlayer(member, team) {
+    const m = member || {};
+    const playerId = String(m.userId || m.playerId || m.id || '').trim();
+    if (!playerId) return null;
+    const name = this._sourcePlayerDisplayName(m) || playerId;
+    return {
+      userId: playerId,
+      playerId: playerId,
+      id: playerId,
+      name: name,
+      matchNickname: m.matchNickname || m.competitionName || m.nickname || m.name || name,
+      nickname: m.nickname || '',
+      competitionName: m.competitionName || m.name || '',
+      avatar: m.avatar || m.avatarUrl || '',
+      phone: m.phone || '',
+      gender: m.gender || '',
+      userType: m.userType || '',
+      identitySource: m.identitySource || 'team_directory',
+      source: 'team',
+      teamId: m.teamId || (team && team.id) || '',
+      teamName: (team && team.name) || ''
+    };
+  },
+
+  _sourcePlayerToListItem(player, source, extra) {
+    const p = player || {};
+    const id = String(p.userId || p.playerId || p.id || '').trim();
+    if (!id) return null;
+    const title = this._sourcePlayerDisplayName(p) || id;
+    const meta = extra || p.phone || p.teamName || p.identitySource || '';
+    return {
+      id: id,
+      title: title,
+      subtitle: meta,
+      avatar: p.avatar || mockAvatars.pickMockAvatar(id || title),
+      source: source,
+      player: p
+    };
+  },
+
+  _openPlayerSourceListSheet(config) {
+    const cfg = config || {};
+    this.setData({
+      addSheetVisible: false,
+      playerSourceListVisible: true,
+      playerSourceListTitle: cfg.title || '选择人员',
+      playerSourceListOverline: cfg.overline || 'ADD PLAYER',
+      playerSourceListEmptyText: cfg.emptyText || '暂无可添加人员',
+      playerSourceListItems: Array.isArray(cfg.items) ? cfg.items : []
+    });
+  },
+
+  // 【1】报名列表：本页二级列表，数据源为 match.registerInfo.users
+  addMethodRegister() {
+    const match = this._readScoreTeamMatch();
+    const used = this._usedCanonicalPlayerMap();
+    const users = match && match.registerInfo && Array.isArray(match.registerInfo.users)
+      ? match.registerInfo.users
+      : [];
+    const items = [];
+    users.forEach((user) => {
+      const player = this._normalizeRegisterSourcePlayer(user);
+      if (!player) return;
+      const canonicalId = resolveCanonicalUserId(player.userId || player.playerId);
+      if (canonicalId && used[canonicalId]) return;
+      const groupText = user && (user.matchTeamName || user.groupName) ? String(user.matchTeamName || user.groupName) : '';
+      const phoneText = user && user.phone ? String(user.phone) : '';
+      const meta = [groupText, phoneText].filter(Boolean).join(' · ');
+      const item = this._sourcePlayerToListItem(player, 'register', meta || '已报名');
+      if (item) items.push(item);
+    });
+    this._openPlayerSourceListSheet({
+      title: '报名列表',
+      overline: 'REGISTERED',
+      emptyText: users.length ? '报名人员均已在分组中' : '本场暂无报名人员',
+      items: items
+    });
+  },
+
+  // 【2】好友列表：第二层 → 跳转「好友选择页」（多选，已在组默认选中、可取消）
   addMethodFriend() {
     this.setData({ addSheetVisible: false });
     const slots =
@@ -4185,61 +4323,49 @@ Page({
       });
   },
 
-  // 【2】老牌组合：第二层 → 跳转「组合选择页」（高频组合，一键按顺序填充）
-  addMethodCombo() {
-    this.setData({ addSheetVisible: false });
-    const ctx = this._buildSlotCtx();
-    const usedIds = this._otherGroupsUsedIds().concat(this._currentGroupUsedIds());
-    wx.navigateTo({
-      url:
-        '/pages/player/combos/index?matchId=' +
-        encodeURIComponent(ctx.matchId) +
-        '&slotId=' +
-        encodeURIComponent(ctx.slotId) +
-        '&used=' +
-        encodeURIComponent(usedIds.join(',')),
-      events: {
-        comboSelected: (payload) => this._onComboSelected(payload && payload.combo)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+  // 【3】球队列表：本页二级列表，数据源为 teamDirectory/team成员 mock
+  addMethodTeam() {
+    const match = this._readScoreTeamMatch();
+    const matchTeamId = match && match.teamId ? String(match.teamId).trim() : '';
+    const teams = matchTeamId
+      ? [teamDirectory.getTeamById(matchTeamId)].filter(Boolean)
+      : (teamDirectory.listTeamsForSelect('') || []);
+    const used = this._usedCanonicalPlayerMap();
+    const seen = {};
+    const items = [];
+    let memberCount = 0;
+    teams.forEach((team) => {
+      const members = teamDirectory.getTeamMembers(team && team.id) || [];
+      memberCount += members.length;
+      members.forEach((member) => {
+        const player = this._normalizeTeamSourcePlayer(member, team);
+        if (!player) return;
+        const canonicalId = resolveCanonicalUserId(player.userId || player.playerId);
+        if (!canonicalId || seen[canonicalId] || used[canonicalId]) return;
+        seen[canonicalId] = true;
+        const meta = [player.teamName, player.phone].filter(Boolean).join(' · ');
+        const item = this._sourcePlayerToListItem(player, 'team', meta || '球队成员');
+        if (item) items.push(item);
+      });
+    });
+    this._openPlayerSourceListSheet({
+      title: '球队列表',
+      overline: 'TEAM',
+      emptyText: memberCount ? '球队成员均已在分组中' : '暂无球队成员',
+      items: items
     });
   },
 
-  // 组合选择返回：只写 draft，按空位顺序批量补位
-  _onComboSelected(combo) {
-    if (!combo || !Array.isArray(combo.players)) return;
-    if (!this._draftSlots) return;
-    const used = {};
-    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => {
-      used[resolveCanonicalUserId(id)] = true;
-    });
-    const emptyIdx = [];
-    (this._draftSlots || []).forEach((s, i) => {
-      if (s && s.status === 'empty') emptyIdx.push(i);
-    });
-    if (!emptyIdx.length) {
-      wx.showToast({ title: '本组已满（4 人）', icon: 'none' });
-      return;
-    }
-    let slot = 0;
-    combo.players.forEach((pl) => {
-      const pid = pl.playerId || 'cb-' + Date.now() + '-' + slot;
-      const canonicalPid = resolveCanonicalUserId(pid);
-      if (used[canonicalPid]) return;
-      if (slot >= emptyIdx.length) return;
-      // TODO(Patch 2-F): call _ensureMatchParticipant(pl) before binding Slot.
-      this._doBindDraftPlayerToSlot(
-        emptyIdx[slot],
-        { playerId: pid, name: pl.name, avatar: pl.avatar },
-        'combo',
-        false
-      );
-      used[canonicalPid] = true;
-      slot += 1;
-    });
+  onPlayerSourceListItemTap(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    const item = this.data.playerSourceListItems[index];
+    if (!item || !item.player) return;
+    const target = this._targetSlotIdx;
+    this.closePlayerSourceListSheet();
+    this._onPlayerPicked(item.player, target);
   },
 
-  // 【3】手工添加：本页底部弹窗（姓名必填 / 手机选填 / 性别），不跳转独立页
+  // 【4】手工添加：本页底部弹窗（姓名必填 / 手机选填 / 性别），不跳转独立页
   addMethodManual() {
     this.setData({
       addSheetVisible: false,
