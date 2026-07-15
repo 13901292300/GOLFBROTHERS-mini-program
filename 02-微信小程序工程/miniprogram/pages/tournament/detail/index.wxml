@@ -231,10 +231,6 @@
                     <view>
                       <text class="roster-name">{{item.competitionName}}</text>
                       <text wx:if="{{item.contactRemark}}" class="roster-remark">{{item.contactRemark}}</text>
-                      <view wx:if="{{item.identityLabel || item.identitySourceLabel}}" class="roster-identity-tags">
-                        <text wx:if="{{item.identityLabel}}" class="roster-identity-tag">{{item.identityLabel}}</text>
-                        <text wx:if="{{item.identitySourceLabel}}" class="roster-identity-tag">{{item.identitySourceLabel}}</text>
-                      </view>
                     </view>
                     <text wx:if="{{item.genderIcon}}" class="roster-gender {{item.genderClass}}">{{item.genderIcon}}</text>
                   </view>
@@ -1037,72 +1033,6 @@
         <text class="player-manage-team-select__value">{{playerManageTeamFilterLabel || '全部分队'}}</text>
         <text class="player-manage-team-select__arrow">›</text>
       </view>
-      <view class="player-manage-status-tabs">
-        <view
-          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'all' ? 'is-active' : ''}}"
-          data-status="all"
-          bindtap="onPlayerManageGroupStatusTap"
-        >全部</view>
-        <view
-          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'grouped' ? 'is-active' : ''}}"
-          data-status="grouped"
-          bindtap="onPlayerManageGroupStatusTap"
-        >已分组</view>
-        <view
-          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'ungrouped' ? 'is-active' : ''}}"
-          data-status="ungrouped"
-          bindtap="onPlayerManageGroupStatusTap"
-        >未分组</view>
-      </view>
-      <view class="player-manage-status-tabs">
-        <view
-          class="player-manage-status-tab {{playerManageUserTypeFilter === 'all' ? 'is-active' : ''}}"
-          data-usertype="all"
-          bindtap="onPlayerManageUserTypeTap"
-        >全部用户</view>
-        <view
-          class="player-manage-status-tab {{playerManageUserTypeFilter === 'registered' ? 'is-active' : ''}}"
-          data-usertype="registered"
-          bindtap="onPlayerManageUserTypeTap"
-        >注册用户</view>
-        <view
-          class="player-manage-status-tab {{playerManageUserTypeFilter === 'phone' ? 'is-active' : ''}}"
-          data-usertype="phone"
-          bindtap="onPlayerManageUserTypeTap"
-        >手机用户</view>
-        <view
-          class="player-manage-status-tab {{playerManageUserTypeFilter === 'guest' ? 'is-active' : ''}}"
-          data-usertype="guest"
-          bindtap="onPlayerManageUserTypeTap"
-        >临时用户</view>
-      </view>
-      <view class="player-manage-status-tabs">
-        <view
-          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'all' ? 'is-active' : ''}}"
-          data-identitysource="all"
-          bindtap="onPlayerManageIdentitySourceTap"
-        >全部来源</view>
-        <view
-          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'mini_program' ? 'is-active' : ''}}"
-          data-identitysource="mini_program"
-          bindtap="onPlayerManageIdentitySourceTap"
-        >微信用户</view>
-        <view
-          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'app_import' ? 'is-active' : ''}}"
-          data-identitysource="app_import"
-          bindtap="onPlayerManageIdentitySourceTap"
-        >APP导入</view>
-        <view
-          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'manual_add' ? 'is-active' : ''}}"
-          data-identitysource="manual_add"
-          bindtap="onPlayerManageIdentitySourceTap"
-        >手工创建</view>
-        <view
-          class="player-manage-status-tab {{playerManageIdentitySourceFilter === 'derived' ? 'is-active' : ''}}"
-          data-identitysource="derived"
-          bindtap="onPlayerManageIdentitySourceTap"
-        >系统派生</view>
-      </view>
       <text wx:if="{{playerManageCountTip}}" class="player-manage-sheet__count">{{playerManageCountTip}}</text>
     </view>
     <scroll-view scroll-y class="player-manage-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
@@ -1122,13 +1052,8 @@
             <view class="player-manage-row__name-row">
               <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
               <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
-              <text class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
             </view>
             <text wx:if="{{item.contactRemark}}" class="player-manage-row__remark">{{item.contactRemark}}</text>
-            <view wx:if="{{item.identityLabel || item.identitySourceLabel}}" class="player-manage-row__identity-tags">
-              <text wx:if="{{item.identityLabel}}" class="player-manage-row__identity-tag">{{item.identityLabel}}</text>
-              <text wx:if="{{item.identitySourceLabel}}" class="player-manage-row__identity-tag">{{item.identitySourceLabel}}</text>
-            </view>
             <view class="player-manage-row__sub">
               <text
                 class="player-manage-row__phone {{item.hasPhone ? 'is-callable' : ''}}"
@@ -1151,21 +1076,6 @@
             data-userid="{{item.userId}}"
             bindinput="onPlayerManageNicknameInput"
           />
-          <text class="register-sheet__label player-manage-row__label-gap">手机号</text>
-          <view class="player-manage-phone-row">
-            <text
-              class="player-manage-phone-row__value {{item.hasPhone ? 'is-callable' : ''}}"
-              data-userid="{{item.userId}}"
-              data-phone="{{item.phone}}"
-              catchtap="onPlayerManageCallPhone"
-            >{{item.phoneDisplay}}</text>
-            <view
-              class="player-manage-phone-row__copy"
-              data-userid="{{item.userId}}"
-              data-phone="{{item.phone}}"
-              catchtap="onPlayerManageCopyPhone"
-            >复制手机号</view>
-          </view>
           <text class="register-sheet__label player-manage-row__label-gap">性别</text>
           <view class="register-sheet__groups">
             <view
@@ -1188,17 +1098,10 @@
             <text class="player-manage-team-select__arrow">›</text>
           </view>
           <view
-            wx:if="{{!item.formalGrouped}}"
-            class="player-manage-row__add"
-            data-userid="{{item.userId}}"
-            bindtap="onPlayerManageAddToSlot"
-          >加入空位</view>
-          <view
-            wx:if="{{item.formalGrouped}}"
             class="player-manage-row__remove"
             data-userid="{{item.userId}}"
-            bindtap="onPlayerManageRemove"
-          >移出分组</view>
+            bindtap="onRemovePlayerFromRegister"
+          >移除报名表</view>
         </view>
       </view>
     </scroll-view>
@@ -1255,32 +1158,6 @@
     </scroll-view>
     <view class="register-sheet__actions">
       <view bindtap="closePlayerManageTeamPicker" class="register-sheet__cancel">取消</view>
-    </view>
-  </view>
-
-  <!-- 选手管理 · 选择加入位置 -->
-  <view wx:if="{{playerSlotSelectVisible}}" bindtap="closePlayerSlotSelectSheet" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
-  <view wx:if="{{playerSlotSelectVisible}}" class="bottom-sheet register-sheet player-slot-select-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
-    <view class="sheet-handle"></view>
-    <view class="register-sheet__head">
-      <text class="register-sheet__overline">SLOT</text>
-      <text class="register-sheet__title">请选择加入位置</text>
-      <text class="register-sheet__sub">空位中如已有比赛成绩，加入后会沿用该位置的历史成绩。</text>
-    </view>
-    <view class="player-slot-select-sheet__body">
-      <view
-        wx:for="{{playerSlotSelectOptions}}"
-        wx:key="position"
-        class="player-slot-select-item {{item.hasHistoryScore ? 'has-history' : ''}}"
-        data-position="{{item.position}}"
-        bindtap="onPlayerSlotSelectOptionTap"
-      >
-        <text class="player-slot-select-item__title">{{item.title}}</text>
-        <text class="player-slot-select-item__desc">{{item.desc}}</text>
-      </view>
-    </view>
-    <view class="register-sheet__actions">
-      <view bindtap="closePlayerSlotSelectSheet" class="register-sheet__cancel">取消</view>
     </view>
   </view>
 

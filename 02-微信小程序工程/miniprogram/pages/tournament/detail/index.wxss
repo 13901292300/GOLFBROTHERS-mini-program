@@ -1952,37 +1952,6 @@ page {
 .player-manage-filter-select {
   margin-top: 12rpx;
 }
-.player-manage-status-tabs {
-  margin-top: 12rpx;
-  display: flex;
-  gap: 12rpx;
-}
-.player-manage-status-tab {
-  flex: 1;
-  height: 64rpx;
-  border-radius: 12rpx;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 24rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-.player-manage-status-tab.is-active {
-  background: var(--data-blue, #00aeef);
-  border-color: var(--data-blue, #00aeef);
-  color: #fff;
-}
-.detail-page.dark-mode .player-manage-status-tab {
-  background: var(--bg-card);
-}
-.detail-page.dark-mode .player-manage-status-tab.is-active {
-  background: var(--data-blue, #00aeef);
-  color: #fff;
-}
 .player-manage-row__name-row {
   display: flex;
   align-items: center;
@@ -1992,25 +1961,6 @@ page {
 .player-manage-row__name-row .player-manage-row__name {
   flex: 1;
   min-width: 0;
-}
-.player-manage-group-tag {
-  flex-shrink: 0;
-  padding: 2rpx 10rpx;
-  border-radius: 8rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  line-height: 1.4;
-}
-.player-manage-group-tag.is-grouped {
-  color: var(--data-blue, #00aeef);
-  background: rgba(0, 174, 239, 0.12);
-}
-.player-manage-group-tag.is-ungrouped {
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-}
-.detail-page.dark-mode .player-manage-group-tag.is-ungrouped {
-  background: var(--bg-card);
 }
 .player-manage-sheet__count {
   display: block;
@@ -2157,55 +2107,12 @@ page {
   font-size: 22rpx;
   font-weight: 500;
 }
-.player-manage-phone-row__value.is-callable {
-  color: var(--data-blue, #00aeef);
-  text-decoration: underline;
-  text-underline-offset: 4rpx;
-}
-.player-manage-phone-row {
-  margin-top: 12rpx;
-  min-height: 80rpx;
-  padding: 0 20rpx;
-  box-sizing: border-box;
-  border-radius: 12rpx;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-}
-.player-manage-phone-row__value {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-primary);
-  font-size: 28rpx;
-  font-weight: 700;
-}
-.player-manage-phone-row__copy {
-  flex-shrink: 0;
-  color: var(--data-blue, #00aeef);
-  font-size: 24rpx;
-  font-weight: 700;
-  padding: 8rpx 0;
-}
-.detail-page.dark-mode .player-manage-phone-row {
-  background: var(--bg-card);
-}
 .player-manage-row__remove {
   margin-top: 24rpx;
   color: var(--error, #dc2626);
   font-size: 26rpx;
   font-weight: 800;
   opacity: 0.9;
-  padding: 8rpx 0;
-}
-.player-manage-row__add {
-  margin-top: 24rpx;
-  color: var(--data-blue, #00aeef);
-  font-size: 26rpx;
-  font-weight: 800;
-  opacity: 0.95;
   padding: 8rpx 0;
 }
 .detail-page.dark-mode .player-manage-row__input,
@@ -2435,54 +2342,6 @@ page {
   color: var(--data-blue, #00aeef);
   font-size: 28rpx;
   font-weight: 800;
-}
-.player-slot-select-sheet {
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  box-sizing: border-box;
-  z-index: 12100;
-}
-.player-slot-select-sheet__body {
-  padding: 4rpx 0 16rpx;
-}
-.player-slot-select-item {
-  min-height: 96rpx;
-  padding: 18rpx 20rpx;
-  margin-top: 12rpx;
-  border-radius: 18rpx;
-  border: 1px solid var(--border);
-  background: var(--bg-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  box-sizing: border-box;
-}
-.player-slot-select-item.has-history {
-  border-color: rgba(245, 158, 11, 0.45);
-  background: rgba(245, 158, 11, 0.1);
-}
-.player-slot-select-item__title {
-  color: var(--text-primary);
-  font-size: 28rpx;
-  font-weight: 800;
-}
-.player-slot-select-item__desc {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  font-size: 24rpx;
-  font-weight: 700;
-}
-.player-slot-select-item.has-history .player-slot-select-item__desc {
-  color: #b45309;
-}
-.detail-page.dark-mode .player-slot-select-item {
-  background: var(--bg-card);
-}
-.detail-page.dark-mode .player-slot-select-item.has-history {
-  background: rgba(245, 158, 11, 0.16);
 }
 .temp-admin-add-sheet__options {
   display: flex;

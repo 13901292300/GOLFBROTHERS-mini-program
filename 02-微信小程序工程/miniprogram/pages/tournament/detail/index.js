@@ -9,6 +9,7 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const groupsStore = require('../../../utils/groupsStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
+const halfCourse = require('../../../utils/halfCourse.js');
 const partnerConfigUtil = require('../../../utils/partnerConfig.js');
 const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
 const bannerConfig = require('../../../utils/bannerConfig.js');
@@ -61,23 +62,6 @@ const EMPTY_MATCH_VIEW = {
   priceTags: [],
   priceText: ''
 };
-
-function resolveIdentityLabel(userType) {
-  const value = String(userType || '').trim();
-  if (value === 'registered') return '注册用户';
-  if (value === 'phone') return '手机用户';
-  if (value === 'guest') return '临时用户';
-  return '';
-}
-
-function resolveIdentitySourceLabel(identitySource) {
-  const value = String(identitySource || '').trim();
-  if (value === 'mini_program') return '微信用户';
-  if (value === 'app_import') return 'APP导入';
-  if (value === 'manual_add') return '手工创建';
-  if (value === 'derived') return '系统派生';
-  return '';
-}
 
 /* ===== 赛事生命周期状态（teamMatchStore.match.status） ===== */
 const MATCH_LIFECYCLE = {
@@ -414,9 +398,6 @@ Page({
     playerManageSearchKeyword: '',
     playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
     playerManageTeamFilterLabel: '全部分队',
-    playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
-    playerManageUserTypeFilter: playerManage.USER_TYPE_ALL,
-    playerManageIdentitySourceFilter: playerManage.IDENTITY_SOURCE_ALL,
     playerManageCountTip: '',
     playerManageEmptyText: '暂无报名选手',
     expandedPlayerManageUserId: '',
@@ -425,10 +406,6 @@ Page({
     playerTeamPickOptions: [],
     playerManageFilterPickVisible: false,
     playerManageFilterPickOptions: [],
-    playerSlotSelectVisible: false,
-    playerSlotSelectUserId: '',
-    playerSlotSelectGroupId: '',
-    playerSlotSelectOptions: [],
     // 收费管理（极简实收登记）
     showPaymentSheet: false,
     paymentUsers: [],
@@ -784,11 +761,13 @@ Page({
 
   loadMatch(matchId) {
     const match = this._resolveMatchData(matchId);
+    this._syncTournamentHoleLayout(match);
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
     this.setData(Object.assign({
       matchId: matchId,
       match: this._mapMatchToView(match),
+      courseName: (match && match.courseName) || '',
       matchStatus: lifecycle,
       tabs: tabs,
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
@@ -803,6 +782,7 @@ Page({
   refreshMatchData(matchId) {
     const match = this._resolveMatchData(matchId);
     if (!match) return;
+    this._syncTournamentHoleLayout(match);
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status);
     let activeTab = this.data.activeTab;
@@ -811,6 +791,7 @@ Page({
     }
     this.setData(Object.assign({
       match: this._mapMatchToView(match),
+      courseName: match.courseName || '',
       matchStatus: lifecycle,
       tabs: tabs,
       activeTab: activeTab,
@@ -1333,8 +1314,8 @@ Page({
         // Patch 8：手工代报名预留字段，与 store.normalize 对齐
         userType: userType,
         identitySource: identitySource,
-        identityLabel: resolveIdentityLabel(userType),
-        identitySourceLabel: resolveIdentitySourceLabel(identitySource),
+        identityLabel: user.identityLabel || '',
+        identitySourceLabel: user.identitySourceLabel || '',
         realName: user.realName || '',
         remarkName: user.remarkName || ''
       };
@@ -1389,8 +1370,8 @@ Page({
           locked: !!user.locked,
           userType: user.userType || '',
           identitySource: user.identitySource || '',
-          identityLabel: user.identityLabel || resolveIdentityLabel(user.userType),
-          identitySourceLabel: user.identitySourceLabel || resolveIdentitySourceLabel(user.identitySource),
+          identityLabel: user.identityLabel || '',
+          identitySourceLabel: user.identitySourceLabel || '',
           contactRemark: contactRemark,
           realName: user.realName || '',
           remarkName: user.remarkName || ''
@@ -2661,26 +2642,46 @@ Page({
   onEnterGroup(e) {
     const groupId = e.currentTarget.dataset.groupId || '';
     const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     groupsStore.ensureInitialized();
-    let players = groupsStore.loadGroupForScoring(groupId).map((p) => ({
-      playerId: p.playerId,
-      name: p.name,
-      avatar: p.avatar || ''
-    }));
-    if (!players.length && matchId) {
-      const match = teamMatchStore.getMatchById(matchId);
-      const group = match && Array.isArray(match.groups)
-        ? match.groups.find((g) => String(g && g.groupId) === String(groupId))
-        : null;
-      const lookup = this._buildGroupPlayerLookup(match);
-      players = this.hydrateGroupDisplayPlayers(group, lookup).map((p) => ({
-        playerId: p.userId || p.playerId,
-        name: p.displayName || p.name,
+    const group = match && Array.isArray(match.groups)
+      ? match.groups.find((g) => String(g && g.groupId) === String(groupId))
+      : null;
+    const lookup = this._buildGroupPlayerLookup(match);
+    let players = group
+      ? this.hydrateGroupDisplayPlayers(group, lookup).map((p) => ({
+          playerId: p.userId || p.playerId,
+          name: p.displayName || p.name,
+          avatar: p.avatar || ''
+        }))
+      : [];
+    if (!players.length) {
+      players = groupsStore.loadGroupForScoring(groupId).map((p) => ({
+        playerId: p.playerId,
+        name: p.name,
         avatar: p.avatar || ''
       }));
     }
-    const groupCount = (groupsStore.getGroups() || []).length || 2;
-    const courseMeta = groupsStore.getTournamentCourseMeta();
+    const groupCount =
+      match && Array.isArray(match.groups) && match.groups.length
+        ? match.groups.length
+        : (groupsStore.getGroups() || []).length || 1;
+    const courseMeta = match
+      ? {
+          courseId: match.courseId || '',
+          courseName: match.courseName || match.venueName || '',
+          courseLocation: match.courseLocation || '',
+          courseHalfText: match.courseHalfText || '',
+          front9Course: match.front9Course || null,
+          back9Course: match.back9Course || null,
+          roundName: match.roundName || match.name || match.eventName || match.tournamentName || match.teamName || '',
+          gameMode: match.gameMode || match.selectedGameMode || '个人比杆赛',
+          teeTime: match.teeTime || match.date || '',
+          teeTimeText: match.teeTimeText || '',
+          visibility: match.visibility || '',
+          accessCode: match.accessCode || ''
+        }
+      : {};
     matchStateUtil.setMatchState({
       mode: 'individual_stroke',
       formatType: 'individual_stroke',
@@ -2691,9 +2692,15 @@ Page({
       players: players,
       course: {
         courseId: courseMeta.courseId || '',
-        courseName: courseMeta.courseName || groupsStore.getCourseName() || '',
+        courseName: courseMeta.courseName || '',
         courseLocation: courseMeta.courseLocation || '',
         halfText: courseMeta.courseHalfText || '',
+        roundName: courseMeta.roundName || '',
+        gameMode: courseMeta.gameMode || '个人比杆赛',
+        teeTime: courseMeta.teeTime || '',
+        teeTimeText: courseMeta.teeTimeText || '',
+        visibility: courseMeta.visibility || '',
+        accessCode: courseMeta.accessCode || '',
         front9Course: courseMeta.front9Course || null,
         back9Course: courseMeta.back9Course || null
       },
@@ -2705,8 +2712,16 @@ Page({
   },
 
   /* ===== 出发表 + 领先榜 ===== */
-  _syncTournamentHoleLayout() {
-    const meta = groupsStore.getTournamentCourseMeta();
+  _syncTournamentHoleLayout(matchOrNull) {
+    const match = matchOrNull || null;
+    const meta = match
+      ? {
+          courseId: match.courseId || '',
+          courseName: match.courseName || '',
+          front9Course: match.front9Course || null,
+          back9Course: match.back9Course || null
+        }
+      : groupsStore.getTournamentCourseMeta();
     const layout = holeLayout.resolveLayoutFromContext({
       courseId: meta.courseId,
       courseName: meta.courseName,
@@ -2714,6 +2729,20 @@ Page({
       back9Course: meta.back9Course
     });
     holeLayout.applyLayout(layout);
+  },
+
+  _getMatchHolePars(match) {
+    if (!match) return holeLayout.getLayout().holePars.slice();
+    const parsed = (!match.front9Course && !match.back9Course)
+      ? halfCourse.parseCourseHalfText(match.courseHalfText || match.courseHalf || match.halfText)
+      : {};
+    const layout = holeLayout.resolveLayoutFromContext({
+      courseId: match.courseId || '',
+      courseName: match.courseName || '',
+      front9Course: match.front9Course || parsed.front9Course || null,
+      back9Course: match.back9Course || parsed.back9Course || null
+    });
+    return layout.holePars.slice();
   },
 
   _isFilledLeaderboardScore(score) {
@@ -2783,10 +2812,10 @@ Page({
     return total;
   },
 
-  _buildScorecardFromScoreRecord(record, mode, scorecardStatus) {
+  _buildScorecardFromScoreRecord(record, mode, scorecardStatus, match) {
     if (!record || !Array.isArray(record.scores)) return null;
     const scores = record.scores || [];
-    const pars = groupsStore.getHolePars();
+    const pars = this._getMatchHolePars(match);
     const parCell = (value) => ({ t: String(value), m: '', c: '' });
     const blank = { t: '', m: '', c: '' };
 
@@ -2838,9 +2867,9 @@ Page({
     const scores = record && Array.isArray(record.scores) ? record.scores : [];
     const started = scores.some((score) => this._isFilledLeaderboardScore(score));
     if (!started) {
-      return this._buildScorecardFromScoreRecord({ scores: [] }, this.data.scoreDisplayMode, 'not_started');
+      return this._buildScorecardFromScoreRecord({ scores: [] }, this.data.scoreDisplayMode, 'not_started', match);
     }
-    return this._buildScorecardFromScoreRecord(record, this.data.scoreDisplayMode);
+    return this._buildScorecardFromScoreRecord(record, this.data.scoreDisplayMode, null, match);
   },
 
   _resolveMatchPlayerHoles(match, group, player, playerId) {
@@ -2887,7 +2916,7 @@ Page({
   _computeMatchLeaderboardStats(match, group, player, playerId) {
     const resolved = this._resolveMatchPlayerHoles(match, group, player, playerId);
     const holes = resolved.holes || [];
-    const pars = groupsStore.getHolePars();
+    const pars = this._getMatchHolePars(match);
     let total = 0;
     let parThru = 0;
     let thru = 0;
@@ -3411,9 +3440,6 @@ Page({
         playerManageSearchKeyword: '',
         playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
         playerManageTeamFilterLabel: '全部分队',
-        playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
-        playerManageUserTypeFilter: playerManage.USER_TYPE_ALL,
-        playerManageIdentitySourceFilter: playerManage.IDENTITY_SOURCE_ALL,
         expandedPlayerManageUserId: '',
         playerTeamPickVisible: false,
         playerManageFilterPickVisible: false
@@ -3441,9 +3467,6 @@ Page({
     const view = playerManage.buildPlayerManageDisplay(playersForDisplay, {
       keyword: this.data.playerManageSearchKeyword,
       teamFilter: this.data.playerManageTeamFilter,
-      groupStatusFilter: this.data.playerManageGroupStatusFilter,
-      userTypeFilter: this.data.playerManageUserTypeFilter,
-      identitySourceFilter: this.data.playerManageIdentitySourceFilter,
       groups: draft ? draft.groupsDraft : [],
       expandedUserId: this.data.expandedPlayerManageUserId
     });
@@ -3472,20 +3495,6 @@ Page({
     this._syncPlayerManageDisplay();
   },
 
-  _findPlayerManageFirstAvailableGroupId() {
-    const groups = this._playerManageDraft && Array.isArray(this._playerManageDraft.groupsDraft)
-      ? this._playerManageDraft.groupsDraft
-      : [];
-    for (let i = 0; i < groups.length; i++) {
-      const group = groups[i];
-      if (!group || !group.groupId) continue;
-      if (teamMatchStore.getAvailableSlots(group).length > 0) {
-        return String(group.groupId);
-      }
-    }
-    return '';
-  },
-
   closePlayerManageSheet() {
     if (this._playerManageSearchTimer) {
       clearTimeout(this._playerManageSearchTimer);
@@ -3499,9 +3508,6 @@ Page({
       playerManageSearchKeyword: '',
       playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
       playerManageTeamFilterLabel: '全部分队',
-      playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
-      playerManageUserTypeFilter: playerManage.USER_TYPE_ALL,
-      playerManageIdentitySourceFilter: playerManage.IDENTITY_SOURCE_ALL,
       playerManageCountTip: '',
       playerManageEmptyText: '暂无报名选手',
       expandedPlayerManageUserId: '',
@@ -3509,11 +3515,7 @@ Page({
       playerTeamPickUserId: '',
       playerTeamPickOptions: [],
       playerManageFilterPickVisible: false,
-      playerManageFilterPickOptions: [],
-      playerSlotSelectVisible: false,
-      playerSlotSelectUserId: '',
-      playerSlotSelectGroupId: '',
-      playerSlotSelectOptions: []
+      playerManageFilterPickOptions: []
     });
   },
 
@@ -3579,41 +3581,6 @@ Page({
     );
   },
 
-  onPlayerManageGroupStatusTap(e) {
-    const status = String((e.currentTarget.dataset && e.currentTarget.dataset.status) || '');
-    if (
-      status !== playerManage.GROUP_STATUS_ALL &&
-      status !== playerManage.GROUP_STATUS_GROUPED &&
-      status !== playerManage.GROUP_STATUS_UNGROUPED
-    ) {
-      return;
-    }
-    if (String(this.data.playerManageGroupStatusFilter || '') === status) return;
-    this.setData({ playerManageGroupStatusFilter: status }, () =>
-      this._syncPlayerManageDisplay()
-    );
-  },
-
-  onPlayerManageUserTypeTap(e) {
-    const value = String((e.currentTarget.dataset && e.currentTarget.dataset.usertype) || '');
-    const allowed = ['all', 'registered', 'phone', 'guest'];
-    if (allowed.indexOf(value) < 0) return;
-    if (String(this.data.playerManageUserTypeFilter || '') === value) return;
-    this.setData({ playerManageUserTypeFilter: value }, () =>
-      this._syncPlayerManageDisplay()
-    );
-  },
-
-  onPlayerManageIdentitySourceTap(e) {
-    const value = String((e.currentTarget.dataset && e.currentTarget.dataset.identitysource) || '');
-    const allowed = ['all', 'mini_program', 'app_import', 'manual_add', 'derived'];
-    if (allowed.indexOf(value) < 0) return;
-    if (String(this.data.playerManageIdentitySourceFilter || '') === value) return;
-    this.setData({ playerManageIdentitySourceFilter: value }, () =>
-      this._syncPlayerManageDisplay()
-    );
-  },
-
   togglePlayerManageExpand(e) {
     const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
     if (!userId) return;
@@ -3623,7 +3590,6 @@ Page({
       {
         expandedPlayerManageUserId: next,
         playerTeamPickVisible: false,
-        playerSlotSelectVisible: false,
         playerManageFilterPickVisible: false
       },
       () => this._syncPlayerManageDisplay()
@@ -3754,45 +3720,37 @@ Page({
     this._patchPlayerManageDraft(userId, { matchTeamId: teamId });
   },
 
-  onPlayerManageRemove(e) {
+  onRemovePlayerFromRegister(e) {
     const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
     if (!userId || !this._playerManageDraft) return;
     const row = (this._playerManageDraft.players || []).find(
       (item) => String((item && item.userId) || '') === userId
     );
-    const paymentUser = row && row._raw ? row._raw : row;
-    if (paymentManage.isUserPaymentConfirmed(paymentUser)) {
-      const match = teamMatchStore.getMatchById(this.data.matchId || '');
-      const log = paymentManage.createPaymentLog({
-        action: 'payment_protected_delete_blocked',
-        operator: this._buildPaymentLogOperator(match),
-        targetUser: paymentUser,
-        diffText: '管理员尝试删除已收用户' + playerManage.resolveMatchNickname(paymentUser) + '，系统已阻止。请先在收费管理中改为未收后再删除。'
-      });
-      paymentManage.appendPaymentLogs(match, [log]);
-      if (match) teamMatchStore.saveMatch(match);
-      wx.showModal({
-        title: '无法删除已收用户',
-        content: '该用户已登记收款。请先进入收费管理，将该用户改为未收后，再删除选手。',
-        showCancel: false,
-        confirmText: '我知道了'
-      });
+    if (!row) {
+      wx.showToast({ title: '选手不存在', icon: 'none' });
       return;
     }
+    const grouped = playerManage.isPlayerFormalGrouped(
+      row,
+      playerManage.collectFormalGroupedUserIds(this._playerManageDraft.groupsDraft)
+    );
+    const name = playerManage.resolveMatchNickname(row) || '该球员';
+    const content = grouped
+      ? '该球员当前已有出发安排。\n\n移除报名后，该球员将不再属于本场报名名单。\n\n如需调整出发安排，请前往“修改分组”或记分页“添加/删除”。'
+      : '确定要将【' + name + '】从本场比赛报名列表中移除吗？';
     wx.showModal({
-      title: '移出分组',
-      content: '确定将该选手从当前出发组移出吗？该选手仍会保留在本场报名池中。',
+      title: '移除报名',
+      content: content,
       cancelText: '取消',
-      confirmText: '确认移出',
+      confirmText: '确认移除',
       confirmColor: '#dc2626',
       success: (res) => {
         if (!res.confirm) return;
-        const result = playerManage.removePlayerFromDraft(this._playerManageDraft, userId);
-        if (!result || !result.ok) {
-          wx.showToast({ title: '删除失败', icon: 'none' });
-          return;
-        }
-        this._playerManageDraft = result.draft;
+        this._playerManageDraft = Object.assign({}, this._playerManageDraft, {
+          players: (this._playerManageDraft.players || []).filter(
+            (item) => String((item && item.userId) || '') !== userId
+          )
+        });
         const nextExpanded =
           String(this.data.expandedPlayerManageUserId || '') === userId
             ? ''
@@ -3800,108 +3758,9 @@ Page({
         this.setData({ expandedPlayerManageUserId: nextExpanded }, () =>
           this._syncPlayerManageDisplay()
         );
-        wx.showToast({ title: result.wasGrouped ? '已移出分组，保存后生效' : '该选手未在分组中', icon: 'none' });
+        wx.showToast({ title: '已移除报名，保存后生效', icon: 'none' });
       }
     });
-  },
-
-  onPlayerManageAddToSlot(e) {
-    const userId = String((e.currentTarget.dataset && e.currentTarget.dataset.userid) || '');
-    if (!userId || !this._playerManageDraft) return;
-    const row = (this._playerManageDraft.players || []).find(
-      (item) => String((item && item.userId) || '') === userId
-    );
-    if (!row) {
-      wx.showToast({ title: '选手不存在', icon: 'none' });
-      return;
-    }
-    if (playerManage.isPlayerFormalGrouped(row, playerManage.collectFormalGroupedUserIds(this._playerManageDraft.groupsDraft))) {
-      wx.showToast({ title: '该选手已分组', icon: 'none' });
-      return;
-    }
-    const groupId = this._findPlayerManageFirstAvailableGroupId();
-    if (!groupId) {
-      wx.showToast({ title: '暂无可用空位', icon: 'none' });
-      return;
-    }
-    const result = playerManage.addPlayerToGroupsDraft(
-      this._playerManageDraft.groupsDraft || [],
-      groupId,
-      row,
-      { scoreData: this._playerManageDraft.scoreData || {} }
-    );
-    if (result && result.needsSlotSelection) {
-      const options = (result.availableSlots || []).map((slot) => ({
-        position: Number(slot.position) || 0,
-        title: '第' + (Number(slot.position) || 0) + '位',
-        desc: slot.hasHistoryScore ? '已有比赛成绩' : '无历史成绩',
-        hasHistoryScore: !!slot.hasHistoryScore
-      }));
-      this.setData({
-        playerSlotSelectVisible: true,
-        playerSlotSelectUserId: userId,
-        playerSlotSelectGroupId: groupId,
-        playerSlotSelectOptions: options,
-        playerTeamPickVisible: false,
-        playerManageFilterPickVisible: false
-      });
-      return;
-    }
-    if (!result || !result.ok) {
-      wx.showToast({ title: '加入失败', icon: 'none' });
-      return;
-    }
-    this._playerManageDraft = Object.assign({}, this._playerManageDraft, {
-      groupsDraft: result.groups || this._playerManageDraft.groupsDraft
-    });
-    this._syncPlayerManageDisplay();
-    wx.showToast({ title: '已加入空位，保存后生效', icon: 'none' });
-  },
-
-  closePlayerSlotSelectSheet() {
-    this.setData({
-      playerSlotSelectVisible: false,
-      playerSlotSelectUserId: '',
-      playerSlotSelectGroupId: '',
-      playerSlotSelectOptions: []
-    });
-  },
-
-  onPlayerSlotSelectOptionTap(e) {
-    const position = Number((e.currentTarget.dataset && e.currentTarget.dataset.position) || 0);
-    const userId = String(this.data.playerSlotSelectUserId || '');
-    const groupId = String(this.data.playerSlotSelectGroupId || '');
-    if (!position || !userId || !groupId || !this._playerManageDraft) {
-      this.closePlayerSlotSelectSheet();
-      return;
-    }
-    const row = (this._playerManageDraft.players || []).find(
-      (item) => String((item && item.userId) || '') === userId
-    );
-    if (!row) {
-      this.closePlayerSlotSelectSheet();
-      wx.showToast({ title: '选手不存在', icon: 'none' });
-      return;
-    }
-    const result = playerManage.addPlayerToGroupsDraft(
-      this._playerManageDraft.groupsDraft || [],
-      groupId,
-      row,
-      {
-        scoreData: this._playerManageDraft.scoreData || {},
-        slotPosition: position
-      }
-    );
-    if (!result || !result.ok) {
-      wx.showToast({ title: '加入失败', icon: 'none' });
-      return;
-    }
-    this._playerManageDraft = Object.assign({}, this._playerManageDraft, {
-      groupsDraft: result.groups || this._playerManageDraft.groupsDraft
-    });
-    this.closePlayerSlotSelectSheet();
-    this._syncPlayerManageDisplay();
-    wx.showToast({ title: '已加入指定位置，保存后生效', icon: 'none' });
   },
 
   savePlayerManageSheet() {
@@ -4929,7 +4788,7 @@ Page({
    * Patch 5A/5B/5C/7：处理好友/球队成员页差异返回。
    * - removedPlayers → remove plan
    * - addedPlayers → 打开「选择代表分队」；确定后生成 add plan 并统一写盘
-   * - 仅取消（无新增）→ _promptOrApplyProxyCommitPlan（已分组则先确认）
+   * - 仅取消（无新增）→ _promptOrApplyProxyCommitPlan（已有出发安排则先确认）
    */
   _onProxyFriendsSelected(payload) {
     const data = payload || {};
@@ -4970,12 +4829,12 @@ Page({
       return;
     }
 
-    // 仅取消 / 无变更：若取消对象已分组则先确认，再统一提交
+    // 仅取消 / 无变更：若取消对象已有出发安排则先确认，再统一提交
     this._promptOrApplyProxyCommitPlan();
   },
 
   /**
-   * 代报名写盘前：若待取消的 targetUserId 已在正式 groups 中，先弹「已分组」确认。
+   * 代报名写盘前：若待取消的 targetUserId 已在正式 groups 中，先弹二次确认。
    * 判断对象是被取消的好友/队员，不是当前登录用户。
    */
   _promptOrApplyProxyCommitPlan() {
@@ -5778,7 +5637,7 @@ Page({
 
   /**
    * 邀请好友报名：微信分享入口（阶段占位）
-   * 所有注册用户可用；与 registrationStatus 无关（关闭报名后仍可邀请）
+   * 已登录用户可用；与 registrationStatus 无关（关闭报名后仍可邀请）
    */
   shareTournamentInvite() {
     const matchId = this.data.matchId || '';
@@ -5822,6 +5681,8 @@ Page({
     });
     if (matchId) {
       this.refreshMatchData(matchId);
+      this.refreshGroupsDerived();
+      wx.nextTick(() => this.updateOpenScorecard());
     }
   },
 
