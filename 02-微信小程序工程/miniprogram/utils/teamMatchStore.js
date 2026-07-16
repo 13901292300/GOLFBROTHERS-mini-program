@@ -81,6 +81,29 @@ function cloneTeamGroups(list) {
   }));
 }
 
+function normalizeTeamCompetition(input, groupCount) {
+  const source = input && typeof input === 'object' ? input : {};
+  let topN = Number(source.topN);
+  if (!isFinite(topN) || topN < 1) topN = 3;
+  return {
+    enabled: Number(groupCount) >= 2 && source.enabled === true,
+    topN: Math.floor(topN)
+  };
+}
+
+function buildScoringRules(pageData, existingRules) {
+  const data = pageData || {};
+  const base = existingRules && typeof existingRules === 'object' ? Object.assign({}, existingRules) : {};
+  const teamGroups = cloneTeamGroups(data.teamGroups);
+  const input =
+    data.teamCompetition ||
+    (data.scoringRules && data.scoringRules.teamCompetition) ||
+    (base && base.teamCompetition) ||
+    {};
+  base.teamCompetition = normalizeTeamCompetition(input, teamGroups.length);
+  return base;
+}
+
 function normalizeScoreData(scoreData) {
   if (!scoreData || typeof scoreData !== 'object' || Array.isArray(scoreData)) return {};
   return scoreData;
@@ -271,6 +294,7 @@ function buildMatchFromCreatePage(pageData) {
     feeList: cloneFeeList(data.feeList),
     eventInfoList: cloneEventInfoList(data.eventInfoList),
     teamGroups: cloneTeamGroups(data.teamGroups),
+    scoringRules: buildScoringRules(data),
     registerInfo: createDefaultRegisterInfo(),
     groups: [],
     pairings: {},
@@ -335,6 +359,7 @@ function updateMatchFromCreatePage(existing, pageData, options) {
   next.feeList = cloneFeeList(data.feeList);
   next.eventInfoList = cloneEventInfoList(data.eventInfoList);
   next.teamGroups = cloneTeamGroups(data.teamGroups);
+  next.scoringRules = buildScoringRules(data, existing.scoringRules);
   next.feeSet = !!data.feeSet;
   next.isDiamondMode = !!data.isDiamondMode;
   next.bannerImage = data.bannerImage != null ? data.bannerImage : (existing.bannerImage || '');
@@ -872,6 +897,10 @@ function hydrateCreatePageFromMatch(match) {
     feeList: cloneFeeList(match.feeList),
     eventInfoList: cloneEventInfoList(match.eventInfoList),
     teamGroups: cloneTeamGroups(match.teamGroups),
+    teamCompetition: normalizeTeamCompetition(
+      match.scoringRules && match.scoringRules.teamCompetition,
+      cloneTeamGroups(match.teamGroups).length
+    ),
     feeSet: match.feeSet != null ? !!match.feeSet : true,
     isDiamondMode: !!match.isDiamondMode,
     bannerImage: match.bannerImage || '',

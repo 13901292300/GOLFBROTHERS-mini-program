@@ -406,6 +406,23 @@
 
     <text class="team-group-desc ds-desc-text">{{teamGroupSheetDesc}}</text>
 
+    <view wx:if="{{draftTeamGroups.length >= 2}}" class="team-competition-rule">
+      <view class="team-competition-rule__row">
+        <text class="team-competition-rule__name">分队PK</text>
+        <switch checked="{{draftTeamCompetition.enabled}}" bindchange="onTeamCompetitionToggle" color="#C9A45C" />
+      </view>
+      <view wx:if="{{draftTeamCompetition.enabled}}" class="team-competition-rule__topn">
+        <text class="team-competition-rule__label">每队取前</text>
+        <input
+          class="team-competition-rule__input"
+          type="number"
+          value="{{draftTeamCompetition.topN}}"
+          bindinput="onTeamCompetitionTopNInput"
+        />
+        <text class="team-competition-rule__label">名成绩</text>
+      </view>
+    </view>
+
     <view class="team-group-list">
       <view wx:for="{{draftTeamGroups}}" wx:for-item="draftGroup" wx:for-index="draftGroupIndex" wx:key="renderKey" class="team-group-row">
         <input

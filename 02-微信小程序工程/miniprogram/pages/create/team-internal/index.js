@@ -80,6 +80,10 @@ const DEFAULT_TEAM_GROUPS = [
   { id: 1, renderKey: 'team-group-1', name: '正式队员' },
   { id: 2, renderKey: 'team-group-2', name: '嘉宾' }
 ];
+const DEFAULT_TEAM_COMPETITION = {
+  enabled: false,
+  topN: 3
+};
 const ROUND_NAME_SUFFIX = '月例赛';
 
 function buildEventTitleMapForList(list) {
@@ -187,6 +191,8 @@ Page({
 
     teamGroups: DEFAULT_TEAM_GROUPS.map((item) => Object.assign({}, item)),
     draftTeamGroups: [],
+    draftTeamCompetition: Object.assign({}, DEFAULT_TEAM_COMPETITION),
+    teamCompetition: Object.assign({}, DEFAULT_TEAM_COMPETITION),
     showTeamGroupSheet: false,
     nextTeamGroupId: 3,
     teamGroupSummary: '正式队员 / 嘉宾',
@@ -309,6 +315,7 @@ Page({
       ? form.eventInfoList.slice()
       : DEFAULT_EVENT_INFO_LIST.slice();
     const gameMode = form.gameMode || '个人比杆赛';
+    const teamCompetition = this._competitionForGroupCount(form.teamCompetition, teamGroups.length);
     const matchPlay = isMatchPlayMode(gameMode);
     const maxGroupId = teamGroups.reduce((max, g) => Math.max(max, Number(g.id) || 0), 0);
     const maxFeeId = feeList.reduce((max, f) => Math.max(max, Number(f.id) || 0), 0);
@@ -352,6 +359,8 @@ Page({
         teamGroupSheetDesc: getTeamGroupSheetDesc(matchPlay),
         teamGroups: teamGroups,
         teamGroupSummary: this.getTeamGroupSummary(teamGroups),
+        teamCompetition: teamCompetition,
+        draftTeamCompetition: Object.assign({}, teamCompetition),
         nextTeamGroupId: maxGroupId + 1,
         feeList: feeList,
         nextFeeId: maxFeeId + 1,
@@ -486,6 +495,22 @@ Page({
     return DEFAULT_TEAM_GROUPS.map((item) => Object.assign({}, item));
   },
 
+  _normalizeTeamCompetition(input) {
+    const source = input && typeof input === 'object' ? input : {};
+    let topN = Number(source.topN);
+    if (!isFinite(topN) || topN < 1) topN = DEFAULT_TEAM_COMPETITION.topN;
+    return {
+      enabled: source.enabled === true,
+      topN: Math.floor(topN)
+    };
+  },
+
+  _competitionForGroupCount(input, groupCount) {
+    const next = this._normalizeTeamCompetition(input);
+    if (Number(groupCount) < 2) next.enabled = false;
+    return next;
+  },
+
   _matchPlayTeamGroups(preserveNames) {
     const existing = this.data.teamGroups || [];
     return [
@@ -553,6 +578,7 @@ Page({
     const groups = this._cloneDraftTeamGroups(source);
     this.setData({
       draftTeamGroups: groups,
+      draftTeamCompetition: this._competitionForGroupCount(this.data.teamCompetition, groups.length),
       showTeamGroupSheet: true
     });
   },
@@ -593,7 +619,29 @@ Page({
     if (groups.length <= 1) return;
     const index = Number(e.currentTarget.dataset.index);
     groups.splice(index, 1);
-    this.setData({ draftTeamGroups: groups });
+    this.setData({
+      draftTeamGroups: groups,
+      draftTeamCompetition: this._competitionForGroupCount(this.data.draftTeamCompetition, groups.length)
+    });
+  },
+
+  onTeamCompetitionToggle(e) {
+    const enabled = !!(e && e.detail && e.detail.value);
+    const competition = this._competitionForGroupCount(
+      Object.assign({}, this.data.draftTeamCompetition, { enabled: enabled }),
+      (this.data.draftTeamGroups || []).length
+    );
+    this.setData({ draftTeamCompetition: competition });
+  },
+
+  onTeamCompetitionTopNInput(e) {
+    const raw = e && e.detail ? e.detail.value : '';
+    let topN = Number(raw);
+    if (!isFinite(topN) || topN < 1) topN = DEFAULT_TEAM_COMPETITION.topN;
+    const competition = this._normalizeTeamCompetition(
+      Object.assign({}, this.data.draftTeamCompetition, { topN: topN })
+    );
+    this.setData({ draftTeamCompetition: competition });
   },
 
   validateTeamGroups(groups) {
@@ -639,12 +687,15 @@ Page({
     }
 
     const groups = this._cloneTeamGroups(result.groups);
+    const competition = this._competitionForGroupCount(this.data.draftTeamCompetition, groups.length);
     if (!this.data.isMatchPlayMode) {
       this._freeModeTeamGroups = groups;
     }
     this.setData({
       teamGroups: groups,
       teamGroupSummary: this.getTeamGroupSummary(groups),
+      teamCompetition: competition,
+      draftTeamCompetition: Object.assign({}, competition),
       draftTeamGroups: [],
       showTeamGroupSheet: false
     });
