@@ -326,87 +326,181 @@
       <!-- 领先榜 -->
       <block wx:if="{{activeTab === 'leaderboard'}}">
         <view class="leaderboard-table-wrap">
-          <!-- leaderboardDefaultMode === 'team' 仅作为后续分队榜默认展示状态；本 Patch 仍渲染个人榜表头。 -->
-          <view class="leaderboard-head">
-            <text class="lh-pos">POS</text>
-            <text class="lh-player">PLAYER</text>
-            <text class="lh-thru">THRU</text>
-            <text class="lh-total">TOTAL</text>
-          </view>
-
-          <block wx:for="{{leaderboard}}" wx:key="playerId">
-            <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row">
-              <text class="lr-pos pos-cell">{{item.pos}}</text>
-              <view class="lr-player">
-                <text class="player-name">{{item.name}}</text>
-                <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
+          <block wx:if="{{leaderboardMode === 'team'}}">
+            <view class="leaderboard-head">
+              <text class="lh-pos">POS</text>
+              <text class="lh-player">TEAM</text>
+              <text class="lh-thru">SCORING PLAYERS</text>
+              <text class="lh-total">TOTAL</text>
+            </view>
+            <block wx:for="{{teamLeaderboard}}" wx:for-item="team" wx:for-index="teamIndex" wx:key="teamId">
+              <view bindtap="toggleTeamLeaderboardRow" data-team-id="{{team.teamId}}" class="leaderboard-row team-leaderboard-row {{expandedTeamId === team.teamId ? 'is-expanded' : ''}}">
+                <text class="lr-pos pos-cell">{{teamIndex + 1}}</text>
+                <view class="lr-player">
+                  <text class="player-name">{{team.teamName}}</text>
+                </view>
+                <text class="lr-thru">{{team.scoringPlayersCount}}</text>
+                <view class="lr-total team-leaderboard-total">
+                  <text class="leaderboard-total">{{team.total}}</text>
+                  <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
+                </view>
               </view>
-              <text class="lr-thru">{{item.thru}}</text>
-              <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
+              <view wx:if="{{expandedTeamId === team.teamId}}" class="team-leaderboard-players">
+                <view class="team-leaderboard-subhead">
+                  <text class="tlh-pos">POS</text>
+                  <text class="tlh-player">PLAYER</text>
+                  <text class="tlh-thru">THRU</text>
+                  <text class="tlh-total">TOTAL</text>
+                </view>
+                <block wx:for="{{team.players}}" wx:for-item="player" wx:for-index="playerIndex" wx:key="scorecardKey">
+                  <view
+                    wx:if="{{playerIndex === team.scoringPlayersCount}}"
+                    class="team-leaderboard-divider"
+                  ></view>
+                  <view
+                    catchtap="toggleScorecard"
+                    data-mode="team"
+                    data-index="{{player.scorecardKey}}"
+                    class="team-leaderboard-player {{player.isCounting ? '' : 'is-muted'}}"
+                  >
+                    <text class="team-leaderboard-player__pos">{{playerIndex + 1}}</text>
+                    <text class="team-leaderboard-player__name">{{player.name}}</text>
+                    <text class="team-leaderboard-player__thru">{{player.thru}}</text>
+                    <text class="team-leaderboard-player__total">{{player.total}}</text>
+                  </view>
+                  <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+                    <text class="sc-course course-name-title">{{courseName}}</text>
+
+                    <view class="tour-scorecard">
+                      <view class="tsc-row tsc-head">
+                        <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                      </view>
+                      <view class="tsc-row">
+                        <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                      </view>
+                      <view class="tsc-row">
+                        <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                          <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                            <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                          </view>
+                          <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                        </view>
+                      </view>
+                    </view>
+
+                    <view class="tour-scorecard">
+                      <view class="tsc-row tsc-head">
+                        <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                      </view>
+                      <view class="tsc-row">
+                        <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                      </view>
+                      <view class="tsc-row">
+                        <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                          <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                            <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                          </view>
+                          <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                        </view>
+                      </view>
+                    </view>
+
+                    <view class="score-legend-area">
+                      <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                      <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                      <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                      <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                    </view>
+                    <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
+                  </view>
+                </block>
+              </view>
+            </block>
+          </block>
+
+          <block wx:else>
+            <view class="leaderboard-head">
+              <text class="lh-pos">POS</text>
+              <text class="lh-player">PLAYER</text>
+              <text class="lh-thru">THRU</text>
+              <text class="lh-total">TOTAL</text>
             </view>
 
-            <!-- 展开成绩卡 -->
-            <view wx:if="{{item.expanded}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
-              <view class="scorecard-profile">
-                <view class="sc-profile-left">
-                  <view class="sc-avatar-wrap">
-                    <image class="sc-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
-                    <view class="sc-flag"><image src="https://flagcdn.com/w40/{{item.flag}}.png" mode="aspectFill"></image></view>
-                  </view>
-                  <view class="sc-profile-meta">
-                    <view class="sc-name-line"><text class="sc-name">{{item.name}}</text><text class="sc-chevron">›</text></view>
-                    <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
-                  </view>
+            <block wx:for="{{leaderboard}}" wx:key="playerId">
+              <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row">
+                <text class="lr-pos pos-cell">{{item.pos}}</text>
+                <view class="lr-player">
+                  <text class="player-name">{{item.name}}</text>
+                  <text wx:if="{{item.teamTag}}" class="leaderboard-team-tag">{{item.teamTag}}</text>
+                  <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
                 </view>
-                <view catchtap="noop" class="sc-follow-btn">加关注</view>
+                <text class="lr-thru">{{item.thru}}</text>
+                <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
               </view>
 
-              <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
-                <text class="sc-course course-name-title">{{courseName}}</text>
-
-                <view class="tour-scorecard">
-                  <view class="tsc-row tsc-head">
-                    <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
-                  </view>
-                  <view class="tsc-row">
-                    <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
-                  </view>
-                  <view class="tsc-row">
-                    <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
-                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
-                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
-                      </view>
-                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+              <!-- 展开成绩卡 -->
+              <view wx:if="{{item.expanded}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
+                <view class="scorecard-profile">
+                  <view class="sc-profile-left">
+                    <view class="sc-avatar-wrap">
+                      <image class="sc-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+                      <view class="sc-flag"><image src="https://flagcdn.com/w40/{{item.flag}}.png" mode="aspectFill"></image></view>
+                    </view>
+                    <view class="sc-profile-meta">
+                      <view class="sc-name-line"><text class="sc-name">{{item.name}}</text><text class="sc-chevron">›</text></view>
+                      <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
                     </view>
                   </view>
+                  <view catchtap="noop" class="sc-follow-btn">加关注</view>
                 </view>
 
-                <view class="tour-scorecard">
-                  <view class="tsc-row tsc-head">
-                    <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
-                  </view>
-                  <view class="tsc-row">
-                    <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
-                  </view>
-                  <view class="tsc-row">
-                    <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
-                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
-                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+                  <text class="sc-course course-name-title">{{courseName}}</text>
+
+                  <view class="tour-scorecard">
+                    <view class="tsc-row tsc-head">
+                      <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                    </view>
+                    <view class="tsc-row">
+                      <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                    </view>
+                    <view class="tsc-row">
+                      <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                        <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                          <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                        </view>
+                        <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
                       </view>
-                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
                     </view>
                   </view>
-                </view>
 
-                <view class="score-legend-area">
-                  <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
-                  <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
-                  <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
-                  <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                  <view class="tour-scorecard">
+                    <view class="tsc-row tsc-head">
+                      <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                    </view>
+                    <view class="tsc-row">
+                      <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                    </view>
+                    <view class="tsc-row">
+                      <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                        <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                          <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                        </view>
+                        <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                    </view>
+                  </view>
+
+                  <view class="score-legend-area">
+                    <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                    <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                    <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                    <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                  </view>
+                  <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
                 </view>
-                <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
               </view>
-            </view>
+            </block>
           </block>
         </view>
       </block>
