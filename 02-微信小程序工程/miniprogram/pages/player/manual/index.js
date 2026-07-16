@@ -7,6 +7,7 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
+const userIdentityAlias = require('../../../utils/userIdentityAlias.js');
 
 function randomSuffix() {
   return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -18,6 +19,38 @@ function createGuestUserId() {
 
 function createManualPlayerId() {
   return 'm_' + randomSuffix();
+}
+
+function resolveCanonicalUserId(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return '';
+  try {
+    return String(userIdentityAlias.resolveCanonicalUserId(id) || id).trim() || id;
+  } catch (e) {
+    return id;
+  }
+}
+
+function collectIdentityKeys(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return [];
+  const keys = {};
+  keys[id] = true;
+  const canonicalId = resolveCanonicalUserId(id);
+  if (canonicalId) keys[canonicalId] = true;
+  try {
+    (userIdentityAlias.getAliases(id) || []).forEach((alias) => {
+      if (alias && alias.fromUserId) keys[String(alias.fromUserId).trim()] = true;
+      if (alias && alias.toUserId) keys[String(alias.toUserId).trim()] = true;
+    });
+    if (canonicalId && canonicalId !== id) {
+      (userIdentityAlias.getAliases(canonicalId) || []).forEach((alias) => {
+        if (alias && alias.fromUserId) keys[String(alias.fromUserId).trim()] = true;
+        if (alias && alias.toUserId) keys[String(alias.toUserId).trim()] = true;
+      });
+    }
+  } catch (e) {}
+  return Object.keys(keys).filter(Boolean);
 }
 
 Page({
@@ -39,12 +72,14 @@ Page({
     const opt = options || {};
     const usedIds = opt.used ? decodeURIComponent(opt.used).split(',').filter(Boolean) : [];
     const disabledMap = {};
-    usedIds.forEach((id) => { disabledMap[id] = true; });
+    usedIds.forEach((id) => {
+      collectIdentityKeys(id).forEach((key) => { disabledMap[key] = true; });
+    });
     this.setData({
       matchId: opt.matchId || '',
       slotId: opt.slotId || '',
       disabledMap,
-      results: FRIEND_LIST.slice(0, 8)
+      results: this._withDisabledState(FRIEND_LIST.slice(0, 8), disabledMap)
     });
   },
 
@@ -80,17 +115,35 @@ Page({
       const exact = results.some((f) => f.name.toLowerCase() === lower);
       showCreate = !exact;
     }
-    this.setData({ query: q, results, showCreate });
+    this.setData({ query: q, results: this._withDisabledState(results, this.data.disabledMap), showCreate });
   },
 
   clearSearch() {
-    this.setData({ query: '', results: FRIEND_LIST.slice(0, 8), showCreate: false });
+    this.setData({
+      query: '',
+      results: this._withDisabledState(FRIEND_LIST.slice(0, 8), this.data.disabledMap),
+      showCreate: false
+    });
+  },
+
+  _isPlayerDisabled(playerId) {
+    const map = this.data.disabledMap || {};
+    return collectIdentityKeys(playerId).some((key) => !!map[key]);
+  },
+
+  _withDisabledState(list, disabledMap) {
+    const map = disabledMap || this.data.disabledMap || {};
+    return (Array.isArray(list) ? list : []).map((item) => {
+      const playerId = item && (item.playerId || item.userId || item.id);
+      const disabled = collectIdentityKeys(playerId).some((key) => !!map[key]);
+      return Object.assign({}, item, { disabled: disabled });
+    });
   },
 
   pickExisting(e) {
     const f = e.currentTarget.dataset.friend;
     if (!f) return;
-    if (this.data.disabledMap[f.playerId]) return; // 已在本场使用：仅视觉禁用
+    if (f.disabled || this._isPlayerDisabled(f.playerId || f.userId || f.id)) return;
     this._return({ playerId: f.playerId, name: f.name, avatar: f.avatar, source: 'friend' });
   },
 

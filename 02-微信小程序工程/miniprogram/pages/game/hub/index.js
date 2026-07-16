@@ -761,9 +761,10 @@ Page({
       }
       return permSet.indexOf(permission) >= 0;
     };
-    const split = splitPermissionFeatures(
-      FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
-    );
+    const permissionFeatures = FEATURES_PERMISSION
+      .filter((f) => f && f.permission !== 'manage_players' && f.permission !== 'edit_groups' && f.permission !== 'fees' && f.permission !== 'net_score')
+      .filter((f) => visible('permission', f.permission));
+    const split = splitPermissionFeatures(permissionFeatures);
     this.setData({
       featuresCommon: FEATURES_COMMON.filter((f) => visible('common', f.permission)),
       featuresPermission: split.featuresPermission,
@@ -929,47 +930,7 @@ Page({
   },
 
   openPlayerManageSheet() {
-    const gameId = this._gameId || this.data.gameId || '';
-    if (!gameId) {
-      wx.showToast({ title: '当前为演示模式', icon: 'none' });
-      return;
-    }
-    const game = gameStore.getGame(gameId);
-    if (!game) {
-      wx.showToast({ title: '比赛不存在', icon: 'none' });
-      return;
-    }
-    if (!this._canOpenPlayerManage(game)) {
-      wx.showToast({ title: '暂无选手管理权限', icon: 'none' });
-      return;
-    }
-    if (this._playerManageSearchTimer) {
-      clearTimeout(this._playerManageSearchTimer);
-      this._playerManageSearchTimer = null;
-    }
-    let scratch = game;
-    try {
-      scratch = JSON.parse(JSON.stringify(game));
-    } catch (e) {
-      scratch = game;
-    }
-    playerManage.ensureRegisterUsersFromGroups(scratch);
-    const draft = playerManage.buildPlayerManageDraft(scratch);
-    this._playerManageDraft = draft;
-    this.setData(
-      {
-        playerManageSheetVisible: true,
-        playerManageTeamOptions: draft.teamOptions || [],
-        playerManageSearchKeyword: '',
-        playerManageTeamFilter: playerManage.TEAM_FILTER_ALL,
-        playerManageTeamFilterLabel: '全部分队',
-        playerManageGroupStatusFilter: playerManage.GROUP_STATUS_ALL,
-        expandedPlayerManageUserId: '',
-        playerTeamPickVisible: false,
-        playerManageFilterPickVisible: false
-      },
-      () => this._syncPlayerManageDisplay()
-    );
+    wx.showToast({ title: '请在记分页添加/删除中调整球员', icon: 'none' });
   },
 
   _syncPlayerManageDisplay(extra) {

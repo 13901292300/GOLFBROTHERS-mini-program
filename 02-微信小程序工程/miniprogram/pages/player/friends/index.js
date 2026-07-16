@@ -12,6 +12,7 @@ const gameStore = require('../../../utils/gameStore.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const teamDirectory = require('../../../utils/teamDirectory.js');
 const contactStore = require('../../../utils/contactStore.js');
+const userIdentityAlias = require('../../../utils/userIdentityAlias.js');
 
 const MAX_GROUP_SIZE = 4;
 const PROXY_MODE = 'proxy_register';
@@ -140,6 +141,44 @@ function mergeContactFriends(ownerUserId, fallbackList) {
 
 function parseIdList(raw) {
   return raw ? decodeURIComponent(raw).split(',').filter(Boolean) : [];
+}
+
+function resolveCanonicalUserId(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return '';
+  try {
+    return String(userIdentityAlias.resolveCanonicalUserId(id) || id).trim() || id;
+  } catch (e) {
+    return id;
+  }
+}
+
+function collectIdentityKeys(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return [];
+  const keys = {};
+  keys[id] = true;
+  const canonicalId = resolveCanonicalUserId(id);
+  if (canonicalId) keys[canonicalId] = true;
+  try {
+    (userIdentityAlias.getAliases(id) || []).forEach((alias) => {
+      if (alias && alias.fromUserId) keys[String(alias.fromUserId).trim()] = true;
+      if (alias && alias.toUserId) keys[String(alias.toUserId).trim()] = true;
+    });
+    if (canonicalId && canonicalId !== id) {
+      (userIdentityAlias.getAliases(canonicalId) || []).forEach((alias) => {
+        if (alias && alias.fromUserId) keys[String(alias.fromUserId).trim()] = true;
+        if (alias && alias.toUserId) keys[String(alias.toUserId).trim()] = true;
+      });
+    }
+  } catch (e) {}
+  return Object.keys(keys).filter(Boolean);
+}
+
+function markIdentityMap(map, userId, value) {
+  collectIdentityKeys(userId).forEach((id) => {
+    map[id] = value;
+  });
 }
 
 function filterFriends(list, keyword) {
@@ -291,21 +330,22 @@ Page({
     const preselectedMap = {};
     const selectedMap = {};
     groupPlayerIds.forEach((id) => {
-      preselectedMap[id] = true;
-      selectedMap[id] = true;
+      markIdentityMap(preselectedMap, id, true);
+      markIdentityMap(selectedMap, id, true);
     });
 
     const disabledMap = {};
     const occupiedMap = {};
     usedIds.forEach((id) => {
       if (!preselectedMap[id]) {
-        disabledMap[id] = true;
-        occupiedMap[id] = true;
+        markIdentityMap(disabledMap, id, true);
+        markIdentityMap(occupiedMap, id, true);
       }
     });
 
     this._allFriends = mergeContactFriends(currentUser.playerId, FRIEND_LIST || []);
     this._currentGroupPlayerIds = groupPlayerIds.slice();
+    this._normalCurrentUser = currentUser;
     this._mode = '';
 
     this.setData({
@@ -324,7 +364,7 @@ Page({
       selectedMap,
       disabledMap,
       maxAdd: isNaN(emptyCount) ? 4 : emptyCount,
-      selectedCount: groupPlayerIds.length,
+      selectedCount: this._countNormalSelectedPlayers(selectedMap),
       registrationStateMap: {},
       operatorUserId: ''
     });
@@ -602,9 +642,30 @@ Page({
 
   toggleMe() {
     if (this.data.isProxyRegisterMode) return; // 代报名不操作「我」
-    const cu = this.data.currentUser;
+    const cu = this.data.currentUser || this._normalCurrentUser;
     if (!cu || !cu.playerId) return;
     this._togglePlayer(cu.playerId);
+  },
+
+  _countNormalSelectedPlayers(selectedMap) {
+    const map = selectedMap || {};
+    const seen = {};
+    let count = 0;
+    const countIfSelected = (id) => {
+      const rawId = String(id || '').trim();
+      if (!rawId || !map[rawId]) return;
+      const canonicalId = resolveCanonicalUserId(rawId);
+      const key = canonicalId || rawId;
+      if (seen[key]) return;
+      seen[key] = true;
+      count += 1;
+    };
+    const cu = this.data.currentUser || this._normalCurrentUser;
+    if (cu && cu.playerId) countIfSelected(cu.playerId);
+    (this._allFriends || FRIEND_LIST || []).forEach((f) => {
+      countIfSelected(f && (f.playerId || f.userId));
+    });
+    return count;
   },
 
   _togglePlayer(id) {
@@ -625,14 +686,25 @@ Page({
       this.data.isTempAdminSelectMode ||
       this._mode === TEMP_ADMIN_MODE;
     if (isOn) {
-      delete selectedMap[id];
-    } else if (!unlimited && Object.keys(selectedMap).length >= MAX_GROUP_SIZE) {
+      if (unlimited) {
+        delete selectedMap[id];
+      } else {
+        collectIdentityKeys(id).forEach((key) => { delete selectedMap[key]; });
+      }
+    } else if (!unlimited && this._countNormalSelectedPlayers(selectedMap) >= MAX_GROUP_SIZE) {
       wx.showToast({ title: '每组最多 ' + MAX_GROUP_SIZE + ' 人', icon: 'none' });
       return;
     } else {
-      selectedMap[id] = true;
+      if (unlimited) {
+        selectedMap[id] = true;
+      } else {
+        markIdentityMap(selectedMap, id, true);
+      }
     }
-    this.setData({ selectedMap, selectedCount: Object.keys(selectedMap).length });
+    this.setData({
+      selectedMap,
+      selectedCount: unlimited ? Object.keys(selectedMap).length : this._countNormalSelectedPlayers(selectedMap)
+    });
   },
 
   onBack() {

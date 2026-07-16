@@ -31,10 +31,10 @@
     </view>
 
     <view wx:if="{{results.length}}" class="result-label">{{query ? '匹配用户' : '推荐用户'}}</view>
-    <view wx:for="{{results}}" wx:key="playerId" class="friend-row {{disabledMap[item.playerId] ? 'is-disabled' : ''}}" bindtap="pickExisting" data-friend="{{item}}">
+    <view wx:for="{{results}}" wx:key="playerId" class="friend-row {{item.disabled ? 'is-disabled' : ''}}" bindtap="pickExisting" data-friend="{{item}}">
       <image class="friend-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
       <text class="friend-name">{{item.name}}</text>
-      <text wx:if="{{disabledMap[item.playerId]}}" class="friend-used">已在本场使用</text>
+      <text wx:if="{{item.disabled}}" class="friend-used">已在本场使用</text>
       <text wx:else class="friend-add">添加</text>
     </view>
 

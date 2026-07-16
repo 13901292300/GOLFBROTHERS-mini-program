@@ -479,14 +479,14 @@
     <view class="register-sheet__head">
       <text class="register-sheet__overline">PLAYERS</text>
       <text class="register-sheet__title">选手管理</text>
-      <text class="register-sheet__sub">仅修改本场比赛中的选手信息，不会同步修改用户资料。手机号仅用于本场赛事组织者联系、报名确认、出发安排等赛事管理用途。</text>
+      <text class="register-sheet__sub">{{normalGamePlayerManageMode ? '普通比赛成员直接绑定到各组 Slot，不使用报名、球队或分队流程。' : '仅修改本场比赛中的选手信息，不会同步修改用户资料。手机号仅用于本场赛事组织者联系、报名确认、出发安排等赛事管理用途。'}}</text>
     </view>
     <view class="player-manage-sheet__toolbar">
       <view class="player-manage-search">
         <input
           class="player-manage-search__input"
           value="{{playerManageSearchKeyword}}"
-          placeholder="搜索选手姓名 / 昵称 / 手机号"
+          placeholder="{{normalGamePlayerManageMode ? '搜索选手姓名' : '搜索选手姓名 / 昵称 / 手机号'}}"
           placeholder-class="player-manage-search__ph"
           confirm-type="search"
           bindinput="onPlayerManageSearchInput"
@@ -497,11 +497,15 @@
           bindtap="clearPlayerManageSearch"
         >×</view>
       </view>
-      <view class="player-manage-team-select player-manage-filter-select" bindtap="openPlayerManageFilterPicker">
+      <view wx:if="{{normalGamePlayerManageMode}}" class="player-manage-status-tabs">
+        <view class="player-manage-status-tab is-active" bindtap="openNormalGameManageFriendPicker">添加好友</view>
+        <view class="player-manage-status-tab is-active" bindtap="openNormalGameManageManualPicker">手工添加</view>
+      </view>
+      <view wx:else class="player-manage-team-select player-manage-filter-select" bindtap="openPlayerManageFilterPicker">
         <text class="player-manage-team-select__value">{{playerManageTeamFilterLabel || '全部分队'}}</text>
         <text class="player-manage-team-select__arrow">›</text>
       </view>
-      <view class="player-manage-status-tabs">
+      <view wx:if="{{!normalGamePlayerManageMode}}" class="player-manage-status-tabs">
         <view
           class="player-manage-status-tab {{playerManageGroupStatusFilter === 'all' ? 'is-active' : ''}}"
           data-status="all"
@@ -536,10 +540,14 @@
           <view class="player-manage-row__meta">
             <view class="player-manage-row__name-row">
               <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
-              <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
-              <text class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
+              <text wx:if="{{!normalGamePlayerManageMode && item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
+              <text wx:if="{{!normalGamePlayerManageMode}}" class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
             </view>
             <view class="player-manage-row__sub">
+              <block wx:if="{{normalGamePlayerManageMode}}">
+                <text class="player-manage-row__sub-rest">{{item.normalGameSlotText}}</text>
+              </block>
+              <block wx:else>
               <text
                 class="player-manage-row__phone {{item.hasPhone ? 'is-callable' : ''}}"
                 data-userid="{{item.userId}}"
@@ -547,11 +555,23 @@
                 catchtap="onPlayerManageCallPhone"
               >{{item.phone || '暂无手机号'}}</text>
               <text class="player-manage-row__sub-rest"> · {{item.matchGenderLabel || '男'}}{{item.matchTeamName ? ' · ' + item.matchTeamName : ''}}</text>
+              </block>
             </view>
           </view>
           <text class="player-manage-row__expand {{item.expanded ? 'is-open' : ''}}">›</text>
         </view>
         <view wx:if="{{item.expanded}}" class="player-manage-row__body">
+          <block wx:if="{{normalGamePlayerManageMode}}">
+            <text class="register-sheet__label">所在组</text>
+            <view class="player-manage-phone-row">
+              <text class="player-manage-phone-row__value">{{item.groupName}}</text>
+            </view>
+            <text class="register-sheet__label player-manage-row__label-gap">Slot位置</text>
+            <view class="player-manage-phone-row">
+              <text class="player-manage-phone-row__value">{{item.slotPositionText}}</text>
+            </view>
+          </block>
+          <block wx:else>
           <text class="register-sheet__label">比赛名</text>
           <input
             class="player-manage-row__input"
@@ -597,11 +617,12 @@
             <text class="player-manage-team-select__value">{{item.matchTeamName}}</text>
             <text class="player-manage-team-select__arrow">›</text>
           </view>
+          </block>
           <view
             class="player-manage-row__remove"
             data-userid="{{item.userId}}"
             bindtap="onPlayerManageRemove"
-          >删除选手</view>
+          >{{normalGamePlayerManageMode ? '从 Slot 移除' : '删除选手'}}</view>
         </view>
       </view>
     </scroll-view>

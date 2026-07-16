@@ -250,7 +250,9 @@ function resolveNormalGameMoreMenu(gameId, matchState) {
   if (groupCount <= 1) {
     return { moreMenuItems: MORE_MENU_ITEMS_LEGACY.slice() };
   }
-  return { moreMenuItems: MORE_MENU_ITEMS_COMPACT.slice() };
+  return {
+    moreMenuItems: MORE_MENU_ITEMS_COMPACT.filter((item) => item && item.label !== '修改半场')
+  };
 }
 
 const GROUP_PLAYERS = [
@@ -3146,6 +3148,19 @@ Page({
     if (!this._draftSlots || idx == null || idx < 0) return;
     const slots = this._cloneGroupSlots(this._draftSlots);
     if (!slots[idx]) return;
+    if (this._isGameStoreContext()) {
+      const playerId = resolveCanonicalUserId(p && p.playerId);
+      const currentSlotPlayerId = resolveCanonicalUserId(this._slotOccupiedPlayerId(slots[idx]));
+      const used = {};
+      this._otherGroupsUsedIds().forEach((id) => {
+        const canonicalId = resolveCanonicalUserId(id);
+        if (canonicalId) used[canonicalId] = true;
+      });
+      if (playerId && used[playerId] && playerId !== currentSlotPlayerId) {
+        wx.showToast({ title: '该球员已在其他小组', icon: 'none' });
+        return;
+      }
+    }
     console.log('[score-slot-migration]', {
       stage: 'add-before',
       groupId: this.data.groupId || '',
@@ -4055,7 +4070,7 @@ Page({
     return { matchId: this.data.groupId || 'demo-match', slotId: slotId };
   },
 
-  // 已占用 playerId：真实球队赛扫描 teamMatchStore，旧个人比杆回退 groupsStore。
+  // 已占用 playerId：球队赛扫描 teamMatchStore；普通 Game 扫描 gameStore；旧个人比杆回退 groupsStore。
   _otherGroupsUsedIds() {
     const cur = this.data.groupId;
     const match = this._readScoreTeamMatch();
@@ -4073,6 +4088,48 @@ Page({
       console.log('[score-player-occupancy]', {
         source: 'teamMatchStore',
         groupId: cur || '',
+        usedIds: ids
+      });
+      return ids;
+    }
+
+    if (this._isGameStoreContext()) {
+      const game = gameStore.getGame(this.data.gameId);
+      const groups = gameStore.listGroups(game);
+      groups.forEach((g) => {
+        if (!g) return;
+        const collect = (player) => {
+          const playerId = player && (player.playerId || player.userId || player.id);
+          if (playerId) ids.push(playerId);
+        };
+        (Array.isArray(g.playersSlots) ? g.playersSlots : []).forEach(collect);
+        (Array.isArray(g.players) ? g.players : []).forEach(collect);
+      });
+      console.log('[score-player-occupancy]', {
+        source: 'gameStore',
+        gameId: this.data.gameId || '',
+        groupIndex: this._gameGroupIndex || 0,
+        usedIds: ids
+      });
+      return ids;
+    }
+
+    if (this._isGameStoreContext()) {
+      const game = gameStore.getGame(this.data.gameId);
+      const groups = gameStore.listGroups(game);
+      groups.forEach((g) => {
+        if (!g) return;
+        const collect = (player) => {
+          const playerId = player && (player.playerId || player.userId || player.id);
+          if (playerId) ids.push(playerId);
+        };
+        (Array.isArray(g.playersSlots) ? g.playersSlots : []).forEach(collect);
+        (Array.isArray(g.players) ? g.players : []).forEach(collect);
+      });
+      console.log('[score-player-occupancy]', {
+        source: 'gameStore',
+        gameId: this.data.gameId || '',
+        groupIndex: this._gameGroupIndex || 0,
         usedIds: ids
       });
       return ids;
