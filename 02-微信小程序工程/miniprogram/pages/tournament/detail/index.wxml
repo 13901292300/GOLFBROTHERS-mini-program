@@ -141,7 +141,7 @@
     </view>
 
     <!-- Content -->
-    <view class="detail-main {{activeTab === 'discussion' ? 'detail-main--flush' : ''}}">
+    <view class="detail-main {{activeTab === 'discussion' ? 'detail-main--flush' : ''}}" style="{{detailMainMinHeight ? 'min-height:' + detailMainMinHeight + 'px;' : ''}}">
 
       <!-- 赛事详情 -->
       <block wx:if="{{activeTab === 'details'}}">
@@ -326,22 +326,22 @@
       <!-- 领先榜 -->
       <block wx:if="{{activeTab === 'leaderboard'}}">
         <view class="leaderboard-table-wrap">
-          <block wx:if="{{leaderboardMode === 'team'}}">
+          <block wx:if="{{leaderboardView === 'team' || leaderboardMode === 'team'}}">
             <view class="leaderboard-head">
               <text class="lh-pos">POS</text>
               <text class="lh-player">TEAM</text>
-              <text class="lh-thru">SCORING PLAYERS</text>
+              <text class="lh-thru">{{leaderboardTeamCompetitionEnabled ? 'SCORING PLAYERS' : 'PLAYERS'}}</text>
               <text class="lh-total">TOTAL</text>
             </view>
             <block wx:for="{{teamLeaderboard}}" wx:for-item="team" wx:for-index="teamIndex" wx:key="teamId">
               <view bindtap="toggleTeamLeaderboardRow" data-team-id="{{team.teamId}}" class="leaderboard-row team-leaderboard-row {{expandedTeamId === team.teamId ? 'is-expanded' : ''}}">
-                <text class="lr-pos pos-cell">{{teamIndex + 1}}</text>
+                <text class="lr-pos pos-cell">{{team.pos}}</text>
                 <view class="lr-player">
                   <text class="player-name">{{team.teamName}}</text>
                 </view>
-                <text class="lr-thru">{{team.scoringPlayersCount}}</text>
+                <text class="lr-thru">{{leaderboardTeamCompetitionEnabled ? team.scoringPlayersCount : team.players.length}}</text>
                 <view class="lr-total team-leaderboard-total">
-                  <text class="leaderboard-total">{{team.total}}</text>
+                  <text class="leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
                   <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
                 </view>
               </view>
@@ -354,64 +354,81 @@
                 </view>
                 <block wx:for="{{team.players}}" wx:for-item="player" wx:for-index="playerIndex" wx:key="scorecardKey">
                   <view
-                    wx:if="{{playerIndex === team.scoringPlayersCount}}"
+                    wx:if="{{team.scoringPlayersCount > 0 && playerIndex === team.scoringPlayersCount}}"
                     class="team-leaderboard-divider"
                   ></view>
                   <view
                     catchtap="toggleScorecard"
                     data-mode="team"
                     data-index="{{player.scorecardKey}}"
+                    data-player="{{player}}"
                     class="team-leaderboard-player {{player.isCounting ? '' : 'is-muted'}}"
                   >
-                    <text class="team-leaderboard-player__pos">{{playerIndex + 1}}</text>
+                    <text class="team-leaderboard-player__pos">{{player.pos}}</text>
                     <text class="team-leaderboard-player__name">{{player.name}}</text>
                     <text class="team-leaderboard-player__thru">{{player.thru}}</text>
-                    <text class="team-leaderboard-player__total">{{player.total}}</text>
+                    <text class="team-leaderboard-player__total {{player.scoreClass}}">{{player.scoreStr}}</text>
                   </view>
-                  <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
-                    <text class="sc-course course-name-title">{{courseName}}</text>
-
-                    <view class="tour-scorecard">
-                      <view class="tsc-row tsc-head">
-                        <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
-                      </view>
-                      <view class="tsc-row">
-                        <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
-                      </view>
-                      <view class="tsc-row">
-                        <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
-                          <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
-                            <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
-                          </view>
-                          <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                  <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
+                    <view class="scorecard-profile">
+                      <view class="sc-profile-left">
+                        <view class="sc-avatar-wrap">
+                          <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
+                          <view wx:if="{{player.flag}}" class="sc-flag"><image src="https://flagcdn.com/w40/{{player.flag}}.png" mode="aspectFill"></image></view>
+                        </view>
+                        <view class="sc-profile-meta">
+                          <view class="sc-name-line"><text class="sc-name">{{player.name}}</text><text class="sc-chevron">›</text></view>
+                          <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{player.country}}</text>　AGE: <text class="sc-sub-strong">{{player.age}}</text></view>
                         </view>
                       </view>
+                      <view catchtap="noop" class="sc-follow-btn">加关注</view>
                     </view>
 
-                    <view class="tour-scorecard">
-                      <view class="tsc-row tsc-head">
-                        <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
-                      </view>
-                      <view class="tsc-row">
-                        <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
-                      </view>
-                      <view class="tsc-row">
-                        <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
-                          <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
-                            <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    <view class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+                      <text class="sc-course course-name-title">{{scorecardCourseTitle}}</text>
+
+                      <view class="tour-scorecard">
+                        <view class="tsc-row tsc-head">
+                          <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                        </view>
+                        <view class="tsc-row">
+                          <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                        </view>
+                        <view class="tsc-row">
+                          <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                            <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                              <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                            </view>
+                            <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
                           </view>
-                          <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
                         </view>
                       </view>
-                    </view>
 
-                    <view class="score-legend-area">
-                      <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
-                      <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
-                      <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
-                      <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                      <view class="tour-scorecard">
+                        <view class="tsc-row tsc-head">
+                          <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                        </view>
+                        <view class="tsc-row">
+                          <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                        </view>
+                        <view class="tsc-row">
+                          <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                            <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                              <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                            </view>
+                            <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                          </view>
+                        </view>
+                      </view>
+
+                      <view class="score-legend-area">
+                        <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                        <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                        <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                        <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                      </view>
+                      <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
                     </view>
-                    <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
                   </view>
                 </block>
               </view>
@@ -455,7 +472,7 @@
                 </view>
 
                 <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
-                  <text class="sc-course course-name-title">{{courseName}}</text>
+                  <text class="sc-course course-name-title">{{scorecardCourseTitle}}</text>
 
                   <view class="tour-scorecard">
                     <view class="tsc-row tsc-head">
@@ -524,7 +541,7 @@
                 <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
                 <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
                   <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
-                  <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || 'T'}}</text>
+                  <text class="gb-group-player-tee-text">T</text>
                 </view>
               </view>
             </view>
@@ -666,6 +683,80 @@
     </view>
     <view class="sheet-cancel-wrap">
       <view bindtap="closeMoreSheet" class="sheet-cancel-btn">取 消</view>
+    </view>
+  </view>
+
+  <!-- 领先榜查看设置 -->
+  <view wx:if="{{showLeaderboardSettingSheet}}" bindtap="closeLeaderboardSettingSheet" class="sheet-overlay"></view>
+  <view wx:if="{{showLeaderboardSettingSheet}}" class="bottom-sheet leaderboard-setting-sheet" catchtap="stopPropagation">
+    <view class="sheet-handle"></view>
+    <view class="leaderboard-setting__head">
+      <view>
+        <text class="leaderboard-setting__overline">LEADERBOARD</text>
+        <text class="leaderboard-setting__title">查看方式</text>
+      </view>
+      <view bindtap="closeLeaderboardSettingSheet" class="leaderboard-setting__close">×</view>
+    </view>
+
+    <view class="leaderboard-setting__section">
+      <text class="leaderboard-setting__label">成绩类型</text>
+      <view class="leaderboard-setting__options">
+        <view
+          bindtap="onDraftLeaderboardScoreTypeSelect"
+          data-type="gross"
+          class="leaderboard-setting-option {{draftLeaderboardScoreType === 'gross' ? 'is-active' : ''}}"
+        >
+          <text class="leaderboard-setting-option__name">总杆</text>
+        </view>
+        <view
+          bindtap="onDraftLeaderboardScoreTypeSelect"
+          data-type="net"
+          data-disabled="{{!leaderboardNetScoreAvailable}}"
+          class="leaderboard-setting-option {{draftLeaderboardScoreType === 'net' ? 'is-active' : ''}} {{!leaderboardNetScoreAvailable ? 'is-disabled' : ''}}"
+        >
+          <text class="leaderboard-setting-option__name">{{leaderboardNetScoreAvailable ? '净杆' : '净杆（生成之后才可查阅）'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="leaderboard-setting__section">
+      <text class="leaderboard-setting__label">查看方式</text>
+      <view class="leaderboard-setting__options">
+        <view
+          wx:if="{{leaderboardTeamViewAvailable}}"
+          bindtap="onDraftLeaderboardViewSelect"
+          data-view="team"
+          class="leaderboard-setting-option {{draftLeaderboardView === 'team' ? 'is-active' : ''}}"
+        >
+          <text class="leaderboard-setting-option__name">分队</text>
+        </view>
+        <view
+          bindtap="onDraftLeaderboardViewSelect"
+          data-view="all"
+          class="leaderboard-setting-option {{draftLeaderboardView === 'all' ? 'is-active' : ''}}"
+        >
+          <text class="leaderboard-setting-option__name">全部</text>
+        </view>
+        <view
+          bindtap="onDraftLeaderboardViewSelect"
+          data-view="male"
+          class="leaderboard-setting-option {{draftLeaderboardView === 'male' ? 'is-active' : ''}}"
+        >
+          <text class="leaderboard-setting-option__name">男子</text>
+        </view>
+        <view
+          bindtap="onDraftLeaderboardViewSelect"
+          data-view="female"
+          class="leaderboard-setting-option {{draftLeaderboardView === 'female' ? 'is-active' : ''}}"
+        >
+          <text class="leaderboard-setting-option__name">女子</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="leaderboard-setting__footer">
+      <view bindtap="closeLeaderboardSettingSheet" class="leaderboard-setting__btn leaderboard-setting__btn--cancel">取消</view>
+      <view bindtap="confirmLeaderboardSettingSheet" class="leaderboard-setting__btn leaderboard-setting__btn--confirm">确认</view>
     </view>
   </view>
 
