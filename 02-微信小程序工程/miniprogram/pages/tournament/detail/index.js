@@ -3086,6 +3086,139 @@ Page({
     return rows;
   },
 
+  _buildTeamLeaderboardView(match) {
+    const rules = match && match.scoringRules;
+    const competition = rules && rules.teamCompetition;
+    if (!competition || competition.enabled !== true) return [];
+    const configuredTopN = Math.max(1, parseInt(competition.topN, 10) || 1);
+    const teamMap = this._buildTeamLeaderboardTeamMap(match);
+    const playerLookup = this._buildGroupPlayerLookup(match);
+    const playerTeamLookup = this._buildLeaderboardPlayerTeamLookup(match);
+    const groups = match && Array.isArray(match.groups) ? match.groups : [];
+
+    groups.forEach((group) => {
+      (Array.isArray(group && group.players) ? group.players : []).forEach((player) => {
+        const playerId = this._resolveAnyPlayerId(player);
+        if (!playerId) return;
+        const teamRef = this._resolveLeaderboardPlayerTeam(player, playerId, playerLookup, playerTeamLookup);
+        if (!teamRef.teamId) return;
+        if (!teamMap[teamRef.teamId]) {
+          teamMap[teamRef.teamId] = {
+            teamId: teamRef.teamId,
+            teamName: teamRef.teamName || '未命名分队',
+            total: 0,
+            scoringPlayersCount: 0,
+            players: []
+          };
+        } else if (!teamMap[teamRef.teamId].teamName && teamRef.teamName) {
+          teamMap[teamRef.teamId].teamName = teamRef.teamName;
+        }
+        const lookup = playerLookup[playerId] || {};
+        const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
+        teamMap[teamRef.teamId].players.push({
+          playerId: playerId,
+          name: lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
+          avatar: mockAvatars.resolveAvatar(lookup.avatar || player.avatar || player.avatarUrl || '', playerId),
+          total: stat.total,
+          thru: this._resolveLeaderboardThruLabel(stat.thru),
+          isCounting: false,
+          _thruValue: stat.thru
+        });
+      });
+    });
+
+    const teams = Object.keys(teamMap)
+      .map((teamId) => teamMap[teamId])
+      .filter((team) => team.players.length > 0);
+    if (!teams.length) return [];
+    const minTeamSize = teams.reduce(
+      (min, team) => Math.min(min, team.players.length),
+      teams[0].players.length
+    );
+    const effectiveTopN = Math.min(configuredTopN, minTeamSize);
+    return teams.map((team) => {
+      const sortedPlayers = team.players.slice().sort((a, b) => {
+        const aStarted = Number(a._thruValue || 0) > 0;
+        const bStarted = Number(b._thruValue || 0) > 0;
+        if (aStarted !== bStarted) return aStarted ? -1 : 1;
+        if (a.total !== b.total) return a.total - b.total;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      let total = 0;
+      const players = sortedPlayers.map((player, index) => {
+        const isCounting = index < effectiveTopN;
+        if (isCounting) total += Number(player.total || 0);
+        const out = Object.assign({}, player, { isCounting: isCounting });
+        delete out._thruValue;
+        return out;
+      });
+      return {
+        teamId: team.teamId,
+        teamName: team.teamName || '未命名分队',
+        total: total,
+        scoringPlayersCount: effectiveTopN,
+        players: players
+      };
+    });
+  },
+
+  _buildTeamLeaderboardTeamMap(match) {
+    const map = {};
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    teamGroups.forEach((team, index) => {
+      const teamId = team && team.id != null ? String(team.id).trim() : '';
+      if (!teamId) return;
+      map[teamId] = {
+        teamId: teamId,
+        teamName: String((team && team.name) || '').trim() || ('分队' + (index + 1)),
+        total: 0,
+        scoringPlayersCount: 0,
+        players: []
+      };
+    });
+    return map;
+  },
+
+  _buildLeaderboardPlayerTeamLookup(match) {
+    const map = {};
+    this._collectRegisterPlayerSources(match).forEach((users) => {
+      users.forEach((user) => {
+        const playerId = this._resolveAnyPlayerId(user);
+        if (!playerId) return;
+        const teamId = playerManage.resolveMatchTeamId(user);
+        if (!teamId) return;
+        const entry = {
+          teamId: teamId,
+          teamName: playerManage.resolveMatchTeamName(user)
+        };
+        [user.userId, user.playerId, user.id, user.uid, user.openid, playerId]
+          .map((value) => (value != null ? String(value).trim() : ''))
+          .filter(Boolean)
+          .forEach((id) => { if (!map[id]) map[id] = entry; });
+      });
+    });
+    return map;
+  },
+
+  _resolveLeaderboardPlayerTeam(player, playerId, playerLookup, playerTeamLookup) {
+    const directTeamId = playerManage.resolveMatchTeamId(player);
+    if (directTeamId) {
+      return {
+        teamId: directTeamId,
+        teamName: playerManage.resolveMatchTeamName(player)
+      };
+    }
+    const lookup = playerLookup && playerId ? playerLookup[playerId] : null;
+    const lookupTeamId = playerManage.resolveMatchTeamId(lookup);
+    if (lookupTeamId) {
+      return {
+        teamId: lookupTeamId,
+        teamName: playerManage.resolveMatchTeamName(lookup)
+      };
+    }
+    return (playerTeamLookup && playerId && playerTeamLookup[playerId]) || { teamId: '', teamName: '' };
+  },
+
   _resolveLeaderboardDefaultMode(match) {
     const rules = match && match.scoringRules;
     const competition = rules && rules.teamCompetition;
