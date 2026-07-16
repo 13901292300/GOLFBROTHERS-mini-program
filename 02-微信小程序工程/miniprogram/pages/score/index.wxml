@@ -501,7 +501,7 @@
                 <view wx:if="{{item.hasCache}}" class="slot-cache-badge">↻</view>
               </block>
             </view>
-            <text class="player-name">{{item.status === 'occupied' ? item.player.name : (item.status === 'pending' ? '待加入' : (item.hasCache ? '可继承成绩' : '空位'))}}</text>
+            <text class="player-name">{{item.status === 'occupied' ? item.player.name : (item.status === 'pending' ? '待加入' : (item.hasCache ? '有历史成绩' : '空位'))}}</text>
           </view>
         </view>
       </view>

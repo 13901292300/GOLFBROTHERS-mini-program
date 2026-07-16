@@ -174,11 +174,18 @@ const MORE_MENU_ITEMS_LEGACY = MORE_MENU_ITEMS_LEGACY_MAIN
   .concat([MORE_MENU_LEGACY_PLACEHOLDER])
   .concat(MORE_MENU_ITEMS_LEGACY_FOOTER);
 
-/** 空位补位：人员来源选择（player-source-sheet 选项） */
-const PLAYER_SOURCE_OPTIONS = [
+/** Team Match 空位补位：人员来源选择（player-source-sheet 选项） */
+const TEAM_MATCH_PLAYER_SOURCE_OPTIONS = [
   { key: 'register', glyph: '▤', label: '报名列表', desc: '从本场已报名人员中选择' },
   { key: 'friend', glyph: '👥', label: '好友列表', desc: '从我的好友中选择球员' },
   { key: 'team', glyph: '⚑', label: '球队列表', desc: '从现有球队成员中选择' },
+  { key: 'manual', glyph: '✎', label: '手工添加', desc: '手动创建球员并加入该位置' }
+];
+
+/** Normal Game / 快捷创建空位补位：不得展示 Team Match 专属报名 / 球队来源 */
+const NORMAL_GAME_PLAYER_SOURCE_OPTIONS = [
+  { key: 'friend', glyph: '👥', label: '好友列表', desc: '从我的好友中选择球员' },
+  { key: 'combo', glyph: '★', label: '老牌组合', desc: '常用四人组 / 上次比赛组合' },
   { key: 'manual', glyph: '✎', label: '手工添加', desc: '手动创建球员并加入该位置' }
 ];
 
@@ -664,9 +671,9 @@ Page({
     groupPlayers: GROUP_PLAYERS,
     // 占位：真正展示前由 openGroupManagePage() 用当前记分页面球员快照覆盖（唯一数据源）
     groupSlots: [],
-    // 空位补位：一级来源选择；报名/球队走本页列表，好友跳转选择页，手工走本页弹窗
+    // 空位补位：默认普通 Game 来源；Team Match 打开添加/删除时按上下文切换
     addSheetVisible: false,
-    playerSourceOptions: PLAYER_SOURCE_OPTIONS,
+    playerSourceOptions: NORMAL_GAME_PLAYER_SOURCE_OPTIONS,
     playerSourceListVisible: false,
     playerSourceListTitle: '',
     playerSourceListOverline: 'ADD PLAYER',
@@ -1196,16 +1203,24 @@ Page({
     const courseName = c.courseName || '';
     const halfText = c.halfText || '';
     const courseFull = courseName ? (courseName + (halfText || '')) : '';
+    const title = c.roundName || c.eventName || c.tournamentName || c.name || courseName || '高尔夫球局';
+    const format = c.gameMode || c.format || this._labelForFormat(ms && ms.formatType);
+    const teeTime = c.teeTimeText || c.teeTime || c.date || '';
+    const isPrivate = c.visibility === 'private';
     this.setData({
+      'match.course': courseName,
+      'match.name': title,
+      'match.format': format,
+      'match.teeTime': teeTime,
       gameContext: {
         ready: true,
         courseFull: courseFull,
-        title: c.roundName || courseName || '高尔夫球局',
-        format: this._labelForFormat(ms && ms.formatType),
-        teeTime: c.teeTime || '',
+        title: title,
+        format: format,
+        teeTime: teeTime,
         weather: { loading: true, line: '加载中…' },
-        isPrivate: false,
-        accessCode: ''
+        isPrivate: isPrivate,
+        accessCode: isPrivate ? (c.accessCode || '') : ''
       }
     });
     this.fetchWeather();
@@ -1225,12 +1240,36 @@ Page({
     if (!scoresByPlayer) return null;
     const players = ms && Array.isArray(ms.players) ? ms.players : [];
     if (!players.length) return null;
-    return players.map((player) => {
+    const group = Array.isArray(match.groups)
+      ? match.groups.find((item) => String(item && item.groupId) === String(groupId || ''))
+      : null;
+    const groupPlayers = Array.isArray(group && group.players) ? group.players : [];
+    const entryByPlayerId = {};
+    groupPlayers.forEach((entry) => {
+      const id = entry && (entry.userId || entry.playerId || entry.id);
+      const key = id != null ? String(id).trim() : '';
+      if (key && !entryByPlayerId[key]) entryByPlayerId[key] = entry;
+    });
+    const findEntryByPosition = (position) => {
+      const pos = Number(position) || 0;
+      if (!pos) return null;
+      return groupPlayers.find((entry) =>
+        Number(entry && (entry.position != null ? entry.position : entry.slotIndex)) === pos
+      ) || null;
+    };
+    return players.map((player, index) => {
       const playerId = player && (player.playerId || player.id);
-      const record = playerId ? (scoresByPlayer[playerId] || {}) : {};
+      const playerKey = playerId != null ? String(playerId).trim() : '';
+      const position = Number(player && (player.position != null ? player.position : player.slotIndex)) || 0;
+      const entry = (playerKey && entryByPlayerId[playerKey]) || findEntryByPosition(position) || findEntryByPosition(index + 1) || {};
+      const scorePlayerId = entry && (entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId)
+        ? String(entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId).trim()
+        : '';
+      const record = (scorePlayerId && scoresByPlayer[scorePlayerId]) || (playerKey && scoresByPlayer[playerKey]) || {};
       return {
-        id: playerId || '',
-        playerId: playerId || '',
+        id: playerKey || '',
+        playerId: playerKey || '',
+        scorePlayerId: scorePlayerId || playerKey || '',
         name: (player && player.name) || '球员',
         avatar: (player && player.avatar) || '',
         colorClass: 'border-white',
@@ -1252,7 +1291,18 @@ Page({
     const matchPlayers = this._buildTeamMatchIndividualPlayersFromScoreData(match, groupId, ms);
     const group = groupsStore.getGroup(groupId);
     const loaded = groupsStore.loadGroupForScoring(groupId);
-    this._playersSource = matchPlayers || (loaded.length
+    const statePlayers = ms && Array.isArray(ms.players) && ms.players.length
+      ? ms.players.map((p) => ({
+          id: p.playerId || p.id,
+          playerId: p.playerId || p.id,
+          name: p.name || '球员',
+          avatar: p.avatar || '',
+          colorClass: 'border-white',
+          scores: [],
+          putts: []
+        }))
+      : null;
+    this._playersSource = matchPlayers || statePlayers || (loaded.length
       ? loaded.map((p) => ({
           id: p.id,
           playerId: p.playerId || p.id,
@@ -1262,19 +1312,9 @@ Page({
           scores: (p.scores || []).slice(),
           putts: (p.putts || []).slice()
         }))
-      : (ms && Array.isArray(ms.players) && ms.players.length
-          ? ms.players.map((p) => ({
-              id: p.playerId || p.id,
-              playerId: p.playerId || p.id,
-              name: p.name || '球员',
-              avatar: p.avatar || '',
-              colorClass: 'border-white',
-              scores: [],
-              putts: []
-            }))
-          : PLAYER_SEEDS.map((p) =>
-              Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [] })
-            )));
+      : PLAYER_SEEDS.map((p) =>
+          Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [] })
+        ));
     console.log('[score-load-source]', {
       matchId: matchId,
       source: matchPlayers ? 'teamMatch.scoreData' : 'groupsStore',
@@ -1617,8 +1657,10 @@ Page({
       : {};
     (this._playersSource || []).forEach((player) => {
       const playerId = player && (player.playerId || player.id);
-      if (!playerId) return;
-      scoresByPlayer[playerId] = {
+      const scorePlayerId = player && player.scorePlayerId ? String(player.scorePlayerId) : '';
+      const scoreOwnerId = scorePlayerId || playerId;
+      if (!scoreOwnerId) return;
+      scoresByPlayer[scoreOwnerId] = {
         scores: (player.scores || []).slice(),
         putts: (player.putts || []).slice()
       };
@@ -1667,6 +1709,7 @@ Page({
         return {
           id: playerId,
           playerId: playerId,
+          scorePlayerId: scorePlayerId || playerId,
           name: player.name || playerId || '球员',
           avatar: player.avatar || '',
           colorClass: 'border-white',
@@ -2069,11 +2112,11 @@ Page({
         ctx.back9Course = game.back9Course;
       }
     } else if (this.data.mode === 'individual_stroke') {
-      const meta = groupsStore.getTournamentCourseMeta();
-      ctx.courseId = meta.courseId;
-      ctx.courseName = meta.courseName;
-      ctx.front9Course = meta.front9Course;
-      ctx.back9Course = meta.back9Course;
+      const c = (ms && ms.course) || {};
+      ctx.courseId = c.courseId;
+      ctx.courseName = c.courseName;
+      ctx.front9Course = c.front9Course;
+      ctx.back9Course = c.back9Course;
     } else if (ms && ms.course) {
       const c = ms.course;
       ctx.courseId = c.courseId;
@@ -2665,11 +2708,7 @@ Page({
       phone: player.phone || '',
       gender: player.gender || ''
     };
-    if (pending.bindMode === 'draftWithHistoryPrompt') {
-      this._bindDraftPlayerToSlot(pending.slotIndex, bindPlayer, pending.source);
-      return;
-    }
-    this._doBindDraftPlayerToSlot(pending.slotIndex, bindPlayer, pending.source, !!pending.inherit);
+    this._bindDraftPlayerToSlot(pending.slotIndex, bindPlayer, pending.source);
   },
 
   _buildScoreTeamMatchPlayerProfile(match, userId, fallback) {
@@ -2874,6 +2913,7 @@ Page({
     });
   },
 
+  // 显式高级操作预留：LIVE 添加/删除默认只改当前球员绑定，禁止调用此函数迁移成绩 key。
   _rebindTeamMatchScoreOwner(match, groupId, oldPlayerId, newPlayerId, slotPosition) {
     const oldId = String(oldPlayerId || '').trim();
     const newId = String(newPlayerId || '').trim();
@@ -3055,47 +3095,6 @@ Page({
     });
   },
 
-  // draft：槽位是否提示可继承（只读 cache，不初始化/不写 _demoSlots）
-  _draftSlotHasCache(idx) {
-    const match = this._readScoreTeamMatch();
-    const group = this._findScoreTeamMatchGroup(match);
-    const draft = this._draftSlots && this._draftSlots[idx];
-    if (match && group) {
-      const scorePlayerId =
-        (draft && draft.scorePlayerId) ||
-        (this._draftSlotCache && this._draftSlotCache[idx] && this._draftSlotCache[idx].playerId) ||
-        '';
-      const hasHistory = !!scorePlayerId && this._hasScoreTeamMatchHistory(match, group, scorePlayerId);
-      console.log('[score-slot-cache-migration]', {
-        source: 'teamMatchStore',
-        slotIndex: idx,
-        scorePlayerId: scorePlayerId,
-        hasHistory: hasHistory
-      });
-      return hasHistory;
-    }
-    if (this._draftSlotCache && this._draftSlotCache[idx]) return true;
-    if (draft && draft.hasCache) return true;
-    if (this._boundToStore()) {
-      const hasHistory = !!groupsStore.getSlotCache(this.data.groupId, idx);
-      console.log('[score-slot-cache-migration]', {
-        source: 'groupsStore',
-        slotIndex: idx,
-        scorePlayerId: '',
-        hasHistory: hasHistory
-      });
-      return hasHistory;
-    }
-    const hasHistory = !!(this._demoSlotCache && this._demoSlotCache[idx]);
-    console.log('[score-slot-cache-migration]', {
-      source: 'scorePage',
-      slotIndex: idx,
-      scorePlayerId: '',
-      hasHistory: hasHistory
-    });
-    return hasHistory;
-  },
-
   // draft 专用删除：只改 _draftSlots，供添加/删除编辑期使用
   _removeDraftSlotAt(idx) {
     if (!this._draftSlots || idx == null || idx < 0) return;
@@ -3123,7 +3122,7 @@ Page({
       status: 'empty',
       source: null,
       hasCache: true,
-      scorePlayerId: (cur.player && cur.player.playerId) || cur.playerId || cur.scorePlayerId || ''
+      scorePlayerId: cur.scorePlayerId || (cur.player && cur.player.playerId) || cur.playerId || ''
     };
     this._draftSlots = slots;
     this._refreshGroupManageFromDraft();
@@ -3135,28 +3134,15 @@ Page({
     });
   },
 
-  // draft 专用补位入口（可弹继承确认）；确认后只写 draft
+  // draft 专用补位入口：人员调整只修正 Slot 当前球员绑定，不迁移成绩。
   _bindDraftPlayerToSlot(idx, player, source, done) {
     const p = Object.assign({}, player, { source: source || 'manual' });
-    if (this._draftSlotHasCache(idx)) {
-      wx.showModal({
-        title: '该位置有历史成绩',
-        content: '是否让新球员继承上一位球员的成绩？\n选择「从零开始」将以空成绩记分（旧成绩不会被删除）。',
-        confirmText: '继承成绩',
-        cancelText: '从零开始',
-        success: (res) => {
-          this._doBindDraftPlayerToSlot(idx, p, source, !!res.confirm);
-          if (typeof done === 'function') done();
-        }
-      });
-      return;
-    }
-    this._doBindDraftPlayerToSlot(idx, p, source, false);
+    this._doBindDraftPlayerToSlot(idx, p, source);
     if (typeof done === 'function') done();
   },
 
   // draft 专用执行绑定：只改 _draftSlots，不写 gameStore / groupsStore / _demoSlots
-  _doBindDraftPlayerToSlot(idx, p, source, inherit) {
+  _doBindDraftPlayerToSlot(idx, p, source) {
     if (!this._draftSlots || idx == null || idx < 0) return;
     const slots = this._cloneGroupSlots(this._draftSlots);
     if (!slots[idx]) return;
@@ -3164,7 +3150,6 @@ Page({
       stage: 'add-before',
       groupId: this.data.groupId || '',
       slotIndex: idx,
-      inherit: !!inherit,
       draftSlots: this._summarizeScoreSlots(slots)
     });
     const player = {
@@ -3180,8 +3165,7 @@ Page({
       status: 'occupied',
       source: player.source,
       hasCache: false,
-      inherit: !!inherit,
-      scorePlayerId: slots[idx].scorePlayerId || ''
+      scorePlayerId: slots[idx].scorePlayerId || player.playerId || ''
     };
     if (this._draftSlotCache) this._draftSlotCache[idx] = null;
     this._draftSlots = slots;
@@ -3192,15 +3176,13 @@ Page({
         ok: true,
         userId: player.playerId || '',
         groupId: this.data.groupId || '',
-        slotId: idx + 1,
-        inherit: !!inherit
+        slotId: idx + 1
       });
     }
     console.log('[score-slot-migration]', {
       stage: 'add-after',
       groupId: this.data.groupId || '',
       slotIndex: idx,
-      inherit: !!inherit,
       draftSlots: this._summarizeScoreSlots(this._draftSlots)
     });
   },
@@ -3249,7 +3231,10 @@ Page({
     this._originalSlots = this._cloneGroupSlots(snapshot);
     this._draftSlots = this._cloneGroupSlots(snapshot);
     this._draftSlotCache = [];
-    this.setData({ showGroupManage: true });
+    this.setData({
+      showGroupManage: true,
+      playerSourceOptions: this._resolvePlayerSourceOptionsForCurrentContext()
+    });
     this._refreshGroupManageFromDraft();
   },
 
@@ -3323,6 +3308,22 @@ Page({
     };
   },
 
+  _isTeamMatchPlayerSourceContext() {
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+    return !!(match && group);
+  },
+
+  _resolvePlayerSourceOptionsForCurrentContext() {
+    return this._isTeamMatchPlayerSourceContext()
+      ? TEAM_MATCH_PLAYER_SOURCE_OPTIONS
+      : NORMAL_GAME_PLAYER_SOURCE_OPTIONS;
+  },
+
+  _isPlayerSourceAllowed(key) {
+    return this._resolvePlayerSourceOptionsForCurrentContext().some((item) => item && item.key === key);
+  },
+
   // 比较 original vs draft，生成增删替换变化列表（不写 store）
   _buildGroupManageCommitDiff() {
     const original = this._originalSlots || [];
@@ -3356,8 +3357,7 @@ Page({
               status: d.status,
               playerId: toId || null,
               name: (d.player && d.player.name) || null,
-              source: d.source || (d.player && d.player.source) || null,
-              inherit: d.inherit != null ? !!d.inherit : null
+              source: d.source || (d.player && d.player.source) || null
             }
           : null
       };
@@ -3366,8 +3366,7 @@ Page({
         added.push(
           Object.assign({}, base, {
             type: 'add',
-            preserveScores: false,
-            inheritSlotCache: d && d.inherit != null ? !!d.inherit : false
+            preserveScores: false
           })
         );
       } else if (fromId && !toId) {
@@ -3382,8 +3381,7 @@ Page({
           Object.assign({}, base, {
             type: 'replace',
             // 换人规则：playerId 替换不清除成绩
-            preserveScores: true,
-            inheritSlotCache: d && d.inherit != null ? !!d.inherit : true
+            preserveScores: true
           })
         );
       } else {
@@ -3404,7 +3402,7 @@ Page({
    * Phase 3B-2A：将 draft diff 应用到 _demoSlots（gameStore / demoSession）。
    * - remove → 成绩进 _demoSlotCache，槽位置空
    * - replace → 原地换 playerId，保留该槽 scores/putts（禁止先删后增）
-   * - add → 按 inherit 从 cache 取成绩或空成绩
+   * - add → 若该位置有历史缓存则直接恢复显示
    * 不调用 groupsStore；成功后由 _commitDraftSlots 统一 persist / rebind / 关闭。
    */
   _applyGameOrDemoCommitDiff(diff) {
@@ -3464,7 +3462,6 @@ Page({
         if (idx == null || idx < 0 || !ch.toPlayerId) return;
         const draftSlot = draft[idx] || {};
         const player = draftSlot.player || {};
-        const inherit = !!(ch.inheritSlotCache || draftSlot.inherit);
         const cache = this._demoSlotCache[idx];
         this._demoSlots[idx] = {
           id: ch.toPlayerId,
@@ -3473,8 +3470,8 @@ Page({
           avatar: player.avatar || '',
           source: draftSlot.source || (player && player.source) || 'manual',
           colorClass: 'border-white',
-          scores: inherit && cache ? (cache.scores || []).slice() : [],
-          putts: inherit && cache ? (cache.putts || []).slice() : []
+          scores: cache ? (cache.scores || []).slice() : [],
+          putts: cache ? (cache.putts || []).slice() : []
         };
         this._demoSlotCache[idx] = null;
       });
@@ -3518,22 +3515,19 @@ Page({
         '';
       if (userId) {
         const profile = this._buildScoreTeamMatchPlayerProfile(match, userId, slot.player || existing);
-        if (cachedScorePlayerId && cachedScorePlayerId !== userId) {
-          this._rebindTeamMatchScoreOwner(match, group.groupId, cachedScorePlayerId, userId, position);
-        } else {
-          console.log('[score-player-rebind]', {
-            slotPosition: position,
-            oldPlayerId: cachedScorePlayerId || userId,
-            newPlayerId: userId,
-            migratedScore: false,
-            updatedProfile: true
-          });
-        }
+        const scorePlayerId = cachedScorePlayerId || userId;
+        console.log('[score-player-binding]', {
+          slotPosition: position,
+          currentUserId: userId,
+          scorePlayerId: scorePlayerId,
+          migratedScore: false,
+          updatedProfile: true
+        });
         return Object.assign({}, existing, profile, {
           position: position,
           userId: userId,
           playerId: userId,
-          scorePlayerId: userId
+          scorePlayerId: scorePlayerId
         });
       }
       const next = {
@@ -3594,7 +3588,7 @@ Page({
    * Phase 3B-2B：将 draft diff 应用到 groupsStore（individual_stroke）。
    * - remove → removePlayerSlot（holes 进 slotCache）
    * - replace → 原地换 playerId，保留 holes 与 slotCache（禁止 remove+add）
-   * - add → bindPlayerToSlot（按 inherit 消费 slotCache）
+   * - add → bindPlayerToSlot（有 slotCache 时直接恢复显示）
    */
   _applyGroupsStoreCommitDiff(diff) {
     const groupId = this.data.groupId;
@@ -3642,7 +3636,6 @@ Page({
         if (idx == null || idx < 0 || !ch.toPlayerId) return;
         const draftSlot = draft[idx] || {};
         const player = draftSlot.player || {};
-        const inherit = !!(ch.inheritSlotCache || draftSlot.inherit);
         const result = groupsStore.bindPlayerToSlot(
           groupId,
           idx,
@@ -3652,7 +3645,7 @@ Page({
             avatar: player.avatar || '',
             source: draftSlot.source || (player && player.source) || 'manual'
           },
-          inherit
+          true
         );
         if (!result || !result.ok) {
           throw new Error('bindPlayerToSlot failed at slot ' + idx + ': ' + ((result && result.reason) || 'unknown'));
@@ -3910,10 +3903,12 @@ Page({
         const player = slot.player || {};
         const playerId = this._slotOccupiedPlayerId(slot);
         const existing = existingById[playerId] || {};
-        const record = scoresByPlayer[playerId] || {};
+        const scorePlayerId = slot.scorePlayerId || playerId;
+        const record = scoresByPlayer[scorePlayerId] || scoresByPlayer[playerId] || {};
         return {
           id: playerId,
           playerId: playerId,
+          scorePlayerId: scorePlayerId,
           name: player.name || existing.name || '球员',
           avatar: player.avatar || existing.avatar || '',
           colorClass: existing.colorClass || 'border-white',
@@ -3962,7 +3957,7 @@ Page({
     }
   },
 
-  // 目标槽位是否存在「上一位球员」可继承成绩
+  // 目标槽位是否存在历史成绩缓存。
   _slotHasCache(idx) {
     if (this._boundToStore()) return !!groupsStore.getSlotCache(this.data.groupId, idx);
     this._ensureDemoSlots();
@@ -3970,27 +3965,16 @@ Page({
   },
 
   // 统一补位入口：成绩以 playerId 为主键、不改 slot 顺序。
-  // 策略C：若该槽位有历史成绩 → 弹窗让用户选择「继承」或「从零开始」；否则直接空成绩进入。
   _bindPlayerToSlot(idx, player, source) {
     const p = Object.assign({}, player, { source: source || 'manual' });
-    if (this._slotHasCache(idx)) {
-      wx.showModal({
-        title: '该位置有历史成绩',
-        content: '是否让新球员继承上一位球员的成绩？\n选择「从零开始」将以空成绩记分（旧成绩不会被删除）。',
-        confirmText: '继承成绩',
-        cancelText: '从零开始',
-        success: (res) => this._doBindPlayerToSlot(idx, p, source, !!res.confirm)
-      });
-      return;
-    }
-    this._doBindPlayerToSlot(idx, p, source, false);
+    this._doBindPlayerToSlot(idx, p, source);
   },
 
-  // 执行补位绑定：inherit=true 继承该 slot 历史成绩；否则空成绩。slot 顺序与 playerId 主键不变。
-  _doBindPlayerToSlot(idx, p, source, inherit) {
+  // 执行补位绑定：人员调整直接恢复该位置历史缓存；没有缓存则为空成绩。
+  _doBindPlayerToSlot(idx, p, source) {
     if (this._boundToStore()) {
       this.persistSession();
-      groupsStore.bindPlayerToSlot(this.data.groupId, idx, p, inherit);
+      groupsStore.bindPlayerToSlot(this.data.groupId, idx, p, this._slotHasCache(idx));
       this._reloadFromStore();
     } else {
       this._ensureDemoSlots();
@@ -4002,8 +3986,8 @@ Page({
         avatar: p.avatar,
         source: source || 'manual',
         colorClass: p.colorClass || 'border-white',
-        scores: inherit && cache ? (cache.scores || []).slice() : [],
-        putts: inherit && cache ? (cache.putts || []).slice() : []
+        scores: cache ? (cache.scores || []).slice() : [],
+        putts: cache ? (cache.putts || []).slice() : []
       };
       this._demoSlots[idx] = newP;
       this._demoSlotCache[idx] = null;
@@ -4019,13 +4003,16 @@ Page({
     return (this.data.groupSlots || []).findIndex((s) => s && s.status === 'empty');
   },
 
-  // 点击空位（status=empty）：弹出底部 Action Sheet（报名列表 / 好友列表 / 球队列表 / 手工添加）
-  // 记录目标 slot，所有补位方式都只回填「该」slot（仅当前 matchId 的 playersSlots）
+  // 点击空位（status=empty）：按当前比赛上下文弹出人员来源菜单
+  // Team Match：报名 / 好友 / 球队 / 手工；Normal Game：好友 / 老牌组合 / 手工
   onEmptySlotTap(e) {
     const idx = Number(e.currentTarget.dataset.index);
     if (isNaN(idx)) return;
     this._targetSlotIdx = idx;
-    this.setData({ addSheetVisible: true });
+    this.setData({
+      addSheetVisible: true,
+      playerSourceOptions: this._resolvePlayerSourceOptionsForCurrentContext()
+    });
   },
 
   closeAddSheet() {
@@ -4034,9 +4021,15 @@ Page({
 
   onPlayerSourceSelect(e) {
     const key = e.detail && e.detail.key;
+    if (!this._isPlayerSourceAllowed(key)) {
+      wx.showToast({ title: '当前比赛不支持该添加方式', icon: 'none' });
+      this.setData({ addSheetVisible: false });
+      return;
+    }
     if (key === 'register') this.addMethodRegister();
     else if (key === 'friend') this.addMethodFriend();
     else if (key === 'team') this.addMethodTeam();
+    else if (key === 'combo') this.addMethodCombo();
     else if (key === 'manual') this.addMethodManual();
   },
 
@@ -4210,6 +4203,11 @@ Page({
 
   // 【1】报名列表：本页二级列表，数据源为 match.registerInfo.users
   addMethodRegister() {
+    if (!this._isTeamMatchPlayerSourceContext()) {
+      this.setData({ addSheetVisible: false });
+      wx.showToast({ title: '当前比赛无报名列表', icon: 'none' });
+      return;
+    }
     const match = this._readScoreTeamMatch();
     const used = this._usedCanonicalPlayerMap();
     const users = match && match.registerInfo && Array.isArray(match.registerInfo.users)
@@ -4309,22 +4307,21 @@ Page({
           this._openJoinMatchTeamSheet({
             slotIndex: idx,
             player: participant.player || player,
-            source: source,
-            inherit: false
+            source: source
           });
           return;
         }
-        this._doBindDraftPlayerToSlot(
-          idx,
-          player,
-          source,
-          false
-        );
+        this._doBindDraftPlayerToSlot(idx, player, source);
       });
   },
 
   // 【3】球队列表：本页二级列表，数据源为 teamDirectory/team成员 mock
   addMethodTeam() {
+    if (!this._isTeamMatchPlayerSourceContext()) {
+      this.setData({ addSheetVisible: false });
+      wx.showToast({ title: '当前比赛无球队列表', icon: 'none' });
+      return;
+    }
     const match = this._readScoreTeamMatch();
     const matchTeamId = match && match.teamId ? String(match.teamId).trim() : '';
     const teams = matchTeamId
@@ -4353,6 +4350,61 @@ Page({
       overline: 'TEAM',
       emptyText: memberCount ? '球队成员均已在分组中' : '暂无球队成员',
       items: items
+    });
+  },
+
+  // Normal Game / 快捷创建：老牌组合一键按空位顺序填充
+  addMethodCombo() {
+    if (this._isTeamMatchPlayerSourceContext()) {
+      this.setData({ addSheetVisible: false });
+      wx.showToast({ title: '球队赛请使用报名或球队列表', icon: 'none' });
+      return;
+    }
+    this.setData({ addSheetVisible: false });
+    const usedIds = this._otherGroupsUsedIds().concat(this._currentGroupUsedIds());
+    const ctx = this._buildSlotCtx();
+    wx.navigateTo({
+      url:
+        '/pages/player/combos/index?matchId=' +
+        encodeURIComponent(ctx.matchId || '') +
+        '&slotId=' +
+        encodeURIComponent(ctx.slotId || '') +
+        '&used=' +
+        encodeURIComponent(usedIds.join(',')),
+      events: {
+        comboSelected: (payload) => this._onComboSelected(payload && payload.combo)
+      },
+      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    });
+  },
+
+  _onComboSelected(combo) {
+    if (!combo || !Array.isArray(combo.players)) return;
+    if (!this._draftSlots) return;
+    if (this._isTeamMatchPlayerSourceContext()) return;
+    const used = {};
+    this._otherGroupsUsedIds().concat(this._currentGroupUsedIds()).forEach((id) => {
+      if (id) used[String(id)] = true;
+    });
+    let target = this._targetSlotIdx != null && this._targetSlotIdx >= 0 ? this._targetSlotIdx : -1;
+    combo.players.forEach((src) => {
+      const playerId = String((src && src.playerId) || '').trim();
+      if (!playerId || used[playerId]) return;
+      let idx = -1;
+      if (target >= 0 && this._draftSlots[target] && this._draftSlots[target].status === 'empty') {
+        idx = target;
+      } else {
+        idx = this._firstDraftEmptySlotIndex();
+      }
+      target = -1;
+      if (idx < 0) return;
+      this._bindDraftPlayerToSlot(idx, {
+        playerId: playerId,
+        name: src.name || playerId,
+        avatar: src.avatar || '',
+        source: 'combo'
+      }, 'combo');
+      used[playerId] = true;
     });
   },
 
@@ -4628,7 +4680,7 @@ Page({
         slotIndex: idx,
         player: participant.player || bindPlayer,
         source: player.source || 'manual',
-        bindMode: 'draftWithHistoryPrompt'
+        bindMode: 'draftDirectBind'
       });
       return;
     }

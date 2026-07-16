@@ -14,8 +14,29 @@ const DEFAULT_REGISTER_GROUPS = [
   { id: 'team-group-2', name: '嘉宾' }
 ];
 
-function createEmptyGroupPlayer(position) {
-  return { position: position, userId: '', avatar: '', displayName: '', gender: '', tee: '' };
+function resolveScorePlayerId(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const id = entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId || '';
+  return id != null ? String(id).trim() : '';
+}
+
+function withScorePlayerFields(target, source) {
+  const out = target || {};
+  const scorePlayerId = resolveScorePlayerId(source);
+  if (scorePlayerId) out.scorePlayerId = scorePlayerId;
+  if (source && source.hasHistoryScore != null) out.hasHistoryScore = !!source.hasHistoryScore;
+  return out;
+}
+
+function createEmptyGroupPlayer(position, source) {
+  return withScorePlayerFields({
+    position: position,
+    userId: '',
+    avatar: '',
+    displayName: '',
+    gender: '',
+    tee: ''
+  }, source);
 }
 
 function createEmptyGroup(groupIndex) {
@@ -56,13 +77,14 @@ function hydrateDraftPlayers(list, registerInfo) {
         const found = Array.isArray(g && g.players)
           ? g.players.find((p) => Number(p && p.position) === position)
           : null;
-        if (!found || !found.userId) return createEmptyGroupPlayer(position);
+        if (!found) return createEmptyGroupPlayer(position);
+        if (!found.userId) return createEmptyGroupPlayer(position, found);
         const userId = String(found.userId);
         const src = lookup[userId] || {};
         const gender = src.gender || found.gender || playerDirectory.getGenderById(userId, '');
         const teeRaw = found.tee || src.tee || tPosition.defaultFromGender(gender);
         const tee = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
-        return {
+        return withScorePlayerFields({
           position: position,
           userId: userId,
           avatar: src.avatar || (found.avatar ? String(found.avatar) : '') || '',
@@ -72,7 +94,7 @@ function hydrateDraftPlayers(list, registerInfo) {
             || '',
           gender: gender,
           tee: tee
-        };
+        }, found);
       })
     };
     const teeTime = g && g.teeTime != null ? String(g.teeTime).trim() : '';
@@ -95,8 +117,9 @@ function cloneTournamentGroups(list) {
       const found = Array.isArray(g && g.players)
         ? g.players.find((p) => Number(p && p.position) === position)
         : null;
-      if (!found || !found.userId) return createEmptyGroupPlayer(position);
-      return {
+      if (!found) return createEmptyGroupPlayer(position);
+      if (!found.userId) return createEmptyGroupPlayer(position, found);
+      return withScorePlayerFields({
         position: position,
         userId: found.userId ? String(found.userId) : '',
         avatar: found.avatar ? String(found.avatar) : '',
@@ -105,7 +128,7 @@ function cloneTournamentGroups(list) {
           : (found.competitionName ? String(found.competitionName) : ''),
         gender: found.gender ? String(found.gender) : '',
         tee: found.tee ? String(found.tee) : ''
-      };
+      }, found);
     })
   }));
 }
@@ -162,7 +185,7 @@ function mapPlayersForCard(players) {
     const tee = p.tee === tPosition.RED_T ? tPosition.RED_T
       : (p.tee === tPosition.BLUE_T ? tPosition.BLUE_T : '');
     const teeText = tee === tPosition.RED_T ? '红T' : (tee === tPosition.BLUE_T ? '蓝T' : '');
-    return {
+    return withScorePlayerFields({
       position: p.position,
       userId: p.userId ? String(p.userId) : '',
       name: displayName,
@@ -175,7 +198,7 @@ function mapPlayersForCard(players) {
       teeMarkerClass: tee === tPosition.RED_T
         ? 'tee-marker-dot--female'
         : (tee === tPosition.BLUE_T ? 'tee-marker-dot--male' : '')
-    };
+    }, p);
   });
 }
 
@@ -252,7 +275,7 @@ Page({
     const modeOpt = options && options.mode ? String(options.mode) : '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     const formalExists = hasFormalGroups(match);
-    const mode = modeOpt === 'edit' || modeOpt === 'create'
+    const mode = modeOpt === 'edit' || modeOpt === 'create' || modeOpt === 'live'
       ? modeOpt
       : (formalExists ? 'edit' : 'create');
     const gameMode = match && match.gameMode ? String(match.gameMode) : '';
@@ -268,7 +291,7 @@ Page({
     this.setData({
       matchId: matchId,
       mode: mode,
-      headerTitle: mode === 'edit' ? '修改分组' : '开始分组',
+      headerTitle: mode === 'create' ? '开始分组' : '修改分组',
       gameMode: gameMode,
       showPairingSection: showPairingSection,
       pairingSectionTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
@@ -520,20 +543,27 @@ Page({
     if (idx < 0) return;
 
     const lookup = buildRegisterPlayerLookup(this._registerInfo || { users: [] });
+    const previousPlayers = Array.isArray(draft[idx] && draft[idx].players) ? draft[idx].players : [];
+    const previousByPosition = {};
+    previousPlayers.forEach((player) => {
+      const position = Number(player && player.position) || 0;
+      if (position) previousByPosition[position] = player;
+    });
     const players = Array.from({ length: PLAYER_SLOTS }, (_, i) => {
       const position = i + 1;
+      const previous = previousByPosition[position] || null;
       const found = Array.isArray(result.players)
         ? result.players.find((p) => Number(p && p.position) === position)
         : null;
       if (!found || !found.userId) {
-        return createEmptyGroupPlayer(position);
+        return createEmptyGroupPlayer(position, previous);
       }
       const userId = String(found.userId);
       const src = lookup[userId] || {};
       const gender = found.gender || src.gender || playerDirectory.getGenderById(userId, '');
       const teeRaw = found.tee || src.tee || tPosition.defaultFromGender(gender);
       const tee = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
-      return {
+      return withScorePlayerFields({
         position: position,
         userId: userId,
         avatar: found.avatar || src.avatar || '',
@@ -543,7 +573,7 @@ Page({
           || '',
         gender: gender,
         tee: tee
-      };
+      }, previous || found);
     });
 
     draft[idx] = Object.assign({}, draft[idx], {
@@ -838,6 +868,129 @@ Page({
     return next;
   },
 
+  _validateLiveGroupDraft(draft) {
+    const groups = Array.isArray(draft) ? draft : [];
+    const seen = {};
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i] || {};
+      const players = Array.isArray(g.players) ? g.players : [];
+      const localSeen = {};
+      for (let j = 0; j < players.length; j++) {
+        const id = String((players[j] && players[j].userId) || '').trim();
+        if (!id) continue;
+        if (localSeen[id]) return '同一分组内存在重复球员';
+        localSeen[id] = true;
+        if (seen[id]) return '存在重复球员，请检查分组';
+        seen[id] = true;
+      }
+    }
+    return '';
+  },
+
+  _findPlayerEntryByPosition(group, position) {
+    const pos = Number(position) || 0;
+    const players = Array.isArray(group && group.players) ? group.players : [];
+    return players.find((player) =>
+      Number(player && (player.position != null ? player.position : player.slotIndex)) === pos
+    ) || null;
+  },
+
+  _buildLivePlayerEntry(oldEntry, draftEntry, position) {
+    const oldUserId = oldEntry && (oldEntry.userId || oldEntry.playerId || oldEntry.id)
+      ? String(oldEntry.userId || oldEntry.playerId || oldEntry.id).trim()
+      : '';
+    const nextUserId = draftEntry && draftEntry.userId ? String(draftEntry.userId).trim() : '';
+    const scorePlayerId = resolveScorePlayerId(oldEntry) || resolveScorePlayerId(draftEntry) || oldUserId || nextUserId;
+    if (!nextUserId) {
+      const empty = { position: position, userId: '', playerId: '', id: '' };
+      if (scorePlayerId) empty.scorePlayerId = scorePlayerId;
+      return empty;
+    }
+    const next = Object.assign({}, oldEntry || {}, {
+      position: position,
+      userId: nextUserId,
+      playerId: nextUserId,
+      id: nextUserId
+    });
+    if (draftEntry && draftEntry.avatar) next.avatar = draftEntry.avatar;
+    if (draftEntry && draftEntry.displayName) next.displayName = draftEntry.displayName;
+    if (draftEntry && draftEntry.gender) next.gender = draftEntry.gender;
+    if (draftEntry && draftEntry.tee) next.tee = draftEntry.tee;
+    if (scorePlayerId) next.scorePlayerId = scorePlayerId;
+    return next;
+  },
+
+  _buildLiveGroupFromDraft(oldGroup, draftGroup, index) {
+    const base = oldGroup || {};
+    const groupId = draftGroup && draftGroup.groupId
+      ? String(draftGroup.groupId)
+      : (base.groupId ? String(base.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)));
+    const next = Object.assign({}, base, {
+      groupId: groupId,
+      groupName: draftGroup && draftGroup.groupName ? String(draftGroup.groupName) : (base.groupName || ('第' + (index + 1) + '组')),
+      players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
+        const position = i + 1;
+        const oldEntry = this._findPlayerEntryByPosition(base, position);
+        const draftEntry = this._findPlayerEntryByPosition(draftGroup, position);
+        return this._buildLivePlayerEntry(oldEntry, draftEntry, position);
+      })
+    });
+    const teeTime = draftGroup && draftGroup.teeTime != null ? String(draftGroup.teeTime).trim() : '';
+    if (teeTime) next.teeTime = teeTime;
+    const startHole = Number(draftGroup && draftGroup.startHole);
+    if (Number.isFinite(startHole) && startHole >= 1 && startHole <= 18) {
+      next.startHole = Math.floor(startHole);
+    }
+    return next;
+  },
+
+  _confirmLiveGroups(match, rawDraft, pairingDraft) {
+    const oldGroups = Array.isArray(match && match.groups) ? match.groups : [];
+    const draftGroups = Array.isArray(rawDraft) ? rawDraft : [];
+    const oldById = {};
+    oldGroups.forEach((group) => {
+      const groupId = group && group.groupId ? String(group.groupId) : '';
+      if (groupId) oldById[groupId] = group;
+    });
+    const draftIds = {};
+    draftGroups.forEach((group) => {
+      const groupId = group && group.groupId ? String(group.groupId) : '';
+      if (groupId) draftIds[groupId] = true;
+    });
+    const deletedGroupIds = Object.keys(oldById).filter((groupId) => !draftIds[groupId]);
+    const nextGroups = draftGroups.map((group, index) => {
+      const groupId = group && group.groupId ? String(group.groupId) : '';
+      return this._buildLiveGroupFromDraft(groupId ? oldById[groupId] : null, group, index);
+    });
+    const nextScoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? Object.assign({}, match.scoreData)
+      : {};
+    deletedGroupIds.forEach((groupId) => {
+      delete nextScoreData[groupId];
+    });
+    let nextPairings = teamMatchStore.clonePairings(match.pairings || {});
+    deletedGroupIds.forEach((groupId) => {
+      delete nextPairings[groupId];
+    });
+    if (this.data.showPairingSection) {
+      nextPairings = teamMatchStore.sanitizePairings(this._prunePairingsToGroups(nextGroups, nextPairings));
+    } else {
+      nextPairings = {};
+    }
+    const next = Object.assign({}, match, {
+      groups: nextGroups,
+      pairings: nextPairings,
+      scoreData: nextScoreData,
+      updatedAt: Date.now()
+    });
+    teamMatchStore.saveMatch(next);
+    this._leavingConfirmed = true;
+    wx.showToast({ title: '分组已保存', icon: 'success' });
+    setTimeout(() => {
+      wx.navigateBack({ delta: 1 });
+    }, 400);
+  },
+
   onCancel() {
     this._leavingConfirmed = true;
     wx.navigateBack({ delta: 1 });
@@ -851,7 +1004,10 @@ Page({
     if (this.data.saving) return;
     const rawDraft = Array.isArray(this.data.groupDraft) ? this.data.groupDraft : [];
     const pairingDraft = this.data.pairingDraft || {};
-    const err = this._validateGroupDraft(rawDraft, pairingDraft);
+    const isLiveMode = this.data.mode === 'live';
+    const err = isLiveMode
+      ? this._validateLiveGroupDraft(rawDraft)
+      : this._validateGroupDraft(rawDraft, pairingDraft);
     if (err) {
       wx.showToast({ title: err, icon: 'none' });
       return;
@@ -863,6 +1019,10 @@ Page({
       return;
     }
     this.setData({ saving: true });
+    if (isLiveMode) {
+      this._confirmLiveGroups(match, rawDraft, pairingDraft);
+      return;
+    }
     const sanitized = this._sanitizeGroupDraft(rawDraft);
     const isClear = sanitized.length === 0;
     // 正式 groups 只持久化 position + userId；展示字段由详情页 hydrate

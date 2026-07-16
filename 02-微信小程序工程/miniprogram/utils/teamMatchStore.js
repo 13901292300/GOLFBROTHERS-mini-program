@@ -519,17 +519,37 @@ function buildSlotId(groupId, position) {
   return (gid || 'group') + '-slot-' + pos;
 }
 
+function resolveSlotScorePlayerId(source) {
+  if (!source || typeof source !== 'object') return '';
+  const id = source.scorePlayerId || source.slotScorePlayerId || source.scoreOwnerId || '';
+  return id != null ? String(id).trim() : '';
+}
+
+function keepSlotScorePlayerFields(target, source) {
+  const out = target || {};
+  if (!source || typeof source !== 'object') return out;
+  const scorePlayerId = resolveSlotScorePlayerId(source);
+  if (scorePlayerId) out.scorePlayerId = scorePlayerId;
+  if (source.slotScorePlayerId != null && String(source.slotScorePlayerId).trim()) {
+    out.slotScorePlayerId = String(source.slotScorePlayerId).trim();
+  }
+  if (source.scoreOwnerId != null && String(source.scoreOwnerId).trim()) {
+    out.scoreOwnerId = String(source.scoreOwnerId).trim();
+  }
+  return out;
+}
+
 function createResolvedSlot(position, groupId, source) {
   const raw = source && typeof source === 'object' ? source : {};
   const userId = resolveGroupSlotPlayerId(source);
-  return {
+  return keepSlotScorePlayerFields({
     slotId: raw.slotId != null && String(raw.slotId).trim()
       ? String(raw.slotId).trim()
       : buildSlotId(groupId, position),
     position: position,
     userId: userId,
     playerId: userId
-  };
+  }, source);
 }
 
 /**
@@ -575,10 +595,10 @@ function slotsToPlayers(slots) {
       slot && slot.position != null ? slot.position : slot && slot.slotIndex,
       index + 1
     );
-    return {
+    return keepSlotScorePlayerFields({
       position: position,
       userId: resolveGroupSlotPlayerId(slot)
-    };
+    }, slot);
   });
 }
 
@@ -599,7 +619,8 @@ function summarizeSlotsForVerify(slots) {
   return (Array.isArray(slots) ? slots : []).map((slot) => ({
     position: slot.position,
     userId: slot.userId,
-    slotId: slot.slotId
+    slotId: slot.slotId,
+    scorePlayerId: slot.scorePlayerId || ''
   }));
 }
 

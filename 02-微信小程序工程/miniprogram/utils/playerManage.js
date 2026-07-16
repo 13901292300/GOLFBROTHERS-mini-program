@@ -243,23 +243,6 @@ function buildListSubLine(phoneText, genderText, teamName, groupStatusLabel) {
   return parts.join(' · ');
 }
 
-function resolveIdentityLabel(userType) {
-  const value = String(userType || '').trim();
-  if (value === 'registered') return '注册用户';
-  if (value === 'phone') return '手机用户';
-  if (value === 'guest') return '临时用户';
-  return '';
-}
-
-function resolveIdentitySourceLabel(identitySource) {
-  const value = String(identitySource || '').trim();
-  if (value === 'mini_program') return '微信用户';
-  if (value === 'app_import') return 'APP导入';
-  if (value === 'manual_add') return '手工创建';
-  if (value === 'derived') return '系统派生';
-  return '';
-}
-
 /**
  * 分队选项：仅比赛实际存在的真实分队（不含未分队占位）
  * 优先比赛级配置，再汇总报名用户已有分队；删除选手不会改比赛级分队配置。
@@ -586,8 +569,7 @@ function matchesSearchKeyword(player, keyword) {
     player.name,
     player.realName,
     player.remarkName,
-    player.contactRemark,
-    player.userId
+    player.contactRemark
   ];
   for (let i = 0; i < fields.length; i++) {
     const v = String(fields[i] != null ? fields[i] : '')
@@ -694,8 +676,6 @@ function isPlayerFormalGrouped(player, groupedUserIds) {
 const GROUP_STATUS_ALL = 'all';
 const GROUP_STATUS_GROUPED = 'grouped';
 const GROUP_STATUS_UNGROUPED = 'ungrouped';
-const USER_TYPE_ALL = 'all';
-const IDENTITY_SOURCE_ALL = 'all';
 
 function matchesGroupStatusFilter(player, status, groupedUserIds) {
   const s = String(status || GROUP_STATUS_ALL);
@@ -704,18 +684,6 @@ function matchesGroupStatusFilter(player, status, groupedUserIds) {
   if (s === GROUP_STATUS_GROUPED) return grouped;
   if (s === GROUP_STATUS_UNGROUPED) return !grouped;
   return true;
-}
-
-function matchesUserTypeFilter(player, userTypeFilter) {
-  const filter = String(userTypeFilter || USER_TYPE_ALL);
-  if (!filter || filter === USER_TYPE_ALL) return true;
-  return String((player && player.userType) || '') === filter;
-}
-
-function matchesIdentitySourceFilter(player, identitySourceFilter) {
-  const filter = String(identitySourceFilter || IDENTITY_SOURCE_ALL);
-  if (!filter || filter === IDENTITY_SOURCE_ALL) return true;
-  return String((player && player.identitySource) || '') === filter;
 }
 
 /**
@@ -728,8 +696,6 @@ function buildPlayerManageDisplay(players, options) {
   const teamFilter =
     opts.teamFilter != null ? opts.teamFilter : TEAM_FILTER_ALL;
   const groupStatusFilter = opts.groupStatusFilter || GROUP_STATUS_ALL;
-  const userTypeFilter = opts.userTypeFilter || USER_TYPE_ALL;
-  const identitySourceFilter = opts.identitySourceFilter || IDENTITY_SOURCE_ALL;
   const expandedUserId = String(opts.expandedUserId || '');
   const groupedUserIds = collectFormalGroupedUserIds(opts.groups);
   const source = Array.isArray(players) ? players : [];
@@ -737,8 +703,6 @@ function buildPlayerManageDisplay(players, options) {
   filtered = filtered.filter((p) =>
     matchesGroupStatusFilter(p, groupStatusFilter, groupedUserIds)
   );
-  filtered = filtered.filter((p) => matchesUserTypeFilter(p, userTypeFilter));
-  filtered = filtered.filter((p) => matchesIdentitySourceFilter(p, identitySourceFilter));
   if (keyword) {
     filtered = filtered.filter((p) => matchesSearchKeyword(p, keyword));
   }
@@ -754,8 +718,8 @@ function buildPlayerManageDisplay(players, options) {
       phoneMasked: phoneMasked,
       hasPhone: !!phone,
       phoneDisplay: phone || '暂无手机号',
-      identityLabel: resolveIdentityLabel(p.userType),
-      identitySourceLabel: resolveIdentitySourceLabel(p.identitySource),
+      identityLabel: p.identityLabel || '',
+      identitySourceLabel: p.identitySourceLabel || '',
       formalGrouped: formalGrouped,
       formalGroupStatusLabel: statusLabel,
       listSubLine: buildListSubLine(
@@ -775,9 +739,7 @@ function buildPlayerManageDisplay(players, options) {
   const hasActiveFilter =
     !!keyword ||
     filterVal !== TEAM_FILTER_ALL ||
-    String(groupStatusFilter || GROUP_STATUS_ALL) !== GROUP_STATUS_ALL ||
-    String(userTypeFilter || USER_TYPE_ALL) !== USER_TYPE_ALL ||
-    String(identitySourceFilter || IDENTITY_SOURCE_ALL) !== IDENTITY_SOURCE_ALL;
+    String(groupStatusFilter || GROUP_STATUS_ALL) !== GROUP_STATUS_ALL;
   const countTip = hasActiveFilter
     ? '共 ' + totalCount + ' 人，当前显示 ' + displayCount + ' 人'
     : '共 ' + totalCount + ' 人';
@@ -1587,8 +1549,6 @@ module.exports = {
   GROUP_STATUS_ALL,
   GROUP_STATUS_GROUPED,
   GROUP_STATUS_UNGROUPED,
-  USER_TYPE_ALL,
-  IDENTITY_SOURCE_ALL,
   resolveUserId,
   normalizeGender,
   genderLabel,
@@ -1610,8 +1570,6 @@ module.exports = {
   collectFormalGroupedUserIds,
   isPlayerFormalGrouped,
   matchesGroupStatusFilter,
-  matchesUserTypeFilter,
-  matchesIdentitySourceFilter,
   buildPlayerManageDraft,
   buildPlayerManageRow,
   applyExpandState,
