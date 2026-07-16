@@ -500,8 +500,7 @@
   <!-- 出发表 TAB：透明悬浮快捷按钮（仅当"第一组卡片完全进入视口"时显示，固定底部，不参与布局流） -->
   <view
     wx:if="{{activeTab === 'tee-sheet' && quickEntryVisible}}"
-    bindtap="onEnterGroup"
-    data-group-id="g1"
+    bindtap="onEnterMyGroup"
     class="tee-quick-entry-float"
   >快速进入自己的小组 ›</view>
 

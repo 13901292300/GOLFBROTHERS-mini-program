@@ -1091,7 +1091,9 @@ Page({
       wx.showToast({ title: '未找到比赛信息', icon: 'none' });
       return;
     }
-    const mode = this.data.hasFormalGroups ? 'edit' : 'create';
+    const mode = this.data.matchStatus && this.data.matchStatus.isOngoing
+      ? 'live'
+      : (this.data.hasFormalGroups ? 'edit' : 'create');
     wx.navigateTo({
       url: '/pages/tournament/group-editor/index?matchId=' + encodeURIComponent(matchId) +
         '&mode=' + encodeURIComponent(mode)
@@ -2638,9 +2640,34 @@ Page({
     }
   },
 
+  _resolveCurrentUserTournamentGroupId(match) {
+    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
+    if (!currentUserId || !match || !Array.isArray(match.groups)) return '';
+    const group = match.groups.find((g) => {
+      const players = Array.isArray(g && g.players) ? g.players : [];
+      return players.some((player) => String((player && player.userId) || '').trim() === currentUserId);
+    });
+    return group && group.groupId != null ? String(group.groupId) : '';
+  },
+
+  onEnterMyGroup() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const groupId = this._resolveCurrentUserTournamentGroupId(match);
+    if (!groupId) {
+      wx.showToast({ title: '当前未加入任何小组', icon: 'none' });
+      return;
+    }
+    this._enterTournamentGroupScore(groupId);
+  },
+
   // 出发表：点击任意组 → 个人比杆赛记分页。先写好该组 matchState，再统一 enterScorePage。
   onEnterGroup(e) {
     const groupId = e.currentTarget.dataset.groupId || '';
+    this._enterTournamentGroupScore(groupId);
+  },
+
+  _enterTournamentGroupScore(groupId) {
     const matchId = this.data.matchId || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     groupsStore.ensureInitialized();
@@ -2848,6 +2875,23 @@ Page({
     return scorecard;
   },
 
+  _resolveSlotScorePlayerId(slotPlayer, currentPlayerId) {
+    const p = slotPlayer || {};
+    const scorePlayerId = p.scorePlayerId || p.slotScorePlayerId || p.scoreOwnerId;
+    const resolved = scorePlayerId != null ? String(scorePlayerId).trim() : '';
+    if (resolved) return resolved;
+    return currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  },
+
+  _resolveScoresByPlayerRecord(scoresByPlayer, slotPlayer, currentPlayerId) {
+    if (!scoresByPlayer || typeof scoresByPlayer !== 'object') return null;
+    const scorePlayerId = this._resolveSlotScorePlayerId(slotPlayer, currentPlayerId);
+    if (scorePlayerId && scoresByPlayer[scorePlayerId]) return scoresByPlayer[scorePlayerId];
+    const playerId = currentPlayerId != null ? String(currentPlayerId).trim() : '';
+    if (playerId && scoresByPlayer[playerId]) return scoresByPlayer[playerId];
+    return null;
+  },
+
   _resolveTeamMatchScorecard(match, row) {
     const groupId = row && row.groupId ? String(row.groupId) : '';
     const playerId = row && row.playerId ? String(row.playerId) : '';
@@ -2863,7 +2907,7 @@ Page({
       typeof groupScoreData.scoresByPlayer === 'object'
       ? groupScoreData.scoresByPlayer
       : null;
-    const record = scoresByPlayer ? scoresByPlayer[playerId] : null;
+    const record = this._resolveScoresByPlayerRecord(scoresByPlayer, row, playerId);
     const scores = record && Array.isArray(record.scores) ? record.scores : [];
     const started = scores.some((score) => this._isFilledLeaderboardScore(score));
     if (!started) {
@@ -2884,7 +2928,7 @@ Page({
       groupScoreData.scoresByPlayer &&
       typeof groupScoreData.scoresByPlayer === 'object' &&
       playerId
-      ? groupScoreData.scoresByPlayer[playerId]
+      ? this._resolveScoresByPlayerRecord(groupScoreData.scoresByPlayer, player, playerId)
       : null;
     if (scoreRecord && Array.isArray(scoreRecord.scores)) {
       return {
@@ -2902,7 +2946,7 @@ Page({
       };
     }
     const groupScoreRecord = group && group.scoresByPlayer && playerId
-      ? group.scoresByPlayer[playerId]
+      ? this._resolveScoresByPlayerRecord(group.scoresByPlayer, player, playerId)
       : null;
     if (groupScoreRecord && Array.isArray(groupScoreRecord.scores)) {
       return {
@@ -2944,6 +2988,8 @@ Page({
       (Array.isArray(group && group.players) ? group.players : []).forEach((player) => {
         const playerId = this._resolveAnyPlayerId(player);
         if (!playerId) return;
+        const scorePlayerId = this._resolveSlotScorePlayerId(player, playerId);
+        const slotIndex = Number(player && (player.position != null ? player.position : player.slotIndex)) || 0;
         const display = displayMap[playerId] || {};
         const lookup = playerLookup[playerId] || {};
         const genderDisplay = playerManage.getGenderDisplay(
@@ -2952,6 +2998,9 @@ Page({
         const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
         flat.push({
           playerId: playerId,
+          scorePlayerId: scorePlayerId,
+          slotIndex: slotIndex,
+          position: slotIndex,
           name: display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
           group: group.groupName || '',
           groupId: group.groupId || '',
@@ -2988,6 +3037,9 @@ Page({
         group: player.group,
         groupId: player.groupId,
         playerId: player.playerId,
+        scorePlayerId: player.scorePlayerId || player.playerId,
+        slotIndex: player.slotIndex || player.position || 0,
+        position: player.position || player.slotIndex || 0,
         isFemale: player.isFemale,
         genderIcon: player.genderIcon,
         genderClass: player.genderClass,
@@ -3257,6 +3309,11 @@ Page({
     if (permission === 'manage_tee_sheet' || permission === 'tee_management') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this.openTeeSheetManageSheet();
+      return;
+    }
+    if (permission === 'edit_groups') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this.onOpenGroupEditor();
       return;
     }
     if (permission === 'manage_payment' || permission === 'fees') {
