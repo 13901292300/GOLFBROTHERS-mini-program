@@ -636,12 +636,10 @@ Page({
 
   onTeamCompetitionTopNInput(e) {
     const raw = e && e.detail ? e.detail.value : '';
-    let topN = Number(raw);
-    if (!isFinite(topN) || topN < 1) topN = DEFAULT_TEAM_COMPETITION.topN;
-    const competition = this._normalizeTeamCompetition(
-      Object.assign({}, this.data.draftTeamCompetition, { topN: topN })
-    );
-    this.setData({ draftTeamCompetition: competition });
+    const topN = raw === '' ? '' : raw;
+    this.setData({
+      draftTeamCompetition: Object.assign({}, this.data.draftTeamCompetition, { topN: topN })
+    });
   },
 
   validateTeamGroups(groups) {
