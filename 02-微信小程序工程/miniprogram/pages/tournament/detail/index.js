@@ -439,6 +439,7 @@ Page({
     leaderboardTeamViewAvailable: false,
     leaderboardTeamCompetitionEnabled: false,
     leaderboardScoreType: 'gross', // gross | net，当前仅预留 gross
+    leaderboardViewLabel: '总杆 · 全部',
     leaderboardNetScoreAvailable: false,
     showLeaderboardSettingSheet: false,
     draftLeaderboardView: 'all',
@@ -802,6 +803,7 @@ Page({
       leaderboardTeamViewAvailable: leaderboardViewOptions.indexOf('team') >= 0,
       leaderboardTeamCompetitionEnabled: leaderboardTeamCompetitionEnabled,
       leaderboardScoreType: 'gross',
+      leaderboardViewLabel: this._buildLeaderboardViewLabel('gross', leaderboardDefaultView),
       leaderboardNetScoreAvailable: this._hasLeaderboardNetScore(match),
       leaderboard: this._buildLeaderboardViewForView(match, leaderboardDefaultView),
       teamLeaderboard: this._buildTeamLeaderboardView(match),
@@ -846,6 +848,7 @@ Page({
       leaderboardTeamViewAvailable: leaderboardViewOptions.indexOf('team') >= 0,
       leaderboardTeamCompetitionEnabled: leaderboardTeamCompetitionEnabled,
       leaderboardScoreType: this.data.leaderboardScoreType || 'gross',
+      leaderboardViewLabel: this._buildLeaderboardViewLabel(this.data.leaderboardScoreType || 'gross', leaderboardView),
       leaderboardNetScoreAvailable: this._hasLeaderboardNetScore(match),
       leaderboard: this._buildLeaderboardViewForView(match, leaderboardView),
       teamLeaderboard: this._buildTeamLeaderboardView(match),
@@ -3498,6 +3501,17 @@ Page({
     return mode === 'team' ? 'team' : 'all';
   },
 
+  _buildLeaderboardViewLabel(scoreType, view) {
+    const scoreText = scoreType === 'net' ? '净杆' : '总杆';
+    const viewMap = {
+      team: '分队',
+      all: '全部',
+      male: '男子',
+      female: '女子'
+    };
+    return scoreText + ' · ' + (viewMap[view] || viewMap.all);
+  },
+
   _hasLeaderboardNetScore(match) {
     if (!match) return false;
     return match.netScoreGenerated === true ||
@@ -3529,7 +3543,11 @@ Page({
     this.setData({
       teeGroups: teeGroups,
       leaderboard: this._buildLeaderboardViewForView(match, this.data.leaderboardView || 'all'),
-      teamLeaderboard: this._buildTeamLeaderboardView(match)
+      teamLeaderboard: this._buildTeamLeaderboardView(match),
+      leaderboardViewLabel: this._buildLeaderboardViewLabel(
+        this.data.leaderboardScoreType || 'gross',
+        this.data.leaderboardView || 'all'
+      )
     });
   },
 
@@ -3573,7 +3591,11 @@ Page({
       : null;
     this.setData({
       leaderboard: this._buildLeaderboardViewForView(match, this.data.leaderboardView || 'all'),
-      teamLeaderboard: this._buildTeamLeaderboardView(match)
+      teamLeaderboard: this._buildTeamLeaderboardView(match),
+      leaderboardViewLabel: this._buildLeaderboardViewLabel(
+        this.data.leaderboardScoreType || 'gross',
+        this.data.leaderboardView || 'all'
+      )
     });
   },
 
@@ -3628,6 +3650,7 @@ Page({
       leaderboardView: view,
       leaderboardMode: this._leaderboardViewToMode(view),
       leaderboardScoreType: scoreType,
+      leaderboardViewLabel: this._buildLeaderboardViewLabel(scoreType, view),
       expandedTeamId: '',
       openIndex: -1,
       openScorecard: null

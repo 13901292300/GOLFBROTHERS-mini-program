@@ -326,6 +326,7 @@
       <!-- 领先榜 -->
       <block wx:if="{{activeTab === 'leaderboard'}}">
         <view class="leaderboard-table-wrap">
+          <view class="leaderboard-view-label">{{leaderboardViewLabel}}</view>
           <block wx:if="{{leaderboardView === 'team' || leaderboardMode === 'team'}}">
             <view class="leaderboard-head">
               <text class="lh-pos">POS</text>
