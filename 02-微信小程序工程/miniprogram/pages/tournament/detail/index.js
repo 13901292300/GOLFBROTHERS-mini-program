@@ -430,6 +430,7 @@ Page({
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
     scorePanel: 'technical', // technical | quick
     leaderboard: [],
+    leaderboardDefaultMode: 'player', // player | team，仅表示默认展示倾向
     openIndex: -1,
     // 逐洞详情：跟随记分页记忆的显示偏好（gross | diff），不自维护模式
     scoreDisplayMode: 'gross',
@@ -772,6 +773,7 @@ Page({
       tabs: tabs,
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
       activeTab: tabs[0].id,
+      leaderboardDefaultMode: this._resolveLeaderboardDefaultMode(match),
       eventInfoList: this._resolveEventInfoList(match),
       scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
     }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
@@ -795,6 +797,7 @@ Page({
       matchStatus: lifecycle,
       tabs: tabs,
       activeTab: activeTab,
+      leaderboardDefaultMode: this._resolveLeaderboardDefaultMode(match),
       eventInfoList: this._resolveEventInfoList(match),
       scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
     }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
@@ -3081,6 +3084,12 @@ Page({
       playerCount: playerCount
     });
     return rows;
+  },
+
+  _resolveLeaderboardDefaultMode(match) {
+    const rules = match && match.scoringRules;
+    const competition = rules && rules.teamCompetition;
+    return competition && competition.enabled === true ? 'team' : 'player';
   },
 
   refreshGroupsDerived() {

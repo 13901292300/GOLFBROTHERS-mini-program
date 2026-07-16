@@ -326,6 +326,7 @@
       <!-- 领先榜 -->
       <block wx:if="{{activeTab === 'leaderboard'}}">
         <view class="leaderboard-table-wrap">
+          <!-- leaderboardDefaultMode === 'team' 仅作为后续分队榜默认展示状态；本 Patch 仍渲染个人榜表头。 -->
           <view class="leaderboard-head">
             <text class="lh-pos">POS</text>
             <text class="lh-player">PLAYER</text>
