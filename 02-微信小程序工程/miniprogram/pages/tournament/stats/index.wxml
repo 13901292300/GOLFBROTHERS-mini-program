@@ -1,0 +1,62 @@
+<view class="stats-page {{themeClass}}">
+  <view class="stats-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="stats-header__inner">
+      <view class="stats-header__left" bindtap="onBack">
+        <text class="stats-header__back">‹</text>
+        <view class="stats-header__titles">
+          <text class="stats-header__eyebrow">STATISTICS</text>
+          <text class="stats-header__title">{{title}}</text>
+        </view>
+      </view>
+      <text class="stats-header__sub">{{subtitle}}</text>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="stats-scroll" enhanced="{{true}}" show-scrollbar="{{false}}">
+    <view class="stats-table">
+      <view class="stats-thead">
+        <text class="st-cell st-player">PLAYER</text>
+        <text class="st-cell">EAG</text>
+        <text class="st-cell">BIR</text>
+        <text class="st-cell">PAR</text>
+        <text class="st-cell">BOG</text>
+        <text class="st-cell">DBL+</text>
+        <text class="st-cell st-pct">GIR%</text>
+        <text class="st-cell">PUT</text>
+        <text class="st-cell st-pct">FWY%</text>
+        <text class="st-cell">SAND</text>
+        <text class="st-cell">PEN</text>
+        <text class="st-cell">8421</text>
+        <text class="st-cell st-total">TOT</text>
+      </view>
+
+      <block wx:for="{{rows}}" wx:key="id">
+        <view class="stats-row">
+          <view class="st-cell st-player">
+            <image class="st-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+            <view class="st-identity">
+              <text class="st-name">{{item.name}}</text><text wx:if="{{item.genderIcon}}" class="st-gender {{item.genderClass}}">{{item.genderIcon}}</text>
+            </view>
+            <view wx:if="{{item.teeMarkerClass}}" class="st-tee-marker {{item.teeMarkerClass}}"></view>
+          </view>
+          <text class="st-cell st-muted">{{item.eag}}</text>
+          <text class="st-cell st-muted">{{item.bir}}</text>
+          <text class="st-cell">{{item.par}}</text>
+          <text class="st-cell">{{item.bog}}</text>
+          <text class="st-cell">{{item.dbl}}</text>
+          <text class="st-cell st-pct">{{item.gir}}</text>
+          <text class="st-cell">{{item.putts}}</text>
+          <text class="st-cell st-pct">{{item.fwy}}</text>
+          <text class="st-cell st-muted">{{item.sand}}</text>
+          <text class="st-cell">{{item.pen}}</text>
+          <text class="st-cell st-score8421">{{item.score8421}}</text>
+          <text class="st-cell st-total-val">{{item.total}}</text>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <view class="stats-footer">
+    <text class="stats-footer__note">骨架预览 · 真实数据接入后默认按 TOTAL 升序</text>
+  </view>
+</view>

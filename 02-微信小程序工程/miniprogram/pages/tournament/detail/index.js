@@ -4035,6 +4035,17 @@ Page({
       this.openLeaderboardSettingSheet();
       return;
     }
+    if (permission === 'stats') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      const matchId = this.data.matchId || '';
+      wx.navigateTo({
+        url:
+          '/pages/tournament/stats/index' +
+          (matchId ? '?matchId=' + encodeURIComponent(matchId) : ''),
+        fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
   },
 

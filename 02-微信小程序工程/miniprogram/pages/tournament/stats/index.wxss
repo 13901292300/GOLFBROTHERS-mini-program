@@ -1,0 +1,324 @@
+.stats-page {
+  --tour-blue: #002d62;
+  --champion-gold: #ce9224;
+  --accent-red: #cc0000;
+  --stats-bg: #f0f2f5;
+  --stats-card: #ffffff;
+  --stats-text: #1f2937;
+  --stats-text-strong: #111827;
+  --stats-muted: #d1d5db;
+  --stats-row-border: #f0f0f0;
+  --stats-cell-border: #f3f4f6;
+  --stats-thead-bg: #002d62;
+  --stats-thead-text: #ffffff;
+  --stats-header-bg: #002d62;
+  --stats-total-bg: #cc0000;
+  --stats-total-border: #fee2e2;
+  --stats-score8421: #2563eb;
+  --stats-footer-text: #9ca3af;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--stats-bg);
+  color: var(--stats-text);
+  box-sizing: border-box;
+}
+
+/* DARK：仅本页 token，不影响其他页面全局变量 */
+.stats-page.dark-mode {
+  --stats-bg: #000000;
+  --stats-card: #111111;
+  --stats-text: #cbd5e1;
+  --stats-text-strong: #f1f5f9;
+  --stats-muted: #6b7280;
+  --stats-row-border: #2a2a2a;
+  --stats-cell-border: #2a2a2a;
+  --stats-thead-bg: #0a0a0a;
+  --stats-thead-text: #e5e7eb;
+  --stats-header-bg: #0a0a0a;
+  --stats-total-bg: #7f1d1d;
+  --stats-total-border: #333333;
+  --stats-score8421: #60a5fa;
+  --stats-footer-text: #6b7280;
+}
+
+.stats-header {
+  width: 100%;
+  flex-shrink: 0;
+  background: var(--stats-header-bg);
+  border-bottom: 2px solid var(--champion-gold);
+  box-sizing: border-box;
+}
+
+.stats-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 6px;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.stats-header__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stats-header__back {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.stats-header__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stats-header__eyebrow {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+}
+
+.stats-header__title {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.stats-header__sub {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.stats-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: var(--stats-card);
+  box-sizing: border-box;
+}
+
+.stats-table {
+  width: 100%;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/*
+ * 13 列比例铺满横屏：
+ * PLAYER | EAG BIR PAR BOG DBL+ | GIR% | PUT | FWY% | SAND PEN 8421 | TOT
+ */
+.stats-thead,
+.stats-row {
+  display: grid;
+  grid-template-columns:
+    minmax(148px, 2fr)
+    minmax(36px, 0.75fr)
+    minmax(36px, 0.75fr)
+    minmax(36px, 0.75fr)
+    minmax(36px, 0.75fr)
+    minmax(40px, 0.85fr)
+    minmax(52px, 1.1fr)
+    minmax(36px, 0.75fr)
+    minmax(52px, 1.1fr)
+    minmax(40px, 0.85fr)
+    minmax(36px, 0.75fr)
+    minmax(40px, 0.85fr)
+    minmax(40px, 0.9fr);
+  width: 100%;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.stats-thead {
+  background: var(--stats-thead-bg);
+  color: var(--stats-thead-text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.stats-row {
+  border-bottom: 1px solid var(--stats-row-border);
+  background: var(--stats-card);
+  color: var(--stats-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.st-cell {
+  width: auto;
+  min-width: 0;
+  padding: 8px 2px;
+  text-align: center;
+  box-sizing: border-box;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-row .st-cell {
+  border-left: 1px solid var(--stats-cell-border);
+}
+
+/* 百分比列：min 保证 100%，fr 参与剩余空间分配 */
+.st-pct {
+  padding: 8px 4px;
+  letter-spacing: 0;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.st-player {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 8px;
+  text-align: left;
+  border-left: 0 !important;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.stats-thead .st-player {
+  background: var(--stats-thead-bg);
+  color: var(--stats-thead-text);
+  justify-content: flex-start;
+}
+
+.stats-row .st-player {
+  background: var(--stats-card);
+}
+
+/* 与记分页一致：T台竖线贴 PLAYER 列右侧边界 */
+.st-tee-marker {
+  position: absolute;
+  right: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 1px;
+  z-index: 1;
+}
+
+.st-tee-marker.border-red { background: #dc2626; }
+.st-tee-marker.border-gold { background: var(--champion-gold); }
+.st-tee-marker.border-white { background: #111827; }
+.st-tee-marker.border-light { background: #00aeef; }
+
+.stats-page.dark-mode .st-tee-marker.border-white {
+  background: #f1f5f9;
+}
+
+.st-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: #e5e7eb;
+}
+
+.stats-page.dark-mode .st-avatar {
+  background: #2a2a2a;
+}
+
+.st-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.st-name {
+  color: var(--stats-text-strong);
+  font-size: 12px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.st-gender {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+  margin-left: 1px;
+}
+
+.st-gender.gender-male { color: #2563eb; }
+.st-gender.gender-female { color: #db2777; }
+
+.stats-page.dark-mode .st-gender.gender-male { color: #93c5fd; }
+.stats-page.dark-mode .st-gender.gender-female { color: #f9a8d4; }
+
+.st-muted { color: var(--stats-muted); }
+
+.st-score8421 {
+  color: var(--stats-score8421);
+  font-weight: 800;
+}
+
+.st-total {
+  background: var(--stats-total-bg) !important;
+  border-left-color: transparent !important;
+  font-weight: 900;
+  letter-spacing: 0;
+  color: #ffffff;
+}
+
+.st-total-val {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--stats-text-strong);
+  border-left: 1px solid var(--stats-total-border);
+}
+
+.stats-footer {
+  width: 100%;
+  flex-shrink: 0;
+  padding: 4px 12px calc(4px + env(safe-area-inset-bottom));
+  background: var(--stats-card);
+  border-top: 1px solid var(--stats-cell-border);
+  box-sizing: border-box;
+}
+
+.stats-footer__note {
+  color: var(--stats-footer-text);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

@@ -5,6 +5,7 @@
     "pages/score/index",
     "pages/match/join/index",
     "pages/tournament/detail/index",
+    "pages/tournament/stats/index",
     "pages/tournament/group-editor/index",
     "pages/tournament/group-pick/index",
     "pages/create/normal/index",
@@ -23,7 +24,8 @@
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#F6F6F6",
     "navigationBarTitleText": "GOLFBROTHERS",
-    "navigationBarTextStyle": "black"
+    "navigationBarTextStyle": "black",
+    "pageOrientation": "auto"
   },
   "permission": {
     "scope.userLocation": {
