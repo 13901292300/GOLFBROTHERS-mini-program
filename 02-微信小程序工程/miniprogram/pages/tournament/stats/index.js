@@ -1,9 +1,11 @@
 /**
  * 赛事统计数据页（UI 骨架）
- * - 仅 mock 展示，不接 scoreData / 不计算真实统计
+ * - UI 仍用 mock；matchId 存在时预览 adapter 输出（console）
  * - sortField/sortOrder 保持 total/asc；mock 按 TOTAL 升序预制，不另写排序逻辑
  */
 const mockAvatars = require('../../../utils/mockAvatars.js');
+const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const statisticsAdapter = require('../../../utils/statisticsAdapter.js');
 
 const TEE_COLOR_TO_MARKER = {
   '#dc2626': 'border-red',
@@ -309,8 +311,32 @@ Page({
       sortOrder: 'asc',
       rows: this._loadMockStatisticsRows()
     });
+    this._previewAdapterStatisticsRows(matchId);
     this._applyPageBackground();
     this._lockLandscape();
+  },
+
+  /**
+   * Stats-0.3-A2-1：仅预览 adapter，不替换 UI rows
+   */
+  _previewAdapterStatisticsRows(matchId) {
+    const id = matchId != null ? String(matchId).trim() : '';
+    if (!id) {
+      console.log('[stats-adapter-preview]', { matchId: '', count: 0, reason: 'no matchId' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(id);
+    if (!match) {
+      console.log('[stats-adapter-preview]', { matchId: id, count: 0, reason: 'match not found' });
+      return;
+    }
+    const rows = statisticsAdapter.buildStatisticsRows(match) || [];
+    console.log('[stats-adapter-preview]', {
+      matchId: id,
+      count: rows.length,
+      first: rows[0] || null,
+      rows: rows
+    });
   },
 
   /**
