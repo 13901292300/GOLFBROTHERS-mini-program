@@ -1033,6 +1033,30 @@ page {
 .lr-player { width: 45%; padding: 0 16rpx; display: flex; align-items: center; gap: 10rpx; min-width: 0; }
 .lr-thru { width: 20%; text-align: center; font-size: 24rpx; color: var(--text-muted); }
 .lr-total { width: 20%; text-align: center; }
+
+/* 个人榜五列：POS | PLAYER | TEAM | THRU | TO PAR（不影响分队榜四列） */
+.leaderboard-head--personal .lh-pos,
+.leaderboard-row--personal .lr-pos { width: 12%; }
+.leaderboard-head--personal .lh-player,
+.leaderboard-row--personal .lr-player { width: 30%; }
+.leaderboard-head--personal .lh-team,
+.leaderboard-row--personal .lr-team { width: 22%; }
+.leaderboard-head--personal .lh-thru,
+.leaderboard-row--personal .lr-thru { width: 16%; }
+.leaderboard-head--personal .lh-total,
+.leaderboard-row--personal .lr-total { width: 20%; }
+.lh-team { padding-left: 8rpx; text-align: left; box-sizing: border-box; }
+.lr-team {
+  padding: 0 8rpx;
+  box-sizing: border-box;
+  color: var(--text-muted);
+  font-size: 24rpx;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pos-cell { color: var(--text-muted); font-weight: 800; font-size: 26rpx; }
 .player-name { color: var(--text-primary); font-size: 28rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .leaderboard-team-tag { flex-shrink: 0; max-width: 112rpx; padding: 2rpx 8rpx; border-radius: 999rpx; background: rgba(0, 45, 98, 0.08); color: var(--text-muted); font-size: 20rpx; line-height: 1.4; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

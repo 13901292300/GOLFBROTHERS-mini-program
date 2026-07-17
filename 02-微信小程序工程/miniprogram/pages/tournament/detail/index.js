@@ -3108,7 +3108,8 @@ Page({
         );
         const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
         const scoreFields = this._getLeaderboardScoreFields(stat);
-        const teamTag = this._resolveLeaderboardPlayerTeamTag(playerId, playerTeamLookup, teamNameMap);
+        const teamName = this._resolveLeaderboardPlayerTeamName(playerId, playerTeamLookup, teamNameMap);
+        const teamTag = this._formatLeaderboardTeamTagName(teamName);
         flat.push({
           playerId: playerId,
           scorePlayerId: scorePlayerId,
@@ -3131,6 +3132,7 @@ Page({
           diff: scoreFields.toPar,
           thru: stat.thru,
           hasScore: stat.hasScore,
+          teamName: teamName,
           teamTag: teamTag,
           scoreSource: stat.source || ''
         });
@@ -3174,6 +3176,7 @@ Page({
         country: player.country,
         age: player.age,
         flag: player.flag,
+        teamName: player.teamName || '',
         teamTag: player.teamTag || '',
         scoreSource: player.scoreSource || '',
         expanded: index === openIndex
@@ -3193,13 +3196,18 @@ Page({
   },
 
   _resolveLeaderboardPlayerTeamTag(playerId, playerTeamLookup, teamNameMap) {
+    return this._formatLeaderboardTeamTagName(
+      this._resolveLeaderboardPlayerTeamName(playerId, playerTeamLookup, teamNameMap)
+    );
+  },
+
+  _resolveLeaderboardPlayerTeamName(playerId, playerTeamLookup, teamNameMap) {
     const id = playerId != null ? String(playerId).trim() : '';
     if (!id) return '';
     const ref = playerTeamLookup && playerTeamLookup[id];
     const teamId = ref && ref.teamId ? String(ref.teamId).trim() : '';
     if (!teamId) return '';
-    const rawName = (teamNameMap && teamNameMap[teamId]) || (ref && ref.teamName) || '';
-    return this._formatLeaderboardTeamTagName(rawName);
+    return String((teamNameMap && teamNameMap[teamId]) || (ref && ref.teamName) || '').trim();
   },
 
   _formatLeaderboardTeamTagName(name) {

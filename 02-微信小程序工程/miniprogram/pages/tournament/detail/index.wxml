@@ -441,21 +441,22 @@
           </block>
 
           <block wx:else>
-            <view class="leaderboard-head">
+            <view class="leaderboard-head leaderboard-head--personal">
               <text class="lh-pos">POS</text>
               <text class="lh-player">PLAYER</text>
+              <text class="lh-team">TEAM</text>
               <text class="lh-thru">THRU</text>
               <text class="lh-total">TO PAR</text>
             </view>
 
             <block wx:for="{{leaderboard}}" wx:key="playerId">
-              <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row">
+              <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row leaderboard-row--personal">
                 <text class="lr-pos pos-cell">{{item.pos}}</text>
                 <view class="lr-player">
                   <text class="player-name">{{item.name}}</text>
-                  <text wx:if="{{item.teamTag}}" class="leaderboard-team-tag">{{item.teamTag}}</text>
                   <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
                 </view>
+                <text class="lr-team">{{item.teamName || '-'}}</text>
                 <text class="lr-thru">{{item.thru}}</text>
                 <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
               </view>
