@@ -1083,6 +1083,63 @@ page {
 .team-leaderboard-player-row.is-non-counting .leaderboard-total { color: var(--text-secondary); }
 .team-leaderboard-divider-strong { height: 2px; margin: 0; background: #9ca3af; }
 
+/* 分队榜 DARK：避免 LIGHT 固定浅色底，金色仅用于选中态与外边框 */
+.detail-page.dark-mode .team-leaderboard-row {
+  background: #1f1f1f;
+  color: var(--text-primary);
+}
+.detail-page.dark-mode .team-leaderboard-row .pos-cell,
+.detail-page.dark-mode .team-leaderboard-row .player-name,
+.detail-page.dark-mode .team-leaderboard-row .lr-thru,
+.detail-page.dark-mode .team-leaderboard-row .team-leaderboard-chevron {
+  color: var(--text-secondary);
+}
+.detail-page.dark-mode .team-leaderboard-row.is-expanded {
+  background: #ce9224;
+  color: #ffffff;
+}
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .pos-cell,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .player-name,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .lr-thru,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .leaderboard-total,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .leaderboard-total.score-under,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .leaderboard-total.score-even,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .leaderboard-total.score-over,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .team-leaderboard-chevron {
+  color: #ffffff;
+}
+.detail-page.dark-mode .team-leaderboard-players-wrap {
+  background: var(--bg-card);
+  border-color: #ce9224;
+}
+.detail-page.dark-mode .team-leaderboard-player-head {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+.detail-page.dark-mode .team-leaderboard-player-row {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border-bottom-color: #333333;
+}
+.detail-page.dark-mode .team-leaderboard-player-row .player-name {
+  color: var(--text-primary);
+}
+.detail-page.dark-mode .team-leaderboard-player-row:active {
+  background: var(--bg-hover);
+}
+.detail-page.dark-mode .team-leaderboard-player-row.is-non-counting {
+  background: #161616;
+  color: var(--text-muted);
+  opacity: 0.88;
+}
+.detail-page.dark-mode .team-leaderboard-player-row.is-non-counting .player-name,
+.detail-page.dark-mode .team-leaderboard-player-row.is-non-counting .leaderboard-total {
+  color: var(--text-muted);
+}
+.detail-page.dark-mode .team-leaderboard-divider-strong {
+  background: #4b5563;
+}
+
 /* ===== 展开成绩卡 ===== */
 .scorecard-row { background: var(--bg-card); border-bottom: 1px solid var(--border); }
 .scorecard-profile { background: var(--bg-card); color: var(--text-primary); border-bottom: 1px solid var(--border); padding: 32rpx; display: flex; align-items: flex-start; justify-content: space-between; gap: 24rpx; }

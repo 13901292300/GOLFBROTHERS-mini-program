@@ -3348,6 +3348,9 @@ Page({
         }
         const lookup = playerLookup[playerId] || {};
         const display = displayMap[playerId] || {};
+        const genderDisplay = playerManage.getGenderDisplay(
+          Object.assign({}, lookup, player, { gender: lookup.gender || display.gender || player.gender })
+        );
         const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
         const scoreFields = this._getLeaderboardScoreFields(stat);
         const scorePlayerId = this._resolveSlotScorePlayerId(player, playerId);
@@ -3362,6 +3365,9 @@ Page({
           name: name,
           nickname: name,
           avatar: avatar,
+          gender: genderDisplay.gender || '',
+          genderIcon: genderDisplay.icon,
+          genderClass: genderDisplay.className,
           country: player.country || '',
           age: player.age || '',
           flag: player.flag || '',

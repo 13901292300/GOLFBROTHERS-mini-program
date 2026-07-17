@@ -368,7 +368,6 @@
                     <text class="lr-pos pos-cell">{{player.pos}}</text>
                     <view class="lr-player">
                       <text class="player-name">{{player.name}}</text>
-                      <text wx:if="{{player.teamTag}}" class="leaderboard-team-tag">{{player.teamTag}}</text>
                       <text wx:if="{{player.genderIcon}}" class="gender-icon {{player.genderClass}}">{{player.genderIcon}}</text>
                     </view>
                     <text class="lr-thru">{{player.thru}}</text>
