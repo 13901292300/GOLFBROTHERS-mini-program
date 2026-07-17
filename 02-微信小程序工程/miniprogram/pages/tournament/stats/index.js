@@ -1,7 +1,7 @@
 /**
- * 赛事统计数据页（UI 骨架）
- * - UI 仍用 mock；matchId 存在时预览 adapter 输出（console）
- * - sortField/sortOrder 保持 total/asc；mock 按 TOTAL 升序预制，不另写排序逻辑
+ * 赛事统计数据页
+ * - 优先 statisticsAdapter（match.scoreData）；无效时 fallback mock
+ * - sortField/sortOrder 默认 total/asc
  */
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
@@ -286,10 +286,11 @@ Page({
     matchId: '',
     themeClass: 'bright-mode',
     title: 'Player Statistics',
-    subtitle: '赛事统计 · Mock 预览',
+    subtitle: '赛事统计',
     defaultSortNote: 'TOTAL asc',
     sortField: 'total',
     sortOrder: 'asc',
+    dataSource: 'mock',
     mockStatisticsPlayers: mockStatisticsPlayers,
     rows: []
   },
@@ -303,45 +304,186 @@ Page({
     } catch (e) {
       statusBarHeight = 20;
     }
+    const loaded = this._loadStatisticsPageRows(matchId);
     this.setData({
       matchId: matchId,
       statusBarHeight: statusBarHeight,
       themeClass: this._resolveThemeClass(),
       sortField: 'total',
       sortOrder: 'asc',
-      rows: this._loadMockStatisticsRows()
+      dataSource: loaded.dataSource,
+      subtitle: loaded.dataSource === 'adapter' ? '赛事统计 · 真实成绩' : '赛事统计 · Mock 预览',
+      rows: loaded.rows
     });
-    this._previewAdapterStatisticsRows(matchId);
     this._applyPageBackground();
     this._lockLandscape();
   },
 
   /**
-   * Stats-0.3-A2-1：仅预览 adapter，不替换 UI rows
+   * 真实数据优先：matchId → getMatchById → buildStatisticsRows
+   * 无效时 fallback mock
    */
-  _previewAdapterStatisticsRows(matchId) {
+  _loadStatisticsPageRows(matchId) {
     const id = matchId != null ? String(matchId).trim() : '';
-    if (!id) {
-      console.log('[stats-adapter-preview]', { matchId: '', count: 0, reason: 'no matchId' });
-      return;
+    if (id) {
+      const match = teamMatchStore.getMatchById(id);
+      if (match) {
+        const adapterRows = statisticsAdapter.buildStatisticsRows(match) || [];
+        if (adapterRows.length > 0) {
+          const viewRows = this._mapAdapterRowsToView(match, adapterRows);
+          return {
+            dataSource: 'adapter',
+            rows: this._applyCurrentSort(viewRows)
+          };
+        }
+      }
     }
-    const match = teamMatchStore.getMatchById(id);
-    if (!match) {
-      console.log('[stats-adapter-preview]', { matchId: id, count: 0, reason: 'match not found' });
-      return;
-    }
-    const rows = statisticsAdapter.buildStatisticsRows(match) || [];
-    console.log('[stats-adapter-preview]', {
-      matchId: id,
-      count: rows.length,
-      first: rows[0] || null,
-      rows: rows
+    return {
+      dataSource: 'mock',
+      rows: this._loadMockStatisticsRows()
+    };
+  },
+
+  /**
+   * 将 adapter 行映射为表格展示字段；无成绩球员统计列显示 '-'
+   */
+  _mapAdapterRowsToView(match, adapterRows) {
+    const list = Array.isArray(adapterRows) ? adapterRows : [];
+    return list.map((p, index) => {
+      const hasScore = this._countFilledHolesForStatsRow(match, p) > 0;
+      const dash = '-';
+      const eagle = hasScore ? p.eagle : dash;
+      const birdie = hasScore ? p.birdie : dash;
+      const par = hasScore ? p.par : dash;
+      const bogey = hasScore ? p.bogey : dash;
+      const doublePlus = hasScore ? p.doublePlus : dash;
+      const putts = hasScore ? p.putts : dash;
+      const total = hasScore ? p.total : dash;
+      const gender = p.gender === 'female' ? 'female' : (p.gender === 'male' ? 'male' : '');
+      return {
+        id: p.playerId || ('stats-' + index),
+        playerId: p.playerId || '',
+        scorePlayerId: p.scorePlayerId || p.playerId || '',
+        groupId: p.groupId || '',
+        avatar: p.avatar || mockAvatars.pickMockAvatar(p.name || p.playerId || index),
+        name: p.name || '未知球员',
+        gender: gender,
+        genderIcon: p.genderIcon || '',
+        genderClass: gender === 'female' ? 'gender-female' : (gender === 'male' ? 'gender-male' : ''),
+        teeColor: p.teeColor || '#ffffff',
+        teeMarkerClass: resolveTeeMarkerClass(p.teeColor),
+        hasScore: hasScore,
+        eagle: eagle,
+        birdie: birdie,
+        par: par,
+        bogey: bogey,
+        doublePlus: doublePlus,
+        girPercent: p.girPercent != null ? p.girPercent : dash,
+        putts: putts,
+        fairwayPercent: p.fairwayPercent != null ? p.fairwayPercent : dash,
+        sand: p.sand != null ? p.sand : dash,
+        penalty: p.penalty != null ? p.penalty : dash,
+        stat8421: p.stat8421 != null ? p.stat8421 : dash,
+        total: total,
+        eag: eagle,
+        bir: birdie,
+        bog: bogey,
+        dbl: doublePlus,
+        gir: p.girPercent != null ? p.girPercent : dash,
+        fwy: p.fairwayPercent != null ? p.fairwayPercent : dash,
+        pen: p.penalty != null ? p.penalty : dash,
+        score8421: p.stat8421 != null ? p.stat8421 : dash,
+        eagMuted: isZeroLike(eagle),
+        birMuted: isZeroLike(birdie),
+        sandMuted: isZeroLike(p.sand != null ? p.sand : dash)
+      };
     });
   },
 
   /**
-   * 经默认排序状态入口加载 mock（不另写排序算法）
-   * 依赖：sortField=total + sortOrder=asc + mock 预制升序
+   * 按当前 sortField / sortOrder 排列（默认 total asc）
+   * 无成绩 '-' 在升序时排后
+   */
+  _applyCurrentSort(rows) {
+    const field = this.data.sortField || 'total';
+    const order = this.data.sortOrder || 'asc';
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    const valueOf = (row) => {
+      if (!row) return null;
+      if (field === 'total') return row.total;
+      if (field === 'putts') return row.putts;
+      if (field === 'eag' || field === 'eagle') return row.eagle;
+      if (field === 'bir' || field === 'birdie') return row.birdie;
+      if (field === 'par') return row.par;
+      if (field === 'bog' || field === 'bogey') return row.bogey;
+      if (field === 'dbl' || field === 'doublePlus') return row.doublePlus;
+      if (field === 'gir') return row.girPercent;
+      if (field === 'fwy') return row.fairwayPercent;
+      if (field === 'sand') return row.sand;
+      if (field === 'pen' || field === 'penalty') return row.penalty;
+      if (field === 'score8421' || field === 'stat8421') return row.stat8421;
+      return row[field];
+    };
+    list.sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      const aMissing = av === '-' || av === '' || av == null;
+      const bMissing = bv === '-' || bv === '' || bv == null;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
+      const an = Number(av);
+      const bn = Number(bv);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) {
+        if (an === bn) return 0;
+        return order === 'asc' ? an - bn : bn - an;
+      }
+      const as = String(av);
+      const bs = String(bv);
+      if (as === bs) return 0;
+      const cmp = as < bs ? -1 : 1;
+      return order === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  },
+
+  _statsRowHasScoreData(scoreData, row) {
+    const groupId = row && row.groupId != null ? String(row.groupId).trim() : '';
+    const scorePlayerId = row && row.scorePlayerId != null ? String(row.scorePlayerId).trim() : '';
+    const playerId = row && row.playerId != null ? String(row.playerId).trim() : '';
+    const groupScore = groupId && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+      ? scoreData[groupId]
+      : null;
+    const byPlayer = groupScore && groupScore.scoresByPlayer && typeof groupScore.scoresByPlayer === 'object'
+      ? groupScore.scoresByPlayer
+      : null;
+    if (!byPlayer) return false;
+    const record = (scorePlayerId && byPlayer[scorePlayerId]) || (playerId && byPlayer[playerId]) || null;
+    return !!(record && Array.isArray(record.scores));
+  },
+
+  _countFilledHolesForStatsRow(match, row) {
+    const scoreData = match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : {};
+    if (!this._statsRowHasScoreData(scoreData, row)) return 0;
+    const groupId = String(row.groupId || '').trim();
+    const byPlayer = scoreData[groupId].scoresByPlayer;
+    const scorePlayerId = String(row.scorePlayerId || '').trim();
+    const playerId = String(row.playerId || '').trim();
+    const record = (scorePlayerId && byPlayer[scorePlayerId]) || (playerId && byPlayer[playerId]) || null;
+    const scores = record && Array.isArray(record.scores) ? record.scores : [];
+    let filled = 0;
+    scores.forEach((score) => {
+      if (score === null || score === undefined || score === '') return;
+      if (Number.isNaN(Number(score))) return;
+      filled += 1;
+    });
+    return filled;
+  },
+
+  /**
+   * fallback：mock 预制 total asc
    */
   _loadMockStatisticsRows() {
     return mapMockPlayersToRows(mockStatisticsPlayers);
@@ -405,7 +547,7 @@ Page({
   },
 
   /**
-   * 表头排序指示（仅 UI）：同一时间只高亮一个字段，暂不重排 mock 数据
+   * 表头排序指示（仅 UI）：同一时间只高亮一个字段
    */
   onSortHeaderTap(e) {
     const field = e && e.currentTarget && e.currentTarget.dataset
