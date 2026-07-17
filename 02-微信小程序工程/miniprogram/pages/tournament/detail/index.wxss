@@ -1041,24 +1041,23 @@ page {
 .score-under { color: #ef4444; }
 .score-even { color: var(--text-muted); }
 .score-over { color: var(--text-primary); }
-.team-leaderboard-row { margin-top: 12rpx; border-bottom: 0; border-radius: 18rpx; background: var(--bg-card); box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.05); }
-.team-leaderboard-row.is-expanded { background: rgba(0, 45, 98, 0.06); }
+.team-leaderboard-row { margin: 0 0 16rpx; border-bottom: 0; border-radius: 12rpx; background: #e5e7eb; box-shadow: none; overflow: hidden; }
+.team-leaderboard-row.is-expanded { margin-bottom: 0; border-radius: 12rpx 12rpx 0 0; background: var(--champion-gold); color: #ffffff; }
+.team-leaderboard-row.is-expanded .pos-cell,
+.team-leaderboard-row.is-expanded .player-name,
+.team-leaderboard-row.is-expanded .lr-thru,
+.team-leaderboard-row.is-expanded .leaderboard-total,
+.team-leaderboard-row.is-expanded .team-leaderboard-chevron { color: #ffffff; }
 .team-leaderboard-total { display: flex; align-items: center; justify-content: center; gap: 8rpx; }
 .team-leaderboard-chevron { color: var(--text-muted); font-size: 22rpx; line-height: 1; }
-.team-leaderboard-players { margin: 8rpx 0 20rpx; padding: 14rpx 0; border-radius: 20rpx; background: #ffffff; box-shadow: 0 12rpx 34rpx rgba(15, 23, 42, 0.08); overflow: hidden; }
-.team-leaderboard-subhead { display: flex; align-items: center; padding: 14rpx 32rpx; color: var(--text-muted); font-size: 20rpx; line-height: 1; font-weight: 900; letter-spacing: 0.05em; }
-.tlh-pos { width: 15%; text-align: center; }
-.tlh-player { width: 45%; padding: 0 16rpx; box-sizing: border-box; }
-.tlh-thru { width: 20%; text-align: center; }
-.tlh-total { width: 20%; text-align: right; }
-.team-leaderboard-player { display: flex; align-items: center; gap: 0; padding: 22rpx 32rpx; color: var(--text-primary); }
-.team-leaderboard-player:active { background: var(--bg-hover); }
-.team-leaderboard-player.is-muted { color: var(--text-disabled); }
-.team-leaderboard-player__pos { width: 15%; text-align: center; color: var(--text-muted); font-size: 24rpx; font-weight: 800; }
-.team-leaderboard-player__name { width: 45%; min-width: 0; padding: 0 16rpx; box-sizing: border-box; font-size: 26rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-leaderboard-player__thru { width: 20%; text-align: center; color: var(--text-muted); font-size: 24rpx; }
-.team-leaderboard-player__total { width: 20%; text-align: right; font-size: 28rpx; font-weight: 800; }
-.team-leaderboard-divider { height: 1px; margin: 6rpx 32rpx; background: var(--border); }
+.team-leaderboard-players-wrap { margin: 0 0 16rpx; border: 2rpx solid var(--champion-gold); border-top: 0; border-radius: 0 0 12rpx 12rpx; background: #ffffff; box-shadow: none; overflow: hidden; }
+.team-leaderboard-player-head { padding-left: 0; padding-right: 0; background: #ffffff; }
+.team-leaderboard-player-row { padding-left: 0; padding-right: 0; background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+.team-leaderboard-player-row:active { background: var(--bg-hover); }
+.team-leaderboard-player-row.is-non-counting { background: #f8fafc; color: var(--text-secondary); opacity: 0.82; }
+.team-leaderboard-player-row.is-non-counting .player-name,
+.team-leaderboard-player-row.is-non-counting .leaderboard-total { color: var(--text-secondary); }
+.team-leaderboard-divider-strong { height: 2px; margin: 0; background: #9ca3af; }
 
 /* ===== 展开成绩卡 ===== */
 .scorecard-row { background: var(--bg-card); border-bottom: 1px solid var(--border); }

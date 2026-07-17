@@ -3035,6 +3035,24 @@ Page({
     return { source: '', holes: [] };
   },
 
+  /**
+   * 统一领先榜成绩字段语义：
+   * - grossTotal: 实际总杆
+   * - toPar: 相对标准杆杆差
+   * 兼容入参可含 total/diff（旧字段）或 grossTotal/toPar（新字段）。
+   */
+  _getLeaderboardScoreFields(stats) {
+    const source = stats || {};
+    const grossRaw = source.grossTotal != null ? source.grossTotal : source.total;
+    const toParRaw = source.toPar != null ? source.toPar : source.diff;
+    const grossTotal = Number(grossRaw);
+    const toPar = Number(toParRaw);
+    return {
+      grossTotal: Number.isFinite(grossTotal) ? grossTotal : 0,
+      toPar: Number.isFinite(toPar) ? toPar : 0
+    };
+  },
+
   _computeMatchLeaderboardStats(match, group, player, playerId) {
     const resolved = this._resolveMatchPlayerHoles(match, group, player, playerId);
     const holes = resolved.holes || [];
@@ -3049,7 +3067,20 @@ Page({
       parThru += Number(pars[index] || 0);
       thru += 1;
     });
-    return { total: total, diff: total - parThru, thru: thru, hasScore: thru > 0, source: resolved.source || '' };
+    const fields = this._getLeaderboardScoreFields({
+      total: total,
+      diff: total - parThru
+    });
+    return {
+      grossTotal: fields.grossTotal,
+      toPar: fields.toPar,
+      // 兼容：total=总杆，diff=杆差
+      total: fields.grossTotal,
+      diff: fields.toPar,
+      thru: thru,
+      hasScore: thru > 0,
+      source: resolved.source || ''
+    };
   },
 
   _buildLeaderboardFromMatchGroups(match, openIndex) {
@@ -3076,6 +3107,7 @@ Page({
           Object.assign({}, lookup, player, { gender: lookup.gender || display.gender || player.gender })
         );
         const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
+        const scoreFields = this._getLeaderboardScoreFields(stat);
         const teamTag = this._resolveLeaderboardPlayerTeamTag(playerId, playerTeamLookup, teamNameMap);
         flat.push({
           playerId: playerId,
@@ -3093,8 +3125,10 @@ Page({
           flag: player.flag || '',
           country: player.country || '',
           age: player.age || '',
-          total: stat.total,
-          diff: stat.diff,
+          grossTotal: scoreFields.grossTotal,
+          toPar: scoreFields.toPar,
+          total: scoreFields.grossTotal,
+          diff: scoreFields.toPar,
           thru: stat.thru,
           hasScore: stat.hasScore,
           teamTag: teamTag,
@@ -3107,13 +3141,13 @@ Page({
       if (a.thru === 0 && b.thru === 0) return 0;
       if (a.thru === 0) return 1;
       if (b.thru === 0) return -1;
-      if (a.diff !== b.diff) return a.diff - b.diff;
+      if (a.toPar !== b.toPar) return a.toPar - b.toPar;
       return b.thru - a.thru;
     });
     return flat.map((player, index) => {
       const started = player.thru > 0;
-      const firstIndex = flat.findIndex((item) => item.thru > 0 && item.diff === player.diff);
-      const tied = flat.filter((item) => item.thru > 0 && item.diff === player.diff).length > 1;
+      const firstIndex = flat.findIndex((item) => item.thru > 0 && item.toPar === player.toPar);
+      const tied = flat.filter((item) => item.thru > 0 && item.toPar === player.toPar).length > 1;
       const pos = !started ? '-' : tied ? 'T' + (firstIndex + 1) : String(index + 1);
       return {
         pos: pos,
@@ -3129,11 +3163,13 @@ Page({
         genderIcon: player.genderIcon,
         genderClass: player.genderClass,
         thru: this._resolveLeaderboardThruLabel(player.thru),
-        total: player.total,
-        diff: player.diff,
+        grossTotal: player.grossTotal,
+        toPar: player.toPar,
+        total: player.grossTotal,
+        diff: player.toPar,
         hasScore: player.hasScore === true,
-        scoreStr: started ? this._formatLeaderboardDiff(player.diff) : '-',
-        scoreClass: started ? this._resolveLeaderboardTotalClass(player.diff) : 'score-even',
+        scoreStr: started ? this._formatLeaderboardDiff(player.toPar) : '-',
+        scoreClass: started ? this._resolveLeaderboardTotalClass(player.toPar) : 'score-even',
         avatar: player.avatar,
         country: player.country,
         age: player.age,
@@ -3197,7 +3233,19 @@ Page({
       groupCount: sourceGroups.length,
       playerCount: playerCount
     });
-    return rows;
+    return (rows || []).map((row) => this._attachPersonalLeaderboardScoreFields(row));
+  },
+
+  /** 个人榜行：补齐 grossTotal/toPar，并保留 total/diff 兼容别名 */
+  _attachPersonalLeaderboardScoreFields(row) {
+    if (!row) return row;
+    const fields = this._getLeaderboardScoreFields(row);
+    return Object.assign({}, row, {
+      grossTotal: fields.grossTotal,
+      toPar: fields.toPar,
+      total: fields.grossTotal,
+      diff: fields.toPar
+    });
   },
 
   _buildLeaderboardViewForView(match, view) {
@@ -3209,7 +3257,9 @@ Page({
       filtered = rows.filter((row) => row && row.gender === 'female');
     }
     const ranked = this._buildCompetitionRanking(filtered, (row) => (
-      row && row.hasScore === true ? row.diff : null
+      row && row.hasScore === true
+        ? (row.toPar != null ? row.toPar : row.diff)
+        : null
     ));
     return ranked.map((row, index) => Object.assign({}, row, {
       expanded: index === this.data.openIndex
@@ -3279,6 +3329,8 @@ Page({
           teamMap[teamRef.teamId] = {
             teamId: teamRef.teamId,
             teamName: teamRef.teamName || '未命名分队',
+            grossTotal: 0,
+            toPar: 0,
             total: 0,
             scoringPlayersCount: 0,
             players: []
@@ -3289,6 +3341,7 @@ Page({
         const lookup = playerLookup[playerId] || {};
         const display = displayMap[playerId] || {};
         const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
+        const scoreFields = this._getLeaderboardScoreFields(stat);
         const scorePlayerId = this._resolveSlotScorePlayerId(player, playerId);
         const name = display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员';
         const avatar = display.avatar || mockAvatars.resolveAvatar(lookup.avatar || player.avatar || player.avatarUrl || '', playerId);
@@ -3304,10 +3357,14 @@ Page({
           country: player.country || '',
           age: player.age || '',
           flag: player.flag || '',
-          total: stat.diff,
+          grossTotal: scoreFields.grossTotal,
+          toPar: scoreFields.toPar,
+          // 兼容：分队球员行历史上 total 存的是杆差（toPar）
+          total: scoreFields.toPar,
+          diff: scoreFields.toPar,
           hasScore: stat.hasScore,
-          scoreStr: stat.hasScore ? this._formatLeaderboardDiff(stat.diff) : '-',
-          scoreClass: stat.hasScore ? this._resolveLeaderboardTotalClass(stat.diff) : 'score-even',
+          scoreStr: stat.hasScore ? this._formatLeaderboardDiff(scoreFields.toPar) : '-',
+          scoreClass: stat.hasScore ? this._resolveLeaderboardTotalClass(scoreFields.toPar) : 'score-even',
           thru: stat.hasScore ? this._resolveLeaderboardThruLabel(stat.thru) : '-',
           isCounting: false,
           _thruValue: stat.thru
@@ -3331,16 +3388,26 @@ Page({
       return teams.map((team, teamIndex) => {
         const sortedPlayers = team.players.slice().sort((a, b) => {
           if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
-          if (a.total !== b.total) return a.total - b.total;
+          if (a.toPar !== b.toPar) return a.toPar - b.toPar;
           return String(a.name || '').localeCompare(String(b.name || ''));
         });
         const rankedPlayers = this._buildCompetitionRanking(sortedPlayers, (player) => (
-          player && player.hasScore === true ? player.total : null
+          player && player.hasScore === true ? player.toPar : null
         ));
+        let grossTotal = 0;
+        let toPar = 0;
+        rankedPlayers.forEach((player) => {
+          if (!(player && player.hasScore === true)) return;
+          grossTotal += Number(player.grossTotal || 0);
+          toPar += Number(player.toPar || 0);
+        });
         return {
           pos: String(teamIndex + 1),
           teamId: team.teamId,
           teamName: team.teamName || '未命名分队',
+          grossTotal: grossTotal,
+          toPar: toPar,
+          // 兼容：非 PK 仍不参与总分展示/排名，total 保持 0
           total: 0,
           hasScore: false,
           scoreStr: '-',
@@ -3359,17 +3426,21 @@ Page({
     const sortedTeams = teams.map((team, teamIndex) => {
       const sortedPlayers = team.players.slice().sort((a, b) => {
         if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
-        if (a.total !== b.total) return a.total - b.total;
+        if (a.toPar !== b.toPar) return a.toPar - b.toPar;
         return String(a.name || '').localeCompare(String(b.name || ''));
       });
-      let total = 0;
+      let toPar = 0;
+      let grossTotal = 0;
       const scoringPlayersCount = Math.min(
         configuredTopN,
         sortedPlayers.filter((player) => player && player.hasScore === true).length
       );
       const players = sortedPlayers.map((player, index) => {
         const isCounting = player.hasScore === true && index < scoringPlayersCount;
-        if (isCounting) total += Number(player.total || 0);
+        if (isCounting) {
+          toPar += Number(player.toPar || 0);
+          grossTotal += Number(player.grossTotal || 0);
+        }
         const out = Object.assign({}, player, {
           isCounting: isCounting
         });
@@ -3377,26 +3448,28 @@ Page({
         return out;
       });
       const rankedPlayers = this._buildCompetitionRanking(players, (player) => (
-        player && player.hasScore === true ? player.total : null
+        player && player.hasScore === true ? player.toPar : null
       ));
       return {
         teamId: team.teamId,
         teamName: team.teamName || '未命名分队',
-        total: total,
+        grossTotal: grossTotal,
+        toPar: toPar,
+        total: toPar,
         hasScore: scoringPlayersCount > 0,
-        scoreStr: scoringPlayersCount > 0 ? this._formatLeaderboardDiff(total) : '-',
-        scoreClass: scoringPlayersCount > 0 ? this._resolveLeaderboardTotalClass(total) : 'score-even',
+        scoreStr: scoringPlayersCount > 0 ? this._formatLeaderboardDiff(toPar) : '-',
+        scoreClass: scoringPlayersCount > 0 ? this._resolveLeaderboardTotalClass(toPar) : 'score-even',
         scoringPlayersCount: scoringPlayersCount,
         players: rankedPlayers,
         _sortIndex: teamIndex
       };
     }).sort((a, b) => {
       if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
-      if (a.total !== b.total) return a.total - b.total;
+      if (a.toPar !== b.toPar) return a.toPar - b.toPar;
       return a._sortIndex - b._sortIndex;
     });
     const rankedTeams = this._buildCompetitionRanking(sortedTeams, (team) => (
-      team && team.hasScore === true ? team.total : null
+      team && team.hasScore === true ? team.toPar : null
     ));
     return rankedTeams.map((team) => {
       const out = Object.assign({}, team);
@@ -3414,6 +3487,8 @@ Page({
       map[teamId] = {
         teamId: teamId,
         teamName: String((team && team.name) || '').trim() || ('分队' + (index + 1)),
+        grossTotal: 0,
+        toPar: 0,
         total: 0,
         scoringPlayersCount: 0,
         players: []

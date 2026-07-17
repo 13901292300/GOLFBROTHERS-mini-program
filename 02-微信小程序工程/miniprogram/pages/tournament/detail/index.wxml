@@ -331,8 +331,8 @@
             <view class="leaderboard-head">
               <text class="lh-pos">POS</text>
               <text class="lh-player">TEAM</text>
-              <text class="lh-thru">{{leaderboardTeamCompetitionEnabled ? 'SCORING PLAYERS' : 'PLAYERS'}}</text>
-              <text class="lh-total">TOTAL</text>
+              <text class="lh-thru">TOTAL</text>
+              <text class="lh-total">TO PAR</text>
             </view>
             <block wx:for="{{teamLeaderboard}}" wx:for-item="team" wx:for-index="teamIndex" wx:key="teamId">
               <view bindtap="toggleTeamLeaderboardRow" data-team-id="{{team.teamId}}" class="leaderboard-row team-leaderboard-row {{expandedTeamId === team.teamId ? 'is-expanded' : ''}}">
@@ -340,35 +340,39 @@
                 <view class="lr-player">
                   <text class="player-name">{{team.teamName}}</text>
                 </view>
-                <text class="lr-thru">{{leaderboardTeamCompetitionEnabled ? team.scoringPlayersCount : team.players.length}}</text>
+                <text class="lr-thru">{{team.grossTotal}}</text>
                 <view class="lr-total team-leaderboard-total">
                   <text class="leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
                   <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
                 </view>
               </view>
-              <view wx:if="{{expandedTeamId === team.teamId}}" class="team-leaderboard-players">
-                <view class="team-leaderboard-subhead">
-                  <text class="tlh-pos">POS</text>
-                  <text class="tlh-player">PLAYER</text>
-                  <text class="tlh-thru">THRU</text>
-                  <text class="tlh-total">TOTAL</text>
+              <view wx:if="{{expandedTeamId === team.teamId}}" class="team-leaderboard-players-wrap">
+                <view class="leaderboard-head team-leaderboard-player-head">
+                  <text class="lh-pos">POS</text>
+                  <text class="lh-player">PLAYER</text>
+                  <text class="lh-thru">THRU</text>
+                  <text class="lh-total">TO PAR</text>
                 </view>
                 <block wx:for="{{team.players}}" wx:for-item="player" wx:for-index="playerIndex" wx:key="scorecardKey">
                   <view
                     wx:if="{{team.scoringPlayersCount > 0 && playerIndex === team.scoringPlayersCount}}"
-                    class="team-leaderboard-divider"
+                    class="team-leaderboard-divider-strong"
                   ></view>
                   <view
                     catchtap="toggleScorecard"
                     data-mode="team"
                     data-index="{{player.scorecardKey}}"
                     data-player="{{player}}"
-                    class="team-leaderboard-player {{player.isCounting ? '' : 'is-muted'}}"
+                    class="leaderboard-row team-leaderboard-player-row {{player.isCounting ? '' : 'is-non-counting'}}"
                   >
-                    <text class="team-leaderboard-player__pos">{{player.pos}}</text>
-                    <text class="team-leaderboard-player__name">{{player.name}}</text>
-                    <text class="team-leaderboard-player__thru">{{player.thru}}</text>
-                    <text class="team-leaderboard-player__total {{player.scoreClass}}">{{player.scoreStr}}</text>
+                    <text class="lr-pos pos-cell">{{player.pos}}</text>
+                    <view class="lr-player">
+                      <text class="player-name">{{player.name}}</text>
+                      <text wx:if="{{player.teamTag}}" class="leaderboard-team-tag">{{player.teamTag}}</text>
+                      <text wx:if="{{player.genderIcon}}" class="gender-icon {{player.genderClass}}">{{player.genderIcon}}</text>
+                    </view>
+                    <text class="lr-thru">{{player.thru}}</text>
+                    <text class="lr-total leaderboard-total {{player.scoreClass}}">{{player.scoreStr}}</text>
                   </view>
                   <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
                     <view class="scorecard-profile">
@@ -441,7 +445,7 @@
               <text class="lh-pos">POS</text>
               <text class="lh-player">PLAYER</text>
               <text class="lh-thru">THRU</text>
-              <text class="lh-total">TOTAL</text>
+              <text class="lh-total">TO PAR</text>
             </view>
 
             <block wx:for="{{leaderboard}}" wx:key="playerId">
