@@ -293,11 +293,23 @@
 }
 
 .st-total {
-  background: var(--stats-total-bg) !important;
   border-left-color: transparent !important;
   font-weight: 900;
   letter-spacing: 0;
-  color: #ffffff;
+}
+
+/* 表头 TOT：未选中时与普通表头一致，不常驻红/金 */
+.stats-thead .st-total {
+  background: transparent;
+  color: inherit;
+}
+
+/* 仅当前 sortField 对应表头金色高亮；同一时间只允许一个 */
+.stats-thead .st-cell.active-sort,
+.stats-thead .st-player.active-sort,
+.stats-thead .st-total.active-sort {
+  background: var(--champion-gold) !important;
+  color: #ffffff !important;
 }
 
 .st-total-val {
@@ -305,6 +317,7 @@
   font-weight: 900;
   color: var(--stats-text-strong);
   border-left: 1px solid var(--stats-total-border);
+  background: transparent;
 }
 
 .stats-footer {

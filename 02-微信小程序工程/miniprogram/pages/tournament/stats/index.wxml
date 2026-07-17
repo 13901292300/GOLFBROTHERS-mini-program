@@ -16,21 +16,21 @@
     <view class="stats-table">
       <view class="stats-thead">
         <text class="st-cell st-player">PLAYER</text>
-        <text class="st-cell">EAG</text>
-        <text class="st-cell">BIR</text>
-        <text class="st-cell">PAR</text>
-        <text class="st-cell">BOG</text>
-        <text class="st-cell">DBL+</text>
-        <text class="st-cell st-pct">GIR%</text>
-        <text class="st-cell">PUT</text>
-        <text class="st-cell st-pct">FWY%</text>
-        <text class="st-cell">SAND</text>
-        <text class="st-cell">PEN</text>
-        <text class="st-cell">8421</text>
-        <text class="st-cell st-total">TOT</text>
+        <text bindtap="onSortHeaderTap" data-field="eag" class="st-cell {{sortField === 'eag' ? 'active-sort' : ''}}">EAG</text>
+        <text bindtap="onSortHeaderTap" data-field="bir" class="st-cell {{sortField === 'bir' ? 'active-sort' : ''}}">BIR</text>
+        <text bindtap="onSortHeaderTap" data-field="par" class="st-cell {{sortField === 'par' ? 'active-sort' : ''}}">PAR</text>
+        <text bindtap="onSortHeaderTap" data-field="bog" class="st-cell {{sortField === 'bog' ? 'active-sort' : ''}}">BOG</text>
+        <text bindtap="onSortHeaderTap" data-field="dbl" class="st-cell {{sortField === 'dbl' ? 'active-sort' : ''}}">DBL+</text>
+        <text bindtap="onSortHeaderTap" data-field="gir" class="st-cell st-pct {{sortField === 'gir' ? 'active-sort' : ''}}">GIR%</text>
+        <text bindtap="onSortHeaderTap" data-field="putts" class="st-cell {{sortField === 'putts' ? 'active-sort' : ''}}">PUT</text>
+        <text bindtap="onSortHeaderTap" data-field="fwy" class="st-cell st-pct {{sortField === 'fwy' ? 'active-sort' : ''}}">FWY%</text>
+        <text bindtap="onSortHeaderTap" data-field="sand" class="st-cell {{sortField === 'sand' ? 'active-sort' : ''}}">SAND</text>
+        <text bindtap="onSortHeaderTap" data-field="pen" class="st-cell {{sortField === 'pen' ? 'active-sort' : ''}}">PEN</text>
+        <text bindtap="onSortHeaderTap" data-field="score8421" class="st-cell {{sortField === 'score8421' ? 'active-sort' : ''}}">8421</text>
+        <text bindtap="onSortHeaderTap" data-field="total" class="st-cell st-total {{sortField === 'total' ? 'active-sort' : ''}}">TOT</text>
       </view>
 
-      <block wx:for="{{rows}}" wx:key="id">
+      <block wx:for="{{rows}}" wx:key="playerId">
         <view class="stats-row">
           <view class="st-cell st-player">
             <image class="st-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
@@ -39,15 +39,15 @@
             </view>
             <view wx:if="{{item.teeMarkerClass}}" class="st-tee-marker {{item.teeMarkerClass}}"></view>
           </view>
-          <text class="st-cell st-muted">{{item.eag}}</text>
-          <text class="st-cell st-muted">{{item.bir}}</text>
+          <text class="st-cell {{item.eagMuted ? 'st-muted' : ''}}">{{item.eag}}</text>
+          <text class="st-cell {{item.birMuted ? 'st-muted' : ''}}">{{item.bir}}</text>
           <text class="st-cell">{{item.par}}</text>
           <text class="st-cell">{{item.bog}}</text>
           <text class="st-cell">{{item.dbl}}</text>
           <text class="st-cell st-pct">{{item.gir}}</text>
           <text class="st-cell">{{item.putts}}</text>
           <text class="st-cell st-pct">{{item.fwy}}</text>
-          <text class="st-cell st-muted">{{item.sand}}</text>
+          <text class="st-cell {{item.sandMuted ? 'st-muted' : ''}}">{{item.sand}}</text>
           <text class="st-cell">{{item.pen}}</text>
           <text class="st-cell st-score8421">{{item.score8421}}</text>
           <text class="st-cell st-total-val">{{item.total}}</text>
