@@ -32,6 +32,10 @@
   --highlight-on: #002d55;
   --par-color: #CE9224;
 
+  /* 技术面板焦点 pulse：冠军金 → 浅金 → 冠军金 */
+  --tech-panel-pulse: #CE9224;
+  --tech-panel-pulse-mid: #E4C078;
+
   --discussion-bg: #0b0f14;
   --discussion-strip: #101820;
   --discussion-bubble: #182330;
@@ -63,6 +67,10 @@
   --highlight-strong: #002D62;
   --highlight-on: #ffffff;
   --par-color: #002D62;
+
+  /* 技术面板焦点 pulse：PGA蓝 → 浅蓝 → PGA蓝 */
+  --tech-panel-pulse: #002D62;
+  --tech-panel-pulse-mid: #5BA3D9;
 
   --discussion-bg: #f3f4f6;
   --discussion-strip: #ffffff;
@@ -1185,10 +1193,8 @@ page {
   border-right: 4rpx solid var(--highlight-color);
 }
 
-.sheet-player-item--inactive { opacity: 0.6; }
-
-/* 快捷面板不做逐人高亮，球员头像与成绩不置灰 */
-.quick-mode .sheet-player-item--inactive { opacity: 1; }
+/* 非 active 不通过 opacity 灰化，保持正常可读 */
+.sheet-player-item--inactive { opacity: 1; }
 
 .sheet-player-avatar-wrap {
   display: flex;
@@ -1236,6 +1242,75 @@ page {
   flex-shrink: 0;
 }
 
+/* 当前编辑未确认草稿（通用兜底；Bright active 另有覆盖） */
+.sheet-hole-score--draft {
+  color: var(--text-muted, #9ca3af);
+  border-color: var(--border-color, #d1d5db);
+  background: transparent;
+  font-weight: 700;
+}
+
+/* ===== Dark 模式：普通单组技术面板当前球员冠军金高亮 ===== */
+.score-page.dark-mode .sheet-player-item--active {
+  background: #CE9224;
+  border-right: 4rpx solid #CE9224;
+}
+
+.score-page.dark-mode .sheet-player-item--active .sheet-player-name {
+  color: #111111;
+}
+
+/* Dark：正式成绩格冠军金边 + 深底 + 白字（非 draft / 非 empty） */
+.score-page.dark-mode .sheet-hole-score:not(.sheet-hole-score--draft):not(.sheet-hole-score--empty) {
+  border: 2rpx solid #CE9224;
+  background: #111111;
+  color: #ffffff;
+}
+
+/* Dark：草稿成绩 PGA 蓝字；背景/边框保持原草稿样式 */
+.score-page.dark-mode .sheet-hole-score--draft {
+  color: #002D62;
+}
+
+/* ===== Bright 模式：普通单组技术面板 PGA 蓝高亮 ===== */
+.score-page.bright-mode .sheet-player-item--active {
+  background: #002D62;
+  border-right: 4rpx solid #002D62;
+}
+
+.score-page.bright-mode .sheet-player-item--active .sheet-player-name {
+  color: #ffffff;
+}
+
+/* active + 已确认成绩：白底 PGA 蓝字，压在深蓝行上仍清晰 */
+.score-page.bright-mode .sheet-player-item--active .sheet-hole-score:not(.sheet-hole-score--draft) {
+  color: #002D62;
+  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
+/* active + draft：浅蓝/半透明白，表示未确认输入 */
+.score-page.bright-mode .sheet-player-item--active .sheet-hole-score--draft {
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+}
+
+/* 非 active + 无正式成绩：PGA 蓝边 + 浅蓝底，可记未完 */
+.score-page.bright-mode .sheet-player-item--inactive .sheet-hole-score--empty {
+  color: transparent;
+  background: rgba(0, 45, 98, 0.12);
+  border: 2rpx solid #002D62;
+}
+
+/* 非 active + 正式成绩：PGA 蓝边 + 白底 + PGA 蓝字 */
+.score-page.bright-mode .sheet-player-item--inactive .sheet-hole-score:not(.sheet-hole-score--draft):not(.sheet-hole-score--empty) {
+  color: #002D62;
+  background: #ffffff;
+  border: 2rpx solid #002D62;
+}
+
 .sheet-main-panel {
   flex: 1;
   min-width: 0;
@@ -1246,6 +1321,28 @@ page {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+/* Bright：技术面板控件区 PGA 蓝边框，呼应左侧球员高亮；背景/内控件不变 */
+.score-page.bright-mode .tech-score-panel {
+  border: 3px solid #002D62;
+  background: #ffffff;
+}
+
+/* Dark：技术面板控件区冠军金边框，呼应左侧球员高亮；背景/内控件不变 */
+.score-page.dark-mode .tech-score-panel {
+  border: 3px solid #CE9224;
+}
+
+/* 焦点切换 pulse：颜色跟随主题变量（Bright PGA蓝 / Dark 冠军金） */
+.tech-score-panel--focus-pulse {
+  animation: tech-panel-focus-pulse 500ms ease;
+}
+
+@keyframes tech-panel-focus-pulse {
+  0% { border-color: var(--tech-panel-pulse); }
+  50% { border-color: var(--tech-panel-pulse-mid); }
+  100% { border-color: var(--tech-panel-pulse); }
 }
 
 .sheet-control-row {
@@ -1332,6 +1429,16 @@ page {
 
 .direction-label--gold { color: var(--highlight-color); font-weight: 900; }
 
+/* Dark：技术面板 FAIRWAY 选中态冠军金；未选保持原样 */
+.score-page.dark-mode .tech-score-panel .direction-circle--active {
+  background: #CE9224;
+  color: #111111;
+}
+
+.score-page.dark-mode .tech-score-panel .direction-label--gold {
+  color: #CE9224;
+}
+
 .quick-score-control-list {
   display: flex;
   flex-direction: column;
@@ -1405,6 +1512,31 @@ page {
   background: var(--champion-gold);
   color: #000000;
   box-shadow: 0 16rpx 40rpx rgba(206, 146, 36, 0.2);
+}
+
+/* Bright：技术面板操作色统一（+/- / 确认）；不改快捷面板、不改 Dark */
+.score-page.bright-mode .tech-score-panel .control-icon {
+  background: #002D62;
+  color: #ffffff;
+}
+
+.score-page.bright-mode .score-input-sheet:not(.quick-mode) .sheet-footer-btn--confirm {
+  background: #002D62;
+  color: #ffffff;
+  box-shadow: 0 16rpx 40rpx rgba(0, 45, 98, 0.22);
+}
+
+/* Dark：技术面板 +/- 冠军金；不改 Bright / 快捷 */
+.score-page.dark-mode .tech-score-panel .control-icon {
+  background: #CE9224;
+  color: #111111;
+}
+
+/* Dark：技术面板确认按钮冠军金；不改快捷面板 */
+.score-page.dark-mode .score-input-sheet:not(.quick-mode) .sheet-footer-btn--confirm {
+  background: #CE9224;
+  color: #111111;
+  box-shadow: 0 16rpx 40rpx rgba(206, 146, 36, 0.28);
 }
 
 /* Group Manage Page */

@@ -489,6 +489,63 @@ function isFilledScore(s) {
   return s !== null && s !== undefined && s !== '';
 }
 
+/** 开球方向：fairway | left | right；默认 fairway */
+const FAIRWAY_FAIRWAY = 'fairway';
+const FAIRWAY_LEFT = 'left';
+const FAIRWAY_RIGHT = 'right';
+
+function normalizeFairwayValue(v) {
+  if (v === FAIRWAY_LEFT || v === FAIRWAY_RIGHT || v === FAIRWAY_FAIRWAY) return v;
+  return FAIRWAY_FAIRWAY;
+}
+
+function resolveHoleFairway(fairways, holeIndex) {
+  const arr = Array.isArray(fairways) ? fairways : [];
+  return normalizeFairwayValue(arr[holeIndex]);
+}
+
+function sliceFairways(fairways) {
+  return Array.isArray(fairways) ? fairways.slice() : [];
+}
+
+/** 罚杆：默认 0，最小 0 */
+function normalizePenaltyValue(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/** 打开洞回填：有值用该值（含 0），否则 0 */
+function resolveHolePenalty(penalties, holeIndex) {
+  const arr = Array.isArray(penalties) ? penalties : [];
+  const raw = arr[holeIndex];
+  if (raw === null || raw === undefined || raw === '') return 0;
+  return normalizePenaltyValue(raw);
+}
+
+function slicePenalties(penalties) {
+  return Array.isArray(penalties) ? penalties.slice() : [];
+}
+
+/** 沙坑：默认 0，最小 0 */
+function normalizeSandValue(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/** 打开洞回填：有值用该值（含 0），否则 0 → panelBunker */
+function resolveHoleSand(sands, holeIndex) {
+  const arr = Array.isArray(sands) ? sands : [];
+  const raw = arr[holeIndex];
+  if (raw === null || raw === undefined || raw === '') return 0;
+  return normalizeSandValue(raw);
+}
+
+function sliceSands(sands) {
+  return Array.isArray(sands) ? sands.slice() : [];
+}
+
 function enrichPlayer(player, pIdx, displayMode) {
   const scores = player.scores || [];
   const putts = player.putts || [];
@@ -691,6 +748,12 @@ Page({
     joinMatchTeamOptions: [],
 
     activePlayerIdx: 0,
+    /** 技术面板清除草稿：无选中球员，全员成绩格为空（仅 UI） */
+    scoreClearDraft: false,
+    /** 本洞已点清除但未确认：显示层忽略正式 scores，遮罩关闭则丢弃 */
+    scoreHoleClearPending: false,
+    /** 技术面板控件区焦点切换动画（仅 UI） */
+    techPanelFocusPulse: false,
     sheetHoleLabel: 'A1',
     sheetHoleIndex: 0,
     sheetPar: 4,
@@ -701,6 +764,8 @@ Page({
     panelPuttTouched: false,
     panelPenalty: 0,
     panelBunker: 0,
+    /** 开球方向三选一：fairway | left | right */
+    panelFairway: FAIRWAY_FAIRWAY,
     quickPanelScores: [4, 4, 4, 4],
     quickPanelDisplay: ['4', '4', '4', '4'],
     sheetPlayers: [],
@@ -842,7 +907,10 @@ Page({
           avatar: (p && p.avatar) || '',
           colorClass: GAME_COLOR_CLASSES[i % GAME_COLOR_CLASSES.length],
           scores: [],
-          putts: []
+          putts: [],
+          fairways: [],
+          penalties: [],
+          sands: []
         }))
       : PLAYER_SEEDS.map((p) => JSON.parse(JSON.stringify(p)));
     const course = (ms && ms.course) || {};
@@ -1276,7 +1344,10 @@ Page({
         avatar: (player && player.avatar) || '',
         colorClass: 'border-white',
         scores: (record.scores || []).slice(),
-        putts: (record.putts || []).slice()
+        putts: (record.putts || []).slice(),
+        fairways: sliceFairways(record.fairways),
+        penalties: slicePenalties(record.penalties),
+        sands: sliceSands(record.sands)
       };
     });
   },
@@ -1301,7 +1372,10 @@ Page({
           avatar: p.avatar || '',
           colorClass: 'border-white',
           scores: [],
-          putts: []
+          putts: [],
+          fairways: [],
+          penalties: [],
+          sands: []
         }))
       : null;
     this._playersSource = matchPlayers || statePlayers || (loaded.length
@@ -1312,10 +1386,13 @@ Page({
           avatar: p.avatar,
           colorClass: p.colorClass || 'border-white',
           scores: (p.scores || []).slice(),
-          putts: (p.putts || []).slice()
+          putts: (p.putts || []).slice(),
+          fairways: sliceFairways(p.fairways),
+          penalties: slicePenalties(p.penalties),
+          sands: sliceSands(p.sands)
         }))
       : PLAYER_SEEDS.map((p) =>
-          Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [] })
+          Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [], fairways: [], penalties: [], sands: [] })
         ));
     console.log('[score-load-source]', {
       matchId: matchId,
@@ -1520,6 +1597,9 @@ Page({
       if (!p.playerId) p.playerId = p.id;
       if (!Array.isArray(p.scores)) p.scores = [];
       if (!Array.isArray(p.putts)) p.putts = [];
+      if (!Array.isArray(p.fairways)) p.fairways = [];
+      if (!Array.isArray(p.penalties)) p.penalties = [];
+      if (!Array.isArray(p.sands)) p.sands = [];
     });
     this.refreshPlayers();
   },
@@ -1567,7 +1647,10 @@ Page({
         name: p.name,
         avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
         scores: (saved.scores || []).slice(),
-        putts: (saved.putts || []).slice()
+        putts: (saved.putts || []).slice(),
+        fairways: sliceFairways(saved.fairways),
+        penalties: slicePenalties(saved.penalties),
+        sands: sliceSands(saved.sands)
       };
     }
     let colorIdx = 0;
@@ -1578,7 +1661,10 @@ Page({
         name: p.name,
         avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
         scores: (p.scores || []).slice(),
-        putts: (p.putts || []).slice()
+        putts: (p.putts || []).slice(),
+        fairways: sliceFairways(p.fairways),
+        penalties: slicePenalties(p.penalties),
+        sands: sliceSands(p.sands)
       };
       if (opts.colorClasses) {
         row.colorClass = GAME_COLOR_CLASSES[colorIdx % GAME_COLOR_CLASSES.length];
@@ -1664,7 +1750,10 @@ Page({
       if (!scoreOwnerId) return;
       scoresByPlayer[scoreOwnerId] = {
         scores: (player.scores || []).slice(),
-        putts: (player.putts || []).slice()
+        putts: (player.putts || []).slice(),
+        fairways: sliceFairways(player.fairways),
+        penalties: slicePenalties(player.penalties),
+        sands: sliceSands(player.sands)
       };
     });
     match.scoreData[groupId] = {
@@ -1716,7 +1805,10 @@ Page({
           avatar: player.avatar || '',
           colorClass: 'border-white',
           scores: (record.scores || []).slice(),
-          putts: (record.putts || []).slice()
+          putts: (record.putts || []).slice(),
+          fairways: sliceFairways(record.fairways),
+          penalties: slicePenalties(record.penalties),
+          sands: sliceSands(record.sands)
         };
       });
 
@@ -1743,7 +1835,16 @@ Page({
       const gi = this._gameGroupIndex || 0;
       this._persistGameRoster();
       (this._playersSource || []).forEach((p) => {
-        gameStore.setGroupPlayerScores(this.data.gameId, gi, p.playerId || p.id, p.scores, p.putts);
+        gameStore.setGroupPlayerScores(
+          this.data.gameId,
+          gi,
+          p.playerId || p.id,
+          p.scores,
+          p.putts,
+          p.fairways,
+          p.penalties,
+          p.sands
+        );
       });
       if (this.data.mode === 'fourball_best') {
         this._persistTeamScores();
@@ -1780,7 +1881,10 @@ Page({
     app.globalData.scoreSessions = app.globalData.scoreSessions || {};
     app.globalData.scoreSessions[this._sessionKey()] = (this._playersSource || []).map((p) => ({
       scores: (p.scores || []).slice(),
-      putts: (p.putts || []).slice()
+      putts: (p.putts || []).slice(),
+      fairways: sliceFairways(p.fairways),
+      penalties: slicePenalties(p.penalties),
+      sands: sliceSands(p.sands)
     }));
   },
 
@@ -1795,6 +1899,9 @@ Page({
         if (rec) {
           p.scores = (rec.scores || []).slice();
           p.putts = (rec.putts || []).slice();
+          p.fairways = sliceFairways(rec.fairways);
+          p.penalties = slicePenalties(rec.penalties);
+          p.sands = sliceSands(rec.sands);
           changed = true;
         }
       });
@@ -1813,7 +1920,10 @@ Page({
         avatar: p.avatar,
         colorClass: p.colorClass || 'border-white',
         scores: (p.scores || []).slice(),
-        putts: (p.putts || []).slice()
+        putts: (p.putts || []).slice(),
+        fairways: sliceFairways(p.fairways),
+        penalties: slicePenalties(p.penalties),
+        sands: sliceSands(p.sands)
       }));
       this.refreshPlayers();
       console.log('[score-hydrate-migration]', {
@@ -1833,6 +1943,9 @@ Page({
       if (this._playersSource[i]) {
         this._playersSource[i].scores = (rec.scores || []).slice();
         this._playersSource[i].putts = (rec.putts || []).slice();
+        this._playersSource[i].fairways = sliceFairways(rec.fairways);
+        this._playersSource[i].penalties = slicePenalties(rec.penalties);
+        this._playersSource[i].sands = sliceSands(rec.sands);
       }
     });
     this.refreshPlayers();
@@ -1872,25 +1985,70 @@ Page({
       return;
     }
 
-    const { playersView, activePlayerIdx, sheetPar, sheetHoleIndex, quickPanelScores, scorePanelMode, panelScore, scoreDisplayMode } = this.data;
+    const {
+      playersView,
+      activePlayerIdx,
+      sheetPar,
+      sheetHoleIndex,
+      quickPanelScores,
+      scorePanelMode,
+      panelScore,
+      scoreDisplayMode,
+      scoreClearDraft,
+      scoreHoleClearPending
+    } = this.data;
+    const clearDraft = !!scoreClearDraft && scorePanelMode === 'tech';
+    const clearPending = !!scoreHoleClearPending && scorePanelMode === 'tech';
     const sheetPlayers = playersView.map((p, idx) => {
       const shortName = p.name.split('.')[1] || p.name;
-      let holeScore;
+      let holeScore = '';
+      let isDraftScore = false;
       if (scorePanelMode === 'quick') {
         // 快捷面板：显示待写入的快捷成绩（默认 PAR），按当前显示方式换算
         const g = quickPanelScores[idx] != null ? quickPanelScores[idx] : sheetPar;
         holeScore = formatMainScore(g, sheetPar, scoreDisplayMode);
+      } else if (clearDraft) {
+        // 清除草稿（未选人）：本洞成绩栏全部置空（不读正式 scores）
+        holeScore = '';
+        isDraftScore = false;
+      } else if (clearPending) {
+        // 清除待确认：忽略正式 scores；仅当前编辑显示 panelScore（draft）
+        if (idx === activePlayerIdx) {
+          const draft = panelScore != null && panelScore !== '' ? panelScore : sheetPar;
+          holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+          isDraftScore = true;
+        }
       } else {
-        // 技术面板：头像右侧成绩 = players[idx].scores[currentHole]，按当前显示方式换算；空则为空
+        // 技术面板（普通单组）：active ≠ draft；仅 panel 相对正式分有改动才 draft
         const s = (p.scores || [])[sheetHoleIndex];
-        holeScore = isFilledScore(s) ? formatMainScore(s, sheetPar, scoreDisplayMode) : '';
+        const hasFormal = isFilledScore(s);
+        if (idx === activePlayerIdx) {
+          const draft = panelScore != null && panelScore !== '' ? panelScore : sheetPar;
+          if (!hasFormal) {
+            // 无正式成绩：显示 panelScore（默认 PAR）为草稿
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          } else if (Number(draft) === Number(s)) {
+            // 已有正式成绩且未改 panel：显示正式分，非 draft
+            holeScore = formatMainScore(s, sheetPar, scoreDisplayMode);
+            isDraftScore = false;
+          } else {
+            // 已有正式成绩但已改 panel：显示草稿
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          }
+        } else if (hasFormal) {
+          holeScore = formatMainScore(s, sheetPar, scoreDisplayMode);
+          isDraftScore = false;
+        }
       }
       return {
         id: p.id,
         name: shortName,
         avatar: p.avatar,
-        active: idx === activePlayerIdx,
-        holeScore
+        active: clearDraft ? false : idx === activePlayerIdx,
+        holeScore: holeScore,
+        isDraftScore: isDraftScore
       };
     });
     // 面板成绩控件显示值（内部仍以总杆 gross 存储；diff 模式仅转换显示）
@@ -2148,6 +2306,9 @@ Page({
           patch.panelScore = raw;
           const putt = p.putts && p.putts[hi];
           if (putt != null && putt !== '') patch.panelPutt = putt;
+          patch.panelFairway = resolveHoleFairway(p.fairways, hi);
+          patch.panelPenalty = resolveHolePenalty(p.penalties, hi);
+          patch.panelBunker = resolveHoleSand(p.sands, hi);
         }
         if (this.data.scorePanelMode === 'quick') {
           patch.quickPanelScores = this._quickDefaultsForHole(hi, holePars()[hi]);
@@ -2943,7 +3104,10 @@ Page({
     if (oldRecord) {
       scoresByPlayer[newId] = {
         scores: (oldRecord.scores || []).slice(),
-        putts: (oldRecord.putts || []).slice()
+        putts: (oldRecord.putts || []).slice(),
+        fairways: sliceFairways(oldRecord.fairways),
+        penalties: slicePenalties(oldRecord.penalties),
+        sands: sliceSands(oldRecord.sands)
       };
       delete scoresByPlayer[oldId];
       match.scoreData[groupId] = Object.assign({}, groupScoreData, {
@@ -3443,7 +3607,10 @@ Page({
             name: cur.name,
             avatar: cur.avatar,
             scores: (cur.scores || []).slice(),
-            putts: (cur.putts || []).slice()
+            putts: (cur.putts || []).slice(),
+            fairways: sliceFairways(cur.fairways),
+            penalties: slicePenalties(cur.penalties),
+            sands: sliceSands(cur.sands)
           };
         }
         this._demoSlots[idx] = null;
@@ -3458,6 +3625,9 @@ Page({
         const cur = this._demoSlots[idx] || {};
         const scores = (cur.scores || []).slice();
         const putts = (cur.putts || []).slice();
+        const fairways = sliceFairways(cur.fairways);
+        const penalties = slicePenalties(cur.penalties);
+        const sands = sliceSands(cur.sands);
         this._demoSlots[idx] = {
           id: ch.toPlayerId,
           playerId: ch.toPlayerId,
@@ -3466,7 +3636,10 @@ Page({
           source: draftSlot.source || (player && player.source) || 'manual',
           colorClass: cur.colorClass || 'border-white',
           scores: scores,
-          putts: putts
+          putts: putts,
+          fairways: fairways,
+          penalties: penalties,
+          sands: sands
         };
         this._demoSlotCache[idx] = null;
       });
@@ -3486,7 +3659,10 @@ Page({
           source: draftSlot.source || (player && player.source) || 'manual',
           colorClass: 'border-white',
           scores: cache ? (cache.scores || []).slice() : [],
-          putts: cache ? (cache.putts || []).slice() : []
+          putts: cache ? (cache.putts || []).slice() : [],
+          fairways: cache ? sliceFairways(cache.fairways) : [],
+          penalties: cache ? slicePenalties(cache.penalties) : [],
+          sands: cache ? sliceSands(cache.sands) : []
         };
         this._demoSlotCache[idx] = null;
       });
@@ -3500,7 +3676,10 @@ Page({
         source: p.source || 'manual',
         colorClass: p.colorClass || 'border-white',
         scores: (p.scores || []).slice(),
-        putts: (p.putts || []).slice()
+        putts: (p.putts || []).slice(),
+        fairways: sliceFairways(p.fairways),
+        penalties: slicePenalties(p.penalties),
+        sands: sliceSands(p.sands)
       }));
       const patch = { playerCount: this._playersSource.length || 4 };
       if (this.data.activePlayerIdx >= this._playersSource.length) patch.activePlayerIdx = 0;
@@ -3886,7 +4065,10 @@ Page({
       avatar: p.avatar,
       colorClass: p.colorClass || 'border-white',
       scores: (p.scores || []).slice(),
-      putts: (p.putts || []).slice()
+      putts: (p.putts || []).slice(),
+      fairways: sliceFairways(p.fairways),
+      penalties: slicePenalties(p.penalties),
+      sands: sliceSands(p.sands)
     }));
     const patch = {
       playerCount: this._playersSource.length || 4,
@@ -3928,7 +4110,10 @@ Page({
           avatar: player.avatar || existing.avatar || '',
           colorClass: existing.colorClass || 'border-white',
           scores: (record.scores || existing.scores || []).slice(),
-          putts: (record.putts || existing.putts || []).slice()
+          putts: (record.putts || existing.putts || []).slice(),
+          fairways: sliceFairways(record.fairways || existing.fairways),
+          penalties: slicePenalties(record.penalties || existing.penalties),
+          sands: sliceSands(record.sands || existing.sands)
         };
       });
     const patch = {
@@ -3964,7 +4149,10 @@ Page({
           name: cur.name,
           avatar: cur.avatar,
           scores: (cur.scores || []).slice(),
-          putts: (cur.putts || []).slice()
+          putts: (cur.putts || []).slice(),
+          fairways: sliceFairways(cur.fairways),
+          penalties: slicePenalties(cur.penalties),
+          sands: sliceSands(cur.sands)
         };
       }
       this._demoSlots[idx] = null;
@@ -4002,7 +4190,10 @@ Page({
         source: source || 'manual',
         colorClass: p.colorClass || 'border-white',
         scores: cache ? (cache.scores || []).slice() : [],
-        putts: cache ? (cache.putts || []).slice() : []
+        putts: cache ? (cache.putts || []).slice() : [],
+        fairways: cache ? sliceFairways(cache.fairways) : [],
+        penalties: cache ? slicePenalties(cache.penalties) : [],
+        sands: cache ? sliceSands(cache.sands) : []
       };
       this._demoSlots[idx] = newP;
       this._demoSlotCache[idx] = null;
@@ -4800,6 +4991,9 @@ Page({
     const hasScore = rawScore !== null && rawScore !== undefined && rawScore !== '';
     const score = hasScore ? rawScore : par; // 空洞默认填标准杆，便于直接录入
     const putt = player.putts[holeIndex] || 2;
+    const fairway = resolveHoleFairway(player.fairways, holeIndex);
+    const penalty = resolveHolePenalty(player.penalties, holeIndex);
+    const sand = resolveHoleSand(player.sands, holeIndex);
 
     let quick = this.data.quickPanelScores.slice();
     quick[pIdx] = score;
@@ -4808,8 +5002,10 @@ Page({
       quick = this._quickDefaultsForHole(holeIndex, par);
     }
 
-    this.setData({
+    const openPatch = {
       activePlayerIdx: pIdx,
+      scoreClearDraft: false,
+      scoreHoleClearPending: false,
       sheetHoleLabel: label,
       sheetHoleIndex: holeIndex,
       sheetPar: par,
@@ -4817,9 +5013,28 @@ Page({
       panelPutt: putt,
       // 已有成绩的洞：视推杆为既有用户输入，不被自动值覆盖；空洞允许智能默认
       panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand,
       quickPanelScores: quick,
       showScoreSheet: true
-    }, () => {
+    };
+    // 遮罩关闭时恢复进入弹窗前面板状态（清除草稿不落盘）
+    this._scoreSheetEntrySnapshot = {
+      activePlayerIdx: pIdx,
+      scoreClearDraft: false,
+      scoreHoleClearPending: false,
+      sheetHoleLabel: label,
+      sheetHoleIndex: holeIndex,
+      sheetPar: par,
+      panelScore: score,
+      panelPutt: putt,
+      panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand
+    };
+    this.setData(openPatch, () => {
       this.syncSheetPlayers();
       setTimeout(() => this.setData({ scoreSheetOpen: true }), 30);
     });
@@ -4844,6 +5059,9 @@ Page({
     const hasScore = raw !== null;
     const score = hasScore ? raw : par; // 空洞默认 PAR，便于直接录入
     const putt = (groups[active] && (groups[active].putts || [])[holeIndex]) || 2;
+    const fairway = resolveHoleFairway(groups[active] && groups[active].fairways, holeIndex);
+    const penalty = resolveHolePenalty(groups[active] && groups[active].penalties, holeIndex);
+    const sand = resolveHoleSand(groups[active] && groups[active].sands, holeIndex);
 
     this.setData({
       activePlayerIdx: active,
@@ -4853,6 +5071,9 @@ Page({
       panelScore: score,
       panelPutt: putt,
       panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand,
       // 记分控件数量 = 组数（每组一个快捷控件）；UI 结构不变
       quickPanelScores: this._quickDefaultsForHole(holeIndex, par),
       showScoreSheet: true
@@ -4862,9 +5083,79 @@ Page({
     });
   },
 
-  closeScoreInput() {
-    this.setData({ scoreSheetOpen: false });
+  /** 仅收起面板（确认保存后用）；不回滚进入时快照 */
+  _hideScoreSheet() {
+    this.setData({
+      scoreSheetOpen: false,
+      scoreClearDraft: false,
+      scoreHoleClearPending: false
+    });
     setTimeout(() => this.setData({ showScoreSheet: false }), 300);
+  },
+
+  /** 遮罩关闭：恢复进入弹窗前面板状态，不写正式成绩 */
+  closeScoreInput() {
+    const snap = this._scoreSheetEntrySnapshot;
+    const patch = {
+      scoreSheetOpen: false,
+      scoreClearDraft: false,
+      scoreHoleClearPending: false
+    };
+    if (snap && this.data.mode !== 'fourball_best') {
+      patch.activePlayerIdx = snap.activePlayerIdx;
+      patch.sheetHoleLabel = snap.sheetHoleLabel;
+      patch.sheetHoleIndex = snap.sheetHoleIndex;
+      patch.sheetPar = snap.sheetPar;
+      patch.panelScore = snap.panelScore;
+      patch.panelPutt = snap.panelPutt;
+      patch.panelPuttTouched = snap.panelPuttTouched;
+      patch.panelFairway = snap.panelFairway;
+      patch.panelPenalty = snap.panelPenalty;
+      patch.panelBunker = snap.panelBunker;
+    }
+    this.setData(patch);
+    setTimeout(() => this.setData({ showScoreSheet: false }), 300);
+  },
+
+  /** 本洞全组清空写入 _playersSource（仅确认路径调用） */
+  _clearHoleScoresInPlayersSource(holeIndex) {
+    (this._playersSource || []).forEach((p) => {
+      if (!p) return;
+      p.scores = p.scores || [];
+      p.putts = p.putts || [];
+      p.fairways = p.fairways || [];
+      p.penalties = p.penalties || [];
+      p.sands = p.sands || [];
+      p.scores[holeIndex] = null;
+      p.putts[holeIndex] = null;
+      p.fairways[holeIndex] = null;
+      p.penalties[holeIndex] = 0;
+      p.sands[holeIndex] = 0;
+    });
+  },
+
+  /**
+   * 普通单组技术面板：清除当前洞草稿 UI（不写 _playersSource / 不 persist）
+   * 快捷 / 球队赛 / fourball_best：保持原「清除=关闭」行为
+   */
+  clearScoreInput() {
+    if (this._scoreEditBlocked()) return;
+    if (this.data.mode === 'fourball_best' || this.data.scorePanelMode === 'quick') {
+      this.closeScoreInput();
+      return;
+    }
+    const par = this.data.sheetPar;
+    this.setData({
+      scoreClearDraft: true,
+      scoreHoleClearPending: true,
+      activePlayerIdx: -1,
+      panelScore: par,
+      panelPutt: 2,
+      panelPuttTouched: false,
+      panelFairway: FAIRWAY_FAIRWAY,
+      panelPenalty: 0,
+      panelBunker: 0
+    }, () => this.syncSheetPlayers());
   },
 
   // 快捷面板：本洞各记分实体默认成绩（已填取原值，空洞默认 PAR）。
@@ -4901,7 +5192,7 @@ Page({
       this._focusSheetGroup(idx);
       return;
     }
-    this.setData({ activePlayerIdx: idx }, () => this.syncSheetPlayers());
+    this._focusSheetPlayer(idx);
   },
 
   // 技术面板：聚焦到指定组（载入其本洞成绩/推杆），保持面板打开
@@ -4913,17 +5204,30 @@ Page({
     const hasScore = isFilledScore(raw);
     const score = hasScore ? raw : par;
     const putt = (g && (g.putts || [])[holeIndex]) || 2;
+    const fairway = resolveHoleFairway(g && g.fairways, holeIndex);
+    const penalty = resolveHolePenalty(g && g.penalties, holeIndex);
+    const sand = resolveHoleSand(g && g.sands, holeIndex);
     this.setData({
       activePlayerIdx: gi,
       panelScore: score,
       panelPutt: putt,
-      panelPuttTouched: hasScore
+      panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand
     }, () => this.syncSheetPlayers());
   },
 
   // 技术面板智能默认推杆：score-par <= -1（小鸟或更好）→ 1，否则 → 2
   _autoPutts(score, par) {
     return (score - par) <= -1 ? 1 : 2;
+  },
+
+  /** 开球方向三选一 */
+  selectPanelFairway(e) {
+    if (this._scoreEditBlocked()) return;
+    const value = normalizeFairwayValue(e.currentTarget.dataset.value);
+    this.setData({ panelFairway: value });
   },
 
   adjustSheetVal(e) {
@@ -4969,18 +5273,57 @@ Page({
     }
 
     // ===== 技术面板：逐人录入，全部记录完才允许关闭 =====
-    const { activePlayerIdx, sheetHoleIndex, panelScore, panelPutt, sheetPar } = this.data;
+    const {
+      activePlayerIdx,
+      sheetHoleIndex,
+      panelScore,
+      panelPutt,
+      panelFairway,
+      panelPenalty,
+      panelBunker,
+      sheetPar,
+      scoreClearDraft,
+      scoreHoleClearPending
+    } = this.data;
+
+    // 清除草稿确认（未选人）：整组本洞清空 → 原 persistSession
+    if (scoreClearDraft) {
+      this._clearHoleScoresInPlayersSource(sheetHoleIndex);
+      this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
+      this.refreshPlayers();
+      this.persistSession();
+      this._hideScoreSheet();
+      this._afterScoresPersisted();
+      return;
+    }
+
+    if (activePlayerIdx == null || activePlayerIdx < 0 || !this._playersSource[activePlayerIdx]) {
+      return;
+    }
+
+    // 清除待确认 + 已选球员：先整组清空，再写入当前球员面板值
+    if (scoreHoleClearPending) {
+      this._clearHoleScoresInPlayersSource(sheetHoleIndex);
+    }
+
     let newScore = panelScore;
     if (newScore === null || newScore === undefined || newScore === '') {
       newScore = sheetPar;
     }
-    // 1) 写入当前球员本地 state（成绩 / 推杆）
+    // 1) 写入当前球员本地 state（成绩 / 推杆 / 开球方向 / 罚杆 / 沙坑）
     const src = this._playersSource[activePlayerIdx];
     src.scores[sheetHoleIndex] = newScore;
     if (panelPutt !== null && panelPutt !== undefined && panelPutt !== '') {
       src.putts = src.putts || [];
       src.putts[sheetHoleIndex] = panelPutt;
     }
+    src.fairways = src.fairways || [];
+    src.fairways[sheetHoleIndex] = normalizeFairwayValue(panelFairway);
+    src.penalties = src.penalties || [];
+    src.penalties[sheetHoleIndex] = normalizePenaltyValue(panelPenalty);
+    src.sands = src.sands || [];
+    src.sands[sheetHoleIndex] = normalizeSandValue(panelBunker);
+    this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
     // 2) 由本地 state 即时派生 UI（OUT / IN / TOT / 杆差）
     this.refreshPlayers();
     // 3) 会话内本地留存，离开再进入不丢失
@@ -4995,7 +5338,7 @@ Page({
       this._focusSheetPlayer(next);
     } else {
       // 全部球员均已记录：才允许关闭
-      this.closeScoreInput();
+      this._hideScoreSheet();
       this._afterScoresPersisted();
     }
   },
@@ -5032,6 +5375,12 @@ Page({
         g.putts = g.putts || [];
         g.putts[sheetHoleIndex] = this.data.panelPutt;
       }
+      g.fairways = g.fairways || [];
+      g.fairways[sheetHoleIndex] = normalizeFairwayValue(this.data.panelFairway);
+      g.penalties = g.penalties || [];
+      g.penalties[sheetHoleIndex] = normalizePenaltyValue(this.data.panelPenalty);
+      g.sands = g.sands || [];
+      g.sands[sheetHoleIndex] = normalizeSandValue(this.data.panelBunker);
     }
     this.refreshTeamColumns();
     this._persistTeamScores();
@@ -5084,21 +5433,67 @@ Page({
     }
   },
 
-  // 技术面板：聚焦到指定球员（载入其本洞成绩/推杆），保持面板打开
+  /** 技术面板控件区焦点转移动画（打开/关面板/清除/切洞不调用） */
+  _pulseTechPanelFocus() {
+    if (this.data.scorePanelMode !== 'tech' || this.data.mode === 'fourball_best') return;
+    if (this._techFocusPulseTimer) {
+      clearTimeout(this._techFocusPulseTimer);
+      this._techFocusPulseTimer = null;
+    }
+    // 先摘掉 class 再挂上，保证连续切换可重播
+    this.setData({ techPanelFocusPulse: false }, () => {
+      this.setData({ techPanelFocusPulse: true });
+      this._techFocusPulseTimer = setTimeout(() => {
+        this.setData({ techPanelFocusPulse: false });
+        this._techFocusPulseTimer = null;
+      }, 500);
+    });
+  },
+
+  // 技术面板：聚焦到指定球员（载入其本洞成绩/推杆/开球方向/罚杆/沙坑），保持面板打开
   _focusSheetPlayer(idx) {
     const holeIndex = this.data.sheetHoleIndex;
     const par = this.data.sheetPar;
     const player = this.data.playersView[idx];
+    if (!player) return;
+    const switched = Number(this.data.activePlayerIdx) !== Number(idx);
+    // 清除待确认：不回填旧正式成绩，控件用默认值
+    if (this.data.scoreHoleClearPending) {
+      this.setData({
+        scoreClearDraft: false,
+        activePlayerIdx: idx,
+        panelScore: par,
+        panelPutt: 2,
+        panelPuttTouched: false,
+        panelFairway: FAIRWAY_FAIRWAY,
+        panelPenalty: 0,
+        panelBunker: 0
+      }, () => {
+        this.syncSheetPlayers();
+        if (switched) this._pulseTechPanelFocus();
+      });
+      return;
+    }
     const raw = player.scores[holeIndex];
     const hasScore = isFilledScore(raw);
     const score = hasScore ? raw : par;
     const putt = player.putts[holeIndex] || 2;
+    const fairway = resolveHoleFairway(player.fairways, holeIndex);
+    const penalty = resolveHolePenalty(player.penalties, holeIndex);
+    const sand = resolveHoleSand(player.sands, holeIndex);
     this.setData({
+      scoreClearDraft: false,
       activePlayerIdx: idx,
       panelScore: score,
       panelPutt: putt,
-      panelPuttTouched: hasScore
-    }, () => this.syncSheetPlayers());
+      panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand
+    }, () => {
+      this.syncSheetPlayers();
+      if (switched) this._pulseTechPanelFocus();
+    });
   },
 
   // 快捷面板确认：遍历当前组全部球员 → 写入本洞 score 与规则 putts → 关闭
@@ -5111,13 +5506,28 @@ Page({
       const diff = s - sheetPar;
       p.scores = p.scores || [];
       p.putts = p.putts || [];
+      p.fairways = p.fairways || [];
+      p.penalties = p.penalties || [];
+      p.sands = p.sands || [];
       p.scores[sheetHoleIndex] = s;
       p.putts[sheetHoleIndex] = diff < 0 ? 1 : 2; // diff 由 score-par 推导，putts 按规则写入
+      // 快捷录入未选手动方向：缺省 fairway；已有值保留
+      if (p.fairways[sheetHoleIndex] == null || p.fairways[sheetHoleIndex] === '') {
+        p.fairways[sheetHoleIndex] = FAIRWAY_FAIRWAY;
+      }
+      // 快捷录入未设罚杆：缺省 0；已有值保留
+      if (p.penalties[sheetHoleIndex] == null || p.penalties[sheetHoleIndex] === '') {
+        p.penalties[sheetHoleIndex] = 0;
+      }
+      // 快捷录入未设沙坑：缺省 0；已有值保留
+      if (p.sands[sheetHoleIndex] == null || p.sands[sheetHoleIndex] === '') {
+        p.sands[sheetHoleIndex] = 0;
+      }
     });
     // 本洞 score/putts 写入后由 score engine 统一派生 diff 与 OUT/IN/TOT
     this.refreshPlayers();
     this.persistSession();
-    this.closeScoreInput();
+    this._hideScoreSheet();
     this._afterScoresPersisted();
   },
 
@@ -5134,17 +5544,38 @@ Page({
   },
 
   _jumpSheetHole(holeIndex) {
-    const { activePlayerIdx, playersView } = this.data;
+    const { activePlayerIdx, playersView, scoreClearDraft, scorePanelMode } = this.data;
     const label = holePars().length && (holeIndex < 9 ? columnLabels()[holeIndex] : columnLabels()[holeIndex + 1]);
     const par = holePars()[holeIndex];
+    // 清除草稿或无选中球员：只切洞，保持默认控件 / 空成绩栏
+    if (scoreClearDraft || activePlayerIdx == null || activePlayerIdx < 0 || !playersView[activePlayerIdx]) {
+      this.setData({
+        sheetHoleLabel: label,
+        sheetHoleIndex: holeIndex,
+        sheetPar: par,
+        panelScore: par,
+        panelPutt: 2,
+        panelPuttTouched: false,
+        panelFairway: FAIRWAY_FAIRWAY,
+        panelPenalty: 0,
+        panelBunker: 0,
+        quickPanelScores: scorePanelMode === 'quick'
+          ? this._quickDefaultsForHole(holeIndex, par)
+          : this.data.quickPanelScores
+      }, () => this.syncSheetPlayers());
+      return;
+    }
     const player = playersView[activePlayerIdx];
     const score = player.scores[holeIndex];
     const hasScore = isFilledScore(score);
     const putt = player.putts[holeIndex] || 2;
+    const fairway = resolveHoleFairway(player.fairways, holeIndex);
+    const penalty = resolveHolePenalty(player.penalties, holeIndex);
+    const sand = resolveHoleSand(player.sands, holeIndex);
     let quick = this.data.quickPanelScores.slice();
     quick[activePlayerIdx] = score;
     // 快捷模式：切换洞时本洞全组默认 PAR（仅 quick 分支）
-    if (this.data.scorePanelMode === 'quick') {
+    if (scorePanelMode === 'quick') {
       quick = this._quickDefaultsForHole(holeIndex, par);
     }
     this.setData({
@@ -5154,6 +5585,9 @@ Page({
       panelScore: score,
       panelPutt: putt,
       panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand,
       quickPanelScores: quick
     }, () => this.syncSheetPlayers());
   }

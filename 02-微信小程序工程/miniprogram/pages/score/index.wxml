@@ -374,11 +374,11 @@
               <image class="sheet-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
               <text class="sheet-player-name">{{item.name}}</text>
             </view>
-            <view class="sheet-hole-score">{{item.holeScore}}</view>
+            <view class="sheet-hole-score {{item.isDraftScore ? 'sheet-hole-score--draft' : ''}} {{(!item.holeScore && item.holeScore !== 0) ? 'sheet-hole-score--empty' : ''}}">{{item.holeScore}}</view>
           </view>
         </view>
 
-        <view wx:if="{{scorePanelMode === 'tech'}}" class="sheet-main-panel tech-score-panel">
+        <view wx:if="{{scorePanelMode === 'tech'}}" class="sheet-main-panel tech-score-panel {{techPanelFocusPulse ? 'tech-score-panel--focus-pulse' : ''}}">
           <view class="sheet-control-row">
             <text class="sheet-control-label">成绩</text>
             <view class="stepper-btn">
@@ -412,17 +412,17 @@
             </view>
           </view>
           <view class="direction-row">
-            <view class="direction-btn">
-              <view class="direction-circle direction-circle--active">◎</view>
-              <text class="direction-label direction-label--gold">Fairway</text>
+            <view class="direction-btn" bindtap="selectPanelFairway" data-value="fairway">
+              <view class="direction-circle {{panelFairway === 'fairway' ? 'direction-circle--active' : ''}}">◎</view>
+              <text class="direction-label {{panelFairway === 'fairway' ? 'direction-label--gold' : ''}}">Fairway</text>
             </view>
-            <view class="direction-btn">
-              <view class="direction-circle">←</view>
-              <text class="direction-label">Left</text>
+            <view class="direction-btn" bindtap="selectPanelFairway" data-value="left">
+              <view class="direction-circle {{panelFairway === 'left' ? 'direction-circle--active' : ''}}">←</view>
+              <text class="direction-label {{panelFairway === 'left' ? 'direction-label--gold' : ''}}">Left</text>
             </view>
-            <view class="direction-btn">
-              <view class="direction-circle">→</view>
-              <text class="direction-label">Right</text>
+            <view class="direction-btn" bindtap="selectPanelFairway" data-value="right">
+              <view class="direction-circle {{panelFairway === 'right' ? 'direction-circle--active' : ''}}">→</view>
+              <text class="direction-label {{panelFairway === 'right' ? 'direction-label--gold' : ''}}">Right</text>
             </view>
           </view>
         </view>
@@ -441,7 +441,7 @@
       </view>
 
       <view class="sheet-footer-btns">
-        <view bindtap="closeScoreInput" class="sheet-footer-btn sheet-footer-btn--clear">清除</view>
+        <view bindtap="clearScoreInput" class="sheet-footer-btn sheet-footer-btn--clear">清除</view>
         <view bindtap="confirmScoreInput" class="sheet-footer-btn sheet-footer-btn--confirm">确认</view>
       </view>
     </view>
