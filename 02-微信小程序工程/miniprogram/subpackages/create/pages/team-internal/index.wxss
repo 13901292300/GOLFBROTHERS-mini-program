@@ -1,0 +1,2 @@
+/* 队内赛创建页样式：公共样式在主包 styles，避免主包 @import 分包路径 */
+@import '/styles/create-team-common.wxss';

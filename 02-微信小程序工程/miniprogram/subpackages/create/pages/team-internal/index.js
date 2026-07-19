@@ -1,10 +1,10 @@
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const mockAvatars = require('../../../utils/mockAvatars.js');
-const partnerConfigUtil = require('../../../utils/partnerConfig.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
+const partnerConfigUtil = require('../../../../utils/partnerConfig.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const {
   createDefaultEventInfoList
-} = require('../../../utils/eventInfoDefaults.js');
+} = require('../../../../utils/eventInfoDefaults.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];

@@ -1,1 +1,1 @@
-@import '../team-internal/index.wxss';
+@import '../../../styles/create-team-common.wxss';

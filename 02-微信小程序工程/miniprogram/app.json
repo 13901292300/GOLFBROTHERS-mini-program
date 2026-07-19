@@ -9,7 +9,6 @@
     "pages/tournament/peoria/index",
     "pages/tournament/group-editor/index",
     "pages/tournament/group-pick/index",
-    "pages/create/team-internal/index",
     "pages/create/team-inter/index",
     "pages/create/series/index",
     "pages/team/select/index",
@@ -25,7 +24,8 @@
       "root": "subpackages/create",
       "name": "create",
       "pages": [
-        "pages/normal/index"
+        "pages/normal/index",
+        "pages/team-internal/index"
       ]
     }
   ],

@@ -4408,7 +4408,7 @@ Page({
       }
       wx.navigateTo({
         url:
-          '/pages/create/team-internal/index?mode=edit&matchId=' +
+          '/subpackages/create/pages/team-internal/index?mode=edit&matchId=' +
           encodeURIComponent(matchId),
         fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
       });

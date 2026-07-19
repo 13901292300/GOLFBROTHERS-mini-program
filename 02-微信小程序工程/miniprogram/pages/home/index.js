@@ -554,7 +554,7 @@ Page({
 
   openTeamInternalCreate() {
     wx.navigateTo({
-      url: '/pages/create/team-internal/index',
+      url: '/subpackages/create/pages/team-internal/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
