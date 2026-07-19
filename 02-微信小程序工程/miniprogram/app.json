@@ -21,6 +21,13 @@
     "pages/game/hub/index",
     "pages/feedback/index"
   ],
+  "subPackages": [
+    {
+      "root": "subpackages/create",
+      "name": "create",
+      "pages": []
+    }
+  ],
   "window": {
     "backgroundColor": "#F6F6F6",
     "backgroundTextStyle": "light",
