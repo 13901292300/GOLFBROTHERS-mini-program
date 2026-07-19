@@ -44,10 +44,7 @@ const CHAT = [
 const FEATURES_COMMON = [
   { permission: 'leaderboard', glyph: '▦', label: '领先榜' },
   { permission: 'stats', glyph: '📈', label: '统计数据' },
-  { permission: 'poster', glyph: '🪪', label: '海报' },
-  { permission: 'feedback', glyph: '💬', label: '反馈' },
-  { permission: 'theme', glyph: '🎨', label: '风格选择' },
-  { permission: 'export_groups', glyph: '📋', label: '导出分组表' }
+  { permission: 'feedback', glyph: '💬', label: '反馈' }
 ];
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },

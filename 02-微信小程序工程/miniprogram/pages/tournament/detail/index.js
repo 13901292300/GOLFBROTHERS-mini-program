@@ -130,10 +130,7 @@ const CHAT = [
 const FEATURES_COMMON = [
   { permission: 'leaderboard', glyph: '▦', label: '领先榜' },
   { permission: 'stats', glyph: '📈', label: '统计数据' },
-  { permission: 'poster', glyph: '🪪', label: '海报' },
-  { permission: 'feedback', glyph: '💬', label: '反馈' },
-  { permission: 'theme', glyph: '🎨', label: '风格选择' },
-  { permission: 'export_groups', glyph: '📋', label: '导出分组表' }
+  { permission: 'feedback', glyph: '💬', label: '反馈' }
 ];
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
@@ -151,8 +148,7 @@ const FEATURES_PERMISSION = [
 /* 报名中球队赛 M 面板菜单（结构/图标规范与 game/hub 多组面板一致） */
 const REGISTERING_FEATURES_COMMON = [
   { permission: 'register_for_other', glyph: '📝', label: '替他人报名' },
-  { permission: 'invite_friends_register', glyph: '📤', label: '邀请好友报名' },
-  { permission: 'export_groups', glyph: '📋', label: '导出分组表' }
+  { permission: 'invite_friends_register', glyph: '📤', label: '邀请好友报名' }
 ];
 const REGISTERING_FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
