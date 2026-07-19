@@ -2432,7 +2432,7 @@ Page({
       }
       wx.navigateTo({
         url:
-          '/pages/create/normal/index?mode=edit&gameId=' +
+          '/subpackages/create/pages/normal/index?mode=edit&gameId=' +
           encodeURIComponent(this.data.gameId) +
           '&returnTo=score',
         fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })

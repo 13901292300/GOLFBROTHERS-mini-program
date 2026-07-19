@@ -545,7 +545,7 @@ Page({
 
   openNormalCreate() {
     wx.navigateTo({
-      url: '/pages/create/normal/index',
+      url: '/subpackages/create/pages/normal/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }

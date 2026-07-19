@@ -1,9 +1,9 @@
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const { FRIEND_ID_SET } = require('../../../utils/playerDirectory.js');
-const gameStore = require('../../../utils/gameStore.js');
-const matchStateUtil = require('../../../utils/matchState.js');
-const gameEdit = require('../../../utils/gameEdit.js');
-const halfCourseEdit = require('../../../utils/halfCourseEdit.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const { FRIEND_ID_SET } = require('../../../../utils/playerDirectory.js');
+const gameStore = require('../../../../utils/gameStore.js');
+const matchStateUtil = require('../../../../utils/matchState.js');
+const gameEdit = require('../../../../utils/gameEdit.js');
+const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
@@ -53,7 +53,7 @@ function buildCompositionOptions(count) {
   ];
 }
 
-const mockAvatars = require('../../../utils/mockAvatars.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
 
 // 组人数 → 组类型（用于 groups[].type：1=single / 2=pair / 3=triple / 4=quad）
 function partType(size) {

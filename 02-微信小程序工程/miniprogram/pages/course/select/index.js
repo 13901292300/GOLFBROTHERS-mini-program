@@ -223,7 +223,7 @@ Page({
       channel.emit('courseSelected', payload);
     }
     this.setData({ selectedId: course.courseId });
-    wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/pages/create/normal/index' }) });
+    wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/subpackages/create/pages/normal/index' }) });
   },
 
   /* ===== 半场选择二级弹窗 ===== */
