@@ -1,0 +1,112 @@
+<view class="peoria-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">PEORIA</text>
+          <text class="gb-header__title">新新贝利亚</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="page-body">
+    <!-- 已生成：只读冻结态 -->
+    <block wx:if="{{locked}}">
+      <view class="section">
+        <view class="section-title">净杆已生成</view>
+        <view class="locked-card">
+          <view class="locked-row">
+            <text class="locked-label">已选择 6 洞</text>
+            <text class="locked-value">{{selectedText || '-'}}</text>
+          </view>
+          <view class="locked-row">
+            <text class="locked-label">生成时间</text>
+            <text class="locked-value">{{createdAtText || '-'}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="hole-grid">
+          <view
+            wx:for="{{holeOptions}}"
+            wx:key="hole"
+            class="hole-cell {{item.selected ? 'hole-cell--selected' : ''}}"
+          >{{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="submit-wrap">
+        <view class="submit-btn" bindtap="onViewLeaderboard">查看领先榜</view>
+        <text class="submit-hint">净杆结果已冻结，不可重新生成</text>
+      </view>
+    </block>
+
+    <!-- 未生成：原配置流程 -->
+    <block wx:else>
+      <view class="section">
+        <view class="section-title">抽取方式</view>
+        <view class="mode-row">
+          <view
+            class="mode-card {{mode === 'random' ? 'is-active' : ''}}"
+            bindtap="onSelectMode"
+            data-mode="random"
+          >
+            <text class="mode-card__title">随机抽取 6 洞</text>
+            <text class="mode-card__desc">点击开始抽取，停止后锁定结果</text>
+          </view>
+          <view
+            class="mode-card {{mode === 'manual' ? 'is-active' : ''}}"
+            bindtap="onSelectMode"
+            data-mode="manual"
+          >
+            <text class="mode-card__title">手工选择 6 洞</text>
+            <text class="mode-card__desc">点选洞号，最多 6 洞</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{mode === 'random'}}" class="section">
+        <view class="section-title">随机模式</view>
+        <view class="action-btn {{drawing ? 'is-stop' : ''}}" bindtap="onToggleDraw">
+          {{drawing ? '停止' : '开始抽取'}}
+        </view>
+      </view>
+
+      <view wx:if="{{mode === 'manual'}}" class="section">
+        <view class="section-title">手工选择（{{selectedHoles.length}}/6）</view>
+      </view>
+
+      <view class="section">
+        <view class="hole-grid">
+          <view
+            wx:for="{{holeOptions}}"
+            wx:key="hole"
+            class="hole-cell {{item.selected ? 'hole-cell--selected' : ''}}"
+            bindtap="onToggleHole"
+            data-hole="{{item.hole}}"
+          >{{item.label}}</view>
+        </view>
+        <view class="selected-block">
+          <text class="selected-label">已选择：</text>
+          <text wx:if="{{selectedHoles.length && !drawing}}" class="selected-value">{{selectedText}}</text>
+          <text wx:else class="selected-empty">{{mode === 'random' ? (drawing ? '抽取中…' : '尚未抽取') : '请选择 6 个洞'}}</text>
+        </view>
+      </view>
+
+      <view class="submit-wrap">
+        <view
+          class="submit-btn {{canConfirm ? '' : 'is-disabled'}}"
+          bindtap="onConfirm"
+        >生成净杆</view>
+        <text class="submit-hint">根据已选 6 洞与正式成绩计算并保存净杆结果</text>
+      </view>
+    </block>
+
+    <view class="body-pad"></view>
+  </scroll-view>
+</view>

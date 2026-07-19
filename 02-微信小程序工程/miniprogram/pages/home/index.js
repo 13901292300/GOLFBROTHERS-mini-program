@@ -8,6 +8,21 @@ const teamMatchStore = require('../../utils/teamMatchStore.js');
 const userProfileStore = require('../../utils/userProfileStore.js');
 const bannerConfig = require('../../utils/bannerConfig.js');
 
+function decorateTournamentCard(match, card) {
+  if (!card) return null;
+  const status = String((match && match.status) || '').trim().toLowerCase();
+  const out = Object.assign({}, card);
+  if (status === 'finished') {
+    out.statusLabel = '已结束';
+    out.statusTone = 'finished';
+  } else if (out.statusLabel === 'LIVE') {
+    out.statusTone = 'live';
+  } else {
+    out.statusTone = 'default';
+  }
+  return out;
+}
+
 function formatGameDate(ts) {
   const d = ts ? new Date(ts) : new Date();
   const y = d.getFullYear();
@@ -322,7 +337,7 @@ Page({
 
   refreshTeamMatchCards() {
     const latestCards = teamMatchStore.listMatches()
-      .map(teamMatchStore.toTournamentCard)
+      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
       .filter(Boolean);
     this._myTournamentCards = latestCards;
     if (this.data.currentMainSection === 'tournament' && this.data.primaryTabActive) {
@@ -428,7 +443,7 @@ Page({
     this.setHeroTabsVisible(true);
     this.hideMainContents();
     const myCards = teamMatchStore.listMatches()
-      .map(teamMatchStore.toTournamentCard)
+      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
       .filter(Boolean);
     this._myTournamentCards = myCards;
     this.setData({
@@ -478,7 +493,7 @@ Page({
       const cards = which === 'secondary'
         ? (this._baseTournamentCards || [])
         : (this._myTournamentCards || teamMatchStore.listMatches()
-          .map(teamMatchStore.toTournamentCard)
+          .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
           .filter(Boolean));
       this.setData({
         showTournamentContent: true,

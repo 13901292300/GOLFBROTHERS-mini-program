@@ -1,0 +1,146 @@
+.peoria-page { --pga-blue: #002d62; --champion-gold: #ce9224; }
+.peoria-page.dark-mode {
+  --bg-primary: #000000; --bg-card: #111111; --bg-subtle: #0a0a0a;
+  --border: #222222; --text-primary: #f1f5f9; --text-muted: #888888;
+}
+.peoria-page.bright-mode {
+  --bg-primary: #fcfcfc; --bg-card: #ffffff; --bg-subtle: #f3f4f6;
+  --border: #e5e7eb; --text-primary: #002d62; --text-muted: #6b7280;
+}
+
+page { height: 100%; background: var(--bg-primary); }
+.peoria-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.gb-header { background: var(--pga-blue); border-bottom: 2px solid var(--champion-gold); color: #fff; flex-shrink: 0; }
+.gb-header__inner { display: flex; align-items: center; }
+.gb-header__left { display: flex; align-items: center; gap: 20rpx; }
+.gb-header__back { width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; }
+.gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
+.gb-header__eyebrow { display: block; font-size: 17rpx; font-weight: 900; letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.5); line-height: 1; margin-bottom: 6rpx; }
+.gb-header__title { display: block; color: #fff; font-size: 32rpx; font-weight: 900; font-style: italic; line-height: 1; }
+
+.page-body { flex: 1; min-height: 0; }
+.section { padding: 28rpx 32rpx 8rpx; }
+.section-title { font-size: 28rpx; font-weight: 900; margin-bottom: 20rpx; color: var(--text-primary); }
+
+.mode-row { display: flex; flex-direction: column; gap: 16rpx; }
+.mode-card {
+  padding: 28rpx 24rpx;
+  border-radius: 16rpx;
+  background: var(--bg-subtle);
+  border: 2rpx solid var(--border);
+}
+.mode-card.is-active {
+  border-color: var(--champion-gold);
+  background: rgba(206, 146, 36, 0.12);
+}
+.mode-card__title { display: block; font-size: 30rpx; font-weight: 800; color: var(--text-primary); }
+.mode-card__desc { display: block; margin-top: 8rpx; font-size: 24rpx; color: var(--text-muted); }
+
+.action-btn {
+  height: 84rpx;
+  border-radius: 16rpx;
+  background: var(--pga-blue);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8rpx;
+}
+.action-btn.is-stop {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.selected-block {
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+.selected-label { font-size: 26rpx; font-weight: 700; color: var(--text-muted); }
+.selected-value { font-size: 30rpx; font-weight: 900; color: var(--text-primary); }
+.selected-empty { font-size: 26rpx; color: var(--text-muted); }
+
+/* 原型洞格：圆形蓝底白字（对齐记分表 hole-number） */
+.hole-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16rpx 12rpx;
+  margin-bottom: 20rpx;
+  justify-items: center;
+}
+/* 默认：蓝底白字圆形 */
+.hole-cell {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 999rpx;
+  border: 1px solid #002D62;
+  background: #002D62;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 900;
+  color: #ffffff;
+  box-sizing: border-box;
+}
+/* 候选 / 已选：白底蓝字（抽取中与停止后共用） */
+.hole-cell.hole-cell--selected {
+  border: 1px solid #002D62;
+  background: #ffffff;
+  color: #002D62;
+}
+
+.locked-card {
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+.locked-row + .locked-row { margin-top: 20rpx; }
+.locked-label {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 8rpx;
+}
+.locked-value {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.submit-wrap { padding: 48rpx 32rpx 24rpx; }
+.submit-btn {
+  height: 96rpx;
+  border-radius: 16rpx;
+  background: var(--champion-gold);
+  color: #111111;
+  font-size: 30rpx;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.submit-btn.is-disabled { opacity: 0.4; }
+.submit-hint {
+  display: block;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-muted);
+}
+.body-pad { height: 48rpx; }

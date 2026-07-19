@@ -199,7 +199,7 @@
                       <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
                     </view>
                     <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag">
-                      <text class="ds-badge {{item.statusLabel === 'LIVE' ? 'badge-live live-badge-pulse' : 'badge-gold'}}">{{item.statusLabel}}</text>
+                      <text class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : (item.statusLabel === 'LIVE' || item.statusTone === 'live' ? 'badge-live live-badge-pulse' : 'badge-gold')}}">{{item.statusLabel}}</text>
                     </view>
                   </view>
                   <view class="ds-card-club__content">

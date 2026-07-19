@@ -715,10 +715,17 @@ page {
 .badge-gold {
   background: var(--champion-gold);
   color: #ffffff;
+  font-style: italic;
 }
 .badge-live {
-  background: var(--data-blue);
+  background: var(--data-blue, #00aeef);
   color: #ffffff;
+  font-style: italic;
+}
+.badge-finished {
+  background: #6b7280;
+  color: #ffffff;
+  font-style: italic;
 }
 .ds-card-club__avatar-img {
   flex-shrink: 0;
@@ -1196,7 +1203,7 @@ page {
 /* ===== PROGRESS ===== */
 /* ===== 分段进度条（双层结构）=====
    track 层：灰色底，width:100%，代表「未完成」整体轨道
-   active 层：PGA 蓝，width=progressPercentage%，绝对定位从起点(=题目左对齐)铺到当前 step
+   active 层：信息蓝 (--data-blue)，width=progressPercentage%，绝对定位从起点(=题目左对齐)铺到当前 step
    起点 = 进度轨道左侧 = 题目左侧（track 与 title 同为 body 内 100% 宽，左缘对齐） */
 .ds-progress-track {
   height: 2px;
@@ -1211,7 +1218,7 @@ page {
   left: 0;
   top: 0;
   height: 100%;
-  background: var(--tour-blue);
+  background: var(--data-blue, #00aeef);
   border-radius: 9999px;
 }
 /* indicator：左缘锚点定位
@@ -1224,7 +1231,7 @@ page {
   width: var(--progress-marker-size, 16px);
   height: var(--progress-marker-size, 16px);
   max-width: var(--progress-marker-size, 16px);
-  background: var(--tour-blue);
+  background: var(--data-blue, #00aeef);
   border: 2px solid var(--bg-card);
   border-radius: 9999px;
   display: flex;
@@ -1256,21 +1263,21 @@ page {
 /* ===== 已结束状态（finished）：最高优先级，完全覆盖 active（蓝色/分段/比例）逻辑 =====
    finished > active > default。轨道收敛为 1px 线，关闭蓝色 fill 与比例渲染，指示器统一灰色。
    灰阶层级（Gray Hierarchy）：
-     · 进行中-已完成 → PGA 蓝 (--tour-blue)
+     · 进行中-已完成 → 信息蓝 (--data-blue)
      · 进行中-未完成 → 浅灰   (--border)
      · 已结束       → 深灰   (--text-muted，明显深于未完成灰，形成视觉压制) */
 .ds-progress-track--finish {
   height: 1px;
-  background: var(--text-muted) !important;
+  background: #6b7280 !important;
 }
-/* 关闭 active 残留：彻底移除蓝色 progress fill（同时 WXML 已不渲染 fill，双保险） */
+/* 关闭 active 残留：彻底移除进度 fill（同时 WXML 已不渲染 fill，双保险） */
 .ds-progress-track--finish .ds-progress-fill {
   display: none !important;
 }
-/* 指示器与 track 同体系（灰阶）：中性灰底 + 白字，无任何蓝色/active 样式残留 */
+/* 指示器与 track 同体系（灰阶）：灰底 + 白字，无信息蓝/active 样式残留 */
 .ds-progress-track--finish .ds-progress-marker,
 .ds-progress-marker--finish {
-  background: var(--text-muted) !important;
+  background: #6b7280 !important;
   border-color: var(--bg-card) !important;
   color: #ffffff !important;
 }

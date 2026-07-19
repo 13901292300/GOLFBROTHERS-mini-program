@@ -838,6 +838,17 @@ Page({
       this.openTeeSheetManageSheet();
       return;
     }
+    if (permission === 'feedback') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      const gameId = this._gameId || this.data.gameId || '';
+      wx.navigateTo({
+        url:
+          '/pages/feedback/index?source=game' +
+          (gameId ? '&gameId=' + encodeURIComponent(gameId) : ''),
+        fail: () => wx.showToast({ title: '反馈页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
   },
 

@@ -6,6 +6,7 @@
     "pages/match/join/index",
     "pages/tournament/detail/index",
     "pages/tournament/stats/index",
+    "pages/tournament/peoria/index",
     "pages/tournament/group-editor/index",
     "pages/tournament/group-pick/index",
     "pages/create/normal/index",
@@ -17,7 +18,8 @@
     "pages/player/friends/index",
     "pages/player/combos/index",
     "pages/player/manual/index",
-    "pages/game/hub/index"
+    "pages/game/hub/index",
+    "pages/feedback/index"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",

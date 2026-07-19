@@ -1,0 +1,76 @@
+<view class="feedback-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">FEEDBACK</text>
+          <text class="gb-header__title">反馈</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="page-body">
+    <view class="form-section">
+      <view class="field-label">问题描述 <text class="required">*</text></view>
+      <textarea
+        class="field-textarea"
+        maxlength="500"
+        value="{{content}}"
+        placeholder="请描述你遇到的问题或建议"
+        placeholder-class="field-ph"
+        bindinput="onContentInput"
+      />
+      <text class="field-hint">{{content.length}}/500</text>
+    </view>
+
+    <view class="form-section">
+      <view class="field-label">图片（最多 5 张）</view>
+      <view class="image-grid">
+        <view wx:for="{{images}}" wx:key="path" class="image-item">
+          <image class="image-thumb" src="{{item.path}}" mode="aspectFill" />
+          <view class="image-remove" catchtap="onRemoveImage" data-idx="{{index}}">×</view>
+        </view>
+        <view wx:if="{{images.length < 5}}" class="image-add" bindtap="onChooseImage">
+          <text class="image-add__plus">＋</text>
+          <text class="image-add__text">添加</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-section">
+      <view class="field-label">当前位置</view>
+      <view class="location-row">
+        <view class="location-info">
+          <text wx:if="{{location}}" class="location-coords">{{location.latitude}}, {{location.longitude}}</text>
+          <text wx:else class="location-empty">未获取（可选）</text>
+        </view>
+        <view class="location-btn" bindtap="onGetLocation">{{location ? '重新定位' : '获取定位'}}</view>
+      </view>
+      <view wx:if="{{location}}" class="location-clear" bindtap="onClearLocation">清除定位</view>
+    </view>
+
+    <view class="form-section">
+      <view class="field-label">联系电话（选填）</view>
+      <input
+        class="field-input"
+        type="number"
+        maxlength="20"
+        value="{{phone}}"
+        placeholder="方便我们联系你"
+        placeholder-class="field-ph"
+        bindinput="onPhoneInput"
+      />
+    </view>
+
+    <view class="submit-wrap">
+      <view class="submit-btn {{submitting ? 'is-disabled' : ''}}" bindtap="onSubmit">
+        {{submitting ? '提交中…' : '提交反馈'}}
+      </view>
+    </view>
+    <view class="body-pad"></view>
+  </scroll-view>
+</view>

@@ -48,7 +48,10 @@ const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期�
 
 const EMPTY_MATCH_VIEW = {
   matchId: '',
+  status: '',
   statusLabel: '',
+  cardStatusText: '',
+  cardStatusTone: 'default',
   logo: '',
   bannerImage: '',
   dateText: '',
@@ -438,7 +441,7 @@ Page({
     leaderboardViewOptions: ['all'],
     leaderboardTeamViewAvailable: false,
     leaderboardTeamCompetitionEnabled: false,
-    leaderboardScoreType: 'gross', // gross | net，当前仅预留 gross
+    leaderboardScoreType: 'gross', // gross | net（净杆读 peoriaResult）
     leaderboardViewLabel: '总杆 · 全部',
     leaderboardNetScoreAvailable: false,
     showLeaderboardSettingSheet: false,
@@ -833,6 +836,9 @@ Page({
     const leaderboardMode = this._leaderboardViewToMode(leaderboardView);
     const leaderboardTeamCompetitionEnabled = this._isTeamCompetitionEnabled(match);
     const scorecardCourseTitle = this._buildScorecardCourseTitle(match);
+    const netAvailable = this._hasLeaderboardNetScore(match);
+    const leaderboardScoreType =
+      this.data.leaderboardScoreType === 'net' && netAvailable ? 'net' : 'gross';
     this.setData(Object.assign({
       match: this._mapMatchToView(match),
       courseName: match.courseName || '',
@@ -847,9 +853,9 @@ Page({
       leaderboardViewOptions: leaderboardViewOptions,
       leaderboardTeamViewAvailable: leaderboardViewOptions.indexOf('team') >= 0,
       leaderboardTeamCompetitionEnabled: leaderboardTeamCompetitionEnabled,
-      leaderboardScoreType: this.data.leaderboardScoreType || 'gross',
-      leaderboardViewLabel: this._buildLeaderboardViewLabel(this.data.leaderboardScoreType || 'gross', leaderboardView),
-      leaderboardNetScoreAvailable: this._hasLeaderboardNetScore(match),
+      leaderboardScoreType: leaderboardScoreType,
+      leaderboardViewLabel: this._buildLeaderboardViewLabel(leaderboardScoreType, leaderboardView),
+      leaderboardNetScoreAvailable: netAvailable,
       leaderboard: this._buildLeaderboardViewForView(match, leaderboardView),
       teamLeaderboard: this._buildTeamLeaderboardView(match),
       eventInfoList: this._resolveEventInfoList(match),
@@ -1158,15 +1164,16 @@ Page({
   },
 
   // 赛事生命周期：读取 teamMatchStore.match.status，归一化为 registering | ongoing | completed
+  // 持久化 status="finished" 视为已结束（completed）
   _getMatchLifecycle(match) {
     if (!match) return Object.assign({}, EMPTY_MATCH_LIFECYCLE);
     const raw = String(match.status || '').trim().toLowerCase();
-    const allowed = [
-      MATCH_LIFECYCLE.REGISTERING,
-      MATCH_LIFECYCLE.ONGOING,
-      MATCH_LIFECYCLE.COMPLETED
-    ];
-    const status = allowed.indexOf(raw) >= 0 ? raw : '';
+    let status = '';
+    if (raw === 'finished' || raw === MATCH_LIFECYCLE.COMPLETED) {
+      status = MATCH_LIFECYCLE.COMPLETED;
+    } else if (raw === MATCH_LIFECYCLE.REGISTERING || raw === MATCH_LIFECYCLE.ONGOING) {
+      status = raw;
+    }
     return {
       status: status,
       isRegistering: status === MATCH_LIFECYCLE.REGISTERING,
@@ -1175,14 +1182,33 @@ Page({
     };
   },
 
+  /** 英雄区状态芯片：finished → 已结束；其余未结束（进行中）→ LIVE */
+  _resolveCardStatusDisplay(match) {
+    const status = String((match && match.status) || '').trim().toLowerCase();
+    if (status === 'finished') {
+      return { cardStatusText: '已结束', cardStatusTone: 'finished' };
+    }
+    if (status === 'registering') {
+      return {
+        cardStatusText: (match && match.statusLabel) || '报名中',
+        cardStatusTone: 'default'
+      };
+    }
+    return { cardStatusText: 'LIVE', cardStatusTone: 'live' };
+  },
+
   // 将 teamMatchStore 记录映射为顶部信息区视图字段
   _mapMatchToView(match) {
     if (!match) return Object.assign({}, EMPTY_MATCH_VIEW);
     const venue = [match.courseName, match.courseHalfText].filter(Boolean).join('');
     const priceTags = this._mapPriceTags(match);
+    const cardStatus = this._resolveCardStatusDisplay(match);
     return {
       matchId: match.matchId || '',
+      status: String(match.status || '').trim(),
       statusLabel: match.statusLabel || '',
+      cardStatusText: cardStatus.cardStatusText,
+      cardStatusTone: cardStatus.cardStatusTone,
       logo: this._resolveMatchLogo(match),
       bannerImage: bannerConfig.resolveMatchDetailBanner(match.bannerImage),
       dateText: teamMatchStore.formatClubDate(match.teeTime) || '',
@@ -3256,14 +3282,183 @@ Page({
     });
   },
 
+  /**
+   * 净杆榜 rows：只读 match.peoriaResult.results，不重算 HDCP。
+   * 完整 18 洞按 net 升序；未完成追加末尾，POS / NET SCORE 显示 "-"。
+   */
+  _buildNetLeaderboardRows(match) {
+    const results =
+      match && match.peoriaResult && Array.isArray(match.peoriaResult.results)
+        ? match.peoriaResult.results
+        : [];
+    const netByPlayerId = {};
+    results.forEach((item) => {
+      if (!item || item.playerId == null) return;
+      const id = String(item.playerId).trim();
+      if (!id) return;
+      netByPlayerId[id] = item;
+    });
+
+    const groups = match && Array.isArray(match.groups) ? match.groups : [];
+    if (!groups.length) return [];
+
+    const playerLookup = this._buildGroupPlayerLookup(match);
+    const teamNameMap = this._buildLeaderboardTeamNameMap(match);
+    const playerTeamLookup = this._buildLeaderboardPlayerTeamLookup(match);
+    const flat = [];
+    const seen = {};
+
+    groups.forEach((group) => {
+      const displayPlayers = this.hydrateGroupDisplayPlayers(group, playerLookup);
+      const displayMap = {};
+      displayPlayers.forEach((player) => {
+        if (player && player.userId) displayMap[String(player.userId)] = player;
+      });
+      (Array.isArray(group && group.players) ? group.players : []).forEach((player) => {
+        const playerId = this._resolveAnyPlayerId(player);
+        if (!playerId || seen[playerId]) return;
+        seen[playerId] = true;
+        const scorePlayerId = this._resolveSlotScorePlayerId(player, playerId);
+        const slotIndex = Number(player && (player.position != null ? player.position : player.slotIndex)) || 0;
+        const display = displayMap[playerId] || {};
+        const lookup = playerLookup[playerId] || {};
+        const genderDisplay = playerManage.getGenderDisplay(
+          Object.assign({}, lookup, player, { gender: lookup.gender || display.gender || player.gender })
+        );
+        const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
+        const filledHoles = Number(stat && stat.thru) || 0;
+        const peoria =
+          netByPlayerId[playerId] ||
+          (scorePlayerId ? netByPlayerId[scorePlayerId] : null) ||
+          null;
+        const netRaw = peoria && peoria.net != null ? Number(peoria.net) : NaN;
+        const hasNetScore = filledHoles === 18 && Number.isFinite(netRaw);
+        const teamName = this._resolveLeaderboardPlayerTeamName(playerId, playerTeamLookup, teamNameMap);
+        flat.push({
+          playerId: playerId,
+          scorePlayerId: scorePlayerId || playerId,
+          slotIndex: slotIndex,
+          position: slotIndex,
+          name: display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
+          group: group.groupName || '',
+          groupId: group.groupId || '',
+          avatar: display.avatar || mockAvatars.resolveAvatar(player.avatar || player.avatarUrl || '', playerId),
+          gender: genderDisplay.gender || '',
+          isFemale: genderDisplay.gender === 'female',
+          genderIcon: genderDisplay.icon,
+          genderClass: genderDisplay.className,
+          flag: player.flag || '',
+          country: player.country || '',
+          age: player.age || '',
+          filledHoles: filledHoles,
+          thru: this._resolveLeaderboardThruLabel(filledHoles),
+          teamName: teamName,
+          teamTag: this._formatLeaderboardTeamTagName(teamName),
+          net: hasNetScore ? netRaw : null,
+          hasNetScore: hasNetScore,
+          hasScore: hasNetScore,
+          scoreSource: 'match.peoriaResult'
+        });
+      });
+    });
+
+    const complete = [];
+    const incomplete = [];
+    flat.forEach((row) => {
+      if (row.hasNetScore) complete.push(row);
+      else incomplete.push(row);
+    });
+    complete.sort((a, b) => Number(a.net) - Number(b.net));
+    const rankedComplete = this._buildCompetitionRanking(complete, (row) => row.net);
+
+    const formatNet = (value) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '-';
+      return Math.round(n * 100) % 100 === 0 ? String(Math.round(n)) : String(Math.round(n * 100) / 100);
+    };
+
+    // NET SCORE 固定为 peoriaResult.net 数字，不走 toPar / scoreDisplayMode
+    const mapRow = (row) => {
+      const netDisplay = row.hasNetScore ? formatNet(row.net) : '-';
+      return {
+        pos: row.hasNetScore ? row.pos : '-',
+        name: row.name,
+        group: row.group,
+        groupId: row.groupId,
+        playerId: row.playerId,
+        scorePlayerId: row.scorePlayerId || row.playerId,
+        slotIndex: row.slotIndex || row.position || 0,
+        position: row.position || row.slotIndex || 0,
+        gender: row.gender || '',
+        isFemale: row.isFemale,
+        genderIcon: row.genderIcon,
+        genderClass: row.genderClass,
+        thru: row.thru,
+        filledHoles: row.filledHoles,
+        net: row.hasNetScore ? row.net : null,
+        netScoreDisplay: netDisplay,
+        hasNetScore: row.hasNetScore === true,
+        hasScore: row.hasNetScore === true,
+        grossTotal: 0,
+        toPar: 0,
+        total: row.hasNetScore ? row.net : 0,
+        diff: 0,
+        scoreStr: netDisplay,
+        scoreClass: 'score-even',
+        avatar: row.avatar,
+        country: row.country,
+        age: row.age,
+        flag: row.flag,
+        teamName: row.teamName || '',
+        teamTag: row.teamTag || '',
+        scoreSource: row.scoreSource || 'match.peoriaResult',
+        expanded: false
+      };
+    };
+
+    return rankedComplete
+      .map((row) => mapRow(row))
+      .concat(incomplete.map((row) => mapRow(Object.assign({}, row, { pos: '-' }))));
+  },
+
   _buildLeaderboardViewForView(match, view) {
-    const rows = this._buildLeaderboardView(match) || [];
+    const scoreType = this.data.leaderboardScoreType === 'net' ? 'net' : 'gross';
+    let rows;
+    if (scoreType === 'net') {
+      rows = this._buildNetLeaderboardRows(match) || [];
+    } else {
+      rows = this._buildLeaderboardView(match) || [];
+    }
     let filtered = rows;
     if (view === 'male') {
       filtered = rows.filter((row) => row && row.gender === 'male');
     } else if (view === 'female') {
       filtered = rows.filter((row) => row && row.gender === 'female');
     }
+
+    if (scoreType === 'net') {
+      const complete = [];
+      const incomplete = [];
+      filtered.forEach((row) => {
+        if (row && row.hasNetScore === true && row.filledHoles === 18) complete.push(row);
+        else {
+          incomplete.push(Object.assign({}, row, {
+            pos: '-',
+            scoreStr: '-',
+            netScoreDisplay: '-',
+            hasNetScore: false,
+            hasScore: false,
+            net: null
+          }));
+        }
+      });
+      complete.sort((a, b) => Number(a.net) - Number(b.net));
+      const ranked = this._buildCompetitionRanking(complete, (row) => row.net);
+      return ranked.concat(incomplete).map((row, index) => Object.assign({}, row, {
+        expanded: index === this.data.openIndex
+      }));
+    }
+
     const ranked = this._buildCompetitionRanking(filtered, (row) => (
       row && row.hasScore === true
         ? (row.toPar != null ? row.toPar : row.diff)
@@ -3309,6 +3504,9 @@ Page({
   },
 
   _buildTeamLeaderboardView(match) {
+    if (this.data.leaderboardScoreType === 'net') {
+      return this._buildNetTeamLeaderboardView(match);
+    }
     const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
     if (teamGroups.length < 2) return [];
     const rules = match && match.scoringRules;
@@ -3492,6 +3690,231 @@ Page({
     });
   },
 
+  /**
+   * 净杆分队榜：成员 net 来自 match.peoriaResult.results；
+   * 按球队规则取前 N 名 net 累加为 teamNetScore，升序排名。
+   */
+  _buildNetTeamLeaderboardView(match) {
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    if (teamGroups.length < 2) return [];
+
+    const formatNet = (value) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '-';
+      return Math.round(n * 100) % 100 === 0
+        ? String(Math.round(n))
+        : String(Math.round(n * 100) / 100);
+    };
+
+    const results =
+      match && match.peoriaResult && Array.isArray(match.peoriaResult.results)
+        ? match.peoriaResult.results
+        : [];
+    const netByPlayerId = {};
+    results.forEach((item) => {
+      if (!item || item.playerId == null) return;
+      const id = String(item.playerId).trim();
+      if (!id) return;
+      const net = Number(item.net);
+      if (!Number.isFinite(net)) return;
+      netByPlayerId[id] = net;
+    });
+
+    const rules = match && match.scoringRules;
+    const competition = rules && rules.teamCompetition;
+    const isTeamCompetitionEnabled = !!(competition && competition.enabled === true);
+    const configuredTopN = isTeamCompetitionEnabled
+      ? Math.max(1, parseInt(competition.topN, 10) || 1)
+      : 0;
+
+    const teamMap = this._buildTeamLeaderboardTeamMap(match);
+    const playerLookup = this._buildGroupPlayerLookup(match);
+    const playerTeamLookup = this._buildLeaderboardPlayerTeamLookup(match);
+    const groups = match && Array.isArray(match.groups) ? match.groups : [];
+
+    groups.forEach((group) => {
+      const displayPlayers = this.hydrateGroupDisplayPlayers(group, playerLookup);
+      const displayMap = {};
+      displayPlayers.forEach((displayPlayer) => {
+        if (displayPlayer && displayPlayer.userId) displayMap[String(displayPlayer.userId)] = displayPlayer;
+      });
+      (Array.isArray(group && group.players) ? group.players : []).forEach((player) => {
+        const playerId = this._resolveAnyPlayerId(player);
+        if (!playerId) return;
+        const teamRef = this._resolveLeaderboardPlayerTeam(player, playerId, playerLookup, playerTeamLookup);
+        if (!teamRef.teamId) return;
+        if (!teamMap[teamRef.teamId]) {
+          teamMap[teamRef.teamId] = {
+            teamId: teamRef.teamId,
+            teamName: teamRef.teamName || '未命名分队',
+            grossTotal: 0,
+            toPar: 0,
+            total: 0,
+            scoringPlayersCount: 0,
+            players: []
+          };
+        } else if (!teamMap[teamRef.teamId].teamName && teamRef.teamName) {
+          teamMap[teamRef.teamId].teamName = teamRef.teamName;
+        }
+
+        const lookup = playerLookup[playerId] || {};
+        const display = displayMap[playerId] || {};
+        const genderDisplay = playerManage.getGenderDisplay(
+          Object.assign({}, lookup, player, { gender: lookup.gender || display.gender || player.gender })
+        );
+        const scorePlayerId = this._resolveSlotScorePlayerId(player, playerId);
+        const name =
+          display.displayName ||
+          display.name ||
+          lookup.nickname ||
+          this._resolveAnyPlayerNickname(player) ||
+          '未知球员';
+        const avatar =
+          display.avatar ||
+          mockAvatars.resolveAvatar(lookup.avatar || player.avatar || player.avatarUrl || '', playerId);
+
+        // THRU：仅用于展示；净杆成绩本身只读 peoriaResult
+        const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
+        const filledHoles = Number(stat && stat.thru) || 0;
+        const netRaw =
+          netByPlayerId[playerId] != null
+            ? netByPlayerId[playerId]
+            : (scorePlayerId && netByPlayerId[scorePlayerId] != null ? netByPlayerId[scorePlayerId] : NaN);
+        const hasNetScore = filledHoles === 18 && Number.isFinite(netRaw);
+        const netDisplay = hasNetScore ? formatNet(netRaw) : '-';
+
+        teamMap[teamRef.teamId].players.push({
+          playerId: playerId,
+          userId: playerId,
+          scorePlayerId: scorePlayerId,
+          groupId: group && group.groupId ? String(group.groupId) : '',
+          scorecardKey: teamRef.teamId + ':' + playerId,
+          name: name,
+          nickname: name,
+          avatar: avatar,
+          gender: genderDisplay.gender || '',
+          genderIcon: genderDisplay.icon,
+          genderClass: genderDisplay.className,
+          country: player.country || '',
+          age: player.age || '',
+          flag: player.flag || '',
+          filledHoles: filledHoles,
+          net: hasNetScore ? netRaw : null,
+          hasNetScore: hasNetScore,
+          hasScore: hasNetScore,
+          netScoreDisplay: netDisplay,
+          scoreStr: netDisplay,
+          scoreClass: 'score-even',
+          thru: filledHoles > 0 ? this._resolveLeaderboardThruLabel(filledHoles) : '-',
+          isCounting: false,
+          grossTotal: 0,
+          toPar: 0,
+          total: hasNetScore ? netRaw : 0,
+          diff: 0
+        });
+      });
+    });
+
+    const teamOrder = teamGroups
+      .map((team) => (team && team.id != null ? String(team.id).trim() : ''))
+      .filter(Boolean);
+    const orderedTeams = teamOrder.map((teamId) => teamMap[teamId]).filter(Boolean);
+    const extraTeams = Object.keys(teamMap)
+      .filter((teamId) => teamOrder.indexOf(teamId) < 0)
+      .map((teamId) => teamMap[teamId]);
+    const teams = orderedTeams.concat(extraTeams)
+      .filter((team) => (isTeamCompetitionEnabled ? team.players.length > 0 : true));
+    if (!teams.length) return [];
+
+    if (!isTeamCompetitionEnabled) {
+      return teams.map((team, teamIndex) => {
+        const sortedPlayers = team.players.slice().sort((a, b) => {
+          if (a.hasNetScore !== b.hasNetScore) return a.hasNetScore ? -1 : 1;
+          if (a.hasNetScore && b.hasNetScore && a.net !== b.net) return Number(a.net) - Number(b.net);
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        });
+        const rankedPlayers = this._buildCompetitionRanking(sortedPlayers, (player) => (
+          player && player.hasNetScore === true ? player.net : null
+        ));
+        return {
+          pos: String(teamIndex + 1),
+          teamId: team.teamId,
+          teamName: team.teamName || '未命名分队',
+          teamNetScore: null,
+          playerCountLabel: String(rankedPlayers.length),
+          thru: '-',
+          grossTotal: 0,
+          toPar: 0,
+          total: 0,
+          hasScore: false,
+          scoreStr: '-',
+          netScoreDisplay: '-',
+          scoreClass: 'score-even',
+          scoringPlayersCount: 0,
+          players: rankedPlayers.map((player) => Object.assign({}, player, { isCounting: false }))
+        };
+      });
+    }
+
+    const sortedTeams = teams.map((team, teamIndex) => {
+      const sortedPlayers = team.players.slice().sort((a, b) => {
+        if (a.hasNetScore !== b.hasNetScore) return a.hasNetScore ? -1 : 1;
+        if (a.hasNetScore && b.hasNetScore && a.net !== b.net) return Number(a.net) - Number(b.net);
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      const scoringPlayersCount = Math.min(
+        configuredTopN,
+        sortedPlayers.filter((player) => player && player.hasNetScore === true).length
+      );
+      let teamNetScore = 0;
+      let countingAssigned = 0;
+      const players = sortedPlayers.map((player) => {
+        const isCounting = player.hasNetScore === true && countingAssigned < scoringPlayersCount;
+        if (isCounting) {
+          teamNetScore += Number(player.net);
+          countingAssigned += 1;
+        }
+        return Object.assign({}, player, { isCounting: isCounting });
+      });
+      const rankedPlayers = this._buildCompetitionRanking(players, (player) => (
+        player && player.hasNetScore === true ? player.net : null
+      ));
+      const netDisplay = scoringPlayersCount > 0 ? formatNet(teamNetScore) : '-';
+      return {
+        teamId: team.teamId,
+        teamName: team.teamName || '未命名分队',
+        teamNetScore: scoringPlayersCount > 0 ? teamNetScore : null,
+        playerCountLabel: String(scoringPlayersCount),
+        thru: '-',
+        grossTotal: 0,
+        toPar: 0,
+        total: scoringPlayersCount > 0 ? teamNetScore : 0,
+        hasScore: scoringPlayersCount > 0,
+        scoreStr: netDisplay,
+        netScoreDisplay: netDisplay,
+        scoreClass: 'score-even',
+        scoringPlayersCount: scoringPlayersCount,
+        players: rankedPlayers,
+        _sortIndex: teamIndex
+      };
+    }).sort((a, b) => {
+      if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
+      if (a.hasScore && b.hasScore && a.teamNetScore !== b.teamNetScore) {
+        return Number(a.teamNetScore) - Number(b.teamNetScore);
+      }
+      return a._sortIndex - b._sortIndex;
+    });
+
+    const rankedTeams = this._buildCompetitionRanking(sortedTeams, (team) => (
+      team && team.hasScore === true ? team.teamNetScore : null
+    ));
+    return rankedTeams.map((team) => {
+      const out = Object.assign({}, team);
+      delete out._sortIndex;
+      return out;
+    });
+  },
+
   _buildTeamLeaderboardTeamMap(match) {
     const map = {};
     const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
@@ -3601,11 +4024,10 @@ Page({
     return scoreText + ' · ' + (viewMap[view] || viewMap.all);
   },
 
+  /** 领先榜「净杆」入口：仅当 peoriaResult 已生成时可点 */
   _hasLeaderboardNetScore(match) {
-    if (!match) return false;
-    return match.netScoreGenerated === true ||
-      match.netScoreReady === true ||
-      !!(match.netScore && match.netScore.generated === true);
+    if (!match || !match.peoriaResult) return false;
+    return match.peoriaResult.status === 'generated';
   },
 
   refreshGroupsDerived() {
@@ -3689,12 +4111,44 @@ Page({
   },
 
   openLeaderboardSettingSheet() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? this._resolveMatchData(matchId) : null;
+    const netAvailable = this._hasLeaderboardNetScore(match);
+    const currentScoreType =
+      this.data.leaderboardScoreType === 'net' && netAvailable ? 'net' : 'gross';
     this.setData({
       showMoreSheet: false,
       moreFabExpanded: false,
       showLeaderboardSettingSheet: true,
+      leaderboardNetScoreAvailable: netAvailable,
       draftLeaderboardView: this.data.leaderboardView || 'all',
-      draftLeaderboardScoreType: this.data.leaderboardScoreType || 'gross'
+      draftLeaderboardScoreType: currentScoreType
+    });
+  },
+
+  /** peoria 页「查看领先榜」：直接进入净杆 Tab */
+  openNetLeaderboardFromPeoria() {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? this._resolveMatchData(matchId) : null;
+    const netAvailable = this._hasLeaderboardNetScore(match);
+    if (!netAvailable) {
+      wx.showToast({ title: '净杆尚未生成', icon: 'none' });
+      return;
+    }
+    const view = this.data.leaderboardView || 'all';
+    this.setData({
+      showMoreSheet: false,
+      moreFabExpanded: false,
+      showLeaderboardSettingSheet: false,
+      activeTab: 'leaderboard',
+      leaderboardScoreType: 'net',
+      leaderboardNetScoreAvailable: true,
+      leaderboardViewLabel: this._buildLeaderboardViewLabel('net', view),
+      expandedTeamId: '',
+      openIndex: -1,
+      openScorecard: null
+    }, () => {
+      this.refreshLeaderboard();
     });
   },
 
@@ -4003,6 +4457,11 @@ Page({
       this.startTournamentMatch();
       return;
     }
+    if (permission === 'finish_match') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this._promptFinishMatch();
+      return;
+    }
     if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
       if (permission === 'register_for_other') {
         const registerClosed =
@@ -4046,7 +4505,97 @@ Page({
       });
       return;
     }
+    if (permission === 'feedback') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      const matchId = this.data.matchId || '';
+      wx.navigateTo({
+        url:
+          '/pages/feedback/index?source=tournament' +
+          (matchId ? '&matchId=' + encodeURIComponent(matchId) : ''),
+        fail: () => wx.showToast({ title: '反馈页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
+    if (permission === 'net_score') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      const matchId = this.data.matchId || '';
+      if (!matchId) {
+        wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+        return;
+      }
+      const match = this._resolveMatchData(matchId);
+      if (match && match.peoriaResult && match.peoriaResult.status === 'generated') {
+        wx.showToast({
+          title: '净杆已生成，请点击“领先榜”按钮查看。',
+          icon: 'none',
+          duration: 2500
+        });
+        return;
+      }
+      wx.navigateTo({
+        url: '/pages/tournament/peoria/index?matchId=' + encodeURIComponent(matchId),
+        fail: () => wx.showToast({ title: '净杆配置页尚未注册', icon: 'none' })
+      });
+      return;
+    }
     wx.showToast({ title: '功能开发中', icon: 'none' });
+  },
+
+  /**
+   * 结束比赛（M 面板 finish_match）
+   * 写入 match.status="finished" + finishedAt，不改 score/peoria 等。
+   */
+  _promptFinishMatch() {
+    const matchId = this.data.matchId || '';
+    if (
+      !matchId ||
+      demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId) ||
+      !teamMatchStore.getMatchById(matchId)
+    ) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      return;
+    }
+    if (String(match.status || '').trim().toLowerCase() === 'finished') {
+      wx.showToast({ title: '比赛已经结束。', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '结束比赛',
+      content:
+        '确认结束本场比赛？\n\n结束后：\n- 比赛进入最终状态\n- 可生成净杆成绩\n- 领先榜作为最终成绩展示',
+      cancelText: '取消',
+      confirmText: '确认',
+      confirmColor: '#ce9224',
+      success: (res) => {
+        if (res.confirm) this._confirmFinishMatch();
+      }
+    });
+  },
+
+  _confirmFinishMatch() {
+    const matchId = this.data.matchId || '';
+    if (!matchId) return;
+    const match = teamMatchStore.getMatchById(matchId);
+    if (!match) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      return;
+    }
+    if (String(match.status || '').trim().toLowerCase() === 'finished') {
+      wx.showToast({ title: '比赛已经结束。', icon: 'none' });
+      return;
+    }
+    match.status = 'finished';
+    match.finishedAt = Date.now();
+    match.updatedAt = Date.now();
+    teamMatchStore.saveMatch(match);
+    this.refreshMatchData(matchId);
+    this.applyMoreAccess();
+    wx.showToast({ title: '比赛已结束', icon: 'success' });
   },
 
   /**

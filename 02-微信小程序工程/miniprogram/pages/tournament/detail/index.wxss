@@ -78,6 +78,19 @@ page {
   background: var(--tour-blue); color: #fff; border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 20rpx; font-weight: 900; font-style: italic; padding: 8rpx 24rpx; border-radius: 8rpx;
 }
+/* LIVE：信息蓝（--data-blue） */
+.registered-chip--live {
+  background: var(--data-blue, #00aeef);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+/* 已结束：灰色标签 */
+.registered-chip--finished {
+  background: #6b7280;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-style: italic;
+}
 /* translateX 仅用于水平居中(定位)，不参与尺寸控制；bottom = -size/2 维持与 hero 半重叠 */
 .event-logo-wrap { position: absolute; left: 50%; bottom: -36px; transform: translateX(-50%); z-index: 20; }
 /* 球队比赛 LOGO 标准：固定 64px 直径，min/max 锁定，禁止自适应/容器缩放/padding/transform 控制大小 */
@@ -1045,6 +1058,18 @@ page {
 .leaderboard-row--personal .lr-thru { width: 16%; }
 .leaderboard-head--personal .lh-total,
 .leaderboard-row--personal .lr-total { width: 20%; }
+
+/* 净杆分队五列：POS | TEAM | PLAYER | THRU | NET SCORE */
+.leaderboard-head--team-net .lh-pos,
+.team-leaderboard-row--net .lr-pos { width: 12%; }
+.leaderboard-head--team-net .lh-player,
+.team-leaderboard-row--net .lr-player { width: 30%; }
+.leaderboard-head--team-net .lh-team,
+.team-leaderboard-row--net .lr-team { width: 18%; text-align: center; padding-left: 0; }
+.leaderboard-head--team-net .lh-thru,
+.team-leaderboard-row--net .lr-thru { width: 16%; }
+.leaderboard-head--team-net .lh-total,
+.team-leaderboard-row--net .lr-total { width: 24%; }
 .lh-team { padding-left: 8rpx; text-align: left; box-sizing: border-box; }
 .lr-team {
   padding: 0 8rpx;
@@ -1069,6 +1094,7 @@ page {
 .team-leaderboard-row.is-expanded { margin-bottom: 0; border-radius: 12rpx 12rpx 0 0; background: var(--champion-gold); color: #ffffff; }
 .team-leaderboard-row.is-expanded .pos-cell,
 .team-leaderboard-row.is-expanded .player-name,
+.team-leaderboard-row.is-expanded .lr-team,
 .team-leaderboard-row.is-expanded .lr-thru,
 .team-leaderboard-row.is-expanded .leaderboard-total,
 .team-leaderboard-row.is-expanded .team-leaderboard-chevron { color: #ffffff; }
@@ -1100,6 +1126,7 @@ page {
 }
 .detail-page.dark-mode .team-leaderboard-row.is-expanded .pos-cell,
 .detail-page.dark-mode .team-leaderboard-row.is-expanded .player-name,
+.detail-page.dark-mode .team-leaderboard-row.is-expanded .lr-team,
 .detail-page.dark-mode .team-leaderboard-row.is-expanded .lr-thru,
 .detail-page.dark-mode .team-leaderboard-row.is-expanded .leaderboard-total,
 .detail-page.dark-mode .team-leaderboard-row.is-expanded .leaderboard-total.score-under,
@@ -1608,7 +1635,9 @@ page {
 .leaderboard-setting-option { min-height: 88rpx; padding: 18rpx 20rpx; border-radius: 20rpx; border: 2rpx solid var(--border-color); background: var(--bg-subtle); color: var(--text-primary); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
 .leaderboard-setting-option.is-active { border-color: var(--champion-gold); background: rgba(201, 164, 92, 0.16); color: var(--champion-gold); }
 .leaderboard-setting-option.is-disabled { opacity: 0.46; color: var(--text-muted); }
+.leaderboard-setting-option__text { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4rpx; }
 .leaderboard-setting-option__name { font-size: 26rpx; font-weight: 900; text-align: center; line-height: 1.3; }
+.leaderboard-setting-option__sub { font-size: 20rpx; font-weight: 700; text-align: center; line-height: 1.2; color: var(--text-muted); }
 .leaderboard-setting__footer { display: flex; gap: 20rpx; margin-top: 40rpx; }
 .leaderboard-setting__btn { flex: 1; height: 88rpx; border-radius: 20rpx; display: flex; align-items: center; justify-content: center; font-size: 28rpx; font-weight: 900; }
 .leaderboard-setting__btn--cancel { color: var(--text-secondary); background: var(--bg-subtle); border: 1px solid var(--border-color); }

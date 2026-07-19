@@ -81,7 +81,7 @@
           binderror="onMatchBannerError"
         ></image>
         <view class="hero__overlay"></view>
-        <view class="registered-chip">{{match.statusLabel}}</view>
+        <view class="registered-chip {{match.cardStatusTone === 'live' ? 'registered-chip--live' : ''}} {{match.cardStatusTone === 'finished' ? 'registered-chip--finished' : ''}}">{{match.cardStatusText || match.statusLabel}}</view>
       </view>
       <view class="event-logo-wrap">
         <view class="event-logo"><image src="{{match.logo}}" mode="aspectFill" style="width:100%;height:100%;"></image></view>
@@ -328,30 +328,53 @@
         <view class="leaderboard-table-wrap">
           <view class="leaderboard-view-label">{{leaderboardViewLabel}}</view>
           <block wx:if="{{leaderboardView === 'team' || leaderboardMode === 'team'}}">
-            <view class="leaderboard-head">
+            <!-- 净杆分队：POS TEAM PLAYER THRU NET SCORE -->
+            <view wx:if="{{leaderboardScoreType === 'net'}}" class="leaderboard-head leaderboard-head--team-net">
+              <text class="lh-pos">POS</text>
+              <text class="lh-player">TEAM</text>
+              <text class="lh-team">PLAYER</text>
+              <text class="lh-thru">THRU</text>
+              <text class="lh-total">NET SCORE</text>
+            </view>
+            <!-- 总杆分队：保持原样 -->
+            <view wx:else class="leaderboard-head">
               <text class="lh-pos">POS</text>
               <text class="lh-player">TEAM</text>
               <text class="lh-thru">TOTAL</text>
               <text class="lh-total">TO PAR</text>
             </view>
             <block wx:for="{{teamLeaderboard}}" wx:for-item="team" wx:for-index="teamIndex" wx:key="teamId">
-              <view bindtap="toggleTeamLeaderboardRow" data-team-id="{{team.teamId}}" class="leaderboard-row team-leaderboard-row {{expandedTeamId === team.teamId ? 'is-expanded' : ''}}">
+              <view
+                bindtap="toggleTeamLeaderboardRow"
+                data-team-id="{{team.teamId}}"
+                class="leaderboard-row team-leaderboard-row {{leaderboardScoreType === 'net' ? 'team-leaderboard-row--net' : ''}} {{expandedTeamId === team.teamId ? 'is-expanded' : ''}}"
+              >
                 <text class="lr-pos pos-cell">{{team.pos}}</text>
                 <view class="lr-player">
                   <text class="player-name">{{team.teamName}}</text>
                 </view>
-                <text class="lr-thru">{{team.grossTotal}}</text>
-                <view class="lr-total team-leaderboard-total">
-                  <text class="leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
-                  <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
-                </view>
+                <block wx:if="{{leaderboardScoreType === 'net'}}">
+                  <text class="lr-team">{{team.playerCountLabel || '-'}}</text>
+                  <text class="lr-thru">{{team.thru || '-'}}</text>
+                  <view class="lr-total team-leaderboard-total">
+                    <text class="leaderboard-total score-even">{{team.netScoreDisplay || team.scoreStr}}</text>
+                    <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
+                  </view>
+                </block>
+                <block wx:else>
+                  <text class="lr-thru">{{team.grossTotal}}</text>
+                  <view class="lr-total team-leaderboard-total">
+                    <text class="leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
+                    <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
+                  </view>
+                </block>
               </view>
               <view wx:if="{{expandedTeamId === team.teamId}}" class="team-leaderboard-players-wrap">
                 <view class="leaderboard-head team-leaderboard-player-head">
                   <text class="lh-pos">POS</text>
                   <text class="lh-player">PLAYER</text>
                   <text class="lh-thru">THRU</text>
-                  <text class="lh-total">TO PAR</text>
+                  <text class="lh-total">{{leaderboardScoreType === 'net' ? 'NET SCORE' : 'TO PAR'}}</text>
                 </view>
                 <block wx:for="{{team.players}}" wx:for-item="player" wx:for-index="playerIndex" wx:key="scorecardKey">
                   <view
@@ -371,7 +394,7 @@
                       <text wx:if="{{player.genderIcon}}" class="gender-icon {{player.genderClass}}">{{player.genderIcon}}</text>
                     </view>
                     <text class="lr-thru">{{player.thru}}</text>
-                    <text class="lr-total leaderboard-total {{player.scoreClass}}">{{player.scoreStr}}</text>
+                    <text class="lr-total leaderboard-total {{leaderboardScoreType === 'net' ? 'score-even' : player.scoreClass}}">{{leaderboardScoreType === 'net' ? (player.netScoreDisplay || player.scoreStr) : player.scoreStr}}</text>
                   </view>
                   <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
                     <view class="scorecard-profile">
@@ -445,7 +468,7 @@
               <text class="lh-player">PLAYER</text>
               <text class="lh-team">TEAM</text>
               <text class="lh-thru">THRU</text>
-              <text class="lh-total">TO PAR</text>
+              <text class="lh-total">{{leaderboardScoreType === 'net' ? 'NET SCORE' : 'TO PAR'}}</text>
             </view>
 
             <block wx:for="{{leaderboard}}" wx:key="playerId">
@@ -457,7 +480,7 @@
                 </view>
                 <text class="lr-team">{{item.teamName || '-'}}</text>
                 <text class="lr-thru">{{item.thru}}</text>
-                <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
+                <text class="lr-total leaderboard-total {{leaderboardScoreType === 'net' ? 'score-even' : item.scoreClass}}">{{leaderboardScoreType === 'net' ? (item.netScoreDisplay || item.scoreStr) : item.scoreStr}}</text>
               </view>
 
               <!-- 展开成绩卡 -->
@@ -719,7 +742,10 @@
           data-disabled="{{!leaderboardNetScoreAvailable}}"
           class="leaderboard-setting-option {{draftLeaderboardScoreType === 'net' ? 'is-active' : ''}} {{!leaderboardNetScoreAvailable ? 'is-disabled' : ''}}"
         >
-          <text class="leaderboard-setting-option__name">{{leaderboardNetScoreAvailable ? '净杆' : '净杆（生成之后才可查阅）'}}</text>
+          <view class="leaderboard-setting-option__text">
+            <text class="leaderboard-setting-option__name">净杆</text>
+            <text wx:if="{{!leaderboardNetScoreAvailable}}" class="leaderboard-setting-option__sub">（未生成）</text>
+          </view>
         </view>
       </view>
     </view>

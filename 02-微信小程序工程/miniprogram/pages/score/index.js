@@ -2442,6 +2442,20 @@ Page({
 
     if (label === '修改半场') {
       this.openEditHalfSheet();
+      return;
+    }
+
+    if (label === '反馈') {
+      const ms = this._matchState || this._readMatchState() || {};
+      const matchId = ms.matchId || '';
+      const gameId = this.data.gameId || '';
+      const qs = ['source=score'];
+      if (matchId) qs.push('matchId=' + encodeURIComponent(matchId));
+      if (gameId) qs.push('gameId=' + encodeURIComponent(gameId));
+      wx.navigateTo({
+        url: '/pages/feedback/index?' + qs.join('&'),
+        fail: () => wx.showToast({ title: '反馈页面尚未注册', icon: 'none' })
+      });
     }
   },
 
