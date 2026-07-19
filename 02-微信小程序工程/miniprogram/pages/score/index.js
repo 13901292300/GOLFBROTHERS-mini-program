@@ -750,6 +750,10 @@ Page({
     activePlayerIdx: 0,
     /** 技术面板清除草稿：无选中球员，全员成绩格为空（仅 UI） */
     scoreClearDraft: false,
+    /** 快捷面板清除显示草稿：本洞头像旁成绩格全空（仅 UI，不改正式 scores） */
+    quickScoreClearDraft: false,
+    /** 快捷清除后点球员恢复的 PAR 草稿：显示层强制 draft，不改正式 scores */
+    quickScoreFreshDraft: false,
     /** 本洞已点清除但未确认：显示层忽略正式 scores，遮罩关闭则丢弃 */
     scoreHoleClearPending: false,
     /** 技术面板控件区焦点切换动画（仅 UI） */
@@ -1995,18 +1999,36 @@ Page({
       panelScore,
       scoreDisplayMode,
       scoreClearDraft,
-      scoreHoleClearPending
+      scoreHoleClearPending,
+      quickScoreClearDraft,
+      quickScoreFreshDraft
     } = this.data;
     const clearDraft = !!scoreClearDraft && scorePanelMode === 'tech';
     const clearPending = !!scoreHoleClearPending && scorePanelMode === 'tech';
+    const quickClearDraft = !!quickScoreClearDraft && scorePanelMode === 'quick';
+    const quickFreshDraft = !!quickScoreFreshDraft && scorePanelMode === 'quick';
     const sheetPlayers = playersView.map((p, idx) => {
       const shortName = p.name.split('.')[1] || p.name;
       let holeScore = '';
       let isDraftScore = false;
       if (scorePanelMode === 'quick') {
-        // 快捷面板：显示待写入的快捷成绩（默认 PAR），按当前显示方式换算
-        const g = quickPanelScores[idx] != null ? quickPanelScores[idx] : sheetPar;
-        holeScore = formatMainScore(g, sheetPar, scoreDisplayMode);
+        if (quickClearDraft) {
+          // 快捷清除显示：成绩格全空（empty，非 draft）；不读正式 scores
+          holeScore = '';
+          isDraftScore = false;
+        } else {
+          // 快捷面板：显示待写入的快捷成绩（默认 PAR），按当前显示方式换算
+          const g = quickPanelScores[idx] != null ? quickPanelScores[idx] : sheetPar;
+          holeScore = formatMainScore(g, sheetPar, scoreDisplayMode);
+          if (quickFreshDraft) {
+            // 清除后恢复的 PAR 草稿：强制 draft，不读/不改正式 scores
+            isDraftScore = true;
+          } else {
+            // 默认值（无正式 scores）→ draft；已有正式成绩 → 非 draft
+            const formal = (p.scores || [])[sheetHoleIndex];
+            isDraftScore = !isFilledScore(formal);
+          }
+        }
       } else if (clearDraft) {
         // 清除草稿（未选人）：本洞成绩栏全部置空（不读正式 scores）
         holeScore = '';
@@ -5006,6 +5028,8 @@ Page({
       activePlayerIdx: pIdx,
       scoreClearDraft: false,
       scoreHoleClearPending: false,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false,
       sheetHoleLabel: label,
       sheetHoleIndex: holeIndex,
       sheetPar: par,
@@ -5024,6 +5048,8 @@ Page({
       activePlayerIdx: pIdx,
       scoreClearDraft: false,
       scoreHoleClearPending: false,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false,
       sheetHoleLabel: label,
       sheetHoleIndex: holeIndex,
       sheetPar: par,
@@ -5032,7 +5058,8 @@ Page({
       panelPuttTouched: hasScore,
       panelFairway: fairway,
       panelPenalty: penalty,
-      panelBunker: sand
+      panelBunker: sand,
+      quickPanelScores: quick.slice()
     };
     this.setData(openPatch, () => {
       this.syncSheetPlayers();
@@ -5088,7 +5115,9 @@ Page({
     this.setData({
       scoreSheetOpen: false,
       scoreClearDraft: false,
-      scoreHoleClearPending: false
+      scoreHoleClearPending: false,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false
     });
     setTimeout(() => this.setData({ showScoreSheet: false }), 300);
   },
@@ -5099,7 +5128,9 @@ Page({
     const patch = {
       scoreSheetOpen: false,
       scoreClearDraft: false,
-      scoreHoleClearPending: false
+      scoreHoleClearPending: false,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false
     };
     if (snap && this.data.mode !== 'fourball_best') {
       patch.activePlayerIdx = snap.activePlayerIdx;
@@ -5112,6 +5143,9 @@ Page({
       patch.panelFairway = snap.panelFairway;
       patch.panelPenalty = snap.panelPenalty;
       patch.panelBunker = snap.panelBunker;
+      if (Array.isArray(snap.quickPanelScores)) {
+        patch.quickPanelScores = snap.quickPanelScores.slice();
+      }
     }
     this.setData(patch);
     setTimeout(() => this.setData({ showScoreSheet: false }), 300);
@@ -5136,12 +5170,17 @@ Page({
 
   /**
    * 普通单组技术面板：清除当前洞草稿 UI（不写 _playersSource / 不 persist）
-   * 快捷 / 球队赛 / fourball_best：保持原「清除=关闭」行为
+   * 快捷面板：独立清除显示状态（头像旁成绩格全空，不关弹窗、不改正式成绩）
+   * fourball_best：保持原「清除=关闭」行为
    */
   clearScoreInput() {
     if (this._scoreEditBlocked()) return;
-    if (this.data.mode === 'fourball_best' || this.data.scorePanelMode === 'quick') {
+    if (this.data.mode === 'fourball_best') {
       this.closeScoreInput();
+      return;
+    }
+    if (this.data.scorePanelMode === 'quick') {
+      this.setData({ quickScoreClearDraft: true }, () => this.syncSheetPlayers());
       return;
     }
     const par = this.data.sheetPar;
@@ -5171,7 +5210,7 @@ Page({
   switchScorePanelMode(e) {
     const mode = e.currentTarget.dataset.mode;
     if (mode !== 'quick' && mode !== 'tech') return;
-    const patch = { scorePanelMode: mode };
+    const patch = { scorePanelMode: mode, quickScoreClearDraft: false, quickScoreFreshDraft: false };
     // 切换到快捷面板时：本洞全组默认 PAR（仅 quick 分支）
     if (mode === 'quick') {
       patch.quickPanelScores = this._quickDefaultsForHole(this.data.sheetHoleIndex, this.data.sheetPar);
@@ -5184,15 +5223,37 @@ Page({
   },
 
   onSheetPlayerTap(e) {
-    // 快捷模式不进行逐项选择（不影响技术面板）
-    if (this.data.scorePanelMode === 'quick') return;
     const idx = Number(e.currentTarget.dataset.idx);
+    // 快捷清除草稿中：点头像退出清除 → 本洞默认 PAR 草稿（不恢复清除前正式分）
+    if (this.data.scorePanelMode === 'quick') {
+      if (!this.data.quickScoreClearDraft) return;
+      this._resumeQuickEditAfterClear(idx);
+      return;
+    }
     // 四人最佳球位：切换记分实体=切换「组」，载入该组本洞成绩
     if (this.data.mode === 'fourball_best') {
       this._focusSheetGroup(idx);
       return;
     }
     this._focusSheetPlayer(idx);
+  },
+
+  /** 快捷清除显示中点球员：退出清除 UI，仅恢复面板草稿（不写 _playersSource） */
+  _resumeQuickEditAfterClear(playerIdx) {
+    const par = this.data.sheetPar;
+    const quick = (this._playersSource || []).map(() => par);
+    this.setData({
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: true,
+      activePlayerIdx: playerIdx,
+      panelScore: par,
+      panelPutt: 2,
+      panelPuttTouched: false,
+      panelFairway: FAIRWAY_FAIRWAY,
+      panelPenalty: 0,
+      panelBunker: 0,
+      quickPanelScores: quick
+    }, () => this.syncSheetPlayers());
   },
 
   // 技术面板：聚焦到指定组（载入其本洞成绩/推杆），保持面板打开
@@ -5256,7 +5317,7 @@ Page({
     const delta = Number(e.currentTarget.dataset.delta);
     const quick = this.data.quickPanelScores.slice();
     quick[idx] = Math.max(1, (quick[idx] || this.data.sheetPar) + delta);
-    this.setData({ quickPanelScores: quick }, () => this.syncSheetPlayers());
+    this.setData({ quickPanelScores: quick, quickScoreClearDraft: false }, () => this.syncSheetPlayers());
   },
 
   confirmScoreInput() {
@@ -5266,8 +5327,18 @@ Page({
       this.confirmTeamScore();
       return;
     }
-    // 快捷面板：一键写入全组（默认 PAR），仅新增分支
+    // 快捷面板：清除草稿确认 → 整组本洞清空；否则一键写入全组（默认 PAR）
     if (this.data.scorePanelMode === 'quick') {
+      if (this.data.quickScoreClearDraft) {
+        const holeIndex = this.data.sheetHoleIndex;
+        this._clearHoleScoresInPlayersSource(holeIndex);
+        this.setData({ quickScoreClearDraft: false });
+        this.refreshPlayers();
+        this.persistSession();
+        this._hideScoreSheet();
+        this._afterScoresPersisted();
+        return;
+      }
       this.confirmQuickScore();
       return;
     }
@@ -5559,6 +5630,8 @@ Page({
         panelFairway: FAIRWAY_FAIRWAY,
         panelPenalty: 0,
         panelBunker: 0,
+        quickScoreClearDraft: false,
+        quickScoreFreshDraft: false,
         quickPanelScores: scorePanelMode === 'quick'
           ? this._quickDefaultsForHole(holeIndex, par)
           : this.data.quickPanelScores
@@ -5588,6 +5661,8 @@ Page({
       panelFairway: fairway,
       panelPenalty: penalty,
       panelBunker: sand,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false,
       quickPanelScores: quick
     }, () => this.syncSheetPlayers());
   }

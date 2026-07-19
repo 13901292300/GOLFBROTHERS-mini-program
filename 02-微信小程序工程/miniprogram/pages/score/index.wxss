@@ -1311,6 +1311,56 @@ page {
   border: 2rpx solid #002D62;
 }
 
+/* Bright 快捷：头像旁成绩格与技术面板同规范（复用 PGA 蓝体系；draft 不覆盖） */
+.score-page.bright-mode .score-input-sheet.quick-mode .sheet-hole-score--empty {
+  color: transparent;
+  background: rgba(0, 45, 98, 0.12);
+  border: 2rpx solid #002D62;
+}
+
+.score-page.bright-mode .score-input-sheet.quick-mode .sheet-hole-score:not(.sheet-hole-score--draft):not(.sheet-hole-score--empty) {
+  color: #002D62;
+  background: #ffffff;
+  border: 2rpx solid #002D62;
+}
+
+/* Bright 快捷：默认 PAR 等为草稿 — 弱化浅灰，不用正式 PGA 蓝 */
+.score-page.bright-mode .score-input-sheet.quick-mode .sheet-hole-score--draft {
+  color: #9ca3af;
+  background: rgba(148, 163, 184, 0.16);
+  border: 2rpx solid #d1d5db;
+  font-weight: 700;
+}
+
+/* ===== Dark 快捷：成绩格与技术面板 Dark 视觉语言统一（仅 quick-mode） ===== */
+/* 正式成绩：冠军金边 + 深底 + 白字 */
+.score-page.dark-mode .score-input-sheet.quick-mode .sheet-hole-score:not(.sheet-hole-score--draft):not(.sheet-hole-score--empty) {
+  border: 2rpx solid #CE9224;
+  background: #111111;
+  color: #ffffff;
+}
+
+/* 草稿成绩：PGA 蓝字 + Dark 背景，不用冠军金 */
+.score-page.dark-mode .score-input-sheet.quick-mode .sheet-hole-score--draft {
+  color: #4A90E2;
+  background: #111111;
+  border: 2rpx solid #222222;
+  font-weight: 700;
+}
+
+/* 空成绩：不覆盖，沿用现有 Dark .sheet-hole-score / --empty 表现 */
+
+/* Bright 快捷：中间记分控件视觉对齐正式成绩格 */
+.score-page.bright-mode .quick-score-control {
+  background: #ffffff;
+  border: 2rpx solid #002D62;
+  box-shadow: none;
+}
+
+.score-page.bright-mode .quick-score-control-value {
+  color: #002D62;
+}
+
 .sheet-main-panel {
   flex: 1;
   min-width: 0;
@@ -1449,7 +1499,7 @@ page {
   height: 124rpx;
   display: flex;
   align-items: center;
-  padding-left: 8rpx;
+  justify-content: center; /* 控件在行内水平居中；高度不变，与左侧头像行垂直对齐 */
 }
 
 .quick-score-control {
@@ -1477,12 +1527,35 @@ page {
   font-weight: 900;
 }
 
+/* Bright：快捷面板 +/- PGA 蓝；不改技术面板 / Dark */
+.score-page.bright-mode .quick-score-control-btn {
+  background: #002D62;
+  color: #ffffff;
+}
+
+/* Dark：快捷面板 +/- 冠军金 */
+.score-page.dark-mode .score-input-sheet.quick-mode .quick-score-control-btn {
+  background: #CE9224;
+  color: #111111;
+}
+
+/* Dark：快捷记分控件容器（包裹 +/- 与数值） */
+.score-page.dark-mode .score-input-sheet.quick-mode .quick-score-control {
+  background: var(--bg-card);
+  border: 2rpx solid #CE9224;
+  box-shadow: none;
+}
+
 .quick-score-control-value {
   min-width: 56rpx;
   text-align: center;
   font-size: 36rpx;
   font-weight: 900;
   color: #0f172a;
+}
+
+.score-page.dark-mode .score-input-sheet.quick-mode .quick-score-control-value {
+  color: white;
 }
 
 .sheet-footer-btns {
@@ -1521,6 +1594,13 @@ page {
 }
 
 .score-page.bright-mode .score-input-sheet:not(.quick-mode) .sheet-footer-btn--confirm {
+  background: #002D62;
+  color: #ffffff;
+  box-shadow: 0 16rpx 40rpx rgba(0, 45, 98, 0.22);
+}
+
+/* Bright：快捷面板确认 PGA 蓝；不改技术面板选择器、不改 Dark */
+.score-page.bright-mode .score-input-sheet.quick-mode .sheet-footer-btn--confirm {
   background: #002D62;
   color: #ffffff;
   box-shadow: 0 16rpx 40rpx rgba(0, 45, 98, 0.22);
