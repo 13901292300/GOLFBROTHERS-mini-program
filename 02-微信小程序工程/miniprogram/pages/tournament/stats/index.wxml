@@ -16,18 +16,18 @@
     <view class="stats-table">
       <view class="stats-thead">
         <text class="st-cell st-player">PLAYER</text>
-        <text bindtap="onSortHeaderTap" data-field="eag" class="st-cell {{sortField === 'eag' ? 'active-sort' : ''}}">EAG</text>
-        <text bindtap="onSortHeaderTap" data-field="bir" class="st-cell {{sortField === 'bir' ? 'active-sort' : ''}}">BIR</text>
-        <text bindtap="onSortHeaderTap" data-field="par" class="st-cell {{sortField === 'par' ? 'active-sort' : ''}}">PAR</text>
-        <text bindtap="onSortHeaderTap" data-field="bog" class="st-cell {{sortField === 'bog' ? 'active-sort' : ''}}">BOG</text>
-        <text bindtap="onSortHeaderTap" data-field="dbl" class="st-cell {{sortField === 'dbl' ? 'active-sort' : ''}}">DBL+</text>
-        <text bindtap="onSortHeaderTap" data-field="gir" class="st-cell st-pct {{sortField === 'gir' ? 'active-sort' : ''}}">GIR%</text>
-        <text bindtap="onSortHeaderTap" data-field="putts" class="st-cell {{sortField === 'putts' ? 'active-sort' : ''}}">PUT</text>
-        <text bindtap="onSortHeaderTap" data-field="fwy" class="st-cell st-pct {{sortField === 'fwy' ? 'active-sort' : ''}}">FWY%</text>
-        <text bindtap="onSortHeaderTap" data-field="sand" class="st-cell {{sortField === 'sand' ? 'active-sort' : ''}}">SAND</text>
-        <text bindtap="onSortHeaderTap" data-field="pen" class="st-cell {{sortField === 'pen' ? 'active-sort' : ''}}">PEN</text>
-        <text bindtap="onSortHeaderTap" data-field="score8421" class="st-cell {{sortField === 'score8421' ? 'active-sort' : ''}}">8421</text>
-        <text bindtap="onSortHeaderTap" data-field="total" class="st-cell st-total {{sortField === 'total' ? 'active-sort' : ''}}">TOT</text>
+        <text bindtap="onSortHeaderTap" data-field="eag" class="st-cell {{sortField === 'eag' ? 'active-sort' : ''}}">EAG<text wx:if="{{sortField === 'eag'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="bir" class="st-cell {{sortField === 'bir' ? 'active-sort' : ''}}">BIR<text wx:if="{{sortField === 'bir'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="par" class="st-cell {{sortField === 'par' ? 'active-sort' : ''}}">PAR<text wx:if="{{sortField === 'par'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="bog" class="st-cell {{sortField === 'bog' ? 'active-sort' : ''}}">BOG<text wx:if="{{sortField === 'bog'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="dbl" class="st-cell {{sortField === 'dbl' ? 'active-sort' : ''}}">DBL+<text wx:if="{{sortField === 'dbl'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="gir" class="st-cell st-pct {{sortField === 'gir' ? 'active-sort' : ''}}">GIR%<text wx:if="{{sortField === 'gir'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="putts" class="st-cell {{sortField === 'putts' ? 'active-sort' : ''}}">PUT<text wx:if="{{sortField === 'putts'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="fwy" class="st-cell st-pct {{sortField === 'fwy' ? 'active-sort' : ''}}">FWY%<text wx:if="{{sortField === 'fwy'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="sand" class="st-cell {{sortField === 'sand' ? 'active-sort' : ''}}">SAND<text wx:if="{{sortField === 'sand'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="pen" class="st-cell {{sortField === 'pen' ? 'active-sort' : ''}}">PEN<text wx:if="{{sortField === 'pen'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="score8421" class="st-cell {{sortField === 'score8421' ? 'active-sort' : ''}}">8421<text wx:if="{{sortField === 'score8421'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
+        <text bindtap="onSortHeaderTap" data-field="total" class="st-cell st-total {{sortField === 'total' ? 'active-sort' : ''}}">TOT<text wx:if="{{sortField === 'total'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
       </view>
 
       <block wx:for="{{rows}}" wx:key="playerId">

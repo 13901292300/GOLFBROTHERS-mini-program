@@ -11,7 +11,7 @@
  *     groupId, name,
  *     status: 'not_started' | 'in_progress' | 'finished',
  *     playersSlots: [ { playerId, name, avatar } | null ],
- *     scoresByPlayer: { [playerId]: { scores:[...18], putts:[...18] } }
+ *     scoresByPlayer: { [playerId]: { scores:[...18], putts:[...18], fairways?:[...18], penalties?:[...18], sands?:[...18] } }
  *   } ],
  *   status: 'active' | 'finished',
  *   currentRound: 1,
@@ -153,22 +153,44 @@ function getGroup(gameId, groupIndex) {
 }
 
 /** 写入某组某球员逐洞成绩（持久化，刷新可恢复） */
-function setGroupPlayerScores(gameId, groupIndex, playerId, scores, putts) {
+function setGroupPlayerScores(gameId, groupIndex, playerId, scores, putts, fairways, penalties, sands) {
   const list = _readAll();
   const idx = list.findIndex((g) => g && g.gameId === gameId);
   if (idx < 0) return null;
   const game = list[idx];
+  const buildRecord = (prev) => {
+    const rec = {
+      scores: (scores || []).slice(),
+      putts: (putts || []).slice()
+    };
+    if (fairways != null) {
+      rec.fairways = (fairways || []).slice();
+    } else if (prev && Array.isArray(prev.fairways)) {
+      rec.fairways = prev.fairways.slice();
+    }
+    if (penalties != null) {
+      rec.penalties = (penalties || []).slice();
+    } else if (prev && Array.isArray(prev.penalties)) {
+      rec.penalties = prev.penalties.slice();
+    }
+    if (sands != null) {
+      rec.sands = (sands || []).slice();
+    } else if (prev && Array.isArray(prev.sands)) {
+      rec.sands = prev.sands.slice();
+    }
+    return rec;
+  };
   if (!Array.isArray(game.groups) || !game.groups.length) {
     // 旧结构：写顶层
     game.scoresByPlayer = game.scoresByPlayer || {};
-    game.scoresByPlayer[playerId] = { scores: (scores || []).slice(), putts: (putts || []).slice() };
+    game.scoresByPlayer[playerId] = buildRecord(game.scoresByPlayer[playerId]);
     teeSheetManage.inferStartHoleIfNeededForGameGroup(game);
   } else {
     const gi = groupIndex || 0;
     const grp = game.groups[gi];
     if (!grp) return null;
     grp.scoresByPlayer = grp.scoresByPlayer || {};
-    grp.scoresByPlayer[playerId] = { scores: (scores || []).slice(), putts: (putts || []).slice() };
+    grp.scoresByPlayer[playerId] = buildRecord(grp.scoresByPlayer[playerId]);
     teeSheetManage.inferStartHoleIfNeededForGameGroup(grp);
   }
   list[idx] = game;
@@ -182,10 +204,20 @@ function mergeScoresForPlayersSlots(oldScores, playersSlots) {
   const next = {};
   (playersSlots || []).filter(Boolean).forEach((p) => {
     if (prev[p.playerId]) {
-      next[p.playerId] = {
+      const rec = {
         scores: (prev[p.playerId].scores || []).slice(),
         putts: (prev[p.playerId].putts || []).slice()
       };
+      if (Array.isArray(prev[p.playerId].fairways)) {
+        rec.fairways = prev[p.playerId].fairways.slice();
+      }
+      if (Array.isArray(prev[p.playerId].penalties)) {
+        rec.penalties = prev[p.playerId].penalties.slice();
+      }
+      if (Array.isArray(prev[p.playerId].sands)) {
+        rec.sands = prev[p.playerId].sands.slice();
+      }
+      next[p.playerId] = rec;
     }
   });
   return next;

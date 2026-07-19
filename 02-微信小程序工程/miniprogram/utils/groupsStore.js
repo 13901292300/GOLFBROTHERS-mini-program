@@ -2,7 +2,7 @@ const mockAvatars = require('./mockAvatars.js');
 const playerManage = require('./playerManage.js');
 /**
  * 出发表 groups — 领先榜唯一数据源（会话内 app.globalData.groups）
- * 结构：groups[].players[].holes[{ holeNo, score, putts, diff }]
+ * 结构：groups[].players[].holes[{ holeNo, score, putts, fairway, penalty, sand, diff }]
  */
 
 const HOLE_PARS = [4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4];
@@ -97,6 +97,9 @@ function buildEmptyHoles() {
     holeNo: i + 1,
     score: null,
     putts: null,
+    fairway: null,
+    penalty: null,
+    sand: null,
     diff: null
   }));
 }
@@ -186,11 +189,24 @@ function syncGroupFromScoring(groupId, playersSource) {
     if (!player) return;
     const scores = src.scores || [];
     const putts = src.putts || [];
+    const fairways = src.fairways || [];
+    const penalties = src.penalties || [];
+    const sands = src.sands || [];
     player.holes.forEach((hole, hi) => {
       const s = scores[hi];
       const p = putts[hi];
+      const fw = fairways[hi];
+      const pen = penalties[hi];
+      const sand = sands[hi];
       hole.score = isFilledScore(s) ? Number(s) : null;
       hole.putts = p != null && p !== '' ? Number(p) : null;
+      hole.fairway = (fw === 'left' || fw === 'right' || fw === 'fairway') ? fw : null;
+      hole.penalty = (pen !== null && pen !== undefined && pen !== '' && !Number.isNaN(Number(pen)))
+        ? Math.max(0, Number(pen))
+        : null;
+      hole.sand = (sand !== null && sand !== undefined && sand !== '' && !Number.isNaN(Number(sand)))
+        ? Math.max(0, Number(sand))
+        : null;
       hole.diff = isFilledScore(hole.score) ? hole.score - HOLE_PARS[hi] : null;
     });
   });
@@ -198,7 +214,7 @@ function syncGroupFromScoring(groupId, playersSource) {
   return true;
 }
 
-/** 记分页：从 groups 加载本组球员（scores/putts 由 holes 派生，非独立副本） */
+/** 记分页：从 groups 加载本组球员（scores/putts/fairways/penalties/sands 由 holes 派生） */
 function loadGroupForScoring(groupId) {
   const group = getGroup(groupId);
   if (!group) return [];
@@ -210,7 +226,12 @@ function loadGroupForScoring(groupId) {
     avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
     colorClass: 'border-white',
     scores: p.holes.map((h) => (isFilledScore(h.score) ? h.score : undefined)),
-    putts: p.holes.map((h) => (h.putts != null && h.putts !== '' ? h.putts : undefined))
+    putts: p.holes.map((h) => (h.putts != null && h.putts !== '' ? h.putts : undefined)),
+    fairways: p.holes.map((h) => (h.fairway === 'left' || h.fairway === 'right' || h.fairway === 'fairway'
+      ? h.fairway
+      : undefined)),
+    penalties: p.holes.map((h) => (h.penalty != null && h.penalty !== '' ? h.penalty : undefined)),
+    sands: p.holes.map((h) => (h.sand != null && h.sand !== '' ? h.sand : undefined))
   }));
 }
 

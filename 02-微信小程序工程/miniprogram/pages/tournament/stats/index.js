@@ -1,6 +1,8 @@
 /**
  * 赛事统计数据页
- * - 优先 statisticsAdapter（match.scoreData）；无效时 fallback mock
+ * - 优先 statisticsAdapter（match.scoreData）→ dataSource='adapter'
+ * - 仅显式 ?mock=1 → dataSource='mock'（mockStatisticsPlayers）
+ * - 无 matchId / 无可用数据 → dataSource='empty'
  * - sortField/sortOrder 默认 total/asc
  */
 const mockAvatars = require('../../../utils/mockAvatars.js');
@@ -280,6 +282,50 @@ function mapMockPlayersToRows(players) {
   });
 }
 
+/**
+ * 表头首次点击默认方向：desc 类 / asc 类
+ * 同字段再点：asc <-> desc；换字段：重置为该字段默认方向
+ */
+const SORT_DEFAULT_DESC = {
+  eag: true,
+  bir: true,
+  par: true,
+  bog: true,
+  gir: true,
+  fwy: true,
+  score8421: true
+};
+
+const SORT_DEFAULT_ASC = {
+  total: true,
+  putts: true,
+  dbl: true,
+  sand: true,
+  pen: true
+};
+
+function resolveDefaultSortOrder(field) {
+  const key = field != null ? String(field).trim() : '';
+  if (SORT_DEFAULT_DESC[key]) return 'desc';
+  if (SORT_DEFAULT_ASC[key]) return 'asc';
+  return 'asc';
+}
+
+/** 排序键：'-'/空 → missing；"71%" → 71；其余 Number 或原串 */
+function parseStatsSortValue(raw) {
+  if (raw === '-' || raw === '' || raw == null) return { missing: true, num: null, str: '' };
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw)) return { missing: true, num: null, str: '' };
+    return { missing: false, num: raw, str: String(raw) };
+  }
+  const s = String(raw).trim();
+  if (!s || s === '-') return { missing: true, num: null, str: '' };
+  const pctStr = s.charAt(s.length - 1) === '%' ? s.slice(0, -1).trim() : s;
+  const n = Number(pctStr);
+  if (!Number.isNaN(n)) return { missing: false, num: n, str: s };
+  return { missing: false, num: null, str: s };
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -290,13 +336,14 @@ Page({
     defaultSortNote: 'TOTAL asc',
     sortField: 'total',
     sortOrder: 'asc',
-    dataSource: 'mock',
+    dataSource: 'empty',
     mockStatisticsPlayers: mockStatisticsPlayers,
     rows: []
   },
 
   onLoad(options) {
-    const matchId = options && options.matchId ? String(options.matchId) : '';
+    const opts = options || {};
+    const matchId = opts.matchId ? String(opts.matchId) : '';
     let statusBarHeight = 20;
     try {
       const sys = wx.getSystemInfoSync();
@@ -304,7 +351,7 @@ Page({
     } catch (e) {
       statusBarHeight = 20;
     }
-    const loaded = this._loadStatisticsPageRows(matchId);
+    const loaded = this._loadStatisticsPageRows(opts);
     this.setData({
       matchId: matchId,
       statusBarHeight: statusBarHeight,
@@ -312,19 +359,51 @@ Page({
       sortField: 'total',
       sortOrder: 'asc',
       dataSource: loaded.dataSource,
-      subtitle: loaded.dataSource === 'adapter' ? '赛事统计 · 真实成绩' : '赛事统计 · Mock 预览',
+      subtitle: this._subtitleForDataSource(loaded.dataSource),
       rows: loaded.rows
     });
     this._applyPageBackground();
     this._lockLandscape();
   },
 
+  /** adapter / mock / empty 对应副标题（不改布局） */
+  _subtitleForDataSource(dataSource) {
+    if (dataSource === 'adapter') return '赛事统计 · 真实成绩';
+    if (dataSource === 'mock') return '赛事统计 · Mock 预览';
+    return '赛事统计 · 暂无数据';
+  },
+
+  /**
+   * 开发 mock 模式：
+   * - 显式 ?mock=1 / ?dataSource=mock
+   * - 或无 matchId（本地直接打开统计页预览）
+   */
+  _isStatsMockMode(options) {
+    const opts = options || {};
+    const mockFlag = opts.mock === '1' || opts.mock === 'true' || opts.dataSource === 'mock';
+    if (mockFlag) return true;
+    const id = opts.matchId != null ? String(opts.matchId).trim() : '';
+    return !id;
+  },
+
   /**
    * 真实数据优先：matchId → getMatchById → buildStatisticsRows
-   * 无效时 fallback mock
+   * 开发 mock → mockStatisticsPlayers；非 mock 无数据 → empty
    */
-  _loadStatisticsPageRows(matchId) {
-    const id = matchId != null ? String(matchId).trim() : '';
+  _loadStatisticsPageRows(options) {
+    const opts = options || {};
+    const id = opts.matchId != null ? String(opts.matchId).trim() : '';
+    const forceMock = this._isStatsMockMode(opts);
+
+    // 显式 mock 且未带真实 matchId：直接走 mock（保留开发预览）
+    // 若同时带有 matchId，仍优先尝试真实 adapter，失败再 mock
+    if (forceMock && !id) {
+      return {
+        dataSource: 'mock',
+        rows: this._loadMockStatisticsRows()
+      };
+    }
+
     if (id) {
       const match = teamMatchStore.getMatchById(id);
       if (match) {
@@ -333,24 +412,34 @@ Page({
           const viewRows = this._mapAdapterRowsToView(match, adapterRows);
           return {
             dataSource: 'adapter',
-            rows: this._applyCurrentSort(viewRows)
+            rows: this._applyCurrentSort(viewRows, 'total', 'asc')
           };
         }
       }
     }
+
+    if (forceMock) {
+      return {
+        dataSource: 'mock',
+        rows: this._loadMockStatisticsRows()
+      };
+    }
+
     return {
-      dataSource: 'mock',
-      rows: this._loadMockStatisticsRows()
+      dataSource: 'empty',
+      rows: []
     };
   },
 
   /**
-   * 将 adapter 行映射为表格展示字段；无成绩球员统计列显示 '-'
+   * 将 adapter 行映射为表格展示字段；
+   * filledHoles === 0 → 全部统计列显示 '-'；filledHoles > 0 → 保持 adapter 原值（含 0）
    */
   _mapAdapterRowsToView(match, adapterRows) {
     const list = Array.isArray(adapterRows) ? adapterRows : [];
     return list.map((p, index) => {
-      const hasScore = this._countFilledHolesForStatsRow(match, p) > 0;
+      const filledHoles = this._countFilledHolesForStatsRow(match, p);
+      const hasScore = filledHoles > 0;
       const dash = '-';
       const eagle = hasScore ? p.eagle : dash;
       const birdie = hasScore ? p.birdie : dash;
@@ -359,6 +448,11 @@ Page({
       const doublePlus = hasScore ? p.doublePlus : dash;
       const putts = hasScore ? p.putts : dash;
       const total = hasScore ? p.total : dash;
+      const girPercent = hasScore ? p.girPercent : dash;
+      const fairwayPercent = hasScore ? p.fairwayPercent : dash;
+      const sand = hasScore ? p.sand : dash;
+      const penalty = hasScore ? p.penalty : dash;
+      const stat8421 = hasScore ? p.stat8421 : dash;
       const gender = p.gender === 'female' ? 'female' : (p.gender === 'male' ? 'male' : '');
       return {
         id: p.playerId || ('stats-' + index),
@@ -378,35 +472,43 @@ Page({
         par: par,
         bogey: bogey,
         doublePlus: doublePlus,
-        girPercent: p.girPercent != null ? p.girPercent : dash,
+        girPercent: girPercent,
         putts: putts,
-        fairwayPercent: p.fairwayPercent != null ? p.fairwayPercent : dash,
-        sand: p.sand != null ? p.sand : dash,
-        penalty: p.penalty != null ? p.penalty : dash,
-        stat8421: p.stat8421 != null ? p.stat8421 : dash,
+        fairwayPercent: fairwayPercent,
+        sand: sand,
+        penalty: penalty,
+        stat8421: stat8421,
         total: total,
         eag: eagle,
         bir: birdie,
         bog: bogey,
         dbl: doublePlus,
-        gir: p.girPercent != null ? p.girPercent : dash,
-        fwy: p.fairwayPercent != null ? p.fairwayPercent : dash,
-        pen: p.penalty != null ? p.penalty : dash,
-        score8421: p.stat8421 != null ? p.stat8421 : dash,
+        gir: girPercent,
+        fwy: fairwayPercent,
+        pen: penalty,
+        score8421: stat8421,
         eagMuted: isZeroLike(eagle),
         birMuted: isZeroLike(birdie),
-        sandMuted: isZeroLike(p.sand != null ? p.sand : dash)
+        sandMuted: isZeroLike(sand)
       };
     });
   },
 
   /**
-   * 按当前 sortField / sortOrder 排列（默认 total asc）
-   * 无成绩 '-' 在升序时排后
+   * 按 sortField / sortOrder 排列 rows
+   * - 百分比（gir/fwy："71%"）转数字比较
+   * - '-' / 空 永远排最后
+   * @param {Array} rows
+   * @param {string} [fieldOverride] 可选，避免 setData 异步导致读到旧状态
+   * @param {string} [orderOverride]
    */
-  _applyCurrentSort(rows) {
-    const field = this.data.sortField || 'total';
-    const order = this.data.sortOrder || 'asc';
+  _applyCurrentSort(rows, fieldOverride, orderOverride) {
+    const field = fieldOverride != null && fieldOverride !== ''
+      ? String(fieldOverride)
+      : (this.data.sortField || 'total');
+    const order = orderOverride === 'desc' || orderOverride === 'asc'
+      ? orderOverride
+      : (this.data.sortOrder || 'asc');
     const list = Array.isArray(rows) ? rows.slice() : [];
     const valueOf = (row) => {
       if (!row) return null;
@@ -417,31 +519,27 @@ Page({
       if (field === 'par') return row.par;
       if (field === 'bog' || field === 'bogey') return row.bogey;
       if (field === 'dbl' || field === 'doublePlus') return row.doublePlus;
-      if (field === 'gir') return row.girPercent;
-      if (field === 'fwy') return row.fairwayPercent;
+      if (field === 'gir') return row.girPercent != null ? row.girPercent : row.gir;
+      if (field === 'fwy') return row.fairwayPercent != null ? row.fairwayPercent : row.fwy;
       if (field === 'sand') return row.sand;
-      if (field === 'pen' || field === 'penalty') return row.penalty;
-      if (field === 'score8421' || field === 'stat8421') return row.stat8421;
+      if (field === 'pen' || field === 'penalty') return row.penalty != null ? row.penalty : row.pen;
+      if (field === 'score8421' || field === 'stat8421') {
+        return row.stat8421 != null ? row.stat8421 : row.score8421;
+      }
       return row[field];
     };
     list.sort((a, b) => {
-      const av = valueOf(a);
-      const bv = valueOf(b);
-      const aMissing = av === '-' || av === '' || av == null;
-      const bMissing = bv === '-' || bv === '' || bv == null;
-      if (aMissing && bMissing) return 0;
-      if (aMissing) return 1;
-      if (bMissing) return -1;
-      const an = Number(av);
-      const bn = Number(bv);
-      if (!Number.isNaN(an) && !Number.isNaN(bn)) {
-        if (an === bn) return 0;
-        return order === 'asc' ? an - bn : bn - an;
+      const ap = parseStatsSortValue(valueOf(a));
+      const bp = parseStatsSortValue(valueOf(b));
+      if (ap.missing && bp.missing) return 0;
+      if (ap.missing) return 1;
+      if (bp.missing) return -1;
+      if (ap.num != null && bp.num != null) {
+        if (ap.num === bp.num) return 0;
+        return order === 'asc' ? ap.num - bp.num : bp.num - ap.num;
       }
-      const as = String(av);
-      const bs = String(bv);
-      if (as === bs) return 0;
-      const cmp = as < bs ? -1 : 1;
+      if (ap.str === bp.str) return 0;
+      const cmp = ap.str < bp.str ? -1 : 1;
       return order === 'asc' ? cmp : -cmp;
     });
     return list;
@@ -483,10 +581,10 @@ Page({
   },
 
   /**
-   * fallback：mock 预制 total asc
+   * 开发 mock 数据源：mockStatisticsPlayers 预制；仍走统一排序（默认 total asc）
    */
   _loadMockStatisticsRows() {
-    return mapMockPlayersToRows(mockStatisticsPlayers);
+    return this._applyCurrentSort(mapMockPlayersToRows(mockStatisticsPlayers), 'total', 'asc');
   },
 
   onShow() {
@@ -547,17 +645,30 @@ Page({
   },
 
   /**
-   * 表头排序指示（仅 UI）：同一时间只高亮一个字段
+   * 表头排序：更新 sortField/sortOrder，并重排 rows
+   * - 首次点击字段 → 该字段默认方向
+   * - 再点同一字段 → asc <-> desc
+   * - active-sort 仍由 sortField 驱动
    */
   onSortHeaderTap(e) {
     const field = e && e.currentTarget && e.currentTarget.dataset
       ? String(e.currentTarget.dataset.field || '').trim()
       : '';
     if (!field) return;
-    if (field === this.data.sortField) return;
+
+    let nextField = field;
+    let nextOrder;
+    if (field === this.data.sortField) {
+      nextOrder = this.data.sortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      nextOrder = resolveDefaultSortOrder(field);
+    }
+
+    const sortedRows = this._applyCurrentSort(this.data.rows, nextField, nextOrder);
     this.setData({
-      sortField: field,
-      sortOrder: 'asc'
+      sortField: nextField,
+      sortOrder: nextOrder,
+      rows: sortedRows
     });
   }
 });
