@@ -5,7 +5,7 @@
         <text class="stats-header__back">‹</text>
         <view class="stats-header__titles">
           <text class="stats-header__eyebrow">STATISTICS</text>
-          <text class="stats-header__title">{{title}}</text>
+          <text class="stats-header__title">数据统计</text>
         </view>
       </view>
       <text class="stats-header__sub">{{subtitle}}</text>
