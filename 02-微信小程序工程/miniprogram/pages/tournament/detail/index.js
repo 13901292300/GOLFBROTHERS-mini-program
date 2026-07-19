@@ -5982,7 +5982,7 @@ Page({
     const operatorUserId = String(operator.userId || '');
     const registerUsers = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
     const url =
-      '/pages/player/friends/index?mode=' +
+      '/subpackages/player/pages/friends/index?mode=' +
       encodeURIComponent('proxy_register') +
       '&matchId=' +
       encodeURIComponent(matchId) +
@@ -6035,7 +6035,7 @@ Page({
     const operatorUserId = String(operator.userId || '');
     const registerUsers = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
     const url =
-      '/pages/player/friends/index?mode=' +
+      '/subpackages/player/pages/friends/index?mode=' +
       encodeURIComponent('proxy_register_team') +
       '&matchId=' +
       encodeURIComponent(matchId) +

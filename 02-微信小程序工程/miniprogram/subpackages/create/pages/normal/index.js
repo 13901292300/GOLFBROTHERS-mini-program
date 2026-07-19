@@ -343,7 +343,7 @@ Page({
     const usedIds = this._gameUsedIds(t.gIdx);
     wx.navigateTo({
       url:
-        '/pages/player/friends/index?matchId=&slotId=' +
+        '/subpackages/player/pages/friends/index?matchId=&slotId=' +
         (t.pIdx + 1) +
         '&emptyCount=' +
         emptyCount +

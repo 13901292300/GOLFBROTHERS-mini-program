@@ -5,14 +5,14 @@
  * - proxy_register_team（替他人报名·球队成员）：数据源 teamDirectory.getTeamMembers，三态同好友
  * - select_temp_admin（本场临时管理员）：多选，已存在管理员禁用，emit { mode, friends }
  */
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
-const mockAvatars = require('../../../utils/mockAvatars.js');
-const gameStore = require('../../../utils/gameStore.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
-const teamDirectory = require('../../../utils/teamDirectory.js');
-const contactStore = require('../../../utils/contactStore.js');
-const userIdentityAlias = require('../../../utils/userIdentityAlias.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const { FRIEND_LIST } = require('../../../../utils/playerDirectory.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
+const gameStore = require('../../../../utils/gameStore.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const teamDirectory = require('../../../../utils/teamDirectory.js');
+const contactStore = require('../../../../utils/contactStore.js');
+const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 
 const MAX_GROUP_SIZE = 4;
 const PROXY_MODE = 'proxy_register';

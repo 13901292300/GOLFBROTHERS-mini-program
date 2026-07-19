@@ -4537,7 +4537,7 @@ Page({
     const ctx = this._buildSlotCtx();
     const usedIds = this._otherGroupsUsedIds();
     const url =
-      '/pages/player/friends/index?matchId=' +
+      '/subpackages/player/pages/friends/index?matchId=' +
       encodeURIComponent(ctx.matchId) +
       '&slotId=' +
       encodeURIComponent(ctx.slotId) +

@@ -563,7 +563,7 @@ Page({
 
   openTeamInterCreate() {
     wx.navigateTo({
-      url: '/pages/create/team-inter/index',
+      url: '/subpackages/create/pages/team-inter/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
@@ -572,7 +572,7 @@ Page({
 
   openSeriesCreate() {
     wx.navigateTo({
-      url: '/pages/create/series/index',
+      url: '/subpackages/create/pages/series/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
