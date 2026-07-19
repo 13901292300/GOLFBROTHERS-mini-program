@@ -4,10 +4,10 @@
  * - 新建球员（输入姓名直接创建）
  * - 单人添加 → 通过 openerEventChannel 回传，由记分页面绑定到当前 slot 或第一个空位
  */
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const { FRIEND_LIST } = require('../../../utils/playerDirectory.js');
-const mockAvatars = require('../../../utils/mockAvatars.js');
-const userIdentityAlias = require('../../../utils/userIdentityAlias.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const { FRIEND_LIST } = require('../../../../utils/playerDirectory.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
+const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 
 function randomSuffix() {
   return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);

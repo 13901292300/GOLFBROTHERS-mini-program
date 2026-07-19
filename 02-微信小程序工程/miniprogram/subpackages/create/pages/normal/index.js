@@ -400,7 +400,7 @@ Page({
     const usedIds = this._gameUsedIds(null); // 组合：全 Game 已用都不可重复
     wx.navigateTo({
       url:
-        '/pages/player/combos/index?matchId=&slotId=' +
+        '/subpackages/player/pages/combos/index?matchId=&slotId=' +
         (t.pIdx + 1) +
         '&used=' +
         encodeURIComponent(usedIds.join(',')),
@@ -443,7 +443,7 @@ Page({
     const usedIds = this._gameUsedIds(null);
     wx.navigateTo({
       url:
-        '/pages/player/manual/index?matchId=&slotId=' +
+        '/subpackages/player/pages/manual/index?matchId=&slotId=' +
         (t.pIdx + 1) +
         '&used=' +
         encodeURIComponent(usedIds.join(',')),

@@ -4649,7 +4649,7 @@ Page({
     const ctx = this._buildSlotCtx();
     wx.navigateTo({
       url:
-        '/pages/player/combos/index?matchId=' +
+        '/subpackages/player/pages/combos/index?matchId=' +
         encodeURIComponent(ctx.matchId || '') +
         '&slotId=' +
         encodeURIComponent(ctx.slotId || '') +

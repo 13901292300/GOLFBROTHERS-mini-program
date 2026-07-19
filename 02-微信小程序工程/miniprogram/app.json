@@ -11,8 +11,6 @@
     "pages/tournament/group-pick/index",
     "pages/team/select/index",
     "pages/course/select/index",
-    "pages/player/combos/index",
-    "pages/player/manual/index",
     "pages/game/hub/index",
     "pages/feedback/index"
   ],
@@ -31,7 +29,9 @@
       "root": "subpackages/player",
       "name": "player",
       "pages": [
-        "pages/friends/index"
+        "pages/friends/index",
+        "pages/combos/index",
+        "pages/manual/index"
       ]
     }
   ],

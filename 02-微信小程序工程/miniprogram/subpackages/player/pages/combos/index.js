@@ -3,8 +3,8 @@
  * - 展示使用频率最高的 6 个组合
  * - 点击某个组合 → 通过 openerEventChannel 回传，由记分页面按 slot 顺序一键批量填充
  */
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const { PRESET_COMBOS } = require('../../../utils/playerDirectory.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const { PRESET_COMBOS } = require('../../../../utils/playerDirectory.js');
 
 Page({
   data: {
