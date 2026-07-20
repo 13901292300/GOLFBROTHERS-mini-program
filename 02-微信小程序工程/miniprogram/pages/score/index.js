@@ -5739,12 +5739,19 @@ Page({
   },
 
   // 快捷面板：本洞各记分实体默认成绩（已填取原值，空洞默认 PAR）。
-  // 四人最佳球位 → 记分实体为 scoreEngine.groups（每组一个控件）；其余 → 球员。
+  // fourball_best → groups；stroke_entity → _entitiesSource；其余 → _playersSource。
   _quickDefaultsForHole(holeIndex, par) {
-    const src = this.data.mode === 'fourball_best' ? (this._engineGroups || []) : (this._playersSource || []);
+    let src;
+    if (this.data.mode === 'fourball_best') {
+      src = this._engineGroups || [];
+    } else if (this.data.mode === 'stroke_entity') {
+      src = this._entitiesSource || [];
+    } else {
+      src = this._playersSource || [];
+    }
     return src.map((p) => {
       const s = (p.scores || [])[holeIndex];
-      return (s === null || s === undefined || s === '') ? par : s;
+      return s === null || s === undefined || s === '' ? par : s;
     });
   },
 
@@ -5960,16 +5967,24 @@ Page({
   },
 
   /**
-   * Patch-02C2B2：Entity 技术面板确认 → 写 _entitiesSource → persistSession → refreshEntities
-   * 快捷模式本阶段不实现（安全拦截，不进 confirmQuickScore）
+   * Patch-02C2B2 / 02C2C2：Entity 确认入口（技术 / 快捷）
+   * 禁止落入 confirmQuickScore / _playersSource
    */
   confirmEntityScoreInput() {
     if (this._scoreEditBlocked()) return;
     if (this.data.mode !== 'stroke_entity') return;
 
     if (this.data.scorePanelMode === 'quick') {
-      wx.showToast({ title: 'Entity快捷录入将在后续版本支持', icon: 'none' });
-      return;
+      if (this.data.quickScoreClearDraft) {
+        const holeIndex = this.data.sheetHoleIndex;
+        this._clearHoleScoresInEntitiesSource(holeIndex);
+        this.setData({ quickScoreClearDraft: false });
+        this.refreshEntities();
+        this.persistSession();
+        this._hideScoreSheet();
+        return;
+      }
+      return this.confirmEntityQuickScore();
     }
 
     const {
@@ -6025,6 +6040,51 @@ Page({
     entity.sands[sheetHoleIndex] = normalizeSandValue(panelBunker);
 
     this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
+    this.refreshEntities();
+    this.persistSession();
+    this._hideScoreSheet();
+  },
+
+  /**
+   * Patch-02C2C2：Entity 快捷确认 → 按 quickPanelScores 写满本洞全部 Entity
+   */
+  confirmEntityQuickScore() {
+    if (this._scoreEditBlocked()) return;
+    if (this.data.mode !== 'stroke_entity') return;
+
+    const { sheetHoleIndex, sheetPar, quickPanelScores } = this.data;
+    const entities = this._entitiesSource || [];
+    const quick = quickPanelScores || [];
+
+    entities.forEach((entity, i) => {
+      if (!entity) return;
+      let s = quick[i];
+      if (s === null || s === undefined || s === '') s = sheetPar;
+      const diff = s - sheetPar;
+      entity.scores = entity.scores || [];
+      entity.putts = entity.putts || [];
+      entity.fairways = entity.fairways || [];
+      entity.penalties = entity.penalties || [];
+      entity.sands = entity.sands || [];
+      while (entity.scores.length < 18) entity.scores.push(null);
+      while (entity.putts.length < 18) entity.putts.push(null);
+      while (entity.fairways.length < 18) entity.fairways.push(null);
+      while (entity.penalties.length < 18) entity.penalties.push(0);
+      while (entity.sands.length < 18) entity.sands.push(0);
+      entity.scores[sheetHoleIndex] = s;
+      entity.putts[sheetHoleIndex] = diff < 0 ? 1 : 2;
+      if (entity.fairways[sheetHoleIndex] == null || entity.fairways[sheetHoleIndex] === '') {
+        entity.fairways[sheetHoleIndex] = FAIRWAY_FAIRWAY;
+      }
+      if (entity.penalties[sheetHoleIndex] == null || entity.penalties[sheetHoleIndex] === '') {
+        entity.penalties[sheetHoleIndex] = 0;
+      }
+      if (entity.sands[sheetHoleIndex] == null || entity.sands[sheetHoleIndex] === '') {
+        entity.sands[sheetHoleIndex] = 0;
+      }
+    });
+
+    this.setData({ quickScoreClearDraft: false, quickScoreFreshDraft: false });
     this.refreshEntities();
     this.persistSession();
     this._hideScoreSheet();
