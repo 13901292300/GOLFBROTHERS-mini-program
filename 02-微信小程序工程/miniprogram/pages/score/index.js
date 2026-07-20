@@ -2224,6 +2224,72 @@ Page({
   },
 
   syncSheetPlayers() {
+    // Stroke Entity：面板侧栏来自 _entitiesSource（不读 _playersSource）
+    if (this.data.mode === 'stroke_entity') {
+      const {
+        sheetPar,
+        sheetHoleIndex,
+        panelScore,
+        scoreDisplayMode,
+        activeEntityIndex,
+        scorePanelMode,
+        quickPanelScores,
+        entitiesView
+      } = this.data;
+      const entities = this._entitiesSource || [];
+      const views = entitiesView || [];
+      const nameMap = this._resolveEntityMemberNameMap();
+      const sheetPlayers = entities.map((entity, idx) => {
+        const entView = views[idx];
+        const displayName =
+          (entView && entView.displayName) ||
+          this._buildEntityDisplayName(entity, idx, nameMap);
+        const formal = entity && Array.isArray(entity.scores) ? entity.scores[sheetHoleIndex] : null;
+        const hasFormal = isFilledScore(formal);
+        let holeScore = '';
+        let isDraftScore = false;
+        if (scorePanelMode === 'quick') {
+          const q =
+            quickPanelScores && quickPanelScores[idx] != null
+              ? quickPanelScores[idx]
+              : sheetPar;
+          holeScore = formatMainScore(q, sheetPar, scoreDisplayMode);
+          isDraftScore = !hasFormal;
+        } else if (idx === activeEntityIndex) {
+          const draft = panelScore != null && panelScore !== '' ? panelScore : sheetPar;
+          if (!hasFormal) {
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          } else if (Number(draft) === Number(formal)) {
+            holeScore = formatMainScore(formal, sheetPar, scoreDisplayMode);
+            isDraftScore = false;
+          } else {
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          }
+        } else if (hasFormal) {
+          holeScore = formatMainScore(formal, sheetPar, scoreDisplayMode);
+          isDraftScore = false;
+        }
+        return {
+          id: (entity && entity.entityId) || 'entity_' + idx,
+          name: displayName,
+          avatar: '',
+          active: idx === activeEntityIndex,
+          holeScore: holeScore,
+          isDraftScore: isDraftScore
+        };
+      });
+      this.setData({
+        sheetPlayers,
+        panelMainDisplay: formatMainScore(panelScore, sheetPar, scoreDisplayMode),
+        quickPanelDisplay: (quickPanelScores || []).map((q) =>
+          formatMainScore(q != null ? q : sheetPar, sheetPar, scoreDisplayMode)
+        )
+      });
+      return;
+    }
+
     // 四人最佳球位 / 最好成绩：记分实体 = scoreEngine.groups，球员列表/快捷控件按组数呈现（一组一项）
     if (this.data.mode === 'fourball_best') {
       const { sheetPar, sheetHoleIndex, panelScore, scoreDisplayMode, activePlayerIdx, quickPanelScores, scorePanelMode } = this.data;
@@ -5270,7 +5336,7 @@ Page({
   noop() {},
 
   /**
-   * Patch-02C2A-V2：Entity 成绩格点击入口（只记上下文，不打开面板、不写成绩）
+   * Patch-02C2A-V2 / 02C2B1：Entity 成绩格点击 → 打开现有记分面板（本阶段不写成绩）
    */
   onEntityScoreCellTap(e) {
     if (this.data.mode !== 'stroke_entity') return;
@@ -5283,9 +5349,78 @@ Page({
       entityIndex: entityIndex,
       holeIndex: holeIndex
     });
-    this.setData({
+    this.openEntityScoreInput(entityIndex, holeIndex);
+  },
+
+  /**
+   * Patch-02C2B1：用 _entitiesSource 初始化面板并打开 score-input-sheet（不写成绩、不改 activePlayerIdx）
+   */
+  openEntityScoreInput(entityIndex, holeIndex) {
+    if (this._scoreEditBlocked()) return;
+    if (this.data.mode !== 'stroke_entity') return;
+    const entities = this._entitiesSource || [];
+    const entity = entities[entityIndex];
+    if (!entity) return;
+
+    const par = holePars()[holeIndex];
+    const label =
+      holeIndex < 9 ? columnLabels()[holeIndex] : columnLabels()[holeIndex + 1];
+    const scores = Array.isArray(entity.scores) ? entity.scores : [];
+    const putts = Array.isArray(entity.putts) ? entity.putts : [];
+    const rawScore = scores[holeIndex];
+    const hasScore = isFilledScore(rawScore);
+    // 空洞：与现有面板一致，默认填标准杆便于录入（本 Patch 仍不落盘）
+    const score = hasScore ? rawScore : par;
+    const putt = putts[holeIndex] || 2;
+    const fairway = resolveHoleFairway(entity.fairways, holeIndex);
+    const penalty = resolveHolePenalty(entity.penalties, holeIndex);
+    const sand = resolveHoleSand(entity.sands, holeIndex);
+
+    const quick = entities.map((ent, idx) => {
+      if (idx === entityIndex) return score;
+      const s = ent && Array.isArray(ent.scores) ? ent.scores[holeIndex] : null;
+      return isFilledScore(s) ? s : par;
+    });
+
+    const openPatch = {
       activeEntityIndex: entityIndex,
-      sheetHoleIndex: holeIndex
+      scoreClearDraft: false,
+      scoreHoleClearPending: false,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false,
+      sheetHoleLabel: label,
+      sheetHoleIndex: holeIndex,
+      sheetPar: par,
+      panelScore: score,
+      panelPutt: putt,
+      panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand,
+      quickPanelScores: quick,
+      showScoreSheet: true
+    };
+    this._scoreSheetEntrySnapshot = {
+      activeEntityIndex: entityIndex,
+      activePlayerIdx: this.data.activePlayerIdx,
+      scoreClearDraft: false,
+      scoreHoleClearPending: false,
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: false,
+      sheetHoleLabel: label,
+      sheetHoleIndex: holeIndex,
+      sheetPar: par,
+      panelScore: score,
+      panelPutt: putt,
+      panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand,
+      quickPanelScores: quick.slice()
+    };
+    this.setData(openPatch, () => {
+      this.syncSheetPlayers();
+      setTimeout(() => this.setData({ scoreSheetOpen: true }), 30);
     });
   },
 
