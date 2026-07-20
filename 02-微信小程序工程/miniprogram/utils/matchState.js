@@ -8,11 +8,12 @@
  *
  * 结构：
  * {
- *   mode: 'game' | 'fourball_best' | 'individual_stroke' | 'standard',
+ *   mode: 'game' | 'fourball_best' | 'individual_stroke' | 'stroke_entity' | 'standard',
  *   formatType: 'best_score' | 'best_ball' | 'best_ball_4_0' | 'individual_stroke' | 'fourball_2ball' | 'standard',
+ *   // Stroke Entity：用 mode='stroke_entity' 区分记分主体；formatType 保持原有语义，不新增运行字段。
  *   gameId: '',        // game 模式持久化键（gameStore）
  *   groupIndex: 0,     // game 模式当前组
- *   groupId: '',       // individual_stroke（赛事出发表）当前组
+ *   groupId: '',       // 当前组：普通个人记分 / Stroke Entity 组合记分均使用
  *   players: [],       // HOLE 上方名册（{ playerId, name, avatar }）
  *   course: {},        // 球场信息（courseName / teeTime / halfText / roundName ...）
  *   scores: [],        // 18 洞成绩，初始全部为 null
