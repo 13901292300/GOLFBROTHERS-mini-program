@@ -238,6 +238,33 @@ function createEmptyGroupPlayer(position) {
   return { position: position, userId: '' };
 }
 
+/**
+ * Patch-02C3A：进记分页 mode 分流
+ * 1) scoreEntities[groupId] 非空 → stroke_entity
+ * 2) scoreEntities 整体不存在时，按 gameMode（四人四球/最佳球位/四人两球）兜底
+ * 3) 否则 individual_stroke
+ */
+function resolveTournamentScorePageMode(match, groupId) {
+  const gid = groupId != null ? String(groupId) : '';
+  const scoreEntities = match && match.scoreEntities;
+  if (scoreEntities && typeof scoreEntities === 'object' && !Array.isArray(scoreEntities)) {
+    const list = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
+    if (list.length > 0) return 'stroke_entity';
+    return 'individual_stroke';
+  }
+  const gameMode = String(
+    (match && (match.gameMode || match.selectedGameMode)) || ''
+  ).trim();
+  if (
+    gameMode === '四人四球比杆赛' ||
+    gameMode === '最佳球位比杆赛' ||
+    gameMode === '四人两球比杆赛'
+  ) {
+    return 'stroke_entity';
+  }
+  return 'individual_stroke';
+}
+
 /** 只读展示用：从正式 groups 规范化克隆（详情页不持有 groupDraft；正式位只保留 userId/position） */
 function cloneTournamentGroups(list) {
   if (!Array.isArray(list)) return [];
@@ -2800,8 +2827,9 @@ Page({
           accessCode: match.accessCode || ''
         }
       : {};
+    const mode = resolveTournamentScorePageMode(match, groupId);
     matchStateUtil.setMatchState({
-      mode: 'individual_stroke',
+      mode: mode,
       formatType: 'individual_stroke',
       gameId: '',
       matchId: matchId,
