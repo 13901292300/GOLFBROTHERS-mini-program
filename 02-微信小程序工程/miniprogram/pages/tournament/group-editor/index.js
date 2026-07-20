@@ -7,6 +7,10 @@ const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const playerDirectory = require('../../../utils/playerDirectory.js');
 const tPosition = require('../../../utils/tPosition.js');
+const { validateStrokeEntities } = require('../../../utils/strokeEntityValidator.js');
+const { buildStrokeEntities } = require('../../../utils/strokeEntityBuilder.js');
+
+const STROKE_ENTITY_INVALID_TIP = '当前分组不符合该比赛赛制要求，请重新分组。';
 
 const PLAYER_SLOTS = 4;
 const DEFAULT_REGISTER_GROUPS = [
@@ -861,6 +865,7 @@ Page({
   _clearGroupDerivedFields(matchPatch) {
     const next = matchPatch || {};
     next.pairings = {};
+    next.scoreEntities = {};
     if (Object.prototype.hasOwnProperty.call(next, 'groupCount')) next.groupCount = 0;
     if (Object.prototype.hasOwnProperty.call(next, 'teeGroups')) next.teeGroups = [];
     if (Object.prototype.hasOwnProperty.call(next, 'groupSummary')) next.groupSummary = null;
@@ -977,6 +982,7 @@ Page({
     } else {
       nextPairings = {};
     }
+    // LIVE：不重建 scoreEntities（Object.assign 保留原字段）；不调用 buildStrokeEntities
     const next = Object.assign({}, match, {
       groups: nextGroups,
       pairings: nextPairings,
@@ -1033,24 +1039,41 @@ Page({
       formal = teeSheetManage.mergeTeeFieldsByGroupId(match.groups, formal);
     }
 
+    const gameMode = String(match.gameMode || this.data.gameMode || '');
+    const isG4Stroke = gameMode === '四人两球比杆赛';
+    // G4 成绩主体来自 pairings；即使 UI 组合区未开，保存时仍保留/写入 pairings
+    const shouldPersistPairings = this.data.showPairingSection || isG4Stroke;
+
     let formalPairings = {};
-    if (!isClear && this.data.showPairingSection) {
-      // 只保留仍存在的出发组；空组合剥离
-      const pruned = this._prunePairingsToGroups(formal, pairingDraft);
+    if (!isClear && shouldPersistPairings) {
+      const pairingSource = this.data.showPairingSection
+        ? pairingDraft
+        : (match.pairings || {});
+      const pruned = this._prunePairingsToGroups(formal, pairingSource);
       formalPairings = teamMatchStore.sanitizePairings(pruned);
     }
 
     let next = Object.assign({}, match, {
       groups: formal,
-      pairings: isClear ? {} : (this.data.showPairingSection ? formalPairings : (match.pairings || {})),
+      pairings: isClear ? {} : (shouldPersistPairings ? formalPairings : {}),
       updatedAt: Date.now()
     });
-    // 非组合比杆赛：不改写已有 pairings（通常为空）；清空分组时一并清空
     if (isClear) {
       next = this._clearGroupDerivedFields(next);
-    } else if (!this.data.showPairingSection) {
-      // 非组合比杆：确保不残留 pairings
+    } else if (!shouldPersistPairings) {
       next.pairings = {};
+    }
+
+    // Phase1：报名期保存生成 scoreEntities；失败则阻止写盘
+    if (!isClear) {
+      const check = validateStrokeEntities(next);
+      if (!check || check.valid !== true) {
+        console.warn('[stroke-entity-validate]', check && check.reason ? check.reason : 'invalid');
+        this.setData({ saving: false });
+        wx.showToast({ title: STROKE_ENTITY_INVALID_TIP, icon: 'none' });
+        return;
+      }
+      next.scoreEntities = buildStrokeEntities(next);
     }
 
     teamMatchStore.saveMatch(next);

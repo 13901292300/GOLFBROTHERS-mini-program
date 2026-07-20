@@ -225,6 +225,61 @@
           </view>
           </block>
 
+          <!-- tbody: stroke_entity 按 Entity 渲染；洞格点击走 onEntityScoreCellTap（不走 onScoreCellTap） -->
+          <block wx:elif="{{mode === 'stroke_entity'}}">
+          <view
+            wx:for="{{entitiesView}}"
+            wx:key="entityId"
+            wx:for-index="eIdx"
+            class="scoreboard-row scoreboard-row--player entity-row"
+          >
+            <view class="scoreboard-cell sticky-col entity-sticky-cell">
+              <view class="entity-card">
+                <view class="entity-top-line">
+                  <text class="entity-name">{{item.displayName}}</text>
+                  <view class="entity-diff-wrap">
+                    <text class="entity-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
+                  </view>
+                </view>
+                <text class="entity-member">{{item.memberNamesText}}</text>
+              </view>
+            </view>
+
+            <view
+              wx:for="{{item.cells}}"
+              wx:for-item="cell"
+              wx:key="colIdx"
+              wx:for-index="cIdx"
+              bindtap="onEntityScoreCellTap"
+              data-entity-index="{{eIdx}}"
+              data-hole-index="{{cell.holeIndex}}"
+              class="scoreboard-cell score-cell entity-score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
+            >
+              <block wx:if="{{cell.type === 'special'}}">
+                <view class="special-cell-inner">
+                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                  <view class="special-cell-meta">
+                    <text class="special-cell-putt">{{cell.puttTotal}}</text>
+                    <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+
+              <block wx:else>
+                <view class="hole-cell-inner">
+                  <view class="{{cell.scoreClass}}">
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}}">{{cell.mainStr}}</text>
+                  </view>
+                  <view class="hole-cell-meta">
+                    <text class="hole-cell-putt">{{cell.putts}}</text>
+                    <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+          </block>
+
           <block wx:else>
           <view
             wx:for="{{playersView}}"

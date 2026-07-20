@@ -726,6 +726,7 @@ Page({
 
     columns: buildColumns(),
     playersView: [],
+    entitiesView: [],
     moreMenuItems: MORE_MENU_ITEMS_COMPACT,
     groupPlayers: GROUP_PLAYERS,
     // 占位：真正展示前由 openGroupManagePage() 用当前记分页面球员快照覆盖（唯一数据源）
@@ -748,6 +749,8 @@ Page({
     joinMatchTeamOptions: [],
 
     activePlayerIdx: 0,
+    /** Stroke Entity 当前编辑主体索引（与 activePlayerIdx 并存，不替代） */
+    activeEntityIndex: -1,
     /** 技术面板清除草稿：无选中球员，全员成绩格为空（仅 UI） */
     scoreClearDraft: false,
     /** 快捷面板清除显示草稿：本洞头像旁成绩格全空（仅 UI，不改正式 scores） */
@@ -824,6 +827,8 @@ Page({
       this.initGameMode(gameId, groupIndex);
     } else if (mode === 'fourball_best') {
       this.initFourBallBestMode();
+    } else if (mode === 'stroke_entity') {
+      this.initStrokeEntityMode(groupId);
     } else if (mode === 'individual_stroke') {
       this.initIndividualStrokeMode(groupId);
     } else {
@@ -864,7 +869,13 @@ Page({
   _resolvePageMode(ms) {
     if (!ms) return 'standard';
     const m = ms.mode;
-    if (m === 'game' || m === 'fourball_best' || m === 'individual_stroke' || m === 'standard') {
+    if (
+      m === 'game' ||
+      m === 'fourball_best' ||
+      m === 'individual_stroke' ||
+      m === 'stroke_entity' ||
+      m === 'standard'
+    ) {
       return m;
     }
     if (ms.gameId) return 'game';
@@ -1420,6 +1431,234 @@ Page({
     this.refreshPlayers();
   },
 
+  /**
+   * Patch-02B/02C1：球队赛 Stroke Entity 记分入口（G2/G3/G4）
+   * 读取 scoreEntities + teamScoresByEntity → _entitiesSource → entitiesView（本阶段仅展示）
+   */
+  initStrokeEntityMode(groupId) {
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = (ms && ms.matchId) || '';
+    const gid = groupId || (ms && ms.groupId) || this.data.groupId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    this._entitiesSource = this._hydrateTeamMatchEntityFromSession(match, gid) || [];
+    this.setData({
+      mode: 'stroke_entity',
+      groupId: gid
+    });
+    this.refreshEntities();
+    console.log('[stroke_entity] init', {
+      matchId: matchId,
+      groupId: gid,
+      mode: 'stroke_entity',
+      entityCount: (this._entitiesSource || []).length
+    });
+  },
+
+  /** 报名名单 userId → 展示名（仅展示用） */
+  _resolveEntityMemberNameMap() {
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = (ms && ms.matchId) || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const users =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    const map = {};
+    users.forEach((user) => {
+      if (!user) return;
+      const uid = user.userId != null ? String(user.userId).trim() : '';
+      if (!uid) return;
+      const name =
+        (user.competitionName && String(user.competitionName).trim()) ||
+        (user.matchNickname && String(user.matchNickname).trim()) ||
+        (user.nickname && String(user.nickname).trim()) ||
+        (user.name && String(user.name).trim()) ||
+        uid;
+      map[uid] = name;
+    });
+    return map;
+  },
+
+  _buildEntityDisplayName(entity, index, nameMap) {
+    const type = entity && entity.entityType ? String(entity.entityType) : '';
+    const members = Array.isArray(entity && entity.members) ? entity.members : [];
+    if (type === 'pair') {
+      const names = members
+        .map((id) => {
+          const key = id != null ? String(id).trim() : '';
+          return (nameMap && nameMap[key]) || key || '球员';
+        })
+        .filter(Boolean);
+      return names.length ? names.join(' + ') : '组合';
+    }
+    return '第' + (index + 1) + '组组合';
+  },
+
+  /**
+   * Patch-02C1：_entitiesSource → entitiesView（只展示，不录入）
+   */
+  refreshEntities() {
+    const displayMode = this.data.scoreDisplayMode;
+    const nameMap = this._resolveEntityMemberNameMap();
+    const entitiesView = (this._entitiesSource || []).map((entity, index) => {
+      const entityId = entity && entity.entityId != null ? String(entity.entityId) : '';
+      const entityType = entity && entity.entityType ? String(entity.entityType) : '';
+      const members = Array.isArray(entity && entity.members) ? entity.members.slice() : [];
+      const displayName = this._buildEntityDisplayName(entity, index, nameMap);
+      const scores = Array.isArray(entity && entity.scores) ? entity.scores.slice() : [];
+      const putts = Array.isArray(entity && entity.putts) ? entity.putts.slice() : [];
+      // 复用 enrichPlayer 洞格派生（不改 _entitiesSource 成绩）
+      const enriched = enrichPlayer(
+        {
+          id: entityId,
+          playerId: entityId,
+          name: displayName,
+          scores: scores,
+          putts: putts,
+          avatar: ''
+        },
+        index,
+        displayMode
+      );
+      let total = 0;
+      let filled = 0;
+      scores.forEach((s) => {
+        if (isFilledScore(s)) {
+          total += Number(s);
+          filled += 1;
+        }
+      });
+      const diff = enriched.relScore;
+      return {
+        entityId: entityId,
+        entityType: entityType,
+        members: members.map((id) => {
+          const key = id != null ? String(id).trim() : '';
+          return {
+            userId: key,
+            name: (nameMap && nameMap[key]) || key || ''
+          };
+        }),
+        memberNamesText: members
+          .map((id) => {
+            const key = id != null ? String(id).trim() : '';
+            return (nameMap && nameMap[key]) || key || '';
+          })
+          .filter(Boolean)
+          .join(' / '),
+        displayName: displayName,
+        scores: scores,
+        putts: putts,
+        total: filled > 0 ? total : '',
+        diff: diff,
+        relScoreStr: enriched.relScoreStr,
+        relClass: enriched.relClass,
+        cells: enriched.cells
+      };
+    });
+    this.setData({ entitiesView: entitiesView });
+  },
+
+  /**
+   * 从 match.scoreEntities + scoreData[groupId].teamScoresByEntity 构建 _entitiesSource
+   * 成绩主键：teamScoresByEntity[].teamId === scoreEntities[].entityId（兼容 Game 的 teamId 字段名）
+   */
+  _hydrateTeamMatchEntityFromSession(match, groupId) {
+    const gid = groupId != null ? String(groupId) : '';
+    if (!match || !gid) {
+      console.log('[stroke_entity] hydrate', { ok: false, reason: 'missing_match_or_groupId', groupId: gid });
+      return [];
+    }
+    const scoreEntities =
+      match.scoreEntities && typeof match.scoreEntities === 'object' && !Array.isArray(match.scoreEntities)
+        ? match.scoreEntities
+        : {};
+    const metaList = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
+    const groupScoreData =
+      match.scoreData && match.scoreData[gid] && typeof match.scoreData[gid] === 'object'
+        ? match.scoreData[gid]
+        : {};
+    const teamScoresByEntity = Array.isArray(groupScoreData.teamScoresByEntity)
+      ? groupScoreData.teamScoresByEntity
+      : [];
+    const scoreByKey = {};
+    teamScoresByEntity.forEach((rec) => {
+      if (!rec || typeof rec !== 'object') return;
+      // 主键：teamId（与普通 Game teamScoresByEntity 字段兼容）；可选 entityId 仅作回退读取
+      const key =
+        rec.teamId != null && String(rec.teamId).trim() !== ''
+          ? String(rec.teamId).trim()
+          : rec.entityId != null && String(rec.entityId).trim() !== ''
+            ? String(rec.entityId).trim()
+            : '';
+      if (!key) return;
+      scoreByKey[key] = rec;
+    });
+
+    const entities = metaList.map((meta) => {
+      const entityId = meta && meta.entityId != null ? String(meta.entityId).trim() : '';
+      const rec = entityId && scoreByKey[entityId] ? scoreByKey[entityId] : {};
+      return {
+        entityId: entityId,
+        entityType: meta && meta.entityType ? String(meta.entityType) : '',
+        members: Array.isArray(meta && meta.members) ? meta.members.slice() : [],
+        compositionMode: meta && meta.compositionMode != null ? String(meta.compositionMode) : '',
+        teamGroupId: meta && meta.teamGroupId != null ? String(meta.teamGroupId) : '',
+        scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
+        putts: Array.isArray(rec.putts) ? rec.putts.slice() : [],
+        fairways: sliceFairways(rec.fairways),
+        penalties: slicePenalties(rec.penalties),
+        sands: sliceSands(rec.sands)
+      };
+    });
+
+    console.log('[stroke_entity] hydrate', {
+      matchId: match.matchId || '',
+      groupId: gid,
+      entityCount: entities.length,
+      scoreRecordCount: teamScoresByEntity.length
+    });
+    return entities;
+  },
+
+  /**
+   * 将 _entitiesSource 写入 match.scoreData[groupId].teamScoresByEntity
+   * teamId 字段存 entityId（兼容已有 Game 结构字段名，不改模型）
+   */
+  _persistTeamMatchEntityScores(match, groupId) {
+    if (!match || !match.matchId || !groupId) return false;
+    match.scoreData =
+      match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+        ? match.scoreData
+        : {};
+    const groupScoreData =
+      match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
+        ? match.scoreData[groupId]
+        : {};
+    const scoresByPlayer =
+      groupScoreData.scoresByPlayer && typeof groupScoreData.scoresByPlayer === 'object'
+        ? groupScoreData.scoresByPlayer
+        : {};
+    const teamScoresByEntity = (this._entitiesSource || [])
+      .filter((entity) => entity && entity.entityId)
+      .map((entity) => ({
+        teamId: String(entity.entityId),
+        scores: Array.isArray(entity.scores) ? entity.scores.slice() : [],
+        putts: Array.isArray(entity.putts) ? entity.putts.slice() : []
+      }));
+    match.scoreData[groupId] = {
+      scoresByPlayer: scoresByPlayer,
+      teamScoresByEntity: teamScoresByEntity
+    };
+    teamMatchStore.saveMatch(match);
+    console.log('[stroke_entity] persist', {
+      matchId: match.matchId || '',
+      groupId: groupId,
+      entityCount: teamScoresByEntity.length
+    });
+    return true;
+  },
+
   // Game 模式：球员来源 = 该组 playersSlots，所有记分格初始化为空（支持单组/多组）
   initGameMode(gameId, groupIndex) {
     const game = gameStore.getGame(gameId);
@@ -1542,6 +1781,9 @@ Page({
       this.initGameMode(gameId, gi);
     } else if (nextMode === 'fourball_best') {
       this.initFourBallBestMode();
+    } else if (nextMode === 'stroke_entity') {
+      // 本函数主路径服务普通 Game（buildFromGame）；补齐枚举以免将来误带 stroke_entity 时落入无 init
+      this.initStrokeEntityMode(ms.groupId || '');
     } else if (nextMode === 'individual_stroke') {
       this.initIndividualStrokeMode(ms.groupId || gameId);
     }
@@ -1613,7 +1855,10 @@ Page({
     const value = e.currentTarget.dataset.value;
     if (value === this.data.scoreDisplayMode) return;
     // 1) 更新状态 2) 写入缓存（记忆偏好）3) 刷新记分格与记分面板显示
-    this.setData({ scoreDisplayMode: value }, () => this.refreshPlayers());
+    this.setData({ scoreDisplayMode: value }, () => {
+      if (this.data.mode === 'stroke_entity') this.refreshEntities();
+      else this.refreshPlayers();
+    });
     try {
       wx.setStorageSync(this._displayModeKey(), value);
     } catch (err) {}
@@ -1855,6 +2100,21 @@ Page({
       }
       return;
     }
+    if (this.data.mode === 'stroke_entity' && this.data.groupId) {
+      const ms = this._matchState || this._readMatchState() || {};
+      const matchId = ms.matchId || '';
+      const groupId = this.data.groupId || ms.groupId || '';
+      const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      if (match && this._persistTeamMatchEntityScores(match, groupId)) {
+        console.log('[score-save-source]', {
+          matchId: matchId,
+          source: 'teamMatch.scoreData.teamScoresByEntity',
+          groupId: groupId,
+          entityCount: (this._entitiesSource || []).length
+        });
+      }
+      return;
+    }
     if (this.data.mode === 'individual_stroke' && this.data.groupId) {
       const ms = this._matchState || this._readMatchState() || {};
       const matchId = ms.matchId || '';
@@ -1910,6 +2170,14 @@ Page({
         }
       });
       if (changed) this.refreshPlayers();
+      return;
+    }
+    if (this.data.mode === 'stroke_entity' && this.data.groupId) {
+      const ms = this._matchState || this._readMatchState() || {};
+      const matchId = ms.matchId || '';
+      const groupId = this.data.groupId || ms.groupId || '';
+      const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      this._entitiesSource = this._hydrateTeamMatchEntityFromSession(match, groupId) || [];
       return;
     }
     if (this.data.mode === 'individual_stroke' && this.data.groupId) {
