@@ -225,7 +225,7 @@
           </view>
           </block>
 
-          <!-- tbody: stroke_entity 按 Entity 渲染；洞格点击走 onEntityScoreCellTap（不走 onScoreCellTap） -->
+          <!-- tbody: stroke_entity；洞格点击 → onEntityScoreCellTap（不走 onScoreCellTap） -->
           <block wx:elif="{{mode === 'stroke_entity'}}">
           <view
             wx:for="{{entitiesView}}"

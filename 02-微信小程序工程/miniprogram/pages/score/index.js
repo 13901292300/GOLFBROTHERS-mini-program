@@ -5269,6 +5269,26 @@ Page({
   // 阻止面板点击穿透
   noop() {},
 
+  /**
+   * Patch-02C2A-V2：Entity 成绩格点击入口（只记上下文，不打开面板、不写成绩）
+   */
+  onEntityScoreCellTap(e) {
+    if (this.data.mode !== 'stroke_entity') return;
+    const entityIndex = Number(e.currentTarget.dataset.entityIndex);
+    const holeIndex = Number(e.currentTarget.dataset.holeIndex);
+    if (!Number.isFinite(entityIndex) || entityIndex < 0) return;
+    if (!Number.isFinite(holeIndex) || holeIndex < 0 || holeIndex > 17) return;
+    console.log({
+      mode: 'stroke_entity',
+      entityIndex: entityIndex,
+      holeIndex: holeIndex
+    });
+    this.setData({
+      activeEntityIndex: entityIndex,
+      sheetHoleIndex: holeIndex
+    });
+  },
+
   onScoreCellTap(e) {
     if (this._scoreEditBlocked()) return;
     const { playerIdx, colIdx } = e.currentTarget.dataset;
