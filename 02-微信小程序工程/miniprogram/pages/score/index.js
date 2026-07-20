@@ -5405,7 +5405,7 @@ Page({
     };
     this._scoreSheetEntrySnapshot = {
       activeEntityIndex: entityIndex,
-      activePlayerIdx: this.data.activePlayerIdx,
+      entitiesSource: this._cloneEntitiesSourceSnapshot(entities),
       scoreClearDraft: false,
       scoreHoleClearPending: false,
       quickScoreClearDraft: false,
@@ -5564,6 +5564,42 @@ Page({
 
   /** 遮罩关闭：恢复进入弹窗前面板状态，不写正式成绩 */
   closeScoreInput() {
+    // Stroke Entity：回滚面板草稿 + _entitiesSource 快照（不碰 _playersSource / activePlayerIdx）
+    if (this.data.mode === 'stroke_entity') {
+      const snap = this._scoreSheetEntrySnapshot;
+      const patch = {
+        scoreSheetOpen: false,
+        scoreClearDraft: false,
+        scoreHoleClearPending: false,
+        quickScoreClearDraft: false,
+        quickScoreFreshDraft: false
+      };
+      if (snap) {
+        if (Array.isArray(snap.entitiesSource)) {
+          this._entitiesSource = this._cloneEntitiesSourceSnapshot(snap.entitiesSource);
+        }
+        if (snap.activeEntityIndex != null) {
+          patch.activeEntityIndex = snap.activeEntityIndex;
+        }
+        patch.sheetHoleLabel = snap.sheetHoleLabel;
+        patch.sheetHoleIndex = snap.sheetHoleIndex;
+        patch.sheetPar = snap.sheetPar;
+        patch.panelScore = snap.panelScore;
+        patch.panelPutt = snap.panelPutt;
+        patch.panelPuttTouched = snap.panelPuttTouched;
+        patch.panelFairway = snap.panelFairway;
+        patch.panelPenalty = snap.panelPenalty;
+        patch.panelBunker = snap.panelBunker;
+        if (Array.isArray(snap.quickPanelScores)) {
+          patch.quickPanelScores = snap.quickPanelScores.slice();
+        }
+      }
+      this.setData(patch);
+      this.refreshEntities();
+      setTimeout(() => this.setData({ showScoreSheet: false }), 300);
+      return;
+    }
+
     const snap = this._scoreSheetEntrySnapshot;
     const patch = {
       scoreSheetOpen: false,
@@ -5591,6 +5627,25 @@ Page({
     setTimeout(() => this.setData({ showScoreSheet: false }), 300);
   },
 
+  /** 深拷贝 _entitiesSource（供面板打开快照 / 取消回滚） */
+  _cloneEntitiesSourceSnapshot(list) {
+    return (list || []).map((entity) => {
+      if (!entity || typeof entity !== 'object') return entity;
+      return {
+        entityId: entity.entityId,
+        entityType: entity.entityType,
+        members: Array.isArray(entity.members) ? entity.members.slice() : [],
+        compositionMode: entity.compositionMode,
+        teamGroupId: entity.teamGroupId,
+        scores: Array.isArray(entity.scores) ? entity.scores.slice() : [],
+        putts: Array.isArray(entity.putts) ? entity.putts.slice() : [],
+        fairways: Array.isArray(entity.fairways) ? entity.fairways.slice() : [],
+        penalties: Array.isArray(entity.penalties) ? entity.penalties.slice() : [],
+        sands: Array.isArray(entity.sands) ? entity.sands.slice() : []
+      };
+    });
+  },
+
   /** 本洞全组清空写入 _playersSource（仅确认路径调用） */
   _clearHoleScoresInPlayersSource(holeIndex) {
     (this._playersSource || []).forEach((p) => {
@@ -5608,20 +5663,27 @@ Page({
     });
   },
 
-  /** Stroke Entity：本洞全部 Entity 清空写入 _entitiesSource（不碰 _playersSource） */
+  /** Stroke Entity：本洞全部 Entity 清空写入 _entitiesSource（不碰 _playersSource，不 splice） */
   _clearHoleScoresInEntitiesSource(holeIndex) {
+    const hi = Number(holeIndex);
+    if (!Number.isFinite(hi) || hi < 0 || hi > 17) return;
     (this._entitiesSource || []).forEach((entity) => {
       if (!entity) return;
-      entity.scores = entity.scores || [];
-      entity.putts = entity.putts || [];
-      entity.fairways = entity.fairways || [];
-      entity.penalties = entity.penalties || [];
-      entity.sands = entity.sands || [];
-      entity.scores[holeIndex] = null;
-      entity.putts[holeIndex] = null;
-      entity.fairways[holeIndex] = null;
-      entity.penalties[holeIndex] = 0;
-      entity.sands[holeIndex] = 0;
+      entity.scores = Array.isArray(entity.scores) ? entity.scores : [];
+      entity.putts = Array.isArray(entity.putts) ? entity.putts : [];
+      entity.fairways = Array.isArray(entity.fairways) ? entity.fairways : [];
+      entity.penalties = Array.isArray(entity.penalties) ? entity.penalties : [];
+      entity.sands = Array.isArray(entity.sands) ? entity.sands : [];
+      while (entity.scores.length < 18) entity.scores.push(null);
+      while (entity.putts.length < 18) entity.putts.push(null);
+      while (entity.fairways.length < 18) entity.fairways.push(null);
+      while (entity.penalties.length < 18) entity.penalties.push(0);
+      while (entity.sands.length < 18) entity.sands.push(0);
+      entity.scores[hi] = null;
+      entity.putts[hi] = null;
+      entity.fairways[hi] = null;
+      entity.penalties[hi] = 0;
+      entity.sands[hi] = 0;
     });
   },
 
@@ -5629,9 +5691,31 @@ Page({
    * 普通单组技术面板：清除当前洞草稿 UI（不写 _playersSource / 不 persist）
    * 快捷面板：独立清除显示状态（头像旁成绩格全空，不关弹窗、不改正式成绩）
    * fourball_best：保持原「清除=关闭」行为
+   * stroke_entity：清洞正式成绩 + 落盘 + 关面板（不改 activePlayerIdx）
    */
   clearScoreInput() {
     if (this._scoreEditBlocked()) return;
+    if (this.data.mode === 'stroke_entity') {
+      const holeIndex = this.data.sheetHoleIndex;
+      const par = this.data.sheetPar;
+      this._clearHoleScoresInEntitiesSource(holeIndex);
+      this.setData({
+        panelScore: par,
+        panelPutt: 2,
+        panelPuttTouched: false,
+        panelFairway: FAIRWAY_FAIRWAY,
+        panelPenalty: 0,
+        panelBunker: 0,
+        scoreClearDraft: false,
+        scoreHoleClearPending: false,
+        quickScoreClearDraft: false,
+        quickScoreFreshDraft: false
+      });
+      this.refreshEntities();
+      this.persistSession();
+      this._hideScoreSheet();
+      return;
+    }
     if (this.data.mode === 'fourball_best') {
       this.closeScoreInput();
       return;
