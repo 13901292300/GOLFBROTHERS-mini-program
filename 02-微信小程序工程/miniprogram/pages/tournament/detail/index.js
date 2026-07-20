@@ -3270,6 +3270,17 @@ Page({
   },
 
   _buildLeaderboardView(match) {
+    // Patch-02C3B：Stroke Entity 领先榜（最前置分支，G1 路径不变）
+    if (this._shouldBuildEntityLeaderboard(match)) {
+      const entityRows = this._buildEntityLeaderboardRows(match, this.data.openIndex) || [];
+      console.log('[leaderboard-score-source]', {
+        matchId: this.data.matchId || '',
+        source: 'teamMatch.scoreData.teamScoresByEntity',
+        entityCount: entityRows.length
+      });
+      return entityRows.map((row) => this._attachPersonalLeaderboardScoreFields(row));
+    }
+
     const matchRows = this._buildLeaderboardFromMatchGroups(match, this.data.openIndex);
     let source = 'groupsStore';
     if (matchRows) {
@@ -3292,6 +3303,165 @@ Page({
       playerCount: playerCount
     });
     return (rows || []).map((row) => this._attachPersonalLeaderboardScoreFields(row));
+  },
+
+  /** 是否走 Entity 领先榜：matchState.mode 或 scoreEntities 任一组非空 */
+  _shouldBuildEntityLeaderboard(match) {
+    try {
+      const ms = matchStateUtil.getMatchState && matchStateUtil.getMatchState();
+      if (ms && ms.mode === 'stroke_entity') return true;
+    } catch (e) {}
+    const scoreEntities =
+      match && match.scoreEntities && typeof match.scoreEntities === 'object' && !Array.isArray(match.scoreEntities)
+        ? match.scoreEntities
+        : null;
+    if (!scoreEntities) return false;
+    const keys = Object.keys(scoreEntities);
+    for (let i = 0; i < keys.length; i++) {
+      const list = scoreEntities[keys[i]];
+      if (Array.isArray(list) && list.length > 0) return true;
+    }
+    return false;
+  },
+
+  /**
+   * Patch-02C3B：Entity 领先榜行
+   * 主体 = scoreEntities + teamScoresByEntity（teamId === entityId），不生成个人成绩主体
+   */
+  _buildEntityLeaderboardRows(match, openIndex) {
+    const scoreEntities =
+      match && match.scoreEntities && typeof match.scoreEntities === 'object' && !Array.isArray(match.scoreEntities)
+        ? match.scoreEntities
+        : {};
+    const scoreData =
+      match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+        ? match.scoreData
+        : {};
+    const nameLookup = this._buildGroupPlayerLookup(match) || {};
+    const groupNameMap = {};
+    (Array.isArray(match && match.groups) ? match.groups : []).forEach((g) => {
+      if (!g || g.groupId == null) return;
+      groupNameMap[String(g.groupId)] = g.groupName || '';
+    });
+    const pars = this._getMatchHolePars(match);
+    const flat = [];
+
+    Object.keys(scoreEntities).forEach((groupId) => {
+      const entities = Array.isArray(scoreEntities[groupId]) ? scoreEntities[groupId] : [];
+      if (!entities.length) return;
+      const groupScoreData =
+        scoreData[groupId] && typeof scoreData[groupId] === 'object' ? scoreData[groupId] : {};
+      const teamScoresByEntity = Array.isArray(groupScoreData.teamScoresByEntity)
+        ? groupScoreData.teamScoresByEntity
+        : [];
+      const scoreByEntityId = {};
+      teamScoresByEntity.forEach((rec) => {
+        if (!rec || typeof rec !== 'object') return;
+        const key =
+          rec.teamId != null && String(rec.teamId).trim() !== ''
+            ? String(rec.teamId).trim()
+            : rec.entityId != null && String(rec.entityId).trim() !== ''
+              ? String(rec.entityId).trim()
+              : '';
+        if (!key) return;
+        scoreByEntityId[key] = rec;
+      });
+
+      entities.forEach((entity, entityIndex) => {
+        if (!entity) return;
+        const entityId = entity.entityId != null ? String(entity.entityId).trim() : '';
+        if (!entityId) return;
+        const members = Array.isArray(entity.members) ? entity.members : [];
+        const memberNames = members
+          .map((id) => {
+            const uid = id != null ? String(id).trim() : '';
+            if (!uid) return '';
+            const user = nameLookup[uid] || {};
+            return (
+              (user.nickname && String(user.nickname).trim()) ||
+              (user.competitionName && String(user.competitionName).trim()) ||
+              (user.matchNickname && String(user.matchNickname).trim()) ||
+              (user.name && String(user.name).trim()) ||
+              (user.displayName && String(user.displayName).trim()) ||
+              uid
+            );
+          })
+          .filter(Boolean);
+        const entityType = entity.entityType ? String(entity.entityType) : '';
+        const name =
+          memberNames.length > 0
+            ? memberNames.join(entityType === 'pair' ? ' + ' : ' / ')
+            : entityType === 'pair'
+              ? '组合'
+              : '第' + (entityIndex + 1) + '组组合';
+
+        const rec = scoreByEntityId[entityId] || {};
+        const scores = Array.isArray(rec.scores) ? rec.scores.slice() : [];
+        let grossTotal = 0;
+        let parThru = 0;
+        let thru = 0;
+        for (let h = 0; h < 18; h++) {
+          const s = scores[h];
+          if (!this._isFilledLeaderboardScore(s)) continue;
+          grossTotal += Number(s);
+          parThru += Number(pars[h] || 0);
+          thru += 1;
+        }
+        const toPar = grossTotal - parThru;
+        const hasScore = thru > 0;
+        flat.push({
+          entityId: entityId,
+          name: name,
+          group: groupNameMap[String(groupId)] || '',
+          groupId: String(groupId),
+          scores: scores,
+          grossTotal: hasScore ? grossTotal : 0,
+          toPar: hasScore ? toPar : 0,
+          total: hasScore ? grossTotal : 0,
+          diff: hasScore ? toPar : 0,
+          thru: thru,
+          hasScore: hasScore,
+          scoreSource: 'teamMatch.scoreData.teamScoresByEntity',
+          isEntity: true
+        });
+      });
+    });
+
+    if (!flat.length) return [];
+
+    flat.sort((a, b) => {
+      if (a.thru === 0 && b.thru === 0) return 0;
+      if (a.thru === 0) return 1;
+      if (b.thru === 0) return -1;
+      if (a.toPar !== b.toPar) return a.toPar - b.toPar;
+      return b.thru - a.thru;
+    });
+
+    return flat.map((entity, index) => {
+      const started = entity.thru > 0;
+      const firstIndex = flat.findIndex((item) => item.thru > 0 && item.toPar === entity.toPar);
+      const tied = flat.filter((item) => item.thru > 0 && item.toPar === entity.toPar).length > 1;
+      const pos = !started ? '-' : tied ? 'T' + (firstIndex + 1) : String(index + 1);
+      return {
+        pos: pos,
+        entityId: entity.entityId,
+        name: entity.name,
+        group: entity.group,
+        groupId: entity.groupId,
+        scores: entity.scores,
+        thru: this._resolveLeaderboardThruLabel(entity.thru),
+        grossTotal: entity.grossTotal,
+        toPar: entity.toPar,
+        total: entity.grossTotal,
+        diff: entity.toPar,
+        hasScore: entity.hasScore === true,
+        scoreStr: started ? this._formatLeaderboardDiff(entity.toPar) : '-',
+        scoreClass: started ? this._resolveLeaderboardTotalClass(entity.toPar) : 'score-even',
+        scoreSource: entity.scoreSource || '',
+        isEntity: true,
+        expanded: index === openIndex
+      };
+    });
   },
 
   /** 个人榜行：补齐 grossTotal/toPar，并保留 total/diff 兼容别名 */
