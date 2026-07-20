@@ -3022,6 +3022,56 @@ Page({
 
   _resolveTeamMatchScorecard(match, row) {
     const groupId = row && row.groupId ? String(row.groupId) : '';
+    const entityId =
+      row && row.entityId != null && String(row.entityId).trim() !== ''
+        ? String(row.entityId).trim()
+        : '';
+    const isEntityRow = !!(row && (row.isEntity === true || entityId));
+
+    // Patch-02C3E：Entity 成绩卡 — 主体 = entityId / teamScoresByEntity，不走 playerId
+    if (isEntityRow) {
+      if (!match || !groupId || !entityId) return null;
+      const scoreData =
+        match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+          ? match.scoreData
+          : null;
+      const groupScoreData =
+        scoreData && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+          ? scoreData[groupId]
+          : null;
+      const teamScoresByEntity = Array.isArray(groupScoreData && groupScoreData.teamScoresByEntity)
+        ? groupScoreData.teamScoresByEntity
+        : [];
+      let entityRec = null;
+      for (let i = 0; i < teamScoresByEntity.length; i++) {
+        const rec = teamScoresByEntity[i];
+        if (!rec || typeof rec !== 'object') continue;
+        const teamId = rec.teamId != null ? String(rec.teamId).trim() : '';
+        if (teamId && teamId === entityId) {
+          entityRec = rec;
+          break;
+        }
+      }
+      const record = {
+        scores: Array.isArray(entityRec && entityRec.scores) ? entityRec.scores : [],
+        putts: Array.isArray(entityRec && entityRec.putts) ? entityRec.putts : undefined,
+        fairways: Array.isArray(entityRec && entityRec.fairways) ? entityRec.fairways : undefined,
+        penalties: Array.isArray(entityRec && entityRec.penalties) ? entityRec.penalties : undefined,
+        sands: Array.isArray(entityRec && entityRec.sands) ? entityRec.sands : undefined
+      };
+      const scores = record.scores;
+      const started = scores.some((score) => this._isFilledLeaderboardScore(score));
+      if (!started) {
+        return this._buildScorecardFromScoreRecord(
+          { scores: [] },
+          this.data.scoreDisplayMode,
+          'not_started',
+          match
+        );
+      }
+      return this._buildScorecardFromScoreRecord(record, this.data.scoreDisplayMode, null, match);
+    }
+
     const playerId = row && row.playerId ? String(row.playerId) : '';
     if (!match || !groupId || !playerId) return null;
     const scoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
