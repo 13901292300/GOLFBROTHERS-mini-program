@@ -1644,7 +1644,10 @@ Page({
       .map((entity) => ({
         teamId: String(entity.entityId),
         scores: Array.isArray(entity.scores) ? entity.scores.slice() : [],
-        putts: Array.isArray(entity.putts) ? entity.putts.slice() : []
+        putts: Array.isArray(entity.putts) ? entity.putts.slice() : [],
+        fairways: Array.isArray(entity.fairways) ? entity.fairways.slice() : [],
+        penalties: Array.isArray(entity.penalties) ? entity.penalties.slice() : [],
+        sands: Array.isArray(entity.sands) ? entity.sands.slice() : []
       }));
     match.scoreData[groupId] = {
       scoresByPlayer: scoresByPlayer,
@@ -5605,6 +5608,23 @@ Page({
     });
   },
 
+  /** Stroke Entity：本洞全部 Entity 清空写入 _entitiesSource（不碰 _playersSource） */
+  _clearHoleScoresInEntitiesSource(holeIndex) {
+    (this._entitiesSource || []).forEach((entity) => {
+      if (!entity) return;
+      entity.scores = entity.scores || [];
+      entity.putts = entity.putts || [];
+      entity.fairways = entity.fairways || [];
+      entity.penalties = entity.penalties || [];
+      entity.sands = entity.sands || [];
+      entity.scores[holeIndex] = null;
+      entity.putts[holeIndex] = null;
+      entity.fairways[holeIndex] = null;
+      entity.penalties[holeIndex] = 0;
+      entity.sands[holeIndex] = 0;
+    });
+  },
+
   /**
    * 普通单组技术面板：清除当前洞草稿 UI（不写 _playersSource / 不 persist）
    * 快捷面板：独立清除显示状态（头像旁成绩格全空，不关弹窗、不改正式成绩）
@@ -5759,6 +5779,10 @@ Page({
 
   confirmScoreInput() {
     if (this._scoreEditBlocked()) return;
+    // Stroke Entity：早分流，禁止落入 confirmQuickScore / _playersSource
+    if (this.data.mode === 'stroke_entity') {
+      return this.confirmEntityScoreInput();
+    }
     // 四人最佳球位 / 最好成绩：只写入一个团队成绩到当前洞（不生成球员级成绩、不拆分球员）
     if (this.data.mode === 'fourball_best') {
       this.confirmTeamScore();
@@ -5849,6 +5873,77 @@ Page({
       this._hideScoreSheet();
       this._afterScoresPersisted();
     }
+  },
+
+  /**
+   * Patch-02C2B2：Entity 技术面板确认 → 写 _entitiesSource → persistSession → refreshEntities
+   * 快捷模式本阶段不实现（安全拦截，不进 confirmQuickScore）
+   */
+  confirmEntityScoreInput() {
+    if (this._scoreEditBlocked()) return;
+    if (this.data.mode !== 'stroke_entity') return;
+
+    if (this.data.scorePanelMode === 'quick') {
+      wx.showToast({ title: 'Entity快捷录入将在后续版本支持', icon: 'none' });
+      return;
+    }
+
+    const {
+      activeEntityIndex,
+      sheetHoleIndex,
+      panelScore,
+      panelPutt,
+      panelFairway,
+      panelPenalty,
+      panelBunker,
+      sheetPar,
+      scoreClearDraft,
+      scoreHoleClearPending
+    } = this.data;
+
+    if (scoreClearDraft) {
+      this._clearHoleScoresInEntitiesSource(sheetHoleIndex);
+      this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
+      this.refreshEntities();
+      this.persistSession();
+      this._hideScoreSheet();
+      return;
+    }
+
+    const eIdx = Number(activeEntityIndex);
+    const entity =
+      Number.isFinite(eIdx) && eIdx >= 0 && this._entitiesSource
+        ? this._entitiesSource[eIdx]
+        : null;
+    if (!entity) return;
+
+    if (scoreHoleClearPending) {
+      this._clearHoleScoresInEntitiesSource(sheetHoleIndex);
+    }
+
+    let newScore = panelScore;
+    if (newScore === null || newScore === undefined || newScore === '') {
+      newScore = sheetPar;
+    }
+
+    entity.scores = entity.scores || [];
+    entity.putts = entity.putts || [];
+    entity.fairways = entity.fairways || [];
+    entity.penalties = entity.penalties || [];
+    entity.sands = entity.sands || [];
+
+    entity.scores[sheetHoleIndex] = newScore;
+    if (panelPutt !== null && panelPutt !== undefined && panelPutt !== '') {
+      entity.putts[sheetHoleIndex] = panelPutt;
+    }
+    entity.fairways[sheetHoleIndex] = normalizeFairwayValue(panelFairway);
+    entity.penalties[sheetHoleIndex] = normalizePenaltyValue(panelPenalty);
+    entity.sands[sheetHoleIndex] = normalizeSandValue(panelBunker);
+
+    this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
+    this.refreshEntities();
+    this.persistSession();
+    this._hideScoreSheet();
   },
 
   // 四人最佳球位 / 最好成绩：每个记分实体（组）写入一个成绩；不拆分球员、不生成多值数组。
