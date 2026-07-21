@@ -625,6 +625,83 @@ Page({
     });
   },
 
+  _teamGroupIdKey(id) {
+    return id != null ? String(id).trim() : '';
+  },
+
+  /**
+   * 删除分队后：将被删分队下的报名成员迁移到剩余分队的第一个。
+   * 只改 registerInfo.users 归属字段；不碰 groups / scoreEntities / pairings。
+   * @returns {object|null} 新的 registerInfo；无迁移时返回 null
+   */
+  _migrateRegisterUsersAfterTeamDelete(oldTeamGroups, newTeamGroups, registerInfo) {
+    const nextGroups = Array.isArray(newTeamGroups) ? newTeamGroups : [];
+    if (!nextGroups.length) return null;
+
+    const kept = {};
+    nextGroups.forEach((g) => {
+      const key = this._teamGroupIdKey(g && g.id);
+      if (key) kept[key] = g;
+    });
+
+    const deletedIds = [];
+    (Array.isArray(oldTeamGroups) ? oldTeamGroups : []).forEach((g) => {
+      const key = this._teamGroupIdKey(g && g.id);
+      if (key && !kept[key]) deletedIds.push(key);
+    });
+    if (!deletedIds.length) return null;
+
+    // 迁移目标 = 删除后 teamGroups 的第一个剩余分队
+    const target = nextGroups[0];
+    const targetId = target.id;
+    const targetIdKey = this._teamGroupIdKey(targetId);
+    const targetName = target && target.name != null ? String(target.name).trim() : '';
+    if (!targetIdKey) return null;
+
+    const deletedSet = {};
+    deletedIds.forEach((id) => {
+      deletedSet[id] = true;
+    });
+
+    const users =
+      registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    let changed = false;
+    const nextUsers = users.map((user) => {
+      if (!user || typeof user !== 'object') return user;
+      const groupKey = this._teamGroupIdKey(user.groupId);
+      const matchTeamKey = this._teamGroupIdKey(user.matchTeamId);
+      const hitDeleted =
+        (groupKey && deletedSet[groupKey]) || (matchTeamKey && deletedSet[matchTeamKey]);
+      if (!hitDeleted) return user;
+
+      changed = true;
+      const next = Object.assign({}, user);
+      if (groupKey && deletedSet[groupKey]) {
+        next.groupId = targetId;
+        next.groupName = targetName;
+      }
+      if (matchTeamKey && deletedSet[matchTeamKey]) {
+        next.matchTeamId = targetId;
+        next.matchTeamName = targetName;
+      } else if (groupKey && deletedSet[groupKey]) {
+        // groupId 已迁；同步 matchTeam 归属，避免 resolver 仍读到旧分队
+        next.matchTeamId = targetId;
+        next.matchTeamName = targetName;
+      }
+      return next;
+    });
+
+    if (!changed) return null;
+
+    return Object.assign({}, registerInfo || {}, {
+      users: nextUsers,
+      totalCount:
+        registerInfo && registerInfo.totalCount != null
+          ? registerInfo.totalCount
+          : nextUsers.length
+    });
+  },
+
   onTeamCompetitionToggle(e) {
     const enabled = !!(e && e.detail && e.detail.value);
     const competition = this._competitionForGroupCount(
@@ -1543,6 +1620,17 @@ Page({
       wx.showToast({ title: '保存失败', icon: 'none' });
       return;
     }
+
+    // 删除分队后：迁移孤儿报名成员到剩余第一个分队（不改 groups / scoreEntities / pairings）
+    const migratedRegisterInfo = this._migrateRegisterUsersAfterTeamDelete(
+      existing && existing.teamGroups,
+      this.data.teamGroups,
+      updated.registerInfo
+    );
+    if (migratedRegisterInfo) {
+      updated.registerInfo = migratedRegisterInfo;
+    }
+
     teamMatchStore.saveMatch(updated);
     wx.showToast({ title: '已保存修改', icon: 'success' });
     setTimeout(() => {

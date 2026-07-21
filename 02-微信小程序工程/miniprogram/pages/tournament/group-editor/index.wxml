@@ -15,6 +15,22 @@
 
   <scroll-view class="editor-scroll" scroll-y>
     <view class="editor-body">
+      <view wx:if="{{showCompositionMode}}" class="composition-mode-section">
+        <text class="composition-mode-section__label">组合模式</text>
+        <view class="composition-mode-options">
+          <view
+            class="composition-mode-option {{strokeCompositionMode === '4+0' ? 'is-active' : ''}}"
+            bindtap="onStrokeCompositionModeTap"
+            data-mode="4+0"
+          >4+0</view>
+          <view
+            class="composition-mode-option {{strokeCompositionMode === '2+2' ? 'is-active' : ''}}"
+            bindtap="onStrokeCompositionModeTap"
+            data-mode="2+2"
+          >2+2</view>
+        </view>
+      </view>
+
       <block wx:if="{{draftCards.length > 0}}">
         <view wx:for="{{draftCards}}" wx:key="groupId" class="group-block">
           <view
@@ -51,7 +67,20 @@
             </view>
           </view>
 
-          <!-- 组合比杆赛：组合分配区域 -->
+          <!-- G2/G3 报名期 2+2：只读组合预览（由座位自动生成，不保存） -->
+          <view wx:if="{{item.compositionPreview}}" class="composition-preview" catchtap="stopPropagation">
+            <text class="composition-preview__title">{{item.compositionPreview.title}}</text>
+            <view wx:if="{{item.compositionPreview.showCombo1}}" class="composition-preview__row">
+              <text class="composition-preview__label">{{item.compositionPreview.combo1Label}}：</text>
+              <text class="composition-preview__names">{{item.compositionPreview.combo1Text}}</text>
+            </view>
+            <view wx:if="{{item.compositionPreview.showCombo2}}" class="composition-preview__row">
+              <text class="composition-preview__label">{{item.compositionPreview.combo2Label}}：</text>
+              <text class="composition-preview__names">{{item.compositionPreview.combo2Text}}</text>
+            </view>
+          </view>
+
+          <!-- LIVE / 非组合模式赛制：保留原组合分配区域 -->
           <view wx:if="{{showPairingSection && item.pairingBlock}}" class="pairing-section" catchtap="stopPropagation">
             <view class="pairing-section__head">
               <text class="pairing-section__title">{{item.pairingBlock.title}}</text>

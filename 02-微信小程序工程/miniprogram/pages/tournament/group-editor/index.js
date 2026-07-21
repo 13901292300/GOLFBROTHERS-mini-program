@@ -9,6 +9,7 @@ const playerDirectory = require('../../../utils/playerDirectory.js');
 const tPosition = require('../../../utils/tPosition.js');
 const { validateStrokeEntities } = require('../../../utils/strokeEntityValidator.js');
 const { buildStrokeEntities } = require('../../../utils/strokeEntityBuilder.js');
+const { resolveStrokeCompositions } = require('../../../utils/strokeCompositionResolver.js');
 
 const STROKE_ENTITY_INVALID_TIP = '当前分组不符合该比赛赛制要求，请重新分组。';
 
@@ -213,6 +214,101 @@ function resolveRegisterInfo(match) {
     : match.registerInfo;
 }
 
+/** userId → 报名分队 groupId */
+function buildRegisterTeamGroupMap(registerInfo) {
+  const map = {};
+  const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+  users.forEach((u) => {
+    const id = u && u.userId != null ? String(u.userId).trim() : '';
+    if (!id) return;
+    map[id] = u.groupId != null ? String(u.groupId).trim() : '';
+  });
+  return map;
+}
+
+function resolvePlayerTeamGroupId(userId, teamMap) {
+  const id = userId != null ? String(userId).trim() : '';
+  if (!id) return '';
+  return teamMap && teamMap[id] != null ? String(teamMap[id]) : '';
+}
+
+/**
+ * 报名期 G2/G3 组合模式选人校验（仅校验，不改选人弹窗）
+ * @returns {string} 空串表示通过，否则为提示文案
+ */
+function validateStrokeCompositionPlayers(players, compositionMode, teamMap) {
+  const mode = compositionMode === '2+2' ? '2+2' : '4+0';
+  const filled = (Array.isArray(players) ? players : []).filter((p) =>
+    p && String(p.userId || '').trim()
+  );
+  if (!filled.length) return '';
+
+  if (mode === '4+0') {
+    let firstTeam = '';
+    for (let i = 0; i < filled.length; i++) {
+      const teamId = resolvePlayerTeamGroupId(filled[i].userId, teamMap);
+      if (!firstTeam) {
+        firstTeam = teamId;
+        continue;
+      }
+      if (teamId !== firstTeam) {
+        return '4+0模式下，同组球员必须来自同一分队';
+      }
+    }
+    return '';
+  }
+
+  // 2+2：组合由座位固定（1+2 / 3+4），不限制整组同队人数；
+  // 组合预览与座位完整性由 buildCompositionPreview 处理，此处不做分队人数拦截
+  return '';
+}
+
+/**
+ * 2+2 只读预览：委托 strokeCompositionResolver，再转成现有 wxml 结构
+ * @param {object} matchLike 含 gameMode / strokeCompositionMode / teamGroups / registerInfo
+ * @param {object} group 草稿组
+ */
+function buildCompositionPreview(matchLike, group) {
+  const list = resolveStrokeCompositions(matchLike, group);
+  if (!Array.isArray(list) || !list.length) return null;
+
+  const labels = ['', ''];
+  const texts = ['', ''];
+  list.slice(0, 2).forEach((combo, index) => {
+    const members = Array.isArray(combo && combo.members) ? combo.members : [];
+    const names = members
+      .map((m) => (m && (m.nickname || m.userId)) || '')
+      .filter(Boolean);
+    texts[index] = names.join(' / ');
+    const teamName =
+      combo && combo.teamName != null && String(combo.teamName).trim()
+        ? String(combo.teamName).trim()
+        : combo && combo.teamId != null && String(combo.teamId).trim()
+          ? String(combo.teamId).trim()
+          : '分队';
+    labels[index] = index + 1 + '. ' + teamName;
+  });
+
+  const combo1Text = texts[0] || '';
+  const combo2Text = texts[1] || '';
+  if (!combo1Text && !combo2Text) return null;
+
+  const combos = [];
+  if (combo1Text) combos.push({ label: labels[0], text: combo1Text });
+  if (combo2Text) combos.push({ label: labels[1], text: combo2Text });
+
+  return {
+    title: '组合',
+    combos: combos,
+    showCombo1: !!combo1Text,
+    showCombo2: !!combo2Text,
+    combo1Label: labels[0],
+    combo1Text: combo1Text,
+    combo2Label: labels[1],
+    combo2Text: combo2Text
+  };
+}
+
 function resolveRegisterSubTabs(match, registerInfo) {
   const source = match && Array.isArray(match.teamGroups) && match.teamGroups.length
     ? match.teamGroups
@@ -256,6 +352,7 @@ Page({
     headerTitle: '开始分组',
     gameMode: '',
     showPairingSection: false,
+    showCompositionMode: false,
     pairingSectionTitle: '组合',
     groupDraft: [],
     pairingDraft: {},
@@ -269,6 +366,7 @@ Page({
     editingPairingSelectedIds: [],
     pairingEditTitle: '修改组合',
     pairingEditOptions: [],
+    strokeCompositionMode: '4+0',
     saving: false
   },
 
@@ -283,25 +381,44 @@ Page({
       ? modeOpt
       : (formalExists ? 'edit' : 'create');
     const gameMode = match && match.gameMode ? String(match.gameMode) : '';
-    const showPairingSection = teamMatchStore.isPairingStrokeFormat(gameMode);
+    const matchType = match && match.matchType ? String(match.matchType) : 'team-internal';
+    const isG2G3 = teamMatchStore.isPairingStrokeFormat(gameMode);
+    // 报名期 + 队内赛 + G2/G3：组合模式 UI；LIVE 保持原 pairing 交互不动
+    const showCompositionMode = mode !== 'live' && matchType === 'team-internal' && isG2G3;
+    const showPairingSection = isG2G3 && !showCompositionMode;
+    const strokeCompositionMode = match && match.strokeCompositionMode
+      ? String(match.strokeCompositionMode)
+      : '4+0';
     const draft = buildInitialGroupDraft(match);
     const pairingDraft = showPairingSection
       ? teamMatchStore.clonePairings(match && match.pairings)
       : {};
     this._registerInfo = resolveRegisterInfo(match);
+    this._registerTeamMap = buildRegisterTeamGroupMap(this._registerInfo);
     this._registerSubTabs = resolveRegisterSubTabs(match, this._registerInfo);
+    this._matchSnapshot = match || null;
     this._leavingConfirmed = false;
     this._pairingIdSeq = 1;
+    const resolvedMode = strokeCompositionMode === '2+2' ? '2+2' : '4+0';
     this.setData({
       matchId: matchId,
       mode: mode,
       headerTitle: mode === 'create' ? '开始分组' : '修改分组',
       gameMode: gameMode,
       showPairingSection: showPairingSection,
+      showCompositionMode: showCompositionMode,
       pairingSectionTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
+      strokeCompositionMode: resolvedMode,
       groupDraft: draft,
       pairingDraft: pairingDraft,
-      draftCards: this._buildDraftCards(draft, pairingDraft, showPairingSection, gameMode)
+      draftCards: this._buildDraftCards(
+        draft,
+        pairingDraft,
+        showPairingSection,
+        gameMode,
+        showCompositionMode,
+        resolvedMode
+      )
     });
   },
 
@@ -322,8 +439,33 @@ Page({
     });
   },
 
-  _buildDraftCards(groups, pairingDraft, showPairing, gameMode) {
+  /** 预览用 match 上下文：用当前 UI 的 strokeCompositionMode，不改写 store */
+  _buildCompositionMatchContext(compositionMode) {
+    const stored = this.data.matchId
+      ? teamMatchStore.getMatchById(this.data.matchId)
+      : null;
+    const base = stored || this._matchSnapshot || {};
+    const mode = compositionMode === '2+2' ? '2+2' : '4+0';
+    return Object.assign({}, base, {
+      gameMode: this.data.gameMode || base.gameMode || '',
+      strokeCompositionMode: mode,
+      registerInfo: this._registerInfo || base.registerInfo || { totalCount: 0, users: [] },
+      teamGroups: Array.isArray(base.teamGroups) ? base.teamGroups : []
+    });
+  },
+
+  _buildDraftCards(groups, pairingDraft, showPairing, gameMode, showCompositionMode, strokeCompositionMode) {
     const title = teamMatchStore.getPairingStrokeLabel(gameMode || this.data.gameMode);
+    const showMode = showCompositionMode != null
+      ? !!showCompositionMode
+      : !!this.data.showCompositionMode;
+    const compositionMode = strokeCompositionMode != null
+      ? String(strokeCompositionMode)
+      : String(this.data.strokeCompositionMode || '');
+    const showCompositionPreview = showMode && compositionMode === '2+2';
+    const matchLike = showCompositionPreview
+      ? this._buildCompositionMatchContext(compositionMode)
+      : null;
     return (groups || []).map((g) => {
       const players = mapPlayersForCard(g.players);
       const card = {
@@ -333,6 +475,10 @@ Page({
       };
       if (showPairing) {
         card.pairingBlock = this._buildPairingBlockView(g, pairingDraft, title);
+      }
+      if (showCompositionPreview && matchLike) {
+        const preview = buildCompositionPreview(matchLike, g);
+        if (preview) card.compositionPreview = preview;
       }
       return card;
     });
@@ -454,6 +600,16 @@ Page({
       if (!groupIds[gid]) return;
     });
     return next;
+  },
+
+  onStrokeCompositionModeTap(e) {
+    if (!this.data.showCompositionMode) return;
+    const mode = String((e.currentTarget.dataset.mode != null ? e.currentTarget.dataset.mode : ''));
+    if (mode !== '4+0' && mode !== '2+2') return;
+    if (mode === this.data.strokeCompositionMode) return;
+    this.setData({ strokeCompositionMode: mode }, () => {
+      this._refreshCards();
+    });
   },
 
   onAddGroup() {
@@ -579,6 +735,19 @@ Page({
         tee: tee
       }, previous || found);
     });
+
+    // 报名期 G2/G3 组合模式：坐入前校验；失败则禁止写回
+    if (this.data.showCompositionMode) {
+      const compositionErr = validateStrokeCompositionPlayers(
+        players,
+        this.data.strokeCompositionMode,
+        this._registerTeamMap || buildRegisterTeamGroupMap(this._registerInfo)
+      );
+      if (compositionErr) {
+        wx.showToast({ title: compositionErr, icon: 'none' });
+        return;
+      }
+    }
 
     draft[idx] = Object.assign({}, draft[idx], {
       groupName: result.groupName || draft[idx].groupName,
@@ -816,6 +985,14 @@ Page({
         if (seen[id]) return '存在重复球员，请检查分组';
         seen[id] = true;
       }
+      if (this.data.showCompositionMode) {
+        const compositionErr = validateStrokeCompositionPlayers(
+          g.players,
+          this.data.strokeCompositionMode,
+          this._registerTeamMap || buildRegisterTeamGroupMap(this._registerInfo)
+        );
+        if (compositionErr) return compositionErr;
+      }
     }
 
     if (this.data.showPairingSection) {
@@ -983,6 +1160,7 @@ Page({
       nextPairings = {};
     }
     // LIVE：不重建 scoreEntities（Object.assign 保留原字段）；不调用 buildStrokeEntities
+    // 不改写 strokeCompositionMode（报名期组合模式专属）
     const next = Object.assign({}, match, {
       groups: nextGroups,
       pairings: nextPairings,
@@ -1058,6 +1236,9 @@ Page({
       pairings: isClear ? {} : (shouldPersistPairings ? formalPairings : {}),
       updatedAt: Date.now()
     });
+    if (this.data.showCompositionMode) {
+      next.strokeCompositionMode = this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
+    }
     if (isClear) {
       next = this._clearGroupDerivedFields(next);
     } else if (!shouldPersistPairings) {

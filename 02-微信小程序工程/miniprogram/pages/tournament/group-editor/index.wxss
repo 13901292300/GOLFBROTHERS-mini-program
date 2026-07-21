@@ -83,6 +83,82 @@ page {
   box-sizing: border-box;
 }
 
+.composition-mode-section {
+  margin-bottom: 28rpx;
+}
+.composition-mode-section__label {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 16rpx;
+}
+.composition-mode-options {
+  display: flex;
+  gap: 16rpx;
+}
+.composition-mode-option {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 14rpx;
+  border: 2rpx solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.composition-mode-option.is-active {
+  border-color: var(--champion-gold, #c8a24a);
+  background: rgba(200, 162, 74, 0.12);
+  color: var(--text-primary);
+}
+
+.composition-preview {
+  margin: -8rpx 0 28rpx;
+  padding: 20rpx 24rpx 22rpx;
+  background: var(--bg-subtle, #f3f4f6);
+  border: 1px solid var(--border);
+  border-radius: 0 0 20rpx 20rpx;
+  border-top: none;
+}
+.composition-preview__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 12rpx;
+}
+.composition-preview__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8rpx;
+  margin-top: 8rpx;
+  overflow: hidden;
+}
+.composition-preview__label {
+  flex-shrink: 0;
+  max-width: 46%;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--cloud-blue, #002d62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composition-preview__names {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .editor-empty {
   display: flex;
   align-items: center;
