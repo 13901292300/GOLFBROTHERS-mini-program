@@ -897,26 +897,31 @@ Page({
     const formal = cloneTournamentGroups(match && Array.isArray(match.groups) ? match.groups : []);
     const unscheduled = this._resolveUnscheduledPlayers(match, formal);
     const gameMode = match && match.gameMode ? String(match.gameMode) : '';
-    const showPairings = teamMatchStore.isPairingStrokeFormat(gameMode);
+    const isG4Stroke = gameMode === '四人两球比杆赛';
+    // G2/G3 组合比杆 + G4 四人两球：分组 TAB 展示组合描述
+    const showPairings = teamMatchStore.isPairingStrokeFormat(gameMode) || isG4Stroke;
     const matchType = match && match.matchType ? String(match.matchType) : 'team-internal';
     const strokeModeRaw =
       match && match.strokeCompositionMode != null
         ? String(match.strokeCompositionMode).trim()
         : '';
-    const lifecycle = this._getMatchLifecycle(match);
-    // 报名期队内赛 G2/G3：用 composition 展示，避免空 pairings 误报「未完成组合」
+    // 队内赛 G2/G3：报名与 LIVE 均用 composition 展示（不因 ongoing 切到 pairing 头像卡）
     const useCompositionDisplay =
       showPairings
+      && !isG4Stroke
       && matchType === 'team-internal'
-      && (strokeModeRaw === '4+0' || strokeModeRaw === '2+2')
-      && !lifecycle.isOngoing;
-    const pairings = showPairings && !useCompositionDisplay
-      ? teamMatchStore.clonePairings(match && match.pairings)
-      : {};
+      && (strokeModeRaw === '4+0' || strokeModeRaw === '2+2');
+    // G4：用 pairings 映射为「分队：球员」文字行（与 G2/G3 composition 行同款 UI）
+    const useG4PairingTextDisplay = isG4Stroke && matchType === 'team-internal';
+    const pairings =
+      showPairings && (useG4PairingTextDisplay || !useCompositionDisplay)
+        ? teamMatchStore.clonePairings(match && match.pairings)
+        : {};
     const playerLookup = this._buildGroupPlayerLookup(match);
     const groupsTabCards = this._mapGroupsToTabCards(formal, {
       showPairings: showPairings,
       useCompositionDisplay: useCompositionDisplay,
+      useG4PairingTextDisplay: useG4PairingTextDisplay,
       match: match,
       pairings: pairings,
       pairingTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
@@ -1089,6 +1094,7 @@ Page({
     const opts = options || {};
     const showPairings = !!opts.showPairings;
     const useCompositionDisplay = !!opts.useCompositionDisplay;
+    const useG4PairingTextDisplay = !!opts.useG4PairingTextDisplay;
     const pairings = opts.pairings || {};
     const pairingTitle = opts.pairingTitle || '组合';
     const playerLookup = opts.playerLookup || {};
@@ -1110,21 +1116,97 @@ Page({
         hasTeeInfo: !!(teeTime || startHole != null)
       };
       if (showPairings) {
-        // 报名期 G2/G3 composition；其余（含 LIVE）保持 pairings
-        card.pairingBlock = useCompositionDisplay
-          ? this._mapGroupCompositionBlock(match, g, playerLookup)
-          : this._mapGroupPairingBlock(g, pairings, pairingTitle, playerLookup);
+        if (useCompositionDisplay) {
+          // 队内赛 G2/G3：composition 文字行（报名 / LIVE 同路径）
+          card.pairingBlock = this._mapGroupCompositionBlock(match, g, playerLookup);
+        } else if (useG4PairingTextDisplay) {
+          // G4：pairings → 分队文字行（复用 composition 行 UI，不用「组合N」）
+          card.pairingBlock = this._mapGroupG4PairingTextBlock(match, g, pairings, playerLookup);
+        } else {
+          // 其余：pairing 头像卡
+          card.pairingBlock = this._mapGroupPairingBlock(g, pairings, pairingTitle, playerLookup);
+        }
       }
       return card;
     });
   },
 
   /**
-   * 报名期 G2/G3：委托 strokeCompositionResolver，转成文字组合说明（与 group-editor 一致）
+   * G4 分组 TAB：pairings → 与 G2/G3 同款文字行
+   * 展示：{分队名称}：{球员}（无「组合1/2」标题）
+   */
+  _mapGroupG4PairingTextBlock(match, group, pairings, playerLookup) {
+    const emptyBlock = {
+      title: '',
+      isCompositionText: true,
+      pairings: [],
+      hasPairings: false,
+      incompletePlayers: [],
+      incompleteNamesText: '',
+      hasIncomplete: false
+    };
+    const groupId = group && group.groupId != null ? String(group.groupId) : '';
+    if (!groupId) return emptyBlock;
+    const list = pairings && Array.isArray(pairings[groupId]) ? pairings[groupId] : [];
+    if (!list.length) return emptyBlock;
+
+    const lookup = playerLookup || {};
+    const playerTeamLookup = this._buildLeaderboardPlayerTeamLookup(match);
+    const teamNameMap = this._buildLeaderboardTeamNameMap(match);
+
+    const comboViews = [];
+    list.forEach((pr, idx) => {
+      const ids = Array.isArray(pr && pr.playerIds)
+        ? pr.playerIds.map((id) => String(id || '').trim()).filter(Boolean)
+        : [];
+      if (!ids.length) return;
+
+      const names = ids.map((id) => {
+        const fromLookup = lookup[id] || null;
+        return (fromLookup && fromLookup.nickname) || id || '';
+      }).filter(Boolean);
+      if (!names.length) return;
+
+      let teamLabel = '';
+      for (let i = 0; i < ids.length; i++) {
+        const name = this._resolveLeaderboardPlayerTeamName(
+          ids[i],
+          playerTeamLookup,
+          teamNameMap
+        );
+        if (name) {
+          teamLabel = name;
+          break;
+        }
+      }
+      if (!teamLabel) teamLabel = '分队';
+
+      comboViews.push({
+        id: (pr && pr.id != null && String(pr.id).trim()) || ('g4_pair_' + (idx + 1)),
+        label: teamLabel,
+        namesText: names.join(' / '),
+        members: []
+      });
+    });
+
+    return {
+      title: '',
+      isCompositionText: true,
+      pairings: comboViews,
+      hasPairings: comboViews.length > 0,
+      incompletePlayers: [],
+      incompleteNamesText: '',
+      hasIncomplete: false
+    };
+  },
+
+  /**
+   * 队内赛 G2/G3：委托 strokeCompositionResolver，转成文字组合说明
+   * 展示：{分队名称}：{球员}（无标题、无序号）；报名 / LIVE 共用
    */
   _mapGroupCompositionBlock(match, group, playerLookup) {
     const emptyBlock = {
-      title: '组合',
+      title: '',
       isCompositionText: true,
       pairings: [],
       hasPairings: false,
@@ -1160,14 +1242,14 @@ Page({
             : '分队';
       return {
         id: 'composition_' + (index + 1),
-        label: index + 1 + '. ' + teamName,
+        label: teamName,
         namesText: namesText,
         members: []
       };
     }).filter((pr) => pr.namesText);
 
     return {
-      title: '组合',
+      title: '',
       isCompositionText: true,
       pairings: comboViews,
       hasPairings: comboViews.length > 0,

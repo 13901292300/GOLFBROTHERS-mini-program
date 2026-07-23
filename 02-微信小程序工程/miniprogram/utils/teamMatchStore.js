@@ -459,12 +459,15 @@ function clonePairings(pairings) {
   return out;
 }
 
-/** 去掉空组合（无 playerIds） */
+/**
+ * 规范化 pairings：保留成绩行槽位（含空 playerIds）
+ * 仅丢弃无 id 的脏数据；禁止因无人占用而删除 slot
+ */
 function sanitizePairings(pairings) {
   const cloned = clonePairings(pairings);
   const out = {};
   Object.keys(cloned).forEach((groupId) => {
-    const list = (cloned[groupId] || []).filter((p) => p && Array.isArray(p.playerIds) && p.playerIds.length > 0);
+    const list = (cloned[groupId] || []).filter((p) => p && p.id != null && String(p.id).trim() !== '');
     if (list.length) out[groupId] = list;
   });
   return out;
@@ -783,7 +786,7 @@ function clearUserFromFormalGroups(match, userId) {
 }
 
 /**
- * 从 pairings 移除该 userId；清空的组合删除；组下无组合则去掉该 group key
+ * 从 pairings 移除该 userId；清空成员但保留成绩行槽位（含空 playerIds）
  */
 function clearUserFromPairings(match, userId) {
   const uid = String(userId || '').trim();
@@ -791,12 +794,10 @@ function clearUserFromPairings(match, userId) {
   const cloned = clonePairings(match.pairings);
   const out = {};
   Object.keys(cloned).forEach((groupId) => {
-    const list = (cloned[groupId] || [])
-      .map((p) => ({
-        id: p.id,
-        playerIds: (p.playerIds || []).filter((id) => String(id) !== uid)
-      }))
-      .filter((p) => p.playerIds.length > 0);
+    const list = (cloned[groupId] || []).map((p) => ({
+      id: p.id,
+      playerIds: (p.playerIds || []).filter((id) => String(id) !== uid)
+    }));
     if (list.length) out[groupId] = list;
   });
   match.pairings = out;

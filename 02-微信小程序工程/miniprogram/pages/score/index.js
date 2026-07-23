@@ -1445,6 +1445,8 @@ Page({
       mode: 'stroke_entity',
       groupId: gid
     });
+    // 与 individual_stroke 一致：顶栏/Context Panel 继承 matchState.course（创建时快照）
+    this.buildGameContextFromMatchState(ms);
     this.refreshEntities();
     console.log('[stroke_entity] init', {
       matchId: matchId,
@@ -1479,6 +1481,87 @@ Page({
     return map;
   },
 
+  /** 队内赛记分行第一列：赛制标题（team 样式用） */
+  _resolveEntityTeamLabel(match) {
+    const gameMode = String(
+      (match && (match.gameMode || match.selectedGameMode)) ||
+        ((this._matchState || {}).course && (this._matchState || {}).course.gameMode) ||
+        ''
+    );
+    if (gameMode.indexOf('最佳球位') >= 0) return '最佳球位';
+    if (gameMode.indexOf('四人四球') >= 0) return '四人四球';
+    if (gameMode.indexOf('最好成绩') >= 0) return '最好成绩';
+    if (gameMode.indexOf('四人两球') >= 0) return '四人两球';
+    return '组合';
+  },
+
+  /**
+   * 第一列 kind：按赛制，不按 members.length
+   * - G4（entityType=pair / 四人两球）：永远 pair
+   * - G2/G3 compositionMode=2+2：pair
+   * - G2/G3 compositionMode=4+0：team
+   */
+  _resolveEntityRowKind(entity, match) {
+    const entityType = entity && entity.entityType ? String(entity.entityType) : '';
+    const gameMode = String(
+      (match && (match.gameMode || match.selectedGameMode)) || ''
+    );
+    if (entityType === 'pair' || gameMode === '四人两球比杆赛') {
+      return 'pair';
+    }
+    const fromEntity =
+      entity && entity.compositionMode != null
+        ? String(entity.compositionMode).trim()
+        : '';
+    const fromMatch =
+      match && match.strokeCompositionMode != null
+        ? String(match.strokeCompositionMode).trim()
+        : '';
+    const compositionMode = fromEntity === '2+2' || fromMatch === '2+2' ? '2+2' : '4+0';
+    return compositionMode === '2+2' ? 'pair' : 'team';
+  },
+
+  /** 成员展示列表（含头像）；空成员保留为空数组 */
+  _buildEntityMemberDisplay(entity, match, nameMap) {
+    const members = Array.isArray(entity && entity.members) ? entity.members : [];
+    return members
+      .map((id) => {
+        const key = id != null ? String(id).trim() : '';
+        if (!key) return null;
+        const profile = this._buildScoreTeamMatchPlayerProfile(match, key, {});
+        const name =
+          (nameMap && nameMap[key]) ||
+          (profile && profile.name) ||
+          key ||
+          '球员';
+        const avatarRaw = (profile && profile.avatar) || '';
+        return {
+          userId: key,
+          name: this._shortName(name) || name || '球员',
+          avatar: mockAvatars.resolveAvatar(avatarRaw, key)
+        };
+      })
+      .filter(Boolean);
+  },
+
+  _buildEntityPairMembers(memberDisplay, paletteStart) {
+    const PAIR_LEFT = ['24rpx', '128rpx'];
+    const list = Array.isArray(memberDisplay) ? memberDisplay.slice(0, 2) : [];
+    let gpos = paletteStart || 0;
+    return list.map((m, mi) => {
+      const tp = TEE_PALETTE[gpos % TEE_PALETTE.length];
+      gpos += 1;
+      return {
+        name: (m && m.name) || '球员',
+        avatar: (m && m.avatar) || '',
+        teeColor: tp.teeColor,
+        left: PAIR_LEFT[mi] || 24 + mi * 104 + 'rpx',
+        tf: mi === 1 ? 'translateX(var(--pair-second-shift, 0rpx))' : 'none'
+      };
+    });
+  },
+
+  /** @deprecated 保留兼容；展示以 kind / pairMembers / label 为准 */
   _buildEntityDisplayName(entity, index, nameMap) {
     const type = entity && entity.entityType ? String(entity.entityType) : '';
     const members = Array.isArray(entity && entity.members) ? entity.members : [];
@@ -1491,23 +1574,72 @@ Page({
         .filter(Boolean);
       return names.length ? names.join(' + ') : '组合';
     }
-    return '第' + (index + 1) + '组组合';
+    const names = members
+      .map((id) => {
+        const key = id != null ? String(id).trim() : '';
+        return (nameMap && nameMap[key]) || key || '';
+      })
+      .filter(Boolean);
+    return names.length ? names.join(' + ') : '组合';
   },
 
   /**
-   * Patch-02C1：_entitiesSource → entitiesView（只展示，不录入）
+   * Patch-02C1：_entitiesSource → entitiesView
+   * 第一列复用 fourball 的 single/pair/team 视觉字段（kind / avatar / pairMembers）
    */
   refreshEntities() {
     const displayMode = this.data.scoreDisplayMode;
     const nameMap = this._resolveEntityMemberNameMap();
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = (ms && ms.matchId) || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const teamLabel = this._resolveEntityTeamLabel(match);
+    let palettePos = 0;
+
     const entitiesView = (this._entitiesSource || []).map((entity, index) => {
       const entityId = entity && entity.entityId != null ? String(entity.entityId) : '';
       const entityType = entity && entity.entityType ? String(entity.entityType) : '';
       const members = Array.isArray(entity && entity.members) ? entity.members.slice() : [];
-      const displayName = this._buildEntityDisplayName(entity, index, nameMap);
+      const kind = this._resolveEntityRowKind(entity, match);
+      const memberDisplay = this._buildEntityMemberDisplay(entity, match, nameMap);
+      const memberNamesText = memberDisplay.map((m) => m.name).filter(Boolean).join(' / ');
+      let pairMembers = [];
+      let avatar = '';
+      let name = '';
+      let label = teamLabel;
+      let colorClass = '';
+      let isSingle = false;
+
+      if (kind === 'pair') {
+        pairMembers = this._buildEntityPairMembers(memberDisplay, palettePos);
+        palettePos += Math.max(pairMembers.length, 1);
+        name = memberNamesText || '组合';
+        avatar = (pairMembers[0] && pairMembers[0].avatar) || '';
+      } else if (kind === 'single') {
+        const m0 = memberDisplay[0] || {};
+        colorClass = GAME_COLOR_CLASSES[palettePos % GAME_COLOR_CLASSES.length];
+        palettePos += 1;
+        isSingle = true;
+        name = m0.name || '球员';
+        avatar = m0.avatar || '';
+        label = name;
+      } else {
+        // team：按赛制标题，不按成员数
+        palettePos += Math.max(memberDisplay.length, 1);
+        name = memberNamesText || teamLabel;
+        avatar = (memberDisplay[0] && memberDisplay[0].avatar) || '';
+        label = teamLabel;
+      }
+
+      const displayName =
+        kind === 'team'
+          ? label
+          : kind === 'pair'
+            ? memberDisplay.map((m) => m.name).filter(Boolean).join(' + ') || '组合'
+            : name;
+
       const scores = Array.isArray(entity && entity.scores) ? entity.scores.slice() : [];
       const putts = Array.isArray(entity && entity.putts) ? entity.putts.slice() : [];
-      // 复用 enrichPlayer 洞格派生（不改 _entitiesSource 成绩）
       const enriched = enrichPlayer(
         {
           id: entityId,
@@ -1515,7 +1647,7 @@ Page({
           name: displayName,
           scores: scores,
           putts: putts,
-          avatar: ''
+          avatar: avatar || ''
         },
         index,
         displayMode
@@ -1532,20 +1664,19 @@ Page({
       return {
         entityId: entityId,
         entityType: entityType,
-        members: members.map((id) => {
-          const key = id != null ? String(id).trim() : '';
-          return {
-            userId: key,
-            name: (nameMap && nameMap[key]) || key || ''
-          };
-        }),
-        memberNamesText: members
-          .map((id) => {
-            const key = id != null ? String(id).trim() : '';
-            return (nameMap && nameMap[key]) || key || '';
-          })
-          .filter(Boolean)
-          .join(' / '),
+        kind: kind,
+        isSingle: isSingle,
+        label: label,
+        name: name,
+        avatar: avatar,
+        colorClass: colorClass,
+        pairMembers: pairMembers,
+        memberDisplay: memberDisplay,
+        members: memberDisplay.map((m) => ({
+          userId: m.userId,
+          name: m.name
+        })),
+        memberNamesText: memberNamesText,
         displayName: displayName,
         scores: scores,
         putts: putts,
@@ -1553,10 +1684,22 @@ Page({
         diff: diff,
         relScoreStr: enriched.relScoreStr,
         relClass: enriched.relClass,
+        teamDiffStr: enriched.relScoreStr,
+        teamDiffClass: enriched.relClass,
         cells: enriched.cells
       };
     });
-    this.setData({ entitiesView: entitiesView });
+
+    const hasPair = entitiesView.some((row) => row && row.kind === 'pair');
+    const colStartW = hasPair ? 344 : 300;
+    const scoreboardStyle = this._buildScoreboardStyleVars({
+      colWidth: colStartW,
+      bestDiffGrow: 1
+    });
+    this.setData({
+      entitiesView: entitiesView,
+      scoreboardStyle: scoreboardStyle
+    });
   },
 
   /**
@@ -2226,8 +2369,49 @@ Page({
     this.refreshPlayers();
   },
 
+  /**
+   * 记分面板侧栏：按 entity kind 生成 name / avatar（不改成绩）
+   * - pair：成员头像（首成员）+ 成员姓名
+   * - team：赛制/团队标题
+   * - single：单人姓名 + 头像
+   */
+  _resolveEntitySheetSidebarMeta(entView, entity, index, nameMap) {
+    const view = entView || {};
+    const kind = view.kind ? String(view.kind) : 'team';
+    const memberDisplay = Array.isArray(view.memberDisplay) ? view.memberDisplay : [];
+
+    if (kind === 'pair') {
+      const names = memberDisplay.map((m) => m && m.name).filter(Boolean);
+      const avatar =
+        (memberDisplay[0] && memberDisplay[0].avatar) ||
+        (view.pairMembers && view.pairMembers[0] && view.pairMembers[0].avatar) ||
+        view.avatar ||
+        '';
+      return {
+        name: names.length
+          ? names.join(' / ')
+          : view.name || this._buildEntityDisplayName(entity, index, nameMap) || '组合',
+        avatar: avatar
+      };
+    }
+
+    if (kind === 'single') {
+      const m0 = memberDisplay[0] || {};
+      return {
+        name: view.name || m0.name || this._buildEntityDisplayName(entity, index, nameMap) || '球员',
+        avatar: view.avatar || m0.avatar || ''
+      };
+    }
+
+    // team：保持团队展示（赛制标题），头像用首成员（与 fourball 组行一致，可为空）
+    return {
+      name: view.label || view.displayName || '组合',
+      avatar: view.avatar || (memberDisplay[0] && memberDisplay[0].avatar) || ''
+    };
+  },
+
   syncSheetPlayers() {
-    // Stroke Entity：面板侧栏来自 _entitiesSource（不读 _playersSource）
+    // Stroke Entity：面板侧栏来自 entitiesView / _entitiesSource（不读 _playersSource）
     if (this.data.mode === 'stroke_entity') {
       const {
         sheetPar,
@@ -2243,10 +2427,8 @@ Page({
       const views = entitiesView || [];
       const nameMap = this._resolveEntityMemberNameMap();
       const sheetPlayers = entities.map((entity, idx) => {
-        const entView = views[idx];
-        const displayName =
-          (entView && entView.displayName) ||
-          this._buildEntityDisplayName(entity, idx, nameMap);
+        const entView = views[idx] || {};
+        const meta = this._resolveEntitySheetSidebarMeta(entView, entity, idx, nameMap);
         const formal = entity && Array.isArray(entity.scores) ? entity.scores[sheetHoleIndex] : null;
         const hasFormal = isFilledScore(formal);
         let holeScore = '';
@@ -2276,8 +2458,8 @@ Page({
         }
         return {
           id: (entity && entity.entityId) || 'entity_' + idx,
-          name: displayName,
-          avatar: '',
+          name: meta.name,
+          avatar: meta.avatar,
           active: idx === activeEntityIndex,
           holeScore: holeScore,
           isDraftScore: isDraftScore
@@ -2438,11 +2620,8 @@ Page({
     });
 
     const matchStateForBack = this._readMatchState();
-    if (
-      matchStateForBack &&
-      matchStateForBack.matchId &&
-      this.data.mode === 'individual_stroke'
-    ) {
+    // 队内赛 / 赛事记分：有 matchId 即回详情（含 stroke_entity，勿仅限 individual_stroke）
+    if (matchStateForBack && matchStateForBack.matchId) {
       console.log('[score-back-source]', {
         source: 'teamMatch',
         matchId: matchStateForBack.matchId,
@@ -2535,21 +2714,34 @@ Page({
     const progress = Math.min(1, Math.max(0, scrollLeft / 72));
     const eased = 1 - Math.pow(1 - progress, 3);
     const isBest = this.data.mode === 'fourball_best';
-    const hasPairSwipe = isBest && progress > 0 && this._engineHasPairGroups();
+    const isEntity = this.data.mode === 'stroke_entity';
+    const entityHasPair =
+      isEntity &&
+      (this.data.entitiesView || []).some((row) => row && row.kind === 'pair');
+    const hasPairSwipe =
+      (isBest && progress > 0 && this._engineHasPairGroups()) ||
+      (entityHasPair && progress > 0);
     const paddingX = 24 - (24 - 16) * eased;
     const diffOpacity = Math.max(0, 1 - progress * 1.35);
-    const diffColW = isBest ? 96 * diffOpacity : 96;
+    const diffColW = isBest || isEntity ? 96 * diffOpacity : 96;
     let colWidth;
     if (hasPairSwipe) {
       colWidth = this._computePairSwipeColumnWidth(paddingX, progress, diffColW);
     } else {
-      const startW = isBest ? this._computeBestballColStartWidth() : 240;
-      const minW = isBest ? Math.max(200, Math.round(startW * 0.67)) : 128;
+      const startW = isBest
+        ? this._computeBestballColStartWidth()
+        : isEntity
+          ? entityHasPair
+            ? 344
+            : 300
+          : 240;
+      const minW =
+        isBest || isEntity ? Math.max(200, Math.round(startW * 0.67)) : 128;
       colWidth = startW - (startW - minW) * eased;
     }
     const nameWidth = 192 - (192 - 88) * eased;
     const labelSize = 30 - (30 - 20) * eased;
-    const bestDiffGrow = isBest ? diffOpacity : 1;
+    const bestDiffGrow = isBest || isEntity ? diffOpacity : 1;
     const pairSecondShift = -(PAIR_SWIPE_GEOM.SECOND_SHIFT_MAX * progress);
     let pairContainerShift = 0;
     if (hasPairSwipe) {
@@ -5772,6 +5964,16 @@ Page({
 
   onSheetPlayerTap(e) {
     const idx = Number(e.currentTarget.dataset.idx);
+    // Stroke Entity：侧栏切换走 activeEntityIndex，禁止落入 _focusSheetPlayer
+    if (this.data.mode === 'stroke_entity') {
+      if (this.data.scorePanelMode === 'quick') {
+        if (!this.data.quickScoreClearDraft) return;
+        this._resumeQuickEditAfterClearEntity(idx);
+        return;
+      }
+      this._focusSheetEntity(idx);
+      return;
+    }
     // 快捷清除草稿中：点头像退出清除 → 本洞默认 PAR 草稿（不恢复清除前正式分）
     if (this.data.scorePanelMode === 'quick') {
       if (!this.data.quickScoreClearDraft) return;
@@ -5784,6 +5986,26 @@ Page({
       return;
     }
     this._focusSheetPlayer(idx);
+  },
+
+  /** 快捷清除显示中点 Entity：退出清除 UI，仅恢复面板草稿（不写正式成绩） */
+  _resumeQuickEditAfterClearEntity(entityIdx) {
+    if (this.data.mode !== 'stroke_entity') return;
+    const par = this.data.sheetPar;
+    const entities = this._entitiesSource || [];
+    const quick = entities.map(() => par);
+    this.setData({
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: true,
+      activeEntityIndex: entityIdx,
+      panelScore: par,
+      panelPutt: 2,
+      panelPuttTouched: false,
+      panelFairway: FAIRWAY_FAIRWAY,
+      panelPenalty: 0,
+      panelBunker: 0,
+      quickPanelScores: quick
+    }, () => this.syncSheetPlayers());
   },
 
   /** 快捷清除显示中点球员：退出清除 UI，仅恢复面板草稿（不写 _playersSource） */
@@ -6042,7 +6264,16 @@ Page({
     this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
     this.refreshEntities();
     this.persistSession();
-    this._hideScoreSheet();
+
+    // 技术面板：对齐 G1 — 本洞还有未填 entity 则切换并保持面板；全部填完才关闭
+    const next = (this._entitiesSource || []).findIndex(
+      (ent) => !isFilledScore((ent && ent.scores ? ent.scores : [])[sheetHoleIndex])
+    );
+    if (next !== -1) {
+      this._focusSheetEntity(next);
+    } else {
+      this._hideScoreSheet();
+    }
   },
 
   /**
@@ -6231,6 +6462,57 @@ Page({
     this.setData({
       scoreClearDraft: false,
       activePlayerIdx: idx,
+      panelScore: score,
+      panelPutt: putt,
+      panelPuttTouched: hasScore,
+      panelFairway: fairway,
+      panelPenalty: penalty,
+      panelBunker: sand
+    }, () => {
+      this.syncSheetPlayers();
+      if (switched) this._pulseTechPanelFocus();
+    });
+  },
+
+  /**
+   * 技术面板：聚焦到指定 Entity（对称 _focusSheetPlayer）
+   * 使用 activeEntityIndex + _entitiesSource，不碰 _playersSource / activePlayerIdx
+   */
+  _focusSheetEntity(idx) {
+    if (this.data.mode !== 'stroke_entity') return;
+    const holeIndex = this.data.sheetHoleIndex;
+    const par = this.data.sheetPar;
+    const entity = (this._entitiesSource || [])[idx];
+    if (!entity) return;
+    const switched = Number(this.data.activeEntityIndex) !== Number(idx);
+
+    if (this.data.scoreHoleClearPending) {
+      this.setData({
+        scoreClearDraft: false,
+        activeEntityIndex: idx,
+        panelScore: par,
+        panelPutt: 2,
+        panelPuttTouched: false,
+        panelFairway: FAIRWAY_FAIRWAY,
+        panelPenalty: 0,
+        panelBunker: 0
+      }, () => {
+        this.syncSheetPlayers();
+        if (switched) this._pulseTechPanelFocus();
+      });
+      return;
+    }
+
+    const raw = Array.isArray(entity.scores) ? entity.scores[holeIndex] : null;
+    const hasScore = isFilledScore(raw);
+    const score = hasScore ? raw : par;
+    const putt = (Array.isArray(entity.putts) && entity.putts[holeIndex]) || 2;
+    const fairway = resolveHoleFairway(entity.fairways, holeIndex);
+    const penalty = resolveHolePenalty(entity.penalties, holeIndex);
+    const sand = resolveHoleSand(entity.sands, holeIndex);
+    this.setData({
+      scoreClearDraft: false,
+      activeEntityIndex: idx,
       panelScore: score,
       panelPutt: putt,
       panelPuttTouched: hasScore,

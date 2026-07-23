@@ -67,9 +67,8 @@
             </view>
           </view>
 
-          <!-- G2/G3 报名期 2+2：只读组合预览（由座位自动生成，不保存） -->
+          <!-- G2/G3 报名 / G4 报名编辑：只读组合预览（与 composition-preview 同款） -->
           <view wx:if="{{item.compositionPreview}}" class="composition-preview" catchtap="stopPropagation">
-            <text class="composition-preview__title">{{item.compositionPreview.title}}</text>
             <view wx:if="{{item.compositionPreview.showCombo1}}" class="composition-preview__row">
               <text class="composition-preview__label">{{item.compositionPreview.combo1Label}}：</text>
               <text class="composition-preview__names">{{item.compositionPreview.combo1Text}}</text>
@@ -80,9 +79,9 @@
             </view>
           </view>
 
-          <!-- LIVE / 非组合模式赛制：保留原组合分配区域 -->
+          <!-- LIVE / 非 G4 组合分配区；G4 报名用上方 composition-preview -->
           <view wx:if="{{showPairingSection && item.pairingBlock}}" class="pairing-section" catchtap="stopPropagation">
-            <view class="pairing-section__head">
+            <view wx:if="{{item.pairingBlock.title}}" class="pairing-section__head">
               <text class="pairing-section__title">{{item.pairingBlock.title}}</text>
             </view>
 
@@ -119,7 +118,7 @@
               <text class="pairing-incomplete__names">{{item.pairingBlock.incompleteNamesText}}</text>
             </view>
 
-            <view class="pairing-toolbar">
+            <view wx:if="{{showPairingComposeTools}}" class="pairing-toolbar">
               <view
                 class="pairing-tool-btn"
                 catchtap="onAutoPairTap"

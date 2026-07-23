@@ -1,9 +1,176 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const playerManage = require('../../../utils/playerManage.js');
+const { buildRegisterTeamMap } = require('../../../utils/strokeEntityValidator.js');
 
 const TEE_BLUE = 'BLUE_T';
 const TEE_RED = 'RED_T';
+
+function listFilledPickPlayers(players) {
+  return (Array.isArray(players) ? players : [])
+    .map((p) => ({
+      userId: p && p.userId != null ? String(p.userId).trim() : '',
+      position: Number(p && p.position) || 0
+    }))
+    .filter((p) => p.userId)
+    .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+}
+
+function ensurePlayersHaveTeam(filled, teamMap) {
+  for (let i = 0; i < filled.length; i++) {
+    const uid = filled[i].userId;
+    const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return '存在未归属分队的球员，请先完成报名分队';
+    }
+  }
+  return '';
+}
+
+function isSameTeamMembers(userIds, teamMap) {
+  let first = '';
+  for (let i = 0; i < userIds.length; i++) {
+    const tid = teamMap && teamMap[userIds[i]] != null ? String(teamMap[userIds[i]]).trim() : '';
+    if (!tid) return false;
+    if (!first) first = tid;
+    else if (tid !== first) return false;
+  }
+  return true;
+}
+
+/**
+ * 按分队分桶后桶内每 2 人切成成绩组合（与 2+2 / G4 pair 生成思路一致）
+ * @returns {Array<{ teamId: string, members: string[] }>}
+ */
+function generatePairCompositionsByTeam(filled, teamMap) {
+  const buckets = {};
+  const teamOrder = [];
+  filled.forEach((p) => {
+    const tid = teamMap && teamMap[p.userId] != null ? String(teamMap[p.userId]).trim() : '';
+    const key = tid || '__unknown__';
+    if (!buckets[key]) {
+      buckets[key] = [];
+      teamOrder.push(key);
+    }
+    buckets[key].push(p);
+  });
+
+  const compositions = [];
+  teamOrder.forEach((teamId) => {
+    const list = (buckets[teamId] || []).slice().sort(
+      (a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId))
+    );
+    for (let i = 0; i < list.length; i += 2) {
+      const chunk = list.slice(i, i + 2);
+      compositions.push({
+        teamId: teamId === '__unknown__' ? '' : teamId,
+        members: chunk.map((p) => p.userId)
+      });
+    }
+  });
+  return compositions;
+}
+
+/**
+ * 校验每个成绩组合内部同队，且 2 人 pair 无落单
+ */
+function validateGeneratedPairCompositions(compositions, teamMap, expectedPairCount) {
+  if (!Array.isArray(compositions) || compositions.length !== expectedPairCount) {
+    return '无法形成合法的同队两人组合';
+  }
+  for (let i = 0; i < compositions.length; i++) {
+    const members = compositions[i] && Array.isArray(compositions[i].members)
+      ? compositions[i].members
+      : [];
+    if (members.length !== 2) {
+      return '无法形成合法的同队两人组合';
+    }
+    if (!isSameTeamMembers(members, teamMap)) {
+      return '成绩组合不能跨分队';
+    }
+  }
+  return '';
+}
+
+/**
+ * G4：先按分队生成 2 人 pair，再验每组合内部同队
+ */
+function validateG4GroupStructurePlayers(players, teamMap) {
+  const filled = listFilledPickPlayers(players);
+  if (!filled.length) return '';
+
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap);
+  if (teamErr) return teamErr;
+
+  const n = filled.length;
+  if (n !== 2 && n !== 4) {
+    return '四人两球每组须为 2 人或 4 人';
+  }
+
+  const compositions = generatePairCompositionsByTeam(filled, teamMap);
+  return validateGeneratedPairCompositions(compositions, teamMap, n / 2);
+}
+
+/**
+ * G2/G3 2+2：按分队数量与各队人数判断能否拆成两个组合（每组合最多 2 人）
+ * - 1 分队：永远合法
+ * - 2 分队：各队人数均 ≤2（允许 2+2 / 2+1 / 1+1；禁止 3+1）
+ * - 3+ 分队：非法
+ */
+function validateG2G3TwoPlusTwoPlayers(filled, teamMap) {
+  if (!filled.length) return '';
+  if (filled.length > 4) {
+    return '2+2模式下每组最多 4 人';
+  }
+
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = teamMap && teamMap[p.userId] != null ? String(teamMap[p.userId]).trim() : '';
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p.userId);
+  });
+  const teamIds = Object.keys(buckets);
+  const teamCount = teamIds.length;
+
+  if (teamCount === 1) {
+    return '';
+  }
+  if (teamCount === 2) {
+    for (let i = 0; i < teamIds.length; i++) {
+      if (buckets[teamIds[i]].length > 2) {
+        return '2+2模式下每个组合最多 2 人，无法按分队拆成合法组合';
+      }
+    }
+    return '';
+  }
+  return '2+2模式同组最多来自两个分队';
+}
+
+/**
+ * G2/G3：先按模式生成组合，再验每组合内部同队
+ */
+function validateStrokeCompositionPlayers(players, compositionMode, teamMap) {
+  const mode = compositionMode === '2+2' ? '2+2' : '4+0';
+  const filled = listFilledPickPlayers(players);
+  if (!filled.length) return '';
+
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap);
+  if (teamErr) return teamErr;
+
+  if (mode === '4+0') {
+    // 一个组合最多 4 人；允许 1–4；整组即一个组合，不可跨分队
+    if (filled.length > 4) {
+      return '4+0模式下每组最多 4 人';
+    }
+    const ids = filled.map((p) => p.userId);
+    if (!isSameTeamMembers(ids, teamMap)) {
+      return '4+0组合不能跨分队';
+    }
+    return '';
+  }
+
+  return validateG2G3TwoPlusTwoPlayers(filled, teamMap);
+}
 
 function createEmptySlot(position) {
   return {
@@ -149,6 +316,15 @@ Page({
     const payload = this._resolvePayload(matchId);
     this._registerInfo = payload.registerInfo || { totalCount: 0, users: [] };
     this._allGroups = payload.groups || [];
+    this._match = payload.match || null;
+    this._gameMode = String(
+      payload.gameMode
+      || (payload.match && (payload.match.gameMode || payload.match.selectedGameMode))
+      || ''
+    );
+    this._strokeCompositionMode =
+      payload.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
+    this._showCompositionMode = !!payload.showCompositionMode;
     this._leavingConfirmed = false;
 
     const editingGroupIndex = (this._allGroups || []).findIndex(
@@ -190,8 +366,19 @@ Page({
     const app = getApp();
     const payload = (app && app.globalData && app.globalData.tournamentGroupPickPayload) || null;
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const modeFromPayload = payload && payload.strokeCompositionMode;
+    const modeFromMatch = match && match.strokeCompositionMode;
+    const strokeCompositionMode =
+      modeFromPayload === '2+2' || (!modeFromPayload && modeFromMatch === '2+2')
+        ? '2+2'
+        : '4+0';
     return {
       match: match,
+      gameMode: payload && payload.gameMode != null
+        ? String(payload.gameMode)
+        : (match && (match.gameMode || match.selectedGameMode)) || '',
+      strokeCompositionMode: strokeCompositionMode,
+      showCompositionMode: !!(payload && payload.showCompositionMode),
       registerInfo: payload && payload.registerInfo ? payload.registerInfo : (match && match.registerInfo) || { totalCount: 0, users: [] },
       registerSubTabs: payload && Array.isArray(payload.registerSubTabs) ? payload.registerSubTabs : [],
       players: payload && Array.isArray(payload.players) ? payload.players : [],
@@ -259,9 +446,25 @@ Page({
   },
 
   /**
+   * 4+0：当前组已有球员时锁定其 teamGroupId；空组不锁定
+   */
+  _resolveLockedTeamIdFor40(slots, teamMap) {
+    if (!teamMap) return '';
+    const selected = (slots || [])
+      .map((s) => String((s && s.userId) || '').trim())
+      .filter(Boolean);
+    if (!selected.length) return '';
+    for (let i = 0; i < selected.length; i++) {
+      const tid = teamMap[selected[i]] != null ? String(teamMap[selected[i]]).trim() : '';
+      if (tid) return tid;
+    }
+    return '';
+  },
+
+  /**
    * 弹窗列表状态：
    * checked  = 是否在当前 slots（临时选中）
-   * disabled = 是否在其它出发组（与 checked / 当前组原始名单无关）
+   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队
    */
   _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
@@ -271,7 +474,15 @@ Page({
     const occupiedMap = this._buildOccupiedMap(editId, editIdx);
     const selectedCount = Object.keys(selectedMap).length;
     const groupFull = selectedCount >= 4;
-    const selectedIds = slotsToSelectedIds(slots);
+
+    const apply40TeamLock =
+      !!this._showCompositionMode && this._strokeCompositionMode === '4+0';
+    const teamMap = apply40TeamLock
+      ? buildRegisterTeamMap({ registerInfo: registerInfo || { users: [] } })
+      : null;
+    const lockedTeamId = apply40TeamLock
+      ? this._resolveLockedTeamIdFor40(slots, teamMap)
+      : '';
 
     return users
       .map(normalizeUser)
@@ -281,14 +492,17 @@ Page({
         const checked = !!selectedMap[uid];
         const occupiedGroupName = occupiedMap[uid] || '';
         const isOccupied = !!occupiedGroupName;
-        // disabled 只看其它出发组占用；满员时仅未选中者不可再选
         let isDisabled = false;
         if (isOccupied) {
           isDisabled = true;
         } else if (!checked && groupFull) {
           isDisabled = true;
-        } else {
-          isDisabled = false;
+        } else if (!checked && lockedTeamId) {
+          const candTeam =
+            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+          if (candTeam !== lockedTeamId) {
+            isDisabled = true;
+          }
         }
         return Object.assign({}, u, {
           isSelected: checked,
@@ -337,7 +551,41 @@ Page({
     };
   },
 
+  /**
+   * 确定前校验；失败 toast 并 return false（不 navigateBack、不改用户选择）
+   */
+  _validateBeforeCommit() {
+    const payload = this._buildConfirmPayload();
+    const teamMap = buildRegisterTeamMap({
+      registerInfo: this._registerInfo || { users: [] }
+    });
+
+    if (this._gameMode === '四人两球比杆赛') {
+      const err = validateG4GroupStructurePlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    // G2/G3：先生成组合结构，再验每个成绩组合内部是否同队
+    if (this._showCompositionMode) {
+      const err = validateStrokeCompositionPlayers(
+        payload.players,
+        this._strokeCompositionMode,
+        teamMap
+      );
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+    }
+    return true;
+  },
+
   _commitAndBack() {
+    if (!this._validateBeforeCommit()) return;
     const app = getApp();
     app.globalData = app.globalData || {};
     app.globalData.tournamentGroupPickResult = this._buildConfirmPayload();
@@ -387,7 +635,7 @@ Page({
 
   /**
    * 勾选/取消：只改 slots（临时选中），再重建列表。
-   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap 判断。
+   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 分队锁判断。
    */
   onTogglePlayer(e) {
     const user = e.currentTarget.dataset.user || null;
@@ -405,7 +653,7 @@ Page({
 
     const selectedIndex = slots.findIndex((s) => String((s && s.userId) || '') === pickedUserId);
 
-    // 取消勾选：清空该位置
+    // 取消勾选：清空该位置（含删光后恢复全部分队可选）
     if (selectedIndex >= 0) {
       slots[selectedIndex] = createEmptySlot(slots[selectedIndex].position || (selectedIndex + 1));
       const displayUsers = this._buildDisplayUsers(
@@ -417,6 +665,19 @@ Page({
       );
       this.setData({ slots: slots, displayUsers: displayUsers });
       return;
+    }
+
+    // 4+0：已有球员时禁止跨分队入座
+    if (this._showCompositionMode && this._strokeCompositionMode === '4+0') {
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const lockedTeamId = this._resolveLockedTeamIdFor40(slots, teamMap);
+      if (lockedTeamId) {
+        const candTeam =
+          teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
+        if (candTeam !== lockedTeamId) return;
+      }
     }
 
     if (this._countFilledSlots(slots) >= 4) {

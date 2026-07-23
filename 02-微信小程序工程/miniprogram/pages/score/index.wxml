@@ -225,7 +225,7 @@
           </view>
           </block>
 
-          <!-- tbody: stroke_entity；洞格点击 → onEntityScoreCellTap（不走 onScoreCellTap） -->
+          <!-- tbody: stroke_entity；第一列复用 fourball single/pair/team；洞格仍走 onEntityScoreCellTap -->
           <block wx:elif="{{mode === 'stroke_entity'}}">
           <view
             wx:for="{{entitiesView}}"
@@ -233,16 +233,50 @@
             wx:for-index="eIdx"
             class="scoreboard-row scoreboard-row--player entity-row"
           >
-            <view class="scoreboard-cell sticky-col entity-sticky-cell">
-              <view class="entity-card">
-                <view class="entity-top-line">
-                  <text class="entity-name">{{item.displayName}}</text>
-                  <view class="entity-diff-wrap">
-                    <text class="entity-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
+            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'single' ? 'bestball-single-cell' : (item.kind === 'pair' ? 'bestball-pair-cell' : 'bestball-mode-cell')}}">
+              <block wx:if="{{item.kind === 'single'}}">
+                <view class="player-card">
+                  <view class="player-top-line">
+                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <view class="player-diff-wrap">
+                      <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                    </view>
+                  </view>
+                  <text class="player-name-line">{{item.name}}</text>
+                </view>
+                <view class="player-tee-marker {{item.colorClass}}"></view>
+              </block>
+              <block wx:elif="{{item.kind === 'pair'}}">
+                <view class="player-cell-content">
+                  <view class="paired-avatars">
+                    <view class="pair-avatar-group">
+                      <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
+                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                      </view>
+                    </view>
+                    <view class="player-diff-wrap">
+                      <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                    </view>
+                  </view>
+                  <view class="paired-names">
+                    <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
                   </view>
                 </view>
-                <text class="entity-member">{{item.memberNamesText}}</text>
-              </view>
+                <view class="tee-marker-strip-right">
+                  <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="tee-half" style="background:{{pm.teeColor}};"></view>
+                </view>
+              </block>
+              <block wx:else>
+                <view class="bestball-mode-layout">
+                  <view class="bestball-mode-wrap">
+                    <text class="bestball-mode-kicker">TEAM SCORE</text>
+                    <text class="bestball-mode-main">{{item.label}}</text>
+                  </view>
+                  <view class="player-diff-wrap bestball-mode-diff">
+                    <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                  </view>
+                </view>
+              </block>
             </view>
 
             <view

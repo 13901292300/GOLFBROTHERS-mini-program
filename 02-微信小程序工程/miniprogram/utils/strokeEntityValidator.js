@@ -258,20 +258,49 @@ function validateG4(match) {
       return { valid: false, reason: 'missing_groupId' };
     }
     const filled = listFilledPlayers(group);
+    // 空组允许，不参与非法判断
+    if (!filled.length) {
+      continue;
+    }
+
     const n = filled.length;
     if (n !== 2 && n !== 4) {
       return { valid: false, reason: 'g4_player_count:' + n };
     }
-    const list = Array.isArray(pairings[groupId]) ? pairings[groupId] : [];
-    if (!list.length) {
-      return { valid: false, reason: 'g4_missing_pairings:' + groupId };
+
+    // 分队结构：所有人必须有分队归属
+    const buckets = {};
+    for (let f = 0; f < filled.length; f++) {
+      const uid = filled[f].userId;
+      const teamId = teamMap[uid] || '';
+      if (!teamId) {
+        return { valid: false, reason: 'g4_player_missing_team:' + uid };
+      }
+      if (!buckets[teamId]) buckets[teamId] = [];
+      buckets[teamId].push(uid);
     }
-    const expectedPairs = n / 2;
-    if (list.length !== expectedPairs) {
-      return { valid: false, reason: 'g4_pairing_count' };
+    const teamIds = Object.keys(buckets);
+    if (n === 2) {
+      // 2 人组：必须同一分队
+      if (teamIds.length !== 1) {
+        return { valid: false, reason: 'g4_2_cross_team' };
+      }
+    } else {
+      // 4 人组：单分队，或两个分队且 2+2
+      if (teamIds.length === 1) {
+        // ok
+      } else if (teamIds.length === 2) {
+        if (buckets[teamIds[0]].length !== 2 || buckets[teamIds[1]].length !== 2) {
+          return { valid: false, reason: 'g4_illegal_split' };
+        }
+      } else {
+        return { valid: false, reason: 'g4_too_many_teams:' + teamIds.length };
+      }
     }
 
-    const covered = {};
+    const list = Array.isArray(pairings[groupId]) ? pairings[groupId] : [];
+    // 允许空成绩行槽位（playerIds=[]）；占用组合仍须合法
+    const occupied = [];
     for (let p = 0; p < list.length; p++) {
       const pairing = list[p];
       const pairingId = pairing && pairing.id != null ? String(pairing.id).trim() : '';
@@ -281,6 +310,24 @@ function validateG4(match) {
       const ids = Array.isArray(pairing.playerIds)
         ? pairing.playerIds.map((id) => String(id || '').trim()).filter(Boolean)
         : [];
+      if (ids.length === 0) {
+        // 空成绩行：保留 slot，不参与占用校验
+        continue;
+      }
+      occupied.push({ pairingId: pairingId, ids: ids });
+    }
+
+    const expectedPairs = n / 2;
+    if (!occupied.length) {
+      return { valid: false, reason: 'g4_missing_pairings:' + groupId };
+    }
+    if (occupied.length !== expectedPairs) {
+      return { valid: false, reason: 'g4_pairing_count' };
+    }
+
+    const covered = {};
+    for (let p = 0; p < occupied.length; p++) {
+      const ids = occupied[p].ids;
       if (ids.length !== 2) {
         return { valid: false, reason: 'g4_pair_size:' + ids.length };
       }
@@ -289,10 +336,8 @@ function validateG4(match) {
       }
       const teamA = teamMap[ids[0]] || '';
       const teamB = teamMap[ids[1]] || '';
-      if (teamA || teamB) {
-        if (!teamA || !teamB || teamA !== teamB) {
-          return { valid: false, reason: 'g4_pair_cross_team' };
-        }
+      if (!teamA || !teamB || teamA !== teamB) {
+        return { valid: false, reason: 'g4_pair_cross_team' };
       }
       for (let k = 0; k < ids.length; k++) {
         if (covered[ids[k]]) {

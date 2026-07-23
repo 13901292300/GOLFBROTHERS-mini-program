@@ -7,9 +7,9 @@ const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const playerDirectory = require('../../../utils/playerDirectory.js');
 const tPosition = require('../../../utils/tPosition.js');
-const { validateStrokeEntities } = require('../../../utils/strokeEntityValidator.js');
-const { buildStrokeEntities } = require('../../../utils/strokeEntityBuilder.js');
-const { resolveStrokeCompositions } = require('../../../utils/strokeCompositionResolver.js');
+const { validateStrokeEntities, buildRegisterTeamMap } = require('../../../utils/strokeEntityValidator.js');
+const { syncStrokeEntities } = require('../../../utils/strokeEntityBuilder.js');
+const { normalizeFormalGroupSeats } = require('../../../utils/strokeGroupSeatNormalizer.js');
 
 const STROKE_ENTITY_INVALID_TIP = '当前分组不符合该比赛赛制要求，请重新分组。';
 
@@ -164,6 +164,40 @@ function toFormalGroups(list) {
   });
 }
 
+/** G4：userId → 报名分队（matchTeamId || groupId） */
+function buildG4RegisterTeamMap(match) {
+  const users =
+    match && match.registerInfo && Array.isArray(match.registerInfo.users)
+      ? match.registerInfo.users
+      : [];
+  const map = {};
+  users.forEach((user) => {
+    const uid = user && user.userId != null ? String(user.userId).trim() : '';
+    if (!uid) return;
+    const teamId =
+      user.matchTeamId != null && String(user.matchTeamId).trim() !== ''
+        ? String(user.matchTeamId).trim()
+        : user.groupId != null && String(user.groupId).trim() !== ''
+          ? String(user.groupId).trim()
+          : '';
+    if (teamId) map[uid] = teamId;
+  });
+  return map;
+}
+
+function listG4TeamOrder(match) {
+  const list = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+  const order = [];
+  const seen = {};
+  list.forEach((g) => {
+    const id = g && g.id != null ? String(g.id).trim() : '';
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    order.push(id);
+  });
+  return order;
+}
+
 function hasFormalGroups(match) {
   return !!(match && Array.isArray(match.groups) && match.groups.length > 0);
 }
@@ -233,79 +267,404 @@ function resolvePlayerTeamGroupId(userId, teamMap) {
 }
 
 /**
- * 报名期 G2/G3 组合模式选人校验（仅校验，不改选人弹窗）
- * @returns {string} 空串表示通过，否则为提示文案
+ * 选人返回/草稿：按分队生成 pair 组合后校验（与 group-pick 同规则）
  */
-function validateStrokeCompositionPlayers(players, compositionMode, teamMap) {
-  const mode = compositionMode === '2+2' ? '2+2' : '4+0';
-  const filled = (Array.isArray(players) ? players : []).filter((p) =>
-    p && String(p.userId || '').trim()
-  );
-  if (!filled.length) return '';
+function listFilledPickPlayers(players) {
+  return (Array.isArray(players) ? players : [])
+    .map((p) => ({
+      userId: p && p.userId != null ? String(p.userId).trim() : '',
+      position: Number(p && p.position) || 0
+    }))
+    .filter((p) => p.userId)
+    .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+}
 
-  if (mode === '4+0') {
-    let firstTeam = '';
-    for (let i = 0; i < filled.length; i++) {
-      const teamId = resolvePlayerTeamGroupId(filled[i].userId, teamMap);
-      if (!firstTeam) {
-        firstTeam = teamId;
-        continue;
-      }
-      if (teamId !== firstTeam) {
-        return '4+0模式下，同组球员必须来自同一分队';
-      }
+function ensurePlayersHaveTeam(filled, teamMap) {
+  for (let i = 0; i < filled.length; i++) {
+    const uid = filled[i].userId;
+    const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return '存在未归属分队的球员，请先完成报名分队';
     }
-    return '';
   }
+  return '';
+}
 
-  // 2+2：组合由座位固定（1+2 / 3+4），不限制整组同队人数；
-  // 组合预览与座位完整性由 buildCompositionPreview 处理，此处不做分队人数拦截
+function allMembersSameTeam(userIds, teamMap) {
+  let first = '';
+  for (let i = 0; i < userIds.length; i++) {
+    const teamId = teamMap && teamMap[userIds[i]] != null ? String(teamMap[userIds[i]]).trim() : '';
+    if (!teamId) return false;
+    if (!first) first = teamId;
+    else if (teamId !== first) return false;
+  }
+  return true;
+}
+
+function generatePairCompositionsByTeam(filled, teamMap) {
+  const buckets = {};
+  const teamOrder = [];
+  filled.forEach((p) => {
+    const teamId = teamMap && teamMap[p.userId] != null ? String(teamMap[p.userId]).trim() : '';
+    const key = teamId || '__unknown__';
+    if (!buckets[key]) {
+      buckets[key] = [];
+      teamOrder.push(key);
+    }
+    buckets[key].push(p);
+  });
+
+  const compositions = [];
+  teamOrder.forEach((teamId) => {
+    const list = (buckets[teamId] || []).slice().sort(
+      (a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId))
+    );
+    for (let i = 0; i < list.length; i += 2) {
+      const chunk = list.slice(i, i + 2);
+      compositions.push({
+        teamId: teamId === '__unknown__' ? '' : teamId,
+        members: chunk.map((p) => p.userId)
+      });
+    }
+  });
+  return compositions;
+}
+
+function validateGeneratedCompositions(compositions, teamMap, options) {
+  const requirePairSize = !!(options && options.requirePairSize);
+  const expectedCount = options && options.expectedCount != null ? Number(options.expectedCount) : -1;
+
+  for (let i = 0; i < compositions.length; i++) {
+    const members = compositions[i].members || [];
+    if (requirePairSize && members.length !== 2) {
+      return '无法形成合法同队两人组合';
+    }
+    if (!allMembersSameTeam(members, teamMap)) {
+      return '成绩组合不能跨分队';
+    }
+  }
+  if (expectedCount >= 0 && compositions.length !== expectedCount) {
+    return '无法形成赛制要求的合法组合';
+  }
   return '';
 }
 
 /**
- * 2+2 只读预览：委托 strokeCompositionResolver，再转成现有 wxml 结构
- * @param {object} matchLike 含 gameMode / strokeCompositionMode / teamGroups / registerInfo
- * @param {object} group 草稿组
+ * G2/G3 2+2：按分队数量与各队人数判断能否拆成两个组合（每组合最多 2 人）
+ * - 1 分队：永远合法
+ * - 2 分队：各队人数均 ≤2（允许 2+2 / 2+1 / 1+1；禁止 3+1）
+ * - 3+ 分队：非法
  */
-function buildCompositionPreview(matchLike, group) {
-  const list = resolveStrokeCompositions(matchLike, group);
-  if (!Array.isArray(list) || !list.length) return null;
+function validateG2G3TwoPlusTwoPlayers(filled, teamMap) {
+  if (!filled.length) return '';
+  if (filled.length > 4) {
+    return '2+2模式下每组最多 4 人';
+  }
 
-  const labels = ['', ''];
-  const texts = ['', ''];
-  list.slice(0, 2).forEach((combo, index) => {
-    const members = Array.isArray(combo && combo.members) ? combo.members : [];
-    const names = members
-      .map((m) => (m && (m.nickname || m.userId)) || '')
-      .filter(Boolean);
-    texts[index] = names.join(' / ');
-    const teamName =
-      combo && combo.teamName != null && String(combo.teamName).trim()
-        ? String(combo.teamName).trim()
-        : combo && combo.teamId != null && String(combo.teamId).trim()
-          ? String(combo.teamId).trim()
-          : '分队';
-    labels[index] = index + 1 + '. ' + teamName;
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = teamMap && teamMap[p.userId] != null ? String(teamMap[p.userId]).trim() : '';
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p.userId);
+  });
+  const teamIds = Object.keys(buckets);
+  const teamCount = teamIds.length;
+
+  if (teamCount === 1) {
+    return '';
+  }
+  if (teamCount === 2) {
+    for (let i = 0; i < teamIds.length; i++) {
+      if (buckets[teamIds[i]].length > 2) {
+        return '2+2模式下每个组合最多 2 人，无法按分队拆成合法组合';
+      }
+    }
+    return '';
+  }
+  return '2+2模式同组最多来自两个分队';
+}
+
+/**
+ * 报名期 G2/G3：先按模式生成组合，再验组合内是否同队
+ */
+function validateStrokeCompositionPlayers(players, compositionMode, teamMap) {
+  const mode = compositionMode === '2+2' ? '2+2' : '4+0';
+  const filled = listFilledPickPlayers(players);
+  if (!filled.length) return '';
+
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap);
+  if (teamErr) return teamErr;
+
+  if (mode === '4+0') {
+    if (filled.length > 4) {
+      return '4+0模式下每组最多 4 人';
+    }
+    if (!allMembersSameTeam(filled.map((p) => p.userId), teamMap)) {
+      return '4+0组合不能跨分队';
+    }
+    return '';
+  }
+
+  return validateG2G3TwoPlusTwoPlayers(filled, teamMap);
+}
+
+/**
+ * G4 选人写回：生成 pair 组合后验组合内同队（不对 pairing / entity）
+ */
+function validateG4GroupStructurePlayers(players, teamMap) {
+  const filled = listFilledPickPlayers(players);
+  if (!filled.length) return '';
+
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap);
+  if (teamErr) return teamErr;
+
+  const n = filled.length;
+  if (n !== 2 && n !== 4) {
+    return '四人两球每组须为 2 人或 4 人';
+  }
+
+  const compositions = generatePairCompositionsByTeam(filled, teamMap);
+  return validateGeneratedCompositions(compositions, teamMap, {
+    requirePairSize: true,
+    expectedCount: n / 2
+  }) || '';
+}
+
+/**
+ * 报名分队 id：matchTeamId || groupId（与保存后 TAB / teamMap 一致）
+ */
+function resolveRegisterTeamId(user) {
+  if (!user) return '';
+  if (user.matchTeamId != null && String(user.matchTeamId).trim() !== '') {
+    return String(user.matchTeamId).trim();
+  }
+  if (user.groupId != null && String(user.groupId).trim() !== '') {
+    return String(user.groupId).trim();
+  }
+  return '';
+}
+
+function buildPreviewRegisterMaps(matchLike) {
+  const users =
+    matchLike && matchLike.registerInfo && Array.isArray(matchLike.registerInfo.users)
+      ? matchLike.registerInfo.users
+      : [];
+  const teamIdByUser = {};
+  const nameByUser = {};
+  users.forEach((user) => {
+    const uid = user && user.userId != null ? String(user.userId).trim() : '';
+    if (!uid) return;
+    const teamId = resolveRegisterTeamId(user);
+    if (teamId) teamIdByUser[uid] = teamId;
+    const nick =
+      (user.competitionName && String(user.competitionName).trim())
+      || (user.displayName && String(user.displayName).trim())
+      || (user.nickname && String(user.nickname).trim())
+      || uid;
+    nameByUser[uid] = nick;
   });
 
-  const combo1Text = texts[0] || '';
-  const combo2Text = texts[1] || '';
-  if (!combo1Text && !combo2Text) return null;
+  const teamNameById = {};
+  const teamOrder = [];
+  const teamGroups = matchLike && Array.isArray(matchLike.teamGroups) ? matchLike.teamGroups : [];
+  teamGroups.forEach((g, index) => {
+    const id = g && g.id != null ? String(g.id).trim() : '';
+    if (!id) return;
+    teamOrder.push(id);
+    teamNameById[id] = String((g && g.name) || '').trim() || ('分队' + (index + 1));
+  });
+  users.forEach((user) => {
+    const tid = resolveRegisterTeamId(user);
+    if (!tid || teamNameById[tid]) return;
+    const tname =
+      (user.matchTeamName && String(user.matchTeamName).trim())
+      || (user.groupName && String(user.groupName).trim())
+      || '';
+    if (tname) teamNameById[tid] = tname;
+  });
 
-  const combos = [];
-  if (combo1Text) combos.push({ label: labels[0], text: combo1Text });
-  if (combo2Text) combos.push({ label: labels[1], text: combo2Text });
+  return { teamIdByUser: teamIdByUser, nameByUser: nameByUser, teamNameById: teamNameById, teamOrder: teamOrder };
+}
+
+/**
+ * G2/G3 只读预览：按分队归属生成组合（禁止按座位 1+2 / 3+4）
+ * 2+2 双分队：每个分队一个组合；单分队：稳定序每 2 人切
+ * 4+0：每个分队一个组合（同组应仅一分队）
+ */
+function buildCompositionPreview(matchLike, group) {
+  const mode =
+    matchLike && matchLike.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
+  const maps = buildPreviewRegisterMaps(matchLike);
+  const filled = ((group && group.players) || [])
+    .map((p) => ({
+      userId: p && p.userId != null ? String(p.userId).trim() : '',
+      position: Number(p && p.position) || 0,
+      displayName: resolvePlayerDisplayName(p)
+    }))
+    .filter((p) => p.userId)
+    .slice(0, 4);
+  if (!filled.length) return null;
+
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = maps.teamIdByUser[p.userId] || '__unknown__';
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p);
+  });
+  Object.keys(buckets).forEach((key) => {
+    buckets[key].sort(
+      (a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId))
+    );
+  });
+
+  const orderedTeamIds = [];
+  const used = {};
+  (maps.teamOrder || []).forEach((id) => {
+    if (buckets[id] && buckets[id].length && !used[id]) {
+      orderedTeamIds.push(id);
+      used[id] = true;
+    }
+  });
+  Object.keys(buckets).forEach((id) => {
+    if (!used[id] && buckets[id] && buckets[id].length) {
+      orderedTeamIds.push(id);
+      used[id] = true;
+    }
+  });
+
+  const compositions = [];
+  const pushCombo = (teamId, members) => {
+    if (!members || !members.length) return;
+    const label =
+      teamId === '__unknown__'
+        ? '分队'
+        : maps.teamNameById[teamId] || teamId || '分队';
+    const names = members
+      .map((m) => m.displayName || maps.nameByUser[m.userId] || m.userId)
+      .filter(Boolean);
+    if (!names.length) return;
+    compositions.push({
+      label: label,
+      text: names.join(' / ')
+    });
+  };
+
+  if (mode === '4+0') {
+    orderedTeamIds.forEach((teamId) => {
+      pushCombo(teamId, buckets[teamId] || []);
+    });
+  } else if (orderedTeamIds.length === 1) {
+    // 单分队 2+2：按稳定序每 2 人切成最多两个组合（不用座位 1+2/3+4）
+    const list = buckets[orderedTeamIds[0]] || [];
+    for (let i = 0; i < list.length && compositions.length < 2; i += 2) {
+      pushCombo(orderedTeamIds[0], list.slice(i, i + 2));
+    }
+  } else {
+    // 双分队及以上：每个分队对应一个组合（最多展示两行）
+    orderedTeamIds.slice(0, 2).forEach((teamId) => {
+      pushCombo(teamId, buckets[teamId] || []);
+    });
+  }
+
+  if (!compositions.length) return null;
+  const combo1 = compositions[0] || { label: '', text: '' };
+  const combo2 = compositions[1] || { label: '', text: '' };
+  return {
+    title: '',
+    combos: compositions,
+    showCombo1: !!combo1.text,
+    showCombo2: !!combo2.text,
+    combo1Label: combo1.label || '',
+    combo1Text: combo1.text || '',
+    combo2Label: combo2.label || '',
+    combo2Text: combo2.text || ''
+  };
+}
+
+/**
+ * G4 报名/编辑：由座位推导只读预览（与 G2/G3 compositionPreview 同结构）
+ * 组合 = position 1+2 / 3+4；标签取该组合球员所属分队名
+ * 不写 pairing、不改座位
+ */
+function buildG4CompositionPreviewFromSeats(group, match, registerInfo) {
+  const matchLike = Object.assign({}, match || {}, {
+    registerInfo: registerInfo || (match && match.registerInfo) || { totalCount: 0, users: [] }
+  });
+  const teamIdByUser = buildG4RegisterTeamMap(matchLike);
+  const teamNameById = {};
+  const teamGroups = Array.isArray(matchLike.teamGroups) ? matchLike.teamGroups : [];
+  teamGroups.forEach((g, index) => {
+    const id = g && g.id != null ? String(g.id).trim() : '';
+    if (!id) return;
+    teamNameById[id] = String((g && g.name) || '').trim() || ('分队' + (index + 1));
+  });
+  const users =
+    (registerInfo && Array.isArray(registerInfo.users) && registerInfo.users)
+    || (matchLike.registerInfo && Array.isArray(matchLike.registerInfo.users) && matchLike.registerInfo.users)
+    || [];
+  users.forEach((u) => {
+    if (!u) return;
+    const tid =
+      u.matchTeamId != null && String(u.matchTeamId).trim() !== ''
+        ? String(u.matchTeamId).trim()
+        : u.groupId != null && String(u.groupId).trim() !== ''
+          ? String(u.groupId).trim()
+          : '';
+    const tname =
+      (u.matchTeamName != null && String(u.matchTeamName).trim())
+      || (u.groupName != null && String(u.groupName).trim())
+      || '';
+    if (tid && tname && !teamNameById[tid]) teamNameById[tid] = tname;
+  });
+
+  const byPos = {};
+  ((group && group.players) || []).forEach((p) => {
+    const uid = p && p.userId != null ? String(p.userId).trim() : '';
+    if (!uid) return;
+    const pos = Number(p && p.position) || 0;
+    if (pos < 1 || pos > 4) return;
+    byPos[pos] = {
+      userId: uid,
+      name: resolvePlayerDisplayName(p) || uid
+    };
+  });
+
+  const resolveComboLabel = (members) => {
+    for (let i = 0; i < members.length; i++) {
+      const tid = teamIdByUser[members[i].userId] || '';
+      if (tid && teamNameById[tid]) return teamNameById[tid];
+      if (tid) return tid;
+    }
+    return '分队';
+  };
+
+  const buildSeatCombo = (posA, posB) => {
+    const members = [];
+    if (byPos[posA]) members.push(byPos[posA]);
+    if (byPos[posB]) members.push(byPos[posB]);
+    if (!members.length) {
+      return { label: '', text: '' };
+    }
+    return {
+      label: resolveComboLabel(members),
+      text: members.map((m) => m.name).filter(Boolean).join(' / ')
+    };
+  };
+
+  // 四人两球：座位 1+2 / 3+4 各为一组合（单分队 4 人亦拆两行，不按队聚合）
+  const combo1 = buildSeatCombo(1, 2);
+  const combo2 = buildSeatCombo(3, 4);
+  if (!combo1.text && !combo2.text) return null;
 
   return {
-    title: '组合',
-    combos: combos,
-    showCombo1: !!combo1Text,
-    showCombo2: !!combo2Text,
-    combo1Label: labels[0],
-    combo1Text: combo1Text,
-    combo2Label: labels[1],
-    combo2Text: combo2Text
+    title: '',
+    combos: [],
+    showCombo1: !!combo1.text,
+    showCombo2: !!combo2.text,
+    combo1Label: combo1.label,
+    combo1Text: combo1.text,
+    combo2Label: combo2.label,
+    combo2Text: combo2.text
   };
 }
 
@@ -322,22 +681,83 @@ function resolveRegisterSubTabs(match, registerInfo) {
   });
 }
 
-function createEmptyPairing(index) {
+/** G4 Score Slot：{matchId}__{groupId}__slot1 | slot2 */
+function buildPairingSlotId(matchId, groupId, slotNo) {
+  const mid = matchId != null ? String(matchId).trim() : '';
+  const gid = groupId != null ? String(groupId).trim() : '';
+  const n = Number(slotNo) >= 1 ? Math.floor(Number(slotNo)) : 1;
+  return mid + '__' + gid + '__slot' + n;
+}
+
+function resolvePairingSlotNo(pairingId, fallbackIndex) {
+  const id = pairingId != null ? String(pairingId) : '';
+  const m = /__slot(\d+)$/.exec(id);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (n >= 1) return n;
+  }
+  return Number(fallbackIndex) >= 0 ? Math.floor(Number(fallbackIndex)) + 1 : 1;
+}
+
+/**
+ * 创建空组合槽位（稳定 Score Slot ID，不用 Date.now）
+ * @param {string} matchId
+ * @param {string} groupId
+ * @param {number} slotNo 1-based：1 → slot1，2 → slot2
+ */
+function createEmptyPairing(matchId, groupId, slotNo) {
+  const n = Number(slotNo) >= 1 ? Math.floor(Number(slotNo)) : 1;
   return {
-    id: 'pairing_' + Date.now() + '_' + (index + 1),
+    id: buildPairingSlotId(matchId, groupId, n),
     playerIds: []
   };
 }
 
-/** 按组内球员顺序：1+2 → 组合1，3+4 → 组合2；奇数末位留作未完成组合 */
-function buildAutoPairingsForGroup(group) {
-  const players = ((group && group.players) || []).filter((p) => p && String(p.userId || '').trim());
-  const list = [];
+/**
+ * 按组内座位顺序：优先占用空闲成绩行 slot（1+2 → slot1，3+4 → slot2）
+ * 若已有 slot：保留 id，只更新 playerIds；未被占用的已有 slot 保留为空行
+ */
+function buildAutoPairingsForGroup(group, matchId, existingList) {
+  const groupId = group && group.groupId != null ? String(group.groupId) : '';
+  const players = ((group && group.players) || [])
+    .map((p) => ({
+      userId: p && p.userId != null ? String(p.userId).trim() : '',
+      position: Number(p && p.position) || 0
+    }))
+    .filter((p) => p.userId)
+    .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+
+  const existingBySlot = {};
+  (Array.isArray(existingList) ? existingList : []).forEach((pr, idx) => {
+    if (!pr) return;
+    const slotNo = resolvePairingSlotNo(pr.id, idx);
+    if (!existingBySlot[slotNo]) {
+      existingBySlot[slotNo] = pr.id != null ? String(pr.id) : '';
+    }
+  });
+
+  const filledBySlot = {};
+  let slotNo = 1;
   for (let i = 0; i + 1 < players.length; i += 2) {
-    list.push({
-      id: 'pairing_' + Date.now() + '_' + (list.length + 1),
+    const prevId = existingBySlot[slotNo] || '';
+    const id = prevId || buildPairingSlotId(matchId, groupId, slotNo);
+    filledBySlot[slotNo] = {
+      id: id,
       playerIds: [String(players[i].userId), String(players[i + 1].userId)]
-    });
+    };
+    slotNo += 1;
+  }
+
+  const list = [];
+  const maxSlot = Math.max(2, ...Object.keys(existingBySlot).map((n) => Number(n) || 0), slotNo - 1);
+  for (let n = 1; n <= maxSlot; n++) {
+    if (filledBySlot[n]) {
+      list.push(filledBySlot[n]);
+      continue;
+    }
+    if (existingBySlot[n]) {
+      list.push({ id: existingBySlot[n], playerIds: [] });
+    }
   }
   return list;
 }
@@ -353,6 +773,8 @@ Page({
     gameMode: '',
     showPairingSection: false,
     showCompositionMode: false,
+    /** 非 G4：显示「自动组合 / 添加组合」；G4 由分队规则生成 pairing，不展示 */
+    showPairingComposeTools: false,
     pairingSectionTitle: '组合',
     groupDraft: [],
     pairingDraft: {},
@@ -383,14 +805,17 @@ Page({
     const gameMode = match && match.gameMode ? String(match.gameMode) : '';
     const matchType = match && match.matchType ? String(match.matchType) : 'team-internal';
     const isG2G3 = teamMatchStore.isPairingStrokeFormat(gameMode);
+    const isG4 = gameMode === '四人两球比杆赛';
     // 报名期 + 队内赛 + G2/G3：组合模式 UI；LIVE 保持原 pairing 交互不动
     const showCompositionMode = mode !== 'live' && matchType === 'team-internal' && isG2G3;
-    const showPairingSection = isG2G3 && !showCompositionMode;
+    // G2/G3：仅 LIVE 开 pairing；G4：仅 LIVE 开 pairing 编辑区（报名/编辑用 composition 文字预览）
+    const showPairingSection = (isG2G3 && !showCompositionMode) || (isG4 && mode === 'live');
     const strokeCompositionMode = match && match.strokeCompositionMode
       ? String(match.strokeCompositionMode)
       : '4+0';
     const draft = buildInitialGroupDraft(match);
-    const pairingDraft = showPairingSection
+    // G4 报名也保留 pairingDraft，供保存时复用 slot id（不展示 pairing 操作区）
+    const pairingDraft = (showPairingSection || isG4)
       ? teamMatchStore.clonePairings(match && match.pairings)
       : {};
     this._registerInfo = resolveRegisterInfo(match);
@@ -407,6 +832,7 @@ Page({
       gameMode: gameMode,
       showPairingSection: showPairingSection,
       showCompositionMode: showCompositionMode,
+      showPairingComposeTools: showPairingSection && !isG4,
       pairingSectionTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
       strokeCompositionMode: resolvedMode,
       groupDraft: draft,
@@ -456,13 +882,15 @@ Page({
 
   _buildDraftCards(groups, pairingDraft, showPairing, gameMode, showCompositionMode, strokeCompositionMode) {
     const title = teamMatchStore.getPairingStrokeLabel(gameMode || this.data.gameMode);
+    const resolvedGameMode = String(gameMode || this.data.gameMode || '');
+    const isG4 = resolvedGameMode === '四人两球比杆赛';
     const showMode = showCompositionMode != null
       ? !!showCompositionMode
       : !!this.data.showCompositionMode;
     const compositionMode = strokeCompositionMode != null
       ? String(strokeCompositionMode)
       : String(this.data.strokeCompositionMode || '');
-    const showCompositionPreview = showMode && compositionMode === '2+2';
+    const showCompositionPreview = !!showMode;
     const matchLike = showCompositionPreview
       ? this._buildCompositionMatchContext(compositionMode)
       : null;
@@ -479,6 +907,14 @@ Page({
       if (showCompositionPreview && matchLike) {
         const preview = buildCompositionPreview(matchLike, g);
         if (preview) card.compositionPreview = preview;
+      } else if (isG4 && !showPairing) {
+        // G4 报名/编辑：与 G2/G3 同款 composition-preview（座位+分队，只读）
+        const preview = buildG4CompositionPreviewFromSeats(
+          g,
+          this._matchSnapshot,
+          this._registerInfo
+        );
+        if (preview) card.compositionPreview = preview;
       }
       return card;
     });
@@ -486,11 +922,45 @@ Page({
 
   _buildPairingBlockView(group, pairingDraft, sectionTitle) {
     const groupId = String(group.groupId || '');
+    const isG4 = String(this.data.gameMode || '') === '四人两球比杆赛';
     const players = ((group && group.players) || []).filter((p) => p && String(p.userId || '').trim());
     const playerMap = {};
     players.forEach((p) => {
       playerMap[String(p.userId)] = p;
     });
+    const teamIdByUser = isG4
+      ? buildG4RegisterTeamMap({
+          registerInfo: this._registerInfo || (this._matchSnapshot && this._matchSnapshot.registerInfo)
+        })
+      : {};
+    const teamNameById = {};
+    if (isG4) {
+      const match = this._matchSnapshot || {};
+      const teamGroups = Array.isArray(match.teamGroups) ? match.teamGroups : [];
+      teamGroups.forEach((g, index) => {
+        const id = g && g.id != null ? String(g.id).trim() : '';
+        if (!id) return;
+        teamNameById[id] = String((g && g.name) || '').trim() || ('分队' + (index + 1));
+      });
+      const users =
+        (this._registerInfo && Array.isArray(this._registerInfo.users) && this._registerInfo.users)
+        || (match.registerInfo && Array.isArray(match.registerInfo.users) && match.registerInfo.users)
+        || [];
+      users.forEach((u) => {
+        if (!u) return;
+        const tid =
+          u.matchTeamId != null && String(u.matchTeamId).trim() !== ''
+            ? String(u.matchTeamId).trim()
+            : u.groupId != null && String(u.groupId).trim() !== ''
+              ? String(u.groupId).trim()
+              : '';
+        const tname =
+          (u.matchTeamName != null && String(u.matchTeamName).trim())
+          || (u.groupName != null && String(u.groupName).trim())
+          || '';
+        if (tid && tname && !teamNameById[tid]) teamNameById[tid] = tname;
+      });
+    }
     const rawList = (pairingDraft && pairingDraft[groupId]) ? pairingDraft[groupId] : [];
     const pairings = rawList.map((pairing, idx) => {
       const ids = Array.isArray(pairing.playerIds) ? pairing.playerIds.map(String) : [];
@@ -502,12 +972,28 @@ Page({
           avatar: p && p.avatar ? mockAvatars.resolveAvatar(p.avatar) : ''
         };
       });
+      let label = '组合' + (idx + 1);
+      let namesText = members.map((m) => m.name).filter(Boolean).join(' / ') || '暂无球员';
+      if (isG4) {
+        let teamLabel = '';
+        for (let i = 0; i < ids.length; i++) {
+          const tid = teamIdByUser[ids[i]] || '';
+          if (tid && teamNameById[tid]) {
+            teamLabel = teamNameById[tid];
+            break;
+          }
+        }
+        if (!teamLabel) teamLabel = '分队';
+        // wxml 为 label + names 分行；label 带冒号以贴近「分队：球员」
+        label = teamLabel + '：';
+        namesText = members.map((m) => m.name).filter(Boolean).join('、') || '暂无球员';
+      }
       return {
         id: pairing.id || ('pairing_' + (idx + 1)),
-        label: '组合' + (idx + 1),
+        label: label,
         playerIds: ids,
         members: members,
-        namesText: members.map((m) => m.name).filter(Boolean).join(' / ') || '暂无球员',
+        namesText: namesText,
         isEmpty: members.length === 0
       };
     });
@@ -523,7 +1009,8 @@ Page({
         avatar: p.avatar ? mockAvatars.resolveAvatar(p.avatar) : ''
       }));
     return {
-      title: sectionTitle || '组合',
+      // G4：隐藏「四人两球组合」标题；其它赛制保持原 title
+      title: isG4 ? '' : (sectionTitle || '组合'),
       pairings: pairings,
       incompletePlayers: incomplete,
       incompleteNamesText: incomplete.map((p) => p.name).filter(Boolean).join('、'),
@@ -607,8 +1094,72 @@ Page({
     const mode = String((e.currentTarget.dataset.mode != null ? e.currentTarget.dataset.mode : ''));
     if (mode !== '4+0' && mode !== '2+2') return;
     if (mode === this.data.strokeCompositionMode) return;
-    this.setData({ strokeCompositionMode: mode }, () => {
-      this._refreshCards();
+
+    // 切到 2+2：直接切换
+    if (mode !== '4+0') {
+      this.setData({ strokeCompositionMode: mode }, () => {
+        this._refreshCards();
+      });
+      return;
+    }
+
+    // 2+2 → 4+0：同组必须同一分队；非法组需确认后清空球员
+    const teamMap = buildRegisterTeamMap({
+      registerInfo: this._registerInfo || { users: [] }
+    });
+    const draft = this.data.groupDraft || [];
+    const illegal = [];
+    draft.forEach((g, i) => {
+      const err = validateStrokeCompositionPlayers(
+        g && g.players,
+        '4+0',
+        teamMap
+      );
+      if (!err) return;
+      illegal.push({
+        groupId: g && g.groupId != null ? String(g.groupId) : '',
+        label: (g && g.groupName) ? String(g.groupName) : ('第' + (i + 1) + '组')
+      });
+    });
+
+    if (!illegal.length) {
+      this.setData({ strokeCompositionMode: '4+0' }, () => {
+        this._refreshCards();
+      });
+      return;
+    }
+
+    const names = illegal.map((x) => x.label).join('、');
+    wx.showModal({
+      title: '提示',
+      content:
+        '4+0模式下，同组球员必须来自同一分队。\n当前' +
+        names +
+        '不符合要求，是否清除该组重新配置？',
+      confirmText: '确定',
+      cancelText: '取消',
+      success: (res) => {
+        if (!res.confirm) {
+          // 取消：保持 2+2，不改分组
+          return;
+        }
+        const illegalIds = {};
+        illegal.forEach((x) => {
+          if (x.groupId) illegalIds[x.groupId] = true;
+        });
+        const next = draft.map((g) => {
+          const gid = g && g.groupId != null ? String(g.groupId) : '';
+          if (!gid || !illegalIds[gid]) return g;
+          return Object.assign({}, g, {
+            players: Array.from({ length: PLAYER_SLOTS }, (_, i) =>
+              createEmptyGroupPlayer(i + 1)
+            )
+          });
+        });
+        this.setData({ strokeCompositionMode: '4+0' }, () => {
+          this._setGroupDraft(next);
+        });
+      }
     });
   },
 
@@ -671,6 +1222,9 @@ Page({
       matchId: this.data.matchId || '',
       groupId: groupId,
       groupName: groupName,
+      gameMode: this.data.gameMode || '',
+      strokeCompositionMode: this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0',
+      showCompositionMode: !!this.data.showCompositionMode,
       players: currentGroup && Array.isArray(currentGroup.players) ? currentGroup.players : [],
       groups: draft.map((g) => ({
         groupId: g && g.groupId ? String(g.groupId) : '',
@@ -736,15 +1290,28 @@ Page({
       }, previous || found);
     });
 
-    // 报名期 G2/G3 组合模式：坐入前校验；失败则禁止写回
+    // 报名期 G2/G3：坐入前校验（与 group-pick 同规则）；失败则禁止写回
+    const pickTeamMap = buildRegisterTeamMap({
+      registerInfo: this._registerInfo || { users: [] }
+    });
     if (this.data.showCompositionMode) {
       const compositionErr = validateStrokeCompositionPlayers(
         players,
         this.data.strokeCompositionMode,
-        this._registerTeamMap || buildRegisterTeamGroupMap(this._registerInfo)
+        pickTeamMap
       );
       if (compositionErr) {
         wx.showToast({ title: compositionErr, icon: 'none' });
+        return;
+      }
+    }
+
+    // G4：选人返回后校验 pair 组合内同队；失败不写 draft
+    const gameMode = String(this.data.gameMode || '');
+    if (gameMode === '四人两球比杆赛') {
+      const g4Err = validateG4GroupStructurePlayers(players, pickTeamMap);
+      if (g4Err) {
+        wx.showToast({ title: g4Err, icon: 'none' });
         return;
       }
     }
@@ -759,7 +1326,7 @@ Page({
   /* ===== 组合分配 ===== */
 
   onAutoPairTap(e) {
-    if (!this.data.showPairingSection) return;
+    if (!this.data.showPairingSection || !this.data.showPairingComposeTools) return;
     const groupId = String((e.currentTarget.dataset.groupId != null ? e.currentTarget.dataset.groupId : ''));
     if (!groupId) return;
     const existing = (this.data.pairingDraft && this.data.pairingDraft[groupId]) || [];
@@ -782,19 +1349,49 @@ Page({
   _applyAutoPair(groupId) {
     const group = (this.data.groupDraft || []).find((g) => String(g.groupId) === String(groupId));
     if (!group) return;
-    const list = buildAutoPairingsForGroup(group);
     const pairingDraft = teamMatchStore.clonePairings(this.data.pairingDraft);
+    const existing = (pairingDraft[String(groupId)] || []).slice();
+    const list = buildAutoPairingsForGroup(group, this.data.matchId, existing);
     pairingDraft[String(groupId)] = list;
     this._setPairingDraft(pairingDraft);
   },
 
   onAddPairingTap(e) {
-    if (!this.data.showPairingSection) return;
+    if (!this.data.showPairingSection || !this.data.showPairingComposeTools) return;
     const groupId = String((e.currentTarget.dataset.groupId != null ? e.currentTarget.dataset.groupId : ''));
     if (!groupId) return;
     const pairingDraft = teamMatchStore.clonePairings(this.data.pairingDraft);
     const list = (pairingDraft[groupId] || []).slice();
-    list.push(createEmptyPairing(list.length));
+    const usedSlots = {};
+    list.forEach((pr, idx) => {
+      const slotNo = resolvePairingSlotNo(pr && pr.id, idx);
+      usedSlots[slotNo] = true;
+    });
+    // 优先占用已有空成绩行（playerIds=[]）；否则取最小缺失 slot（最多 slot1/slot2）
+    const emptyIdx = list.findIndex(
+      (pr) => pr && (!Array.isArray(pr.playerIds) || pr.playerIds.filter(Boolean).length === 0)
+    );
+    if (emptyIdx >= 0) {
+      wx.showToast({ title: '请先使用空闲组合位', icon: 'none' });
+      return;
+    }
+    let nextSlot = 0;
+    for (let n = 1; n <= 2; n++) {
+      if (!usedSlots[n]) {
+        nextSlot = n;
+        break;
+      }
+    }
+    if (!nextSlot) {
+      wx.showToast({ title: '最多两个组合', icon: 'none' });
+      return;
+    }
+    list.push(createEmptyPairing(this.data.matchId, groupId, nextSlot));
+    // 按 slot 序号排列，保证第一组合=slot1、第二组合=slot2
+    list.sort(
+      (a, b) =>
+        resolvePairingSlotNo(a && a.id, 0) - resolvePairingSlotNo(b && b.id, 0)
+    );
     pairingDraft[groupId] = list;
     this._setPairingDraft(pairingDraft);
   },
@@ -805,7 +1402,11 @@ Page({
     const pairingId = String((e.currentTarget.dataset.pairingId != null ? e.currentTarget.dataset.pairingId : ''));
     if (!groupId || !pairingId) return;
     const pairingDraft = teamMatchStore.clonePairings(this.data.pairingDraft);
-    pairingDraft[groupId] = (pairingDraft[groupId] || []).filter((p) => String(p.id) !== pairingId);
+    // 删除成员：清空 playerIds，保留稳定 slot id（不删槽位对象）
+    pairingDraft[groupId] = (pairingDraft[groupId] || []).map((p) => {
+      if (!p || String(p.id) !== pairingId) return p;
+      return Object.assign({}, p, { playerIds: [] });
+    });
     this._setPairingDraft(pairingDraft);
   },
 
@@ -989,7 +1590,9 @@ Page({
         const compositionErr = validateStrokeCompositionPlayers(
           g.players,
           this.data.strokeCompositionMode,
-          this._registerTeamMap || buildRegisterTeamGroupMap(this._registerInfo)
+          buildRegisterTeamMap({
+            registerInfo: this._registerInfo || { users: [] }
+          })
         );
         if (compositionErr) return compositionErr;
       }
@@ -1042,7 +1645,27 @@ Page({
   _clearGroupDerivedFields(matchPatch) {
     const next = matchPatch || {};
     next.pairings = {};
-    next.scoreEntities = {};
+    // 清空分组：成绩行保留 entityId，members 置空；不删 teamScoresByEntity / scoreData
+    const se =
+      next.scoreEntities && typeof next.scoreEntities === 'object' && !Array.isArray(next.scoreEntities)
+        ? next.scoreEntities
+        : null;
+    if (se) {
+      const cleared = {};
+      Object.keys(se).forEach((groupId) => {
+        const list = Array.isArray(se[groupId]) ? se[groupId] : [];
+        cleared[groupId] = list
+          .filter((e) => e && e.entityId != null && String(e.entityId).trim() !== '')
+          .map((e) =>
+            Object.assign({}, e, {
+              entityId: String(e.entityId).trim(),
+              members: [],
+              teamGroupId: ''
+            })
+          );
+      });
+      next.scoreEntities = cleared;
+    }
     if (Object.prototype.hasOwnProperty.call(next, 'groupCount')) next.groupCount = 0;
     if (Object.prototype.hasOwnProperty.call(next, 'teeGroups')) next.teeGroups = [];
     if (Object.prototype.hasOwnProperty.call(next, 'groupSummary')) next.groupSummary = null;
@@ -1150,23 +1773,27 @@ Page({
     deletedGroupIds.forEach((groupId) => {
       delete nextScoreData[groupId];
     });
-    let nextPairings = teamMatchStore.clonePairings(match.pairings || {});
-    deletedGroupIds.forEach((groupId) => {
-      delete nextPairings[groupId];
-    });
+    // G4 / LIVE 组合区：以本次 pairingDraft 为准落盘（勿用陈旧 match.pairings 覆盖用户编辑）
+    // 无组合区时保持清空 pairings（G2/G3 报名 composition 路径不走此分支的既有行为）
+    let nextPairings = {};
     if (this.data.showPairingSection) {
-      nextPairings = teamMatchStore.sanitizePairings(this._prunePairingsToGroups(nextGroups, nextPairings));
-    } else {
-      nextPairings = {};
+      const pairingSource = pairingDraft != null ? pairingDraft : (this.data.pairingDraft || {});
+      let draftPairings = teamMatchStore.clonePairings(pairingSource);
+      deletedGroupIds.forEach((groupId) => {
+        delete draftPairings[groupId];
+      });
+      nextPairings = teamMatchStore.sanitizePairings(
+        this._prunePairingsToGroups(nextGroups, draftPairings)
+      );
     }
-    // LIVE：不重建 scoreEntities（Object.assign 保留原字段）；不调用 buildStrokeEntities
-    // 不改写 strokeCompositionMode（报名期组合模式专属）
+    // LIVE：不整表重建成绩行；sync 只更新 members / 保留空行；不碰 teamScoresByEntity
     const next = Object.assign({}, match, {
       groups: nextGroups,
       pairings: nextPairings,
       scoreData: nextScoreData,
       updatedAt: Date.now()
     });
+    next.scoreEntities = syncStrokeEntities(next);
     teamMatchStore.saveMatch(next);
     this._leavingConfirmed = true;
     wx.showToast({ title: '分组已保存', icon: 'success' });
@@ -1219,16 +1846,45 @@ Page({
 
     const gameMode = String(match.gameMode || this.data.gameMode || '');
     const isG4Stroke = gameMode === '四人两球比杆赛';
+    const isG2G3Stroke =
+      gameMode === '最好成绩比杆赛' ||
+      gameMode === '四人四球比杆赛' ||
+      gameMode === '最佳球位比杆赛';
+    // 报名保存：统一正式座位规范化（position ≠ 选人顺序）；不碰 pairing / entity / score
+    if (!isClear && (isG4Stroke || isG2G3Stroke)) {
+      formal = normalizeFormalGroupSeats(formal, match);
+    }
     // G4 成绩主体来自 pairings；即使 UI 组合区未开，保存时仍保留/写入 pairings
     const shouldPersistPairings = this.data.showPairingSection || isG4Stroke;
 
     let formalPairings = {};
     if (!isClear && shouldPersistPairings) {
-      const pairingSource = this.data.showPairingSection
-        ? pairingDraft
-        : (match.pairings || {});
-      const pruned = this._prunePairingsToGroups(formal, pairingSource);
-      formalPairings = teamMatchStore.sanitizePairings(pruned);
+      if (isG4Stroke) {
+        // normalize 后按座位重建 pairing，复用已有 slot id（draft 优先，否则 match）
+        const matchPairings =
+          match.pairings && typeof match.pairings === 'object' && !Array.isArray(match.pairings)
+            ? match.pairings
+            : {};
+        const rebuilt = {};
+        formal.forEach((group) => {
+          const gid = group && group.groupId != null ? String(group.groupId) : '';
+          if (!gid) return;
+          const fromDraft = pairingDraft && Object.prototype.hasOwnProperty.call(pairingDraft, gid)
+            ? pairingDraft[gid]
+            : null;
+          const existingList = Array.isArray(fromDraft)
+            ? fromDraft
+            : (Array.isArray(matchPairings[gid]) ? matchPairings[gid] : []);
+          rebuilt[gid] = buildAutoPairingsForGroup(group, matchId, existingList);
+        });
+        formalPairings = teamMatchStore.sanitizePairings(rebuilt);
+      } else {
+        const pairingSource = this.data.showPairingSection
+          ? pairingDraft
+          : (match.pairings || {});
+        const pruned = this._prunePairingsToGroups(formal, pairingSource);
+        formalPairings = teamMatchStore.sanitizePairings(pruned);
+      }
     }
 
     let next = Object.assign({}, match, {
@@ -1245,7 +1901,7 @@ Page({
       next.pairings = {};
     }
 
-    // Phase1：报名期保存生成 scoreEntities；失败则阻止写盘
+    // 报名期：合并成绩行（已有 entityId 只更新 members；新增主体才新建；不清 teamScoresByEntity）
     if (!isClear) {
       const check = validateStrokeEntities(next);
       if (!check || check.valid !== true) {
@@ -1254,7 +1910,7 @@ Page({
         wx.showToast({ title: STROKE_ENTITY_INVALID_TIP, icon: 'none' });
         return;
       }
-      next.scoreEntities = buildStrokeEntities(next);
+      next.scoreEntities = syncStrokeEntities(next);
     }
 
     teamMatchStore.saveMatch(next);

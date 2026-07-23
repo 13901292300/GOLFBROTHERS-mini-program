@@ -290,7 +290,7 @@
               </view>
 
               <view wx:if="{{showGroupPairings && item.pairingBlock && (item.pairingBlock.hasPairings || item.pairingBlock.hasIncomplete)}}" class="groups-pairing-block">
-                <text wx:if="{{item.pairingBlock.hasPairings}}" class="groups-pairing-block__title">{{item.pairingBlock.title}}</text>
+                <text wx:if="{{item.pairingBlock.hasPairings && !item.pairingBlock.isCompositionText && item.pairingBlock.title}}" class="groups-pairing-block__title">{{item.pairingBlock.title}}</text>
                 <!-- 报名期 G2/G3：文字组合说明（与 group-editor 一致） -->
                 <block wx:if="{{item.pairingBlock.isCompositionText}}">
                   <view
