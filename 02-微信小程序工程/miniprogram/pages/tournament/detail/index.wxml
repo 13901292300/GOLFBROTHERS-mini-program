@@ -412,7 +412,18 @@
                     <text class="lr-total leaderboard-total {{leaderboardScoreType === 'net' ? 'score-even' : player.scoreClass}}">{{leaderboardScoreType === 'net' ? (player.netScoreDisplay || player.scoreStr) : player.scoreStr}}</text>
                   </view>
                   <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
-                    <view class="scorecard-profile">
+                    <!-- Entity 组合：与普通创建 fourball 一致，逐成员身份卡 -->
+                    <view wx:if="{{player.isEntity && player.members && player.members.length}}" class="sc-team-stack-wrap">
+                      <leaderboard-player-identity
+                        wx:for="{{player.members}}"
+                        wx:for-item="mem"
+                        wx:key="playerId"
+                        player="{{mem}}"
+                        followed="{{false}}"
+                        is-self="{{false}}"
+                      />
+                    </view>
+                    <view wx:else class="scorecard-profile">
                       <view class="sc-profile-left">
                         <view class="sc-avatar-wrap">
                           <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
@@ -486,11 +497,11 @@
               <text class="lh-total">{{leaderboardScoreType === 'net' ? 'NET SCORE' : 'TO PAR'}}</text>
             </view>
 
-            <block wx:for="{{leaderboard}}" wx:key="playerId">
+            <block wx:for="{{leaderboard}}" wx:key="rowId">
               <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row leaderboard-row--personal">
                 <text class="lr-pos pos-cell">{{item.pos}}</text>
                 <view class="lr-player">
-                  <text class="player-name">{{item.name}}</text>
+                  <text class="player-name">{{item.displayName || item.name}}</text>
                   <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
                 </view>
                 <text class="lr-team">{{item.teamName || '-'}}</text>
@@ -500,7 +511,18 @@
 
               <!-- 展开成绩卡 -->
               <view wx:if="{{item.expanded}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
-                <view class="scorecard-profile">
+                <!-- Entity 组合：与普通创建 fourball 一致 -->
+                <view wx:if="{{item.isEntity && item.members && item.members.length}}" class="sc-team-stack-wrap">
+                  <leaderboard-player-identity
+                    wx:for="{{item.members}}"
+                    wx:for-item="mem"
+                    wx:key="playerId"
+                    player="{{mem}}"
+                    followed="{{false}}"
+                    is-self="{{false}}"
+                  />
+                </view>
+                <view wx:else class="scorecard-profile">
                   <view class="sc-profile-left">
                     <view class="sc-avatar-wrap">
                       <image class="sc-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
@@ -579,6 +601,7 @@
               <view class="gb-group-player-avatar-wrap">
                 <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
                 <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
+                <text wx:if="{{pl.teamLabel}}" class="tee-player-team-label">[{{pl.teamLabel}}]</text>
               </view>
               <view class="gb-group-player-meta">
                 <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>

@@ -2038,6 +2038,29 @@ page {
   text-align: center;
 }
 
+/* 添加/删除：昵称下方分队小胶囊（仅展示，不改座位布局） */
+.group-manage-team-label {
+  max-width: 96rpx;
+  margin-top: -6rpx;
+  padding: 0 6rpx;
+  height: 24rpx;
+  line-height: 24rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 45, 98, 0.08);
+  color: var(--text-muted, #6b7280);
+  font-size: 16rpx;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+.score-page.dark-mode .group-manage-team-label {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
 /* 空槽位占位（复刻原型 .empty-slot）：虚线圆 + ＋，名称弱化；保持 4 列布局恒定 */
 .empty-slot .avatar-wrap {
   border: 1px dashed var(--border-color);

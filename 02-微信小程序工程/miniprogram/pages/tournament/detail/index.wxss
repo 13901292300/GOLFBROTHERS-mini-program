@@ -1198,6 +1198,11 @@ page {
 
 /* ===== 展开成绩卡 ===== */
 .scorecard-row { background: var(--bg-card); border-bottom: 1px solid var(--border); }
+/* Entity / fourball 组合：成员身份卡纵向叠放 */
+.sc-team-stack-wrap {
+  display: flex;
+  flex-direction: column;
+}
 .scorecard-profile { background: var(--bg-card); color: var(--text-primary); border-bottom: 1px solid var(--border); padding: 32rpx; display: flex; align-items: flex-start; justify-content: space-between; gap: 24rpx; }
 .sc-profile-left { display: flex; align-items: center; gap: 32rpx; min-width: 0; }
 .sc-avatar-wrap { position: relative; flex-shrink: 0; }
@@ -1334,6 +1339,35 @@ page {
   font-weight: 700;
 }
 .tee-v-badge { position: absolute; right: -4rpx; bottom: -4rpx; width: 40rpx; height: 40rpx; border-radius: 9999rpx; background: #fff; border: 1px solid rgba(206, 146, 36, 0.55); display: flex; align-items: center; justify-content: center; color: var(--champion-gold); font-size: 20rpx; font-weight: 900; box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.16); }
+/* 出发表：头像正下方分队小胶囊（不改昵称/T台布局） */
+.tee-group-card .gb-group-player-avatar-wrap {
+  overflow: visible;
+}
+.tee-player-team-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2rpx);
+  transform: translateX(-50%);
+  z-index: 2;
+  max-width: 96rpx;
+  padding: 0 6rpx;
+  height: 24rpx;
+  line-height: 24rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 45, 98, 0.08);
+  color: var(--text-muted);
+  font-size: 16rpx;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.detail-page.dark-mode .tee-player-team-label {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
 .tee-player-name {
   grid-column: 2;
   grid-row: 1;

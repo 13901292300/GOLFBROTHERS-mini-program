@@ -591,6 +591,7 @@
               </block>
             </view>
             <text class="player-name">{{item.status === 'occupied' ? item.player.name : (item.status === 'pending' ? '待加入' : (item.hasCache ? '有历史成绩' : '空位'))}}</text>
+            <text wx:if="{{item.status === 'occupied' && item.player.teamLabel}}" class="group-manage-team-label">[{{item.player.teamLabel}}]</text>
           </view>
         </view>
       </view>

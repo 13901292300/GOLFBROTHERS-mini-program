@@ -32,6 +32,10 @@ const {
   resolveStrokeCompositions,
   resolveCompositionMode
 } = require('../../../utils/strokeCompositionResolver.js');
+const {
+  resolveStrokeKind,
+  resolveGameMode
+} = require('../../../utils/strokeEntityValidator.js');
 const contactStore = require('../../../utils/contactStore.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
@@ -3493,7 +3497,13 @@ Page({
         source: 'teamMatch.scoreData.teamScoresByEntity',
         entityCount: entityRows.length
       });
-      return entityRows.map((row) => this._attachPersonalLeaderboardScoreFields(row));
+      return entityRows.map((row, index) => {
+        const attached = this._attachPersonalLeaderboardScoreFields(row);
+        return Object.assign({}, attached, {
+          displayName: attached.displayName || attached.name || '',
+          rowId: attached.entityId || ('entity-' + index)
+        });
+      });
     }
 
     const matchRows = this._buildLeaderboardFromMatchGroups(match, this.data.openIndex);
@@ -3517,7 +3527,13 @@ Page({
       groupCount: sourceGroups.length,
       playerCount: playerCount
     });
-    return (rows || []).map((row) => this._attachPersonalLeaderboardScoreFields(row));
+    return (rows || []).map((row, index) => {
+      const attached = this._attachPersonalLeaderboardScoreFields(row);
+      return Object.assign({}, attached, {
+        displayName: attached.displayName || attached.name || '',
+        rowId: attached.playerId || attached.entityId || ('player-' + index)
+      });
+    });
   },
 
   /** 是否走 Entity 领先榜：matchState.mode 或 scoreEntities 任一组非空 */
@@ -3596,29 +3612,63 @@ Page({
         if (!entity) return;
         const entityId = entity.entityId != null ? String(entity.entityId).trim() : '';
         if (!entityId) return;
-        const memberIds = Array.isArray(entity.members) ? entity.members : [];
+        const rawMembers = Array.isArray(entity.members) ? entity.members : [];
+        const memberIds = rawMembers
+          .map((m) => {
+            if (m == null) return '';
+            if (typeof m === 'string' || typeof m === 'number') return String(m).trim();
+            if (typeof m === 'object') {
+              const id = m.userId != null ? m.userId : (m.playerId != null ? m.playerId : m.id);
+              return id != null ? String(id).trim() : '';
+            }
+            return '';
+          })
+          .filter(Boolean);
+        // 空占用行不进领先榜（避免「第N组组合」占位名）
+        if (!memberIds.length) return;
+
         const memberViews = memberIds
-          .map((id) => {
-            const uid = id != null ? String(id).trim() : '';
-            if (!uid) return null;
+          .map((uid) => {
             const slotPlayer = slotPlayerMap[uid] || null;
             const displayName = this._resolveGroupedPlayerName(uid, slotPlayer, nameLookup);
+            const lookup = nameLookup[uid] || {};
+            const prof = playerDirectory.getProfileById
+              ? playerDirectory.getProfileById(uid, Object.assign({}, lookup, slotPlayer || {}))
+              : {};
+            const genderDisplay = playerManage.getGenderDisplay(
+              Object.assign({}, lookup, slotPlayer || {}, prof)
+            );
             return {
+              playerId: uid,
               userId: uid,
               name: displayName,
               displayName: displayName,
-              avatar: this._resolveGroupedPlayerAvatar(uid, slotPlayer, nameLookup)
+              avatar: this._resolveGroupedPlayerAvatar(uid, slotPlayer, nameLookup),
+              flag: (prof && prof.flag) || '',
+              country: (prof && prof.country) || '',
+              age: (prof && prof.age) || '',
+              isFemale: genderDisplay.gender === 'female',
+              genderIcon: genderDisplay.icon,
+              genderClass: genderDisplay.className
             };
           })
           .filter(Boolean);
+        if (!memberViews.length) return;
+
         const entityType = entity.entityType ? String(entity.entityType) : '';
-        const name =
-          memberViews.length > 0
-            ? memberViews.map((m) => m.name).join(entityType === 'pair' ? ' + ' : ' / ')
-            : entityType === 'pair'
-              ? '组合'
-              : '第' + (entityIndex + 1) + '组组合';
-        const avatar = memberViews.length > 0 ? memberViews[0].avatar || '' : '';
+        const compositionMode =
+          entity.compositionMode === '2+2' ? '2+2' : entity.compositionMode === '4+0' ? '4+0' : '';
+        const kind =
+          entityType === 'pair' || compositionMode === '2+2'
+            ? 'pair'
+            : 'team';
+        // 名称必须来自成员昵称，禁止「第N组组合 / 第一组合」占位
+        const name = memberViews
+          .map((m) => String((m && (m.name || m.displayName)) || '').trim())
+          .filter(Boolean)
+          .join(' / ');
+        if (!name) return;
+        const avatar = memberViews[0].avatar || '';
 
         const rec = scoreByEntityId[entityId] || {};
         const scores = Array.isArray(rec.scores) ? rec.scores.slice() : [];
@@ -3634,13 +3684,23 @@ Page({
         }
         const toPar = grossTotal - parThru;
         const hasScore = thru > 0;
+        const teamGroupId =
+          entity.teamGroupId != null && String(entity.teamGroupId).trim() !== ''
+            ? String(entity.teamGroupId).trim()
+            : '';
         flat.push({
           entityId: entityId,
+          teamGroupId: teamGroupId,
           name: name,
+          displayName: name,
           group: groupNameMap[String(groupId)] || '',
           groupId: String(groupId),
           scores: scores,
           members: memberViews,
+          pairMembers: memberViews,
+          kind: kind,
+          compositionMode: compositionMode,
+          isTeam: memberViews.length > 1,
           avatar: avatar,
           grossTotal: hasScore ? grossTotal : 0,
           toPar: hasScore ? toPar : 0,
@@ -3655,6 +3715,21 @@ Page({
     });
 
     if (!flat.length) return [];
+
+    // 无 teamGroupId 时用成员报名分队回填（供分队榜聚合）
+    const playerTeamLookup = this._buildLeaderboardPlayerTeamLookup(match);
+    flat.forEach((entity) => {
+      if (entity.teamGroupId) return;
+      const members = Array.isArray(entity.members) ? entity.members : [];
+      for (let i = 0; i < members.length; i++) {
+        const uid = members[i] && members[i].userId != null ? String(members[i].userId).trim() : '';
+        const ref = uid && playerTeamLookup[uid] ? playerTeamLookup[uid] : null;
+        if (ref && ref.teamId) {
+          entity.teamGroupId = String(ref.teamId).trim();
+          break;
+        }
+      }
+    });
 
     flat.sort((a, b) => {
       if (a.thru === 0 && b.thru === 0) return 0;
@@ -3672,13 +3747,20 @@ Page({
       return {
         pos: pos,
         entityId: entity.entityId,
+        teamGroupId: entity.teamGroupId || '',
         name: entity.name,
+        displayName: entity.displayName || entity.name,
         group: entity.group,
         groupId: entity.groupId,
         scores: entity.scores,
         members: Array.isArray(entity.members) ? entity.members : [],
+        pairMembers: Array.isArray(entity.pairMembers) ? entity.pairMembers : (Array.isArray(entity.members) ? entity.members : []),
+        kind: entity.kind || 'team',
+        compositionMode: entity.compositionMode || '',
+        isTeam: entity.isTeam === true,
         avatar: entity.avatar || '',
         thru: this._resolveLeaderboardThruLabel(entity.thru),
+        _thruValue: entity.thru,
         grossTotal: entity.grossTotal,
         toPar: entity.toPar,
         total: entity.grossTotal,
@@ -3930,6 +4012,10 @@ Page({
     if (this.data.leaderboardScoreType === 'net') {
       return this._buildNetTeamLeaderboardView(match);
     }
+    // G2/G3 Stroke Entity：分队展开按组合(Entity)，不按个人
+    if (this._shouldBuildEntityLeaderboard(match)) {
+      return this._buildEntityTeamLeaderboardView(match);
+    }
     const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
     if (teamGroups.length < 2) return [];
     const rules = match && match.scoringRules;
@@ -4079,6 +4165,193 @@ Page({
         const out = Object.assign({}, player, {
           isCounting: isCounting
         });
+        delete out._thruValue;
+        return out;
+      });
+      const rankedPlayers = this._buildCompetitionRanking(players, (player) => (
+        player && player.hasScore === true ? player.toPar : null
+      ));
+      return {
+        teamId: team.teamId,
+        teamName: team.teamName || '未命名分队',
+        grossTotal: grossTotal,
+        toPar: toPar,
+        total: toPar,
+        hasScore: scoringPlayersCount > 0,
+        scoreStr: scoringPlayersCount > 0 ? this._formatLeaderboardDiff(toPar) : '-',
+        scoreClass: scoringPlayersCount > 0 ? this._resolveLeaderboardTotalClass(toPar) : 'score-even',
+        scoringPlayersCount: scoringPlayersCount,
+        players: rankedPlayers,
+        _sortIndex: teamIndex
+      };
+    }).sort((a, b) => {
+      if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
+      if (a.toPar !== b.toPar) return a.toPar - b.toPar;
+      return a._sortIndex - b._sortIndex;
+    });
+    const rankedTeams = this._buildCompetitionRanking(sortedTeams, (team) => (
+      team && team.hasScore === true ? team.toPar : null
+    ));
+    return rankedTeams.map((team) => {
+      const out = Object.assign({}, team);
+      delete out._sortIndex;
+      return out;
+    });
+  },
+
+  /**
+   * G2/G3 Entity 分队榜：展开 subjects = Entity（组合），按 teamGroupId 归队；
+   * 分队 PK topN 对 Entity 累加，不拆个人。
+   * team.players 字段名保留，内容为 entity 行（含 entityId / isEntity）。
+   */
+  _buildEntityTeamLeaderboardView(match) {
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    if (teamGroups.length < 2) return [];
+    const rules = match && match.scoringRules;
+    const competition = rules && rules.teamCompetition;
+    const isTeamCompetitionEnabled = !!(competition && competition.enabled === true);
+    const configuredTopN = isTeamCompetitionEnabled
+      ? Math.max(1, parseInt(competition.topN, 10) || 1)
+      : 0;
+    const teamMap = this._buildTeamLeaderboardTeamMap(match);
+    const teamNameMap = this._buildLeaderboardTeamNameMap(match);
+    const entityRows = this._buildEntityLeaderboardRows(match, -1) || [];
+
+    entityRows.forEach((row) => {
+      if (!row || !row.entityId) return;
+      const members = Array.isArray(row.members) ? row.members : [];
+      if (!members.length) return;
+      const teamId =
+        row.teamGroupId != null && String(row.teamGroupId).trim() !== ''
+          ? String(row.teamGroupId).trim()
+          : '';
+      if (!teamId) return;
+      if (!teamMap[teamId]) {
+        teamMap[teamId] = {
+          teamId: teamId,
+          teamName: teamNameMap[teamId] || '未命名分队',
+          grossTotal: 0,
+          toPar: 0,
+          total: 0,
+          scoringPlayersCount: 0,
+          players: []
+        };
+      } else if (!teamMap[teamId].teamName && teamNameMap[teamId]) {
+        teamMap[teamId].teamName = teamNameMap[teamId];
+      }
+      const avatar =
+        row.avatar
+        || (members[0] && members[0].avatar)
+        || '';
+      teamMap[teamId].players.push({
+        entityId: String(row.entityId),
+        isEntity: true,
+        isTeam: true,
+        kind: row.kind || 'team',
+        compositionMode: row.compositionMode || '',
+        teamGroupId: teamId,
+        playerId: '',
+        userId: '',
+        groupId: row.groupId ? String(row.groupId) : '',
+        scorecardKey: teamId + ':' + String(row.entityId),
+        name: row.name || '组合',
+        nickname: row.name || '组合',
+        avatar: avatar,
+        members: members,
+        pairMembers: members,
+        gender: '',
+        genderIcon: '',
+        genderClass: '',
+        country: '',
+        age: '',
+        flag: '',
+        grossTotal: Number(row.grossTotal) || 0,
+        toPar: Number(row.toPar) || 0,
+        total: Number(row.toPar) || 0,
+        diff: Number(row.toPar) || 0,
+        hasScore: row.hasScore === true,
+        scoreStr: row.hasScore === true
+          ? (row.scoreStr || this._formatLeaderboardDiff(row.toPar))
+          : '-',
+        scoreClass: row.hasScore === true
+          ? (row.scoreClass || this._resolveLeaderboardTotalClass(row.toPar))
+          : 'score-even',
+        thru: row.thru != null ? row.thru : '-',
+        scoreSource: row.scoreSource || 'teamMatch.scoreData.teamScoresByEntity',
+        isCounting: false,
+        _thruValue: row._thruValue != null ? row._thruValue : 0
+      });
+    });
+
+    const teamOrder = teamGroups
+      .map((team) => (team && team.id != null ? String(team.id).trim() : ''))
+      .filter(Boolean);
+    const orderedTeams = teamOrder
+      .map((teamId) => teamMap[teamId])
+      .filter(Boolean);
+    const extraTeams = Object.keys(teamMap)
+      .filter((teamId) => teamOrder.indexOf(teamId) < 0)
+      .map((teamId) => teamMap[teamId]);
+    const teams = orderedTeams.concat(extraTeams)
+      .filter((team) => (isTeamCompetitionEnabled ? team.players.length > 0 : true));
+    if (!teams.length) return [];
+
+    if (!isTeamCompetitionEnabled) {
+      return teams.map((team, teamIndex) => {
+        const sortedPlayers = team.players.slice().sort((a, b) => {
+          if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
+          if (a.toPar !== b.toPar) return a.toPar - b.toPar;
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        });
+        const rankedPlayers = this._buildCompetitionRanking(sortedPlayers, (player) => (
+          player && player.hasScore === true ? player.toPar : null
+        ));
+        let grossTotal = 0;
+        let toPar = 0;
+        rankedPlayers.forEach((player) => {
+          if (!(player && player.hasScore === true)) return;
+          grossTotal += Number(player.grossTotal || 0);
+          toPar += Number(player.toPar || 0);
+        });
+        return {
+          pos: String(teamIndex + 1),
+          teamId: team.teamId,
+          teamName: team.teamName || '未命名分队',
+          grossTotal: grossTotal,
+          toPar: toPar,
+          total: 0,
+          hasScore: false,
+          scoreStr: '-',
+          scoreClass: 'score-even',
+          scoringPlayersCount: 0,
+          players: rankedPlayers.map((player) => {
+            const out = Object.assign({}, player, { isCounting: false });
+            delete out._thruValue;
+            return out;
+          })
+        };
+      });
+    }
+
+    const sortedTeams = teams.map((team, teamIndex) => {
+      const sortedPlayers = team.players.slice().sort((a, b) => {
+        if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
+        if (a.toPar !== b.toPar) return a.toPar - b.toPar;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      let toPar = 0;
+      let grossTotal = 0;
+      const scoringPlayersCount = Math.min(
+        configuredTopN,
+        sortedPlayers.filter((player) => player && player.hasScore === true).length
+      );
+      const players = sortedPlayers.map((player, index) => {
+        const isCounting = player.hasScore === true && index < scoringPlayersCount;
+        if (isCounting) {
+          toPar += Number(player.toPar || 0);
+          grossTotal += Number(player.grossTotal || 0);
+        }
+        const out = Object.assign({}, player, { isCounting: isCounting });
         delete out._thruValue;
         return out;
       });
@@ -4488,34 +4761,87 @@ Page({
   _mergeTeeSheetPlayerTeeInfo(match, teeGroups, playerLookup) {
     const groups = match && Array.isArray(match.groups) ? match.groups : [];
     const lookup = playerLookup || {};
+    const strokeKind = resolveStrokeKind(resolveGameMode(match));
+    const showTeamLabel =
+      (strokeKind === 'g2g3' || strokeKind === 'g4') &&
+      this._isTeamCompetitionEnabled(match);
+    const teamNameMap = showTeamLabel ? this._buildLeaderboardTeamNameMap(match) : {};
+    const playerTeamLookup = showTeamLabel ? this._buildLeaderboardPlayerTeamLookup(match) : {};
     const displayByGroup = {};
+    const rawByGroup = {};
     groups.forEach((group, index) => {
       const groupId = group && group.groupId != null ? String(group.groupId) : ('group-' + (index + 1));
       const playerMap = {};
+      const rawMap = {};
       this.hydrateGroupDisplayPlayers(group, lookup).forEach((player) => {
         if (!player || !player.userId) return;
         playerMap[String(player.userId)] = player;
       });
+      (Array.isArray(group && group.players) ? group.players : []).forEach((raw) => {
+        const uid = this._resolveAnyPlayerId(raw);
+        if (!uid) return;
+        rawMap[String(uid)] = raw;
+      });
       displayByGroup[groupId] = playerMap;
+      rawByGroup[groupId] = rawMap;
     });
     return (Array.isArray(teeGroups) ? teeGroups : []).map((card) => {
       const groupId = card && (card.groupId || card.id) != null ? String(card.groupId || card.id) : '';
       const playerMap = displayByGroup[groupId] || {};
+      const rawMap = rawByGroup[groupId] || {};
       const players = (Array.isArray(card && card.players) ? card.players : []).map((player) => {
         const playerId = player && (player.userId || player.playerId) != null
           ? String(player.userId || player.playerId)
           : '';
         const display = playerMap[playerId] || {};
+        const raw = rawMap[playerId] || {};
         return Object.assign({}, player, {
           tee: display.tee || player.tee || '',
           teeText: display.teeText || player.teeText || '',
           teeLabel: display.teeLabel || player.teeLabel || '',
           teeCode: display.teeCode || player.teeCode || '',
-          teeMarkerClass: display.teeMarkerClass || player.teeMarkerClass || ''
+          teeMarkerClass: display.teeMarkerClass || player.teeMarkerClass || '',
+          teamLabel: showTeamLabel
+            ? this._resolveTeeSheetPlayerTeamLabel(raw, playerId, teamNameMap, playerTeamLookup)
+            : ''
         });
       });
       return Object.assign({}, card, { players: players });
     });
+  },
+
+  /**
+   * 出发表分队标签：优先 groups.players 上的分队字段，再回退报名分队名；不读 scoreEntities。
+   */
+  _resolveTeeSheetPlayerTeamLabel(rawPlayer, userId, teamNameMap, playerTeamLookup) {
+    const raw = rawPlayer && typeof rawPlayer === 'object' ? rawPlayer : {};
+    const directName =
+      (raw.teamGroupName != null && String(raw.teamGroupName).trim()) ||
+      (raw.teamName != null && String(raw.teamName).trim()) ||
+      (raw.matchTeamName != null && String(raw.matchTeamName).trim()) ||
+      '';
+    if (directName) {
+      return this._formatLeaderboardTeamTagName(directName);
+    }
+    const teamId =
+      (raw.teamGroupId != null && String(raw.teamGroupId).trim()) ||
+      (raw.teamId != null && String(raw.teamId).trim()) ||
+      (raw.matchTeamId != null && String(raw.matchTeamId).trim()) ||
+      '';
+    if (teamId && teamNameMap && teamNameMap[teamId]) {
+      return this._formatLeaderboardTeamTagName(teamNameMap[teamId]);
+    }
+    const uid = userId != null ? String(userId).trim() : '';
+    const ref = uid && playerTeamLookup ? playerTeamLookup[uid] : null;
+    if (ref) {
+      const fromMap =
+        (ref.teamId && teamNameMap && teamNameMap[ref.teamId]) ||
+        ref.teamName ||
+        ref.matchTeamName ||
+        '';
+      return this._formatLeaderboardTeamTagName(fromMap);
+    }
+    return '';
   },
 
   refreshLeaderboard() {
@@ -4674,7 +5000,9 @@ Page({
         source: scorecard.scorecardStatus === 'not_started' ? 'teamMatch.not_started' : 'teamMatch.scoreData',
         matchId,
         groupId: row.groupId,
-        playerId: row.playerId
+        playerId: row.playerId || '',
+        entityId: row.entityId || '',
+        isEntity: !!(row.isEntity || row.entityId)
       });
       this.setData({ openScorecard: scorecard });
       return;

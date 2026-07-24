@@ -806,10 +806,10 @@ Page({
     const matchType = match && match.matchType ? String(match.matchType) : 'team-internal';
     const isG2G3 = teamMatchStore.isPairingStrokeFormat(gameMode);
     const isG4 = gameMode === '四人两球比杆赛';
-    // 报名期 + 队内赛 + G2/G3：组合模式 UI；LIVE 保持原 pairing 交互不动
-    const showCompositionMode = mode !== 'live' && matchType === 'team-internal' && isG2G3;
-    // G2/G3：仅 LIVE 开 pairing；G4：仅 LIVE 开 pairing 编辑区（报名/编辑用 composition 文字预览）
-    const showPairingSection = (isG2G3 && !showCompositionMode) || (isG4 && mode === 'live');
+    // G2/G3 队内赛：create / edit / live 统一座位编辑 + 组合模式预览（不展示 pairing 工具）
+    const showCompositionMode = matchType === 'team-internal' && isG2G3;
+    // G4：仅 LIVE 开 pairing 编辑区；G2/G3 全程关闭 pairing 区
+    const showPairingSection = isG4 && mode === 'live';
     const strokeCompositionMode = match && match.strokeCompositionMode
       ? String(match.strokeCompositionMode)
       : '4+0';
@@ -832,7 +832,7 @@ Page({
       gameMode: gameMode,
       showPairingSection: showPairingSection,
       showCompositionMode: showCompositionMode,
-      showPairingComposeTools: showPairingSection && !isG4,
+      showPairingComposeTools: false,
       pairingSectionTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
       strokeCompositionMode: resolvedMode,
       groupDraft: draft,
