@@ -1,6 +1,7 @@
 /**
  * 赛事统计数据页
  * - 优先 statisticsAdapter（match.scoreData）→ dataSource='adapter'
+ *   G1：buildStatisticsRows（个人）；G2/G3/G4：buildEntityStatisticsRows（组合）
  * - 仅显式 ?mock=1 → dataSource='mock'（mockStatisticsPlayers）
  * - 无 matchId / 无可用数据 → dataSource='empty'
  * - sortField/sortOrder 默认 total/asc
@@ -407,7 +408,10 @@ Page({
     if (id) {
       const match = teamMatchStore.getMatchById(id);
       if (match) {
-        const adapterRows = statisticsAdapter.buildStatisticsRows(match) || [];
+        const useEntity = statisticsAdapter.shouldUseEntityStatistics(match);
+        const adapterRows = useEntity
+          ? (statisticsAdapter.buildEntityStatisticsRows(match) || [])
+          : (statisticsAdapter.buildStatisticsRows(match) || []);
         if (adapterRows.length > 0) {
           const viewRows = this._mapAdapterRowsToView(match, adapterRows);
           return {
@@ -454,15 +458,37 @@ Page({
       const penalty = hasScore ? p.penalty : dash;
       const stat8421 = hasScore ? p.stat8421 : dash;
       const gender = p.gender === 'female' ? 'female' : (p.gender === 'male' ? 'male' : '');
+      const entityId = p.entityId != null ? String(p.entityId).trim() : '';
+      const isEntity = p.isEntity === true || !!entityId;
+      const playerId = p.playerId != null ? String(p.playerId).trim() : '';
+      // 组合头像：沿用 score pairMembers 的 members[].avatar，最多 4 人叠放
+      const members = isEntity
+        ? (Array.isArray(p.members) ? p.members : [])
+            .filter((m) => m && (m.userId || m.avatar))
+            .slice(0, 4)
+            .map((m) => ({
+              userId: m.userId != null ? String(m.userId) : '',
+              name: m.name || '',
+              avatar: m.avatar || ''
+            }))
+        : [];
+      const memberCount = members.length;
       return {
-        id: p.playerId || ('stats-' + index),
-        playerId: p.playerId || '',
-        scorePlayerId: p.scorePlayerId || p.playerId || '',
+        id: entityId || playerId || ('stats-' + index),
+        isEntity: isEntity,
+        entityId: entityId,
+        playerId: playerId,
+        scorePlayerId: p.scorePlayerId || playerId || '',
         groupId: p.groupId || '',
-        avatar: p.avatar || mockAvatars.pickMockAvatar(p.name || p.playerId || index),
-        name: p.name || '未知球员',
+        avatar: p.avatar || mockAvatars.pickMockAvatar(p.name || entityId || playerId || index),
+        members: members,
+        showPairedAvatars: isEntity && memberCount > 0,
+        avatarSlotClass: isEntity
+          ? ('st-avatar-slot--n' + Math.max(1, Math.min(memberCount, 4)))
+          : 'st-avatar-slot--single',
+        name: p.name || (isEntity ? '组合' : '未知球员'),
         gender: gender,
-        genderIcon: p.genderIcon || '',
+        genderIcon: isEntity ? '' : (p.genderIcon || ''),
         genderClass: gender === 'female' ? 'gender-female' : (gender === 'male' ? 'gender-male' : ''),
         teeColor: p.teeColor || '#ffffff',
         teeMarkerClass: resolveTeeMarkerClass(p.teeColor),
@@ -547,12 +573,32 @@ Page({
 
   _statsRowHasScoreData(scoreData, row) {
     const groupId = row && row.groupId != null ? String(row.groupId).trim() : '';
-    const scorePlayerId = row && row.scorePlayerId != null ? String(row.scorePlayerId).trim() : '';
-    const playerId = row && row.playerId != null ? String(row.playerId).trim() : '';
     const groupScore = groupId && scoreData[groupId] && typeof scoreData[groupId] === 'object'
       ? scoreData[groupId]
       : null;
-    const byPlayer = groupScore && groupScore.scoresByPlayer && typeof groupScore.scoresByPlayer === 'object'
+    if (!groupScore) return false;
+
+    const entityId = row && row.entityId != null ? String(row.entityId).trim() : '';
+    if (row && (row.isEntity === true || entityId)) {
+      if (!entityId) return false;
+      const list = Array.isArray(groupScore.teamScoresByEntity) ? groupScore.teamScoresByEntity : [];
+      for (let i = 0; i < list.length; i++) {
+        const rec = list[i];
+        if (!rec || typeof rec !== 'object') continue;
+        const key =
+          rec.teamId != null && String(rec.teamId).trim() !== ''
+            ? String(rec.teamId).trim()
+            : rec.entityId != null && String(rec.entityId).trim() !== ''
+              ? String(rec.entityId).trim()
+              : '';
+        if (key === entityId) return Array.isArray(rec.scores);
+      }
+      return false;
+    }
+
+    const scorePlayerId = row && row.scorePlayerId != null ? String(row.scorePlayerId).trim() : '';
+    const playerId = row && row.playerId != null ? String(row.playerId).trim() : '';
+    const byPlayer = groupScore.scoresByPlayer && typeof groupScore.scoresByPlayer === 'object'
       ? groupScore.scoresByPlayer
       : null;
     if (!byPlayer) return false;
@@ -566,11 +612,34 @@ Page({
       : {};
     if (!this._statsRowHasScoreData(scoreData, row)) return 0;
     const groupId = String(row.groupId || '').trim();
-    const byPlayer = scoreData[groupId].scoresByPlayer;
-    const scorePlayerId = String(row.scorePlayerId || '').trim();
-    const playerId = String(row.playerId || '').trim();
-    const record = (scorePlayerId && byPlayer[scorePlayerId]) || (playerId && byPlayer[playerId]) || null;
-    const scores = record && Array.isArray(record.scores) ? record.scores : [];
+    const groupScore = scoreData[groupId];
+    let scores = [];
+
+    const entityId = row && row.entityId != null ? String(row.entityId).trim() : '';
+    if (row && (row.isEntity === true || entityId)) {
+      const list = Array.isArray(groupScore.teamScoresByEntity) ? groupScore.teamScoresByEntity : [];
+      for (let i = 0; i < list.length; i++) {
+        const rec = list[i];
+        if (!rec || typeof rec !== 'object') continue;
+        const key =
+          rec.teamId != null && String(rec.teamId).trim() !== ''
+            ? String(rec.teamId).trim()
+            : rec.entityId != null && String(rec.entityId).trim() !== ''
+              ? String(rec.entityId).trim()
+              : '';
+        if (key === entityId) {
+          scores = Array.isArray(rec.scores) ? rec.scores : [];
+          break;
+        }
+      }
+    } else {
+      const byPlayer = groupScore.scoresByPlayer;
+      const scorePlayerId = String(row.scorePlayerId || '').trim();
+      const playerId = String(row.playerId || '').trim();
+      const record = (scorePlayerId && byPlayer[scorePlayerId]) || (playerId && byPlayer[playerId]) || null;
+      scores = record && Array.isArray(record.scores) ? record.scores : [];
+    }
+
     let filled = 0;
     scores.forEach((score) => {
       if (score === null || score === undefined || score === '') return;

@@ -489,24 +489,28 @@
           </block>
 
           <block wx:else>
-            <view class="leaderboard-head leaderboard-head--personal">
+            <view class="leaderboard-head leaderboard-head--personal {{showLeaderboardTeamColumn ? '' : 'leaderboard-head--personal-no-team'}}">
               <text class="lh-pos">POS</text>
               <text class="lh-player">PLAYER</text>
-              <text class="lh-team">TEAM</text>
-              <text class="lh-thru">THRU</text>
-              <text class="lh-total">{{leaderboardScoreType === 'net' ? 'NET SCORE' : 'TO PAR'}}</text>
+              <view class="leaderboard-metrics {{showLeaderboardTeamColumn ? 'leaderboard-metrics--with-team' : 'leaderboard-metrics--no-team'}}">
+                <text wx:if="{{showLeaderboardTeamColumn}}" class="lh-team">TEAM</text>
+                <text class="lh-thru">THRU</text>
+                <text class="lh-total">{{leaderboardScoreType === 'net' ? 'NET SCORE' : 'TO PAR'}}</text>
+              </view>
             </view>
 
             <block wx:for="{{leaderboard}}" wx:key="rowId">
-              <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row leaderboard-row--personal">
+              <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row leaderboard-row--personal {{showLeaderboardTeamColumn ? '' : 'leaderboard-row--personal-no-team'}}">
                 <text class="lr-pos pos-cell">{{item.pos}}</text>
                 <view class="lr-player">
-                  <text class="player-name">{{item.displayName || item.name}}</text>
-                  <text wx:if="{{item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
+                  <text class="player-name">{{item.name}}</text>
+                  <text wx:if="{{!item.isTeam && item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
                 </view>
-                <text class="lr-team">{{item.teamName || '-'}}</text>
-                <text class="lr-thru">{{item.thru}}</text>
-                <text class="lr-total leaderboard-total {{leaderboardScoreType === 'net' ? 'score-even' : item.scoreClass}}">{{leaderboardScoreType === 'net' ? (item.netScoreDisplay || item.scoreStr) : item.scoreStr}}</text>
+                <view class="leaderboard-metrics {{showLeaderboardTeamColumn ? 'leaderboard-metrics--with-team' : 'leaderboard-metrics--no-team'}}">
+                  <text wx:if="{{showLeaderboardTeamColumn}}" class="lr-team">{{item.teamName || '-'}}</text>
+                  <text class="lr-thru">{{item.thru}}</text>
+                  <text class="lr-total leaderboard-total {{leaderboardScoreType === 'net' ? 'score-even' : item.scoreClass}}">{{leaderboardScoreType === 'net' ? (item.netScoreDisplay || item.scoreStr) : item.scoreStr}}</text>
+                </view>
               </view>
 
               <!-- 展开成绩卡 -->
@@ -597,17 +601,21 @@
             <view class="tee-start-info"><text class="tee-clock">🕘</text>{{item.teeMetaLine}}</view>
           </view>
           <view class="gb-group-player-grid">
-            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="gb-group-player">
-              <view class="gb-group-player-avatar-wrap">
-                <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
-                <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
-                <text wx:if="{{pl.teamLabel}}" class="tee-player-team-label">[{{pl.teamLabel}}]</text>
-              </view>
-              <view class="gb-group-player-meta">
-                <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
-                <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
-                  <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
-                  <text class="gb-group-player-tee-text">T</text>
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="gb-group-player tee-sheet-player">
+              <view class="tee-sheet-player-main">
+                <view class="tee-sheet-player-avatar-col">
+                  <view class="gb-group-player-avatar-wrap">
+                    <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                    <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
+                  </view>
+                  <text wx:if="{{pl.teamLabel}}" class="tee-player-team-label">{{pl.teamLabel}}</text>
+                </view>
+                <view class="gb-group-player-meta">
+                  <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                  <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
+                    <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                    <text class="gb-group-player-tee-text">T</text>
+                  </view>
                 </view>
               </view>
             </view>
@@ -703,7 +711,14 @@
     <view class="feature-section">
       <view class="feature-section-title"><text class="fst-main">{{featuresSectionCommonMain}}</text><text wx:if="{{featuresSectionCommonSub}}" class="fst-sub">{{featuresSectionCommonSub}}</text></view>
       <view class="feature-grid">
-        <view wx:for="{{featuresCommon}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+        <view
+          wx:for="{{featuresCommon}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
           <view class="feature-icon"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
         </view>
@@ -712,7 +727,14 @@
     <view class="feature-section">
       <view class="feature-section-title"><text class="fst-main">{{featuresSectionPermissionMain}}</text><text wx:if="{{featuresSectionPermissionSub}}" class="fst-sub">{{featuresSectionPermissionSub}}</text></view>
       <view class="feature-grid">
-        <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+        <view
+          wx:for="{{featuresPermission}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
         </view>
@@ -726,7 +748,8 @@
           wx:key="permission"
           bindtap="onFeatureTap"
           data-permission="{{item.permission}}"
-          class="feature-item"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
         >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
@@ -740,7 +763,8 @@
           wx:key="permission"
           bindtap="onFeatureTap"
           data-permission="{{item.permission}}"
-          class="feature-item"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
         >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>

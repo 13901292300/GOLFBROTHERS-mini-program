@@ -23,18 +23,21 @@ const TEAM_GAME_MODES = [
 const GAME_MODE_OPTIONS = TEAM_GAME_MODES.map((item) => item.name);
 
 const MATCH_PLAY_MODES = [
+  '个人比洞赛',
+  '最好成绩比洞赛',
   '四人四球比洞赛',
-  '四人两球比洞赛',
   '最佳球位比洞赛',
-  '个人比洞赛'
+  '四人两球比洞赛'
 ];
+
+const MATCH_PLAY_TEAM_GROUPS_TIP = '比洞赛必须设置两个分队，请调整分队配置后继续。';
 
 function isMatchPlayMode(name) {
   return MATCH_PLAY_MODES.indexOf(name) >= 0;
 }
 
 const TEAM_GROUP_DESC_DEFAULT = '用于设置本场队内赛的分队名称，如不需要分队 PK，可保留默认设置。';
-const TEAM_GROUP_DESC_MATCH_PLAY = '比洞赛赛制下，有且只能有两个分队，分队名称可自行编辑。';
+const TEAM_GROUP_DESC_MATCH_PLAY = '比洞赛赛制下，有且只能有两个分队，分队名称可自行编辑；切换赛制不会自动改动分队名称。';
 
 function getTeamGroupSheetDesc(matchPlay) {
   return matchPlay ? TEAM_GROUP_DESC_MATCH_PLAY : TEAM_GROUP_DESC_DEFAULT;
@@ -304,6 +307,8 @@ Page({
     this._activeTimeTarget = 'tee';
     this._editMatchId = matchId;
     this._roundNameManual = true;
+    // 编辑页：记录进入时已落盘赛制，保存失败时仅回滚赛制 UI（不碰 teamGroups）
+    this._originalGameMode = form.gameMode || '个人比杆赛';
 
     const teamGroups = (form.teamGroups && form.teamGroups.length)
       ? this._cloneTeamGroups(form.teamGroups)
@@ -355,7 +360,7 @@ Page({
         selectedGameMode: gameMode,
         gameMode: gameMode,
         isMatchPlayMode: matchPlay,
-        teamGroupMode: matchPlay ? 'fixed-2' : 'free',
+        teamGroupMode: 'free',
         teamGroupSheetDesc: getTeamGroupSheetDesc(matchPlay),
         teamGroups: teamGroups,
         teamGroupSummary: this.getTeamGroupSummary(teamGroups),
@@ -511,56 +516,17 @@ Page({
     return next;
   },
 
-  _matchPlayTeamGroups(preserveNames) {
-    const existing = this.data.teamGroups || [];
-    return [
-      {
-        id: 1,
-        renderKey: 'team-group-1',
-        name: preserveNames && existing[0] && existing[0].name ? existing[0].name : '红队'
-      },
-      {
-        id: 2,
-        renderKey: 'team-group-2',
-        name: preserveNames && existing[1] && existing[1].name ? existing[1].name : '蓝队'
-      }
-    ];
-  },
-
-  _normalizeMatchPlayGroups(groups) {
-    const cloned = this._cloneTeamGroups(groups);
-    if (cloned.length === 2) return cloned;
-    return this._matchPlayTeamGroups(cloned.length > 0);
-  },
-
+  /**
+   * 选赛制时只更新比洞相关 UI 标记，绝不改写 teamGroups / 报名归属。
+   * （历史：比洞赛会静默重置为红队/蓝队，已移除）
+   */
   _getTeamGroupUpdatesForGameMode(gameMode) {
     const nextMatchPlay = isMatchPlayMode(gameMode);
-    const prevMatchPlay = isMatchPlayMode(this.data.selectedGameMode);
-    const updates = {
+    return {
       isMatchPlayMode: nextMatchPlay,
-      teamGroupMode: nextMatchPlay ? 'fixed-2' : 'free',
+      teamGroupMode: 'free',
       teamGroupSheetDesc: getTeamGroupSheetDesc(nextMatchPlay)
     };
-
-    if (nextMatchPlay) {
-      if (!prevMatchPlay) {
-        this._freeModeTeamGroups = this._cloneTeamGroups(this.data.teamGroups);
-      }
-      const teamGroups = this._matchPlayTeamGroups(false);
-      updates.teamGroups = teamGroups;
-      updates.teamGroupSummary = this.getTeamGroupSummary(teamGroups);
-      return updates;
-    }
-
-    if (prevMatchPlay) {
-      const teamGroups = this._freeModeTeamGroups && this._freeModeTeamGroups.length
-        ? this._cloneTeamGroups(this._freeModeTeamGroups)
-        : this._defaultTeamGroups();
-      updates.teamGroups = teamGroups;
-      updates.teamGroupSummary = this.getTeamGroupSummary(teamGroups);
-    }
-
-    return updates;
   },
 
   getTeamGroupSummary(groups) {
@@ -572,9 +538,10 @@ Page({
   },
 
   openTeamGroupSheet() {
-    const source = this.data.isMatchPlayMode
-      ? this._normalizeMatchPlayGroups(this.data.teamGroups)
-      : (this.data.teamGroups && this.data.teamGroups.length ? this.data.teamGroups : this._defaultTeamGroups());
+    const source =
+      this.data.teamGroups && this.data.teamGroups.length
+        ? this.data.teamGroups
+        : this._defaultTeamGroups();
     const groups = this._cloneDraftTeamGroups(source);
     this.setData({
       draftTeamGroups: groups,
@@ -603,7 +570,10 @@ Page({
   },
 
   addTeamGroup() {
-    if (this.data.isMatchPlayMode) return;
+    // 比洞赛：已有 2 队时禁止再加（与 UI 隐藏一致）
+    if (this.data.isMatchPlayMode && (this.data.draftTeamGroups || []).length >= 2) {
+      return;
+    }
     const groups = this._cloneDraftTeamGroups(this.data.draftTeamGroups);
     const nextId = this.data.nextTeamGroupId || Date.now();
     groups.push({ id: nextId, renderKey: 'draft-team-group-' + nextId, name: '新分队' });
@@ -614,6 +584,7 @@ Page({
   },
 
   deleteTeamGroup(e) {
+    // 比洞赛：禁止删除，避免变成单分队非法态（不改写名称/ID）
     if (this.data.isMatchPlayMode) return;
     const groups = this._cloneDraftTeamGroups(this.data.draftTeamGroups);
     if (groups.length <= 1) return;
@@ -720,13 +691,9 @@ Page({
   },
 
   validateTeamGroups(groups) {
-    let source = groups;
-    if (this.data.isMatchPlayMode) {
-      source = this._normalizeMatchPlayGroups(groups);
-    }
-
-    const trimmed = (source || []).map((item) => ({
+    const trimmed = (groups || []).map((item) => ({
       id: item.id,
+      renderKey: item.renderKey,
       name: (item.name || '').trim()
     }));
 
@@ -734,12 +701,13 @@ Page({
       return { ok: false, message: '请输入分队名称' };
     }
 
-    if (this.data.isMatchPlayMode) {
-      if (trimmed.length !== 2) {
-        return { ok: true, groups: this._matchPlayTeamGroups(true) };
-      }
-    } else if (trimmed.length < 1) {
+    if (trimmed.length < 1) {
       return { ok: false, message: '至少需要一个分队' };
+    }
+
+    // 比洞赛必须恰好 2 队；不静默改写名称/ID
+    if (this.data.isMatchPlayMode && trimmed.length !== 2) {
+      return { ok: false, message: MATCH_PLAY_TEAM_GROUPS_TIP };
     }
 
     const seen = {};
@@ -754,6 +722,43 @@ Page({
     return { ok: true, groups: trimmed };
   },
 
+  /**
+   * 编辑保存失败时：仅恢复赛制相关 UI，不改 teamGroups / 费用 / 其他表单。
+   */
+  _restoreOriginalGameModeUi() {
+    if (!this.data.isEditMode) return;
+    const original = this._originalGameMode != null && String(this._originalGameMode).trim() !== ''
+      ? String(this._originalGameMode)
+      : '';
+    if (!original) return;
+    const matchPlay = isMatchPlayMode(original);
+    this.setData({
+      gameMode: original,
+      selectedGameMode: original,
+      isMatchPlayMode: matchPlay,
+      teamGroupMode: 'free',
+      teamGroupSheetDesc: getTeamGroupSheetDesc(matchPlay),
+      showGameModeSheet: false
+    });
+  },
+
+  /** 创建/编辑保存：比洞赛分队数量兜底（不改写 teamGroups） */
+  _assertMatchPlayTeamGroupsOrTip() {
+    const mode = this.data.gameMode || this.data.selectedGameMode || '';
+    if (!isMatchPlayMode(mode)) return true;
+    const n = Array.isArray(this.data.teamGroups) ? this.data.teamGroups.length : 0;
+    if (n === 2) return true;
+    // 保存未写盘：编辑态先回滚赛制 UI，避免卡在比洞「不可删队」状态
+    this._restoreOriginalGameModeUi();
+    wx.showModal({
+      title: '提示',
+      content: MATCH_PLAY_TEAM_GROUPS_TIP,
+      showCancel: false,
+      confirmText: '确认'
+    });
+    return false;
+  },
+
   confirmTeamGroupSheet() {
     const result = this.validateTeamGroups(this.data.draftTeamGroups);
     if (!result.ok) {
@@ -763,9 +768,7 @@ Page({
 
     const groups = this._cloneTeamGroups(result.groups);
     const competition = this._competitionForGroupCount(this.data.draftTeamCompetition, groups.length);
-    if (!this.data.isMatchPlayMode) {
-      this._freeModeTeamGroups = groups;
-    }
+    this._freeModeTeamGroups = groups;
     this.setData({
       teamGroups: groups,
       teamGroupSummary: this.getTeamGroupSummary(groups),
@@ -1547,6 +1550,10 @@ Page({
 
     partnerConfigUtil.savePartnerConfig(this.data.partnerConfig, this.data.teamName);
 
+    if (!this._assertMatchPlayTeamGroupsOrTip()) {
+      return;
+    }
+
     if (this.data.isEditMode) {
       this._submitEditMatch();
       return;
@@ -1573,7 +1580,7 @@ Page({
   },
 
   /**
-   * 编辑保存：赛制变更仅在导致组合关系失效且已有正式分组时提示并清空 groups
+   * 编辑保存：赛制变更时按目标赛制逐组校验；合法保留、非法清除（确认后）
    */
   _submitEditMatch() {
     const matchId = this.data.editMatchId || this._editMatchId;
@@ -1585,26 +1592,38 @@ Page({
 
     const fromMode = existing.gameMode || '';
     const toMode = this.data.gameMode || this.data.selectedGameMode || '';
-    const willClear = teamMatchStore.hasFormalGroups(existing) &&
-      teamMatchStore.shouldClearGroupsOnGameModeChange(fromMode, toMode);
-    const clearPairingsOnly = !willClear &&
+    const clearPairingsOnly =
       teamMatchStore.shouldClearPairingsOnGameModeChange(fromMode, toMode);
 
-    if (willClear) {
-      wx.showModal({
-        title: '提示',
-        content: teamMatchStore.GAME_MODE_CHANGE_CLEAR_GROUPS_TIP,
-        confirmText: '确认',
-        cancelText: '取消',
-        success: (res) => {
-          if (!res.confirm) return;
-          this._persistEditMatch(existing, { clearGroups: true });
-        }
-      });
+    if (!toMode || fromMode === toMode || !teamMatchStore.hasFormalGroups(existing)) {
+      this._persistEditMatch(existing, { clearPairings: clearPairingsOnly });
       return;
     }
 
-    this._persistEditMatch(existing, { clearPairings: clearPairingsOnly });
+    const plan = teamMatchStore.analyzeGameModeChangeGroups(existing, toMode);
+    if (plan.allLegal) {
+      this._persistEditMatch(existing, { clearPairings: clearPairingsOnly });
+      return;
+    }
+
+    const tip = plan.allIllegal
+      ? teamMatchStore.buildGameModeChangeGroupsAllIllegalTip()
+      : teamMatchStore.buildGameModeChangeGroupsPartialTip(plan.illegalCount);
+
+    wx.showModal({
+      title: '提示',
+      content: tip,
+      confirmText: '确认',
+      cancelText: '取消',
+      success: (res) => {
+        if (!res.confirm) return;
+        this._persistEditMatch(existing, {
+          // nextGroups：合法组原样 + 非法组空壳（同序，组数不变）
+          replaceGroups: plan.nextGroups || plan.keepGroups,
+          clearPairings: clearPairingsOnly
+        });
+      }
+    });
   },
 
   _persistEditMatch(existing, options) {
@@ -1612,10 +1631,14 @@ Page({
     const matchId = existing && existing.matchId
       ? existing.matchId
       : (this.data.editMatchId || this._editMatchId);
-    const updated = teamMatchStore.updateMatchFromCreatePage(existing, this.data, {
+    const persistOpts = {
       clearGroups: !!opts.clearGroups,
       clearPairings: !!opts.clearPairings
-    });
+    };
+    if (Array.isArray(opts.replaceGroups)) {
+      persistOpts.replaceGroups = opts.replaceGroups;
+    }
+    const updated = teamMatchStore.updateMatchFromCreatePage(existing, this.data, persistOpts);
     if (!updated) {
       wx.showToast({ title: '保存失败', icon: 'none' });
       return;
@@ -1632,6 +1655,8 @@ Page({
     }
 
     teamMatchStore.saveMatch(updated);
+    // 落盘成功后同步「原始赛制」，供下次校验失败回滚
+    this._originalGameMode = updated.gameMode || this.data.gameMode || this._originalGameMode;
     wx.showToast({ title: '已保存修改', icon: 'success' });
     setTimeout(() => {
       if (getCurrentPages().length > 1) {

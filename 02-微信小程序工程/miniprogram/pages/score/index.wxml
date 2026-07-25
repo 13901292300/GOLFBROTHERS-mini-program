@@ -389,7 +389,12 @@
 
   <!-- Floating Actions -->
   <view wx:if="{{activeTab !== 'discussion'}}" id="score-actions" class="score-actions">
-    <view bindtap="openGroupManagePage" id="quick-score-btn" class="score-actions__primary">添加/删除</view>
+    <view
+      bindtap="openGroupManagePage"
+      data-disabled="{{addDeleteDisabled}}"
+      id="quick-score-btn"
+      class="score-actions__primary {{addDeleteDisabled ? 'is-disabled' : ''}}"
+    >添加/删除</view>
     <view bindtap="toggleSheet" class="score-actions__secondary">更多功能</view>
   </view>
 
@@ -406,7 +411,14 @@
       <view class="feature-grid">
         <block wx:for="{{moreMenuItems}}" wx:key="label">
           <view wx:if="{{item.empty}}" class="feature-item feature-item--empty"></view>
-          <view wx:else bindtap="onMoreMenuTap" data-label="{{item.label}}" class="feature-item">
+          <view
+            wx:else
+            bindtap="onMoreMenuTap"
+            data-label="{{item.label}}"
+            data-action="{{item.action}}"
+            data-disabled="{{item.disabled}}"
+            class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+          >
             <view class="feature-icon {{item.bg === 'bg-red' ? 'danger' : (item.bg === 'bg-gold' ? 'warning' : '')}}"><text>{{item.icon}}</text></view>
             <text class="feature-label">{{item.label}}</text>
           </view>
@@ -419,7 +431,7 @@
   </view>
 
   <!-- Score Input Sheet -->
-  <view wx:if="{{showScoreSheet}}" id="score-input-sheet" class="score-input-sheet {{scorePanelMode === 'quick' ? 'quick-mode' : ''}}">
+  <view wx:if="{{showScoreSheet}}" id="score-input-sheet" class="score-input-sheet {{scorePanelMode === 'quick' ? 'quick-mode' : ''}} {{isReadOnlyScore ? 'is-readonly' : ''}}">
     <view class="score-input-sheet__mask" bindtap="closeScoreInput"></view>
     <view class="score-input-sheet__panel {{scoreSheetOpen ? 'score-input-sheet__panel--open' : ''}}">
       <view class="score-input-sheet__handle"></view>
@@ -467,40 +479,40 @@
           </view>
         </view>
 
-        <view wx:if="{{scorePanelMode === 'tech'}}" class="sheet-main-panel tech-score-panel {{techPanelFocusPulse ? 'tech-score-panel--focus-pulse' : ''}}">
+        <view wx:if="{{scorePanelMode === 'tech'}}" class="sheet-main-panel tech-score-panel {{techPanelFocusPulse ? 'tech-score-panel--focus-pulse' : ''}} {{isReadOnlyScore ? 'is-disabled' : ''}}">
           <view class="sheet-control-row">
             <text class="sheet-control-label">成绩</text>
             <view class="stepper-btn">
-              <view bindtap="adjustSheetVal" data-type="score" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <view bindtap="adjustSheetVal" data-type="score" data-delta="-1" class="control-icon control-icon--minus {{isReadOnlyScore ? 'is-disabled' : ''}}">−</view>
               <text class="stepper-val">{{panelMainDisplay}}</text>
-              <view bindtap="adjustSheetVal" data-type="score" data-delta="1" class="control-icon control-icon--plus">+</view>
+              <view bindtap="adjustSheetVal" data-type="score" data-delta="1" class="control-icon control-icon--plus {{isReadOnlyScore ? 'is-disabled' : ''}}">+</view>
             </view>
           </view>
           <view class="sheet-control-row">
             <text class="sheet-control-label">推杆</text>
             <view class="stepper-btn">
-              <view bindtap="adjustSheetVal" data-type="putt" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <view bindtap="adjustSheetVal" data-type="putt" data-delta="-1" class="control-icon control-icon--minus {{isReadOnlyScore ? 'is-disabled' : ''}}">−</view>
               <text class="stepper-val">{{panelPutt}}</text>
-              <view bindtap="adjustSheetVal" data-type="putt" data-delta="1" class="control-icon control-icon--plus">+</view>
+              <view bindtap="adjustSheetVal" data-type="putt" data-delta="1" class="control-icon control-icon--plus {{isReadOnlyScore ? 'is-disabled' : ''}}">+</view>
             </view>
           </view>
           <view class="sheet-control-row">
             <text class="sheet-control-label">罚杆</text>
             <view class="stepper-btn">
-              <view bindtap="adjustSheetVal" data-type="penalty" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <view bindtap="adjustSheetVal" data-type="penalty" data-delta="-1" class="control-icon control-icon--minus {{isReadOnlyScore ? 'is-disabled' : ''}}">−</view>
               <text class="stepper-val">{{panelPenalty}}</text>
-              <view bindtap="adjustSheetVal" data-type="penalty" data-delta="1" class="control-icon control-icon--plus">+</view>
+              <view bindtap="adjustSheetVal" data-type="penalty" data-delta="1" class="control-icon control-icon--plus {{isReadOnlyScore ? 'is-disabled' : ''}}">+</view>
             </view>
           </view>
           <view class="sheet-control-row">
             <text class="sheet-control-label">沙坑</text>
             <view class="stepper-btn">
-              <view bindtap="adjustSheetVal" data-type="bunker" data-delta="-1" class="control-icon control-icon--minus">−</view>
+              <view bindtap="adjustSheetVal" data-type="bunker" data-delta="-1" class="control-icon control-icon--minus {{isReadOnlyScore ? 'is-disabled' : ''}}">−</view>
               <text class="stepper-val">{{panelBunker}}</text>
-              <view bindtap="adjustSheetVal" data-type="bunker" data-delta="1" class="control-icon control-icon--plus">+</view>
+              <view bindtap="adjustSheetVal" data-type="bunker" data-delta="1" class="control-icon control-icon--plus {{isReadOnlyScore ? 'is-disabled' : ''}}">+</view>
             </view>
           </view>
-          <view class="direction-row">
+          <view class="direction-row {{isReadOnlyScore ? 'is-disabled' : ''}}">
             <view class="direction-btn" bindtap="selectPanelFairway" data-value="fairway">
               <view class="direction-circle {{panelFairway === 'fairway' ? 'direction-circle--active' : ''}}">◎</view>
               <text class="direction-label {{panelFairway === 'fairway' ? 'direction-label--gold' : ''}}">Fairway</text>
@@ -516,13 +528,13 @@
           </view>
         </view>
 
-        <view wx:if="{{scorePanelMode === 'quick'}}" class="sheet-main-panel quick-score-panel">
+        <view wx:if="{{scorePanelMode === 'quick'}}" class="sheet-main-panel quick-score-panel {{isReadOnlyScore ? 'is-disabled' : ''}}">
           <view class="quick-score-control-list">
             <view wx:for="{{quickPanelDisplay}}" wx:key="*this" wx:for-index="qIdx" class="quick-score-control-row">
               <view class="quick-score-control">
-                <view bindtap="adjustQuickPanelScore" data-idx="{{qIdx}}" data-delta="-1" class="quick-score-control-btn">−</view>
+                <view bindtap="adjustQuickPanelScore" data-idx="{{qIdx}}" data-delta="-1" class="quick-score-control-btn {{isReadOnlyScore ? 'is-disabled' : ''}}">−</view>
                 <text class="quick-score-control-value">{{item}}</text>
-                <view bindtap="adjustQuickPanelScore" data-idx="{{qIdx}}" data-delta="1" class="quick-score-control-btn">+</view>
+                <view bindtap="adjustQuickPanelScore" data-idx="{{qIdx}}" data-delta="1" class="quick-score-control-btn {{isReadOnlyScore ? 'is-disabled' : ''}}">+</view>
               </view>
             </view>
           </view>
@@ -530,8 +542,8 @@
       </view>
 
       <view class="sheet-footer-btns">
-        <view bindtap="clearScoreInput" class="sheet-footer-btn sheet-footer-btn--clear">清除</view>
-        <view bindtap="confirmScoreInput" class="sheet-footer-btn sheet-footer-btn--confirm">确认</view>
+        <view bindtap="clearScoreInput" class="sheet-footer-btn sheet-footer-btn--clear {{isReadOnlyScore ? 'is-disabled' : ''}}">清除</view>
+        <view bindtap="confirmScoreInput" class="sheet-footer-btn sheet-footer-btn--confirm {{isReadOnlyScore ? 'is-disabled' : ''}}">确认</view>
       </view>
     </view>
   </view>

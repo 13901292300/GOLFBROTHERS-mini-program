@@ -406,7 +406,8 @@
 
     <text class="team-group-desc ds-desc-text">{{teamGroupSheetDesc}}</text>
 
-    <view wx:if="{{draftTeamGroups.length >= 2}}" class="team-competition-rule">
+    <!-- G5-G8 比洞赛：隐藏分队PK；G1-G4 且分队≥2 时显示。不改 teamCompetition 字段。 -->
+    <view wx:if="{{draftTeamGroups.length >= 2 && !isMatchPlayMode}}" class="team-competition-rule">
       <view class="team-competition-rule__row">
         <text class="team-competition-rule__name">分队PK</text>
         <switch checked="{{draftTeamCompetition.enabled}}" bindchange="onTeamCompetitionToggle" color="#C9A45C" />
@@ -433,6 +434,7 @@
           placeholder="请输入分队名称"
           bindinput="handleTeamGroupNameInput"
         />
+        <!-- 比洞赛：隐藏删除，避免变成单分队；不改写分队数据 -->
         <view
           wx:if="{{draftTeamGroups.length > 1 && !isMatchPlayMode}}"
           class="team-group-delete"
@@ -442,7 +444,12 @@
       </view>
     </view>
 
-    <view wx:if="{{!isMatchPlayMode}}" class="add-team-group-btn" bindtap="addTeamGroup">
+    <!-- 比洞赛：已有 2 队时隐藏添加；不足 2 队时可补齐 -->
+    <view
+      wx:if="{{!isMatchPlayMode || draftTeamGroups.length < 2}}"
+      class="add-team-group-btn"
+      bindtap="addTeamGroup"
+    >
       <view class="add-team-group-icon"><text>+</text></view>
       <text>添加分队</text>
     </view>

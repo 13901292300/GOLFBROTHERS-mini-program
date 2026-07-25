@@ -157,7 +157,7 @@ const MORE_MENU_ITEMS_COMPACT = [
   { icon: '🪪', label: '海报', bg: 'bg-pga-blue' },
   { icon: '🎨', label: '风格选择', bg: 'bg-pga-blue' },
   { icon: '💬', label: '反馈', bg: 'bg-pga-blue' },
-  { icon: '⏻', label: '结束比赛', bg: 'bg-gold' }
+  { icon: '⏻', label: '结束比赛', bg: 'bg-gold', action: 'finish_match' }
 ];
 
 /** 演示/标准模式等其它记分场景：主功能区（原「虚拟」位留空） */
@@ -177,7 +177,7 @@ const MORE_MENU_ITEMS_LEGACY_MAIN = [
 const MORE_MENU_LEGACY_PLACEHOLDER = { empty: true, label: '__placeholder__' };
 const MORE_MENU_ITEMS_LEGACY_FOOTER = [
   { icon: '✕', label: '取消比赛', bg: 'bg-red' },
-  { icon: '⏻', label: '结束比赛', bg: 'bg-gold' }
+  { icon: '⏻', label: '结束比赛', bg: 'bg-gold', action: 'finish_match' }
 ];
 const MORE_MENU_ITEMS_LEGACY = MORE_MENU_ITEMS_LEGACY_MAIN
   .concat([MORE_MENU_LEGACY_PLACEHOLDER])
@@ -228,6 +228,83 @@ function resolveMoreMenuPanels(mode, options) {
 
 function resolveMoreMenuItems(mode, options) {
   return resolveMoreMenuPanels(mode, options).moreMenuItems;
+}
+
+/** 球队赛记分页更多菜单：隐藏与详情页重复的成绩卡/统计入口 */
+const TEAM_MATCH_MORE_MENU_HIDDEN_LABELS = {
+  成绩卡: true,
+  统计卡: true,
+  统计数据: true
+};
+
+function filterTeamMatchScoreMoreMenuItems(items) {
+  return (Array.isArray(items) ? items : []).filter((item) => {
+    if (!item || item.empty) return true;
+    return !TEAM_MATCH_MORE_MENU_HIDDEN_LABELS[item.label];
+  });
+}
+
+/**
+ * 是否球队赛记分页上下文（与详情进记分一致：matchId + team-internal）
+ * 普通 gameId 球局不走此分支
+ */
+function isTeamInternalScoreMatchContext(matchState) {
+  const ms = matchState || null;
+  if (!ms || !ms.matchId) return false;
+  if (ms.gameId && gameStore.getGame(ms.gameId)) return false;
+  const match = teamMatchStore.getMatchById(ms.matchId);
+  if (!match) return true;
+  const matchType = String(match.matchType || '').trim();
+  return !matchType || matchType === 'team-internal';
+}
+
+/** 整场比赛已结束：match.status === 'finished' */
+function isMatchStatusFinished(match) {
+  return String((match && match.status) || '').trim().toLowerCase() === 'finished';
+}
+
+function isFinishMatchMenuItem(item) {
+  if (!item || item.empty) return false;
+  if (item.action === 'finish_match') return true;
+  const label = item.label != null ? String(item.label) : '';
+  return label === '结束比赛' || label === '已结束';
+}
+
+/**
+ * finished：第一行 4 个可点项 disabled；结束比赛 → 已结束 + disabled
+ * 非 finished：结束比赛保持可点
+ */
+function applyFinishedScoreMoreMenuState(items, matchFinished) {
+  const list = Array.isArray(items) ? items : [];
+  if (!matchFinished) {
+    return list.map((item) => {
+      if (!item || item.empty) return item;
+      if (isFinishMatchMenuItem(item)) {
+        return Object.assign({}, item, {
+          action: 'finish_match',
+          label: '结束比赛',
+          disabled: false
+        });
+      }
+      return Object.assign({}, item, { disabled: false });
+    });
+  }
+  let firstRowUsed = 0;
+  return list.map((item) => {
+    if (!item || item.empty) return item;
+    if (isFinishMatchMenuItem(item)) {
+      return Object.assign({}, item, {
+        action: 'finish_match',
+        label: '已结束',
+        disabled: true
+      });
+    }
+    if (firstRowUsed < 4) {
+      firstRowUsed += 1;
+      return Object.assign({}, item, { disabled: true });
+    }
+    return Object.assign({}, item, { disabled: false });
+  });
 }
 
 function resolveGroupCountFromContext(matchState, game) {
@@ -705,6 +782,10 @@ Page({
     gameGroupIndex: 0,
     gameFinished: false,
     scoresCompleted: false,
+    /** 整场 match.status=finished（或本组已结束）时底部「添加/删除」冻结 */
+    addDeleteDisabled: false,
+    /** 记分面板只读：可进入查看，禁止改成绩 */
+    isReadOnlyScore: false,
     showMoreSheet: false,
     halfSheetVisible: false,
     showScoreSheet: false,
@@ -821,6 +902,19 @@ Page({
     const groupIndex = ms.groupIndex != null ? Number(ms.groupIndex) || 0 : 0;
     const groupId = ms.groupId || gameId || '';
     this._gameGroupIndex = groupIndex;
+    // 校正旧 session：match 已是 G1 但 matchState.mode 仍为 stroke_entity
+    if (mode && mode !== ms.mode) {
+      const nextMs = Object.assign({}, ms, { mode: mode });
+      if (nextMs.course && typeof nextMs.course === 'object') {
+        const liveMatch = ms.matchId ? teamMatchStore.getMatchById(ms.matchId) : null;
+        const liveMode = liveMatch && (liveMatch.gameMode || liveMatch.selectedGameMode);
+        if (liveMode) {
+          nextMs.course = Object.assign({}, nextMs.course, { gameMode: liveMode });
+        }
+      }
+      matchState.setMatchState(nextMs);
+      this._matchState = nextMs;
+    }
     this.setData({
       noMatch: false,
       mode: mode,
@@ -874,9 +968,44 @@ Page({
     return 'standard';
   },
 
+  /**
+   * 队内赛记分页 mode：与 detail.resolveTournamentScorePageMode 对齐
+   * G1 优先 individual_stroke；G2/G3/G4 保持 stroke_entity
+   */
+  _resolveTeamMatchScorePageMode(match, groupId) {
+    const gameMode = String(
+      (match && (match.gameMode || match.selectedGameMode)) || ''
+    ).trim();
+    if (gameMode === '个人比杆赛') {
+      return 'individual_stroke';
+    }
+    const gid = groupId != null ? String(groupId) : '';
+    const scoreEntities = match && match.scoreEntities;
+    if (scoreEntities && typeof scoreEntities === 'object' && !Array.isArray(scoreEntities)) {
+      const list = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
+      if (list.length > 0) return 'stroke_entity';
+    }
+    if (
+      gameMode === '最好成绩比杆赛' ||
+      gameMode === '四人四球比杆赛' ||
+      gameMode === '最佳球位比杆赛' ||
+      gameMode === '四人两球比杆赛'
+    ) {
+      return 'stroke_entity';
+    }
+    return 'individual_stroke';
+  },
+
   // 有 gameId 的普通球局必须走 game 模式，避免 formatType 兜底误用球队精简面板
+  // 队内赛：以最新 match.gameMode / scoreEntities 校正，覆盖旧 matchState.mode=stroke_entity
   _resolvePageMode(ms) {
     if (!ms) return 'standard';
+    if (ms.matchId) {
+      const match = teamMatchStore.getMatchById(ms.matchId);
+      if (match) {
+        return this._resolveTeamMatchScorePageMode(match, ms.groupId || '');
+      }
+    }
     const m = ms.mode;
     if (
       m === 'game' ||
@@ -896,28 +1025,82 @@ Page({
     const ms = this._matchState || this._readMatchState();
     const gameId = this.data.gameId || (ms && ms.gameId) || '';
 
+    let panels;
     // 普通球局记分页：优先按 gameStore 组数决定（单组必为完整面板，与 mode 无关）
     if (gameId && gameStore.getGame(gameId)) {
-      return resolveNormalGameMoreMenu(gameId, ms);
+      panels = resolveNormalGameMoreMenu(gameId, ms);
+    } else if (mode === 'standard') {
+      panels = resolveMoreMenuPanels('standard');
+    } else if (mode === 'individual_stroke') {
+      panels = resolveMoreMenuPanels('individual_stroke');
+    } else if (mode === 'fourball_best') {
+      const hasMatch = !!(ms && Array.isArray(ms.players) && ms.players.length);
+      panels = resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: 1 });
+    } else if (mode === 'game') {
+      panels = resolveMoreMenuPanels('game', { groupCount: 1 });
+    } else {
+      panels = { moreMenuItems: MORE_MENU_ITEMS_COMPACT.slice() };
     }
 
-    if (mode === 'standard') return resolveMoreMenuPanels('standard');
-    if (mode === 'individual_stroke') return resolveMoreMenuPanels('individual_stroke');
-    if (mode === 'fourball_best') {
-      const hasMatch = !!(ms && Array.isArray(ms.players) && ms.players.length);
-      return resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: 1 });
+    // 球队赛 G1–G8：不展示成绩卡 / 统计卡（详情页已有对应能力）
+    if (isTeamInternalScoreMatchContext(ms) && panels && panels.moreMenuItems) {
+      panels = {
+        moreMenuItems: filterTeamMatchScoreMoreMenuItems(panels.moreMenuItems)
+      };
     }
-    if (mode === 'game') {
-      return resolveMoreMenuPanels('game', { groupCount: 1 });
+
+    // match.status === 'finished'：首行管理项 + 结束比赛冻结（生成阶段写 disabled）
+    // 本页结束本组后 gameFinished 同步冻结，避免仅改组状态时菜单仍可点
+    const match =
+      ms && ms.matchId ? teamMatchStore.getMatchById(ms.matchId) : null;
+    const matchFinished = isMatchStatusFinished(match) || !!this.data.gameFinished;
+    if (panels && panels.moreMenuItems) {
+      panels = {
+        moreMenuItems: applyFinishedScoreMoreMenuState(panels.moreMenuItems, matchFinished)
+      };
     }
-    return { moreMenuItems: MORE_MENU_ITEMS_COMPACT.slice() };
+    return panels;
+  },
+
+  /** 底部「添加/删除」是否冻结：match.status=finished 或本组已结束 */
+  _resolveAddDeleteDisabled() {
+    if (this.data.gameFinished) return true;
+    const ms = this._matchState || this._readMatchState();
+    const matchId = (ms && ms.matchId) || '';
+    if (!matchId) return false;
+    const match = teamMatchStore.getMatchById(matchId);
+    return isMatchStatusFinished(match);
+  },
+
+  /**
+   * 记分面板只读：match.status === 'finished'
+   * 普通球局无 match 时回退 gameFinished（本组已结束）
+   */
+  _resolveIsReadOnlyScore() {
+    if (this.data.gameFinished) return true;
+    const ms = this._matchState || this._readMatchState();
+    const matchId = (ms && ms.matchId) || '';
+    if (!matchId) return false;
+    const match = teamMatchStore.getMatchById(matchId);
+    return isMatchStatusFinished(match);
+  },
+
+  _syncScoreFinishedUiState() {
+    const panels = this._resolveMoreMenuForCurrentContext();
+    const isReadOnlyScore = this._resolveIsReadOnlyScore();
+    this.data.isReadOnlyScore = isReadOnlyScore;
+    const patch = {
+      addDeleteDisabled: this._resolveAddDeleteDisabled(),
+      isReadOnlyScore: isReadOnlyScore
+    };
+    if (panels && panels.moreMenuItems) {
+      patch.moreMenuItems = panels.moreMenuItems;
+    }
+    this.setData(patch);
   },
 
   _syncMoreMenuItems() {
-    const panels = this._resolveMoreMenuForCurrentContext();
-    if (panels && panels.moreMenuItems) {
-      this.setData({ moreMenuItems: panels.moreMenuItems });
-    }
+    this._syncScoreFinishedUiState();
   },
 
   // 标准模式：球员/球场全部来自 matchState（无球员时回退演示种子，仅用于首页原型卡片）
@@ -1430,7 +1613,11 @@ Page({
       gameFinished: matchGroup
         ? matchStatus.getMatchStatus(matchGroup, { source: 'groups' }).isCompleted
         : matchStatus.getMatchStatus(group, { source: 'groups' }).isCompleted,
-      moreMenuItems: resolveMoreMenuPanels('individual_stroke').moreMenuItems,
+      moreMenuItems: isTeamInternalScoreMatchContext(ms)
+        ? filterTeamMatchScoreMoreMenuItems(
+            resolveMoreMenuPanels('individual_stroke').moreMenuItems
+          )
+        : resolveMoreMenuPanels('individual_stroke').moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
@@ -1935,7 +2122,43 @@ Page({
     } else if (this.data.gameId) {
       this._syncGameFinishedState();
       this._maybeShowEndGroupPrompt();
+    } else {
+      this._maybeRefreshTeamMatchScoreMode();
+      this._syncScoreFinishedUiState();
     }
+  },
+
+  /**
+   * 队内赛：旧 session 为 stroke_entity，但 match 已改为 G1 时，重新初始化 individual_stroke
+   */
+  _maybeRefreshTeamMatchScoreMode() {
+    if (this.data.noMatch) return;
+    const ms = this._matchState || this._readMatchState();
+    if (!ms || !ms.matchId) return;
+    const match = teamMatchStore.getMatchById(ms.matchId);
+    if (!match) return;
+    const groupId = this.data.groupId || ms.groupId || '';
+    const nextMode = this._resolveTeamMatchScorePageMode(match, groupId);
+    if (!nextMode || nextMode === this.data.mode) return;
+
+    const nextMs = Object.assign({}, ms, { mode: nextMode });
+    if (nextMs.course && typeof nextMs.course === 'object') {
+      nextMs.course = Object.assign({}, nextMs.course, {
+        gameMode: match.gameMode || match.selectedGameMode || nextMs.course.gameMode || ''
+      });
+    }
+    matchState.setMatchState(nextMs);
+    this._matchState = nextMs;
+    this.setData({ mode: nextMode, groupId: groupId });
+
+    this._syncHoleLayoutFromCourse({ refresh: false });
+    if (nextMode === 'stroke_entity') {
+      this.initStrokeEntityMode(groupId);
+    } else if (nextMode === 'individual_stroke') {
+      this.initIndividualStrokeMode(groupId);
+    }
+    this.hydrateFromSession();
+    this._syncMoreMenuItems();
   },
 
   /**
@@ -2846,7 +3069,11 @@ Page({
     const show = !this.data.showMoreSheet;
     if (show) {
       const panels = this._resolveMoreMenuForCurrentContext();
-      this.setData({ showMoreSheet: true, moreMenuItems: panels.moreMenuItems });
+      this.setData({
+        showMoreSheet: true,
+        moreMenuItems: panels.moreMenuItems,
+        addDeleteDisabled: this._resolveAddDeleteDisabled()
+      });
       return;
     }
     this.setData({ showMoreSheet: false });
@@ -2946,10 +3173,23 @@ Page({
   },
 
   onMoreMenuTap(e) {
-    const label = e.currentTarget.dataset.label;
+    const dataset = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const disabledAttr = dataset.disabled;
+    if (
+      disabledAttr === true ||
+      disabledAttr === 'true' ||
+      disabledAttr === 1 ||
+      disabledAttr === '1'
+    ) {
+      return;
+    }
+
+    const label = dataset.label;
+    const action = dataset.action != null ? String(dataset.action) : '';
     this.setData({ showMoreSheet: false });
 
-    if (label === '结束比赛') {
+    if (action === 'finish_match' || label === '结束比赛' || label === '已结束') {
+      if (label === '已结束' || this._resolveAddDeleteDisabled()) return;
       if (this._boundToStore() && this.data.groupId) {
         wx.showModal({
           title: '结束本组比赛？',
@@ -3044,19 +3284,25 @@ Page({
       const ms = group
         ? matchStatus.getMatchStatus(group, { source: 'groups' })
         : matchStatus.getMatchStatusForTournamentGroup(this.data.groupId);
+      const gameFinished = !!ms.isCompleted;
+      this.data.gameFinished = gameFinished;
       this.setData({
-        gameFinished: ms.isCompleted,
+        gameFinished: gameFinished,
         scoresCompleted: this._isAllScoresCompleted()
       });
+      this._syncScoreFinishedUiState();
       return;
     }
     if (!this.data.gameId) return;
     const group = gameStore.getGroup(this.data.gameId, this._gameGroupIndex || 0) || {};
     const ms = matchStatus.getMatchStatus(group, { source: 'game' });
+    const gameFinished = !!ms.isCompleted;
+    this.data.gameFinished = gameFinished;
     this.setData({
-      gameFinished: ms.isCompleted,
+      gameFinished: gameFinished,
       scoresCompleted: this._isAllScoresCompleted()
     });
+    this._syncScoreFinishedUiState();
   },
 
   _isAllScoresCompleted() {
@@ -3110,9 +3356,9 @@ Page({
   },
 
   _scoreEditBlocked() {
-    if (!this.data.gameFinished) return false;
-    wx.showToast({ title: '比赛已结束，成绩不可修改', icon: 'none' });
-    return true;
+    // 只读：禁止改成绩；不挡记分格进入（open* 已去掉本检查）
+    if (this.data.isReadOnlyScore || this._resolveIsReadOnlyScore()) return true;
+    return false;
   },
 
   _afterScoresPersisted() {
@@ -3181,7 +3427,9 @@ Page({
 
   _confirmEndGroupGame() {
     if (this._finishScoreTeamMatchGroup()) {
+      this.data.gameFinished = true;
       this.setData({ gameFinished: true, scoresCompleted: true });
+      this._syncScoreFinishedUiState();
       wx.showToast({ title: '比赛已结束', icon: 'success' });
       return;
     }
@@ -3196,13 +3444,17 @@ Page({
         oldStatus: oldStatus,
         newStatus: matchStatus.FINISHED_STORAGE_STATUS
       });
+      this.data.gameFinished = true;
       this.setData({ gameFinished: true, scoresCompleted: true });
+      this._syncScoreFinishedUiState();
       wx.showToast({ title: '比赛已结束', icon: 'success' });
       return;
     }
     if (!this.data.gameId) return;
     gameProgress.confirmFinishGame(this.data.gameId, this._gameGroupIndex || 0);
+    this.data.gameFinished = true;
     this.setData({ gameFinished: true, scoresCompleted: true });
+    this._syncScoreFinishedUiState();
     wx.showToast({ title: '比赛已结束', icon: 'success' });
   },
 
@@ -4087,6 +4339,9 @@ Page({
 
   openGroupManagePage() {
     console.log('[group-manage] enter');
+    if (this.data.addDeleteDisabled || this._resolveAddDeleteDisabled()) {
+      return;
+    }
     if (this.data.gameFinished) {
       wx.showToast({ title: '比赛已结束，不可修改球员', icon: 'none' });
       return;
@@ -5938,7 +6193,7 @@ Page({
    * Patch-02C2B1：用 _entitiesSource 初始化面板并打开 score-input-sheet（不写成绩、不改 activePlayerIdx）
    */
   openEntityScoreInput(entityIndex, holeIndex) {
-    if (this._scoreEditBlocked()) return;
+    // finished：仍允许打开面板查看；改分由 _scoreEditBlocked 拦截
     if (this.data.mode !== 'stroke_entity') return;
     const entities = this._entitiesSource || [];
     const entity = entities[entityIndex];
@@ -6007,7 +6262,7 @@ Page({
   },
 
   onScoreCellTap(e) {
-    if (this._scoreEditBlocked()) return;
+    // finished：仍允许进入记分面板查看
     const { playerIdx, colIdx } = e.currentTarget.dataset;
     const cIdx = Number(colIdx);
     if (SPECIAL_IDX.includes(cIdx)) return;
@@ -6089,7 +6344,7 @@ Page({
   // 四人最佳球位 / 最好成绩：打开个人比杆赛记分面板。记分实体 = scoreEngine.groups（每组一个控件）。
   // 复用同一面板：技术面板逐组录入；快捷面板按组数渲染 N 个控件（不新增 UI 结构）。
   openTeamScoreInput(cIdx, groupIndex) {
-    if (this._scoreEditBlocked()) return;
+    // finished：仍允许打开面板查看
     const label = columnLabels()[cIdx];
     let holeIndex = 0;
     if (cIdx < 9) holeIndex = cIdx;

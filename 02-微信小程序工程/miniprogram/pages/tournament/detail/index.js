@@ -140,6 +140,14 @@ const FEATURES_COMMON = [
   { permission: 'stats', glyph: '📈', label: '统计数据' },
   { permission: 'feedback', glyph: '💬', label: '反馈' }
 ];
+/** 查看类：finished 后仍可点，不受管理项禁用规则影响 */
+const FEATURES_VIEW_PERMISSION_SET = {
+  leaderboard: true,
+  stats: true,
+  feedback: true,
+  register_for_other: true,
+  invite_friends_register: true
+};
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
   { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
@@ -248,22 +256,26 @@ function createEmptyGroupPlayer(position) {
 
 /**
  * Patch-02C3A：进记分页 mode 分流
- * 1) scoreEntities[groupId] 非空 → stroke_entity
- * 2) scoreEntities 整体不存在时，按 gameMode（四人四球/最佳球位/四人两球）兜底
- * 3) 否则 individual_stroke
+ * 1) gameMode=个人比杆赛 → individual_stroke（优先，避免残留 scoreEntities / 旧 session）
+ * 2) scoreEntities[groupId] 非空 → stroke_entity
+ * 3) gameMode 为 G2/G3/G4 → stroke_entity
+ * 4) 否则 individual_stroke
  */
 function resolveTournamentScorePageMode(match, groupId) {
+  const gameMode = String(
+    (match && (match.gameMode || match.selectedGameMode)) || ''
+  ).trim();
+  if (gameMode === '个人比杆赛') {
+    return 'individual_stroke';
+  }
   const gid = groupId != null ? String(groupId) : '';
   const scoreEntities = match && match.scoreEntities;
   if (scoreEntities && typeof scoreEntities === 'object' && !Array.isArray(scoreEntities)) {
     const list = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
     if (list.length > 0) return 'stroke_entity';
-    return 'individual_stroke';
   }
-  const gameMode = String(
-    (match && (match.gameMode || match.selectedGameMode)) || ''
-  ).trim();
   if (
+    gameMode === '最好成绩比杆赛' ||
     gameMode === '四人四球比杆赛' ||
     gameMode === '最佳球位比杆赛' ||
     gameMode === '四人两球比杆赛'
@@ -472,6 +484,7 @@ Page({
     leaderboardViewOptions: ['all'],
     leaderboardTeamViewAvailable: false,
     leaderboardTeamCompetitionEnabled: false,
+    showLeaderboardTeamColumn: false,
     leaderboardScoreType: 'gross', // gross | net（净杆读 peoriaResult）
     leaderboardViewLabel: '总杆 · 全部',
     leaderboardNetScoreAvailable: false,
@@ -819,6 +832,7 @@ Page({
     const leaderboardDefaultView = this._resolveLeaderboardDefaultView(match);
     const leaderboardMode = this._leaderboardViewToMode(leaderboardDefaultView);
     const leaderboardTeamCompetitionEnabled = this._isTeamCompetitionEnabled(match);
+    const showLeaderboardTeamColumn = this._shouldShowTeeSheetTeamLabel(match);
     const scorecardCourseTitle = this._buildScorecardCourseTitle(match);
     this.setData(Object.assign({
       matchId: matchId,
@@ -836,6 +850,7 @@ Page({
       leaderboardViewOptions: leaderboardViewOptions,
       leaderboardTeamViewAvailable: leaderboardViewOptions.indexOf('team') >= 0,
       leaderboardTeamCompetitionEnabled: leaderboardTeamCompetitionEnabled,
+      showLeaderboardTeamColumn: showLeaderboardTeamColumn,
       leaderboardScoreType: 'gross',
       leaderboardViewLabel: this._buildLeaderboardViewLabel('gross', leaderboardDefaultView),
       leaderboardNetScoreAvailable: this._hasLeaderboardNetScore(match),
@@ -866,6 +881,7 @@ Page({
       : leaderboardDefaultView;
     const leaderboardMode = this._leaderboardViewToMode(leaderboardView);
     const leaderboardTeamCompetitionEnabled = this._isTeamCompetitionEnabled(match);
+    const showLeaderboardTeamColumn = this._shouldShowTeeSheetTeamLabel(match);
     const scorecardCourseTitle = this._buildScorecardCourseTitle(match);
     const netAvailable = this._hasLeaderboardNetScore(match);
     const leaderboardScoreType =
@@ -884,6 +900,7 @@ Page({
       leaderboardViewOptions: leaderboardViewOptions,
       leaderboardTeamViewAvailable: leaderboardViewOptions.indexOf('team') >= 0,
       leaderboardTeamCompetitionEnabled: leaderboardTeamCompetitionEnabled,
+      showLeaderboardTeamColumn: showLeaderboardTeamColumn,
       leaderboardScoreType: leaderboardScoreType,
       leaderboardViewLabel: this._buildLeaderboardViewLabel(leaderboardScoreType, leaderboardView),
       leaderboardNetScoreAvailable: netAvailable,
@@ -3536,8 +3553,12 @@ Page({
     });
   },
 
-  /** 是否走 Entity 领先榜：matchState.mode 或 scoreEntities 任一组非空 */
+  /** 是否走 Entity 领先榜：G1 强制个人榜；其余看 matchState.mode 或 scoreEntities */
   _shouldBuildEntityLeaderboard(match) {
+    const gameMode = String(
+      (match && (match.gameMode || match.selectedGameMode)) || ''
+    ).trim();
+    if (gameMode === '个人比杆赛') return false;
     try {
       const ms = matchStateUtil.getMatchState && matchStateUtil.getMatchState();
       if (ms && ms.mode === 'stroke_entity') return true;
@@ -3718,6 +3739,7 @@ Page({
 
     // 无 teamGroupId 时用成员报名分队回填（供分队榜聚合）
     const playerTeamLookup = this._buildLeaderboardPlayerTeamLookup(match);
+    const teamNameMap = this._buildLeaderboardTeamNameMap(match);
     flat.forEach((entity) => {
       if (entity.teamGroupId) return;
       const members = Array.isArray(entity.members) ? entity.members : [];
@@ -3744,10 +3766,29 @@ Page({
       const firstIndex = flat.findIndex((item) => item.thru > 0 && item.toPar === entity.toPar);
       const tied = flat.filter((item) => item.thru > 0 && item.toPar === entity.toPar).length > 1;
       const pos = !started ? '-' : tied ? 'T' + (firstIndex + 1) : String(index + 1);
+      // 展示字段：teamGroupId → teamGroups.name；缺省时回退成员报名分队名
+      let teamName = '';
+      const teamGroupId = entity.teamGroupId != null ? String(entity.teamGroupId).trim() : '';
+      if (teamGroupId && teamNameMap[teamGroupId]) {
+        teamName = String(teamNameMap[teamGroupId]).trim();
+      }
+      if (!teamName) {
+        const members = Array.isArray(entity.members) ? entity.members : [];
+        for (let i = 0; i < members.length; i++) {
+          const uid = members[i] && members[i].userId != null ? String(members[i].userId).trim() : '';
+          const fromMember = this._resolveLeaderboardPlayerTeamName(uid, playerTeamLookup, teamNameMap);
+          if (fromMember) {
+            teamName = fromMember;
+            break;
+          }
+        }
+      }
       return {
         pos: pos,
         entityId: entity.entityId,
-        teamGroupId: entity.teamGroupId || '',
+        teamGroupId: teamGroupId,
+        teamName: teamName,
+        teamTag: this._formatLeaderboardTeamTagName(teamName),
         name: entity.name,
         displayName: entity.displayName || entity.name,
         group: entity.group,
@@ -4688,6 +4729,17 @@ Page({
     return !!(competition && competition.enabled === true);
   },
 
+  /**
+   * LIVE 出发表：是否显示球员分队标签（仅展示，不改分组/成绩数据）
+   * showTeamLabel = teamCount >= 3 || (teamCount === 2 && hasTeamPK)
+   */
+  _shouldShowTeeSheetTeamLabel(match) {
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    const teamCount = teamGroups.length;
+    const hasTeamPK = this._isTeamCompetitionEnabled(match);
+    return teamCount >= 3 || (teamCount === 2 && hasTeamPK);
+  },
+
   _resolveLeaderboardViewOptions(match) {
     const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
     return teamGroups.length >= 2 ? ['team', 'all', 'male', 'female'] : ['all', 'male', 'female'];
@@ -4749,6 +4801,7 @@ Page({
     }
     this.setData({
       teeGroups: teeGroups,
+      showLeaderboardTeamColumn: this._shouldShowTeeSheetTeamLabel(match),
       leaderboard: this._buildLeaderboardViewForView(match, this.data.leaderboardView || 'all'),
       teamLeaderboard: this._buildTeamLeaderboardView(match),
       leaderboardViewLabel: this._buildLeaderboardViewLabel(
@@ -4761,10 +4814,7 @@ Page({
   _mergeTeeSheetPlayerTeeInfo(match, teeGroups, playerLookup) {
     const groups = match && Array.isArray(match.groups) ? match.groups : [];
     const lookup = playerLookup || {};
-    const strokeKind = resolveStrokeKind(resolveGameMode(match));
-    const showTeamLabel =
-      (strokeKind === 'g2g3' || strokeKind === 'g4') &&
-      this._isTeamCompetitionEnabled(match);
+    const showTeamLabel = this._shouldShowTeeSheetTeamLabel(match);
     const teamNameMap = showTeamLabel ? this._buildLeaderboardTeamNameMap(match) : {};
     const playerTeamLookup = showTeamLabel ? this._buildLeaderboardPlayerTeamLookup(match) : {};
     const displayByGroup = {};
@@ -4850,6 +4900,7 @@ Page({
       ? teamMatchStore.getMatchById(matchId)
       : null;
     this.setData({
+      showLeaderboardTeamColumn: this._shouldShowTeeSheetTeamLabel(match),
       leaderboard: this._buildLeaderboardViewForView(match, this.data.leaderboardView || 'all'),
       teamLeaderboard: this._buildTeamLeaderboardView(match),
       leaderboardViewLabel: this._buildLeaderboardViewLabel(
@@ -5037,6 +5088,44 @@ Page({
   noop() {},
 
   /* ===== 更多功能面板 ===== */
+  /**
+   * finished 状态下管理项禁用：
+   * - 未生成净杆：管理项 disabled，net_score 例外
+   * - 已生成净杆：全部管理项 disabled（含 net_score）
+   * - 查看类（领先榜/统计等）永不因此禁用
+   */
+  _getMoreFeatureDisabledState(match, feature) {
+    if (!feature || feature.empty) return false;
+    const permission = feature.permission != null ? String(feature.permission) : '';
+    if (!permission || FEATURES_VIEW_PERMISSION_SET[permission]) return false;
+
+    const status = String((match && match.status) || '').trim().toLowerCase();
+    if (status !== 'finished') return false;
+
+    const netGenerated = !!(
+      match &&
+      match.peoriaResult &&
+      match.peoriaResult.status === 'generated'
+    );
+    if (permission === 'net_score') return netGenerated;
+    return true;
+  },
+
+  _withMoreFeatureDisabledState(list, match) {
+    return (Array.isArray(list) ? list : []).map((f) => {
+      if (!f || f.empty) return f;
+      const next = Object.assign({}, f, {
+        disabled: this._getMoreFeatureDisabledState(match, f)
+      });
+      // finish_match：进行中「结束比赛」；结束后「已结束」+ disabled（权限键不变）
+      if (String(f.permission || '') === 'finish_match') {
+        const status = String((match && match.status) || '').trim().toLowerCase();
+        next.label = status === 'finished' ? '已结束' : '结束比赛';
+      }
+      return next;
+    });
+  },
+
   applyMoreAccess() {
     const isRegistering = !!(this.data.matchStatus && this.data.matchStatus.isRegistering);
     if (isRegistering) {
@@ -5086,11 +5175,17 @@ Page({
         });
       const split = splitPermissionFeatures(permissionFeatures);
       this.setData({
-        featuresCommon: REGISTERING_FEATURES_COMMON.filter((f) => visible('common', f.permission)),
-        featuresPermission: split.featuresPermission,
+        featuresCommon: this._withMoreFeatureDisabledState(
+          REGISTERING_FEATURES_COMMON.filter((f) => visible('common', f.permission)),
+          match
+        ),
+        featuresPermission: this._withMoreFeatureDisabledState(split.featuresPermission, match),
         featuresPermissionFooterPad: split.featuresPermissionFooterPad,
-        featuresPermissionFooter: split.featuresPermissionFooter,
-        lifecycleActions: lifecycleActions,
+        featuresPermissionFooter: this._withMoreFeatureDisabledState(
+          split.featuresPermissionFooter,
+          match
+        ),
+        lifecycleActions: this._withMoreFeatureDisabledState(lifecycleActions, match),
         featuresSectionCommonMain: section.commonMain,
         featuresSectionCommonSub: section.commonSub,
         featuresSectionPermissionMain: section.permissionMain,
@@ -5117,10 +5212,16 @@ Page({
       FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
     );
     this.setData({
-      featuresCommon: FEATURES_COMMON.filter((f) => visible('common', f.permission)),
-      featuresPermission: split.featuresPermission,
+      featuresCommon: this._withMoreFeatureDisabledState(
+        FEATURES_COMMON.filter((f) => visible('common', f.permission)),
+        match
+      ),
+      featuresPermission: this._withMoreFeatureDisabledState(split.featuresPermission, match),
       featuresPermissionFooterPad: split.featuresPermissionFooterPad,
-      featuresPermissionFooter: split.featuresPermissionFooter,
+      featuresPermissionFooter: this._withMoreFeatureDisabledState(
+        split.featuresPermissionFooter,
+        match
+      ),
       lifecycleActions: [],
       featuresSectionCommonMain: section.commonMain,
       featuresSectionCommonSub: section.commonSub,
@@ -5143,6 +5244,17 @@ Page({
 
   onFeatureTap(e) {
     const permission = e.currentTarget.dataset.permission;
+    const disabledAttr = e.currentTarget.dataset.disabled;
+    const disabledFromUi =
+      disabledAttr === true || disabledAttr === 'true' || disabledAttr === 1 || disabledAttr === '1';
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    if (
+      disabledFromUi ||
+      this._getMoreFeatureDisabledState(match, { permission: permission })
+    ) {
+      return;
+    }
     if (permission === 'export_groups') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       wx.showToast({ title: '分组表导出功能开发中', icon: 'none' });

@@ -1,7 +1,14 @@
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const playerManage = require('../../../utils/playerManage.js');
-const { buildRegisterTeamMap } = require('../../../utils/strokeEntityValidator.js');
+const {
+  buildRegisterTeamMap,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode,
+  isG4FamilyMode,
+  validateG6G7MatchPlayPlayers,
+  validateG8MatchPlayPlayers
+} = require('../../../utils/strokeEntityValidator.js');
 
 const TEE_BLUE = 'BLUE_T';
 const TEE_RED = 'RED_T';
@@ -461,10 +468,29 @@ Page({
     return '';
   },
 
+  /** G6/G7/G8：当前组合内各报名分队已选人数 */
+  _countSelectedByTeam(slots, teamMap) {
+    const counts = {};
+    if (!teamMap) return counts;
+    (slots || []).forEach((slot) => {
+      const uid = String((slot && slot.userId) || '').trim();
+      if (!uid) return;
+      const tid = teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+      if (!tid) return;
+      counts[tid] = (counts[tid] || 0) + 1;
+    });
+    return counts;
+  },
+
+  _isMatchPlayTeamCap2Mode() {
+    const mode = String(this._gameMode || '');
+    return isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode);
+  },
+
   /**
    * 弹窗列表状态：
    * checked  = 是否在当前 slots（临时选中）
-   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队
+   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人
    */
   _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
@@ -477,12 +503,17 @@ Page({
 
     const apply40TeamLock =
       !!this._showCompositionMode && this._strokeCompositionMode === '4+0';
-    const teamMap = apply40TeamLock
+    const applyMatchPlayTeamCap2 = this._isMatchPlayTeamCap2Mode();
+    const needTeamMap = apply40TeamLock || applyMatchPlayTeamCap2;
+    const teamMap = needTeamMap
       ? buildRegisterTeamMap({ registerInfo: registerInfo || { users: [] } })
       : null;
     const lockedTeamId = apply40TeamLock
       ? this._resolveLockedTeamIdFor40(slots, teamMap)
       : '';
+    const teamSelectedCounts = applyMatchPlayTeamCap2
+      ? this._countSelectedByTeam(slots, teamMap)
+      : {};
 
     return users
       .map(normalizeUser)
@@ -501,6 +532,13 @@ Page({
           const candTeam =
             teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
           if (candTeam !== lockedTeamId) {
+            isDisabled = true;
+          }
+        } else if (!checked && applyMatchPlayTeamCap2) {
+          // G6/G7/G8：某分队已选满 2 人后，同队其余球员不可再选（已选中的仍可取消）
+          const candTeam =
+            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+          if (candTeam && (teamSelectedCounts[candTeam] || 0) >= 2) {
             isDisabled = true;
           }
         }
@@ -559,8 +597,29 @@ Page({
     const teamMap = buildRegisterTeamMap({
       registerInfo: this._registerInfo || { users: [] }
     });
+    const gameMode = String(this._gameMode || '');
 
-    if (this._gameMode === '四人两球比杆赛') {
+    // G6/G7：双方分队各 1–2 人（不改变 G2/G3 原规则）
+    if (isG6G7MatchPlayMode(gameMode)) {
+      const err = validateG6G7MatchPlayPlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    // G8：仅红2+蓝2；G4 比杆保持原 2/4 人规则
+    if (isG8MatchPlayMode(gameMode)) {
+      const err = validateG8MatchPlayPlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    if (isG4FamilyMode(gameMode) || gameMode === '四人两球比杆赛') {
       const err = validateG4GroupStructurePlayers(payload.players, teamMap);
       if (err) {
         wx.showToast({ title: err, icon: 'none' });
@@ -635,7 +694,7 @@ Page({
 
   /**
    * 勾选/取消：只改 slots（临时选中），再重建列表。
-   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 分队锁判断。
+   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 / G6-G8 分队上限判断。
    */
   onTogglePlayer(e) {
     const user = e.currentTarget.dataset.user || null;
@@ -677,6 +736,19 @@ Page({
         const candTeam =
           teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
         if (candTeam !== lockedTeamId) return;
+      }
+    }
+
+    // G6/G7/G8：单分队已选满 2 人则禁止继续选同队
+    if (this._isMatchPlayTeamCap2Mode()) {
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const candTeam =
+        teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
+      const teamCounts = this._countSelectedByTeam(slots, teamMap);
+      if (candTeam && (teamCounts[candTeam] || 0) >= 2) {
+        return;
       }
     }
 

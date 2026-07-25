@@ -10,7 +10,11 @@ const mockAvatars = require('./mockAvatars.js');
 const G2_G3_MODES = {
   最好成绩比杆赛: true,
   四人四球比杆赛: true,
-  最佳球位比杆赛: true
+  最佳球位比杆赛: true,
+  // G6/G7 比洞：复用 G2/G3 组合解析
+  最好成绩比洞赛: true,
+  四人四球比洞赛: true,
+  最佳球位比洞赛: true
 };
 
 function resolveGameMode(match) {

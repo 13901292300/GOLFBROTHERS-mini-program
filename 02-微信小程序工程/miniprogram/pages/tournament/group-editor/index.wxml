@@ -15,19 +15,20 @@
 
   <scroll-view class="editor-scroll" scroll-y>
     <view class="editor-body">
+      <!-- 仅 G2/G3 比杆显示；G6/G7 比洞隐藏（复用编辑器，不复用 2+2/4+0 选择规则） -->
       <view wx:if="{{showCompositionMode}}" class="composition-mode-section">
         <text class="composition-mode-section__label">组合模式</text>
         <view class="composition-mode-options">
-          <view
-            class="composition-mode-option {{strokeCompositionMode === '4+0' ? 'is-active' : ''}}"
-            bindtap="onStrokeCompositionModeTap"
-            data-mode="4+0"
-          >4+0</view>
           <view
             class="composition-mode-option {{strokeCompositionMode === '2+2' ? 'is-active' : ''}}"
             bindtap="onStrokeCompositionModeTap"
             data-mode="2+2"
           >2+2</view>
+          <view
+            class="composition-mode-option {{strokeCompositionMode === '4+0' ? 'is-active' : ''}}"
+            bindtap="onStrokeCompositionModeTap"
+            data-mode="4+0"
+          >4+0</view>
         </view>
       </view>
 
@@ -79,7 +80,7 @@
             </view>
           </view>
 
-          <!-- LIVE / 非 G4 组合分配区；G4 报名用上方 composition-preview -->
+          <!-- 旧 pairing 编辑区：仅 showPairingSection 时展示；G4 全模式改用上方 composition-preview -->
           <view wx:if="{{showPairingSection && item.pairingBlock}}" class="pairing-section" catchtap="stopPropagation">
             <view wx:if="{{item.pairingBlock.title}}" class="pairing-section__head">
               <text class="pairing-section__title">{{item.pairingBlock.title}}</text>

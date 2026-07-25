@@ -19,6 +19,21 @@ const G4_MODES = {
   四人两球比杆赛: true
 };
 
+/** G6/G7 比洞：复用 G2/G3 UI/Entity 构建，合法性见专用校验（不改变 G2/G3 原规则） */
+const G6_G7_MATCH_PLAY_MODES = {
+  最好成绩比洞赛: true,
+  四人四球比洞赛: true, // 创建页现用名，与 G6 最好成绩比洞同规则
+  最佳球位比洞赛: true
+};
+
+/** G8 比洞：复用 G4 UI/Entity 构建，合法性更严（仅红2+蓝2） */
+const G8_MATCH_PLAY_MODES = {
+  四人两球比洞赛: true
+};
+
+const G6_G7_ILLEGAL_TIP = '比洞赛组合必须由双方分队组成，且每方最多2人';
+const G8_ILLEGAL_TIP = '四人两球比洞赛每组须为双方各2人';
+
 const ALLOWED_GROUP_COMPOSITIONS = {
   '4+0': true,
   '2+2': true,
@@ -31,11 +46,142 @@ function resolveGameMode(match) {
   return String((match && (match.gameMode || match.selectedGameMode)) || '').trim();
 }
 
+function isG6G7MatchPlayMode(gameMode) {
+  return !!G6_G7_MATCH_PLAY_MODES[String(gameMode || '').trim()];
+}
+
+function isG8MatchPlayMode(gameMode) {
+  return !!G8_MATCH_PLAY_MODES[String(gameMode || '').trim()];
+}
+
+/** G2/G3 比杆 + G6/G7 比洞（composition UI / Entity 构建） */
+function isG2G3FamilyMode(gameMode) {
+  const mode = String(gameMode || '').trim();
+  return !!G2_G3_MODES[mode] || isG6G7MatchPlayMode(mode);
+}
+
+/** G4 比杆 + G8 比洞 */
+function isG4FamilyMode(gameMode) {
+  const mode = String(gameMode || '').trim();
+  return !!G4_MODES[mode] || isG8MatchPlayMode(mode);
+}
+
 function resolveStrokeKind(gameMode) {
-  if (G1_MODES[gameMode]) return 'g1';
-  if (G2_G3_MODES[gameMode]) return 'g2g3';
-  if (G4_MODES[gameMode]) return 'g4';
+  const mode = String(gameMode || '').trim();
+  if (G1_MODES[mode]) return 'g1';
+  if (isG2G3FamilyMode(mode)) return 'g2g3';
+  if (isG4FamilyMode(mode)) return 'g4';
   return 'other';
+}
+
+/**
+ * G6/G7 报名分组：双方分队各 1–2 人（允许 1+1 / 1+2 / 2+1 / 2+2）
+ * @returns {string} 空串=合法；否则中文提示
+ */
+function validateG6G7MatchPlayPlayers(players, teamMap) {
+  const filled = listFilledPlayers({ players: players });
+  if (!filled.length) return '';
+
+  for (let i = 0; i < filled.length; i++) {
+    const uid = filled[i].userId;
+    const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return '存在未归属分队的球员，请先完成报名分队';
+    }
+  }
+
+  if (filled.length > 4) {
+    return G6_G7_ILLEGAL_TIP;
+  }
+
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = String(teamMap[p.userId] || '').trim();
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p.userId);
+  });
+  const teamIds = Object.keys(buckets);
+  if (teamIds.length !== 2) {
+    return G6_G7_ILLEGAL_TIP;
+  }
+  for (let i = 0; i < teamIds.length; i++) {
+    const n = buckets[teamIds[i]].length;
+    if (n < 1 || n > 2) {
+      return G6_G7_ILLEGAL_TIP;
+    }
+  }
+  return '';
+}
+
+/**
+ * G8 报名分组：总人数 4，且双方分队各 2 人
+ * @returns {string} 空串=合法；否则中文提示
+ */
+function validateG8MatchPlayPlayers(players, teamMap) {
+  const filled = listFilledPlayers({ players: players });
+  if (!filled.length) return '';
+
+  for (let i = 0; i < filled.length; i++) {
+    const uid = filled[i].userId;
+    const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return '存在未归属分队的球员，请先完成报名分队';
+    }
+  }
+
+  if (filled.length !== 4) {
+    return G8_ILLEGAL_TIP;
+  }
+
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = String(teamMap[p.userId] || '').trim();
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p.userId);
+  });
+  const teamIds = Object.keys(buckets);
+  if (teamIds.length !== 2) {
+    return G8_ILLEGAL_TIP;
+  }
+  if (buckets[teamIds[0]].length !== 2 || buckets[teamIds[1]].length !== 2) {
+    return G8_ILLEGAL_TIP;
+  }
+  return '';
+}
+
+function validateG6G7MatchPlayGroups(match) {
+  const groups = Array.isArray(match && match.groups) ? match.groups : [];
+  if (!groups.length) {
+    return { valid: true };
+  }
+  const teamMap = buildRegisterTeamMap(match);
+  for (let i = 0; i < groups.length; i++) {
+    const filled = listFilledPlayers(groups[i]);
+    if (!filled.length) continue;
+    const err = validateG6G7MatchPlayPlayers(groups[i].players, teamMap);
+    if (err) {
+      return { valid: false, reason: 'g6g7_illegal_split' };
+    }
+  }
+  return { valid: true };
+}
+
+function validateG8MatchPlayGroups(match) {
+  const groups = Array.isArray(match && match.groups) ? match.groups : [];
+  if (!groups.length) {
+    return { valid: true };
+  }
+  const teamMap = buildRegisterTeamMap(match);
+  for (let i = 0; i < groups.length; i++) {
+    const filled = listFilledPlayers(groups[i]);
+    if (!filled.length) continue;
+    const err = validateG8MatchPlayPlayers(groups[i].players, teamMap);
+    if (err) {
+      return { valid: false, reason: 'g8_illegal_split' };
+    }
+  }
+  // 结构合法后再走 G4 pairing 一致性（G8 保存会重建 pairings）
+  return validateG4(match);
 }
 
 /**
@@ -357,11 +503,119 @@ function validateG4(match) {
 }
 
 /**
+ * G4 仅校验组内球员分队结构（不含 pairings；供改赛制逐组保留用）
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+function validateG4GroupPlayersOnly(group, teamMap) {
+  const filled = listFilledPlayers(group);
+  if (!filled.length) {
+    return { valid: true };
+  }
+  const n = filled.length;
+  if (n !== 2 && n !== 4) {
+    return { valid: false, reason: 'g4_player_count:' + n };
+  }
+  const buckets = {};
+  for (let f = 0; f < filled.length; f++) {
+    const uid = filled[f].userId;
+    const teamId = teamMap && teamMap[uid] ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return { valid: false, reason: 'g4_player_missing_team:' + uid };
+    }
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(uid);
+  }
+  const teamIds = Object.keys(buckets);
+  if (n === 2) {
+    if (teamIds.length !== 1) {
+      return { valid: false, reason: 'g4_2_cross_team' };
+    }
+    return { valid: true };
+  }
+  if (teamIds.length === 1) {
+    return { valid: true };
+  }
+  if (teamIds.length === 2) {
+    if (buckets[teamIds[0]].length !== 2 || buckets[teamIds[1]].length !== 2) {
+      return { valid: false, reason: 'g4_illegal_split' };
+    }
+    return { valid: true };
+  }
+  return { valid: false, reason: 'g4_too_many_teams:' + teamIds.length };
+}
+
+/**
+ * 单组相对「目标赛制」合法性（报名态改赛制 / 分组保留）。
+ * 包装已有 G1–G8 校验，不改动原函数契约。
+ * @param {string} targetGameMode
+ * @param {object} group
+ * @param {object} [matchLike] 提供 registerInfo / strokeCompositionMode
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+function validateGroupForTargetGameMode(targetGameMode, group, matchLike) {
+  const mode = String(targetGameMode || '').trim();
+  if (!mode) {
+    return { valid: false, reason: 'missing_mode' };
+  }
+  if (!group || typeof group !== 'object') {
+    return { valid: false, reason: 'invalid_group' };
+  }
+  const filled = listFilledPlayers(group);
+  // 空组占位：改赛制时保留
+  if (!filled.length) {
+    return { valid: true };
+  }
+
+  // 个人赛制：保留已有组（与 →G1/个人比洞 不清组一致）
+  if (G1_MODES[mode] || mode === '个人比洞赛') {
+    return { valid: true };
+  }
+
+  const teamMap = buildRegisterTeamMap(matchLike || {});
+  const players = filled.map((p) => ({ userId: p.userId }));
+
+  if (isG6G7MatchPlayMode(mode)) {
+    const tip = validateG6G7MatchPlayPlayers(players, teamMap);
+    return tip ? { valid: false, reason: tip } : { valid: true };
+  }
+  if (isG8MatchPlayMode(mode)) {
+    const tip = validateG8MatchPlayPlayers(players, teamMap);
+    return tip ? { valid: false, reason: tip } : { valid: true };
+  }
+  if (G4_MODES[mode]) {
+    return validateG4GroupPlayersOnly(group, teamMap);
+  }
+  if (G2_G3_MODES[mode]) {
+    let compositionMode = resolveDeclaredCompositionMode(matchLike);
+    if (!compositionMode) compositionMode = '2+2';
+    const probe = Object.assign({}, matchLike || {}, {
+      gameMode: mode,
+      strokeCompositionMode: compositionMode
+    });
+    const checked = validateG2G3GroupWithResolver(probe, group);
+    if (!checked.ok) {
+      return { valid: false, reason: checked.reason || 'g2g3_invalid' };
+    }
+    return { valid: true };
+  }
+
+  // 未知赛制：保守保留
+  return { valid: true };
+}
+
+/**
  * @param {object} match 已含 groups / pairings / registerInfo / gameMode 的待保存对象
  * @returns {{ valid: boolean, reason?: string }}
  */
 function validateStrokeEntities(match) {
   const gameMode = resolveGameMode(match);
+  // G6/G7/G8：专用合法性（识别赛制 + 阻止非法组合进入异常态）；Entity 构建仍走 g2g3/g4
+  if (isG6G7MatchPlayMode(gameMode)) {
+    return validateG6G7MatchPlayGroups(match);
+  }
+  if (isG8MatchPlayMode(gameMode)) {
+    return validateG8MatchPlayGroups(match);
+  }
   const kind = resolveStrokeKind(gameMode);
   if (kind === 'g1' || kind === 'other') {
     return { valid: true };
@@ -377,6 +631,7 @@ function validateStrokeEntities(match) {
 
 module.exports = {
   validateStrokeEntities,
+  validateGroupForTargetGameMode,
   resolveStrokeKind,
   resolveGameMode,
   resolveDeclaredCompositionMode,
@@ -384,8 +639,16 @@ module.exports = {
   bucketGroupByTeam,
   buildRegisterTeamMap,
   listFilledPlayers,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode,
+  isG2G3FamilyMode,
+  isG4FamilyMode,
+  validateG6G7MatchPlayPlayers,
+  validateG8MatchPlayPlayers,
   G1_MODES,
   G2_G3_MODES,
   G4_MODES,
+  G6_G7_MATCH_PLAY_MODES,
+  G8_MATCH_PLAY_MODES,
   ALLOWED_GROUP_COMPOSITIONS
 };

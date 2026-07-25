@@ -242,13 +242,77 @@
 .st-avatar {
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: 50%;
   flex-shrink: 0;
   background: #e5e7eb;
+  display: block;
 }
 
 .stats-page.dark-mode .st-avatar {
   background: #2a2a2a;
+}
+
+/* 固定头像槽：单人 / 组合叠放（对齐 score paired-avatars 层级思路） */
+.st-avatar-slot {
+  position: relative;
+  flex-shrink: 0;
+  height: 22px;
+  width: 22px;
+}
+.st-avatar-slot--single {
+  width: 22px;
+}
+.st-avatar-slot--n1 {
+  width: 22px;
+}
+.st-avatar-slot--n2 {
+  width: 34px;
+}
+.st-avatar-slot--n3 {
+  width: 46px;
+}
+.st-avatar-slot--n4 {
+  width: 58px;
+}
+
+.st-paired-avatars {
+  position: relative;
+  width: 100%;
+  height: 22px;
+}
+
+.st-pair-avatar {
+  position: absolute;
+  top: 0;
+  width: 22px;
+  height: 22px;
+}
+
+/* 对齐 score：前者更高 z-index，后者右移叠放 */
+.st-pair-avatar:nth-child(1) {
+  left: 0;
+  z-index: 10;
+}
+.st-pair-avatar:nth-child(2) {
+  left: 12px;
+  z-index: 9;
+}
+.st-pair-avatar:nth-child(3) {
+  left: 24px;
+  z-index: 8;
+}
+.st-pair-avatar:nth-child(4) {
+  left: 36px;
+  z-index: 7;
+}
+
+.st-avatar--stack {
+  border: 1.5px solid var(--stats-card);
+  box-sizing: border-box;
+}
+
+.stats-page.dark-mode .st-avatar--stack {
+  border-color: var(--stats-card);
 }
 
 .st-identity {

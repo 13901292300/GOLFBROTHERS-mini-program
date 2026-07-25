@@ -7,7 +7,16 @@ const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const playerDirectory = require('../../../utils/playerDirectory.js');
 const tPosition = require('../../../utils/tPosition.js');
-const { validateStrokeEntities, buildRegisterTeamMap } = require('../../../utils/strokeEntityValidator.js');
+const {
+  validateStrokeEntities,
+  buildRegisterTeamMap,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode,
+  isG2G3FamilyMode,
+  isG4FamilyMode,
+  validateG6G7MatchPlayPlayers,
+  validateG8MatchPlayPlayers
+} = require('../../../utils/strokeEntityValidator.js');
 const { syncStrokeEntities } = require('../../../utils/strokeEntityBuilder.js');
 const { normalizeFormalGroupSeats } = require('../../../utils/strokeGroupSeatNormalizer.js');
 
@@ -431,6 +440,27 @@ function validateG4GroupStructurePlayers(players, teamMap) {
 }
 
 /**
+ * 报名分组球员校验：G6/G7、G8 走专用规则；G2/G3、G4 保持原逻辑
+ */
+function validatePlayersForRegisterGameMode(players, gameMode, compositionMode, teamMap, options) {
+  const mode = String(gameMode || '').trim();
+  const opts = options || {};
+  if (isG6G7MatchPlayMode(mode)) {
+    return validateG6G7MatchPlayPlayers(players, teamMap);
+  }
+  if (isG8MatchPlayMode(mode)) {
+    return validateG8MatchPlayPlayers(players, teamMap);
+  }
+  if (isG4FamilyMode(mode)) {
+    return validateG4GroupStructurePlayers(players, teamMap);
+  }
+  if (opts.showCompositionMode) {
+    return validateStrokeCompositionPlayers(players, compositionMode, teamMap);
+  }
+  return '';
+}
+
+/**
  * 报名分队 id：matchTeamId || groupId（与保存后 TAB / teamMap 一致）
  */
 function resolveRegisterTeamId(user) {
@@ -773,6 +803,8 @@ Page({
     gameMode: '',
     showPairingSection: false,
     showCompositionMode: false,
+    /** G2/G3/G6/G7 组合预览；与 showCompositionMode（2+2/4+0 选择）分离 */
+    showCompositionPreview: false,
     /** 非 G4：显示「自动组合 / 添加组合」；G4 由分队规则生成 pairing，不展示 */
     showPairingComposeTools: false,
     pairingSectionTitle: '组合',
@@ -788,7 +820,7 @@ Page({
     editingPairingSelectedIds: [],
     pairingEditTitle: '修改组合',
     pairingEditOptions: [],
-    strokeCompositionMode: '4+0',
+    strokeCompositionMode: '2+2',
     saving: false
   },
 
@@ -804,18 +836,26 @@ Page({
       : (formalExists ? 'edit' : 'create');
     const gameMode = match && match.gameMode ? String(match.gameMode) : '';
     const matchType = match && match.matchType ? String(match.matchType) : 'team-internal';
-    const isG2G3 = teamMatchStore.isPairingStrokeFormat(gameMode);
-    const isG4 = gameMode === '四人两球比杆赛';
-    // G2/G3 队内赛：create / edit / live 统一座位编辑 + 组合模式预览（不展示 pairing 工具）
-    const showCompositionMode = matchType === 'team-internal' && isG2G3;
-    // G4：仅 LIVE 开 pairing 编辑区；G2/G3 全程关闭 pairing 区
-    const showPairingSection = isG4 && mode === 'live';
-    const strokeCompositionMode = match && match.strokeCompositionMode
-      ? String(match.strokeCompositionMode)
-      : '4+0';
+    // G2/G3 比杆 + G6/G7 比洞 → 组合编辑器；G4 比杆 + G8 比洞 → G4 preview/pairing
+    const isG2G3 = isG2G3FamilyMode(gameMode) || teamMatchStore.isPairingStrokeFormat(gameMode);
+    const isG6G7 = isG6G7MatchPlayMode(gameMode);
+    const isG4 = isG4FamilyMode(gameMode);
+    // 仅 G2/G3 比杆显示「2+2 / 4+0」选择；G6/G7 复用编辑器但不复用该选择规则
+    const showCompositionMode = matchType === 'team-internal' && isG2G3 && !isG6G7;
+    // G2/G3/G6/G7：组合预览（G6/G7 无模式选择，预览按分队自动按 2+2 展示）
+    const showCompositionPreview = matchType === 'team-internal' && isG2G3;
+    // G4/G8 create/edit/live：统一报名期 UI（composition-preview）；不展示旧 pairing 编辑区
+    // pairing 数据仍保留在 pairingDraft / 保存链路，仅隐藏编辑入口
+    const showPairingSection = false;
+    // G2/G3：已有 4+0 / 2+2 保持；G6/G7：不依赖用户选择，固定按双方分队结构 → 2+2
+    const rawComposition =
+      match && match.strokeCompositionMode != null && String(match.strokeCompositionMode).trim() !== ''
+        ? String(match.strokeCompositionMode).trim()
+        : '';
+    const resolvedMode = isG6G7 ? '2+2' : (rawComposition === '4+0' ? '4+0' : '2+2');
     const draft = buildInitialGroupDraft(match);
-    // G4 报名也保留 pairingDraft，供保存时复用 slot id（不展示 pairing 操作区）
-    const pairingDraft = (showPairingSection || isG4)
+    // G4 保留 pairingDraft，供保存时复用 slot id（不展示 pairing 操作区）
+    const pairingDraft = isG4
       ? teamMatchStore.clonePairings(match && match.pairings)
       : {};
     this._registerInfo = resolveRegisterInfo(match);
@@ -824,7 +864,6 @@ Page({
     this._matchSnapshot = match || null;
     this._leavingConfirmed = false;
     this._pairingIdSeq = 1;
-    const resolvedMode = strokeCompositionMode === '2+2' ? '2+2' : '4+0';
     this.setData({
       matchId: matchId,
       mode: mode,
@@ -832,6 +871,7 @@ Page({
       gameMode: gameMode,
       showPairingSection: showPairingSection,
       showCompositionMode: showCompositionMode,
+      showCompositionPreview: showCompositionPreview,
       showPairingComposeTools: false,
       pairingSectionTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
       strokeCompositionMode: resolvedMode,
@@ -842,7 +882,7 @@ Page({
         pairingDraft,
         showPairingSection,
         gameMode,
-        showCompositionMode,
+        showCompositionPreview,
         resolvedMode
       )
     });
@@ -880,17 +920,21 @@ Page({
     });
   },
 
-  _buildDraftCards(groups, pairingDraft, showPairing, gameMode, showCompositionMode, strokeCompositionMode) {
+  _buildDraftCards(groups, pairingDraft, showPairing, gameMode, showCompositionPreviewFlag, strokeCompositionMode) {
     const title = teamMatchStore.getPairingStrokeLabel(gameMode || this.data.gameMode);
     const resolvedGameMode = String(gameMode || this.data.gameMode || '');
-    const isG4 = resolvedGameMode === '四人两球比杆赛';
-    const showMode = showCompositionMode != null
-      ? !!showCompositionMode
-      : !!this.data.showCompositionMode;
-    const compositionMode = strokeCompositionMode != null
-      ? String(strokeCompositionMode)
-      : String(this.data.strokeCompositionMode || '');
-    const showCompositionPreview = !!showMode;
+    const isG4 = isG4FamilyMode(resolvedGameMode);
+    const isG6G7 = isG6G7MatchPlayMode(resolvedGameMode);
+    // 第 5 参：组合预览开关（G2/G3/G6/G7）；不再与「2+2/4+0 选择」绑死
+    const showCompositionPreview = showCompositionPreviewFlag != null
+      ? !!showCompositionPreviewFlag
+      : !!this.data.showCompositionPreview;
+    // G6/G7：不读用户 compositionMode，按双方分队结构固定 2+2 预览
+    const compositionMode = isG6G7
+      ? '2+2'
+      : (strokeCompositionMode != null
+        ? String(strokeCompositionMode)
+        : String(this.data.strokeCompositionMode || ''));
     const matchLike = showCompositionPreview
       ? this._buildCompositionMatchContext(compositionMode)
       : null;
@@ -922,7 +966,7 @@ Page({
 
   _buildPairingBlockView(group, pairingDraft, sectionTitle) {
     const groupId = String(group.groupId || '');
-    const isG4 = String(this.data.gameMode || '') === '四人两球比杆赛';
+    const isG4 = isG4FamilyMode(this.data.gameMode);
     const players = ((group && group.players) || []).filter((p) => p && String(p.userId || '').trim());
     const playerMap = {};
     players.forEach((p) => {
@@ -1034,7 +1078,9 @@ Page({
     let nextPairings = pairingDraft != null
       ? teamMatchStore.clonePairings(pairingDraft)
       : teamMatchStore.clonePairings(this.data.pairingDraft);
-    if (this.data.showPairingSection) {
+    const isG4 = isG4FamilyMode(this.data.gameMode);
+    if (this.data.showPairingSection || isG4) {
+      // G4/G8：无编辑区也 prune 保留 slot id，供保存 rebuild 复用
       nextPairings = this._prunePairingsToGroups(nextGroups, nextPairings);
     } else {
       nextPairings = {};
@@ -1090,6 +1136,7 @@ Page({
   },
 
   onStrokeCompositionModeTap(e) {
+    // G6/G7 不展示该入口；仅 G2/G3 比杆可切换
     if (!this.data.showCompositionMode) return;
     const mode = String((e.currentTarget.dataset.mode != null ? e.currentTarget.dataset.mode : ''));
     if (mode !== '4+0' && mode !== '2+2') return;
@@ -1223,7 +1270,10 @@ Page({
       groupId: groupId,
       groupName: groupName,
       gameMode: this.data.gameMode || '',
-      strokeCompositionMode: this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0',
+      // G6/G7：固定 2+2，且不开启 G2/G3 的 4+0 选人分队锁
+      strokeCompositionMode: isG6G7MatchPlayMode(this.data.gameMode)
+        ? '2+2'
+        : (this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0'),
       showCompositionMode: !!this.data.showCompositionMode,
       players: currentGroup && Array.isArray(currentGroup.players) ? currentGroup.players : [],
       groups: draft.map((g) => ({
@@ -1290,30 +1340,21 @@ Page({
       }, previous || found);
     });
 
-    // 报名期 G2/G3：坐入前校验（与 group-pick 同规则）；失败则禁止写回
+    // 报名期：坐入前校验（与 group-pick 同规则）；失败则禁止写回
     const pickTeamMap = buildRegisterTeamMap({
       registerInfo: this._registerInfo || { users: [] }
     });
-    if (this.data.showCompositionMode) {
-      const compositionErr = validateStrokeCompositionPlayers(
-        players,
-        this.data.strokeCompositionMode,
-        pickTeamMap
-      );
-      if (compositionErr) {
-        wx.showToast({ title: compositionErr, icon: 'none' });
-        return;
-      }
-    }
-
-    // G4：选人返回后校验 pair 组合内同队；失败不写 draft
     const gameMode = String(this.data.gameMode || '');
-    if (gameMode === '四人两球比杆赛') {
-      const g4Err = validateG4GroupStructurePlayers(players, pickTeamMap);
-      if (g4Err) {
-        wx.showToast({ title: g4Err, icon: 'none' });
-        return;
-      }
+    const pickErr = validatePlayersForRegisterGameMode(
+      players,
+      gameMode,
+      this.data.strokeCompositionMode,
+      pickTeamMap,
+      { useComposition: true, showCompositionMode: !!this.data.showCompositionMode }
+    );
+    if (pickErr) {
+      wx.showToast({ title: pickErr, icon: 'none' });
+      return;
     }
 
     draft[idx] = Object.assign({}, draft[idx], {
@@ -1586,16 +1627,18 @@ Page({
         if (seen[id]) return '存在重复球员，请检查分组';
         seen[id] = true;
       }
-      if (this.data.showCompositionMode) {
-        const compositionErr = validateStrokeCompositionPlayers(
-          g.players,
-          this.data.strokeCompositionMode,
-          buildRegisterTeamMap({
-            registerInfo: this._registerInfo || { users: [] }
-          })
-        );
-        if (compositionErr) return compositionErr;
-      }
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const gameMode = String(this.data.gameMode || '');
+      const structureErr = validatePlayersForRegisterGameMode(
+        g.players,
+        gameMode,
+        this.data.strokeCompositionMode,
+        teamMap,
+        { useComposition: true, showCompositionMode: !!this.data.showCompositionMode }
+      );
+      if (structureErr) return structureErr;
     }
 
     if (this.data.showPairingSection) {
@@ -1749,54 +1792,175 @@ Page({
     return next;
   },
 
+  /**
+   * normalize 后按 userId / 座位回填 LIVE 的 scorePlayerId 等字段（normalize 只产出 position+userId）
+   */
+  _rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore) {
+    const byGroupUser = {};
+    const byGroupPos = {};
+    (Array.isArray(liveGroupsBefore) ? liveGroupsBefore : []).forEach((g) => {
+      const gid = g && g.groupId != null ? String(g.groupId) : '';
+      if (!gid) return;
+      if (!byGroupUser[gid]) byGroupUser[gid] = {};
+      if (!byGroupPos[gid]) byGroupPos[gid] = {};
+      (Array.isArray(g.players) ? g.players : []).forEach((p) => {
+        if (!p) return;
+        const pos = Number(p.position) || 0;
+        const uid = p.userId != null ? String(p.userId).trim() : '';
+        const scorePlayerId = resolveScorePlayerId(p);
+        if (uid) {
+          byGroupUser[gid][uid] = p;
+        } else if (pos >= 1) {
+          byGroupPos[gid][pos] = p;
+        }
+      });
+    });
+
+    return (Array.isArray(normalizedGroups) ? normalizedGroups : []).map((g) => {
+      const gid = g && g.groupId != null ? String(g.groupId) : '';
+      const players = (Array.isArray(g.players) ? g.players : []).map((slot) => {
+        const position = Number(slot && slot.position) || 0;
+        const uid = slot && slot.userId != null ? String(slot.userId).trim() : '';
+        if (uid) {
+          const prev = (byGroupUser[gid] && byGroupUser[gid][uid]) || {};
+          return withScorePlayerFields(
+            Object.assign({}, prev, slot, {
+              position: position,
+              userId: uid,
+              playerId: uid,
+              id: uid
+            }),
+            prev
+          );
+        }
+        const prevEmpty = (byGroupPos[gid] && byGroupPos[gid][position]) || {};
+        return withScorePlayerFields(
+          {
+            position: position,
+            userId: '',
+            playerId: '',
+            id: ''
+          },
+          prevEmpty
+        );
+      });
+      return Object.assign({}, g, { players: players });
+    });
+  },
+
   _confirmLiveGroups(match, rawDraft, pairingDraft) {
     const oldGroups = Array.isArray(match && match.groups) ? match.groups : [];
-    const draftGroups = Array.isArray(rawDraft) ? rawDraft : [];
+    const sanitized = this._sanitizeGroupDraft(rawDraft);
+    const isClear = sanitized.length === 0;
     const oldById = {};
     oldGroups.forEach((group) => {
       const groupId = group && group.groupId ? String(group.groupId) : '';
       if (groupId) oldById[groupId] = group;
     });
     const draftIds = {};
-    draftGroups.forEach((group) => {
+    sanitized.forEach((group) => {
       const groupId = group && group.groupId ? String(group.groupId) : '';
       if (groupId) draftIds[groupId] = true;
     });
     const deletedGroupIds = Object.keys(oldById).filter((groupId) => !draftIds[groupId]);
-    const nextGroups = draftGroups.map((group, index) => {
+
+    // 先按座位合并，保留 scorePlayerId（LIVE 换人继承）
+    let nextGroups = sanitized.map((group, index) => {
       const groupId = group && group.groupId ? String(group.groupId) : '';
       return this._buildLiveGroupFromDraft(groupId ? oldById[groupId] : null, group, index);
     });
+
     const nextScoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
       ? Object.assign({}, match.scoreData)
       : {};
     deletedGroupIds.forEach((groupId) => {
       delete nextScoreData[groupId];
     });
-    // G4 / LIVE 组合区：以本次 pairingDraft 为准落盘（勿用陈旧 match.pairings 覆盖用户编辑）
-    // 无组合区时保持清空 pairings（G2/G3 报名 composition 路径不走此分支的既有行为）
-    let nextPairings = {};
-    if (this.data.showPairingSection) {
-      const pairingSource = pairingDraft != null ? pairingDraft : (this.data.pairingDraft || {});
-      let draftPairings = teamMatchStore.clonePairings(pairingSource);
-      deletedGroupIds.forEach((groupId) => {
-        delete draftPairings[groupId];
-      });
-      nextPairings = teamMatchStore.sanitizePairings(
-        this._prunePairingsToGroups(nextGroups, draftPairings)
+
+    const matchId = match && match.matchId != null ? String(match.matchId).trim() : '';
+    const gameMode = String(match.gameMode || this.data.gameMode || '');
+    const isG4Stroke = isG4FamilyMode(gameMode);
+    const isG2G3Stroke = isG2G3FamilyMode(gameMode);
+
+    // 与报名一致：座位规范化；再回填 LIVE scorePlayerId
+    if (!isClear && (isG4Stroke || isG2G3Stroke)) {
+      const beforeNormalize = nextGroups;
+      nextGroups = this._rematerializeLivePlayersAfterNormalize(
+        normalizeFormalGroupSeats(nextGroups, match),
+        beforeNormalize
       );
     }
-    // LIVE：不整表重建成绩行；sync 只更新 members / 保留空行；不碰 teamScoresByEntity
-    const next = Object.assign({}, match, {
+
+    // 与报名一致：G4/G8 按座位重建 pairings（复用 slot id）
+    const shouldPersistPairings = this.data.showPairingSection || isG4Stroke;
+    let nextPairings = {};
+    if (!isClear && shouldPersistPairings) {
+      if (isG4Stroke) {
+        const matchPairings =
+          match.pairings && typeof match.pairings === 'object' && !Array.isArray(match.pairings)
+            ? match.pairings
+            : {};
+        const draftSource = pairingDraft != null ? pairingDraft : (this.data.pairingDraft || {});
+        const rebuilt = {};
+        nextGroups.forEach((group) => {
+          const gid = group && group.groupId != null ? String(group.groupId) : '';
+          if (!gid) return;
+          const fromDraft = draftSource && Object.prototype.hasOwnProperty.call(draftSource, gid)
+            ? draftSource[gid]
+            : null;
+          const existingList = Array.isArray(fromDraft)
+            ? fromDraft
+            : (Array.isArray(matchPairings[gid]) ? matchPairings[gid] : []);
+          rebuilt[gid] = buildAutoPairingsForGroup(group, matchId, existingList);
+        });
+        nextPairings = teamMatchStore.sanitizePairings(rebuilt);
+      } else {
+        const pairingSource = this.data.showPairingSection
+          ? (pairingDraft != null ? pairingDraft : (this.data.pairingDraft || {}))
+          : (match.pairings || {});
+        let draftPairings = teamMatchStore.clonePairings(pairingSource);
+        deletedGroupIds.forEach((groupId) => {
+          delete draftPairings[groupId];
+        });
+        nextPairings = teamMatchStore.sanitizePairings(
+          this._prunePairingsToGroups(nextGroups, draftPairings)
+        );
+      }
+    }
+
+    let next = Object.assign({}, match, {
       groups: nextGroups,
-      pairings: nextPairings,
+      pairings: isClear ? {} : (shouldPersistPairings ? nextPairings : {}),
       scoreData: nextScoreData,
       updatedAt: Date.now()
     });
-    next.scoreEntities = syncStrokeEntities(next);
+    if (this.data.showCompositionMode) {
+      next.strokeCompositionMode = this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
+    } else if (isG6G7MatchPlayMode(gameMode) && !isClear) {
+      // G6/G7：不依赖用户选择；双方分队结构对应 2+2 Entity 切分
+      next.strokeCompositionMode = '2+2';
+    }
+    if (isClear) {
+      next = this._clearGroupDerivedFields(next);
+    } else if (!shouldPersistPairings) {
+      next.pairings = {};
+    }
+
+    // 与报名一致：stroke entity 校验 + sync（不碰 teamScoresByEntity）
+    if (!isClear) {
+      const check = validateStrokeEntities(next);
+      if (!check || check.valid !== true) {
+        console.warn('[stroke-entity-validate]', check && check.reason ? check.reason : 'invalid');
+        this.setData({ saving: false });
+        wx.showToast({ title: STROKE_ENTITY_INVALID_TIP, icon: 'none' });
+        return;
+      }
+      next.scoreEntities = syncStrokeEntities(next);
+    }
+
     teamMatchStore.saveMatch(next);
     this._leavingConfirmed = true;
-    wx.showToast({ title: '分组已保存', icon: 'success' });
+    wx.showToast({ title: isClear ? '分组已清空' : '分组已保存', icon: 'success' });
     setTimeout(() => {
       wx.navigateBack({ delta: 1 });
     }, 400);
@@ -1815,10 +1979,8 @@ Page({
     if (this.data.saving) return;
     const rawDraft = Array.isArray(this.data.groupDraft) ? this.data.groupDraft : [];
     const pairingDraft = this.data.pairingDraft || {};
-    const isLiveMode = this.data.mode === 'live';
-    const err = isLiveMode
-      ? this._validateLiveGroupDraft(rawDraft)
-      : this._validateGroupDraft(rawDraft, pairingDraft);
+    // create / edit / live：同一套分组校验（含 G4）
+    const err = this._validateGroupDraft(rawDraft, pairingDraft);
     if (err) {
       wx.showToast({ title: err, icon: 'none' });
       return;
@@ -1830,7 +1992,7 @@ Page({
       return;
     }
     this.setData({ saving: true });
-    if (isLiveMode) {
+    if (this.data.mode === 'live') {
       this._confirmLiveGroups(match, rawDraft, pairingDraft);
       return;
     }
@@ -1845,16 +2007,13 @@ Page({
     }
 
     const gameMode = String(match.gameMode || this.data.gameMode || '');
-    const isG4Stroke = gameMode === '四人两球比杆赛';
-    const isG2G3Stroke =
-      gameMode === '最好成绩比杆赛' ||
-      gameMode === '四人四球比杆赛' ||
-      gameMode === '最佳球位比杆赛';
+    const isG4Stroke = isG4FamilyMode(gameMode);
+    const isG2G3Stroke = isG2G3FamilyMode(gameMode);
     // 报名保存：统一正式座位规范化（position ≠ 选人顺序）；不碰 pairing / entity / score
     if (!isClear && (isG4Stroke || isG2G3Stroke)) {
       formal = normalizeFormalGroupSeats(formal, match);
     }
-    // G4 成绩主体来自 pairings；即使 UI 组合区未开，保存时仍保留/写入 pairings
+    // G4/G8 成绩主体来自 pairings；即使 UI 组合区未开，保存时仍保留/写入 pairings
     const shouldPersistPairings = this.data.showPairingSection || isG4Stroke;
 
     let formalPairings = {};
@@ -1894,6 +2053,9 @@ Page({
     });
     if (this.data.showCompositionMode) {
       next.strokeCompositionMode = this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
+    } else if (isG6G7MatchPlayMode(gameMode) && !isClear) {
+      // G6/G7：不依赖用户选择；双方分队结构对应 2+2 Entity 切分
+      next.strokeCompositionMode = '2+2';
     }
     if (isClear) {
       next = this._clearGroupDerivedFields(next);

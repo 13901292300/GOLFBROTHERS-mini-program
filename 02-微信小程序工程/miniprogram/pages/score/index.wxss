@@ -787,6 +787,12 @@ page {
   text-align: center;
 }
 
+.score-actions__primary.is-disabled {
+  background: #9ca3af;
+  color: #f3f4f6;
+  opacity: 0.72;
+}
+
 .score-actions__secondary {
   flex: 1;
   background: transparent;
@@ -1001,6 +1007,9 @@ page {
 .fst-sub { font-style: normal; font-size: 20rpx; color: #9ca3af; letter-spacing: 0.08em; }
 .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24rpx; row-gap: 32rpx; }
 .feature-item { display: flex; flex-direction: column; align-items: center; min-height: 156rpx; }
+.feature-item.is-disabled {
+  opacity: 0.46;
+}
 .feature-icon { width: 112rpx; height: 112rpx; border-radius: 24rpx; background: var(--tour-blue); color: var(--champion-gold); display: flex; align-items: center; justify-content: center; margin-bottom: 16rpx; font-size: 44rpx; box-shadow: 0 12rpx 24rpx rgba(0, 45, 98, 0.18); }
 .feature-icon.danger { background: #ff5722; color: #fff; }
 .feature-icon.warning { background: #ffc107; color: var(--tour-blue); }
@@ -1585,6 +1594,19 @@ page {
   background: var(--champion-gold);
   color: #000000;
   box-shadow: 0 16rpx 40rpx rgba(206, 146, 36, 0.2);
+}
+
+/* finished 只读：编辑控件置灰，成绩展示布局不变 */
+.score-input-sheet.is-readonly .control-icon.is-disabled,
+.score-input-sheet.is-readonly .quick-score-control-btn.is-disabled,
+.score-input-sheet.is-readonly .sheet-footer-btn.is-disabled {
+  opacity: 0.42;
+  filter: grayscale(0.35);
+}
+.score-input-sheet.is-readonly .tech-score-panel.is-disabled .direction-row,
+.score-input-sheet.is-readonly .direction-row.is-disabled,
+.score-input-sheet.is-readonly .quick-score-panel.is-disabled {
+  opacity: 0.55;
 }
 
 /* Bright：技术面板操作色统一（+/- / 确认）；不改快捷面板、不改 Dark */

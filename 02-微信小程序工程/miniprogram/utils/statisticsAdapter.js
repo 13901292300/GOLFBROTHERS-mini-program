@@ -2,10 +2,11 @@
  * 统计数据适配层（Stats-0.3-A1）
  *
  * 输入：match（teamMatchStore 比赛对象）
- * 输出：statistics rows（供统计页消费；本 Patch 不接入页面）
+ * 输出：statistics rows（供统计页消费）
  *
- * 数据来源：仅 match.scoreData
- * 身份：复用详情页 / teamMatchStore 的 scorePlayerId 解析规则
+ * G1：buildStatisticsRows → scoresByPlayer（个人）
+ * G2/G3/G4：buildEntityStatisticsRows → scoreEntities + teamScoresByEntity（组合）
+ *
  * 洞状态：groupsStore.getScoreStatus
  * 标准杆：holeLayout.resolveLayoutFromContext
  */
@@ -17,6 +18,7 @@ const playerManage = require('./playerManage.js');
 const tPosition = require('./tPosition.js');
 const mockAvatars = require('./mockAvatars.js');
 const matchStatus = require('./matchStatus.js');
+const { resolveStrokeKind, resolveGameMode } = require('./strokeEntityValidator.js');
 
 const SCORE_CELL_COUNT = holeLayout.SCORE_CELL_COUNT || 18;
 
@@ -335,8 +337,143 @@ function buildStatisticsRows(match) {
   return rows;
 }
 
+/** G2/G3/G4：统计按 Stroke Entity；G1 / 其它：个人 */
+function shouldUseEntityStatistics(match) {
+  const kind = resolveStrokeKind(resolveGameMode(match));
+  return kind === 'g2g3' || kind === 'g4';
+}
+
+function resolveEntityMemberId(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string' || typeof raw === 'number') return String(raw).trim();
+  if (typeof raw !== 'object') return '';
+  const id = raw.userId != null ? raw.userId : (raw.playerId != null ? raw.playerId : raw.id);
+  return id != null ? String(id).trim() : '';
+}
+
+/** 与领先榜 Entity 行一致：成员昵称用 ' / ' 连接 */
+function resolveEntityStatisticsDisplayName(memberIds, lookup) {
+  const names = (Array.isArray(memberIds) ? memberIds : [])
+    .map((uid) => {
+      const meta = (lookup && lookup[uid]) || {};
+      return (
+        playerManage.resolveMatchNickname(meta) ||
+        meta.nickname ||
+        ''
+      );
+    })
+    .map((n) => String(n || '').trim())
+    .filter(Boolean);
+  return names.join(' / ');
+}
+
+function findTeamScoreByEntityId(groupScoreData, entityId) {
+  const eid = entityId != null ? String(entityId).trim() : '';
+  if (!eid) return null;
+  const list = Array.isArray(groupScoreData && groupScoreData.teamScoresByEntity)
+    ? groupScoreData.teamScoresByEntity
+    : [];
+  for (let i = 0; i < list.length; i++) {
+    const rec = list[i];
+    if (!rec || typeof rec !== 'object') continue;
+    const key =
+      rec.teamId != null && String(rec.teamId).trim() !== ''
+        ? String(rec.teamId).trim()
+        : rec.entityId != null && String(rec.entityId).trim() !== ''
+          ? String(rec.entityId).trim()
+          : '';
+    if (key === eid) return rec;
+  }
+  return null;
+}
+
+/**
+ * G2/G3/G4：按 scoreEntities + teamScoresByEntity 生成组合统计行
+ * 禁止从 scoresByPlayer 反推
+ */
+function buildEntityStatisticsRows(match) {
+  if (!match || typeof match !== 'object') return [];
+  const pars = resolveMatchHolePars(match);
+  const lookup = buildPlayerLookup(match);
+  const scoreEntities =
+    match.scoreEntities && typeof match.scoreEntities === 'object' && !Array.isArray(match.scoreEntities)
+      ? match.scoreEntities
+      : {};
+  const rows = [];
+  const seen = {};
+
+  Object.keys(scoreEntities).forEach((groupId) => {
+    const gid = String(groupId);
+    const entities = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
+    const groupScoreData = getGroupScoreData(match, gid);
+
+    entities.forEach((entity) => {
+      if (!entity) return;
+      const entityId = entity.entityId != null ? String(entity.entityId).trim() : '';
+      if (!entityId || seen[entityId]) return;
+
+      const memberIds = (Array.isArray(entity.members) ? entity.members : [])
+        .map(resolveEntityMemberId)
+        .filter(Boolean);
+      // 空占用行不进统计（与领先榜一致）
+      if (!memberIds.length) return;
+      seen[entityId] = true;
+
+      const rec = findTeamScoreByEntityId(groupScoreData, entityId);
+      const scores = rec && Array.isArray(rec.scores) ? rec.scores : [];
+      const putts = rec && Array.isArray(rec.putts) ? rec.putts : [];
+      const fairways = rec && Array.isArray(rec.fairways) ? rec.fairways : [];
+      const penalties = rec && Array.isArray(rec.penalties) ? rec.penalties : [];
+      const sands = rec && Array.isArray(rec.sands) ? rec.sands : [];
+      const holeStats = computePlayerHoleStats(scores, putts, pars, fairways, penalties, sands);
+
+      const name = resolveEntityStatisticsDisplayName(memberIds, lookup) || '组合';
+      const members = memberIds.map((uid) => {
+        const meta = lookup[uid] || {};
+        return {
+          userId: uid,
+          name: playerManage.resolveMatchNickname(meta) || meta.nickname || '',
+          avatar: mockAvatars.resolveAvatar(meta.avatar || '', uid)
+        };
+      });
+      const avatar = (members[0] && members[0].avatar) || '';
+
+      rows.push({
+        isEntity: true,
+        entityId: entityId,
+        playerId: '',
+        scorePlayerId: '',
+        groupId: gid,
+        memberIds: memberIds.slice(),
+        members: members,
+        avatar: avatar,
+        name: name,
+        gender: '',
+        genderIcon: '',
+        teeColor: resolveTeeColor(null, lookup[memberIds[0]] || {}),
+        eagle: holeStats.eagle,
+        birdie: holeStats.birdie,
+        par: holeStats.par,
+        bogey: holeStats.bogey,
+        doublePlus: holeStats.doublePlus,
+        girPercent: holeStats.girPercent,
+        putts: holeStats.putts,
+        fairwayPercent: holeStats.fairwayPercent,
+        sand: holeStats.sand,
+        penalty: holeStats.penalty,
+        stat8421: holeStats.stat8421,
+        total: holeStats.total
+      });
+    });
+  });
+
+  return rows;
+}
+
 module.exports = {
   buildStatisticsRows,
+  buildEntityStatisticsRows,
+  shouldUseEntityStatistics,
   computePlayerHoleStats,
   get8421Score,
   resolveMatchHolePars,

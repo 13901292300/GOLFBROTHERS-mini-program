@@ -332,7 +332,9 @@ function buildMatchFromCreatePage(pageData) {
  * 编辑保存：用创建页表单更新赛事基础配置，保留报名/状态等运行中数据。
  * @param {object} existing
  * @param {object} pageData
- * @param {{ clearGroups?: boolean }} [options] clearGroups=true 时清空正式 groups 及派生字段
+ * @param {{ clearGroups?: boolean, clearPairings?: boolean, replaceGroups?: array }} [options]
+ *   clearGroups=true 时清空正式 groups 及派生字段；
+ *   replaceGroups 为数组时写入正式 groups（非法组已变为空壳）；空组剪掉 pairings
  */
 function updateMatchFromCreatePage(existing, pageData, options) {
   if (!existing || !existing.matchId) return null;
@@ -391,7 +393,19 @@ function updateMatchFromCreatePage(existing, pageData, options) {
   next.createdAt = existing.createdAt;
   next.updatedAt = Date.now();
 
-  if (opts.clearGroups) {
+  const fromMode = existing.gameMode || '';
+  const toMode = next.gameMode || '';
+  // G2/G3/G4 → G1：组合成绩展开为个人成绩，并清理 scoreEntities / pairings
+  if (shouldMigrateComboScoresToIndividualStroke(fromMode, toMode)) {
+    next.scoreData = migrateComboScoresToIndividualStroke(existing, toMode);
+    next.scoreEntities = {};
+    clearFormalPairingsOnMatch(next);
+  } else if (Array.isArray(opts.replaceGroups)) {
+    replaceFormalGroupsOnMatch(next, opts.replaceGroups);
+    if (opts.clearPairings) {
+      clearFormalPairingsOnMatch(next);
+    }
+  } else if (opts.clearGroups) {
     clearFormalGroupsOnMatch(next);
   } else if (opts.clearPairings) {
     clearFormalPairingsOnMatch(next);
@@ -409,12 +423,19 @@ const FORMAL_SLOT_COUNT = 4;
  */
 const PAIRING_STROKE_FORMAT_SET = {
   '四人四球比杆赛': true,
-  '最佳球位比杆赛': true
+  '最佳球位比杆赛': true,
+  // G6/G7：报名分组走 G2/G3 composition UI
+  '最好成绩比洞赛': true,
+  '四人四球比洞赛': true,
+  '最佳球位比洞赛': true
 };
 
 const PAIRING_STROKE_LABELS = {
   '四人四球比杆赛': '四人四球组合',
-  '最佳球位比杆赛': '最佳球位组合'
+  '最佳球位比杆赛': '最佳球位组合',
+  '最好成绩比洞赛': '最好成绩组合',
+  '四人四球比洞赛': '四人四球组合',
+  '最佳球位比洞赛': '最佳球位组合'
 };
 
 function isPairingStrokeFormat(format) {
@@ -474,26 +495,150 @@ function sanitizePairings(pairings) {
 }
 
 /**
- * 赛制变更是否会导致分组/组合关系失效而需要清空正式 groups。
- * 规则：
- * 1. 任意 → 个人比杆赛：不清空 groups
- * 2. 个人比杆赛 → 组合赛制：清空
- * 3. 组合赛制 ↔ 组合赛制：清空
- * 4. 无正式分组：由调用方跳过提示
+ * @deprecated 组合赛制不再「一变就全清」。请用 analyzeGameModeChangeGroups。
+ * 保留签名避免旧调用误清；恒返回 false。
  */
-function shouldClearGroupsOnGameModeChange(fromMode, toMode) {
-  const from = String(fromMode || '');
-  const to = String(toMode || '');
-  if (!to || from === to) return false;
-  if (to === INDIVIDUAL_STROKE_MODE) return false;
-  if (to === '个人比洞赛') return false;
-  if (!isComboGameMode(to)) return false;
-  return true;
+function shouldClearGroupsOnGameModeChange(/* fromMode, toMode */) {
+  return false;
+}
+
+/**
+ * 非法正式组 → 空组壳：保留 groupId/groupName/teeTime/startHole 等配置，只清空 players。
+ */
+function toEmptyFormalGroupShell(group) {
+  if (!group || typeof group !== 'object') {
+    return { players: [] };
+  }
+  const next = Object.assign({}, group);
+  next.players = [];
+  return next;
+}
+
+function formalGroupHasFilledPlayers(group) {
+  const players = Array.isArray(group && group.players) ? group.players : [];
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    if (p == null) continue;
+    const id =
+      typeof p === 'string' || typeof p === 'number'
+        ? String(p).trim()
+        : String((p.userId || p.playerId || p.id) != null ? p.userId || p.playerId || p.id : '').trim();
+    if (id) return true;
+  }
+  return false;
+}
+
+/**
+ * 按目标赛制对已有正式分组做逐组合法性检查。
+ * 合法组原样保留；非法组改为空组（不清 group 壳）。
+ * @returns {{
+ *   nextGroups: array,
+ *   keepGroups: array,
+ *   emptiedGroups: array,
+ *   removeGroups: array,
+ *   illegalCount: number,
+ *   legalCount: number,
+ *   total: number,
+ *   allLegal: boolean,
+ *   allIllegal: boolean
+ * }}
+ */
+function analyzeGameModeChangeGroups(match, toMode) {
+  const strokeEntityValidator = require('./strokeEntityValidator.js');
+  const groups = match && Array.isArray(match.groups) ? match.groups : [];
+  const nextGroups = [];
+  const emptiedGroups = [];
+  let legalCount = 0;
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+    const checked = strokeEntityValidator.validateGroupForTargetGameMode(toMode, group, match);
+    if (checked && checked.valid) {
+      nextGroups.push(group);
+      legalCount += 1;
+    } else {
+      const emptyShell = toEmptyFormalGroupShell(group);
+      nextGroups.push(emptyShell);
+      emptiedGroups.push(emptyShell);
+    }
+  }
+  const illegalCount = emptiedGroups.length;
+  return {
+    nextGroups: nextGroups,
+    // 兼容旧调用：replaceGroups 使用完整结果列表（含空组）
+    keepGroups: nextGroups,
+    emptiedGroups: emptiedGroups,
+    removeGroups: emptiedGroups,
+    illegalCount: illegalCount,
+    legalCount: legalCount,
+    total: groups.length,
+    allLegal: illegalCount === 0,
+    allIllegal: groups.length > 0 && legalCount === 0
+  };
+}
+
+/** 赛制变更分组提示：部分非法 */
+function buildGameModeChangeGroupsPartialTip(illegalCount) {
+  const n = Number(illegalCount) || 0;
+  return (
+    '当前分组中有' + n + '组不符合新赛制要求。\n\n' +
+    '继续修改后，这' + n + '组的球员将被清空并保留为空组，其他合法分组将保留。'
+  );
+}
+
+/** 赛制变更分组提示：全部非法 */
+function buildGameModeChangeGroupsAllIllegalTip() {
+  return (
+    '当前所有分组均不符合新赛制要求。\n\n' +
+    '继续修改后，各组球员将被清空，分组空壳将保留。'
+  );
+}
+
+/**
+ * 写入正式 groups（含非法组清空后的空壳），并清理空组 / 已不存在组的 pairings。
+ * 不碰 scoreData / scoreEntities / registerInfo / teamGroups。
+ */
+function replaceFormalGroupsOnMatch(match, nextGroups) {
+  if (!match || typeof match !== 'object') return match;
+  const groups = Array.isArray(nextGroups) ? nextGroups.slice() : [];
+  match.groups = groups;
+  const keepIds = {};
+  const emptyIds = {};
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    if (!g || g.groupId == null) continue;
+    const gid = String(g.groupId);
+    keepIds[gid] = true;
+    if (!formalGroupHasFilledPlayers(g)) emptyIds[gid] = true;
+  }
+  const pairings = clonePairings(match.pairings);
+  const nextPairings = {};
+  Object.keys(pairings).forEach((gid) => {
+    const key = String(gid);
+    if (keepIds[key] && !emptyIds[key]) nextPairings[key] = pairings[gid];
+  });
+  match.pairings = nextPairings;
+  if (Object.prototype.hasOwnProperty.call(match, 'groupCount')) {
+    match.groupCount = groups.length;
+  }
+  if (Object.prototype.hasOwnProperty.call(match, 'pairingMap')) {
+    const nextMap = {};
+    const srcMap =
+      match.pairingMap && typeof match.pairingMap === 'object' && !Array.isArray(match.pairingMap)
+        ? match.pairingMap
+        : {};
+    Object.keys(srcMap).forEach((gid) => {
+      const key = String(gid);
+      if (keepIds[key] && !emptyIds[key]) nextMap[key] = srcMap[gid];
+    });
+    match.pairingMap = nextMap;
+  }
+  return match;
 }
 
 /**
  * 赛制变更是否需要清空正式 pairings（可保留 groups）
  * - 组合比杆赛 → 个人比杆赛：保留 groups，清空 pairings
+ * - G2/G3/G4（含最好成绩 / 四人两球）→ 个人比杆赛：保留 groups，清空 pairings
  * - 清空 groups 时一并清空 pairings（由 clearFormalGroupsOnMatch 处理）
  */
 function shouldClearPairingsOnGameModeChange(fromMode, toMode) {
@@ -501,8 +646,189 @@ function shouldClearPairingsOnGameModeChange(fromMode, toMode) {
   const to = String(toMode || '');
   if (!from || !to || from === to) return false;
   if (shouldClearGroupsOnGameModeChange(from, to)) return true;
+  if (isStrokeEntityGameMode(from) && to === INDIVIDUAL_STROKE_MODE) return true;
   if (isPairingStrokeFormat(from) && !isPairingStrokeFormat(to)) return true;
   return false;
+}
+
+/** Stroke Entity 赛制：G2（最好成绩/四人四球）/ G3（最佳球位）/ G4（四人两球） */
+function isStrokeEntityGameMode(mode) {
+  const m = String(mode || '');
+  return (
+    m === '最好成绩比杆赛' ||
+    m === '四人四球比杆赛' ||
+    m === '最佳球位比杆赛' ||
+    m === '四人两球比杆赛'
+  );
+}
+
+function shouldMigrateComboScoresToIndividualStroke(fromMode, toMode) {
+  return isStrokeEntityGameMode(fromMode) && String(toMode || '') === INDIVIDUAL_STROKE_MODE;
+}
+
+function clonePlayerScoreRecord(rec) {
+  if (!rec || typeof rec !== 'object') {
+    return { scores: [], putts: [], fairways: [], penalties: [], sands: [] };
+  }
+  return {
+    scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
+    putts: Array.isArray(rec.putts) ? rec.putts.slice() : [],
+    fairways: Array.isArray(rec.fairways) ? rec.fairways.slice() : [],
+    penalties: Array.isArray(rec.penalties) ? rec.penalties.slice() : [],
+    sands: Array.isArray(rec.sands) ? rec.sands.slice() : []
+  };
+}
+
+function hasMeaningfulPlayerScores(rec) {
+  if (!rec || typeof rec !== 'object') return false;
+  const scores = rec.scores;
+  if (!Array.isArray(scores) || !scores.length) return false;
+  for (let i = 0; i < scores.length; i++) {
+    const s = scores[i];
+    if (s == null || s === '') continue;
+    if (typeof s === 'number' && isNaN(s)) continue;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 成绩归属 ID：scorePlayerId > playerId > userId；禁止姓名匹配
+ */
+function resolveMigrationScoreOwnerId(group, memberRaw) {
+  let memberKey = '';
+  if (memberRaw != null && (typeof memberRaw === 'string' || typeof memberRaw === 'number')) {
+    memberKey = String(memberRaw).trim();
+  } else if (memberRaw && typeof memberRaw === 'object') {
+    memberKey = String(
+      memberRaw.userId || memberRaw.playerId || memberRaw.id || ''
+    ).trim();
+  }
+
+  const players = group && Array.isArray(group.players) ? group.players : [];
+  let found = null;
+  if (memberKey) {
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      if (!p) continue;
+      const uid = resolveGroupSlotPlayerId(p);
+      const pid = p.playerId != null ? String(p.playerId).trim() : '';
+      const sp = resolveSlotScorePlayerId(p);
+      if (uid === memberKey || pid === memberKey || (sp && sp === memberKey)) {
+        found = p;
+        break;
+      }
+    }
+  }
+
+  if (found) {
+    const sp = resolveSlotScorePlayerId(found);
+    if (sp) return sp;
+    if (found.playerId != null && String(found.playerId).trim()) {
+      return String(found.playerId).trim();
+    }
+    const uid = resolveGroupSlotPlayerId(found);
+    if (uid) return uid;
+  }
+
+  if (memberRaw && typeof memberRaw === 'object') {
+    const sp = resolveSlotScorePlayerId(memberRaw);
+    if (sp) return sp;
+    if (memberRaw.playerId != null && String(memberRaw.playerId).trim()) {
+      return String(memberRaw.playerId).trim();
+    }
+    if (memberRaw.userId != null && String(memberRaw.userId).trim()) {
+      return String(memberRaw.userId).trim();
+    }
+  }
+  return memberKey;
+}
+
+/**
+ * 将 G2/G3/G4 LIVE 组合成绩展开为 G1 个人成绩。
+ * 输入：旧 match + 目标 gameMode；输出：迁移后的 scoreData（各组 teamScoresByEntity 已清空）。
+ * 不修改 match.groups / registerInfo；scoreEntities / pairings 由调用方清理。
+ */
+function migrateComboScoresToIndividualStroke(match, targetGameMode) {
+  const target = targetGameMode != null ? String(targetGameMode).trim() : INDIVIDUAL_STROKE_MODE;
+  const raw =
+    match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : {};
+  let out;
+  try {
+    out = JSON.parse(JSON.stringify(raw));
+  } catch (e) {
+    out = {};
+  }
+  if (target !== INDIVIDUAL_STROKE_MODE) return out;
+
+  const scoreEntities =
+    match && match.scoreEntities && typeof match.scoreEntities === 'object' && !Array.isArray(match.scoreEntities)
+      ? match.scoreEntities
+      : {};
+
+  const groupsById = {};
+  (Array.isArray(match && match.groups) ? match.groups : []).forEach((g) => {
+    if (g && g.groupId != null) groupsById[String(g.groupId)] = g;
+  });
+
+  const groupIds = {};
+  Object.keys(scoreEntities).forEach((gid) => {
+    groupIds[String(gid)] = true;
+  });
+  Object.keys(out).forEach((gid) => {
+    groupIds[String(gid)] = true;
+  });
+
+  Object.keys(groupIds).forEach((gid) => {
+    const groupScore = out[gid] && typeof out[gid] === 'object' ? out[gid] : {};
+    const scoresByPlayer =
+      groupScore.scoresByPlayer && typeof groupScore.scoresByPlayer === 'object'
+        ? Object.assign({}, groupScore.scoresByPlayer)
+        : {};
+    const entityScores = Array.isArray(groupScore.teamScoresByEntity)
+      ? groupScore.teamScoresByEntity
+      : [];
+    const byEntityId = {};
+    entityScores.forEach((rec) => {
+      if (!rec || typeof rec !== 'object') return;
+      const key =
+        rec.teamId != null && String(rec.teamId).trim() !== ''
+          ? String(rec.teamId).trim()
+          : rec.entityId != null && String(rec.entityId).trim() !== ''
+            ? String(rec.entityId).trim()
+            : '';
+      if (key) byEntityId[key] = rec;
+    });
+
+    const entities = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
+    const group = groupsById[gid];
+
+    entities.forEach((entity) => {
+      if (!entity) return;
+      const eid = entity.entityId != null ? String(entity.entityId).trim() : '';
+      if (!eid) return;
+      const rec = byEntityId[eid];
+      if (!rec) return;
+      const payload = clonePlayerScoreRecord(rec);
+      const members = Array.isArray(entity.members) ? entity.members : [];
+      members.forEach((memberRaw) => {
+        const ownerId = resolveMigrationScoreOwnerId(group, memberRaw);
+        if (!ownerId) return;
+        // 已有个人成绩则保留（成绩继承），不覆盖
+        if (hasMeaningfulPlayerScores(scoresByPlayer[ownerId])) return;
+        scoresByPlayer[ownerId] = clonePlayerScoreRecord(payload);
+      });
+    });
+
+    out[gid] = {
+      scoresByPlayer: scoresByPlayer,
+      teamScoresByEntity: []
+    };
+  });
+
+  return out;
 }
 
 /** 清空正式分组及与 groups 强绑定的派生字段（不碰报名/赛事基础信息） */
@@ -856,8 +1182,8 @@ function cancelRegistration(matchId, targetUserId) {
   return { ok: true, match: match, wasGrouped: !!result.wasGrouped };
 }
 
+/** @deprecated 旧「全清」文案；改赛制请用 buildGameModeChangeGroups*Tip */
 const GAME_MODE_CHANGE_CLEAR_GROUPS_TIP = '修改赛制后，需要重新分配组合，已有分组将被清空。';
-
 
 /**
  * 将已存赛事回填为创建页表单字段（缺省用空/默认，由页面再兜底）
@@ -979,11 +1305,19 @@ module.exports = {
   isPairingStrokeFormat,
   getPairingStrokeLabel,
   isComboGameMode,
+  isStrokeEntityGameMode,
   hasFormalGroups,
   clonePairings,
   sanitizePairings,
   shouldClearGroupsOnGameModeChange,
   shouldClearPairingsOnGameModeChange,
+  analyzeGameModeChangeGroups,
+  toEmptyFormalGroupShell,
+  buildGameModeChangeGroupsPartialTip,
+  buildGameModeChangeGroupsAllIllegalTip,
+  replaceFormalGroupsOnMatch,
+  shouldMigrateComboScoresToIndividualStroke,
+  migrateComboScoresToIndividualStroke,
   clearFormalGroupsOnMatch,
   clearFormalPairingsOnMatch,
   resolveGroupSlots,

@@ -1076,17 +1076,78 @@ page {
 .lr-thru { width: 20%; text-align: center; font-size: 24rpx; color: var(--text-muted); }
 .lr-total { width: 20%; text-align: center; }
 
-/* 个人榜五列：POS | PLAYER | TEAM | THRU | TO PAR（不影响分队榜四列） */
+/* 个人榜：POS + PLAYER(优先弹性) | 右侧 metrics(grid 均分 TEAM/THRU/TO PAR) */
+.leaderboard-head--personal,
+.leaderboard-row--personal {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
 .leaderboard-head--personal .lh-pos,
-.leaderboard-row--personal .lr-pos { width: 12%; }
+.leaderboard-row--personal .lr-pos {
+  flex: 0 0 72rpx;
+  width: 72rpx;
+  text-align: center;
+}
 .leaderboard-head--personal .lh-player,
-.leaderboard-row--personal .lr-player { width: 30%; }
-.leaderboard-head--personal .lh-team,
-.leaderboard-row--personal .lr-team { width: 22%; }
-.leaderboard-head--personal .lh-thru,
-.leaderboard-row--personal .lr-thru { width: 16%; }
-.leaderboard-head--personal .lh-total,
-.leaderboard-row--personal .lr-total { width: 20%; }
+.leaderboard-row--personal .lr-player {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  padding: 0 12rpx 0 8rpx;
+}
+/* 与普通创建多组领先榜一致：name + genderIcon 紧邻，不把 nickname 撑满整列 */
+.leaderboard-row--personal .player-name {
+  min-width: 0;
+}
+
+/* 右侧数据区：有 TEAM 三等分，无 TEAM 两等分；不留空列 */
+.leaderboard-metrics {
+  flex: 0 0 46%;
+  max-width: 46%;
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  column-gap: 0;
+  box-sizing: border-box;
+}
+.leaderboard-metrics--with-team {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.leaderboard-metrics--no-team {
+  grid-template-columns: 1fr 1fr;
+}
+.leaderboard-metrics .lh-team,
+.leaderboard-metrics .lr-team,
+.leaderboard-metrics .lh-thru,
+.leaderboard-metrics .lr-thru,
+.leaderboard-metrics .lh-total,
+.leaderboard-metrics .lr-total {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 4rpx;
+  box-sizing: border-box;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leaderboard-metrics .lh-team,
+.leaderboard-metrics .lr-team {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-left: 0;
+}
+
+/* 无 TEAM 时 PLAYER 可再多占一点（metrics 略收） */
+.leaderboard-head--personal-no-team .leaderboard-metrics,
+.leaderboard-row--personal-no-team .leaderboard-metrics {
+  flex-basis: 40%;
+  max-width: 40%;
+}
 
 /* 净杆分队五列：POS | TEAM | PLAYER | THRU | NET SCORE */
 .leaderboard-head--team-net .lh-pos,
@@ -1339,33 +1400,52 @@ page {
   font-weight: 700;
 }
 .tee-v-badge { position: absolute; right: -4rpx; bottom: -4rpx; width: 40rpx; height: 40rpx; border-radius: 9999rpx; background: #fff; border: 1px solid rgba(206, 146, 36, 0.55); display: flex; align-items: center; justify-content: center; color: var(--champion-gold); font-size: 20rpx; font-weight: 900; box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.16); }
-/* 出发表：头像正下方分队小胶囊（不改昵称/T台布局） */
-.tee-group-card .gb-group-player-avatar-wrap {
-  overflow: visible;
+
+/* 出发表球员卡：昵称/T在头像右侧；分队标签在头像下方并以头像中心对齐 */
+.tee-group-card .gb-group-player-grid {
+  gap: 20rpx 8rpx;
+}
+.tee-group-card .tee-sheet-player {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-bottom: 4rpx;
+}
+.tee-group-card .tee-sheet-player-main {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+.tee-group-card .tee-sheet-player-avatar-col {
+  width: 80rpx;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.tee-group-card .tee-sheet-player-main .gb-group-player-meta {
+  margin-left: 8rpx;
+  margin-top: 8rpx;
 }
 .tee-player-team-label {
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 2rpx);
-  transform: translateX(-50%);
-  z-index: 2;
-  max-width: 96rpx;
-  padding: 0 6rpx;
-  height: 24rpx;
-  line-height: 24rpx;
-  border-radius: 999rpx;
-  background: rgba(0, 45, 98, 0.08);
+  display: block;
+  width: 80rpx;
+  max-width: 80rpx;
+  box-sizing: border-box;
+  padding: 0 2rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   color: var(--text-muted);
-  font-size: 16rpx;
-  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-sizing: border-box;
-  pointer-events: none;
 }
 .detail-page.dark-mode .tee-player-team-label {
-  background: rgba(255, 255, 255, 0.1);
   color: var(--text-secondary);
 }
 .tee-player-name {
@@ -1510,6 +1590,10 @@ page {
 .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24rpx; row-gap: 32rpx; }
 .feature-item { display: flex; flex-direction: column; align-items: center; min-height: 156rpx; }
 .feature-item--empty { visibility: hidden; pointer-events: none; }
+.feature-item.is-disabled {
+  opacity: 0.46;
+  pointer-events: none;
+}
 .feature-icon { width: 112rpx; height: 112rpx; border-radius: 24rpx; background: var(--tour-blue); color: var(--champion-gold); display: flex; align-items: center; justify-content: center; margin-bottom: 16rpx; font-size: 44rpx; box-shadow: 0 12rpx 24rpx rgba(0, 45, 98, 0.18); }
 .feature-icon.danger { background: #ff5722; color: #fff; }
 .feature-icon.warning { background: #ffc107; color: var(--tour-blue); }

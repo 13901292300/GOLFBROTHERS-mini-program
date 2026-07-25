@@ -30,10 +30,24 @@
         <text bindtap="onSortHeaderTap" data-field="total" class="st-cell st-total {{sortField === 'total' ? 'active-sort' : ''}}">TOT<text wx:if="{{sortField === 'total'}}">{{sortOrder === 'asc' ? ' ▲' : ' ▼'}}</text></text>
       </view>
 
-      <block wx:for="{{rows}}" wx:key="playerId">
+      <block wx:for="{{rows}}" wx:key="id">
         <view class="stats-row">
           <view class="st-cell st-player">
-            <image class="st-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+            <view class="st-avatar-slot {{item.avatarSlotClass}}">
+              <block wx:if="{{item.showPairedAvatars}}">
+                <view class="st-paired-avatars">
+                  <view
+                    wx:for="{{item.members}}"
+                    wx:for-item="m"
+                    wx:key="userId"
+                    class="st-pair-avatar"
+                  >
+                    <image class="st-avatar st-avatar--stack" src="{{m.avatar}}" mode="aspectFill"></image>
+                  </view>
+                </view>
+              </block>
+              <image wx:else class="st-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+            </view>
             <view class="st-identity">
               <text class="st-name">{{item.name}}</text><text wx:if="{{item.genderIcon}}" class="st-gender {{item.genderClass}}">{{item.genderIcon}}</text>
             </view>
