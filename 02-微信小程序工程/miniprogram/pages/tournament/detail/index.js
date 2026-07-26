@@ -3457,6 +3457,10 @@ Page({
   },
 
   onShow() {
+    // 从 stats 横屏返回时夺回竖屏（不改赛事数据）
+    if (typeof wx.setPageOrientation === 'function') {
+      wx.setPageOrientation({ orientation: 'portrait' });
+    }
     this.applyTheme(getApp().getTheme());
     // 不单靠 onHide：onShow 再认一次栈内 score，供 refresh 折叠 Details
     if (this._isReturningFromScorePage()) {

@@ -690,7 +690,10 @@ Page({
     this._restorePortrait();
   },
 
-  onHide() {},
+  onHide() {
+    // 系统手势返回不走 onBack，须在隐藏时恢复竖屏
+    this._restorePortrait();
+  },
 
   _lockLandscape() {
     if (typeof wx.setPageOrientation === 'function') {
@@ -698,18 +701,28 @@ Page({
     }
   },
 
-  _restorePortrait() {
-    if (typeof wx.setPageOrientation === 'function') {
-      wx.setPageOrientation({ orientation: 'portrait' });
+  _restorePortrait(done) {
+    const finish = typeof done === 'function' ? done : null;
+    if (typeof wx.setPageOrientation !== 'function') {
+      if (finish) finish();
+      return;
     }
+    // 等方向 API 完成后再离开页面，避免卸载竞态导致 portrait 未生效
+    wx.setPageOrientation({
+      orientation: 'portrait',
+      complete: () => {
+        if (finish) finish();
+      }
+    });
   },
 
   onBack() {
-    this._restorePortrait();
-    wx.navigateBack({
-      fail: () => {
-        wx.reLaunch({ url: '/pages/home/index' });
-      }
+    this._restorePortrait(() => {
+      wx.navigateBack({
+        fail: () => {
+          wx.reLaunch({ url: '/pages/home/index' });
+        }
+      });
     });
   },
 
