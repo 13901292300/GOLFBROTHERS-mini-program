@@ -537,6 +537,13 @@ page {
   border: 1px solid #002d62;
 }
 
+/* G5–G8 比洞：自动起始洞 HOLE 金底白字 */
+.hole-label-circle--start {
+  background: var(--champion-gold, #ce9224) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--champion-gold, #ce9224);
+}
+
 .hole-label-circle--special {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -1017,6 +1024,75 @@ page {
 .feature-item--empty { visibility: hidden; pointer-events: none; }
 .sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
 .sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
+
+/* G5-G8: change start hole sheet */
+.start-hole-sheet { z-index: 190; padding: 0 40rpx 32rpx; }
+.start-hole-sheet__title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8rpx;
+  margin-bottom: 28rpx;
+  padding: 0 8rpx;
+}
+.start-hole-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16rpx;
+  margin-bottom: 32rpx;
+  justify-items: center;
+}
+/* 未选中：蓝底白字圆钮；选中：金底白字（真实洞号 A1–B9） */
+.start-hole-cell {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 999rpx;
+  border: none;
+  background: var(--cloud-blue, #002d62);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.start-hole-cell--active {
+  background: var(--champion-gold, #ce9224);
+  border: none;
+  color: #fff;
+}
+.start-hole-sheet__footer {
+  display: flex;
+  gap: 20rpx;
+  padding-bottom: 16rpx;
+}
+.start-hole-sheet__btn-cancel,
+.start-hole-sheet__btn-confirm {
+  flex: 1;
+}
+.start-hole-sheet__btn-cancel {
+  background: #e5e7eb;
+  color: var(--cloud-blue, #002d62);
+}
+.score-page.dark-mode .start-hole-sheet {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+.score-page.dark-mode .start-hole-cell {
+  background: var(--cloud-blue, #002d62);
+  border: none;
+  color: #fff;
+}
+.score-page.dark-mode .start-hole-cell--active {
+  background: var(--champion-gold, #ce9224);
+  border: none;
+  color: #fff;
+}
+.score-page.dark-mode .start-hole-sheet__btn-cancel {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
 
 /* More 弹窗 — DARK 模式（复用页面 Theme Token + 卡片顶部分隔线） */
 .bottom-sheet--more-menu { overflow: hidden; }
@@ -2886,15 +2962,16 @@ page {
   pointer-events: none;
 }
 
+/* 与详情页得分榜一致：红 #E31837 / 蓝 #004B87 */
 .match-win-line--a {
   top: 0;
-  background: #ef4444;
+  background: #E31837;
   clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
 .match-win-line--b {
   bottom: 0;
-  background: #3b82f6;
+  background: #004B87;
   clip-path: polygon(50% 0, 0 100%, 100% 100%);
 }
 
@@ -2919,13 +2996,13 @@ page {
   white-space: nowrap;
 }
 
-/* 原型领先色：A 红 / B 蓝 / AS 灰 */
+/* 与详情页得分榜一致：红方领先红 / 蓝方领先蓝 / TIED 灰 */
 .match-cumulative.team-a-lead {
-  color: #ef4444;
+  color: #E31837;
 }
 
 .match-cumulative.team-b-lead {
-  color: #3b82f6;
+  color: #004B87;
 }
 
 .match-cumulative.all-square {

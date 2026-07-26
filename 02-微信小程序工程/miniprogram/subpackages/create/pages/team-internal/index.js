@@ -37,7 +37,8 @@ function isMatchPlayMode(name) {
 }
 
 const TEAM_GROUP_DESC_DEFAULT = '用于设置本场队内赛的分队名称，如不需要分队 PK，可保留默认设置。';
-const TEAM_GROUP_DESC_MATCH_PLAY = '比洞赛赛制下，有且只能有两个分队，分队名称可自行编辑；切换赛制不会自动改动分队名称。';
+const TEAM_GROUP_DESC_MATCH_PLAY =
+  '比洞赛固定两个比赛阵营；创建时默认红队/蓝队，名称可自行编辑。编辑已有比赛不会自动改名。';
 
 function getTeamGroupSheetDesc(matchPlay) {
   return matchPlay ? TEAM_GROUP_DESC_MATCH_PLAY : TEAM_GROUP_DESC_DEFAULT;
@@ -82,6 +83,11 @@ const DEFAULT_FEE_LIST = [
 const DEFAULT_TEAM_GROUPS = [
   { id: 1, renderKey: 'team-group-1', name: '正式队员' },
   { id: 2, renderKey: 'team-group-2', name: '嘉宾' }
+];
+/** G5–G8 比洞：创建阶段默认两个比赛阵营（仅创建选赛制时初始化，不改已有比赛） */
+const MATCH_PLAY_DEFAULT_TEAM_GROUPS = [
+  { id: 1, renderKey: 'team-group-1', name: '红队' },
+  { id: 2, renderKey: 'team-group-2', name: '蓝队' }
 ];
 const DEFAULT_TEAM_COMPETITION = {
   enabled: false,
@@ -500,6 +506,10 @@ Page({
     return DEFAULT_TEAM_GROUPS.map((item) => Object.assign({}, item));
   },
 
+  _matchPlayDefaultTeamGroups() {
+    return MATCH_PLAY_DEFAULT_TEAM_GROUPS.map((item) => Object.assign({}, item));
+  },
+
   _normalizeTeamCompetition(input) {
     const source = input && typeof input === 'object' ? input : {};
     let topN = Number(source.topN);
@@ -517,16 +527,34 @@ Page({
   },
 
   /**
-   * 选赛制时只更新比洞相关 UI 标记，绝不改写 teamGroups / 报名归属。
-   * （历史：比洞赛会静默重置为红队/蓝队，已移除）
+   * 选赛制时更新比洞相关 UI。
+   * 仅「创建」且由非比洞 → G5–G8：初始化 teamGroups 为红队/蓝队。
+   * 编辑已有比赛、G1–G4、比洞内互切：不改写 teamGroups / 不自动重命名。
    */
   _getTeamGroupUpdatesForGameMode(gameMode) {
     const nextMatchPlay = isMatchPlayMode(gameMode);
-    return {
+    const prevMatchPlay = !!this.data.isMatchPlayMode;
+    const updates = {
       isMatchPlayMode: nextMatchPlay,
       teamGroupMode: 'free',
       teamGroupSheetDesc: getTeamGroupSheetDesc(nextMatchPlay)
     };
+    const isCreate = !this.data.isEditMode;
+    if (isCreate && nextMatchPlay && !prevMatchPlay) {
+      this._freeModeTeamGroups = this._cloneTeamGroups(
+        this.data.teamGroups && this.data.teamGroups.length
+          ? this.data.teamGroups
+          : this._defaultTeamGroups()
+      );
+      const groups = this._matchPlayDefaultTeamGroups();
+      updates.teamGroups = groups;
+      updates.teamGroupSummary = this.getTeamGroupSummary(groups);
+      updates.teamCompetition = this._competitionForGroupCount(
+        this.data.teamCompetition,
+        groups.length
+      );
+    }
+    return updates;
   },
 
   getTeamGroupSummary(groups) {

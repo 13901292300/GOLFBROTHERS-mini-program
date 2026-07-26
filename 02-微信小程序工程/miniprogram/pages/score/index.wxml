@@ -115,7 +115,7 @@
               class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}}"
             >
               <view class="hole-label-wrap">
-                <view class="hole-label-circle {{item.isSpecial ? 'hole-label-circle--special' : 'hole-number'}}">{{item.label}}</view>
+                <view class="hole-label-circle {{item.isSpecial ? 'hole-label-circle--special' : (item.isStartHole ? 'hole-label-circle--start' : 'hole-number')}}">{{item.label}}</view>
               </view>
             </view>
           </view>
@@ -315,6 +315,112 @@
           </view>
           </block>
 
+          <!-- 比洞：成绩主体 = matchSidesView（Side A / status / Side B）；不读 entity -->
+          <block wx:elif="{{isG5MatchPlay && matchSidesView.length}}">
+          <block
+            wx:for="{{matchSidesView}}"
+            wx:key="sideId"
+            wx:for-index="sIdx"
+          >
+          <view class="scoreboard-row scoreboard-row--player match-side-row">
+            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'pair' ? 'bestball-pair-cell' : ''}}">
+              <block wx:if="{{item.kind === 'single'}}">
+                <view class="player-card">
+                  <view class="player-top-line">
+                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <view class="player-diff-wrap">
+                      <text class="player-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
+                    </view>
+                  </view>
+                  <text class="player-name-line">{{item.name}}</text>
+                </view>
+                <view class="player-tee-marker {{item.colorClass}}"></view>
+              </block>
+              <block wx:else>
+                <view class="player-cell-content">
+                  <view class="paired-avatars">
+                    <view class="pair-avatar-group">
+                      <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
+                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                      </view>
+                    </view>
+                    <view class="player-diff-wrap">
+                      <text class="player-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
+                    </view>
+                  </view>
+                  <view class="paired-names">
+                    <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
+                  </view>
+                </view>
+                <view class="tee-marker-strip-right">
+                  <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="tee-half" style="background:{{pm.teeColor}};"></view>
+                </view>
+              </block>
+            </view>
+
+            <view
+              wx:for="{{item.cells}}"
+              wx:for-item="cell"
+              wx:key="colIdx"
+              wx:for-index="cIdx"
+              bindtap="onMatchSideScoreCellTap"
+              data-side-idx="{{sIdx}}"
+              data-col-idx="{{cIdx}}"
+              class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
+            >
+              <block wx:if="{{cell.type === 'special'}}">
+                <view class="special-cell-inner">
+                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                  <view class="special-cell-meta">
+                    <text class="special-cell-putt">{{cell.puttTotal}}</text>
+                    <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+
+              <block wx:else>
+                <view class="hole-cell-inner">
+                  <view class="{{cell.scoreClass}}">
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}}">{{cell.mainStr}}</text>
+                  </view>
+                  <view class="hole-cell-meta">
+                    <text class="hole-cell-putt">{{cell.putts}}</text>
+                    <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+
+          <!-- Side A / B 胜洞走势：文案 TIED·nUP·nDN；色同详情得分榜红蓝 -->
+          <view
+            wx:if="{{sIdx === 0}}"
+            class="scoreboard-row match-status-row"
+          >
+            <view class="scoreboard-cell sticky-col match-status-sticky">
+              <view class="match-label-wrap">
+                <text class="match-label-kicker">MATCH</text>
+                <text class="match-label-main">胜洞走势</text>
+              </view>
+            </view>
+            <view
+              wx:for="{{matchStatusView.rowCells}}"
+              wx:for-item="msCell"
+              wx:key="colIdx"
+              class="scoreboard-cell match-status-cell {{msCell.isSpecial || msCell.isTot ? 'scoreboard-cell--special-cell' : ''}} {{msCell.isTot || msCell.showFinal ? 'match-status-cell--tot match-status-summary' : ''}}"
+            >
+              <view wx:if="{{msCell.showWinA}}" class="match-win-line match-win-line--a"></view>
+              <view wx:if="{{msCell.showWinB}}" class="match-win-line match-win-line--b"></view>
+              <view class="match-cell-inner">
+                <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-summary-label">FINAL</text>
+                <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-cumulative {{msCell.leadClass || matchStatusView.currentLeadClass}}">{{msCell.text || matchStatusView.currentLabel}}</text>
+                <text wx:elif="{{msCell.showStanding}}" class="match-cumulative {{msCell.leadClass}}">{{msCell.standingText}}</text>
+              </view>
+            </view>
+          </view>
+          </block>
+          </block>
+
           <block wx:else>
           <block
             wx:for="{{playersView}}"
@@ -345,9 +451,7 @@
               data-col-idx="{{cIdx}}"
               class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
             >
-              <!-- 比洞赛(G5–G8)：隐藏红蓝角标；比杆赛保持名次三角 -->
               <view wx:if="{{!isMatchPlayScoreMode && cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
-              <!-- 名次视觉：纯红=1 纯蓝=2 蓝+白腰线=3 红+白腰线=4（取消数字，腰线左上→右下且裁剪于三角内） -->
               <view wx:if="{{!isMatchPlayScoreMode && cell.triangleClass && (cell.gameCornerRank === 3 || cell.gameCornerRank === 4)}}" class="corner-waist"></view>
 
               <block wx:if="{{cell.type === 'special'}}">
@@ -371,35 +475,6 @@
                   </view>
                 </view>
               </block>
-            </view>
-          </view>
-
-          <!-- G5：插在球员A与球员B之间的比洞状态行（对齐原型 match-status-row，不影响 G1 / Entity / fourball） -->
-          <view
-            wx:if="{{isG5MatchPlay && pIdx === 0}}"
-            class="scoreboard-row match-status-row"
-          >
-            <view class="scoreboard-cell sticky-col match-status-sticky">
-              <view class="match-label-wrap">
-                <text class="match-label-kicker">MATCH</text>
-                <text class="match-label-main">胜洞走势</text>
-              </view>
-            </view>
-            <view
-              wx:for="{{matchStatusView.rowCells}}"
-              wx:for-item="msCell"
-              wx:key="colIdx"
-              class="scoreboard-cell match-status-cell {{msCell.isSpecial || msCell.isTot ? 'scoreboard-cell--special-cell' : ''}} {{msCell.isTot || msCell.showFinal ? 'match-status-cell--tot match-status-summary' : ''}}"
-            >
-              <view wx:if="{{msCell.showWinA}}" class="match-win-line match-win-line--a"></view>
-              <view wx:if="{{msCell.showWinB}}" class="match-win-line match-win-line--b"></view>
-              <view class="match-cell-inner">
-                <!-- 原型 FINAL 列：FINAL + 累计（按领先方着色） -->
-                <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-summary-label">FINAL</text>
-                <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-cumulative {{msCell.leadClass || matchStatusView.currentLeadClass}}">{{msCell.text || matchStatusView.currentLabel}}</text>
-                <!-- 原型洞格：三角胜负 + 洞后累计 A/S·nUP -->
-                <text wx:elif="{{msCell.showStanding}}" class="match-cumulative {{msCell.leadClass}}">{{msCell.standingText}}</text>
-              </view>
             </view>
           </view>
           </block>
@@ -838,5 +913,29 @@
     bind:close="closeHalfSheet"
     bind:confirm="onHalfCourseConfirmed"
   />
+
+  <!-- G5–G8：修改起始洞（1–18），写入 matchPlayMeta.source=manual -->
+  <view wx:if="{{startHoleSheetVisible}}" class="sheet-overlay" bindtap="closeStartHoleSheet"></view>
+  <view wx:if="{{startHoleSheetVisible}}" class="bottom-sheet start-hole-sheet" catchtap="noop">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="feature-section-title start-hole-sheet__title">
+      <text class="fst-main">修改起始洞</text>
+      <text class="fst-sub">胜洞从所选洞起累计</text>
+    </view>
+    <view class="start-hole-grid">
+      <view
+        wx:for="{{startHoleOptions}}"
+        wx:key="hole"
+        class="start-hole-cell {{startHoleDraft === item.hole ? 'start-hole-cell--active' : ''}}"
+        data-hole="{{item.hole}}"
+        bindtap="onStartHoleDraftSelect"
+      >{{item.label}}</view>
+    </view>
+    <view class="start-hole-sheet__footer">
+      <view class="sheet-cancel-btn start-hole-sheet__btn-cancel" bindtap="closeStartHoleSheet">取消</view>
+      <view class="sheet-cancel-btn start-hole-sheet__btn-confirm" bindtap="confirmStartHoleSheet">确认</view>
+    </view>
+  </view>
 
 </view>

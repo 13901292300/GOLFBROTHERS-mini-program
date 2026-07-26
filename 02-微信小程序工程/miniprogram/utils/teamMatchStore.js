@@ -109,6 +109,67 @@ function normalizeScoreData(scoreData) {
   return scoreData;
 }
 
+/**
+ * 组级成绩桶：写回时必须同时保留字段，避免互相覆盖丢失。
+ * - scoresByPlayer：G1/G5 个人
+ * - teamScoresByEntity：Entity 组合（比杆）
+ * - scoresBySide：G6/G7/G8 比洞 Side（组合，非个人）
+ * - matchPlayMeta：G5–G8 比洞起始洞（Phase1-D，可选）
+ */
+function normalizeMatchPlayMeta(meta) {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const sh = Number(meta.startHole);
+  if (!Number.isFinite(sh) || sh < 1 || sh > 18) return null;
+  // manual 优先于 auto：手动设定后禁止被自动推断覆盖
+  const source = meta.source === 'manual' ? 'manual' : 'auto';
+  return {
+    startHole: Math.floor(sh),
+    source: source
+  };
+}
+
+function normalizeGroupScoreBucket(groupScore) {
+  const g = groupScore && typeof groupScore === 'object' && !Array.isArray(groupScore) ? groupScore : {};
+  const scoresByPlayer =
+    g.scoresByPlayer && typeof g.scoresByPlayer === 'object' && !Array.isArray(g.scoresByPlayer)
+      ? g.scoresByPlayer
+      : {};
+  const teamScoresByEntity = Array.isArray(g.teamScoresByEntity) ? g.teamScoresByEntity : [];
+  const scoresBySide =
+    g.scoresBySide && typeof g.scoresBySide === 'object' && !Array.isArray(g.scoresBySide)
+      ? g.scoresBySide
+      : {};
+  const matchPlayMeta = normalizeMatchPlayMeta(g.matchPlayMeta);
+  const out = {
+    scoresByPlayer: scoresByPlayer,
+    teamScoresByEntity: teamScoresByEntity,
+    scoresBySide: scoresBySide
+  };
+  if (matchPlayMeta) out.matchPlayMeta = matchPlayMeta;
+  return out;
+}
+
+/** 规范化单条 Side 成绩（不读成员个人分） */
+function normalizeSideScoreRecord(sideId, sideKey, record) {
+  const id = sideId != null ? String(sideId).trim() : '';
+  const rec = record && typeof record === 'object' && !Array.isArray(record) ? record : {};
+  const key =
+    sideKey === 'B' || sideKey === 'A'
+      ? sideKey
+      : rec.sideKey === 'B' || rec.sideKey === 'A'
+        ? rec.sideKey
+        : '';
+  return {
+    sideId: id || (rec.sideId != null ? String(rec.sideId).trim() : ''),
+    sideKey: key,
+    scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
+    putts: Array.isArray(rec.putts) ? rec.putts.slice() : [],
+    fairways: Array.isArray(rec.fairways) ? rec.fairways.slice() : [],
+    penalties: Array.isArray(rec.penalties) ? rec.penalties.slice() : [],
+    sands: Array.isArray(rec.sands) ? rec.sands.slice() : []
+  };
+}
+
 function normalizeStoredMatch(match) {
   if (!match || typeof match !== 'object') return match;
   if (!match.scoreData || typeof match.scoreData !== 'object' || Array.isArray(match.scoreData)) {
@@ -844,10 +905,13 @@ function migrateComboScoresToIndividualStroke(match, targetGameMode) {
       });
     });
 
+    const preserved = normalizeGroupScoreBucket(groupScore);
     out[gid] = {
       scoresByPlayer: scoresByPlayer,
-      teamScoresByEntity: []
+      teamScoresByEntity: [],
+      scoresBySide: preserved.scoresBySide
     };
+    if (preserved.matchPlayMeta) out[gid].matchPlayMeta = preserved.matchPlayMeta;
   });
 
   return out;
@@ -1343,6 +1407,9 @@ module.exports = {
   shouldMigrateComboScoresToIndividualStroke,
   shouldClearComboArtifactsForPersonalMatchPlay,
   migrateComboScoresToIndividualStroke,
+  normalizeGroupScoreBucket,
+  normalizeMatchPlayMeta,
+  normalizeSideScoreRecord,
   clearFormalGroupsOnMatch,
   clearFormalPairingsOnMatch,
   resolveGroupSlots,

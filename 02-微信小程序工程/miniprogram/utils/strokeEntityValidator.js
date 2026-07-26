@@ -66,6 +66,12 @@ function isG5MatchPlayMode(gameMode) {
   return !!G5_MATCH_PLAY_MODES[String(gameMode || '').trim()];
 }
 
+/** G5–G8 比洞看板/得分榜：统一判断（禁止各页再写赛制字符串） */
+function isMatchPlayBoardMode(gameMode) {
+  const mode = String(gameMode || '').trim();
+  return isG5MatchPlayMode(mode) || isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode);
+}
+
 /** G2/G3 比杆 + G6/G7 比洞（composition UI / Entity 构建） */
 function isG2G3FamilyMode(gameMode) {
   const mode = String(gameMode || '').trim();
@@ -706,6 +712,7 @@ module.exports = {
   isG5MatchPlayMode,
   isG6G7MatchPlayMode,
   isG8MatchPlayMode,
+  isMatchPlayBoardMode,
   isG2G3FamilyMode,
   isG4FamilyMode,
   validateG5MatchPlayPlayers,

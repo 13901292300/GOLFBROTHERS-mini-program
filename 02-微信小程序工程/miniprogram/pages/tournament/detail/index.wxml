@@ -45,6 +45,38 @@
     </view>
   </template>
 
+  <!-- G5–G8 得分榜摘要（流内 + 吸顶克隆共用）：红蓝总分行 + 文字摘要 -->
+  <template name="matchPlayScoreSummary">
+    <view class="mp-sb-score-summary">
+      <view class="mp-sb-progress">
+        <view class="mp-sb-progress__a">
+          <view class="mp-sb-progress__grid">
+            <view wx:for="{{[1,2,3,4,5,6,7,8,9,10,11,12,13,14]}}" wx:key="*this" class="mp-sb-progress__line"></view>
+          </view>
+          <view class="mp-sb-progress__score mp-sb-progress__score--a">
+            <text class="mp-sb-progress__name">{{matchPlayScoreboard.teamA.name}}</text>
+            <view class="mp-sb-progress__num-slot left">
+              <text class="mp-sb-progress__num">{{matchPlayScoreboard.teamA.score}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="mp-sb-score-divider"></view>
+        <view class="mp-sb-progress__b">
+          <view class="mp-sb-progress__grid">
+            <view wx:for="{{[1,2,3,4,5,6,7,8,9,10,11,12,13,14]}}" wx:key="*this" class="mp-sb-progress__line"></view>
+          </view>
+          <view class="mp-sb-progress__score mp-sb-progress__score--b">
+            <view class="mp-sb-progress__num-slot right">
+              <text class="mp-sb-progress__num">{{matchPlayScoreboard.teamB.score}}</text>
+            </view>
+            <text class="mp-sb-progress__name">{{matchPlayScoreboard.teamB.name}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="mp-sb-summary">{{matchPlayScoreboard.matchesCompleteText}}</view>
+    </view>
+  </template>
+
   <!-- Header -->
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
@@ -138,6 +170,14 @@
       class="register-ext-wrap register-ext-wrap--inflow"
     >
       <template is="registerExtensionStrip" data="{{registerTotalCount: registerTotalCount, registerSubTabs: registerSubTabs, activeRegisterSubTab: activeRegisterSubTab}}" />
+    </view>
+
+    <!-- G5–G8 得分榜摘要（得分榜 TAB）：独立层，紧随 TAB 之后，二级吸顶；卡片仍在下方滚动 -->
+    <view
+      wx:if="{{activeTab === 'leaderboard' && isMatchPlayScoreboard && matchPlayScoreboard}}"
+      class="mp-sb-summary-wrap mp-sb-summary-wrap--inflow"
+    >
+      <template is="matchPlayScoreSummary" data="{{matchPlayScoreboard: matchPlayScoreboard}}" />
     </view>
 
     <!-- Content -->
@@ -354,9 +394,201 @@
         </view>
       </block>
 
-      <!-- 领先榜 -->
+      <!-- 领先榜 / G5–G8 得分榜（mock UI） -->
       <block wx:if="{{activeTab === 'leaderboard'}}">
-        <view class="leaderboard-table-wrap">
+        <!-- G5–G8：得分榜 UI 复刻（仅 mock，不读真实成绩） -->
+        <block wx:if="{{isMatchPlayScoreboard && matchPlayScoreboard}}">
+          <view class="mp-sb-root">
+            <!-- 摘要区已上提至 TAB 下二级吸顶；此处仅滚动对阵卡片 -->
+            <view
+              wx:for="{{matchPlayScoreboard.matches}}"
+              wx:for-item="card"
+              wx:key="cardKey"
+              class="mp-sb-card mp-sb-match-card"
+            >
+              <!-- 状态层：winner-a / winner-b / all-square / not-started 互斥 -->
+              <view class="mp-sb-card__header mp-sb-status {{card.statusLayerClass || (card.winner === 'A' ? 'winner-a' : (card.winner === 'B' ? 'winner-b' : 'all-square'))}}">
+                <view class="mp-sb-status-layer">
+                  <view class="mp-sb-st-fill mp-sb-st-fill--a"></view>
+                  <view class="mp-sb-st-chevron mp-sb-st-chevron--a"></view>
+                  <view class="mp-sb-st-edge mp-sb-st-edge--b"></view>
+                  <view class="mp-sb-st-fill mp-sb-st-fill--b"></view>
+                  <view class="mp-sb-st-chevron mp-sb-st-chevron--b"></view>
+                  <view class="mp-sb-st-edge mp-sb-st-edge--a"></view>
+                  <view class="mp-sb-st-fill mp-sb-st-fill--as-l"></view>
+                  <view class="mp-sb-st-chevron mp-sb-st-chevron--as-l"></view>
+                  <view class="mp-sb-st-fill mp-sb-st-fill--as-r"></view>
+                  <view class="mp-sb-st-chevron mp-sb-st-chevron--as-r"></view>
+                </view>
+
+                <view class="mp-sb-content-layer">
+                  <view class="mp-sb-side mp-sb-side--left">
+                    <view class="mp-sb-side__content">
+                      <block wx:if="{{card.sideA.kind === 'pair'}}">
+                        <view class="mp-sb-side__identity mp-sb-side__identity--pair">
+                          <view class="mp-sb-pair">
+                            <image
+                              wx:for="{{card.sideA.members}}"
+                              wx:for-item="mem"
+                              wx:key="userId"
+                              class="mp-sb-pair__avatar"
+                              src="{{mem.avatar}}"
+                              mode="aspectFill"
+                            ></image>
+                          </view>
+                          <view class="mp-sb-side__names">
+                            <text
+                              wx:for="{{card.sideA.members}}"
+                              wx:for-item="mem"
+                              wx:key="userId"
+                              class="mp-sb-side__name"
+                            >{{mem.displayName}}</text>
+                          </view>
+                        </view>
+                      </block>
+                      <block wx:else>
+                        <view class="mp-sb-side__identity mp-sb-side__identity--single">
+                          <image
+                            wx:if="{{card.sideA.members[0].avatar}}"
+                            class="mp-sb-side__avatar"
+                            src="{{card.sideA.members[0].avatar}}"
+                            mode="aspectFill"
+                          ></image>
+                          <text class="mp-sb-side__name">{{card.sideA.members[0].displayName}}</text>
+                        </view>
+                      </block>
+                    </view>
+                  </view>
+
+                  <view class="mp-sb-center">
+                    <!-- 顶部：THRU / FINAL，固定位置 -->
+                    <view class="mp-sb-center__top">
+                      <text wx:if="{{card.phaseLabel}}" class="mp-sb-center__phase">{{card.phaseLabel}}</text>
+                    </view>
+                    <!-- 中部：比赛状态，高度可变化 -->
+                    <view class="mp-sb-center__mid">
+                      <view class="mp-sb-center__status {{card.statusLeadClass}}">
+                        <text class="mp-sb-center__main">{{card.statusMain}}</text>
+                        <text wx:if="{{card.statusSub}}" class="mp-sb-center__sub">{{card.statusSub}}</text>
+                      </view>
+                    </view>
+                    <!-- 底部：DETAILS，固定贴底，不参与 flex -->
+                    <view class="mp-sb-center__bot">
+                      <view
+                        class="mp-sb-center__btn"
+                        data-id="{{card.id}}"
+                        catchtap="toggleMatchPlayScoreboardCard"
+                      >
+                        <text>Details</text>
+                        <text class="mp-sb-center__chevron {{card.expanded ? 'is-open' : ''}}">▾</text>
+                      </view>
+                    </view>
+                  </view>
+
+                  <view class="mp-sb-side mp-sb-side--right">
+                    <view class="mp-sb-side__content mp-sb-side__content--right">
+                      <block wx:if="{{card.sideB.kind === 'pair'}}">
+                        <view class="mp-sb-side__identity mp-sb-side__identity--pair">
+                          <view class="mp-sb-pair">
+                            <image
+                              wx:for="{{card.sideB.members}}"
+                              wx:for-item="mem"
+                              wx:key="userId"
+                              class="mp-sb-pair__avatar"
+                              src="{{mem.avatar}}"
+                              mode="aspectFill"
+                            ></image>
+                          </view>
+                          <view class="mp-sb-side__names">
+                            <text
+                              wx:for="{{card.sideB.members}}"
+                              wx:for-item="mem"
+                              wx:key="userId"
+                              class="mp-sb-side__name"
+                            >{{mem.displayName}}</text>
+                          </view>
+                        </view>
+                      </block>
+                      <block wx:else>
+                        <view class="mp-sb-side__identity mp-sb-side__identity--single">
+                          <image
+                            wx:if="{{card.sideB.members[0].avatar}}"
+                            class="mp-sb-side__avatar"
+                            src="{{card.sideB.members[0].avatar}}"
+                            mode="aspectFill"
+                          ></image>
+                          <text class="mp-sb-side__name">{{card.sideB.members[0].displayName}}</text>
+                        </view>
+                      </block>
+                    </view>
+                  </view>
+                </view>
+              </view>
+
+              <view wx:if="{{card.expanded}}" class="mp-sb-card__body">
+                <!-- 未开始：固定提示，不渲染洞表 -->
+                <view wx:if="{{card.detailsMode === 'comingSoon'}}" class="mp-sb-coming-soon">
+                  <text class="mp-sb-coming-soon__text">Match details coming soon.....</text>
+                </view>
+                <block wx:else>
+                  <!-- 18 洞状态圆点：数字固定 Match Hole 1–18；颜色按比赛序洞胜负 -->
+                  <view class="mp-sb-holes">
+                    <view
+                      wx:for="{{card.holeDots}}"
+                      wx:for-item="dot"
+                      wx:key="n"
+                      class="mp-sb-dot {{dot.cls}}"
+                    >{{dot.n}}</view>
+                  </view>
+                  <!-- 左列固定标签 + 右侧洞数据横向滚动（不用 sticky） -->
+                  <view class="mp-sb-table">
+                    <view class="mp-sb-table__labels">
+                      <view class="mp-sb-cell mp-sb-cell--label">Hole</view>
+                      <view class="mp-sb-cell mp-sb-cell--label">Par</view>
+                      <view class="mp-sb-cell mp-sb-cell--label">Status</view>
+                      <view class="mp-sb-cell mp-sb-cell--label">Score</view>
+                    </view>
+                    <scroll-view scroll-x class="mp-sb-table__scroll" enable-flex>
+                      <view class="mp-sb-table__data">
+                        <view class="mp-sb-row">
+                          <!-- HOLE：displayHole（如 A5/B1），列序从 startHole 环绕 -->
+                          <view wx:for="{{card.holeLabels}}" wx:for-item="h" wx:for-index="hi" wx:key="hi" class="mp-sb-cell">{{h}}</view>
+                        </view>
+                        <view class="mp-sb-row">
+                          <view wx:for="{{card.pars}}" wx:for-item="p" wx:for-index="pi" wx:key="pi" class="mp-sb-cell">{{p}}</view>
+                        </view>
+                        <view class="mp-sb-row">
+                          <view wx:for="{{card.statusCells}}" wx:for-item="st" wx:key="index" class="mp-sb-cell {{st.cls}}">{{st.text}}</view>
+                        </view>
+                        <view class="mp-sb-row">
+                          <view
+                            wx:for="{{card.scoreCells}}"
+                            wx:for-item="sc"
+                            wx:key="index"
+                            class="mp-sb-cell mp-sb-split {{sc.splitCls}}"
+                          >
+                            <text class="mp-sb-split__a">{{sc.a}}</text>
+                            <text class="mp-sb-split__b">{{sc.b}}</text>
+                          </view>
+                        </view>
+                      </view>
+                    </scroll-view>
+                  </view>
+                  <!-- 与 G1–G4 领先榜展开同一图片源 scorecardAdImage / .sc-ad -->
+                  <image
+                    wx:if="{{scorecardAdImage}}"
+                    class="sc-ad mp-sb-sc-ad"
+                    src="{{scorecardAdImage}}"
+                    mode="widthFix"
+                  ></image>
+                </block>
+              </view>
+            </view>
+          </view>
+        </block>
+
+        <!-- G1–G4：原领先榜 -->
+        <view wx:else class="leaderboard-table-wrap">
           <view class="leaderboard-view-label">{{leaderboardViewLabel}}</view>
           <block wx:if="{{leaderboardView === 'team' || leaderboardMode === 'team'}}">
             <!-- 净杆分队：POS TEAM PLAYER THRU NET SCORE -->
@@ -697,6 +929,15 @@
     style="top:{{stickyRegisterExtTop}}px;"
   >
     <template is="registerExtensionStrip" data="{{registerTotalCount: registerTotalCount, registerSubTabs: registerSubTabs, activeRegisterSubTab: activeRegisterSubTab}}" />
+  </view>
+
+  <!-- 吸顶 G5–G8 得分榜摘要：二级 sticky，紧贴 TAB 下方 -->
+  <view
+    wx:if="{{activeTab === 'leaderboard' && isMatchPlayScoreboard && matchPlayScoreboard}}"
+    class="mp-sb-summary-wrap mp-sb-summary-wrap--fixed {{isStickyMpSbSummary ? 'mp-sb-summary-wrap--show' : 'mp-sb-summary-wrap--hide'}}"
+    style="top:{{stickyMpSbSummaryTop}}px;"
+  >
+    <template is="matchPlayScoreSummary" data="{{matchPlayScoreboard: matchPlayScoreboard}}" />
   </view>
 
   <!-- 出发表 TAB：透明悬浮快捷按钮（仅当"第一组卡片完全进入视口"时显示，固定底部，不参与布局流） -->

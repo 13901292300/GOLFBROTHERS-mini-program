@@ -35,9 +35,14 @@ const {
 const {
   resolveStrokeKind,
   resolveGameMode,
-  isG5MatchPlayMode
+  isG5MatchPlayMode,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode,
+  isMatchPlayBoardMode
 } = require('../../../utils/strokeEntityValidator.js');
+const matchStatus = require('../../../utils/matchStatus.js');
 const contactStore = require('../../../utils/contactStore.js');
+const { buildMatchPlayResultSummary } = require('../../../utils/matchPlayResult.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
 const DEFAULT_SCORECARD_AD_IMAGE =
@@ -114,8 +119,301 @@ const TOURNAMENT_TABS = {
 };
 
 // 无 matchId / 未知状态时，沿用进行中 TAB 集，保持既有演示页视觉不变
-function resolveTournamentTabs(status) {
-  return TOURNAMENT_TABS[status] || TOURNAMENT_TABS.ongoing;
+// G5–G8 比洞：进行中「领先榜」文案改为「得分榜」（仅 label，id/排序/点击不变）
+function resolveTournamentTabs(status, match) {
+  const base = TOURNAMENT_TABS[status] || TOURNAMENT_TABS.ongoing;
+  const tabs = base.map((tab) => Object.assign({}, tab));
+  if (isMatchPlayBoardMode(resolveGameMode(match))) {
+    tabs.forEach((tab) => {
+      if (tab && tab.id === 'leaderboard' && tab.label === '领先榜') {
+        tab.label = '得分榜';
+      }
+    });
+  }
+  return tabs;
+}
+
+/**
+ * UI 层：比洞 18 洞展示顺序（从 startHole 起环绕）。
+ * 只生成洞号序列，不改 scores / scoreData / matchPlayMeta / 胜负计算。
+ * @param {number} startHole 1–18，无效则按 1
+ * @returns {number[]} 例 startHole=10 → [10..18,1..9]
+ */
+function buildMatchPlayHoleTimeline(startHole) {
+  const n = Number(startHole);
+  let start = 1;
+  if (Number.isFinite(n)) {
+    const h = Math.floor(n);
+    if (h >= 1 && h <= 18) start = h;
+  }
+  const timeline = [];
+  for (let i = 0; i < 18; i++) {
+    timeline.push(((start - 1 + i) % 18) + 1);
+  }
+  return timeline;
+}
+
+/** actualHole 1–9 → A1–A9；10–18 → B1–B9（仅 HOLE 行文案） */
+function formatMatchPlayDisplayHole(actualHole) {
+  const h = Number(actualHole);
+  if (!Number.isFinite(h) || h < 1 || h > 18) return '';
+  if (h <= 9) return 'A' + h;
+  return 'B' + (h - 9);
+}
+
+/**
+ * UI 层列定义：displayHole（HOLE 行）+ actualHole（读成绩/PAR/胜负）
+ * @returns {Array<{ displayHole: string, actualHole: number }>}
+ */
+function buildMatchPlayHoleTimelineColumns(startHole) {
+  return buildMatchPlayHoleTimeline(startHole).map((actualHole) => ({
+    displayHole: formatMatchPlayDisplayHole(actualHole),
+    actualHole: actualHole
+  }));
+}
+
+/**
+ * G5–G8 得分榜 UI 演示数据（仅展示，禁止读 scoreData / leaderboard）
+ * 结构对齐原型「比洞赛得分榜展示界面.html」TAB 以下区域
+ */
+function buildMockMatchPlayScoreboard() {
+  const holeNums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+  const holeLabelsDefault = holeNums.map((n) => formatMatchPlayDisplayHole(n));
+  const pars = [4, 5, 4, 3, 4, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 5];
+  const mkDot = (n, result) => ({
+    n: n,
+    result: result || '',
+    cls:
+      result === 'A'
+        ? 'mp-sb-dot--a'
+        : result === 'B'
+          ? 'mp-sb-dot--b'
+          : result === 'AS'
+            ? 'mp-sb-dot--as'
+            : 'empty'
+  });
+  const mkStatus = (text, lead) => ({
+    text: text === 'A/S' ? 'TIED' : text,
+    cls:
+      lead === 'A' ? 'mp-sb-st--up' : lead === 'B' ? 'mp-sb-st--dn' : lead === 'AS' ? 'mp-sb-st--as' : ''
+  });
+  const mkScore = (a, b, result) => {
+    const pending = a == null && b == null;
+    return {
+      a: pending ? '-' : String(a),
+      b: pending ? '-' : String(b),
+      result: result || '',
+      splitCls: pending
+        ? 'mp-sb-split--pending'
+        : result === 'A'
+          ? 'mp-sb-split--a'
+          : result === 'B'
+            ? 'mp-sb-split--b'
+            : result === 'AS'
+              ? 'mp-sb-split--tie'
+              : '',
+      empty: false,
+      pending: pending
+    };
+  };
+
+  return {
+    teamA: {
+      name: '红队',
+      score: 13,
+      flagUrl: 'https://flagcdn.com/w40/cn.png'
+    },
+    teamB: {
+      name: '蓝队',
+      score: 15,
+      flagUrl: 'https://flagcdn.com/w40/us.png'
+    },
+    progressAPercent: 46,
+    finishedMatches: 2,
+    totalMatches: 3,
+    matchesCompleteText: '2/3 MATCHES COMPLETE',
+    matches: [
+      {
+        id: 'mock-mp-1',
+        expanded: false,
+        winner: 'A',
+        phaseLabel: 'FINAL',
+        statusMain: '1',
+        statusSub: 'UP',
+        statusLeadClass: 'mp-sb-lead--a',
+        statusLayerClass: 'winner-a',
+        sideA: {
+          kind: 'single',
+          members: [
+            {
+              userId: 'mock-a1',
+              displayName: 'Cameron Young',
+              nickname: 'Cameron Young',
+              name: 'Cameron Young',
+              avatar: mockAvatars.avatarByIndex(0)
+            }
+          ]
+        },
+        sideB: {
+          kind: 'single',
+          members: [
+            {
+              userId: 'mock-b1',
+              displayName: 'Justin Rose',
+              nickname: 'Justin Rose',
+              name: 'Justin Rose',
+              avatar: mockAvatars.avatarByIndex(1)
+            }
+          ]
+        },
+        holeDots: [
+          mkDot(1, 'A'), mkDot(2, 'AS'), mkDot(3, 'B'), mkDot(4, 'AS'),
+          mkDot(5, 'B'), mkDot(6, 'A'), mkDot(7, 'A'), mkDot(8, 'AS'),
+          mkDot(9, 'AS'), mkDot(10, 'A'), mkDot(11, 'AS'), mkDot(12, 'A'),
+          mkDot(13, 'B'), mkDot(14, 'B'), mkDot(15, 'AS'), mkDot(16, 'B'),
+          mkDot(17, 'AS'), mkDot(18, 'A')
+        ],
+        holeLabels: holeLabelsDefault.slice(),
+        pars: pars.slice(),
+        statusCells: [
+          mkStatus('1UP', 'A'), mkStatus('1UP', 'A'), mkStatus('A/S', 'AS'),
+          mkStatus('1UP', 'A'), mkStatus('1UP', 'A'), mkStatus('2UP', 'A'),
+          mkStatus('3UP', 'A'), mkStatus('2UP', 'A'), mkStatus('A/S', 'AS'),
+          mkStatus('1DN', 'B'), mkStatus('2DN', 'B'), mkStatus('A/S', 'AS'),
+          mkStatus('1UP', 'A'), mkStatus('1UP', 'A'), mkStatus('1UP', 'A'),
+          mkStatus('2UP', 'A'), mkStatus('1UP', 'A'), mkStatus('1UP', 'A')
+        ],
+        scoreCells: [
+          mkScore(4, 5, 'A'), mkScore(5, 5, 'AS'), mkScore(5, 4, 'B'),
+          mkScore(3, 4, 'A'), mkScore(4, 4, 'AS'), mkScore(4, 5, 'A'),
+          mkScore(3, 4, 'A'), mkScore(4, 3, 'B'), mkScore(4, 4, 'AS'),
+          mkScore(5, 4, 'B'), mkScore(5, 4, 'B'), mkScore(3, 4, 'A'),
+          mkScore(4, 5, 'A'), mkScore(4, 3, 'B'), mkScore(4, 4, 'AS'),
+          mkScore(3, 4, 'A'), mkScore(4, 4, 'AS'), mkScore(5, 4, 'A')
+        ]
+      },
+      {
+        id: 'mock-mp-2',
+        expanded: false,
+        winner: 'B',
+        phaseLabel: 'FINAL',
+        statusMain: '3',
+        statusSub: '&2',
+        statusLeadClass: 'mp-sb-lead--b',
+        statusLayerClass: 'winner-b',
+        sideA: {
+          kind: 'pair',
+          members: [
+            {
+              userId: 'mock-a2',
+              displayName: '大雷',
+              nickname: '大雷',
+              name: '大雷',
+              avatar: mockAvatars.avatarByIndex(2)
+            },
+            {
+              userId: 'mock-a3',
+              displayName: 'Alex',
+              nickname: 'Alex',
+              name: 'Alex',
+              avatar: mockAvatars.avatarByIndex(3)
+            }
+          ]
+        },
+        sideB: {
+          kind: 'pair',
+          members: [
+            {
+              userId: 'mock-b2',
+              displayName: 'Rahm',
+              nickname: 'Rahm',
+              name: 'Rahm',
+              avatar: mockAvatars.avatarByIndex(4)
+            },
+            {
+              userId: 'mock-b3',
+              displayName: 'Scheffler',
+              nickname: 'Scheffler',
+              name: 'Scheffler',
+              avatar: mockAvatars.avatarByIndex(5)
+            }
+          ]
+        },
+        holeDots: [
+          mkDot(1, 'B'), mkDot(2, 'B'), mkDot(3, 'AS'), mkDot(4, 'B'),
+          mkDot(5, 'A'), mkDot(6, 'B'), mkDot(7, 'B'), mkDot(8, 'AS'),
+          mkDot(9, 'AS'), mkDot(10, 'B'), mkDot(11, 'B'), mkDot(12, 'B'),
+          mkDot(13, 'A'), mkDot(14, 'B'), mkDot(15, 'B'), mkDot(16, 'B'),
+          mkDot(17, ''), mkDot(18, '')
+        ],
+        holeLabels: holeLabelsDefault.slice(),
+        pars: pars.slice(),
+        statusCells: [
+          mkStatus('1DN', 'B'), mkStatus('2DN', 'B'), mkStatus('2DN', 'B'),
+          mkStatus('3DN', 'B'), mkStatus('2DN', 'B'), mkStatus('3DN', 'B'),
+          mkStatus('4DN', 'B'), mkStatus('4DN', 'B'), mkStatus('4DN', 'B'),
+          mkStatus('5DN', 'B'), mkStatus('6DN', 'B'), mkStatus('7DN', 'B'),
+          mkStatus('6DN', 'B'), mkStatus('5DN', 'B'), mkStatus('4DN', 'B'),
+          mkStatus('3DN', 'B'), mkStatus('-', ''), mkStatus('-', '')
+        ],
+        scoreCells: [
+          mkScore(5, 4, 'B'), mkScore(6, 5, 'B'), mkScore(4, 4, 'AS'),
+          mkScore(4, 3, 'B'), mkScore(4, 5, 'A'), mkScore(5, 4, 'B'),
+          mkScore(5, 4, 'B'), mkScore(3, 3, 'AS'), mkScore(4, 4, 'AS'),
+          mkScore(6, 5, 'B'), mkScore(5, 4, 'B'), mkScore(4, 3, 'B'),
+          mkScore(3, 4, 'A'), mkScore(5, 4, 'B'), mkScore(5, 4, 'B'),
+          mkScore(4, 3, 'B'), mkScore(null, null, ''), mkScore(null, null, '')
+        ]
+      },
+      {
+        id: 'mock-mp-3',
+        expanded: false,
+        winner: 'AS',
+        phaseLabel: 'THRU 12',
+        statusMain: 'TIED',
+        statusSub: '',
+        statusLeadClass: 'mp-sb-lead--as',
+        statusLayerClass: 'all-square',
+        sideA: {
+          kind: 'single',
+          members: [
+            {
+              userId: 'mock-a4',
+              displayName: 'Brooks Koepka',
+              nickname: 'Brooks Koepka',
+              name: 'Brooks Koepka',
+              avatar: mockAvatars.avatarByIndex(6)
+            }
+          ]
+        },
+        sideB: {
+          kind: 'single',
+          members: [
+            {
+              userId: 'mock-b4',
+              displayName: 'Ludvig Aberg',
+              nickname: 'Ludvig Aberg',
+              name: 'Ludvig Aberg',
+              avatar: mockAvatars.avatarByIndex(7)
+            }
+          ]
+        },
+        holeDots: holeNums.map((n) =>
+          n <= 12 ? mkDot(n, n % 3 === 0 ? 'AS' : n % 2 === 0 ? 'B' : 'A') : mkDot(n, '')
+        ),
+        holeLabels: holeLabelsDefault.slice(),
+        pars: pars.slice(),
+        statusCells: holeNums.map((n) =>
+          n <= 12 ? mkStatus(n % 4 === 0 ? 'A/S' : '1UP', n % 4 === 0 ? 'AS' : 'A') : mkStatus('-', '')
+        ),
+        scoreCells: holeNums.map((n) =>
+          n <= 12
+            ? mkScore(4, n % 2 === 0 ? 5 : 4, n % 3 === 0 ? 'AS' : n % 2 === 0 ? 'A' : 'B')
+            : mkScore(null, null, '')
+        )
+      }
+    ]
+  };
 }
 
 /* ===== 讨论区 ===== */
@@ -256,10 +554,10 @@ function createEmptyGroupPlayer(position) {
 }
 
 /**
- * Patch-02C3A / G5 Phase1-C：进记分页 mode 分流
- * 1) gameMode=个人比杆赛 / 个人比洞赛 → individual_stroke（同级优先，避免残留 scoreEntities）
+ * Patch-02C3A / G5 Phase1-C / G6–G8 Phase1-A：进记分页 mode 分流
+ * 1) gameMode=个人比杆赛 / 个人比洞赛 / G6/G7/G8 比洞 → individual_stroke（同级优先，避免残留 scoreEntities）
  * 2) scoreEntities[groupId] 非空 → stroke_entity
- * 3) gameMode 为 G2/G3/G4 → stroke_entity
+ * 3) gameMode 为 G2/G3/G4 比杆 → stroke_entity
  * 4) 否则 individual_stroke
  */
 function resolveTournamentScorePageMode(match, groupId) {
@@ -268,6 +566,10 @@ function resolveTournamentScorePageMode(match, groupId) {
   ).trim();
   // G1 / G5：个人记分路径；禁止因残留 scoreEntities 落入 stroke_entity
   if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) {
+    return 'individual_stroke';
+  }
+  // G6/G7/G8：比洞复用 G5 记分看板；禁止落入 stroke_entity / G2–G4 比杆页
+  if (isG6G7MatchPlayMode(gameMode) || isG8MatchPlayMode(gameMode)) {
     return 'individual_stroke';
   }
   const gid = groupId != null ? String(groupId) : '';
@@ -364,6 +666,10 @@ Page({
     isStickyRegisterExt: false,
     registerExtOffsetTop: 0,
     stickyRegisterExtTop: 142,
+    // G5–G8 得分榜摘要：二级 sticky（紧贴 TAB 下方）
+    isStickyMpSbSummary: false,
+    mpSbSummaryOffsetTop: 0,
+    stickyMpSbSummaryTop: 142,
     tabShowLeftIndicator: false,
     tabShowRightIndicator: false,
     tabHScrollLeft: 0,
@@ -478,6 +784,9 @@ Page({
     // 领先榜
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
     scorePanel: 'technical', // technical | quick
+    /** G5–G8：得分榜 UI 开关（仅展示 mock，不读真实成绩） */
+    isMatchPlayScoreboard: false,
+    matchPlayScoreboard: null,
     leaderboard: [],
     leaderboardDefaultMode: 'player', // player | team，仅表示默认展示倾向
     leaderboardMode: 'player', // player | team，当前页面展示模式
@@ -829,7 +1138,8 @@ Page({
     const match = this._resolveMatchData(matchId);
     this._syncTournamentHoleLayout(match);
     const lifecycle = this._getMatchLifecycle(match);
-    const tabs = resolveTournamentTabs(lifecycle.status);
+    const tabs = resolveTournamentTabs(lifecycle.status, match);
+    const isMatchPlayScoreboard = isMatchPlayBoardMode(resolveGameMode(match));
     const leaderboardViewOptions = this._resolveLeaderboardViewOptions(match);
     const leaderboardDefaultView = this._resolveLeaderboardDefaultView(match);
     const leaderboardMode = this._leaderboardViewToMode(leaderboardDefaultView);
@@ -843,6 +1153,10 @@ Page({
       scorecardCourseTitle: scorecardCourseTitle,
       matchStatus: lifecycle,
       tabs: tabs,
+      isMatchPlayScoreboard: isMatchPlayScoreboard,
+      matchPlayScoreboard: isMatchPlayScoreboard
+        ? this._buildMatchPlayScoreboard(match, { resetExpanded: true })
+        : null,
       // 首次进入统一落到 tabs[0]（各状态首项均为 details）
       activeTab: tabs[0].id,
       leaderboardDefaultMode: leaderboardMode,
@@ -870,7 +1184,8 @@ Page({
     if (!match) return;
     this._syncTournamentHoleLayout(match);
     const lifecycle = this._getMatchLifecycle(match);
-    const tabs = resolveTournamentTabs(lifecycle.status);
+    const tabs = resolveTournamentTabs(lifecycle.status, match);
+    const isMatchPlayScoreboard = isMatchPlayBoardMode(resolveGameMode(match));
     let activeTab = this.data.activeTab;
     if (!tabs.some((t) => t.id === activeTab)) {
       activeTab = tabs[0].id;
@@ -888,12 +1203,20 @@ Page({
     const netAvailable = this._hasLeaderboardNetScore(match);
     const leaderboardScoreType =
       this.data.leaderboardScoreType === 'net' && netAvailable ? 'net' : 'gross';
+    // 从记分页返回：折叠得分榜 Details（onHide 标 + 栈内 score 页双保险）
+    const resetMatchPlayExpanded =
+      !!this._resetMatchPlayExpandedOnReturn || this._isReturningFromScorePage();
+    this._resetMatchPlayExpandedOnReturn = false;
     this.setData(Object.assign({
       match: this._mapMatchToView(match),
       courseName: match.courseName || '',
       scorecardCourseTitle: scorecardCourseTitle,
       matchStatus: lifecycle,
       tabs: tabs,
+      isMatchPlayScoreboard: isMatchPlayScoreboard,
+      matchPlayScoreboard: isMatchPlayScoreboard
+        ? this._buildMatchPlayScoreboard(match, { resetExpanded: resetMatchPlayExpanded })
+        : null,
       activeTab: activeTab,
       leaderboardDefaultMode: this._leaderboardViewToMode(leaderboardDefaultView),
       leaderboardMode: leaderboardMode,
@@ -913,6 +1236,11 @@ Page({
     }, this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
       this.applyMoreAccess();
       this.refreshPartnerSection();
+      if (activeTab === 'leaderboard' && isMatchPlayScoreboard) {
+        wx.nextTick(() => this.measureMpSbSummaryTop());
+      } else if (this.data.isStickyMpSbSummary) {
+        this.setData({ isStickyMpSbSummary: false });
+      }
     });
   },
 
@@ -1161,6 +1489,691 @@ Page({
       }
       return card;
     });
+  },
+
+  /**
+   * G5–G8 得分榜：顶部总分真实计算；身份区用 match.groups + 分队归属；
+   * 卡片洞走势等仍用 mock。不读 leaderboard / stats / mockScore。
+   * @param {object} [opts]
+   * @param {boolean} [opts.resetExpanded] true=全部折叠（从记分页返回）；默认保留已有 expanded
+   */
+  _buildMatchPlayScoreboard(match, opts) {
+    const board = buildMockMatchPlayScoreboard();
+    const summary = this._buildMatchPlayTeamScoreSummary(match);
+    const teamScores = {
+      teamA: Object.assign({}, board.teamA, {
+        score: this._formatMatchPlayTeamScore(summary.redScore)
+      }),
+      teamB: Object.assign({}, board.teamB, {
+        score: this._formatMatchPlayTeamScore(summary.blueScore)
+      })
+    };
+    const groups = match && Array.isArray(match.groups) ? match.groups : [];
+    const resetExpanded = !!(opts && opts.resetExpanded);
+    // 普通刷新：保留 expanded；从记分页返回：全部折叠
+    const prevExpandedById = {};
+    const prevBoard = this.data && this.data.matchPlayScoreboard;
+    if (!resetExpanded && prevBoard && Array.isArray(prevBoard.matches)) {
+      prevBoard.matches.forEach((m) => {
+        if (!m || m.id == null) return;
+        prevExpandedById[String(m.id)] = !!m.expanded;
+      });
+    }
+    const applyCardMeta = (card, index, groupId) => {
+      if (!card) return card;
+      const id = card.id != null ? String(card.id) : '';
+      const gid = groupId != null && String(groupId).trim() !== '' ? String(groupId) : 'mock';
+      const cardKey = gid + '_' + index;
+      const expanded = resetExpanded
+        ? false
+        : !!(id && Object.prototype.hasOwnProperty.call(prevExpandedById, id) && prevExpandedById[id]);
+      return Object.assign({}, card, { expanded: expanded, cardKey: cardKey });
+    };
+    if (!groups.length || !board || !Array.isArray(board.matches) || !board.matches.length) {
+      const mockMatches = (board.matches || []).map((m, index) =>
+        applyCardMeta(Object.assign({}, m, { detailsMode: 'scorecard' }), index, 'mock')
+      );
+      // 无真实分组：保留 mock 摘要
+      const finishedMatches =
+        board.finishedMatches != null ? board.finishedMatches : 0;
+      const totalMatches =
+        board.totalMatches != null ? board.totalMatches : mockMatches.length;
+      return Object.assign({}, board, teamScores, {
+        finishedMatches: finishedMatches,
+        totalMatches: totalMatches,
+        matchesCompleteText:
+          board.matchesCompleteText ||
+          finishedMatches + '/' + totalMatches + ' MATCHES COMPLETE',
+        matches: mockMatches
+      });
+    }
+    const lookup = this._buildGroupPlayerLookup(match);
+    const teamIds = this._resolveMatchPlaySideTeamIds(match);
+    const gameMode = resolveGameMode(match);
+    const isG5 = isG5MatchPlayMode(gameMode);
+    const templates = board.matches;
+    const emptyDetail = {
+      holeColumns: [],
+      holeLabels: [],
+      pars: [],
+      statusCells: [],
+      scoreCells: [],
+      holeDots: []
+    };
+    const matches = groups.map((group, index) => {
+      const base = Object.assign({}, templates[index] || templates[templates.length - 1]);
+      const sides = this._buildMatchPlayCardSides(match, group, lookup, teamIds);
+      const groupId = group && group.groupId != null ? String(group.groupId) : '';
+      const id = groupId || base.id;
+      const centerStatus = this._buildMatchPlayCardCenterStatus(match, group, teamIds, isG5);
+      const started = this._hasMatchPlayGroupAnyHoleScore(match, group, teamIds, isG5);
+      const detailsMode = started ? 'scorecard' : 'comingSoon';
+      const detailTable = started
+        ? this._buildMatchPlayCardDetailTable(match, group, teamIds, isG5)
+        : emptyDetail;
+      return applyCardMeta(Object.assign({}, base, {
+        id: id,
+        detailsMode: detailsMode,
+        sideA: sides.sideA,
+        sideB: sides.sideB,
+        phaseLabel: centerStatus.phaseLabel,
+        statusMain: centerStatus.statusMain,
+        statusSub: centerStatus.statusSub,
+        statusLeadClass: centerStatus.statusLeadClass,
+        statusLayerClass: centerStatus.statusLayerClass,
+        holeColumns: detailTable.holeColumns,
+        holeLabels: detailTable.holeLabels,
+        pars: detailTable.pars,
+        statusCells: detailTable.statusCells,
+        scoreCells: detailTable.scoreCells,
+        holeDots: detailTable.holeDots
+      }), index, groupId || 'mock');
+    });
+    const pkProgress = this._buildMatchPlayPkProgressSummary(match, groups, teamIds, isG5);
+    return Object.assign({}, board, teamScores, pkProgress, { matches: matches });
+  },
+
+  /**
+   * 顶部摘要：finishedMatches/totalMatches MATCHES COMPLETE
+   * 分子仅统计 buildMatchPlayResultSummary().status === 'finished'（FINAL）。
+   */
+  _buildMatchPlayPkProgressSummary(match, groups, teamIds, isG5) {
+    const list = Array.isArray(groups) ? groups : [];
+    const totalMatches = list.length;
+    let finishedMatches = 0;
+    if (match && totalMatches > 0) {
+      for (let i = 0; i < list.length; i++) {
+        const group = list[i];
+        const sideScores = this._resolveMatchPlayGroupSideScores(match, group, teamIds, isG5);
+        const startHole = this._resolveMatchPlayCardStartHole(match, group);
+        const summary = this._buildMatchPlayResultSummary(
+          sideScores.scoresA,
+          sideScores.scoresB,
+          startHole
+        );
+        if (summary && summary.status === 'finished') finishedMatches += 1;
+      }
+    }
+    return {
+      finishedMatches: finishedMatches,
+      totalMatches: totalMatches,
+      matchesCompleteText: finishedMatches + '/' + totalMatches + ' MATCHES COMPLETE'
+    };
+  },
+
+  /** 该组是否已有任一有效双方洞成绩（未开始 → Details comingSoon） */
+  _hasMatchPlayGroupAnyHoleScore(match, group, teamIds, isG5) {
+    const sideScores = this._resolveMatchPlayGroupSideScores(match, group, teamIds, isG5);
+    const scoresA = sideScores.scoresA || [];
+    const scoresB = sideScores.scoresB || [];
+    const len = Math.max(scoresA.length, scoresB.length, 18);
+    for (let hi = 0; hi < len; hi++) {
+      if (
+        this._isMatchPlayFilledScore(scoresA[hi]) &&
+        this._isMatchPlayFilledScore(scoresB[hi])
+      ) {
+        const sa = Number(scoresA[hi]);
+        const sb = Number(scoresB[hi]);
+        if (Number.isFinite(sa) && Number.isFinite(sb)) return true;
+      }
+    }
+    return false;
+  },
+
+  /**
+   * 对阵卡中间文案 + 状态层 class。
+   * 未开始：VS；进行中：THRU + UP/DN/TIED；
+   * FINAL / 数学提前结束：与记分页 TOTAL 共用 buildMatchPlayResultSummary（n + &m）。
+   */
+  _buildMatchPlayCardCenterStatus(match, group, teamIds, isG5) {
+    const sideScores = this._resolveMatchPlayGroupSideScores(match, group, teamIds, isG5);
+    const scoresA = sideScores.scoresA;
+    const scoresB = sideScores.scoresB;
+    const startHole = this._resolveMatchPlayCardStartHole(match, group);
+    const summary = this._buildMatchPlayResultSummary(scoresA, scoresB, startHole);
+    const thru = summary.thru;
+
+    const completed = !!(
+      matchStatus.isGroupConfirmedFinished(group && group.status) ||
+      matchStatus.getMatchStatus(group, { source: 'groups' }).isCompleted
+    );
+    const notStarted = !completed && thru === 0;
+
+    if (notStarted) {
+      return {
+        phaseLabel: '',
+        statusMain: 'VS',
+        statusSub: '',
+        statusLeadClass: 'mp-sb-lead--vs',
+        statusLayerClass: 'not-started'
+      };
+    }
+
+    // 数学结束（领先>剩余）或组已确认结束：顶部显示 FINAL（Details 仍按真实录入洞展示）
+    const matchPlayOver = completed || !!summary.clinched;
+    const phaseLabel = matchPlayOver ? 'FINAL' : 'THRU ' + thru;
+    // FINAL / 已 clinch：用统一摘要 n + &m；进行中未结束仍用 UP/DN
+    const useResultSummary = matchPlayOver;
+    let statusMain = summary.statusMain;
+    let statusSub = summary.statusSub;
+    if (!useResultSummary) {
+      if (summary.leader === 'A') {
+        statusMain = String(summary.up);
+        statusSub = 'UP';
+      } else if (summary.leader === 'B') {
+        statusMain = String(summary.up);
+        statusSub = 'DN';
+      } else {
+        statusMain = 'TIED';
+        statusSub = '';
+      }
+    }
+
+    let statusLeadClass = 'mp-sb-lead--as';
+    let statusLayerClass = 'all-square';
+    if (summary.leader === 'A') {
+      statusLeadClass = 'mp-sb-lead--a';
+      statusLayerClass = 'winner-a';
+    } else if (summary.leader === 'B') {
+      statusLeadClass = 'mp-sb-lead--b';
+      statusLayerClass = 'winner-b';
+    }
+
+    return {
+      phaseLabel: phaseLabel,
+      statusMain: statusMain,
+      statusSub: statusSub,
+      statusLeadClass: statusLeadClass,
+      statusLayerClass: statusLayerClass
+    };
+  },
+
+  /**
+   * 与记分页 TOTAL 共用：Match Play Result 摘要（展示层）。
+   * 附加 status：finished = 数学结束（clinch）或比赛序已打满 18 洞（FINAL）。
+   * 不改动 util 内胜负/杆数计算。
+   */
+  _buildMatchPlayResultSummary(scoresA, scoresB, startHole) {
+    const summary = buildMatchPlayResultSummary(scoresA, scoresB, startHole) || {};
+    const thru = Number(summary.thru) || 0;
+    const status = summary.clinched || thru >= 18 ? 'finished' : 'open';
+    return Object.assign({}, summary, { status: status });
+  },
+
+  /** 读取组 startHole：仅 matchPlayMeta，未设默认 1（不写盘、不推断覆盖） */
+  _resolveMatchPlayCardStartHole(match, group) {
+    const groupId = group && group.groupId != null ? String(group.groupId).trim() : '';
+    const bucket = this._readMatchPlayGroupScoreBucket(match, groupId);
+    const meta =
+      typeof teamMatchStore.normalizeMatchPlayMeta === 'function'
+        ? teamMatchStore.normalizeMatchPlayMeta(bucket.matchPlayMeta)
+        : null;
+    return meta && meta.startHole ? meta.startHole : 1;
+  },
+
+  /**
+   * Details 表展示层：列序 = startHole 环绕；
+   * HOLE=displayHole（A5/B1…）；PAR/STATUS/SCORE 按 actualHole 读数据；
+   * 顶部圆点文案 = Match Hole 1–18（不受真实洞号影响），颜色仍按比赛序洞结果。
+   */
+  _buildMatchPlayCardDetailTable(match, group, teamIds, isG5) {
+    const sideScores = this._resolveMatchPlayGroupSideScores(match, group, teamIds, isG5);
+    const scoresA = sideScores.scoresA;
+    const scoresB = sideScores.scoresB;
+    const startHole = this._resolveMatchPlayCardStartHole(match, group);
+    const holeColumns = buildMatchPlayHoleTimelineColumns(startHole);
+    const pars18 = this._getMatchHolePars(match);
+    const holeLabels = [];
+    const pars = [];
+    const statusCells = [];
+    const scoreCells = [];
+    const holeDots = [];
+    let aWins = 0;
+    let bWins = 0;
+
+    for (let ci = 0; ci < holeColumns.length; ci++) {
+      const col = holeColumns[ci];
+      const actualHole = col.actualHole;
+      const hi = actualHole - 1;
+      holeLabels.push(col.displayHole);
+      const parVal = pars18[hi];
+      pars.push(parVal != null && parVal !== '' ? parVal : '-');
+
+      let holeResult = '';
+      let dotCls = 'empty';
+      const rawA = scoresA[hi];
+      const rawB = scoresB[hi];
+      const bothFilled =
+        this._isMatchPlayFilledScore(rawA) && this._isMatchPlayFilledScore(rawB);
+      let sa = NaN;
+      let sb = NaN;
+      if (bothFilled) {
+        sa = Number(rawA);
+        sb = Number(rawB);
+        if (Number.isFinite(sa) && Number.isFinite(sb)) {
+          if (sa < sb) {
+            holeResult = 'A';
+            dotCls = 'mp-sb-dot--a';
+            aWins += 1;
+          } else if (sb < sa) {
+            holeResult = 'B';
+            dotCls = 'mp-sb-dot--b';
+            bWins += 1;
+          } else {
+            holeResult = 'AS';
+            dotCls = 'mp-sb-dot--as';
+          }
+        }
+      }
+
+      if (bothFilled && Number.isFinite(sa) && Number.isFinite(sb)) {
+        const diff = aWins - bWins;
+        let leader = 'AS';
+        let up = 0;
+        if (diff > 0) {
+          leader = 'A';
+          up = diff;
+        } else if (diff < 0) {
+          leader = 'B';
+          up = -diff;
+        }
+        const text =
+          leader === 'AS' ? 'TIED' : leader === 'B' ? up + 'DN' : up + 'UP';
+        const cls =
+          leader === 'A' ? 'mp-sb-st--up' : leader === 'B' ? 'mp-sb-st--dn' : 'mp-sb-st--as';
+        statusCells.push({ text: text, cls: cls });
+        scoreCells.push({
+          a: String(sa),
+          b: String(sb),
+          result: holeResult,
+          splitCls:
+            holeResult === 'A'
+              ? 'mp-sb-split--a'
+              : holeResult === 'B'
+                ? 'mp-sb-split--b'
+                : 'mp-sb-split--tie',
+          empty: false
+        });
+      } else {
+        statusCells.push({ text: '-', cls: '' });
+        scoreCells.push({
+          a: '-',
+          b: '-',
+          result: '',
+          splitCls: 'mp-sb-split--pending',
+          empty: false,
+          pending: true
+        });
+      }
+
+      // 圆点数字 = 比赛序号（1–18），颜色 = 本 Match Hole 对应 actualHole 胜负
+      holeDots.push({
+        n: ci + 1,
+        displayHole: col.displayHole,
+        actualHole: actualHole,
+        result: holeResult,
+        cls: dotCls
+      });
+    }
+
+    return {
+      holeColumns: holeColumns,
+      holeLabels: holeLabels,
+      pars: pars,
+      statusCells: statusCells,
+      scoreCells: scoreCells,
+      holeDots: holeDots
+    };
+  },
+
+  /**
+   * 顶部红蓝总分：每组 1 分；复用记分页比洞胜负累计规则（Side 洞胜差）。
+   * 红胜 +1 / 蓝胜 +1 / 平局各 +0.5；无已决洞的组不计分。
+   * @returns {{ redScore: number, blueScore: number }}
+   */
+  _buildMatchPlayTeamScoreSummary(match) {
+    let redScore = 0;
+    let blueScore = 0;
+    if (!match || typeof match !== 'object') {
+      return { redScore: 0, blueScore: 0 };
+    }
+    const groups = Array.isArray(match.groups) ? match.groups : [];
+    if (!groups.length) {
+      return { redScore: 0, blueScore: 0 };
+    }
+    const gameMode = resolveGameMode(match);
+    const isG5 = isG5MatchPlayMode(gameMode);
+    const teamIds = this._resolveMatchPlaySideTeamIds(match);
+
+    groups.forEach((group) => {
+      const leader = this._resolveMatchPlayGroupFinalLeader(match, group, teamIds, isG5);
+      if (leader === 'A') redScore += 1;
+      else if (leader === 'B') blueScore += 1;
+      else if (leader === 'AS') {
+        redScore += 0.5;
+        blueScore += 0.5;
+      }
+    });
+
+    return { redScore: redScore, blueScore: blueScore };
+  },
+
+  /** 整数 → "3"；半分 → "3.5" */
+  _formatMatchPlayTeamScore(score) {
+    const n = Number(score);
+    if (!Number.isFinite(n)) return '0';
+    const halfSteps = Math.round(n * 2);
+    const rounded = halfSteps / 2;
+    if (halfSteps % 2 === 0) return String(Math.round(rounded));
+    return String(rounded);
+  },
+
+  _isMatchPlayFilledScore(raw) {
+    return raw !== null && raw !== undefined && raw !== '';
+  },
+
+  _normalizeMatchPlayStartHole(startHole) {
+    const n = Number(startHole);
+    if (!Number.isFinite(n)) return 1;
+    const h = Math.floor(n);
+    return h >= 1 && h <= 18 ? h : 1;
+  },
+
+  _buildMatchPlayHoleOrder(startHole) {
+    const startIdx = this._normalizeMatchPlayStartHole(startHole) - 1;
+    const order = [];
+    for (let i = 0; i < 18; i++) order.push((startIdx + i) % 18);
+    return order;
+  },
+
+  _readMatchPlayGroupScoreBucket(match, groupId) {
+    const gid = groupId != null ? String(groupId).trim() : '';
+    const scoreData =
+      match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+        ? match.scoreData
+        : null;
+    const raw = gid && scoreData && scoreData[gid] && typeof scoreData[gid] === 'object'
+      ? scoreData[gid]
+      : null;
+    if (typeof teamMatchStore.normalizeGroupScoreBucket === 'function') {
+      return teamMatchStore.normalizeGroupScoreBucket(raw);
+    }
+    return {
+      scoresByPlayer: {},
+      scoresBySide: {},
+      matchPlayMeta: null
+    };
+  },
+
+  /**
+   * 解析一组双方 Side.scores（对齐记分页：G5 member / G6–G8 combo scoresBySide）
+   */
+  _resolveMatchPlayGroupSideScores(match, group, teamIds, isG5) {
+    const groupId = group && group.groupId != null ? String(group.groupId).trim() : '';
+    const bucket = this._readMatchPlayGroupScoreBucket(match, groupId);
+    const teamAId = teamIds && teamIds.teamAId ? String(teamIds.teamAId) : '';
+    const teamBId = teamIds && teamIds.teamBId ? String(teamIds.teamBId) : '';
+
+    const users =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    const teamIdByUser = {};
+    users.forEach((user) => {
+      const uid = this._resolveAnyPlayerId(user);
+      if (!uid) return;
+      const teamId =
+        user.matchTeamId != null && String(user.matchTeamId).trim() !== ''
+          ? String(user.matchTeamId).trim()
+          : user.groupId != null && String(user.groupId).trim() !== ''
+            ? String(user.groupId).trim()
+            : '';
+      if (teamId) teamIdByUser[uid] = teamId;
+    });
+
+    const filled = (Array.isArray(group && group.players) ? group.players : [])
+      .map((p) => ({
+        userId: this._resolveAnyPlayerId(p),
+        position: Number(p && (p.position != null ? p.position : p.slotIndex)) || 0,
+        raw: p
+      }))
+      .filter((p) => p.userId)
+      .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+
+    const playersA = [];
+    const playersB = [];
+    filled.forEach((p) => {
+      const tid = teamIdByUser[p.userId] || '';
+      if (teamAId && tid === teamAId) playersA.push(p);
+      else if (teamBId && tid === teamBId) playersB.push(p);
+    });
+    if (!playersA.length && !playersB.length && filled.length >= 2) {
+      playersA.push(filled[0]);
+      playersB.push(filled[1]);
+    }
+
+    let scoresA = [];
+    let scoresB = [];
+    if (isG5) {
+      const scoresByPlayer =
+        bucket.scoresByPlayer && typeof bucket.scoresByPlayer === 'object'
+          ? bucket.scoresByPlayer
+          : {};
+      const recA = playersA[0]
+        ? this._resolveScoresByPlayerRecord(scoresByPlayer, playersA[0].raw, playersA[0].userId)
+        : null;
+      const recB = playersB[0]
+        ? this._resolveScoresByPlayerRecord(scoresByPlayer, playersB[0].raw, playersB[0].userId)
+        : null;
+      scoresA = recA && Array.isArray(recA.scores) ? recA.scores.slice() : [];
+      scoresB = recB && Array.isArray(recB.scores) ? recB.scores.slice() : [];
+    } else {
+      const scoresBySide =
+        bucket.scoresBySide && typeof bucket.scoresBySide === 'object' ? bucket.scoresBySide : {};
+      const rawA =
+        (teamAId && scoresBySide[teamAId]) || scoresBySide.A || scoresBySide.a || null;
+      const rawB =
+        (teamBId && scoresBySide[teamBId]) || scoresBySide.B || scoresBySide.b || null;
+      const normA =
+        typeof teamMatchStore.normalizeSideScoreRecord === 'function'
+          ? teamMatchStore.normalizeSideScoreRecord(teamAId || 'A', 'A', rawA)
+          : rawA;
+      const normB =
+        typeof teamMatchStore.normalizeSideScoreRecord === 'function'
+          ? teamMatchStore.normalizeSideScoreRecord(teamBId || 'B', 'B', rawB)
+          : rawB;
+      scoresA = normA && Array.isArray(normA.scores) ? normA.scores.slice() : [];
+      scoresB = normB && Array.isArray(normB.scores) ? normB.scores.slice() : [];
+    }
+
+    let startHole = 1;
+    const meta =
+      typeof teamMatchStore.normalizeMatchPlayMeta === 'function'
+        ? teamMatchStore.normalizeMatchPlayMeta(bucket.matchPlayMeta)
+        : null;
+    if (meta && meta.startHole) {
+      startHole = meta.startHole;
+    } else {
+      for (let hi = 0; hi < 18; hi++) {
+        if (!this._isMatchPlayFilledScore(scoresA[hi]) || !this._isMatchPlayFilledScore(scoresB[hi])) {
+          continue;
+        }
+        const sa = Number(scoresA[hi]);
+        const sb = Number(scoresB[hi]);
+        if (!Number.isFinite(sa) || !Number.isFinite(sb)) continue;
+        startHole = hi + 1;
+        break;
+      }
+    }
+
+    return { scoresA: scoresA, scoresB: scoresB, startHole: startHole };
+  },
+
+  /**
+   * 一组最终领先方：对齐 score/buildMatchStatusView 的洞胜累计。
+   * @returns {'A'|'B'|'AS'|null} null = 尚无已决洞，不计分
+   */
+  _resolveMatchPlayGroupFinalLeader(match, group, teamIds, isG5) {
+    const sideScores = this._resolveMatchPlayGroupSideScores(match, group, teamIds, isG5);
+    const scoresA = sideScores.scoresA;
+    const scoresB = sideScores.scoresB;
+    const holeOrder = this._buildMatchPlayHoleOrder(sideScores.startHole);
+    let aWins = 0;
+    let bWins = 0;
+    let decided = 0;
+
+    for (let oi = 0; oi < holeOrder.length; oi++) {
+      const hi = holeOrder[oi];
+      const rawA = scoresA[hi];
+      const rawB = scoresB[hi];
+      if (!this._isMatchPlayFilledScore(rawA) || !this._isMatchPlayFilledScore(rawB)) continue;
+      const sa = Number(rawA);
+      const sb = Number(rawB);
+      if (!Number.isFinite(sa) || !Number.isFinite(sb)) continue;
+      decided += 1;
+      if (sa < sb) aWins += 1;
+      else if (sb < sa) bWins += 1;
+    }
+
+    if (!decided) return null;
+    const diff = aWins - bWins;
+    if (diff > 0) return 'A';
+    if (diff < 0) return 'B';
+    return 'AS';
+  },
+
+  /** teamGroups[0]=红/A，teamGroups[1]=蓝/B */
+  _resolveMatchPlaySideTeamIds(match) {
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    const teamAId =
+      teamGroups[0] && teamGroups[0].id != null ? String(teamGroups[0].id).trim() : '';
+    const teamBId =
+      teamGroups[1] && teamGroups[1].id != null ? String(teamGroups[1].id).trim() : '';
+    return { teamAId: teamAId, teamBId: teamBId };
+  },
+
+  _resolveMatchPlayMemberDisplayName(userId, slotPlayer, playerLookup) {
+    const id = userId != null ? String(userId).trim() : '';
+    const src = (playerLookup && id && playerLookup[id]) || null;
+    const fromSrc = src
+      ? String(src.displayName || src.nickname || src.name || '').trim()
+      : '';
+    if (fromSrc) return fromSrc;
+    const fromSlot = this._resolveAnyPlayerNickname(slotPlayer);
+    if (fromSlot) return fromSlot;
+    return '未知球员';
+  },
+
+  _buildMatchPlaySideMember(userId, slotPlayer, playerLookup) {
+    const id = userId != null ? String(userId).trim() : '';
+    const src = (playerLookup && id && playerLookup[id]) || null;
+    const displayName = this._resolveMatchPlayMemberDisplayName(id, slotPlayer, playerLookup);
+    return {
+      userId: id,
+      displayName: displayName,
+      nickname: (src && src.nickname) || displayName,
+      name: (src && src.name) || displayName,
+      avatar: this._resolveGroupedPlayerAvatar(id, slotPlayer, playerLookup)
+    };
+  },
+
+  _buildMatchPlaySideView(members) {
+    const list = Array.isArray(members) ? members.filter((m) => m && m.userId) : [];
+    return {
+      kind: list.length >= 2 ? 'pair' : 'single',
+      members: list
+    };
+  },
+
+  /**
+   * 从 group.players + registerInfo 分队归属拆 A/B side（红/蓝）
+   */
+  _buildMatchPlayCardSides(match, group, playerLookup, teamIds) {
+    const emptySide = { kind: 'single', members: [] };
+    const players = Array.isArray(group && group.players) ? group.players : [];
+    const filled = players
+      .map((p) => ({
+        userId: this._resolveAnyPlayerId(p),
+        position: Number(p && (p.position != null ? p.position : p.slotIndex)) || 0,
+        raw: p
+      }))
+      .filter((p) => p.userId)
+      .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+
+    if (!filled.length) {
+      return { sideA: emptySide, sideB: emptySide };
+    }
+
+    const teamAId = teamIds && teamIds.teamAId ? String(teamIds.teamAId) : '';
+    const teamBId = teamIds && teamIds.teamBId ? String(teamIds.teamBId) : '';
+    const teamIdByUser = {};
+    const users =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    users.forEach((user) => {
+      const uid = this._resolveAnyPlayerId(user);
+      if (!uid) return;
+      const teamId =
+        user.matchTeamId != null && String(user.matchTeamId).trim() !== ''
+          ? String(user.matchTeamId).trim()
+          : user.groupId != null && String(user.groupId).trim() !== ''
+            ? String(user.groupId).trim()
+            : '';
+      if (teamId) teamIdByUser[uid] = teamId;
+    });
+
+    const membersA = [];
+    const membersB = [];
+    filled.forEach((p) => {
+      const member = this._buildMatchPlaySideMember(p.userId, p.raw, playerLookup);
+      const teamId = teamIdByUser[p.userId] || '';
+      if (teamAId && teamId === teamAId) membersA.push(member);
+      else if (teamBId && teamId === teamBId) membersB.push(member);
+    });
+
+    // 无分队归属时按座位顺序拆边（G5: 1v1；四人: 前二红后二蓝）
+    if (!membersA.length && !membersB.length) {
+      if (filled.length <= 2) {
+        filled.forEach((p, idx) => {
+          const member = this._buildMatchPlaySideMember(p.userId, p.raw, playerLookup);
+          if (idx === 0) membersA.push(member);
+          else membersB.push(member);
+        });
+      } else {
+        const mid = Math.ceil(filled.length / 2);
+        filled.forEach((p, idx) => {
+          const member = this._buildMatchPlaySideMember(p.userId, p.raw, playerLookup);
+          if (idx < mid) membersA.push(member);
+          else membersB.push(member);
+        });
+      }
+    }
+
+    return {
+      sideA: this._buildMatchPlaySideView(membersA),
+      sideB: this._buildMatchPlaySideView(membersB)
+    };
   },
 
   /**
@@ -2425,8 +3438,30 @@ Page({
     });
   },
 
+  /**
+   * 是否从记分页返回 / 栈内仍有 score 页。
+   * navigateBack 时 onShow 可能早于 score.onUnload，栈顶或次顶仍可能是 pages/score/index。
+   */
+  _isReturningFromScorePage() {
+    try {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      if (!pages || !pages.length) return false;
+      for (let i = pages.length - 1; i >= 0; i--) {
+        const route = pages[i] && pages[i].route != null ? String(pages[i].route) : '';
+        if (route === 'pages/score/index' || route.indexOf('pages/score/index') >= 0) {
+          return true;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  },
+
   onShow() {
     this.applyTheme(getApp().getTheme());
+    // 不单靠 onHide：onShow 再认一次栈内 score，供 refresh 折叠 Details
+    if (this._isReturningFromScorePage()) {
+      this._resetMatchPlayExpandedOnReturn = true;
+    }
     // 从「修改比赛」返回时刷新赛事基础信息，不强制重置 TAB
     if (this.data.matchId && this._detailReady) {
       this.refreshMatchData(this.data.matchId);
@@ -2449,6 +3484,9 @@ Page({
     wx.nextTick(() => this.measureTabOverflow());
     if (this.data.activeTab === 'discussion') wx.nextTick(() => this.measureWatchersTop());
     if (this.data.activeTab === 'register') wx.nextTick(() => this.measureRegisterExtTop());
+    if (this.data.activeTab === 'leaderboard' && this.data.isMatchPlayScoreboard) {
+      wx.nextTick(() => this.measureMpSbSummaryTop());
+    }
     if (this.data.activeTab === 'groups') wx.nextTick(() => this.computeGroupsPanelMinHeight());
     wx.nextTick(() => this._refreshFabHitZones());
   },
@@ -2456,6 +3494,15 @@ Page({
   onHide() {
     this.disconnectTeeObserver();
     if (this.data.moreFabDragging) this.setData({ moreFabDragging: false });
+    // 前往记分页时打标：返回 onShow/refresh 时折叠得分榜 Details
+    try {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      const top = pages.length ? pages[pages.length - 1] : null;
+      const route = top && top.route ? String(top.route) : '';
+      if (route === 'pages/score/index' || route.indexOf('pages/score/index') >= 0) {
+        this._resetMatchPlayExpandedOnReturn = true;
+      }
+    } catch (e) { /* ignore */ }
   },
 
   onUnload() {
@@ -2615,7 +3662,8 @@ Page({
       headerBarStyle: header.headerBarStyle,
       headerTotalHeight,
       stickyWatchersTop: headerTotalHeight + tabBarHeight,
-      stickyRegisterExtTop: headerTotalHeight + tabBarHeight
+      stickyRegisterExtTop: headerTotalHeight + tabBarHeight,
+      stickyMpSbSummaryTop: headerTotalHeight + tabBarHeight
     });
   },
 
@@ -2639,15 +3687,20 @@ Page({
           if (top > 0) {
             const patch = { tabOffsetTop: top };
             if (tabRect.height > 0) {
+              const stickySecondaryTop = (this.data.headerTotalHeight || 0) + tabRect.height;
               patch.tabBarHeight = tabRect.height;
-              patch.stickyWatchersTop = (this.data.headerTotalHeight || 0) + tabRect.height;
-              patch.stickyRegisterExtTop = (this.data.headerTotalHeight || 0) + tabRect.height;
+              patch.stickyWatchersTop = stickySecondaryTop;
+              patch.stickyRegisterExtTop = stickySecondaryTop;
+              patch.stickyMpSbSummaryTop = stickySecondaryTop;
             }
             this.setData(patch);
             this._syncStickyByScroll(scrollOff.scrollTop || 0);
             this.updateTabContentSpacer();
             if (this.data.activeTab === 'discussion') this.measureWatchersTop();
             if (this.data.activeTab === 'register') this.measureRegisterExtTop();
+            if (this.data.activeTab === 'leaderboard' && this.data.isMatchPlayScoreboard) {
+              this.measureMpSbSummaryTop();
+            }
             if (this.data.activeTab === 'groups') this.computeGroupsPanelMinHeight();
             wx.nextTick(() => this.measureTabOverflow());
           }
@@ -2718,6 +3771,32 @@ Page({
             if (top > 0) {
               this.setData({ watchersOffsetTop: top });
               this._syncStickyWatchersByScroll(scrollOff.scrollTop || 0);
+            }
+          }
+        });
+    });
+  },
+
+  // 测量 G5–G8 得分榜摘要相对滚动内容顶部的偏移（二级吸顶，紧贴 TAB 下方）
+  measureMpSbSummaryTop() {
+    if (this.data.activeTab !== 'leaderboard' || !this.data.isMatchPlayScoreboard) return;
+    wx.nextTick(() => {
+      this.createSelectorQuery()
+        .select('.mp-sb-summary-wrap--inflow')
+        .boundingClientRect()
+        .select('.detail-scroll')
+        .boundingClientRect()
+        .select('.detail-scroll')
+        .scrollOffset()
+        .exec((res) => {
+          const sRect = res && res[0];
+          const scrollRect = res && res[1];
+          const scrollOff = res && res[2];
+          if (sRect && scrollRect && scrollOff && sRect.height > 0) {
+            const top = sRect.top - scrollRect.top + scrollOff.scrollTop;
+            if (top > 0) {
+              this.setData({ mpSbSummaryOffsetTop: top });
+              this._syncStickyMpSbSummaryByScroll(scrollOff.scrollTop || 0);
             }
           }
         });
@@ -2843,12 +3922,15 @@ Page({
       .boundingClientRect()
       .select('.register-ext-wrap--inflow')
       .boundingClientRect()
+      .select('.mp-sb-summary-wrap--inflow')
+      .boundingClientRect()
       .exec((res) => {
         const view = res && res[0];
         const main = res && res[1];
         const tabBar = res && res[2];
         const watchersBar = res && res[3];
         const registerExt = res && res[4];
+        const mpSbSummary = res && res[5];
         if (!view || !main || !tabBar) return;
         const viewportH = view.height || 0;
         const spacerNow = this.data.contentSpacerHeight || 0;
@@ -2862,6 +3944,13 @@ Page({
           secondaryH = watchersBar.height;
         } else if (tab === 'register' && registerExt && registerExt.height > 0) {
           secondaryH = registerExt.height;
+        } else if (
+          tab === 'leaderboard' &&
+          this.data.isMatchPlayScoreboard &&
+          mpSbSummary &&
+          mpSbSummary.height > 0
+        ) {
+          secondaryH = mpSbSummary.height;
         }
         const minH = Math.max(0, Math.ceil(viewportH - tabH - secondaryH));
         const stickyThresholdOffset = 8; // 轻微 buffer，确保可稳定触发吸顶
@@ -2874,6 +3963,9 @@ Page({
         if (Object.keys(patch).length) {
           this.setData(patch, () => {
             if (tab === 'discussion') this.measureWatchersTop();
+            if (tab === 'leaderboard' && this.data.isMatchPlayScoreboard) {
+              this.measureMpSbSummaryTop();
+            }
           });
         }
       });
@@ -2894,6 +3986,10 @@ Page({
     const registerExtSticky = this._calcStickyRegisterExt(scrollTop, sticky);
     if (registerExtSticky !== this.data.isStickyRegisterExt) {
       patch.isStickyRegisterExt = registerExtSticky;
+    }
+    const mpSbSummarySticky = this._calcStickyMpSbSummary(scrollTop, sticky);
+    if (mpSbSummarySticky !== this.data.isStickyMpSbSummary) {
+      patch.isStickyMpSbSummary = mpSbSummarySticky;
     }
     if (this.data.activeTab === 'register' || this.data.activeTab === 'groups') {
       const hideCTA = this._calcHideRegisterCTA(scrollTop, sticky);
@@ -2975,6 +4071,21 @@ Page({
     }
   },
 
+  _calcStickyMpSbSummary(scrollTop, isStickyTab) {
+    if (this.data.activeTab !== 'leaderboard' || !this.data.isMatchPlayScoreboard) return false;
+    if (!isStickyTab) return false;
+    const summaryThreshold = this.data.mpSbSummaryOffsetTop || 0;
+    const stickyTop = this.data.stickyMpSbSummaryTop || 0;
+    return summaryThreshold > 0 && scrollTop >= summaryThreshold - stickyTop;
+  },
+
+  _syncStickyMpSbSummaryByScroll(scrollTop) {
+    const sticky = this._calcStickyMpSbSummary(scrollTop, this.data.isStickyTab);
+    if (sticky !== this.data.isStickyMpSbSummary) {
+      this.setData({ isStickyMpSbSummary: sticky });
+    }
+  },
+
   onScroll(e) {
     const scrollTop = e.detail.scrollTop || 0;
     // 先同步吸顶状态；吸顶后再由 _syncStickyByScroll 按内容是否溢出钳制列表
@@ -2998,6 +4109,9 @@ Page({
     if (tab !== 'register' && this.data.isStickyRegisterExt) {
       patch.isStickyRegisterExt = false;
     }
+    if (!(tab === 'leaderboard' && this.data.isMatchPlayScoreboard) && this.data.isStickyMpSbSummary) {
+      patch.isStickyMpSbSummary = false;
+    }
     if (tab !== 'register') {
       patch.registrationContentLocked = false;
       patch.registrationStickySpacerHeight = 0;
@@ -3011,6 +4125,10 @@ Page({
       if (tab === 'discussion') this.measureWatchersTop();
       if (tab === 'register') {
         this.measureRegisterExtTop();
+        this._syncStickyByScroll(this.data.scrollYState || 0);
+      }
+      if (tab === 'leaderboard' && this.data.isMatchPlayScoreboard) {
+        this.measureMpSbSummaryTop();
         this._syncStickyByScroll(this.data.scrollYState || 0);
       }
       if (tab === 'groups') {
@@ -4839,11 +5957,22 @@ Page({
 
   /**
    * LIVE 出发表：是否显示球员分队标签（仅展示，不改分组/成绩数据）
-   * showTeamLabel = teamCount >= 3 || (teamCount === 2 && hasTeamPK)
+   * - G5–G8 比洞：永远两队天然 PK → teamCount === 2 即显示
+   * - 其他赛制：teamCount >= 3 || (teamCount === 2 && hasTeamPK)
    */
   _shouldShowTeeSheetTeamLabel(match) {
     const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
     const teamCount = teamGroups.length;
+    const gameMode = String(
+      (match && (match.gameMode || match.selectedGameMode)) || ''
+    );
+    const isG578MatchPlay =
+      isG5MatchPlayMode(gameMode) ||
+      isG6G7MatchPlayMode(gameMode) ||
+      isG8MatchPlayMode(gameMode);
+    if (isG578MatchPlay) {
+      return teamCount === 2;
+    }
     const hasTeamPK = this._isTeamCompetitionEnabled(match);
     return teamCount >= 3 || (teamCount === 2 && hasTeamPK);
   },
@@ -4886,6 +6015,72 @@ Page({
     return match.peoriaResult.status === 'generated';
   },
 
+  /**
+   * G5–G8 出发表出发洞优先级（仅展示）：
+   * 1) scoreData[groupId].matchPlayMeta.startHole（normalize）
+   * 2) scoreData[groupId].matchPlayMeta.startHole（原始有效 1–18）
+   * 3) 创建阶段 group.startHole
+   */
+  _resolveTeeSheetMatchPlayStartHole(match, groupId, group) {
+    const gid = groupId != null ? String(groupId).trim() : '';
+    const bucket = this._readMatchPlayGroupScoreBucket(match, gid);
+    const normalized =
+      typeof teamMatchStore.normalizeMatchPlayMeta === 'function'
+        ? teamMatchStore.normalizeMatchPlayMeta(bucket.matchPlayMeta)
+        : null;
+    if (normalized && normalized.startHole) return normalized.startHole;
+    const rawMeta = bucket && bucket.matchPlayMeta;
+    if (rawMeta && rawMeta.startHole != null && rawMeta.startHole !== '') {
+      const n = Number(rawMeta.startHole);
+      if (Number.isFinite(n)) {
+        const h = Math.floor(n);
+        if (h >= 1 && h <= 18) return h;
+      }
+    }
+    return teeSheetManage.resolveGroupStartHole(group);
+  },
+
+  /** G5–G8：出发表 meta 行洞号用 A1–B9（与 Details HOLE 一致） */
+  _formatMatchPlayTeeMetaLine(teeTime, startHole) {
+    const t =
+      typeof teeSheetManage.normalizeTeeTime === 'function'
+        ? teeSheetManage.normalizeTeeTime(teeTime)
+        : String(teeTime || '').trim();
+    const label = formatMatchPlayDisplayHole(startHole);
+    if (t && label) return t + ' · ' + label + '出发';
+    if (t) return t + ' · 待分配';
+    if (label) return label + '出发';
+    return '待分配';
+  },
+
+  /** G5–G8：用实际 matchPlayMeta 起始洞覆盖出发表卡片展示（不写盘） */
+  _applyMatchPlayStartHoleToTeeGroups(match, teeGroups) {
+    if (!match || !isMatchPlayBoardMode(resolveGameMode(match))) {
+      return teeGroups || [];
+    }
+    const list = Array.isArray(teeGroups) ? teeGroups : [];
+    const groups = Array.isArray(match.groups) ? match.groups : [];
+    const groupById = {};
+    groups.forEach((g, index) => {
+      const id = g && g.groupId != null ? String(g.groupId) : '';
+      if (id) groupById[id] = g;
+      else groupById['group-' + (index + 1)] = g;
+    });
+    return list.map((tg, index) => {
+      if (!tg) return tg;
+      const gid = tg.groupId != null ? String(tg.groupId) : tg.id != null ? String(tg.id) : '';
+      const group = groupById[gid] || groups[index] || null;
+      const startHole = this._resolveTeeSheetMatchPlayStartHole(match, gid, group);
+      const holeLabel = formatMatchPlayDisplayHole(startHole);
+      return Object.assign({}, tg, {
+        startHole: startHole,
+        hole: holeLabel ? holeLabel + '出发' : '待分配',
+        teeMetaLine: this._formatMatchPlayTeeMetaLine(tg.teeTime, startHole),
+        hasTeeInfo: !!(tg.teeTime || startHole != null)
+      });
+    });
+  },
+
   refreshGroupsDerived() {
     this._syncTournamentHoleLayout();
     groupsStore.ensureInitialized();
@@ -4903,6 +6098,7 @@ Page({
           source: 'match'
         });
         teeGroups = this._mergeTeeSheetPlayerTeeInfo(match, teeGroups, playerLookup);
+        teeGroups = this._applyMatchPlayStartHoleToTeeGroups(match, teeGroups);
       } else {
         teeGroups = [];
       }
@@ -5124,6 +6320,82 @@ Page({
   },
 
   // 点击领先榜球员行：在该行下方展开/收起逐洞详情（一次仅一个）
+  /** G5–G8 得分榜：展开/收起 Details（手风琴：同时仅一张展开） */
+  toggleMatchPlayScoreboardCard(e) {
+    const id = e && e.currentTarget && e.currentTarget.dataset
+      ? String(e.currentTarget.dataset.id || '')
+      : '';
+    const board = this.data.matchPlayScoreboard;
+    if (!id || !board || !Array.isArray(board.matches)) return;
+    const target = board.matches.find((m) => m && String(m.id) === id);
+    const willExpand = !(target && target.expanded);
+
+    // 折叠：只改 expanded
+    if (!willExpand) {
+      const matches = board.matches.map((m) => {
+        if (!m) return m;
+        return Object.assign({}, m, { expanded: false });
+      });
+      this.setData({
+        matchPlayScoreboard: Object.assign({}, board, { matches: matches })
+      });
+      return;
+    }
+
+    // 未开始：不重拉 scoreData，直接展开 comingSoon 提示
+    if (target && target.detailsMode === 'comingSoon') {
+      const matchesSoon = board.matches.map((m) => {
+        if (!m) return m;
+        return Object.assign({}, m, {
+          expanded: String(m.id) === id
+        });
+      });
+      this.setData({
+        matchPlayScoreboard: Object.assign({}, board, { matches: matchesSoon })
+      });
+      return;
+    }
+
+    // 展开 scorecard：从 store 重拉当前组 detailTable
+    let detailPatch = null;
+    const matchId = this.data.matchId || '';
+    const match = matchId ? this._resolveMatchData(matchId) : null;
+    if (match && Array.isArray(match.groups)) {
+      const group =
+        match.groups.find((g) => g && String(g.groupId) === id) || null;
+      if (group) {
+        const teamIds = this._resolveMatchPlaySideTeamIds(match);
+        const isG5 = isG5MatchPlayMode(resolveGameMode(match));
+        const detailTable = this._buildMatchPlayCardDetailTable(
+          match,
+          group,
+          teamIds,
+          isG5
+        );
+        detailPatch = {
+          holeColumns: detailTable.holeColumns,
+          holeLabels: detailTable.holeLabels,
+          pars: detailTable.pars,
+          statusCells: detailTable.statusCells,
+          scoreCells: detailTable.scoreCells,
+          holeDots: detailTable.holeDots,
+          detailsMode: 'scorecard'
+        };
+      }
+    }
+
+    const matches = board.matches.map((m) => {
+      if (!m) return m;
+      if (String(m.id) !== id) {
+        return Object.assign({}, m, { expanded: false });
+      }
+      return Object.assign({}, m, detailPatch || {}, { expanded: true });
+    });
+    this.setData({
+      matchPlayScoreboard: Object.assign({}, board, { matches: matches })
+    });
+  },
+
   toggleScorecard(e) {
     if (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.mode === 'team') {
       const key = e.currentTarget.dataset.index != null ? String(e.currentTarget.dataset.index) : '';
@@ -6684,7 +7956,7 @@ Page({
       return;
     }
     const playerLookup = this._buildGroupPlayerLookup(match);
-    const teeGroups = Array.isArray(match.groups) && match.groups.length
+    let teeGroups = Array.isArray(match.groups) && match.groups.length
       ? this._mergeTeeSheetPlayerTeeInfo(
           match,
           teeSheetManage.buildTeeSheetTabView(match, {
@@ -6694,6 +7966,7 @@ Page({
           playerLookup
         )
       : [];
+    teeGroups = this._applyMatchPlayStartHoleToTeeGroups(match, teeGroups);
     this.setData(
       Object.assign(this._buildGroupsTabStatePatch(match), {
         teeGroups: teeGroups

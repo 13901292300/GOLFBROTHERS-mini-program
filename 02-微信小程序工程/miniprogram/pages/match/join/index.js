@@ -4,6 +4,11 @@ const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const userIdentityAlias = require('../../../utils/userIdentityAlias.js');
 const gameStore = require('../../../utils/gameStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
+const {
+  isG5MatchPlayMode,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode
+} = require('../../../utils/strokeEntityValidator.js');
 
 const PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
 
@@ -40,12 +45,22 @@ function isSameUserIdentity(leftUserId, rightUserId) {
 }
 
 /**
- * Patch-02C3A：进记分页 mode 分流
- * 1) scoreEntities[groupId] 非空 → stroke_entity
- * 2) scoreEntities 整体不存在时，按 gameMode（四人四球/最佳球位/四人两球）兜底
- * 3) 否则 individual_stroke
+ * Patch-02C3A / G6–G8 Phase1-A：进记分页 mode 分流（与 detail / score 对齐）
+ * 1) G1 / G5 / G6/G7/G8 比洞 → individual_stroke（禁止残留 scoreEntities 抢路）
+ * 2) scoreEntities[groupId] 非空 → stroke_entity
+ * 3) G2/G3/G4 比杆 gameMode → stroke_entity
+ * 4) 否则 individual_stroke
  */
 function resolveTournamentScorePageMode(match, groupId) {
+  const gameMode = String(
+    (match && (match.gameMode || match.selectedGameMode)) || ''
+  ).trim();
+  if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) {
+    return 'individual_stroke';
+  }
+  if (isG6G7MatchPlayMode(gameMode) || isG8MatchPlayMode(gameMode)) {
+    return 'individual_stroke';
+  }
   const gid = groupId != null ? String(groupId) : '';
   const scoreEntities = match && match.scoreEntities;
   if (scoreEntities && typeof scoreEntities === 'object' && !Array.isArray(scoreEntities)) {
@@ -53,10 +68,8 @@ function resolveTournamentScorePageMode(match, groupId) {
     if (list.length > 0) return 'stroke_entity';
     return 'individual_stroke';
   }
-  const gameMode = String(
-    (match && (match.gameMode || match.selectedGameMode)) || ''
-  ).trim();
   if (
+    gameMode === '最好成绩比杆赛' ||
     gameMode === '四人四球比杆赛' ||
     gameMode === '最佳球位比杆赛' ||
     gameMode === '四人两球比杆赛'
