@@ -6592,12 +6592,26 @@ Page({
       return permSet.indexOf(permission) >= 0;
     };
     const section = FEATURE_SECTION_DEFAULT;
+    // G5–G8 比洞：M 面板隐藏「领先榜」「生成净杆」（TAB/成绩/净杆逻辑不动）
+    const hideStrokeOnlyFeatures = isMatchPlayBoardMode(resolveGameMode(match));
+    const allowFeature = (f) => {
+      if (!f || !f.permission) return false;
+      if (
+        hideStrokeOnlyFeatures &&
+        (f.permission === 'leaderboard' || f.permission === 'net_score')
+      ) {
+        return false;
+      }
+      return true;
+    };
     const split = splitPermissionFeatures(
-      FEATURES_PERMISSION.filter((f) => visible('permission', f.permission))
+      FEATURES_PERMISSION.filter(
+        (f) => allowFeature(f) && visible('permission', f.permission)
+      )
     );
     this.setData({
       featuresCommon: this._withMoreFeatureDisabledState(
-        FEATURES_COMMON.filter((f) => visible('common', f.permission)),
+        FEATURES_COMMON.filter((f) => allowFeature(f) && visible('common', f.permission)),
         match
       ),
       featuresPermission: this._withMoreFeatureDisabledState(split.featuresPermission, match),
