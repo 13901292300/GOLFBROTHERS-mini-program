@@ -34,7 +34,8 @@ const {
 } = require('../../../utils/strokeCompositionResolver.js');
 const {
   resolveStrokeKind,
-  resolveGameMode
+  resolveGameMode,
+  isG5MatchPlayMode
 } = require('../../../utils/strokeEntityValidator.js');
 const contactStore = require('../../../utils/contactStore.js');
 
@@ -255,8 +256,8 @@ function createEmptyGroupPlayer(position) {
 }
 
 /**
- * Patch-02C3A：进记分页 mode 分流
- * 1) gameMode=个人比杆赛 → individual_stroke（优先，避免残留 scoreEntities / 旧 session）
+ * Patch-02C3A / G5 Phase1-C：进记分页 mode 分流
+ * 1) gameMode=个人比杆赛 / 个人比洞赛 → individual_stroke（同级优先，避免残留 scoreEntities）
  * 2) scoreEntities[groupId] 非空 → stroke_entity
  * 3) gameMode 为 G2/G3/G4 → stroke_entity
  * 4) 否则 individual_stroke
@@ -265,7 +266,8 @@ function resolveTournamentScorePageMode(match, groupId) {
   const gameMode = String(
     (match && (match.gameMode || match.selectedGameMode)) || ''
   ).trim();
-  if (gameMode === '个人比杆赛') {
+  // G1 / G5：个人记分路径；禁止因残留 scoreEntities 落入 stroke_entity
+  if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) {
     return 'individual_stroke';
   }
   const gid = groupId != null ? String(groupId) : '';
@@ -919,7 +921,8 @@ Page({
     const unscheduled = this._resolveUnscheduledPlayers(match, formal);
     const gameMode = match && match.gameMode ? String(match.gameMode) : '';
     const isG4Stroke = gameMode === '四人两球比杆赛';
-    // G2/G3 组合比杆 + G4 四人两球：分组 TAB 展示组合描述
+    const isG5MatchPlay = isG5MatchPlayMode(gameMode);
+    // G2/G3 组合比杆 + G4 四人两球：分组 TAB 展示组合描述（不含 G5）
     const showPairings = teamMatchStore.isPairingStrokeFormat(gameMode) || isG4Stroke;
     const matchType = match && match.matchType ? String(match.matchType) : 'team-internal';
     const strokeModeRaw =
@@ -934,6 +937,8 @@ Page({
       && (strokeModeRaw === '4+0' || strokeModeRaw === '2+2');
     // G4：用 pairings 映射为「分队：球员」文字行（与 G2/G3 composition 行同款 UI）
     const useG4PairingTextDisplay = isG4Stroke && matchType === 'team-internal';
+    // G5：独立 1v1 分队行（不进 pairing / composition / Entity）
+    const useG5MatchPlayDisplay = isG5MatchPlay && matchType === 'team-internal';
     const pairings =
       showPairings && (useG4PairingTextDisplay || !useCompositionDisplay)
         ? teamMatchStore.clonePairings(match && match.pairings)
@@ -943,6 +948,7 @@ Page({
       showPairings: showPairings,
       useCompositionDisplay: useCompositionDisplay,
       useG4PairingTextDisplay: useG4PairingTextDisplay,
+      useG5MatchPlayDisplay: useG5MatchPlayDisplay,
       match: match,
       pairings: pairings,
       pairingTitle: teamMatchStore.getPairingStrokeLabel(gameMode),
@@ -955,7 +961,8 @@ Page({
       hasFormalGroups: formal.length > 0,
       canManageGroups: this._resolveCanManageGroups(match),
       unscheduledPlayerCount: unscheduled.length,
-      showGroupPairings: showPairings
+      showGroupPairings: showPairings,
+      showGroupMatchPlayTeams: useG5MatchPlayDisplay
     };
   },
 
@@ -1116,6 +1123,7 @@ Page({
     const showPairings = !!opts.showPairings;
     const useCompositionDisplay = !!opts.useCompositionDisplay;
     const useG4PairingTextDisplay = !!opts.useG4PairingTextDisplay;
+    const useG5MatchPlayDisplay = !!opts.useG5MatchPlayDisplay;
     const pairings = opts.pairings || {};
     const pairingTitle = opts.pairingTitle || '组合';
     const playerLookup = opts.playerLookup || {};
@@ -1136,7 +1144,10 @@ Page({
         teeMetaLine: teeSheetManage.formatTeeMetaLine(teeTime, startHole),
         hasTeeInfo: !!(teeTime || startHole != null)
       };
-      if (showPairings) {
+      if (useG5MatchPlayDisplay) {
+        // G5：players→分队行；不调 composition / pairings
+        card.matchPlayTeamBlock = this._buildMatchPlayTeamBlock(match, g, playerLookup);
+      } else if (showPairings) {
         if (useCompositionDisplay) {
           // 队内赛 G2/G3：composition 文字行（报名 / LIVE 同路径）
           card.pairingBlock = this._mapGroupCompositionBlock(match, g, playerLookup);
@@ -1150,6 +1161,102 @@ Page({
       }
       return card;
     });
+  },
+
+  /**
+   * G5 个人比洞：分队 1v1 文字行（group.players + registerInfo + teamGroups）
+   * 不读 pairings，不进 _mapGroupCompositionBlock。
+   */
+  _buildMatchPlayTeamBlock(match, group, playerLookup) {
+    const empty = { visible: false, lines: [] };
+    const players = Array.isArray(group && group.players) ? group.players : [];
+    const filled = players
+      .map((p) => ({
+        userId: p && p.userId != null ? String(p.userId).trim() : '',
+        position: Number(p && (p.position != null ? p.position : p.slotIndex)) || 0
+      }))
+      .filter((p) => p.userId)
+      .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+    if (!filled.length) return empty;
+
+    const users =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    const teamIdByUser = {};
+    const nameByUser = {};
+    users.forEach((user) => {
+      const uid = this._resolveAnyPlayerId(user);
+      if (!uid) return;
+      const teamId =
+        user.matchTeamId != null && String(user.matchTeamId).trim() !== ''
+          ? String(user.matchTeamId).trim()
+          : user.groupId != null && String(user.groupId).trim() !== ''
+            ? String(user.groupId).trim()
+            : '';
+      if (teamId) teamIdByUser[uid] = teamId;
+      const nick = this._resolveAnyPlayerNickname(user) || uid;
+      nameByUser[uid] = nick;
+    });
+
+    const teamNameById = {};
+    const teamOrder = [];
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    teamGroups.forEach((tg, index) => {
+      const id = tg && tg.id != null ? String(tg.id).trim() : '';
+      if (!id) return;
+      teamOrder.push(id);
+      teamNameById[id] = String((tg && tg.name) || '').trim() || ('分队' + (index + 1));
+    });
+
+    const buckets = {};
+    filled.forEach((p) => {
+      const teamId = teamIdByUser[p.userId] || '__unknown__';
+      if (!buckets[teamId]) buckets[teamId] = [];
+      buckets[teamId].push(p);
+    });
+
+    const orderedTeamIds = [];
+    const used = {};
+    teamOrder.forEach((id) => {
+      if (buckets[id] && buckets[id].length && !used[id]) {
+        orderedTeamIds.push(id);
+        used[id] = true;
+      }
+    });
+    Object.keys(buckets).forEach((id) => {
+      if (!used[id] && buckets[id] && buckets[id].length) {
+        orderedTeamIds.push(id);
+        used[id] = true;
+      }
+    });
+
+    const lookup = playerLookup || {};
+    const lines = [];
+    orderedTeamIds.forEach((teamId) => {
+      const members = buckets[teamId] || [];
+      const names = members
+        .map((m) => {
+          const fromLookup = lookup[m.userId] || null;
+          return (
+            (fromLookup && (fromLookup.nickname || fromLookup.displayName || fromLookup.name))
+            || nameByUser[m.userId]
+            || m.userId
+          );
+        })
+        .filter(Boolean);
+      if (!names.length) return;
+      lines.push({
+        teamName:
+          teamId === '__unknown__'
+            ? '分队'
+            : teamNameById[teamId] || teamId || '分队',
+        namesText: names.join(' / ')
+      });
+    });
+
+    if (!lines.length) return empty;
+    return { visible: true, lines: lines };
   },
 
   /**
@@ -3553,12 +3660,13 @@ Page({
     });
   },
 
-  /** 是否走 Entity 领先榜：G1 强制个人榜；其余看 matchState.mode 或 scoreEntities */
+  /** 是否走 Entity 领先榜：G1/G5 强制个人榜；其余看 matchState.mode 或 scoreEntities */
   _shouldBuildEntityLeaderboard(match) {
     const gameMode = String(
       (match && (match.gameMode || match.selectedGameMode)) || ''
     ).trim();
-    if (gameMode === '个人比杆赛') return false;
+    // G1 / G5：个人路径；不因残留 scoreEntities / 旧 session mode 走 Entity 榜
+    if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) return false;
     try {
       const ms = matchStateUtil.getMatchState && matchStateUtil.getMatchState();
       if (ms && ms.mode === 'stroke_entity') return true;

@@ -68,6 +68,19 @@
             </view>
           </view>
 
+          <!-- G5 个人比洞：分队 1v1 展示（不走组合预览） -->
+          <view wx:if="{{item.matchPlayTeamPreview && item.matchPlayTeamPreview.length}}" class="composition-preview" catchtap="stopPropagation">
+            <view
+              wx:for="{{item.matchPlayTeamPreview}}"
+              wx:for-item="mpLine"
+              wx:key="teamName"
+              class="composition-preview__row"
+            >
+              <text class="composition-preview__label">{{mpLine.teamName}}：</text>
+              <text class="composition-preview__names">{{mpLine.namesText}}</text>
+            </view>
+          </view>
+
           <!-- G2/G3 报名 / G4 报名编辑：只读组合预览（与 composition-preview 同款） -->
           <view wx:if="{{item.compositionPreview}}" class="composition-preview" catchtap="stopPropagation">
             <view wx:if="{{item.compositionPreview.showCombo1}}" class="composition-preview__row">

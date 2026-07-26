@@ -77,8 +77,8 @@
         <!-- Context Panel 已移至 .score-page 根级浮层（position:fixed），不再参与本容器布局流 -->
       </view>
 
-      <!-- Best Ball Roster Strip（仅 3 人及以上组展示；2+2 / 2+1+1 等纯 pair/single 组合时名册为空并隐藏） -->
-      <view wx:if="{{mode === 'fourball_best' && bestRoster.length}}" class="bestball-roster-strip">
+      <!-- Best Ball Roster Strip：fourball_best 演示 + stroke_entity 4+0（team，1–4 人均可）；2+2 pair 名册为空 -->
+      <view wx:if="{{(mode === 'fourball_best' || mode === 'stroke_entity') && bestRoster.length}}" class="bestball-roster-strip">
         <view class="bestball-roster-inner">
           <view
             wx:for="{{bestRoster}}"
@@ -267,6 +267,7 @@
                 </view>
               </block>
               <block wx:else>
+                <!-- team（G2/G3 4+0）：与 fourball_best「四人最佳球位挑战-18」同构 — sticky 仅 TEAM SCORE；头像在 bestRoster 名册条 -->
                 <view class="bestball-mode-layout">
                   <view class="bestball-mode-wrap">
                     <text class="bestball-mode-kicker">TEAM SCORE</text>
@@ -315,12 +316,12 @@
           </block>
 
           <block wx:else>
-          <view
+          <block
             wx:for="{{playersView}}"
             wx:key="id"
             wx:for-index="pIdx"
-            class="scoreboard-row scoreboard-row--player"
           >
+          <view class="scoreboard-row scoreboard-row--player">
             <view class="scoreboard-cell sticky-col player-cell">
               <view class="player-card">
                 <view class="player-top-line">
@@ -344,9 +345,10 @@
               data-col-idx="{{cIdx}}"
               class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
             >
-              <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+              <!-- 比洞赛(G5–G8)：隐藏红蓝角标；比杆赛保持名次三角 -->
+              <view wx:if="{{!isMatchPlayScoreMode && cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
               <!-- 名次视觉：纯红=1 纯蓝=2 蓝+白腰线=3 红+白腰线=4（取消数字，腰线左上→右下且裁剪于三角内） -->
-              <view wx:if="{{cell.triangleClass && (cell.gameCornerRank === 3 || cell.gameCornerRank === 4)}}" class="corner-waist"></view>
+              <view wx:if="{{!isMatchPlayScoreMode && cell.triangleClass && (cell.gameCornerRank === 3 || cell.gameCornerRank === 4)}}" class="corner-waist"></view>
 
               <block wx:if="{{cell.type === 'special'}}">
                 <view class="special-cell-inner">
@@ -371,6 +373,36 @@
               </block>
             </view>
           </view>
+
+          <!-- G5：插在球员A与球员B之间的比洞状态行（对齐原型 match-status-row，不影响 G1 / Entity / fourball） -->
+          <view
+            wx:if="{{isG5MatchPlay && pIdx === 0}}"
+            class="scoreboard-row match-status-row"
+          >
+            <view class="scoreboard-cell sticky-col match-status-sticky">
+              <view class="match-label-wrap">
+                <text class="match-label-kicker">MATCH</text>
+                <text class="match-label-main">胜洞走势</text>
+              </view>
+            </view>
+            <view
+              wx:for="{{matchStatusView.rowCells}}"
+              wx:for-item="msCell"
+              wx:key="colIdx"
+              class="scoreboard-cell match-status-cell {{msCell.isSpecial || msCell.isTot ? 'scoreboard-cell--special-cell' : ''}} {{msCell.isTot || msCell.showFinal ? 'match-status-cell--tot match-status-summary' : ''}}"
+            >
+              <view wx:if="{{msCell.showWinA}}" class="match-win-line match-win-line--a"></view>
+              <view wx:if="{{msCell.showWinB}}" class="match-win-line match-win-line--b"></view>
+              <view class="match-cell-inner">
+                <!-- 原型 FINAL 列：FINAL + 累计（按领先方着色） -->
+                <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-summary-label">FINAL</text>
+                <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-cumulative {{msCell.leadClass || matchStatusView.currentLeadClass}}">{{msCell.text || matchStatusView.currentLabel}}</text>
+                <!-- 原型洞格：三角胜负 + 洞后累计 A/S·nUP -->
+                <text wx:elif="{{msCell.showStanding}}" class="match-cumulative {{msCell.leadClass}}">{{msCell.standingText}}</text>
+              </view>
+            </view>
+          </view>
+          </block>
           </block>
         </view>
       </scroll-view>

@@ -10,10 +10,12 @@ const tPosition = require('../../../utils/tPosition.js');
 const {
   validateStrokeEntities,
   buildRegisterTeamMap,
+  isG5MatchPlayMode,
   isG6G7MatchPlayMode,
   isG8MatchPlayMode,
   isG2G3FamilyMode,
   isG4FamilyMode,
+  validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
 } = require('../../../utils/strokeEntityValidator.js');
@@ -440,11 +442,14 @@ function validateG4GroupStructurePlayers(players, teamMap) {
 }
 
 /**
- * 报名分组球员校验：G6/G7、G8 走专用规则；G2/G3、G4 保持原逻辑
+ * 报名分组球员校验：G5/G6/G7、G8 走专用规则；G2/G3、G4 保持原逻辑
  */
 function validatePlayersForRegisterGameMode(players, gameMode, compositionMode, teamMap, options) {
   const mode = String(gameMode || '').trim();
   const opts = options || {};
+  if (isG5MatchPlayMode(mode)) {
+    return validateG5MatchPlayPlayers(players, teamMap);
+  }
   if (isG6G7MatchPlayMode(mode)) {
     return validateG6G7MatchPlayPlayers(players, teamMap);
   }
@@ -514,6 +519,67 @@ function buildPreviewRegisterMaps(matchLike) {
   });
 
   return { teamIdByUser: teamIdByUser, nameByUser: nameByUser, teamNameById: teamNameById, teamOrder: teamOrder };
+}
+
+/**
+ * G5 个人比洞：按分队展示 1v1 行（players + registerInfo + teamGroups）
+ * 不读 pairings，不走 buildCompositionPreview / 组合赛逻辑。
+ * @returns {array|null} [{ teamName, namesText }, ...]
+ */
+function buildMatchPlayTeamPreview(group, matchLike) {
+  const maps = buildPreviewRegisterMaps(matchLike || {});
+  const filled = ((group && group.players) || [])
+    .map((p) => ({
+      userId: p && p.userId != null ? String(p.userId).trim() : '',
+      position: Number(p && p.position) || 0,
+      displayName: resolvePlayerDisplayName(p)
+    }))
+    .filter((p) => p.userId);
+  if (!filled.length) return null;
+
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = maps.teamIdByUser[p.userId] || '__unknown__';
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p);
+  });
+  Object.keys(buckets).forEach((key) => {
+    buckets[key].sort(
+      (a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId))
+    );
+  });
+
+  const orderedTeamIds = [];
+  const used = {};
+  (maps.teamOrder || []).forEach((id) => {
+    if (buckets[id] && buckets[id].length && !used[id]) {
+      orderedTeamIds.push(id);
+      used[id] = true;
+    }
+  });
+  Object.keys(buckets).forEach((id) => {
+    if (!used[id] && buckets[id] && buckets[id].length) {
+      orderedTeamIds.push(id);
+      used[id] = true;
+    }
+  });
+
+  const lines = [];
+  orderedTeamIds.forEach((teamId) => {
+    const members = buckets[teamId] || [];
+    const names = members
+      .map((m) => m.displayName || maps.nameByUser[m.userId] || m.userId)
+      .filter(Boolean);
+    if (!names.length) return;
+    lines.push({
+      teamName:
+        teamId === '__unknown__'
+          ? '分队'
+          : maps.teamNameById[teamId] || teamId || '分队',
+      namesText: names.join(' / ')
+    });
+  });
+  return lines.length ? lines : null;
 }
 
 /**
@@ -924,6 +990,7 @@ Page({
     const title = teamMatchStore.getPairingStrokeLabel(gameMode || this.data.gameMode);
     const resolvedGameMode = String(gameMode || this.data.gameMode || '');
     const isG4 = isG4FamilyMode(resolvedGameMode);
+    const isG5 = isG5MatchPlayMode(resolvedGameMode);
     const isG6G7 = isG6G7MatchPlayMode(resolvedGameMode);
     // 第 5 参：组合预览开关（G2/G3/G6/G7）；不再与「2+2/4+0 选择」绑死
     const showCompositionPreview = showCompositionPreviewFlag != null
@@ -938,6 +1005,14 @@ Page({
     const matchLike = showCompositionPreview
       ? this._buildCompositionMatchContext(compositionMode)
       : null;
+    const g5MatchLike = isG5
+      ? {
+          registerInfo: this._registerInfo || { totalCount: 0, users: [] },
+          teamGroups: Array.isArray(this._matchSnapshot && this._matchSnapshot.teamGroups)
+            ? this._matchSnapshot.teamGroups
+            : []
+        }
+      : null;
     return (groups || []).map((g) => {
       const players = mapPlayersForCard(g.players);
       const card = {
@@ -948,7 +1023,11 @@ Page({
       if (showPairing) {
         card.pairingBlock = this._buildPairingBlockView(g, pairingDraft, title);
       }
-      if (showCompositionPreview && matchLike) {
+      if (isG5 && g5MatchLike) {
+        // G5：独立 1v1 分队行；不进 composition / pairings
+        const lines = buildMatchPlayTeamPreview(g, g5MatchLike);
+        if (lines && lines.length) card.matchPlayTeamPreview = lines;
+      } else if (showCompositionPreview && matchLike) {
         const preview = buildCompositionPreview(matchLike, g);
         if (preview) card.compositionPreview = preview;
       } else if (isG4 && !showPairing) {
@@ -1881,9 +1960,10 @@ Page({
     const gameMode = String(match.gameMode || this.data.gameMode || '');
     const isG4Stroke = isG4FamilyMode(gameMode);
     const isG2G3Stroke = isG2G3FamilyMode(gameMode);
+    const isG5MatchPlay = isG5MatchPlayMode(gameMode);
 
-    // 与报名一致：座位规范化；再回填 LIVE scorePlayerId
-    if (!isClear && (isG4Stroke || isG2G3Stroke)) {
+    // 与报名一致：座位规范化；再回填 LIVE scorePlayerId（G5 复用现有 normalize，不进组合逻辑）
+    if (!isClear && (isG4Stroke || isG2G3Stroke || isG5MatchPlay)) {
       const beforeNormalize = nextGroups;
       nextGroups = this._rematerializeLivePlayersAfterNormalize(
         normalizeFormalGroupSeats(nextGroups, match),
@@ -2009,8 +2089,10 @@ Page({
     const gameMode = String(match.gameMode || this.data.gameMode || '');
     const isG4Stroke = isG4FamilyMode(gameMode);
     const isG2G3Stroke = isG2G3FamilyMode(gameMode);
+    const isG5MatchPlay = isG5MatchPlayMode(gameMode);
     // 报名保存：统一正式座位规范化（position ≠ 选人顺序）；不碰 pairing / entity / score
-    if (!isClear && (isG4Stroke || isG2G3Stroke)) {
+    // G5：复用现有 normalizeFormalGroupSeats，不进 composition / pairings
+    if (!isClear && (isG4Stroke || isG2G3Stroke || isG5MatchPlay)) {
       formal = normalizeFormalGroupSeats(formal, match);
     }
     // G4/G8 成绩主体来自 pairings；即使 UI 组合区未开，保存时仍保留/写入 pairings

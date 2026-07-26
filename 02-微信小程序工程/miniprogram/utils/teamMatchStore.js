@@ -400,6 +400,13 @@ function updateMatchFromCreatePage(existing, pageData, options) {
     next.scoreData = migrateComboScoresToIndividualStroke(existing, toMode);
     next.scoreEntities = {};
     clearFormalPairingsOnMatch(next);
+  } else if (shouldClearComboArtifactsForPersonalMatchPlay(fromMode, toMode)) {
+    // G2/G3/G4 → G5：保留 groups / scoreData；仅清 scoreEntities / pairings（不进 Entity）
+    next.scoreEntities = {};
+    clearFormalPairingsOnMatch(next);
+    if (Array.isArray(opts.replaceGroups)) {
+      replaceFormalGroupsOnMatch(next, opts.replaceGroups);
+    }
   } else if (Array.isArray(opts.replaceGroups)) {
     replaceFormalGroupsOnMatch(next, opts.replaceGroups);
     if (opts.clearPairings) {
@@ -415,6 +422,8 @@ function updateMatchFromCreatePage(existing, pageData, options) {
 
 /** 个人比杆赛：任意赛制改为此项时保留已有分组 */
 const INDIVIDUAL_STROKE_MODE = '个人比杆赛';
+/** G5 个人比洞赛：个人记分路径（与 G1 同级；不进 scoreEntities / pairings） */
+const INDIVIDUAL_MATCH_PLAY_MODE = '个人比洞赛';
 const FORMAL_SLOT_COUNT = 4;
 
 /**
@@ -638,7 +647,7 @@ function replaceFormalGroupsOnMatch(match, nextGroups) {
 /**
  * 赛制变更是否需要清空正式 pairings（可保留 groups）
  * - 组合比杆赛 → 个人比杆赛：保留 groups，清空 pairings
- * - G2/G3/G4（含最好成绩 / 四人两球）→ 个人比杆赛：保留 groups，清空 pairings
+ * - G2/G3/G4（含最好成绩 / 四人两球）→ 个人比杆赛 / 个人比洞赛：保留 groups，清空 pairings
  * - 清空 groups 时一并清空 pairings（由 clearFormalGroupsOnMatch 处理）
  */
 function shouldClearPairingsOnGameModeChange(fromMode, toMode) {
@@ -646,7 +655,7 @@ function shouldClearPairingsOnGameModeChange(fromMode, toMode) {
   const to = String(toMode || '');
   if (!from || !to || from === to) return false;
   if (shouldClearGroupsOnGameModeChange(from, to)) return true;
-  if (isStrokeEntityGameMode(from) && to === INDIVIDUAL_STROKE_MODE) return true;
+  if (isStrokeEntityGameMode(from) && isIndividualPersonalScoreMode(to)) return true;
   if (isPairingStrokeFormat(from) && !isPairingStrokeFormat(to)) return true;
   return false;
 }
@@ -662,8 +671,21 @@ function isStrokeEntityGameMode(mode) {
   );
 }
 
+/** G1 个人比杆 / G5 个人比洞：个人成绩路径（非 stroke_entity） */
+function isIndividualPersonalScoreMode(mode) {
+  const m = String(mode || '').trim();
+  return m === INDIVIDUAL_STROKE_MODE || m === INDIVIDUAL_MATCH_PLAY_MODE;
+}
+
 function shouldMigrateComboScoresToIndividualStroke(fromMode, toMode) {
   return isStrokeEntityGameMode(fromMode) && String(toMode || '') === INDIVIDUAL_STROKE_MODE;
+}
+
+/**
+ * G2/G3/G4 → G5：清 scoreEntities / pairings；保留 groups / scoreData（不改 G1 迁移逻辑）
+ */
+function shouldClearComboArtifactsForPersonalMatchPlay(fromMode, toMode) {
+  return isStrokeEntityGameMode(fromMode) && String(toMode || '').trim() === INDIVIDUAL_MATCH_PLAY_MODE;
 }
 
 function clonePlayerScoreRecord(rec) {
@@ -1301,11 +1323,13 @@ module.exports = {
   REGISTER_SUBJECT_TYPES,
   REGISTER_PICK_CHANNELS,
   INDIVIDUAL_STROKE_MODE,
+  INDIVIDUAL_MATCH_PLAY_MODE,
   GAME_MODE_CHANGE_CLEAR_GROUPS_TIP,
   isPairingStrokeFormat,
   getPairingStrokeLabel,
   isComboGameMode,
   isStrokeEntityGameMode,
+  isIndividualPersonalScoreMode,
   hasFormalGroups,
   clonePairings,
   sanitizePairings,
@@ -1317,6 +1341,7 @@ module.exports = {
   buildGameModeChangeGroupsAllIllegalTip,
   replaceFormalGroupsOnMatch,
   shouldMigrateComboScoresToIndividualStroke,
+  shouldClearComboArtifactsForPersonalMatchPlay,
   migrateComboScoresToIndividualStroke,
   clearFormalGroupsOnMatch,
   clearFormalPairingsOnMatch,

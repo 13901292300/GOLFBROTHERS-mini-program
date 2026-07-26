@@ -27,7 +27,10 @@ const {
   resolveStrokeKind,
   resolveGameMode,
   buildRegisterTeamMap,
-  listFilledPlayers
+  listFilledPlayers,
+  isG5MatchPlayMode,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode
 } = require('../../utils/strokeEntityValidator.js');
 const { resolveCompositionMode } = require('../../utils/strokeCompositionResolver.js');
 const { normalizeFormalGroupSeats } = require('../../utils/strokeGroupSeatNormalizer.js');
@@ -570,9 +573,290 @@ function buildColumns() {
   }));
 }
 
+/** G5 比洞展示列：18 洞 + FINAL（无 OUT/IN/TOT）；仅展示层，不改 holeLayout */
+const G5_FINAL_COL_IDX = 18;
+
+function g5HoleColumnLabels() {
+  const full = columnLabels();
+  const out = [];
+  for (let i = 0; i < full.length; i++) {
+    if (!SPECIAL_IDX.includes(i)) out.push(full[i]);
+  }
+  return out;
+}
+
+function buildG5Columns() {
+  const full = buildColumns();
+  const next = [];
+  let holeCol = 0;
+  full.forEach((col) => {
+    if (col && col.isSpecial) {
+      if (col.isTot) {
+        next.push(
+          Object.assign({}, col, {
+            colIdx: G5_FINAL_COL_IDX,
+            label: 'FINAL',
+            isOut: false,
+            isIn: false,
+            isTot: true,
+            isFinal: true
+          })
+        );
+      }
+      return;
+    }
+    next.push(Object.assign({}, col, { colIdx: holeCol }));
+    holeCol += 1;
+  });
+  return next;
+}
+
+function resolveHoleIndexFromColIdx(cIdx, isG5MatchPlay) {
+  const n = Number(cIdx);
+  if (!Number.isFinite(n)) return -1;
+  if (isG5MatchPlay) {
+    if (n < 0 || n >= 18) return -1;
+    return n;
+  }
+  if (SPECIAL_IDX.includes(n)) return -1;
+  if (n < 9) return n;
+  if (n > 9 && n < 19) return n - 1;
+  return -1;
+}
+
 // 成绩格是否已填（空洞保持空白，不计入任何汇总）
 function isFilledScore(s) {
   return s !== null && s !== undefined && s !== '';
+}
+
+/** G5 个人比洞：仅识别，不改变 individual_stroke / 不进 stroke_entity */
+function isG5PersonalMatchPlayMode(gameMode) {
+  return isG5MatchPlayMode(gameMode);
+}
+
+/** G5–G8 比洞赛：成绩格不展示红蓝角标（胜负由 match-status-row 表达） */
+function isMatchPlayScoreMode(gameMode) {
+  const mode = String(gameMode || '').trim();
+  return isG5MatchPlayMode(mode) || isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode);
+}
+
+function resolveG5PlayerId(player) {
+  if (!player) return '';
+  const id = player.playerId != null ? player.playerId : player.id;
+  return id != null ? String(id).trim() : '';
+}
+
+function resolveG5RegisterTeamId(user) {
+  if (!user || typeof user !== 'object') return '';
+  if (user.matchTeamId != null && String(user.matchTeamId).trim() !== '') {
+    return String(user.matchTeamId).trim();
+  }
+  if (user.groupId != null && String(user.groupId).trim() !== '') {
+    return String(user.groupId).trim();
+  }
+  return '';
+}
+
+/**
+ * G5 两侧球员：优先按 teamGroups 顺序映射为 A/B；否则按源列表前两人。
+ * @returns {{ playerA: object, playerB: object }|null}
+ */
+function resolveG5MatchPlaySides(playersSource, match) {
+  const list = (Array.isArray(playersSource) ? playersSource : []).filter((p) => resolveG5PlayerId(p));
+  if (list.length < 2) return null;
+
+  const users =
+    match && match.registerInfo && Array.isArray(match.registerInfo.users)
+      ? match.registerInfo.users
+      : [];
+  const teamIdByUser = {};
+  users.forEach((user) => {
+    const uid =
+      user && (user.userId != null || user.playerId != null || user.id != null)
+        ? String(user.userId || user.playerId || user.id).trim()
+        : '';
+    if (!uid) return;
+    const tid = resolveG5RegisterTeamId(user);
+    if (tid) teamIdByUser[uid] = tid;
+  });
+
+  const teamOrder = [];
+  const seen = {};
+  (match && Array.isArray(match.teamGroups) ? match.teamGroups : []).forEach((tg) => {
+    const id = tg && tg.id != null ? String(tg.id).trim() : '';
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    teamOrder.push(id);
+  });
+
+  if (teamOrder.length >= 2) {
+    const byTeam = {};
+    list.forEach((p) => {
+      const tid = teamIdByUser[resolveG5PlayerId(p)] || '';
+      if (!tid || byTeam[tid]) return;
+      byTeam[tid] = p;
+    });
+    const playerA = byTeam[teamOrder[0]];
+    const playerB = byTeam[teamOrder[1]];
+    if (playerA && playerB && resolveG5PlayerId(playerA) !== resolveG5PlayerId(playerB)) {
+      return { playerA: playerA, playerB: playerB };
+    }
+  }
+
+  return { playerA: list[0], playerB: list[1] };
+}
+
+function formatG5MatchPlayStanding(leader, up) {
+  if (leader === 'A' || leader === 'B') {
+    const n = Number(up) || 0;
+    return n > 0 ? n + 'UP' : 'A/S';
+  }
+  return 'A/S';
+}
+
+/** 原型 lead 色：仅展示映射，不改胜负计算 */
+function resolveG5LeadClass(leader) {
+  if (leader === 'A') return 'team-a-lead';
+  if (leader === 'B') return 'team-b-lead';
+  return 'all-square';
+}
+
+/**
+ * Phase1-A：由两人 scores[] 派生比洞状态（不写盘）
+ * result: A_WIN | B_WIN | AS | null（缺分不判定）
+ */
+function buildG5MatchStatusView(playersSource, match) {
+  const empty = {
+    cells: [],
+    rowCells: [],
+    currentLabel: 'A/S',
+    currentLeadClass: 'all-square',
+    leader: 'AS',
+    up: 0
+  };
+  const sides = resolveG5MatchPlaySides(playersSource, match);
+  if (!sides) return empty;
+
+  const scoresA = Array.isArray(sides.playerA.scores) ? sides.playerA.scores : [];
+  const scoresB = Array.isArray(sides.playerB.scores) ? sides.playerB.scores : [];
+  let aWins = 0;
+  let bWins = 0;
+  const cells = [];
+
+  for (let hi = 0; hi < 18; hi++) {
+    const rawA = scoresA[hi];
+    const rawB = scoresB[hi];
+    let result = null;
+    if (isFilledScore(rawA) && isFilledScore(rawB)) {
+      const sa = Number(rawA);
+      const sb = Number(rawB);
+      if (Number.isFinite(sa) && Number.isFinite(sb)) {
+        if (sa < sb) {
+          result = 'A_WIN';
+          aWins += 1;
+        } else if (sb < sa) {
+          result = 'B_WIN';
+          bWins += 1;
+        } else {
+          result = 'AS';
+        }
+      }
+    }
+    const diff = aWins - bWins;
+    let leader = 'AS';
+    let up = 0;
+    if (diff > 0) {
+      leader = 'A';
+      up = diff;
+    } else if (diff < 0) {
+      leader = 'B';
+      up = -diff;
+    }
+    cells.push({
+      holeIndex: hi,
+      result: result,
+      leader: leader,
+      up: up,
+      standingLabel: formatG5MatchPlayStanding(leader, up)
+    });
+  }
+
+  const finalDiff = aWins - bWins;
+  let currentLeader = 'AS';
+  let currentUp = 0;
+  if (finalDiff > 0) {
+    currentLeader = 'A';
+    currentUp = finalDiff;
+  } else if (finalDiff < 0) {
+    currentLeader = 'B';
+    currentUp = -finalDiff;
+  }
+  const currentLabel = formatG5MatchPlayStanding(currentLeader, currentUp);
+
+  // Phase1-D：rowCells 与 G5 columns 对齐 = 18 洞 + FINAL（不映射 OUT/IN；胜负仍用已算 cells）
+  const currentLeadClass = resolveG5LeadClass(currentLeader);
+  const holeLabels = g5HoleColumnLabels();
+  const rowCells = [];
+  for (let hi = 0; hi < 18; hi++) {
+    const holeCell = cells[hi] || null;
+    const result = holeCell ? holeCell.result : null;
+    const hasResult = result != null;
+    const holeLeader = holeCell ? holeCell.leader : 'AS';
+    rowCells.push({
+      colIdx: hi,
+      label: holeLabels[hi] || String(hi + 1),
+      isSpecial: false,
+      isTot: false,
+      showFinal: false,
+      result: result,
+      showWinA: result === 'A_WIN',
+      showWinB: result === 'B_WIN',
+      showStanding: hasResult,
+      standingText: hasResult && holeCell ? (holeCell.standingLabel || '') : '',
+      leadClass: hasResult ? resolveG5LeadClass(holeLeader) : '',
+      text: ''
+    });
+  }
+  rowCells.push({
+    colIdx: G5_FINAL_COL_IDX,
+    label: 'FINAL',
+    isSpecial: true,
+    isTot: true,
+    showFinal: true,
+    result: null,
+    showWinA: false,
+    showWinB: false,
+    showStanding: false,
+    standingText: '',
+    leadClass: currentLeadClass,
+    text: currentLabel
+  });
+
+  return {
+    cells: cells,
+    rowCells: rowCells,
+    currentLabel: currentLabel,
+    currentLeadClass: currentLeadClass,
+    leader: currentLeader,
+    up: currentUp,
+    aWins: aWins,
+    bWins: bWins,
+    playerAId: resolveG5PlayerId(sides.playerA),
+    playerBId: resolveG5PlayerId(sides.playerB)
+  };
+}
+
+/** G5：展示/点格顺序固定为 A（分队1）→ B（分队2），与胜洞行一致 */
+function orderPlayersSourceForG5(playersSource, match) {
+  const sides = resolveG5MatchPlaySides(playersSource, match);
+  if (!sides) return playersSource;
+  const aId = resolveG5PlayerId(sides.playerA);
+  const bId = resolveG5PlayerId(sides.playerB);
+  const rest = (Array.isArray(playersSource) ? playersSource : []).filter((p) => {
+    const id = resolveG5PlayerId(p);
+    return id && id !== aId && id !== bId;
+  });
+  return [sides.playerA, sides.playerB].concat(rest);
 }
 
 /** 开球方向：fairway | left | right；默认 fairway */
@@ -632,7 +916,8 @@ function sliceSands(sands) {
   return Array.isArray(sands) ? sands.slice() : [];
 }
 
-function enrichPlayer(player, pIdx, displayMode) {
+function enrichPlayer(player, pIdx, displayMode, options) {
+  const hideCorners = !!(options && options.hideCorners);
   const scores = player.scores || [];
   const putts = player.putts || [];
 
@@ -689,8 +974,9 @@ function enrichPlayer(player, pIdx, displayMode) {
         diff: 0,
         diffStr: '',
         scoreClass: '',
-        triangleClass: COLUMN_TRIANGLES[colIdx] ? COLUMN_TRIANGLES[colIdx][pIdx] : '',
-        gameCornerRank: cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
+        triangleClass:
+          hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
+        gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
         diffClass: 'diff-even'
       };
     }
@@ -723,8 +1009,9 @@ function enrichPlayer(player, pIdx, displayMode) {
       // 右下角杆差：杆差模式下隐藏（主数字已是杆差，避免重复）
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
       scoreClass: scoreStyle(diff),
-      triangleClass: COLUMN_TRIANGLES[colIdx] ? COLUMN_TRIANGLES[colIdx][pIdx] : '',
-      gameCornerRank: cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
+      triangleClass:
+        hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
+      gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even'
     };
   });
@@ -739,6 +1026,32 @@ function enrichPlayer(player, pIdx, displayMode) {
     relClass: relScore < 0 ? 'diff-under' : relScore === 0 ? 'diff-even' : '',
     cells
   });
+}
+
+/** G5：从标准 enrich 结果去掉 OUT/IN，TOT→FINAL，colIdx 重排为 0..18 */
+function enrichPlayerG5(player, pIdx, displayMode) {
+  const enriched = enrichPlayer(player, pIdx, displayMode, { hideCorners: true });
+  const src = Array.isArray(enriched.cells) ? enriched.cells : [];
+  const next = [];
+  let holeCol = 0;
+  src.forEach((cell) => {
+    if (!cell) return;
+    if (cell.type === 'special') {
+      if (cell.isTot) {
+        next.push(
+          Object.assign({}, cell, {
+            colIdx: G5_FINAL_COL_IDX,
+            label: 'FINAL',
+            isFinal: true
+          })
+        );
+      }
+      return;
+    }
+    next.push(Object.assign({}, cell, { colIdx: holeCol }));
+    holeCol += 1;
+  });
+  return Object.assign({}, enriched, { cells: next });
 }
 
 Page({
@@ -817,6 +1130,19 @@ Page({
     columns: buildColumns(),
     playersView: [],
     entitiesView: [],
+    /** G5：比洞识别开关（mode 仍为 individual_stroke） */
+    isG5MatchPlay: false,
+    /** G5–G8：比洞赛记分页（隐藏成绩格红蓝角标） */
+    isMatchPlayScoreMode: false,
+    /** G5：由两人成绩派生的比洞状态（不落库） */
+    matchStatusView: {
+      cells: [],
+      rowCells: [],
+      currentLabel: 'A/S',
+      currentLeadClass: 'all-square',
+      leader: 'AS',
+      up: 0
+    },
     moreMenuItems: MORE_MENU_ITEMS_COMPACT,
     groupPlayers: GROUP_PLAYERS,
     // 占位：真正展示前由 openGroupManagePage() 用当前记分页面球员快照覆盖（唯一数据源）
@@ -971,12 +1297,17 @@ Page({
   /**
    * 队内赛记分页 mode：与 detail.resolveTournamentScorePageMode 对齐
    * G1 优先 individual_stroke；G2/G3/G4 保持 stroke_entity
+   * G5 个人比洞：仍返回 individual_stroke（由 isG5MatchPlay 叠加比洞状态）
    */
   _resolveTeamMatchScorePageMode(match, groupId) {
     const gameMode = String(
       (match && (match.gameMode || match.selectedGameMode)) || ''
     ).trim();
     if (gameMode === '个人比杆赛') {
+      return 'individual_stroke';
+    }
+    // G5：明确走个人行记分，禁止落入 stroke_entity
+    if (isG5PersonalMatchPlayMode(gameMode)) {
       return 'individual_stroke';
     }
     const gid = groupId != null ? String(groupId) : '';
@@ -994,6 +1325,35 @@ Page({
       return 'stroke_entity';
     }
     return 'individual_stroke';
+  },
+
+  /** 当前球队赛 gameMode（match 优先，其次 matchState.course） */
+  _resolveTeamMatchGameMode(match, ms) {
+    if (match && (match.gameMode || match.selectedGameMode)) {
+      return String(match.gameMode || match.selectedGameMode).trim();
+    }
+    const course = (ms && ms.course) || {};
+    return String(course.gameMode || course.format || '').trim();
+  },
+
+  /** Phase1-A：刷新 G5 比洞派生状态（不写盘、不改 UI 结构） */
+  _syncG5MatchStatusView(match, isG5MatchPlay) {
+    const enabled = isG5MatchPlay != null ? !!isG5MatchPlay : !!this.data.isG5MatchPlay;
+    if (!enabled) {
+      return {
+        matchStatusView: {
+          cells: [],
+          rowCells: [],
+          currentLabel: 'A/S',
+          currentLeadClass: 'all-square',
+          leader: 'AS',
+          up: 0
+        }
+      };
+    }
+    return {
+      matchStatusView: buildG5MatchStatusView(this._playersSource, match || null)
+    };
   },
 
   // 有 gameId 的普通球局必须走 game 模式，避免 formatType 兜底误用球队精简面板
@@ -1276,6 +1636,43 @@ Page({
           playerId: m.playerId || ('seat-' + i),
           name: shortName || m.name || '球员',
           avatar: m.avatar || '',
+          tee: tp.tee,
+          teeColor: tp.teeColor,
+          groupIndex: gi,
+          groupClass: 'bestball-group-' + (gi % 4)
+        });
+      });
+    });
+    return roster;
+  },
+
+  /**
+   * Stroke Entity 4+0（kind=team）：复用 fourball_best「四人最佳球位挑战-18」名册条。
+   * 只要 memberDisplay 有有效成员即展示（1–4 人同一模板横向排列），不要求人数===4。
+   * 头像在 HOLE 上方名册；sticky 仅 TEAM SCORE。2+2（pair）不进名册。
+   */
+  _buildEntityRosterFromEntitiesView(entitiesView) {
+    const roster = [];
+    (entitiesView || []).forEach((row, gi) => {
+      if (!row || row.kind !== 'team') return;
+      const members = (Array.isArray(row.memberDisplay) ? row.memberDisplay : []).filter((m) => {
+        if (!m) return false;
+        const uid = m.userId != null ? String(m.userId).trim() : '';
+        const name = m.name != null ? String(m.name).trim() : '';
+        const avatar = m.avatar != null ? String(m.avatar).trim() : '';
+        return !!(uid || name || avatar);
+      });
+      if (!members.length) return;
+      members.forEach((m) => {
+        const i = roster.length;
+        const tp = TEE_PALETTE[i % TEE_PALETTE.length];
+        const rawName = (m && m.name) || '';
+        const shortName =
+          rawName && rawName.indexOf('.') >= 0 ? rawName.split('.').pop().trim() : rawName;
+        roster.push({
+          playerId: (m && m.userId) || ('seat-' + i),
+          name: shortName || rawName || '球员',
+          avatar: (m && m.avatar) || '',
           tee: tp.tee,
           teeColor: tp.teeColor,
           groupIndex: gi,
@@ -1607,8 +2004,14 @@ Page({
       groupId: groupId || '',
       playerCount: (this._playersSource || []).length
     });
+    const gameMode = this._resolveTeamMatchGameMode(match, ms);
+    const isG5MatchPlay = isG5PersonalMatchPlayMode(gameMode);
+    const matchPlayScoreMode = isMatchPlayScoreMode(gameMode);
     this.setData({
       mode: 'individual_stroke',
+      isG5MatchPlay: isG5MatchPlay,
+      isMatchPlayScoreMode: matchPlayScoreMode,
+      columns: isG5MatchPlay ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
         ? matchStatus.getMatchStatus(matchGroup, { source: 'groups' }).isCompleted
@@ -1621,10 +2024,97 @@ Page({
       scoringMode: 'stroke',
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
-      'match.format': '个人比杆赛'
+      bestRoster: [],
+      // G5 显示个人比洞赛；G1 及其他个人行保持个人比杆赛
+      'match.format': isG5MatchPlay ? '个人比洞赛' : '个人比杆赛'
     });
     if (ms) this.buildGameContextFromMatchState(ms);
+    // Context 若带回 course.gameMode，再校正一次 G5 文案（避免被其它路径盖成比杆）
+    if (isG5MatchPlay) {
+      this.setData({
+        isG5MatchPlay: true,
+        isMatchPlayScoreMode: true,
+        columns: buildG5Columns(),
+        'match.format': '个人比洞赛',
+        'gameContext.format': '个人比洞赛'
+      });
+    }
     this.refreshPlayers();
+  },
+
+  /**
+   * LIVE 改 2+2/4+0 后：按当前 match.strokeCompositionMode 重对齐 scoreEntities，
+   * 与普通创建保存后的结构一致，再 hydrate → entitiesView（复用既有 team/pair UI）。
+   * 不改 teamScoresByEntity 成绩内容。
+   */
+  _ensureG2G3ScoreEntitiesAligned(match) {
+    if (!match || !match.matchId) return match;
+    const kind = resolveStrokeKind(resolveGameMode(match));
+    if (kind !== 'g2g3') return match;
+    const prev = match.scoreEntities;
+    const next = syncStrokeEntities(match);
+    if (!this._scoreEntitiesMetaEqual(prev, next)) {
+      match.scoreEntities = next;
+      teamMatchStore.saveMatch(match);
+      console.log('[stroke_entity] resync scoreEntities', {
+        matchId: match.matchId,
+        compositionMode: resolveCompositionMode(match)
+      });
+    } else {
+      match.scoreEntities = next;
+    }
+    return match;
+  },
+
+  /** 仅比较展示相关字段：entityId / members / compositionMode / entityType */
+  _scoreEntitiesMetaEqual(a, b) {
+    const norm = (map) => {
+      const src =
+        map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+      const out = {};
+      Object.keys(src)
+        .sort()
+        .forEach((gid) => {
+          const list = Array.isArray(src[gid]) ? src[gid] : [];
+          out[gid] = list
+            .map((e) => ({
+              entityId: e && e.entityId != null ? String(e.entityId) : '',
+              entityType: e && e.entityType != null ? String(e.entityType) : '',
+              compositionMode:
+                e && e.compositionMode != null ? String(e.compositionMode) : '',
+              members: (Array.isArray(e && e.members) ? e.members : [])
+                .map((m) => {
+                  if (m == null) return '';
+                  if (typeof m === 'string' || typeof m === 'number') return String(m).trim();
+                  return m.userId != null ? String(m.userId).trim() : '';
+                })
+                .filter(Boolean)
+            }))
+            .sort((x, y) => String(x.entityId).localeCompare(String(y.entityId)));
+        });
+      return out;
+    };
+    try {
+      return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /** entity.members → 稳定 userId 字符串列表（兼容对象成员） */
+  _normalizeEntityMemberIds(members) {
+    if (!Array.isArray(members)) return [];
+    return members
+      .map((m) => {
+        if (m == null) return '';
+        if (typeof m === 'string' || typeof m === 'number') return String(m).trim();
+        if (typeof m === 'object') {
+          const id = m.userId != null ? m.userId : m.playerId != null ? m.playerId : m.id;
+          return id != null ? String(id).trim() : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
   },
 
   /**
@@ -1635,11 +2125,15 @@ Page({
     const ms = this._matchState || this._readMatchState() || {};
     const matchId = (ms && ms.matchId) || '';
     const gid = groupId || (ms && ms.groupId) || this.data.groupId || '';
-    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    let match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    match = this._ensureG2G3ScoreEntitiesAligned(match) || match;
+    const gameMode = this._resolveTeamMatchGameMode(match, ms);
     this._entitiesSource = this._hydrateTeamMatchEntityFromSession(match, gid) || [];
     this.setData({
       mode: 'stroke_entity',
-      groupId: gid
+      groupId: gid,
+      isMatchPlayScoreMode: isMatchPlayScoreMode(gameMode),
+      isG5MatchPlay: false
     });
     // 与 individual_stroke 一致：顶栏/Context Panel 继承 matchState.course（创建时快照）
     this.buildGameContextFromMatchState(ms);
@@ -1648,6 +2142,7 @@ Page({
       matchId: matchId,
       groupId: gid,
       mode: 'stroke_entity',
+      compositionMode: match ? resolveCompositionMode(match) : '',
       entityCount: (this._entitiesSource || []).length
     });
   },
@@ -1694,8 +2189,8 @@ Page({
   /**
    * 第一列 kind：按赛制，不按 members.length
    * - G4（entityType=pair / 四人两球）：永远 pair
-   * - G2/G3 compositionMode=2+2：pair
-   * - G2/G3 compositionMode=4+0：team
+   * - G2/G3：仅认 match.strokeCompositionMode（2+2→pair，4+0→team）
+   *   不用旧 entity.compositionMode 覆盖当前比赛组合模式（LIVE 2+2→4+0）
    */
   _resolveEntityRowKind(entity, match) {
     const entityType = entity && entity.entityType ? String(entity.entityType) : '';
@@ -1705,32 +2200,48 @@ Page({
     if (entityType === 'pair' || gameMode === '四人两球比杆赛') {
       return 'pair';
     }
-    const fromEntity =
-      entity && entity.compositionMode != null
-        ? String(entity.compositionMode).trim()
-        : '';
-    const fromMatch =
-      match && match.strokeCompositionMode != null
-        ? String(match.strokeCompositionMode).trim()
-        : '';
-    const compositionMode = fromEntity === '2+2' || fromMatch === '2+2' ? '2+2' : '4+0';
+    const compositionMode = resolveCompositionMode(match);
     return compositionMode === '2+2' ? 'pair' : 'team';
   },
 
-  /** 成员展示列表（含头像）；空成员保留为空数组 */
+  /** groups.players 座位上的展示兜底（LIVE 与报名同源 userId） */
+  _findGroupPlayerFallback(match, userId) {
+    const uid = String(userId || '').trim();
+    if (!uid || !match || !Array.isArray(match.groups)) return null;
+    for (let i = 0; i < match.groups.length; i++) {
+      const players = Array.isArray(match.groups[i] && match.groups[i].players)
+        ? match.groups[i].players
+        : [];
+      for (let j = 0; j < players.length; j++) {
+        const p = players[j];
+        if (!p) continue;
+        const id = String(p.userId || p.playerId || p.id || '').trim();
+        if (id && isSameUserIdentity(id, uid)) return p;
+      }
+    }
+    return null;
+  },
+
+  /** 成员展示列表（含头像）；空成员保留为空数组；与普通创建 / LIVE 共用 */
   _buildEntityMemberDisplay(entity, match, nameMap) {
-    const members = Array.isArray(entity && entity.members) ? entity.members : [];
+    const members = this._normalizeEntityMemberIds(entity && entity.members);
     return members
       .map((id) => {
         const key = id != null ? String(id).trim() : '';
         if (!key) return null;
-        const profile = this._buildScoreTeamMatchPlayerProfile(match, key, {});
+        const groupPlayer = this._findGroupPlayerFallback(match, key) || {};
+        const profile = this._buildScoreTeamMatchPlayerProfile(match, key, groupPlayer);
         const name =
           (nameMap && nameMap[key]) ||
           (profile && profile.name) ||
+          (groupPlayer.name || groupPlayer.nickname || groupPlayer.competitionName) ||
           key ||
           '球员';
-        const avatarRaw = (profile && profile.avatar) || '';
+        const avatarRaw =
+          (profile && profile.avatar) ||
+          groupPlayer.avatar ||
+          groupPlayer.avatarUrl ||
+          '';
         return {
           userId: key,
           name: this._shortName(name) || name || '球员',
@@ -1789,6 +2300,8 @@ Page({
     const ms = this._matchState || this._readMatchState() || {};
     const matchId = (ms && ms.matchId) || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const gameMode = this._resolveTeamMatchGameMode(match, ms);
+    const matchPlayScoreMode = isMatchPlayScoreMode(gameMode);
     const teamLabel = this._resolveEntityTeamLabel(match);
     let palettePos = 0;
 
@@ -1846,7 +2359,8 @@ Page({
           avatar: avatar || ''
         },
         index,
-        displayMode
+        displayMode,
+        { hideCorners: matchPlayScoreMode }
       );
       let total = 0;
       let filled = 0;
@@ -1892,9 +2406,14 @@ Page({
       colWidth: colStartW,
       bestDiffGrow: 1
     });
+    // 4+0 team：名册与演示同构（1–4 人均显示）；2+2 pair → []
+    const bestRoster = this._buildEntityRosterFromEntitiesView(entitiesView);
     this.setData({
       entitiesView: entitiesView,
-      scoreboardStyle: scoreboardStyle
+      bestRoster: bestRoster,
+      scoreboardStyle: scoreboardStyle,
+      isMatchPlayScoreMode: matchPlayScoreMode,
+      isG5MatchPlay: false
     });
   },
 
@@ -1941,10 +2460,11 @@ Page({
     const entities = metaList.map((meta) => {
       const entityId = meta && meta.entityId != null ? String(meta.entityId).trim() : '';
       const rec = entityId && scoreByKey[entityId] ? scoreByKey[entityId] : {};
+      const members = this._normalizeEntityMemberIds(meta && meta.members);
       return {
         entityId: entityId,
         entityType: meta && meta.entityType ? String(meta.entityType) : '',
-        members: Array.isArray(meta && meta.members) ? meta.members.slice() : [],
+        members: members,
         compositionMode: meta && meta.compositionMode != null ? String(meta.compositionMode) : '',
         teamGroupId: meta && meta.teamGroupId != null ? String(meta.teamGroupId) : '',
         scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
@@ -1953,12 +2473,14 @@ Page({
         penalties: slicePenalties(rec.penalties),
         sands: sliceSands(rec.sands)
       };
-    });
+    }).filter((entity) => entity && entity.members && entity.members.length > 0);
 
     console.log('[stroke_entity] hydrate', {
       matchId: match.matchId || '',
       groupId: gid,
+      compositionMode: resolveCompositionMode(match),
       entityCount: entities.length,
+      memberCounts: entities.map((e) => (e.members || []).length),
       scoreRecordCount: teamScoresByEntity.length
     });
     return entities;
@@ -2129,7 +2651,9 @@ Page({
   },
 
   /**
-   * 队内赛：旧 session 为 stroke_entity，但 match 已改为 G1 时，重新初始化 individual_stroke
+   * 队内赛：
+   * - mode 变化时切换 individual_stroke / stroke_entity
+   * - 已是 stroke_entity：onShow 仍重拉 Entity（LIVE 改 2+2/4+0 后对齐创建展示）
    */
   _maybeRefreshTeamMatchScoreMode() {
     if (this.data.noMatch) return;
@@ -2139,7 +2663,19 @@ Page({
     if (!match) return;
     const groupId = this.data.groupId || ms.groupId || '';
     const nextMode = this._resolveTeamMatchScorePageMode(match, groupId);
-    if (!nextMode || nextMode === this.data.mode) return;
+    if (!nextMode) return;
+
+    // 同为 stroke_entity：不改 mode，仍对齐 Entity + hydrate + 刷新（LIVE 改 2+2/4+0）
+    if (nextMode === this.data.mode && nextMode === 'stroke_entity') {
+      this._matchState = ms;
+      const aligned = this._ensureG2G3ScoreEntitiesAligned(match) || match;
+      this._entitiesSource = this._hydrateTeamMatchEntityFromSession(aligned, groupId) || [];
+      this.refreshEntities();
+      this._syncMoreMenuItems();
+      return;
+    }
+
+    if (nextMode === this.data.mode) return;
 
     const nextMs = Object.assign({}, ms, { mode: nextMode });
     if (nextMs.course && typeof nextMs.course === 'object') {
@@ -2227,11 +2763,32 @@ Page({
       return;
     }
     const displayMode = this.data.scoreDisplayMode;
-    const players = this._playersSource.map((p, i) => enrichPlayer(p, i, displayMode));
+    // G5：先按分队顺序固定 A→B，再 enrich（保证点格 pIdx 与胜洞行一致）
+    let g5Match = null;
+    let isG5MatchPlay = false;
+    let matchPlayScoreMode = false;
+    if (this.data.mode === 'individual_stroke') {
+      const ms = this._matchState || this._readMatchState();
+      const matchId = (ms && ms.matchId) || '';
+      g5Match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      const gameMode = this._resolveTeamMatchGameMode(g5Match, ms);
+      isG5MatchPlay = isG5PersonalMatchPlayMode(gameMode);
+      matchPlayScoreMode = isMatchPlayScoreMode(gameMode);
+      if (isG5MatchPlay) {
+        this._playersSource = orderPlayersSourceForG5(this._playersSource, g5Match);
+      }
+    }
+    const players = this._playersSource.map((p, i) =>
+      isG5MatchPlay
+        ? enrichPlayerG5(p, i, displayMode)
+        : enrichPlayer(p, i, displayMode, { hideCorners: matchPlayScoreMode })
+    );
     const patch = { playersView: players };
     // 四人最佳球位：真实比赛由分组结构(scoreEngine.groups)派生球队记分行（逐洞各组最佳）与高亮名册；
     // 演示态保留原型数据。
     if (this.data.mode === 'fourball_best') {
+      patch.isMatchPlayScoreMode = false;
+      patch.isG5MatchPlay = false;
       patch.bestTeams = this._buildBestTeams(displayMode);
       if (this.data.bestHasMatch) {
         const team = this._teamBestColumns(displayMode);
@@ -2242,6 +2799,28 @@ Page({
       } else {
         patch.bestColumns = buildBestBallColumns(displayMode);
         patch.bestRoster = buildBestRoster(this._playersSource);
+      }
+    }
+    // G5：比洞状态 + 展示列（18+FINAL）；G1 恢复标准 OUT/IN/TOT 列
+    if (this.data.mode === 'individual_stroke') {
+      patch.isG5MatchPlay = isG5MatchPlay;
+      patch.isMatchPlayScoreMode = matchPlayScoreMode;
+      patch.columns = isG5MatchPlay ? buildG5Columns() : buildColumns();
+      if (isG5MatchPlay) {
+        patch['match.format'] = '个人比洞赛';
+        if (this.data.gameContext && this.data.gameContext.ready) {
+          patch['gameContext.format'] = '个人比洞赛';
+        }
+        Object.assign(patch, this._syncG5MatchStatusView(g5Match, true));
+      } else if (patch.isG5MatchPlay === false) {
+        patch.matchStatusView = {
+          cells: [],
+          rowCells: [],
+          currentLabel: 'A/S',
+          currentLeadClass: 'all-square',
+          leader: 'AS',
+          up: 0
+        };
       }
     }
     this.setData(patch);
@@ -3114,13 +3693,16 @@ Page({
       groupsStore.setHolePars(layout.holePars);
     }
 
-    const patch = { columns: buildColumns() };
+    const isG5Cols = !!this.data.isG5MatchPlay;
+    const patch = { columns: isG5Cols ? buildG5Columns() : buildColumns() };
 
     if (this.data.showScoreSheet) {
       const hi = this.data.sheetHoleIndex;
       if (hi >= 0 && hi < holeLayout.SCORE_CELL_COUNT) {
-        const cIdx = hi < 9 ? hi : hi + 1;
-        patch.sheetHoleLabel = columnLabels()[cIdx];
+        const cIdx = isG5Cols ? hi : hi < 9 ? hi : hi + 1;
+        patch.sheetHoleLabel = isG5Cols
+          ? (g5HoleColumnLabels()[hi] || '')
+          : columnLabels()[cIdx];
         patch.sheetPar = holePars()[hi];
         const p = (this._playersSource || [])[this.data.activePlayerIdx];
         const raw = p && (p.scores || [])[hi];
@@ -5318,12 +5900,14 @@ Page({
     const ms = this._matchState || this._readMatchState() || {};
     const matchId = (ms && ms.matchId) || '';
     const gid = this.data.groupId || (ms && ms.groupId) || '';
-    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    let match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    match = this._ensureG2G3ScoreEntitiesAligned(match) || match;
     this._entitiesSource = this._hydrateTeamMatchEntityFromSession(match, gid) || [];
     this.refreshEntities();
     console.log('[stroke_entity] reload-after-group-manage', {
       matchId: matchId,
       groupId: gid,
+      compositionMode: match ? resolveCompositionMode(match) : '',
       entityCount: (this._entitiesSource || []).length
     });
   },
@@ -6265,7 +6849,12 @@ Page({
     // finished：仍允许进入记分面板查看
     const { playerIdx, colIdx } = e.currentTarget.dataset;
     const cIdx = Number(colIdx);
-    if (SPECIAL_IDX.includes(cIdx)) return;
+    const isG5MatchPlay = !!this.data.isG5MatchPlay;
+    if (isG5MatchPlay) {
+      if (cIdx === G5_FINAL_COL_IDX) return;
+    } else if (SPECIAL_IDX.includes(cIdx)) {
+      return;
+    }
 
     // 四人最佳球位 / 最好成绩：复用个人比杆赛记分面板；点击的行 = 对应 group（多人组=组记分，单人组=个人比杆）
     if (this.data.mode === 'fourball_best') {
@@ -6275,11 +6864,11 @@ Page({
     }
 
     const pIdx = Number(playerIdx);
-
-    const label = columnLabels()[cIdx];
-    let holeIndex = 0;
-    if (cIdx < 9) holeIndex = cIdx;
-    else if (cIdx > 9 && cIdx < 19) holeIndex = cIdx - 1;
+    const holeIndex = resolveHoleIndexFromColIdx(cIdx, isG5MatchPlay);
+    if (holeIndex < 0) return;
+    const label = isG5MatchPlay
+      ? ((this.data.columns[cIdx] && this.data.columns[cIdx].label) || g5HoleColumnLabels()[holeIndex] || '')
+      : columnLabels()[cIdx];
 
     const par = holePars()[holeIndex];
     const player = this.data.playersView[pIdx];

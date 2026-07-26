@@ -31,8 +31,16 @@ const G8_MATCH_PLAY_MODES = {
   四人两球比洞赛: true
 };
 
+/** G5 个人比洞：不进组合 family / Entity；每组恰好跨分队 1v1 */
+const G5_MATCH_PLAY_MODES = {
+  个人比洞赛: true
+};
+
 const G6_G7_ILLEGAL_TIP = '比洞赛组合必须由双方分队组成，且每方最多2人';
 const G8_ILLEGAL_TIP = '四人两球比洞赛每组须为双方各2人';
+const G5_COUNT_TIP = '个人比洞赛每组必须有且只有两名球员';
+const G5_TEAM_MISSING_TIP = '个人比洞赛球员必须归属分队';
+const G5_SAME_TEAM_TIP = '个人比洞赛双方球员必须来自不同分队';
 
 const ALLOWED_GROUP_COMPOSITIONS = {
   '4+0': true,
@@ -54,6 +62,10 @@ function isG8MatchPlayMode(gameMode) {
   return !!G8_MATCH_PLAY_MODES[String(gameMode || '').trim()];
 }
 
+function isG5MatchPlayMode(gameMode) {
+  return !!G5_MATCH_PLAY_MODES[String(gameMode || '').trim()];
+}
+
 /** G2/G3 比杆 + G6/G7 比洞（composition UI / Entity 构建） */
 function isG2G3FamilyMode(gameMode) {
   const mode = String(gameMode || '').trim();
@@ -72,6 +84,49 @@ function resolveStrokeKind(gameMode) {
   if (isG2G3FamilyMode(mode)) return 'g2g3';
   if (isG4FamilyMode(mode)) return 'g4';
   return 'other';
+}
+
+/**
+ * G5 个人比洞：每组恰好 2 人，且必须来自不同分队（不允许同分队 1v1 / 单人 / 超过 2 人）
+ * @returns {string} 空串=合法；否则中文提示
+ */
+function validateG5MatchPlayPlayers(players, teamMap) {
+  const filled = listFilledPlayers({ players: players });
+  if (filled.length !== 2) {
+    return G5_COUNT_TIP;
+  }
+
+  const teamIds = [];
+  for (let i = 0; i < filled.length; i++) {
+    const uid = filled[i].userId;
+    const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return G5_TEAM_MISSING_TIP;
+    }
+    teamIds.push(teamId);
+  }
+
+  if (teamIds[0] === teamIds[1]) {
+    return G5_SAME_TEAM_TIP;
+  }
+  return '';
+}
+
+function validateG5MatchPlayGroups(match) {
+  const groups = Array.isArray(match && match.groups) ? match.groups : [];
+  if (!groups.length) {
+    return { valid: true };
+  }
+  const teamMap = buildRegisterTeamMap(match);
+  for (let i = 0; i < groups.length; i++) {
+    const filled = listFilledPlayers(groups[i]);
+    if (!filled.length) continue;
+    const err = validateG5MatchPlayPlayers(groups[i].players, teamMap);
+    if (err) {
+      return { valid: false, reason: 'g5_illegal_split' };
+    }
+  }
+  return { valid: true };
 }
 
 /**
@@ -566,14 +621,19 @@ function validateGroupForTargetGameMode(targetGameMode, group, matchLike) {
     return { valid: true };
   }
 
-  // 个人赛制：保留已有组（与 →G1/个人比洞 不清组一致）
-  if (G1_MODES[mode] || mode === '个人比洞赛') {
+  // 个人比杆：保留已有组
+  if (G1_MODES[mode]) {
     return { valid: true };
   }
 
   const teamMap = buildRegisterTeamMap(matchLike || {});
   const players = filled.map((p) => ({ userId: p.userId }));
 
+  // G5 个人比洞：跨分队 1v1（不进组合 family）
+  if (isG5MatchPlayMode(mode)) {
+    const tip = validateG5MatchPlayPlayers(players, teamMap);
+    return tip ? { valid: false, reason: tip } : { valid: true };
+  }
   if (isG6G7MatchPlayMode(mode)) {
     const tip = validateG6G7MatchPlayPlayers(players, teamMap);
     return tip ? { valid: false, reason: tip } : { valid: true };
@@ -609,6 +669,10 @@ function validateGroupForTargetGameMode(targetGameMode, group, matchLike) {
  */
 function validateStrokeEntities(match) {
   const gameMode = resolveGameMode(match);
+  // G5：个人比洞结构校验（不生成组合 Entity）
+  if (isG5MatchPlayMode(gameMode)) {
+    return validateG5MatchPlayGroups(match);
+  }
   // G6/G7/G8：专用合法性（识别赛制 + 阻止非法组合进入异常态）；Entity 构建仍走 g2g3/g4
   if (isG6G7MatchPlayMode(gameMode)) {
     return validateG6G7MatchPlayGroups(match);
@@ -639,15 +703,18 @@ module.exports = {
   bucketGroupByTeam,
   buildRegisterTeamMap,
   listFilledPlayers,
+  isG5MatchPlayMode,
   isG6G7MatchPlayMode,
   isG8MatchPlayMode,
   isG2G3FamilyMode,
   isG4FamilyMode,
+  validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers,
   G1_MODES,
   G2_G3_MODES,
   G4_MODES,
+  G5_MATCH_PLAY_MODES,
   G6_G7_MATCH_PLAY_MODES,
   G8_MATCH_PLAY_MODES,
   ALLOWED_GROUP_COMPOSITIONS

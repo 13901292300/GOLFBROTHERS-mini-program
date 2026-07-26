@@ -289,6 +289,22 @@
                 </view>
               </view>
 
+              <!-- G5 个人比洞：分队 1v1 行（不读 pairings / 不进 composition） -->
+              <view
+                wx:if="{{showGroupMatchPlayTeams && item.matchPlayTeamBlock && item.matchPlayTeamBlock.visible}}"
+                class="groups-pairing-block"
+              >
+                <view
+                  wx:for="{{item.matchPlayTeamBlock.lines}}"
+                  wx:for-item="mpLine"
+                  wx:key="teamName"
+                  class="groups-composition-line"
+                >
+                  <text class="groups-composition-line__label">{{mpLine.teamName}}：</text>
+                  <text class="groups-composition-line__names">{{mpLine.namesText}}</text>
+                </view>
+              </view>
+
               <view wx:if="{{showGroupPairings && item.pairingBlock && (item.pairingBlock.hasPairings || item.pairingBlock.hasIncomplete)}}" class="groups-pairing-block">
                 <text wx:if="{{item.pairingBlock.hasPairings && !item.pairingBlock.isCompositionText && item.pairingBlock.title}}" class="groups-pairing-block__title">{{item.pairingBlock.title}}</text>
                 <!-- 报名期 G2/G3：文字组合说明（与 group-editor 一致） -->

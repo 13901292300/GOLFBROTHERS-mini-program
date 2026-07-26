@@ -3,9 +3,11 @@ const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const playerManage = require('../../../utils/playerManage.js');
 const {
   buildRegisterTeamMap,
+  isG5MatchPlayMode,
   isG6G7MatchPlayMode,
   isG8MatchPlayMode,
   isG4FamilyMode,
+  validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
 } = require('../../../utils/strokeEntityValidator.js');
@@ -487,10 +489,15 @@ Page({
     return isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode);
   },
 
+  /** G5 个人比洞：每分队最多 1 人（勿与 G6-G8 cap2 混用） */
+  _isG5MatchPlayTeamCap1Mode() {
+    return isG5MatchPlayMode(String(this._gameMode || ''));
+  },
+
   /**
    * 弹窗列表状态：
    * checked  = 是否在当前 slots（临时选中）
-   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人
+   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人
    */
   _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
@@ -499,21 +506,23 @@ Page({
     const selectedMap = this._buildSelectedMap(slots || []);
     const occupiedMap = this._buildOccupiedMap(editId, editIdx);
     const selectedCount = Object.keys(selectedMap).length;
-    const groupFull = selectedCount >= 4;
+    const applyG5Cap1 = this._isG5MatchPlayTeamCap1Mode();
+    const groupFull = applyG5Cap1 ? selectedCount >= 2 : selectedCount >= 4;
 
     const apply40TeamLock =
       !!this._showCompositionMode && this._strokeCompositionMode === '4+0';
     const applyMatchPlayTeamCap2 = this._isMatchPlayTeamCap2Mode();
-    const needTeamMap = apply40TeamLock || applyMatchPlayTeamCap2;
+    const needTeamMap = apply40TeamLock || applyMatchPlayTeamCap2 || applyG5Cap1;
     const teamMap = needTeamMap
       ? buildRegisterTeamMap({ registerInfo: registerInfo || { users: [] } })
       : null;
     const lockedTeamId = apply40TeamLock
       ? this._resolveLockedTeamIdFor40(slots, teamMap)
       : '';
-    const teamSelectedCounts = applyMatchPlayTeamCap2
-      ? this._countSelectedByTeam(slots, teamMap)
-      : {};
+    const teamSelectedCounts =
+      applyMatchPlayTeamCap2 || applyG5Cap1
+        ? this._countSelectedByTeam(slots, teamMap)
+        : {};
 
     return users
       .map(normalizeUser)
@@ -532,6 +541,13 @@ Page({
           const candTeam =
             teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
           if (candTeam !== lockedTeamId) {
+            isDisabled = true;
+          }
+        } else if (!checked && applyG5Cap1) {
+          // G5：某分队已选 1 人后，同队其余不可再选；满 2 人由 groupFull 禁用全部
+          const candTeam =
+            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+          if (candTeam && (teamSelectedCounts[candTeam] || 0) >= 1) {
             isDisabled = true;
           }
         } else if (!checked && applyMatchPlayTeamCap2) {
@@ -598,6 +614,16 @@ Page({
       registerInfo: this._registerInfo || { users: [] }
     });
     const gameMode = String(this._gameMode || '');
+
+    // G5：跨分队恰好 1v1
+    if (isG5MatchPlayMode(gameMode)) {
+      const err = validateG5MatchPlayPlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
 
     // G6/G7：双方分队各 1–2 人（不改变 G2/G3 原规则）
     if (isG6G7MatchPlayMode(gameMode)) {
@@ -736,6 +762,23 @@ Page({
         const candTeam =
           teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
         if (candTeam !== lockedTeamId) return;
+      }
+    }
+
+    // G5：单分队已选 1 人则禁止继续选同队；全组最多 2 人
+    if (this._isG5MatchPlayTeamCap1Mode()) {
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const candTeam =
+        teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
+      const teamCounts = this._countSelectedByTeam(slots, teamMap);
+      if (candTeam && (teamCounts[candTeam] || 0) >= 1) {
+        return;
+      }
+      if (this._countFilledSlots(slots) >= 2) {
+        wx.showToast({ title: '个人比洞赛每组必须有且只有两名球员', icon: 'none' });
+        return;
       }
     }
 

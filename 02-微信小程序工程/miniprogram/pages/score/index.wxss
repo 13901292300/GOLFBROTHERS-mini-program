@@ -2805,3 +2805,151 @@ page {
 .score-page.bright-mode .entity-member {
   color: rgba(0, 45, 98, 0.55);
 }
+
+/* ===== G5 个人比洞：胜洞走势行（仅 isG5MatchPlay 渲染，不改通用球员行） ===== */
+.match-status-row {
+  height: 100rpx;
+  min-height: 100rpx;
+  background: linear-gradient(
+    90deg,
+    rgba(206, 146, 36, 0.08),
+    rgba(0, 45, 98, 0.14),
+    rgba(206, 146, 36, 0.06)
+  );
+}
+
+.match-status-sticky {
+  justify-content: center;
+  background: #08111d;
+  height: 100rpx;
+  box-shadow: inset -1px 0 0 var(--border-color);
+}
+
+.match-label-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  width: 100%;
+  padding: 0 var(--player-col-padding-x, 24rpx);
+  box-sizing: border-box;
+}
+
+.match-label-kicker {
+  font-size: 16rpx;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  font-weight: 900;
+  color: #ce9224;
+  text-transform: uppercase;
+}
+
+.match-label-main {
+  font-size: 22rpx;
+  line-height: 1;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.match-status-cell {
+  height: 100rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.match-status-cell--tot,
+.match-status-summary {
+  background: rgba(0, 45, 98, 0.22);
+}
+
+.match-cell-inner {
+  min-height: 72rpx;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  z-index: 1;
+}
+
+.match-win-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 16rpx;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.match-win-line--a {
+  top: 0;
+  background: #ef4444;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.match-win-line--b {
+  bottom: 0;
+  background: #3b82f6;
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+/* 原型 FINAL 角标 */
+.match-summary-label {
+  font-size: 16rpx;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #ce9224;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.match-cumulative {
+  font-size: 28rpx;
+  line-height: 1;
+  font-weight: 900;
+  font-style: italic;
+  color: #ce9224;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* 原型领先色：A 红 / B 蓝 / AS 灰 */
+.match-cumulative.team-a-lead {
+  color: #ef4444;
+}
+
+.match-cumulative.team-b-lead {
+  color: #3b82f6;
+}
+
+.match-cumulative.all-square {
+  color: #6b7280;
+}
+
+.score-page.bright-mode .match-status-row {
+  background: #ffffff;
+}
+
+.score-page.bright-mode .match-status-sticky {
+  background: #f8fafc;
+  box-shadow: inset -1px 0 0 #e2e8f0;
+}
+
+.score-page.bright-mode .match-label-main {
+  color: #002d62;
+}
+
+.score-page.bright-mode .match-status-cell--tot,
+.score-page.bright-mode .match-status-summary {
+  background: rgba(0, 45, 98, 0.04);
+}
+
+.score-page.bright-mode .match-summary-label {
+  color: #ce9224;
+}
