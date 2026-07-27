@@ -239,7 +239,9 @@ function setGroupPlayersSlots(gameId, groupIndex, playersSlots) {
     return {
       playerId: p.playerId,
       name: p.name || '球员',
-      avatar: p.avatar || ''
+      avatar: p.avatar || '',
+      gender: p.gender || '',
+      tPosition: p.tPosition || ''
     };
   });
 

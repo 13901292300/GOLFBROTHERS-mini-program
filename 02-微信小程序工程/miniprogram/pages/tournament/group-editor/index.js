@@ -98,8 +98,11 @@ function hydrateDraftPlayers(list, registerInfo) {
         const userId = String(found.userId);
         const src = lookup[userId] || {};
         const gender = src.gender || found.gender || playerDirectory.getGenderById(userId, '');
-        const teeRaw = found.tee || src.tee || tPosition.defaultFromGender(gender);
-        const tee = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
+        const tee = tPosition.resolve({
+          tPosition: found.tPosition,
+          tee: found.tee,
+          gender: gender
+        });
         return withScorePlayerFields({
           position: position,
           userId: userId,
@@ -109,7 +112,8 @@ function hydrateDraftPlayers(list, registerInfo) {
             || (found.competitionName ? String(found.competitionName) : '')
             || '',
           gender: gender,
-          tee: tee
+          tee: tee,
+          tPosition: tee
         }, found);
       })
     };
@@ -143,13 +147,18 @@ function cloneTournamentGroups(list) {
           ? String(found.displayName)
           : (found.competitionName ? String(found.competitionName) : ''),
         gender: found.gender ? String(found.gender) : '',
-        tee: found.tee ? String(found.tee) : ''
+        tee: found.tee ? String(found.tee) : '',
+        tPosition: found.tPosition
+          ? String(found.tPosition)
+          : (found.tee === tPosition.RED_T || found.tee === tPosition.BLUE_T
+            ? String(found.tee)
+            : '')
       }, found);
     })
   }));
 }
 
-/** 正式 groups：只保存 position + userId（位号保留，含空位）；保留 teeTime / startHole */
+/** 正式 groups：保存 position + userId + tPosition（位号保留，含空位）；保留 teeTime / startHole */
 function toFormalGroups(list) {
   if (!Array.isArray(list)) return [];
   return list.map((g, index) => {
@@ -162,7 +171,11 @@ function toFormalGroups(list) {
           ? g.players.find((p) => Number(p && p.position) === position)
           : null;
         const userId = found && found.userId ? String(found.userId).trim() : '';
-        return { position: position, userId: userId };
+        const entry = { position: position, userId: userId };
+        if (userId && found) {
+          entry.tPosition = tPosition.resolve(found);
+        }
+        return entry;
       })
     };
     const teeTime = g && g.teeTime != null ? String(g.teeTime).trim() : '';
@@ -1404,8 +1417,11 @@ Page({
       const userId = String(found.userId);
       const src = lookup[userId] || {};
       const gender = found.gender || src.gender || playerDirectory.getGenderById(userId, '');
-      const teeRaw = found.tee || src.tee || tPosition.defaultFromGender(gender);
-      const tee = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
+      const tee = tPosition.resolve({
+        tPosition: found.tPosition,
+        tee: found.tee,
+        gender: gender
+      });
       return withScorePlayerFields({
         position: position,
         userId: userId,
@@ -1415,7 +1431,8 @@ Page({
           || src.displayName
           || '',
         gender: gender,
-        tee: tee
+        tee: tee,
+        tPosition: tee
       }, previous || found);
     });
 
@@ -1842,7 +1859,13 @@ Page({
     if (draftEntry && draftEntry.avatar) next.avatar = draftEntry.avatar;
     if (draftEntry && draftEntry.displayName) next.displayName = draftEntry.displayName;
     if (draftEntry && draftEntry.gender) next.gender = draftEntry.gender;
-    if (draftEntry && draftEntry.tee) next.tee = draftEntry.tee;
+    if (draftEntry && (draftEntry.tPosition || draftEntry.tee || draftEntry.gender)) {
+      next.tPosition = tPosition.resolve(draftEntry);
+      next.tee = next.tPosition;
+    } else if (oldEntry && (oldEntry.tPosition || oldEntry.tee)) {
+      next.tPosition = tPosition.resolve(oldEntry);
+      next.tee = next.tPosition;
+    }
     if (scorePlayerId) next.scorePlayerId = scorePlayerId;
     return next;
   },

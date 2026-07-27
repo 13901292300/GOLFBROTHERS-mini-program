@@ -5,7 +5,7 @@
 const { createHeaderStyle } = require('../../utils/headerEngine.js');
 const groupsStore = require('../../utils/groupsStore.js');
 const playerSlots = require('../../utils/playerSlots.js');
-const { FRIEND_ID_SET } = require('../../utils/playerDirectory.js');
+const { getGenderById } = require('../../utils/playerDirectory.js');
 const teamDirectory = require('../../utils/teamDirectory.js');
 const gameStore = require('../../utils/gameStore.js');
 const weatherService = require('../../utils/weatherService.js');
@@ -439,7 +439,7 @@ const BEST_ROSTER = [
   { name: 'SCHAUFFELE', avatar: mockAvatars.avatarByIndex(3), tee: '蓝T', teeColor: '#00aeef' }
 ];
 
-// 四人最佳球位「球员名册条」T台配色（按槽位顺序分配，新增球员复用同一调色板）
+// 四人最佳球位「球员名册条」T台配色（按槽位顺序分配；无 tPosition 时 fallback）
 const TEE_PALETTE = [
   { tee: '黑T', teeColor: '#dc2626' },
   { tee: '金T', teeColor: '#ce9224' },
@@ -447,17 +447,91 @@ const TEE_PALETTE = [
   { tee: '蓝T', teeColor: '#00aeef' }
 ];
 
+/**
+ * 记分页 T 台样式（无历史兼容）。
+ * 1) tPosition BLUE_T/RED_T → 蓝/红
+ * 2) 否则 gender === female → 红T，其它（含缺省）→ 蓝T
+ * @param {object} player
+ * @param {number} [_fallbackIndex] 保留参数兼容调用方，不再参与配色
+ * @returns {{ tPosition: string, tee: string, teeColor: string, colorClass: string }}
+ */
+function resolveScoreTeeStyle(player, _fallbackIndex) {
+  let tp = '';
+  if (player && (player.tPosition === 'BLUE_T' || player.tPosition === 'RED_T')) {
+    tp = player.tPosition;
+  } else {
+    const gender =
+      (player && (player.gender === 'female' || player.gender === 'male') && player.gender) ||
+      (player && (player.matchGender === 'female' || player.matchGender === 'male') && player.matchGender) ||
+      'male';
+    tp = gender === 'female' ? 'RED_T' : 'BLUE_T';
+  }
+  if (tp === 'RED_T') {
+    return {
+      tPosition: 'RED_T',
+      tee: '红T',
+      teeColor: '#dc2626',
+      colorClass: 'border-red'
+    };
+  }
+  return {
+    tPosition: 'BLUE_T',
+    tee: '蓝T',
+    teeColor: '#00aeef',
+    colorClass: 'border-light'
+  };
+}
+
+/** 展示用性别：显式字段 / 好友目录；异常缺失一律按男性 */
+function resolveScoreDisplayGender(player, playerId) {
+  if (player && player.gender === 'female') return 'female';
+  if (player && player.gender === 'male') return 'male';
+  if (player && player.matchGender === 'female') return 'female';
+  if (player && player.matchGender === 'male') return 'male';
+  const id = String(
+    playerId || (player && (player.playerId || player.userId || player.id)) || ''
+  ).trim();
+  if (id) {
+    const g = getGenderById(id, 'male');
+    if (g === 'female') return 'female';
+  }
+  return 'male';
+}
+
+/**
+ * 为 individual_stroke / team_match 记分源补齐 gender / tPosition / colorClass（不写 scoreData）
+ * @returns {{ gender: string, tPosition: string, colorClass: string }}
+ */
+function applyScorePlayerTeeFields(player, index) {
+  const p = player || {};
+  const playerId = p.playerId || p.id || p.userId || '';
+  const rawTp = p.tPosition === 'BLUE_T' || p.tPosition === 'RED_T' ? p.tPosition : '';
+  const gender = resolveScoreDisplayGender(p, playerId);
+  const teeStyle = resolveScoreTeeStyle(
+    {
+      tPosition: rawTp,
+      gender: gender
+    },
+    index
+  );
+  return {
+    gender: gender,
+    tPosition: rawTp || teeStyle.tPosition,
+    colorClass: teeStyle.colorClass
+  };
+}
+
 // 由当前记分页面球员(_playersSource) 派生四人最佳球位名册条（唯一数据源，增删后随之刷新）
 function buildBestRoster(players) {
   return (players || []).map((p, i) => {
-    const tp = TEE_PALETTE[i % TEE_PALETTE.length];
+    const style = resolveScoreTeeStyle(p, i);
     const shortName = p && p.name && p.name.indexOf('.') >= 0 ? p.name.split('.').pop().trim() : (p && p.name);
     return {
       playerId: (p && (p.playerId || p.id)) || ('seat-' + i),
       name: shortName || (p && p.name) || '球员',
       avatar: p && p.avatar,
-      tee: tp.tee,
-      teeColor: tp.teeColor
+      tee: style.tee,
+      teeColor: style.teeColor
     };
   });
 }
@@ -774,7 +848,7 @@ function resolveG5RegisterTeamId(user) {
 
 /**
  * MatchPlaySide 成员（仅展示：头像/姓名；不参与胜洞比较）
- * @returns {{ playerId: string, name: string, avatar: string, scorePlayerId: string }}
+ * @returns {{ playerId: string, name: string, avatar: string, scorePlayerId: string, tPosition: string, gender: string }}
  */
 function buildMatchPlaySideMember(player) {
   const playerId = resolveG5PlayerId(player);
@@ -782,11 +856,17 @@ function buildMatchPlaySideMember(player) {
     player && (player.scorePlayerId || player.slotScorePlayerId || player.scoreOwnerId)
       ? String(player.scorePlayerId || player.slotScorePlayerId || player.scoreOwnerId).trim()
       : '';
+  const tPosition =
+    player && (player.tPosition === 'BLUE_T' || player.tPosition === 'RED_T')
+      ? player.tPosition
+      : '';
   return {
     playerId: playerId,
     name: (player && player.name) || '',
     avatar: (player && player.avatar) || '',
-    scorePlayerId: scorePlayerId || playerId
+    scorePlayerId: scorePlayerId || playerId,
+    tPosition: tPosition,
+    gender: resolveScoreDisplayGender(player, playerId)
   };
 }
 
@@ -1151,13 +1231,13 @@ function buildMatchPlayPairMembers(members) {
   const PAIR_LEFT = ['24rpx', '128rpx'];
   const list = (Array.isArray(members) ? members : []).slice(0, 2);
   return list.map((m, mi) => {
-    const tp = TEE_PALETTE[mi % TEE_PALETTE.length];
+    const style = resolveScoreTeeStyle(m, mi);
     const playerId = m && m.playerId ? String(m.playerId) : '';
     const name = (m && m.name) || '球员';
     return {
       name: name,
       avatar: mockAvatars.resolveAvatar(m && m.avatar, playerId || name),
-      teeColor: tp.teeColor,
+      teeColor: style.teeColor,
       left: PAIR_LEFT[mi] || 24 + mi * 104 + 'rpx',
       tf: mi === 1 ? 'translateX(var(--pair-second-shift, 0rpx))' : 'none'
     };
@@ -1195,6 +1275,7 @@ function enrichMatchPlaySide(side, sIdx, displayMode) {
   // 杆差属 Side：G5/G678 均由 side.scores → enrichPlayerG5（gross-par）派生，不区分 member/combo
   const enriched = enrichPlayerG5(pseudo, sIdx, displayMode);
   const m0 = members[0] || null;
+  const teeStyle = resolveScoreTeeStyle(primary || m0, sIdx);
   const relScoreStr = enriched.relScoreStr || '';
   const relClass = enriched.relClass || '';
   return {
@@ -1208,7 +1289,7 @@ function enrichMatchPlaySide(side, sIdx, displayMode) {
     cells: enriched.cells || [],
     name: m0 ? m0.name || '球员' : '',
     avatar: mockAvatars.resolveAvatar(m0 && m0.avatar, (m0 && m0.playerId) || ''),
-    colorClass: 'border-white',
+    colorClass: kind === 'single' ? teeStyle.colorClass : 'border-white',
     relScoreStr: relScoreStr,
     relClass: relClass,
     teamDiffStr: relScoreStr,
@@ -1935,18 +2016,32 @@ Page({
   initStandardFromMatchState(ms) {
     const players = (ms && ms.players) || [];
     this._playersSource = players.length
-      ? players.map((p, i) => ({
-          id: (p && (p.playerId || p.id)) || ('seat-' + i),
-          playerId: (p && (p.playerId || p.id)) || ('seat-' + i),
-          name: (p && p.name) || '球员',
-          avatar: (p && p.avatar) || '',
-          colorClass: GAME_COLOR_CLASSES[i % GAME_COLOR_CLASSES.length],
-          scores: [],
-          putts: [],
-          fairways: [],
-          penalties: [],
-          sands: []
-        }))
+      ? players.map((p, i) => {
+          const playerId = (p && (p.playerId || p.id)) || ('seat-' + i);
+          const teeFields = applyScorePlayerTeeFields(
+            {
+              playerId: playerId,
+              tPosition: (p && p.tPosition) || '',
+              gender: (p && p.gender) || '',
+              matchGender: (p && p.matchGender) || ''
+            },
+            i
+          );
+          return {
+            id: playerId,
+            playerId: playerId,
+            name: (p && p.name) || '球员',
+            avatar: (p && p.avatar) || '',
+            gender: teeFields.gender,
+            tPosition: teeFields.tPosition,
+            colorClass: teeFields.colorClass,
+            scores: [],
+            putts: [],
+            fairways: [],
+            penalties: [],
+            sands: []
+          };
+        })
       : PLAYER_SEEDS.map((p) => JSON.parse(JSON.stringify(p)));
     const course = (ms && ms.course) || {};
     const menuPanels = resolveMoreMenuPanels('standard');
@@ -2296,17 +2391,18 @@ Page({
       let pairMembers = [];
       let colorClass = 'border-white';
       if (kind === 'single') {
-        colorClass = GAME_COLOR_CLASSES[gpos % GAME_COLOR_CLASSES.length];
+        const style = resolveScoreTeeStyle(m0, gpos);
+        colorClass = style.colorClass;
         gpos += 1;
       } else if (kind === 'pair') {
         const PAIR_LEFT = ['24rpx', '128rpx'];
         pairMembers = members.map((m, mi) => {
-          const tp = TEE_PALETTE[gpos % TEE_PALETTE.length];
+          const style = resolveScoreTeeStyle(m, gpos);
           gpos += 1;
           return {
             name: this._shortName(m.name) || m.name || '球员',
             avatar: m.avatar || '',
-            teeColor: tp.teeColor,
+            teeColor: style.teeColor,
             left: PAIR_LEFT[mi] || (24 + mi * 104) + 'rpx',
             tf: mi === 1 ? 'translateX(var(--pair-second-shift, 0rpx))' : 'none'
           };
@@ -2408,13 +2504,36 @@ Page({
         ? String(entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId).trim()
         : '';
       const record = (scorePlayerId && scoresByPlayer[scorePlayerId]) || (playerKey && scoresByPlayer[playerKey]) || {};
+      const rawTp =
+        entry && (entry.tPosition === 'BLUE_T' || entry.tPosition === 'RED_T')
+          ? entry.tPosition
+          : entry && (entry.tee === 'BLUE_T' || entry.tee === 'RED_T')
+            ? entry.tee
+            : '';
+      const profile = this._buildScoreTeamMatchPlayerProfile(
+        match,
+        playerKey,
+        Object.assign({}, entry, player || {})
+      );
+      const teeFields = applyScorePlayerTeeFields(
+        {
+          playerId: playerKey,
+          tPosition: rawTp,
+          tee: entry && entry.tee,
+          gender: profile.gender || entry.gender || (player && player.gender) || '',
+          matchGender: profile.matchGender || entry.matchGender || (player && player.matchGender) || ''
+        },
+        index
+      );
       return {
         id: playerKey || '',
         playerId: playerKey || '',
         scorePlayerId: scorePlayerId || playerKey || '',
         name: (player && player.name) || '球员',
         avatar: (player && player.avatar) || '',
-        colorClass: 'border-white',
+        gender: teeFields.gender,
+        tPosition: teeFields.tPosition,
+        colorClass: teeFields.colorClass,
         scores: (record.scores || []).slice(),
         putts: (record.putts || []).slice(),
         fairways: sliceFairways(record.fairways),
@@ -2437,32 +2556,72 @@ Page({
     const group = groupsStore.getGroup(groupId);
     const loaded = groupsStore.loadGroupForScoring(groupId);
     const statePlayers = ms && Array.isArray(ms.players) && ms.players.length
-      ? ms.players.map((p) => ({
-          id: p.playerId || p.id,
-          playerId: p.playerId || p.id,
-          name: p.name || '球员',
-          avatar: p.avatar || '',
-          colorClass: 'border-white',
-          scores: [],
-          putts: [],
-          fairways: [],
-          penalties: [],
-          sands: []
-        }))
+      ? ms.players.map((p, i) => {
+          const playerId = p.playerId || p.id;
+          const entry =
+            (matchGroup &&
+              Array.isArray(matchGroup.players) &&
+              matchGroup.players.find((item) => {
+                const id = item && (item.userId || item.playerId || item.id);
+                return id != null && String(id).trim() === String(playerId || '').trim();
+              })) ||
+            {};
+          const profile = match
+            ? this._buildScoreTeamMatchPlayerProfile(match, playerId, Object.assign({}, entry, p || {}))
+            : {};
+          const teeFields = applyScorePlayerTeeFields(
+            {
+              playerId: playerId,
+              tPosition: entry.tPosition || p.tPosition || '',
+              tee: entry.tee || p.tee || '',
+              gender: profile.gender || entry.gender || p.gender || '',
+              matchGender: profile.matchGender || entry.matchGender || p.matchGender || ''
+            },
+            i
+          );
+          return {
+            id: playerId,
+            playerId: playerId,
+            name: p.name || '球员',
+            avatar: p.avatar || '',
+            gender: teeFields.gender,
+            tPosition: teeFields.tPosition,
+            colorClass: teeFields.colorClass,
+            scores: [],
+            putts: [],
+            fairways: [],
+            penalties: [],
+            sands: []
+          };
+        })
       : null;
     this._playersSource = matchPlayers || statePlayers || (loaded.length
-      ? loaded.map((p) => ({
-          id: p.id,
-          playerId: p.playerId || p.id,
-          name: p.name,
-          avatar: p.avatar,
-          colorClass: p.colorClass || 'border-white',
-          scores: (p.scores || []).slice(),
-          putts: (p.putts || []).slice(),
-          fairways: sliceFairways(p.fairways),
-          penalties: slicePenalties(p.penalties),
-          sands: sliceSands(p.sands)
-        }))
+      ? loaded.map((p, i) => {
+          const teeFields = applyScorePlayerTeeFields(
+            {
+              playerId: p.playerId || p.id,
+              tPosition: p.tPosition || '',
+              tee: p.tee || '',
+              gender: p.gender || '',
+              matchGender: p.matchGender || ''
+            },
+            i
+          );
+          return {
+            id: p.id,
+            playerId: p.playerId || p.id,
+            name: p.name,
+            avatar: p.avatar,
+            gender: teeFields.gender,
+            tPosition: teeFields.tPosition,
+            colorClass: teeFields.colorClass,
+            scores: (p.scores || []).slice(),
+            putts: (p.putts || []).slice(),
+            fairways: sliceFairways(p.fairways),
+            penalties: slicePenalties(p.penalties),
+            sands: sliceSands(p.sands)
+          };
+        })
       : PLAYER_SEEDS.map((p) =>
           Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [], fairways: [], penalties: [], sands: [] })
         ));
@@ -2726,10 +2885,25 @@ Page({
           groupPlayer.avatar ||
           groupPlayer.avatarUrl ||
           '';
+        const tPosition =
+          groupPlayer.tPosition === 'BLUE_T' || groupPlayer.tPosition === 'RED_T'
+            ? groupPlayer.tPosition
+            : groupPlayer.tee === 'BLUE_T' || groupPlayer.tee === 'RED_T'
+              ? groupPlayer.tee
+              : '';
+        const gender = resolveScoreDisplayGender(
+          {
+            gender: (profile && profile.gender) || groupPlayer.gender || '',
+            matchGender: (profile && profile.matchGender) || groupPlayer.matchGender || ''
+          },
+          key
+        );
         return {
           userId: key,
           name: this._shortName(name) || name || '球员',
-          avatar: mockAvatars.resolveAvatar(avatarRaw, key)
+          avatar: mockAvatars.resolveAvatar(avatarRaw, key),
+          tPosition: tPosition,
+          gender: gender
         };
       })
       .filter(Boolean);
@@ -2740,12 +2914,12 @@ Page({
     const list = Array.isArray(memberDisplay) ? memberDisplay.slice(0, 2) : [];
     let gpos = paletteStart || 0;
     return list.map((m, mi) => {
-      const tp = TEE_PALETTE[gpos % TEE_PALETTE.length];
+      const style = resolveScoreTeeStyle(m, gpos);
       gpos += 1;
       return {
         name: (m && m.name) || '球员',
         avatar: (m && m.avatar) || '',
-        teeColor: tp.teeColor,
+        teeColor: style.teeColor,
         left: PAIR_LEFT[mi] || 24 + mi * 104 + 'rpx',
         tf: mi === 1 ? 'translateX(var(--pair-second-shift, 0rpx))' : 'none'
       };
@@ -2810,7 +2984,8 @@ Page({
         avatar = (pairMembers[0] && pairMembers[0].avatar) || '';
       } else if (kind === 'single') {
         const m0 = memberDisplay[0] || {};
-        colorClass = GAME_COLOR_CLASSES[palettePos % GAME_COLOR_CLASSES.length];
+        const style = resolveScoreTeeStyle(m0, palettePos);
+        colorClass = style.colorClass;
         palettePos += 1;
         isSingle = true;
         name = m0.name || '球员';
@@ -3431,6 +3606,8 @@ Page({
         playerId: p.playerId,
         name: p.name,
         avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
+        gender: p.gender || '',
+        tPosition: p.tPosition || '',
         scores: (saved.scores || []).slice(),
         putts: (saved.putts || []).slice(),
         fairways: sliceFairways(saved.fairways),
@@ -3438,22 +3615,34 @@ Page({
         sands: sliceSands(saved.sands)
       };
     }
-    let colorIdx = 0;
+    let occupiedIdx = 0;
     this._playersSource = this._demoSlots.filter(Boolean).map((p) => {
+      const teeFields = applyScorePlayerTeeFields(
+        {
+          playerId: p.playerId,
+          tPosition: p.tPosition || '',
+          gender: p.gender || '',
+          matchGender: p.matchGender || ''
+        },
+        occupiedIdx
+      );
+      occupiedIdx += 1;
       const row = {
         id: p.playerId,
         playerId: p.playerId,
         name: p.name,
         avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
+        gender: teeFields.gender,
+        tPosition: teeFields.tPosition,
         scores: (p.scores || []).slice(),
         putts: (p.putts || []).slice(),
         fairways: sliceFairways(p.fairways),
         penalties: slicePenalties(p.penalties),
         sands: sliceSands(p.sands)
       };
+      // colorClasses：记分竖条 T 台色（与队内赛同一套 resolveScoreTeeStyle，不再用 GAME_COLOR_CLASSES）
       if (opts.colorClasses) {
-        row.colorClass = GAME_COLOR_CLASSES[colorIdx % GAME_COLOR_CLASSES.length];
-        colorIdx++;
+        row.colorClass = teeFields.colorClass;
       }
       return row;
     });
@@ -3467,14 +3656,18 @@ Page({
         return {
           playerId: p.playerId || p.id,
           name: p.name || '球员',
-          avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId || p.id)
+          avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId || p.id),
+          gender: p.gender || '',
+          tPosition: p.tPosition || ''
         };
       });
     }
     return (this._playersSource || []).map((p) => ({
       playerId: p.playerId || p.id,
       name: p.name || '球员',
-      avatar: p.avatar || ''
+      avatar: p.avatar || '',
+      gender: p.gender || '',
+      tPosition: p.tPosition || ''
     }));
   },
 
@@ -3749,18 +3942,37 @@ Page({
 
     this._playersSource = ((teamSlots && teamSlots.slots) || [])
       .filter((slot) => slot && slot.status === 'occupied')
-      .map((slot) => {
+      .map((slot, index) => {
         const player = slot.player || {};
         const playerId = (player && player.playerId) || slot.playerId || '';
         const scorePlayerId = slot.scorePlayerId || '';
         const record = (scorePlayerId && scoresByPlayer[scorePlayerId]) || scoresByPlayer[playerId] || {};
+        const position = Number(slot.slotId) || index + 1;
+        const entry = this._findScoreTeamMatchPlayerEntry(group, position) || {};
+        const profile = this._buildScoreTeamMatchPlayerProfile(
+          match,
+          playerId,
+          Object.assign({}, entry, player)
+        );
+        const teeFields = applyScorePlayerTeeFields(
+          {
+            playerId: playerId,
+            tPosition: entry.tPosition || player.tPosition || '',
+            tee: entry.tee || player.tee || '',
+            gender: profile.gender || entry.gender || player.gender || '',
+            matchGender: profile.matchGender || entry.matchGender || player.matchGender || ''
+          },
+          index
+        );
         return {
           id: playerId,
           playerId: playerId,
           scorePlayerId: scorePlayerId || playerId,
           name: player.name || playerId || '球员',
           avatar: player.avatar || '',
-          colorClass: 'border-white',
+          gender: teeFields.gender,
+          tPosition: teeFields.tPosition,
+          colorClass: teeFields.colorClass,
           scores: (record.scores || []).slice(),
           putts: (record.putts || []).slice(),
           fairways: sliceFairways(record.fairways),
@@ -3906,18 +4118,32 @@ Page({
       groupsStore.ensureInitialized();
       const loaded = groupsStore.loadGroupForScoring(this.data.groupId);
       if (!loaded.length) return;
-      this._playersSource = loaded.map((p) => ({
-        id: p.id,
-        playerId: p.playerId || p.id,
-        name: p.name,
-        avatar: p.avatar,
-        colorClass: p.colorClass || 'border-white',
-        scores: (p.scores || []).slice(),
-        putts: (p.putts || []).slice(),
-        fairways: sliceFairways(p.fairways),
-        penalties: slicePenalties(p.penalties),
-        sands: sliceSands(p.sands)
-      }));
+      this._playersSource = loaded.map((p, i) => {
+        const teeFields = applyScorePlayerTeeFields(
+          {
+            playerId: p.playerId || p.id,
+            tPosition: p.tPosition || '',
+            tee: p.tee || '',
+            gender: p.gender || '',
+            matchGender: p.matchGender || ''
+          },
+          i
+        );
+        return {
+          id: p.id,
+          playerId: p.playerId || p.id,
+          name: p.name,
+          avatar: p.avatar,
+          gender: teeFields.gender,
+          tPosition: teeFields.tPosition,
+          colorClass: teeFields.colorClass,
+          scores: (p.scores || []).slice(),
+          putts: (p.putts || []).slice(),
+          fairways: sliceFairways(p.fairways),
+          penalties: slicePenalties(p.penalties),
+          sands: sliceSands(p.sands)
+        };
+      });
       this.refreshPlayers();
       console.log('[score-hydrate-migration]', {
         isTeamMatch: false,
@@ -4972,6 +5198,8 @@ Page({
             name: s.player.name,
             avatar: s.player.avatar,
             source: s.player.source,
+            gender: s.player.gender || '',
+            tPosition: s.player.tPosition || '',
             teamLabel: s.player.teamLabel || s.player.teamGroupName || '',
             teamGroupName: s.player.teamGroupName || s.player.teamLabel || ''
           }
@@ -5759,6 +5987,8 @@ Page({
       name: p.name,
       avatar: p.avatar || '',
       source: source || p.source || 'manual',
+      gender: p.gender || '',
+      tPosition: p.tPosition || '',
       teamLabel: '',
       teamGroupName: ''
     };
@@ -6069,13 +6299,24 @@ Page({
         const fairways = sliceFairways(cur.fairways);
         const penalties = slicePenalties(cur.penalties);
         const sands = sliceSands(cur.sands);
+        const teeFields = applyScorePlayerTeeFields(
+          {
+            playerId: ch.toPlayerId,
+            tPosition: player.tPosition || '',
+            gender: player.gender || '',
+            matchGender: player.matchGender || ''
+          },
+          idx
+        );
         this._demoSlots[idx] = {
           id: ch.toPlayerId,
           playerId: ch.toPlayerId,
           name: player.name || (ch.to && ch.to.name) || '球员',
           avatar: player.avatar || '',
           source: draftSlot.source || (player && player.source) || 'manual',
-          colorClass: cur.colorClass || 'border-white',
+          gender: teeFields.gender,
+          tPosition: teeFields.tPosition,
+          colorClass: teeFields.colorClass,
           scores: scores,
           putts: putts,
           fairways: fairways,
@@ -6092,13 +6333,24 @@ Page({
         const draftSlot = draft[idx] || {};
         const player = draftSlot.player || {};
         const cache = this._demoSlotCache[idx];
+        const teeFields = applyScorePlayerTeeFields(
+          {
+            playerId: ch.toPlayerId,
+            tPosition: player.tPosition || '',
+            gender: player.gender || '',
+            matchGender: player.matchGender || ''
+          },
+          idx
+        );
         this._demoSlots[idx] = {
           id: ch.toPlayerId,
           playerId: ch.toPlayerId,
           name: player.name || (ch.to && ch.to.name) || '球员',
           avatar: player.avatar || '',
           source: draftSlot.source || (player && player.source) || 'manual',
-          colorClass: 'border-white',
+          gender: teeFields.gender,
+          tPosition: teeFields.tPosition,
+          colorClass: teeFields.colorClass,
           scores: cache ? (cache.scores || []).slice() : [],
           putts: cache ? (cache.putts || []).slice() : [],
           fairways: cache ? sliceFairways(cache.fairways) : [],
@@ -6109,19 +6361,32 @@ Page({
       });
 
       // 由 _demoSlots 派生记分列表（此处不 persist / rebind，交给 commit 收尾）
-      this._playersSource = (this._demoSlots || []).filter(Boolean).map((p) => ({
-        id: p.playerId || p.id,
-        playerId: p.playerId || p.id,
-        name: p.name,
-        avatar: p.avatar,
-        source: p.source || 'manual',
-        colorClass: p.colorClass || 'border-white',
-        scores: (p.scores || []).slice(),
-        putts: (p.putts || []).slice(),
-        fairways: sliceFairways(p.fairways),
-        penalties: slicePenalties(p.penalties),
-        sands: sliceSands(p.sands)
-      }));
+      this._playersSource = (this._demoSlots || []).filter(Boolean).map((p, i) => {
+        const teeFields = applyScorePlayerTeeFields(
+          {
+            playerId: p.playerId || p.id,
+            tPosition: p.tPosition || '',
+            gender: p.gender || '',
+            matchGender: p.matchGender || ''
+          },
+          i
+        );
+        return {
+          id: p.playerId || p.id,
+          playerId: p.playerId || p.id,
+          name: p.name,
+          avatar: p.avatar,
+          source: p.source || 'manual',
+          gender: teeFields.gender,
+          tPosition: teeFields.tPosition,
+          colorClass: teeFields.colorClass,
+          scores: (p.scores || []).slice(),
+          putts: (p.putts || []).slice(),
+          fairways: sliceFairways(p.fairways),
+          penalties: slicePenalties(p.penalties),
+          sands: sliceSands(p.sands)
+        };
+      });
       const patch = { playerCount: this._playersSource.length || 4 };
       if (this.data.activePlayerIdx >= this._playersSource.length) patch.activePlayerIdx = 0;
       this.setData(patch);
@@ -6732,18 +6997,32 @@ Page({
   // 增删后从 store 重新拉取记分数据源（成绩跟随 playerId，不随槽位/顺序错位）
   _reloadFromStore() {
     const loaded = groupsStore.loadGroupForScoring(this.data.groupId);
-    this._playersSource = loaded.map((p) => ({
-      id: p.id,
-      playerId: p.playerId || p.id,
-      name: p.name,
-      avatar: p.avatar,
-      colorClass: p.colorClass || 'border-white',
-      scores: (p.scores || []).slice(),
-      putts: (p.putts || []).slice(),
-      fairways: sliceFairways(p.fairways),
-      penalties: slicePenalties(p.penalties),
-      sands: sliceSands(p.sands)
-    }));
+    this._playersSource = loaded.map((p, i) => {
+      const teeFields = applyScorePlayerTeeFields(
+        {
+          playerId: p.playerId || p.id,
+          tPosition: p.tPosition || '',
+          tee: p.tee || '',
+          gender: p.gender || '',
+          matchGender: p.matchGender || ''
+        },
+        i
+      );
+      return {
+        id: p.id,
+        playerId: p.playerId || p.id,
+        name: p.name,
+        avatar: p.avatar,
+        gender: teeFields.gender,
+        tPosition: teeFields.tPosition,
+        colorClass: teeFields.colorClass,
+        scores: (p.scores || []).slice(),
+        putts: (p.putts || []).slice(),
+        fairways: sliceFairways(p.fairways),
+        penalties: slicePenalties(p.penalties),
+        sands: sliceSands(p.sands)
+      };
+    });
     const patch = {
       playerCount: this._playersSource.length || 4,
       groupSlots: this._groupSlotsForCurrent()
@@ -6756,6 +7035,7 @@ Page({
 
   _reloadFromTeamMatchDraft() {
     const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
     const groupId = String(this.data.groupId || ((this._matchState || {}).groupId) || '');
     const groupScoreData = match && match.scoreData && match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
       ? match.scoreData[groupId]
@@ -6770,19 +7050,54 @@ Page({
     });
     this._playersSource = (this._draftSlots || [])
       .filter((slot) => this._slotOccupiedPlayerId(slot))
-      .map((slot) => {
+      .map((slot, index) => {
         const player = slot.player || {};
         const playerId = this._slotOccupiedPlayerId(slot);
         const existing = existingById[playerId] || {};
         const scorePlayerId = slot.scorePlayerId || playerId;
         const record = scoresByPlayer[scorePlayerId] || scoresByPlayer[playerId] || {};
+        const position = Number(slot.slotId) || index + 1;
+        const entry = this._findScoreTeamMatchPlayerEntry(group, position) || {};
+        const profile = match
+          ? this._buildScoreTeamMatchPlayerProfile(
+              match,
+              playerId,
+              Object.assign({}, entry, player, existing)
+            )
+          : {};
+        const teeFields = applyScorePlayerTeeFields(
+          {
+            playerId: playerId,
+            tPosition:
+              player.tPosition ||
+              existing.tPosition ||
+              entry.tPosition ||
+              '',
+            tee: player.tee || existing.tee || entry.tee || '',
+            gender:
+              player.gender ||
+              existing.gender ||
+              profile.gender ||
+              entry.gender ||
+              '',
+            matchGender:
+              player.matchGender ||
+              existing.matchGender ||
+              profile.matchGender ||
+              entry.matchGender ||
+              ''
+          },
+          index
+        );
         return {
           id: playerId,
           playerId: playerId,
           scorePlayerId: scorePlayerId,
           name: player.name || existing.name || '球员',
           avatar: player.avatar || existing.avatar || '',
-          colorClass: existing.colorClass || 'border-white',
+          gender: teeFields.gender,
+          tPosition: teeFields.tPosition,
+          colorClass: teeFields.colorClass,
           scores: (record.scores || existing.scores || []).slice(),
           putts: (record.putts || existing.putts || []).slice(),
           fairways: sliceFairways(record.fairways || existing.fairways),

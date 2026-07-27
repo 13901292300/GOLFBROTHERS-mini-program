@@ -1332,7 +1332,8 @@ Page({
   },
 
   /**
-   * 分组展示用球员字典：正式 groups 只存 userId/position，昵称/头像/T台从报名名单解析
+   * 分组展示用球员字典：正式 groups 存 userId/position/tPosition；
+   * lookup 补昵称/头像/性别；T 台缺省按性别，不覆盖 groups 已存值（见 hydrate）。
    */
   _buildGroupPlayerLookup(match) {
     const map = {};
@@ -1343,7 +1344,11 @@ Page({
         const primaryId = this._resolveAnyPlayerId(u);
         if (!primaryId) return;
         const gender = playerManage.resolveMatchGender(u);
-        const teeCode = tPosition.defaultFromGender(gender);
+        const teeCode = tPosition.resolve({
+          tPosition: u.tPosition,
+          tee: u.tee,
+          gender: gender
+        });
         const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
         const entry = {
           userId: primaryId,
@@ -1352,6 +1357,7 @@ Page({
           gender: gender,
           handicap: u.handicap != null ? u.handicap : '',
           tee: teeCode,
+          tPosition: teeCode,
           teeText: teeText
         };
         // 同一人多 id 字段都挂到 lookup，避免 groups.userId 与报名 id 字段不一致
@@ -1368,7 +1374,8 @@ Page({
   },
 
   /**
-   * 展示层 hydrate：不改写正式 groups，仅生成 displayPlayers
+   * 展示层 hydrate：不改写正式 groups，仅生成 displayPlayers。
+   * T 台：groups.players.tPosition/tee 优先，禁止 gender 默认覆盖已有事实。
    */
   hydrateGroupDisplayPlayers(group, playerLookup) {
     const lookup = playerLookup || {};
@@ -1377,9 +1384,12 @@ Page({
         const userId = this._resolveAnyPlayerId(p);
         if (!userId) return null;
         const src = lookup[userId] || {};
-        const gender = src.gender || p.gender || playerDirectory.getGenderById(userId, '');
-        const teeRaw = src.tee || p.tee || p.tPosition || tPosition.defaultFromGender(gender);
-        const teeCode = teeRaw === tPosition.RED_T ? tPosition.RED_T : tPosition.BLUE_T;
+        const gender = p.gender || src.gender || playerDirectory.getGenderById(userId, '');
+        const teeCode = tPosition.resolve({
+          tPosition: p.tPosition,
+          tee: p.tee,
+          gender: gender
+        });
         const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
         const nickname = src.nickname
           || this._resolveAnyPlayerNickname(p)
@@ -1402,6 +1412,7 @@ Page({
           teeText: teeText,
           teeLabel: teeText,
           teeCode: teeCode,
+          tPosition: teeCode,
           teeMarkerClass: teeCode === tPosition.RED_T
             ? 'tee-marker-dot--female'
             : 'tee-marker-dot--male',
@@ -6174,12 +6185,36 @@ Page({
           : '';
         const display = playerMap[playerId] || {};
         const raw = rawMap[playerId] || {};
+        // 出发表 T 台：已由 hydrate（groups.players 优先）算出；勿再用 gender lookup 覆盖
+        const teeCode =
+          display.teeCode ||
+          display.tPosition ||
+          (raw.tPosition === tPosition.RED_T || raw.tPosition === tPosition.BLUE_T
+            ? raw.tPosition
+            : '') ||
+          (raw.tee === tPosition.RED_T || raw.tee === tPosition.BLUE_T ? raw.tee : '') ||
+          player.teeCode ||
+          '';
+        const teeText =
+          display.teeText ||
+          display.teeLabel ||
+          (teeCode === tPosition.RED_T ? '红T' : teeCode === tPosition.BLUE_T ? '蓝T' : '') ||
+          player.teeText ||
+          player.tee ||
+          '';
         return Object.assign({}, player, {
-          tee: display.tee || player.tee || '',
-          teeText: display.teeText || player.teeText || '',
-          teeLabel: display.teeLabel || player.teeLabel || '',
-          teeCode: display.teeCode || player.teeCode || '',
-          teeMarkerClass: display.teeMarkerClass || player.teeMarkerClass || '',
+          tee: teeText || player.tee || '',
+          teeText: teeText,
+          teeLabel: display.teeLabel || teeText || player.teeLabel || '',
+          teeCode: teeCode || player.teeCode || '',
+          tPosition: teeCode || player.tPosition || '',
+          teeMarkerClass:
+            display.teeMarkerClass ||
+            (teeCode === tPosition.RED_T
+              ? 'tee-marker-dot--female'
+              : teeCode === tPosition.BLUE_T
+                ? 'tee-marker-dot--male'
+                : player.teeMarkerClass || ''),
           teamLabel: showTeamLabel
             ? this._resolveTeeSheetPlayerTeamLabel(raw, playerId, teamNameMap, playerTeamLookup)
             : ''
