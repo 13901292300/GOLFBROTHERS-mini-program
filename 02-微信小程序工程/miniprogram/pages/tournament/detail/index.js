@@ -42,6 +42,8 @@ const {
 } = require('../../../utils/strokeEntityValidator.js');
 const matchStatus = require('../../../utils/matchStatus.js');
 const contactStore = require('../../../utils/contactStore.js');
+const scheduleStore = require('../../../utils/scheduleStore.js');
+const scheduleAdapter = require('../../../utils/scheduleAdapter.js');
 const { buildMatchPlayResultSummary } = require('../../../utils/matchPlayResult.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
@@ -3288,6 +3290,9 @@ Page({
     // 5. 持久化
     teamMatchStore.saveMatch(match);
 
+    // 5b. 报名名单 → 每人一条赛事日程（幂等；不改 match / toast）
+    this.syncTeamMatchSchedules(match);
+
     // 6. 刷新页面数据（保持当前用户所在分组选中）
     const patch = this._buildRegisterStatePatch(match, groupId);
     patch.registerSheetVisible = false;
@@ -3296,6 +3301,68 @@ Page({
       if (this.data.activeTab === 'register') this.measureRegisterExtTop();
     });
     wx.showToast({ title: '报名成功', icon: 'success' });
+  },
+
+  /**
+   * 将当前报名名单同步为 team_match 日程（已存在则跳过）
+   * @param {object} match
+   */
+  syncTeamMatchSchedules(match) {
+    if (!match || !match.matchId) return;
+    const matchId = String(match.matchId);
+    const users =
+      match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
+      if (!user) continue;
+      const ownerId = String(
+        user.userId != null
+          ? user.userId
+          : user.playerId != null
+            ? user.playerId
+            : user.id != null
+              ? user.id
+              : ''
+      ).trim();
+      if (!ownerId) continue;
+      const existing = scheduleStore.findSchedulesBySource(
+        'team_match',
+        matchId,
+        ownerId
+      );
+      if (existing && existing.length) continue;
+      scheduleStore.createSchedule(
+        scheduleAdapter.createTeamMatchSchedule(match, user)
+      );
+    }
+  },
+
+  /**
+   * 取消报名后：只删目标用户的 team_match 日程（userId = 被取消者，非操作人）
+   * @param {string} matchId
+   * @param {string} userId
+   */
+  deleteTeamMatchSchedule(matchId, userId) {
+    const mid = String(matchId != null ? matchId : '').trim();
+    const uid = String(userId != null ? userId : '').trim();
+    if (!mid || !uid) return;
+    scheduleStore.deleteSchedulesBySource('team_match', mid, uid);
+  },
+
+  /**
+   * 取消整场赛事：删除该 match 下全部 team_match 日程（不传 ownerId）
+   * @param {string} matchId
+   */
+  deleteTeamMatchSchedules(matchId) {
+    const mid = String(matchId != null ? matchId : '').trim();
+    if (!mid) return;
+    try {
+      scheduleStore.deleteSchedulesBySource('team_match', mid);
+    } catch (e) {
+      console.warn('[deleteTeamMatchSchedules] failed', mid, e);
+    }
   },
 
   /* ===== 取消报名流程 ===== */
@@ -3414,6 +3481,9 @@ Page({
       });
       return;
     }
+
+    // 取消成功后：只删目标用户赛事日程（管理员代取消时亦用被取消者 userId）
+    this.deleteTeamMatchSchedule(matchId, userId);
 
     const match = result.match;
     const patch = Object.assign(
@@ -6958,6 +7028,8 @@ Page({
   _confirmCancelMatch() {
     const matchId = this.data.matchId;
     if (!matchId) return;
+    // 先清该赛事全部报名日程，再硬删比赛实体（顺序不可颠倒）
+    this.deleteTeamMatchSchedules(matchId);
     const removed = gameLifecycle.purgeTeamMatchCompletely(matchId);
     if (!removed) {
       wx.showToast({ title: '比赛不存在或已删除', icon: 'none' });

@@ -7,6 +7,8 @@ const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const userProfileStore = require('../../utils/userProfileStore.js');
 const bannerConfig = require('../../utils/bannerConfig.js');
+const scheduleStore = require('../../utils/scheduleStore.js');
+const { sortSchedules } = require('../../utils/scheduleSort.js');
 
 function decorateTournamentCard(match, card) {
   if (!card) return null;
@@ -62,15 +64,45 @@ function formatScheduleDay(date) {
   return WEEKDAYS[date.getDay()] + ' · ' + WEEKDAY_FULL[date.getDay()];
 }
 
-function createScheduleCard(date) {
-  return {
-    id: Date.now() + Math.random(),
-    dateDisplay: formatScheduleDate(date),
-    dayDisplay: formatScheduleDay(date),
-    remindees: [],
-    note: '',
-    removing: false
-  };
+/** Date → scheduleStore date key YYYY-MM-DD */
+function toScheduleDateKey(date) {
+  return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate());
+}
+
+/** YYYY-MM-DD → Date（本地日历日）；非法则 null */
+function parseScheduleDateKey(dateKey) {
+  const parts = String(dateKey || '').split('-');
+  if (parts.length !== 3) return null;
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * scheduleStore → 日程 TAB UI 卡片结构（WXML 仍用 dateDisplay/dayDisplay/note/remindees）
+ * content→note，members→remindees（userId→id）
+ */
+function formatScheduleCards(list) {
+  return (Array.isArray(list) ? list : []).map(function (item) {
+    const dateObj = parseScheduleDateKey(item && item.date) || new Date();
+    const members = item && Array.isArray(item.members) ? item.members : [];
+    return {
+      id: item && item.id != null ? item.id : '',
+      dateDisplay: formatScheduleDate(dateObj),
+      dayDisplay: formatScheduleDay(dateObj),
+      note: item && item.content != null ? String(item.content) : '',
+      remindees: members.map(function (m) {
+        return {
+          id: m && m.userId != null ? String(m.userId) : '',
+          name: m && m.name != null ? String(m.name) : '',
+          avatar: m && m.avatar != null ? String(m.avatar) : ''
+        };
+      }),
+      removing: false
+    };
+  });
 }
 
 Page({
@@ -109,16 +141,17 @@ Page({
     homeBannerImg: bannerConfig.getHomeBanner(),
     calendarMonthYear: '',
     calendarDays: [],
-    scheduleCards: [
-      {
-        id: 1,
-        dateDisplay: '2024年05月20日',
-        dayDisplay: '星期一 · Monday',
-        remindees: [],
-        note: '',
-        removing: false
-      }
-    ],
+    scheduleCards: [],
+    scheduleCalendarYear: new Date().getFullYear(),
+    scheduleCalendarMonth: new Date().getMonth() + 1,
+    eventsByDate: {},
+    scheduleDaySheetVisible: false,
+    scheduleDaySheetDate: '',
+    scheduleDaySheetEvents: [],
+    scheduleEditorVisible: false,
+    scheduleEditorDate: '',
+    scheduleEditorSchedule: null,
+    scheduleRemindPickerForEditor: false,
     scheduleRemindSearch: '',
     filteredScheduleFriends: [],
     tempRemindeeSelection: [],
@@ -249,6 +282,12 @@ Page({
     this.initGlobalTheme();
     this._syncFontScale();
     this.refreshUserProfile();
+    this.setData({
+      scheduleCalendarYear: this.getCurrentCalendarYear(),
+      scheduleCalendarMonth: new Date().getMonth() + 1
+    });
+    this._refreshScheduleCards();
+    this._buildScheduleEventsByDate();
     if (options && options.section === 'profile') {
       this.showProfileSection();
     } else if (options && options.section === 'tournament') {
@@ -270,6 +309,366 @@ Page({
     // 每次显示刷新进行中 GAME（持久化数据源 → 返回首页不丢失、刷新可恢复）
     this.refreshGames();
     this.refreshTeamMatchCards();
+    this._refreshScheduleCards();
+    this._buildScheduleEventsByDate();
+  },
+
+  /** 从 scheduleStore 读取并映射为 UI scheduleCards（空库保持 []，无演示种子） */
+  _refreshScheduleCards() {
+    this.setData({
+      scheduleCards: formatScheduleCards(this._getSchedulesForCurrentUser())
+    });
+  },
+
+  /** 当前用户 userId（日程展示过滤用） */
+  _getCurrentScheduleOwnerId() {
+    const user = gameStore.getCurrentUser() || {};
+    return String(user.userId || 'me');
+  },
+
+  /**
+   * 仅展示 ownerId === 当前用户的日程（不改 store / 不删 friend_reminder 数据）
+   * self / friend_reminder / team_match 均按 ownerId 归属过滤
+   */
+  _filterSchedulesForCurrentUser(list) {
+    const ownerId = this._getCurrentScheduleOwnerId();
+    return (Array.isArray(list) ? list : []).filter(function (item) {
+      return item && String(item.ownerId || '') === ownerId;
+    });
+  },
+
+  _getSchedulesForCurrentUser() {
+    return this._filterSchedulesForCurrentUser(scheduleStore.getSchedules());
+  },
+
+  _getSchedulesByDateForCurrentUser(date) {
+    return this._filterSchedulesForCurrentUser(
+      scheduleStore.getSchedulesByDate(date)
+    );
+  },
+
+  getCurrentCalendarYear() {
+    return new Date().getFullYear();
+  },
+
+  /** 进入日程 TAB：定位到当前年 / 当前月 */
+  _focusCurrentScheduleMonth() {
+    const now = new Date();
+    this.setData({
+      scheduleCalendarYear: now.getFullYear(),
+      scheduleCalendarMonth: now.getMonth() + 1
+    });
+  },
+
+  /**
+   * 滚动唯一容器 #home-scroll-main 到指定月份锚点（month-N）
+   * 说明：首页 disableScroll=true，wx.pageScrollTo 无效，必须滚 ds-scroll-main。
+   */
+  _scrollMainToScheduleMonth(month, attempt) {
+    const tryCount = attempt || 0;
+    let targetMonth = Number(month);
+    if (!targetMonth || targetMonth < 1 || targetMonth > 12) {
+      targetMonth = Number(this.data.scheduleCalendarMonth) || new Date().getMonth() + 1;
+    }
+    const anchorId = '#month-' + targetMonth;
+    const cal = this.selectComponent('#schedule-calendar');
+    if (!cal) {
+      if (tryCount < 8) {
+        setTimeout(() => {
+          this._scrollMainToScheduleMonth(targetMonth, tryCount + 1);
+        }, 50);
+      }
+      return;
+    }
+
+    const stickyOffset = 56; // 吸顶 TAB 高度余量
+    wx.createSelectorQuery()
+      .in(cal)
+      .select(anchorId)
+      .boundingClientRect()
+      .exec((monthRes) => {
+        const monthRect = monthRes && monthRes[0];
+        if (!monthRect) {
+          if (tryCount < 8) {
+            setTimeout(() => {
+              this._scrollMainToScheduleMonth(targetMonth, tryCount + 1);
+            }, 50);
+          }
+          return;
+        }
+
+        this.createSelectorQuery()
+          .select('#home-scroll-main')
+          .boundingClientRect()
+          .select('#home-scroll-main')
+          .scrollOffset()
+          .select('#home-scroll-main')
+          .node()
+          .exec((mainRes) => {
+            const containerRect = mainRes && mainRes[0];
+            const scrollInfo = mainRes && mainRes[1];
+            const nodeWrap = mainRes && mainRes[2];
+            if (!containerRect) return;
+
+            const currentTop =
+              scrollInfo && typeof scrollInfo.scrollTop === 'number'
+                ? scrollInfo.scrollTop
+                : nodeWrap && nodeWrap.node && typeof nodeWrap.node.scrollTop === 'number'
+                  ? nodeWrap.node.scrollTop
+                  : 0;
+            const delta = monthRect.top - containerRect.top;
+            const nextTop = Math.max(0, currentTop + delta - stickyOffset);
+            const node = nodeWrap && nodeWrap.node;
+
+            if (node && typeof node.scrollTo === 'function') {
+              node.scrollTo({ top: nextTop, behavior: 'smooth' });
+            } else if (node) {
+              node.scrollTop = nextTop;
+            } else {
+              // 兜底：部分基础库无 node，尝试 pageScrollTo（通常无效于 disableScroll）
+              try {
+                wx.pageScrollTo({ scrollTop: nextTop, duration: 300 });
+              } catch (e) {
+                /* ignore */
+              }
+            }
+          });
+      });
+  },
+
+  changeCalendarYear(e) {
+    const dir = Number(
+      e && e.currentTarget && e.currentTarget.dataset
+        ? e.currentTarget.dataset.dir
+        : 0
+    );
+    if (!dir) return;
+    const year = Number(this.data.scheduleCalendarYear) || this.getCurrentCalendarYear();
+    this.setData({ scheduleCalendarYear: year + dir }, () => {
+      setTimeout(() => {
+        this._scrollMainToScheduleMonth(this.data.scheduleCalendarMonth);
+      }, 80);
+    });
+  },
+
+  /**
+   * scheduleStore → 日历 eventsByDate（同日多事件合并为数组）
+   * 仅当前用户 ownerId；不接 gameStore / teamMatchStore
+   */
+  _buildScheduleEventsByDate() {
+    const list = this._getSchedulesForCurrentUser();
+    const map = {};
+    (Array.isArray(list) ? list : []).forEach(function (item) {
+      if (!item || !item.date) return;
+      const key = String(item.date);
+      if (!map[key]) map[key] = [];
+      map[key].push({
+        id: item.id,
+        type: item.type || 'manual',
+        content: item.content != null ? String(item.content) : ''
+      });
+    });
+    this.setData({ eventsByDate: map });
+  },
+
+  /** day-sheet 展示用：附带 sourceType / sourceId（不改 store） */
+  _mapDaySheetEvents(list) {
+    return (Array.isArray(list) ? list : []).map(function (item) {
+      return {
+        id: item.id,
+        content: item.content != null ? String(item.content) : '',
+        members: Array.isArray(item.members) ? item.members : [],
+        sourceType: item.sourceType != null ? String(item.sourceType) : 'self',
+        sourceId: item.sourceId != null ? String(item.sourceId) : ''
+      };
+    });
+  },
+
+  /** 打开某日日程列表 Sheet */
+  onScheduleDateTap(e) {
+    const date =
+      e && e.detail && e.detail.date != null ? String(e.detail.date) : '';
+    if (!date) return;
+    const events = this._mapDaySheetEvents(
+      sortSchedules(this._getSchedulesByDateForCurrentUser(date))
+    );
+    this.setData({
+      scheduleDaySheetVisible: true,
+      scheduleDaySheetDate: date,
+      scheduleDaySheetEvents: events
+    });
+  },
+
+  onScheduleDaySheetClose() {
+    this.setData({
+      scheduleDaySheetVisible: false,
+      scheduleDaySheetEvents: []
+    });
+  },
+
+  onScheduleDaySheetAdd(e) {
+    const date =
+      e && e.detail && e.detail.date != null
+        ? String(e.detail.date)
+        : this.data.scheduleDaySheetDate;
+    this.setData({
+      scheduleEditorVisible: true,
+      scheduleEditorDate: date || '',
+      scheduleEditorSchedule: null
+    });
+  },
+
+  onScheduleDaySheetEdit(e) {
+    const id = e && e.detail && e.detail.id != null ? String(e.detail.id) : '';
+    if (!id) return;
+    const found = scheduleStore.getScheduleById(id);
+    if (!found) return;
+    if (String(found.sourceType || '') === 'team_match') {
+      console.warn('[onScheduleDaySheetEdit] team_match is read-only', id);
+      return;
+    }
+    this.setData({
+      scheduleEditorVisible: true,
+      scheduleEditorDate: found.date || this.data.scheduleDaySheetDate,
+      scheduleEditorSchedule: found
+    });
+  },
+
+  onScheduleViewMatch(e) {
+    const matchId =
+      e && e.detail && e.detail.matchId != null ? String(e.detail.matchId) : '';
+    if (!matchId) return;
+    wx.navigateTo({
+      url: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+    });
+  },
+
+  onScheduleEditorClose() {
+    this.setData({
+      scheduleEditorVisible: false,
+      scheduleEditorSchedule: null
+    });
+  },
+
+  onScheduleEditorOpenMemberPicker(e) {
+    const selectedIds =
+      e && e.detail && Array.isArray(e.detail.selectedIds)
+        ? e.detail.selectedIds.slice()
+        : [];
+    this.setData({
+      scheduleRemindPickerForEditor: true,
+      activeRemindScheduleCardIndex: null,
+      scheduleRemindSearch: '',
+      tempRemindeeSelection: selectedIds,
+      scheduleRemindPickerVisible: true
+    });
+    this.renderScheduleFriendList();
+    setTimeout(() => {
+      this.setData({ scheduleRemindPanelOpen: true });
+    }, 10);
+  },
+
+  /** 刷新某日 day-sheet 列表（编辑/删除后） */
+  _refreshScheduleDaySheet(date) {
+    const key = String(date || this.data.scheduleDaySheetDate || '');
+    if (!key) {
+      this.setData({
+        scheduleDaySheetEvents: [],
+        scheduleEditorVisible: false,
+        scheduleEditorSchedule: null
+      });
+      return;
+    }
+    const dayEvents = this._mapDaySheetEvents(
+      sortSchedules(this._getSchedulesByDateForCurrentUser(key))
+    );
+    this.setData({
+      scheduleDaySheetDate: key,
+      scheduleDaySheetEvents: dayEvents,
+      scheduleDaySheetVisible: true,
+      scheduleEditorVisible: false,
+      scheduleEditorSchedule: null
+    });
+  },
+
+  /**
+   * 编辑器保存：
+   * - 编辑：仅 updateSchedule，不生成 friend_reminder 副本
+   * - 新增：createSchedule(self) + 每位好友 friend_reminder
+   * - team_match：禁止保存
+   */
+  saveScheduleFromEditor(e) {
+    const detail = e && e.detail ? e.detail : {};
+    const date = String(detail.date || '');
+    const content = String(detail.content || '').trim();
+    const remindees = Array.isArray(detail.remindees) ? detail.remindees : [];
+    const scheduleId = detail.scheduleId ? String(detail.scheduleId) : '';
+    if (!date || !content) {
+      wx.showToast({ title: '请完善日程', icon: 'none' });
+      return;
+    }
+
+    if (scheduleId) {
+      const existing = scheduleStore.getScheduleById(scheduleId);
+      if (existing && String(existing.sourceType || '') === 'team_match') {
+        console.warn('[saveScheduleFromEditor] blocked team_match save', scheduleId);
+        return;
+      }
+    }
+
+    const user = gameStore.getCurrentUser() || {};
+    const currentUserId = String(user.userId || 'me');
+
+    if (scheduleId) {
+      scheduleStore.updateSchedule(scheduleId, {
+        date: date,
+        content: content,
+        members: remindees
+      });
+    } else {
+      scheduleStore.createSchedule({
+        type: 'manual',
+        date: date,
+        content: content,
+        ownerId: currentUserId,
+        sourceType: 'self',
+        members: remindees
+      });
+      remindees.forEach(function (member) {
+        if (!member || !member.userId) return;
+        scheduleStore.createSchedule({
+          type: 'manual',
+          date: date,
+          content: content,
+          ownerId: String(member.userId),
+          sourceType: 'friend_reminder',
+          sourceUserId: currentUserId,
+          members: []
+        });
+      });
+    }
+
+    this._refreshScheduleCards();
+    this._buildScheduleEventsByDate();
+    this._refreshScheduleDaySheet(date);
+    wx.showToast({ title: scheduleId ? '已修改' : '已保存', icon: 'success' });
+  },
+
+  /**
+   * 编辑器删除：只删当前这条，不影响对方独立副本
+   */
+  deleteScheduleFromEditor(e) {
+    const id = e && e.detail && e.detail.id != null ? String(e.detail.id) : '';
+    if (!id) return;
+    const existing = scheduleStore.getScheduleById(id);
+    const date = existing && existing.date
+      ? String(existing.date)
+      : this.data.scheduleDaySheetDate;
+    scheduleStore.deleteSchedule(id);
+    this._refreshScheduleCards();
+    this._buildScheduleEventsByDate();
+    this._refreshScheduleDaySheet(date);
+    wx.showToast({ title: '已删除', icon: 'success' });
   },
 
   /** 读取全局字体大小偏好（显示设置 → fontScale_global） */
@@ -508,7 +907,12 @@ Page({
     const section = this.data.currentMainSection;
     if (section === 'home') {
       if (which === 'secondary') {
-        this.setData({ showScheduleContent: true });
+        this._focusCurrentScheduleMonth();
+        this.setData({ showScheduleContent: true }, () => {
+          setTimeout(() => {
+            this._scrollMainToScheduleMonth(this.data.scheduleCalendarMonth);
+          }, 80);
+        });
       } else {
         this.setData({ showMyContent: true });
       }
@@ -848,33 +1252,43 @@ Page({
       this.data.selectedCalendarDay
     );
     const idx = this.data.activeScheduleCardIndex;
-    if (idx != null && this.data.scheduleCards[idx]) {
-      this.setData({
-        ['scheduleCards[' + idx + '].dateDisplay']: formatScheduleDate(selected),
-        ['scheduleCards[' + idx + '].dayDisplay']: formatScheduleDay(selected)
-      });
+    const card = idx != null ? this.data.scheduleCards[idx] : null;
+    if (card && card.id) {
+      scheduleStore.updateSchedule(card.id, { date: toScheduleDateKey(selected) });
+      this._refreshScheduleCards();
     }
     this.closeCalendarPicker();
   },
 
   addNewSchedule() {
     const today = new Date();
-    const cards = this.data.scheduleCards.concat(createScheduleCard(today));
-    this.setData({ scheduleCards: cards });
+    scheduleStore.createSchedule({
+      date: toScheduleDateKey(today),
+      content: '',
+      members: []
+    });
+    this._refreshScheduleCards();
   },
 
   removeSchedule(e) {
     const index = e.currentTarget.dataset.index;
+    const card = this.data.scheduleCards[index];
+    if (!card) return;
     this.setData({ ['scheduleCards[' + index + '].removing']: true });
     setTimeout(() => {
-      const cards = this.data.scheduleCards.filter((_, i) => i !== index);
-      this.setData({ scheduleCards: cards });
+      if (card.id) scheduleStore.deleteSchedule(card.id);
+      this._refreshScheduleCards();
     }, 300);
   },
 
   onScheduleNoteInput(e) {
     const index = e.currentTarget.dataset.index;
-    this.setData({ ['scheduleCards[' + index + '].note']: e.detail.value });
+    const card = this.data.scheduleCards[index];
+    const note = e.detail.value;
+    this.setData({ ['scheduleCards[' + index + '].note']: note });
+    if (card && card.id) {
+      scheduleStore.updateSchedule(card.id, { content: note });
+    }
   },
 
   getCardRemindees(card) {
@@ -921,7 +1335,8 @@ Page({
     setTimeout(() => {
       this.setData({
         scheduleRemindPickerVisible: false,
-        activeRemindScheduleCardIndex: null
+        activeRemindScheduleCardIndex: null,
+        scheduleRemindPickerForEditor: false
       });
     }, 300);
   },
@@ -945,13 +1360,38 @@ Page({
   },
 
   confirmScheduleRemindees() {
-    const idx = this.data.activeRemindScheduleCardIndex;
-    if (idx == null) return;
     const selection = this.data.tempRemindeeSelection;
-    const selected = SCHEDULE_FRIENDS.filter(function (f) {
+    const members = SCHEDULE_FRIENDS.filter(function (f) {
       return selection.indexOf(f.id) !== -1;
+    }).map(function (f) {
+      return {
+        userId: f.id,
+        name: f.name,
+        avatar: f.avatar
+      };
     });
-    this.setData({ ['scheduleCards[' + idx + '].remindees']: selected });
+
+    if (this.data.scheduleRemindPickerForEditor) {
+      const editor = this.selectComponent('#schedule-editor-sheet');
+      if (editor && typeof editor.setSelectedMembers === 'function') {
+        editor.setSelectedMembers(members);
+      }
+      this.closeScheduleRemindeePicker();
+      return;
+    }
+
+    const idx = this.data.activeRemindScheduleCardIndex;
+    if (idx == null) {
+      this.closeScheduleRemindeePicker();
+      return;
+    }
+    const card = this.data.scheduleCards[idx];
+    if (!card || !card.id) {
+      this.closeScheduleRemindeePicker();
+      return;
+    }
+    scheduleStore.updateSchedule(card.id, { members: members });
+    this._refreshScheduleCards();
     this.closeScheduleRemindeePicker();
   }
 });

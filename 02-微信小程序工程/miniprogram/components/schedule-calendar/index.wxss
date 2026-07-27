@@ -1,0 +1,198 @@
+/* schedule-calendar — 日期状态视觉（无选中圈 / 无 border 外圈 / 无 shadow） */
+.schedule-calendar {
+  --cal-text: var(--text-primary, #002d62);
+  --cal-muted: #94a3b8;
+  --cal-title: var(--text-primary, #002d62);
+  --cal-today-bg: #4b5563;
+  --cal-event-bg: #d4a017;
+  --cal-on-fill: #ffffff;
+  --cal-mark-size: 60rpx;
+  --cal-core-size: 40rpx;
+  box-sizing: border-box;
+  padding: 8px 12px 16px;
+  color: var(--cal-text);
+}
+
+.month-block {
+  margin-bottom: 20px;
+}
+
+.month-block:last-child {
+  margin-bottom: 0;
+}
+
+.month-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--cal-title);
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+
+.week-header,
+.week-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.week-label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--cal-muted);
+  letter-spacing: 0.08em;
+  padding: 4px 0 8px;
+}
+
+.day-cell {
+  flex: 1;
+  min-width: 0;
+  height: 68rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.day-cell--empty {
+  pointer-events: none;
+}
+
+/* -------- 日期主体：默认无背景 -------- */
+.day-mark {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  position: relative;
+  z-index: 1;
+}
+
+.day-mark__core {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.day-num {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--cal-text);
+}
+
+/* -------- 今天（无日程）：完整深灰圆 60rpx + 白字 -------- */
+.day-mark--today {
+  width: 60rpx;
+  height: 60rpx;
+  background: #4b5563;
+  border: none;
+  box-shadow: none;
+}
+
+.day-mark--today .day-num {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* -------- 有日程（未来）：完整金色圆 60rpx + 白字 -------- */
+.day-mark--event {
+  width: 60rpx;
+  height: 60rpx;
+  background: #d4a017;
+  border: none;
+  box-shadow: none;
+}
+
+.day-mark--event .day-num {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+/* -------- 过去有日程：浅黄圆底 + 深黄/棕黄字（弱于未来金） -------- */
+.day-mark--past-event {
+  width: 60rpx;
+  height: 60rpx;
+  background: #f3e6b5;
+  border: none;
+  box-shadow: none;
+}
+
+.day-mark--past-event .day-num {
+  color: #8a6a12;
+  font-weight: 700;
+}
+
+/*
+ * -------- 今天+有日程（最高优先级，完整自包含）--------
+ * 外层：深灰填充圆 60rpx（非 border / 非 shadow）
+ * 内层：金色同心圆 40rpx
+ */
+.day-mark--today-event {
+  width: 60rpx;
+  height: 60rpx;
+  background: #4b5563;
+  border: none;
+  box-shadow: none;
+}
+
+.day-mark--today-event .day-mark__core {
+  width: 40rpx;
+  height: 40rpx;
+  background: #d4a017;
+  border: none;
+  box-shadow: none;
+}
+
+.day-mark--today-event .day-num {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+/* -------- 暗色：普通字清晰；过去日程仍可辨识 -------- */
+.dark-theme .schedule-calendar,
+.dark-mode .schedule-calendar,
+.schedule-calendar.dark-theme,
+.schedule-calendar.dark-mode {
+  --cal-text: #e5eefc;
+  --cal-muted: #94a3b8;
+  --cal-title: #cbd5e1;
+}
+
+.dark-theme .schedule-calendar .day-mark:not(.day-mark--today):not(.day-mark--event):not(.day-mark--today-event):not(.day-mark--past-event) .day-num,
+.dark-mode .schedule-calendar .day-mark:not(.day-mark--today):not(.day-mark--event):not(.day-mark--today-event):not(.day-mark--past-event) .day-num,
+.schedule-calendar.dark-theme .day-mark:not(.day-mark--today):not(.day-mark--event):not(.day-mark--today-event):not(.day-mark--past-event) .day-num,
+.schedule-calendar.dark-mode .day-mark:not(.day-mark--today):not(.day-mark--event):not(.day-mark--today-event):not(.day-mark--past-event) .day-num {
+  color: var(--cal-text);
+}
+
+.dark-theme .day-mark--past-event,
+.dark-mode .day-mark--past-event,
+.schedule-calendar.dark-theme .day-mark--past-event,
+.schedule-calendar.dark-mode .day-mark--past-event {
+  background: #5c4e2a;
+}
+
+.dark-theme .day-mark--past-event .day-num,
+.dark-mode .day-mark--past-event .day-num,
+.schedule-calendar.dark-theme .day-mark--past-event .day-num,
+.schedule-calendar.dark-mode .day-mark--past-event .day-num {
+  color: #e6c96a;
+}

@@ -1,0 +1,242 @@
+/* schedule-editor-sheet — GOLFBROTHERS 日程编辑底部 Sheet */
+.ses-root {
+  --ses-blue: #002d62;
+  --ses-gold: #ce9224;
+  --ses-muted: #94a3b8;
+  --ses-border: #e2e8f0;
+  --ses-card: #ffffff;
+  --ses-subtle: #f8fafc;
+}
+
+.ses-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 420;
+}
+
+.ses-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 430;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--ses-card);
+  color: var(--ses-blue);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.28);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.ses-handle {
+  width: 48px;
+  height: 4px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  margin: 12px auto 8px;
+  flex-shrink: 0;
+}
+
+.ses-header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 4px 20px 12px;
+  gap: 12px;
+}
+
+.ses-header__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.ses-overline {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ses-muted);
+  margin-bottom: 4px;
+}
+
+.ses-title {
+  display: block;
+  font-size: 18px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--ses-blue);
+  line-height: 1.3;
+}
+
+.ses-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--ses-muted);
+  line-height: 1;
+}
+
+.ses-body {
+  flex: 1;
+  min-height: 0;
+  max-height: 52vh;
+  padding: 4px 20px 8px;
+  box-sizing: border-box;
+}
+
+.ses-section {
+  margin-bottom: 18px;
+}
+
+.ses-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ses-muted);
+  margin-bottom: 8px;
+}
+
+.ses-textarea {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--ses-subtle);
+  border: 1px solid var(--ses-border);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ses-blue);
+  line-height: 1.45;
+}
+
+.ses-members {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.ses-member {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 999px;
+  background: var(--ses-subtle);
+  border: 1px solid var(--ses-border);
+  max-width: 100%;
+}
+
+.ses-member__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #e2e8f0;
+}
+
+.ses-member__avatar--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ses-gold);
+}
+
+.ses-member__ph {
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.ses-member__name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ses-blue);
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ses-add-member {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px dashed var(--ses-border);
+  background: #fff;
+}
+
+.ses-add-member__plus {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ses-gold);
+  line-height: 1;
+}
+
+.ses-add-member__text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ses-muted);
+}
+
+.ses-footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  padding: 12px 20px 4px;
+}
+
+.ses-footer--edit .ses-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+.ses-btn {
+  flex: 1;
+  height: 48px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.ses-btn--ghost {
+  background: var(--ses-subtle);
+  color: var(--ses-muted);
+  border: 1px solid var(--ses-border);
+}
+
+.ses-btn--danger {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.ses-btn--primary {
+  background: var(--ses-blue);
+  color: #fff;
+}

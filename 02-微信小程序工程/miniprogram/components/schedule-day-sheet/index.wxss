@@ -1,0 +1,221 @@
+/* schedule-day-sheet — GOLFBROTHERS 底部日程列表 Sheet */
+.sds-root {
+  --sds-blue: #002d62;
+  --sds-gold: #ce9224;
+  --sds-text: #002d62;
+  --sds-muted: #94a3b8;
+  --sds-border: #e2e8f0;
+  --sds-card: #ffffff;
+  --sds-subtle: #f8fafc;
+}
+
+.sds-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 400;
+}
+
+.sds-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 410;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--sds-card);
+  color: var(--sds-text);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.28);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.sds-handle {
+  width: 48px;
+  height: 4px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  margin: 12px auto 8px;
+  flex-shrink: 0;
+}
+
+.sds-header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 4px 20px 12px;
+  gap: 12px;
+}
+
+.sds-header__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.sds-overline {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--sds-muted);
+  margin-bottom: 4px;
+}
+
+.sds-title {
+  display: block;
+  font-size: 18px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--sds-blue);
+  line-height: 1.3;
+}
+
+.sds-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--sds-muted);
+  line-height: 1;
+}
+
+.sds-body {
+  flex: 1;
+  min-height: 0;
+  max-height: 52vh;
+  padding: 4px 20px 8px;
+  box-sizing: border-box;
+}
+
+.sds-event {
+  background: var(--sds-subtle);
+  border: 1px solid var(--sds-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.sds-event:last-child {
+  margin-bottom: 0;
+}
+
+.sds-event__top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sds-event__source {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--sds-gold);
+  line-height: 1;
+}
+
+.sds-event__action {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--sds-blue);
+  line-height: 1;
+}
+
+.sds-event__content {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sds-blue);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.sds-members {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.sds-member {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sds-member__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #e2e8f0;
+}
+
+.sds-member__avatar--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sds-gold);
+}
+
+.sds-member__ph-text {
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.sds-member__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sds-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.sds-empty {
+  padding: 36px 12px;
+  text-align: center;
+}
+
+.sds-empty__text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sds-muted);
+}
+
+.sds-footer {
+  flex-shrink: 0;
+  padding: 12px 20px 4px;
+}
+
+.sds-add-btn {
+  height: 48px;
+  border-radius: 999px;
+  background: var(--sds-blue);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.02em;
+}

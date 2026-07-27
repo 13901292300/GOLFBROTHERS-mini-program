@@ -1,0 +1,46 @@
+<view class="schedule-calendar">
+  <view
+    wx:for="{{months}}"
+    wx:for-item="mo"
+    wx:key="month"
+    id="{{mo.anchorId}}"
+    class="month-block"
+  >
+    <text class="month-title">{{mo.title}}</text>
+
+    <view class="week-header">
+      <text
+        wx:for="{{weekLabels}}"
+        wx:for-item="label"
+        wx:key="*this"
+        class="week-label"
+      >{{label}}</text>
+    </view>
+
+    <view
+      wx:for="{{mo.weeks}}"
+      wx:for-item="week"
+      wx:for-index="wi"
+      wx:key="wi"
+      class="week-row"
+    >
+      <block wx:for="{{week}}" wx:for-item="cell" wx:for-index="ci" wx:key="ci">
+        <view wx:if="{{cell.empty}}" class="day-cell day-cell--empty"></view>
+        <view
+          wx:else
+          class="day-cell"
+          data-date="{{cell.date}}"
+          bindtap="onDateTap"
+        >
+          <view
+            class="day-mark {{cell.isTodayEvent ? 'day-mark--today-event' : ''}} {{!cell.isTodayEvent && cell.isToday ? 'day-mark--today' : ''}} {{!cell.isTodayEvent && !cell.isToday && cell.hasEvent && !cell.isPastEvent ? 'day-mark--event' : ''}} {{cell.isPastEvent ? 'day-mark--past-event' : ''}}"
+          >
+            <view class="day-mark__core">
+              <text class="day-num">{{cell.day}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,61 @@
+<view wx:if="{{visible}}" class="sds-root">
+  <view class="sds-overlay" bindtap="onOverlayTap" catchtouchmove="stopPropagation"></view>
+
+  <view class="sds-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sds-handle"></view>
+
+    <view class="sds-header">
+      <view class="sds-header__main">
+        <text class="sds-overline">SCHEDULE</text>
+        <text class="sds-title">{{dateTitle}}</text>
+      </view>
+      <view class="sds-close" bindtap="onCloseTap">✕</view>
+    </view>
+
+    <scroll-view scroll-y class="sds-body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <block wx:if="{{displayEvents.length > 0}}">
+        <view
+          wx:for="{{displayEvents}}"
+          wx:key="id"
+          class="sds-event"
+          data-id="{{item.id}}"
+          data-mode="{{item.actionMode}}"
+          data-matchid="{{item.sourceId}}"
+          bindtap="onEventTap"
+        >
+          <view class="sds-event__top">
+            <text class="sds-event__source">{{item.sourceLabel}}</text>
+            <text class="sds-event__action">{{item.actionLabel}}</text>
+          </view>
+          <text class="sds-event__content">{{item.content || '（无内容）'}}</text>
+          <view wx:if="{{item.members && item.members.length}}" class="sds-members">
+            <view
+              wx:for="{{item.members}}"
+              wx:for-item="m"
+              wx:key="userId"
+              class="sds-member"
+            >
+              <image
+                wx:if="{{m.avatar}}"
+                class="sds-member__avatar"
+                src="{{m.avatar}}"
+                mode="aspectFill"
+              ></image>
+              <view wx:else class="sds-member__avatar sds-member__avatar--ph">
+                <text class="sds-member__ph-text">{{m.name ? m.name[0] : '?'}}</text>
+              </view>
+              <text class="sds-member__name">{{m.name}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="sds-empty">
+        <text class="sds-empty__text">今天还没有安排</text>
+      </view>
+    </scroll-view>
+
+    <view class="sds-footer">
+      <view class="sds-add-btn" bindtap="onAddTap">+ 添加日程</view>
+    </view>
+  </view>
+</view>

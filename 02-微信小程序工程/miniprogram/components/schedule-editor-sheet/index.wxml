@@ -1,0 +1,63 @@
+<view wx:if="{{visible}}" class="ses-root">
+  <view class="ses-overlay" bindtap="onOverlayTap" catchtouchmove="stopPropagation"></view>
+
+  <view class="ses-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="ses-handle"></view>
+
+    <view class="ses-header">
+      <view class="ses-header__main">
+        <text class="ses-overline">SCHEDULE</text>
+        <text class="ses-title">{{sheetTitle}}</text>
+      </view>
+      <view class="ses-close" bindtap="onCloseTap">✕</view>
+    </view>
+
+    <scroll-view scroll-y class="ses-body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="ses-section">
+        <text class="ses-label">内容</text>
+        <textarea
+          class="ses-textarea"
+          placeholder="写下你的球局安排…"
+          value="{{content}}"
+          maxlength="500"
+          auto-height
+          bindinput="onContentInput"
+        ></textarea>
+      </view>
+
+      <view class="ses-section">
+        <text class="ses-label">提醒好友</text>
+        <view class="ses-members">
+          <view
+            wx:for="{{selectedMembers}}"
+            wx:key="userId"
+            class="ses-member"
+            data-userid="{{item.userId}}"
+            bindtap="onRemoveMember"
+          >
+            <image
+              wx:if="{{item.avatar}}"
+              class="ses-member__avatar"
+              src="{{item.avatar}}"
+              mode="aspectFill"
+            ></image>
+            <view wx:else class="ses-member__avatar ses-member__avatar--ph">
+              <text class="ses-member__ph">{{item.name ? item.name[0] : '?'}}</text>
+            </view>
+            <text class="ses-member__name">{{item.name}}</text>
+          </view>
+          <view class="ses-add-member" bindtap="onOpenMemberPicker">
+            <text class="ses-add-member__plus">＋</text>
+            <text class="ses-add-member__text">添加提醒人</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="ses-footer {{isEdit ? 'ses-footer--edit' : ''}}">
+      <view class="ses-btn ses-btn--ghost" bindtap="onCloseTap">取消</view>
+      <view wx:if="{{isEdit}}" class="ses-btn ses-btn--danger" bindtap="onDeleteTap">删除</view>
+      <view class="ses-btn ses-btn--primary" bindtap="onSaveTap">{{saveBtnLabel}}</view>
+    </view>
+  </view>
+</view>

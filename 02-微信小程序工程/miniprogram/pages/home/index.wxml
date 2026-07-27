@@ -33,7 +33,7 @@
     </view>
 
     <!-- 唯一滚动容器：使用 view + overflow-y，sticky 在 scroll-view 内不生效 -->
-    <view class="ds-scroll-main no-scrollbar z-10">
+    <view id="home-scroll-main" class="ds-scroll-main no-scrollbar z-10">
       <!-- Background Banner -->
       <view wx:if="{{heroTabsVisible}}" id="main-banner" class="relative w-full h-banner overflow-hidden mt-neg-20">
         <image
@@ -138,51 +138,27 @@
           </view>
         </view>
 
-        <!-- 日程内容 -->
+        <!-- 日程内容：年度日历（旧卡片 UI 已替换；旧 JS 方法保留待下一 PATCH） -->
         <view wx:if="{{showScheduleContent}}" id="schedule-content" class="ds-main">
-          <view class="space-y-6">
-            <view id="schedule-cards-container" class="space-y-6">
-              <view wx:for="{{scheduleCards}}" wx:key="id" class="ds-card rounded-xl overflow-hidden schedule-card {{item.removing ? 'schedule-card-removing' : ''}}">
-                <view bindtap="openCalendarPicker" data-index="{{index}}" class="ds-card-header flex justify-between items-center">
-                  <view class="flex items-center">
-                    <view class="w-10 h-10 bg-white-10 rounded-xl flex items-center justify-center text-gold">
-                      <text class="text-xl">📅</text>
-                    </view>
-                    <view style="margin-left:12px">
-                      <text class="schedule-date-display ds-body-bold text-sm italic schedule-date-text">{{item.dateDisplay}}</text>
-                      <view><text class="schedule-day-display ds-overline schedule-day-text">{{item.dayDisplay}}</text></view>
-                    </view>
-                  </view>
-                  <text catchtap="removeSchedule" data-index="{{index}}" class="text-gold text-xs">🗑</text>
-                </view>
-                <view class="p-4">
-                  <view class="relative">
-                    <textarea placeholder="在这里输入您的球局安排、事件记录..." value="{{item.note}}" bindinput="onScheduleNoteInput" data-index="{{index}}" auto-height class="ds-input ds-textarea rounded-xl"></textarea>
-                    <view class="absolute" style="bottom:12px;right:12px">
-                      <view class="flex items-center">
-                        <text class="text-10px font-bold text-slate-300">自动保存中...</text>
-                        <text class="text-green-400 text-xs" style="margin-left:8px">✓</text>
-                      </view>
-                    </view>
-                  </view>
-                  <view class="schedule-remind-section">
-                    <view class="schedule-remind-tags">
-                      <text wx:for="{{item.remindees}}" wx:for-item="r" wx:key="id" class="ds-tag-mention"><text class="ds-tag-at">@</text>{{r.name}}</text>
-                    </view>
-                    <button bindtap="openScheduleRemindeePicker" data-index="{{index}}" class="ds-btn-text text-11px">
-                      <text>＋ 添加被提醒人</text>
-                    </button>
-                  </view>
-                </view>
-              </view>
-            </view>
-            <view bindtap="addNewSchedule" class="ds-card-dashed p-8 flex flex-col items-center justify-center opacity-60">
-              <view class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                <text>＋</text>
-              </view>
-              <text class="text-xs font-bold text-slate-400 uppercase tracking-widest" style="margin-top:12px">添加新日程</text>
-            </view>
+          <view class="calendar-year-switch">
+            <view
+              class="calendar-year-switch__btn"
+              bindtap="changeCalendarYear"
+              data-dir="-1"
+            >‹</view>
+            <text class="calendar-year-switch__year">{{scheduleCalendarYear}}</text>
+            <view
+              class="calendar-year-switch__btn"
+              bindtap="changeCalendarYear"
+              data-dir="1"
+            >›</view>
           </view>
+          <schedule-calendar
+            id="schedule-calendar"
+            year="{{scheduleCalendarYear}}"
+            eventsByDate="{{eventsByDate}}"
+            bind:dateTap="onScheduleDateTap"
+          />
         </view>
 
         <!-- 赛事内容 -->
@@ -556,8 +532,32 @@
     </view>
   </view>
 
+  <!-- Schedule day list sheet -->
+  <schedule-day-sheet
+    id="schedule-day-sheet"
+    visible="{{scheduleDaySheetVisible}}"
+    date="{{scheduleDaySheetDate}}"
+    events="{{scheduleDaySheetEvents}}"
+    bind:close="onScheduleDaySheetClose"
+    bind:add="onScheduleDaySheetAdd"
+    bind:edit="onScheduleDaySheetEdit"
+    bind:viewMatch="onScheduleViewMatch"
+  />
+
+  <!-- Schedule editor sheet -->
+  <schedule-editor-sheet
+    id="schedule-editor-sheet"
+    visible="{{scheduleEditorVisible}}"
+    date="{{scheduleEditorDate}}"
+    schedule="{{scheduleEditorSchedule}}"
+    bind:close="onScheduleEditorClose"
+    bind:save="saveScheduleFromEditor"
+    bind:delete="deleteScheduleFromEditor"
+    bind:openMemberPicker="onScheduleEditorOpenMemberPicker"
+  />
+
   <!-- Schedule Remindee Picker -->
-  <view wx:if="{{scheduleRemindPickerVisible}}" class="fixed inset-0 z-410">
+  <view wx:if="{{scheduleRemindPickerVisible}}" class="fixed inset-0 z-440">
     <view class="overlay-backdrop" bindtap="closeScheduleRemindeePicker"></view>
     <view class="overlay-panel max-w-md max-h-75vh flex flex-col {{scheduleRemindPanelOpen ? 'panel-open' : 'panel-closed'}}" style="padding:0">
       <view class="px-6 pt-6 pb-3 ds-overlay__fixed">
@@ -580,9 +580,9 @@
           </view>
         </view>
       </scroll-view>
-      <view class="ds-overlay__fixed px-6 py-4 flex justify-end border-t border-slate-100">
-        <button bindtap="closeScheduleRemindeePicker" class="px-6 py-2 text-slate-400 font-bold" style="margin-right:12px">取消</button>
-        <button bindtap="confirmScheduleRemindees" class="px-8 py-2 bg-gold text-white rounded-full font-black italic shadow-sm">确认</button>
+      <view class="schedule-remind-footer ds-overlay__fixed px-6 py-4 border-t border-slate-100">
+        <button bindtap="closeScheduleRemindeePicker" class="schedule-remind-btn schedule-remind-btn--cancel">取消</button>
+        <button bindtap="confirmScheduleRemindees" class="schedule-remind-btn schedule-remind-btn--confirm">确认</button>
       </view>
     </view>
   </view>

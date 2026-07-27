@@ -2,6 +2,9 @@
   "navigationStyle": "custom",
   "disableScroll": true,
   "usingComponents": {
-    "avatar-mosaic": "/components/avatar-mosaic/index"
+    "avatar-mosaic": "/components/avatar-mosaic/index",
+    "schedule-calendar": "/components/schedule-calendar/index",
+    "schedule-day-sheet": "/components/schedule-day-sheet/index",
+    "schedule-editor-sheet": "/components/schedule-editor-sheet/index"
   }
 }

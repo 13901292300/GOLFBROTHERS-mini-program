@@ -1383,6 +1383,53 @@ page {
   background: var(--champion-gold);
   color: var(--text-on-dark);
 }
+
+/* 选择提醒人底部：取消 / 确认 文字居中（仅本弹窗，不影响其他 button） */
+.schedule-remind-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.schedule-remind-footer .schedule-remind-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 16px;
+  height: 40px;
+  min-height: 40px;
+  line-height: normal;
+  text-align: center;
+  box-sizing: border-box;
+  font-size: 14px;
+  overflow: visible;
+}
+
+.schedule-remind-footer .schedule-remind-btn::after {
+  border: none;
+}
+
+.schedule-remind-btn--cancel {
+  background: transparent;
+  color: var(--slate-400);
+  font-weight: 700;
+  border-radius: 9999px;
+}
+
+.schedule-remind-btn--confirm {
+  background: var(--champion-gold);
+  color: var(--text-on-dark);
+  font-weight: 900;
+  font-style: italic;
+  border-radius: 9999px;
+  box-shadow: var(--shadow-gold-soft);
+}
+
 .ds-calendar-day--selected {
   background: var(--champion-gold) !important;
   color: var(--text-on-dark) !important;
@@ -1635,6 +1682,7 @@ page {
 .z-330 { z-index: 330; }
 .z-400 { z-index: 400; }
 .z-410 { z-index: 410; }
+.z-440 { z-index: 440; }
 
 .shadow-lg { box-shadow: var(--shadow-tab); }
 .shadow-xl { box-shadow: 0 20px 25px -5px var(--shadow-black-10), 0 8px 10px -6px var(--shadow-black-10); }
@@ -1961,4 +2009,59 @@ page {
 .ds-app.font-large .text-9px {
   font-size: 12px;
 }
+
+/* ===== 日程 TAB：年度日历年份切换 ===== */
+.calendar-year-switch {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 8px 12px 4px;
+  margin-bottom: 4px;
+}
+
+.calendar-year-switch__btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1;
+}
+
+.calendar-year-switch__year {
+  min-width: 72px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--text-primary, #002d62);
+  letter-spacing: 0.04em;
+}
+.calendar-year-switch__btn:active,
+.calendar-year-switch__btn:hover,
+.calendar-year-switch__btn:focus {
+  color: var(--text-muted, #94a3b8);
+  background: transparent;
+  opacity: 0.75;
+}
+
+/* DARK：日程年份切换 — 年份/箭头浅色，避免固定蓝色 */
+.ds-app.dark-theme .calendar-year-switch__year {
+  color: #f5f5f5;
+}
+
+.ds-app.dark-theme .calendar-year-switch__btn,
+.ds-app.dark-theme .calendar-year-switch__btn:active,
+.ds-app.dark-theme .calendar-year-switch__btn:hover,
+.ds-app.dark-theme .calendar-year-switch__btn:focus {
+  color: #f5f5f5;
+  background: transparent;
+}
+
+
 
