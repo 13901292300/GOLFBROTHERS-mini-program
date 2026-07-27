@@ -914,6 +914,50 @@
     bind:confirm="onHalfCourseConfirmed"
   />
 
+  <!-- 修改T台（第一阶段：仅 UI / 本地选中，不写盘） -->
+  <view wx:if="{{editTeeSheetVisible}}" class="sheet-overlay" bindtap="closeEditTeeSheet"></view>
+  <view wx:if="{{editTeeSheetVisible}}" class="bottom-sheet edit-tee-sheet" catchtap="noop">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="feature-section-title edit-tee-sheet__title">
+      <text class="fst-main">修改T台</text>
+      <text class="fst-sub">黑 · 金 · 蓝 · 白 · 红</text>
+    </view>
+    <scroll-view scroll-y class="edit-tee-sheet__list" enable-flex="{{true}}">
+      <view
+        wx:for="{{editTeePlayers}}"
+        wx:key="playerId"
+        class="edit-tee-row"
+      >
+        <view class="edit-tee-row__player">
+          <image class="edit-tee-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <text class="edit-tee-row__name">{{item.name}}</text>
+        </view>
+        <view class="edit-tee-row__dots">
+          <view
+            wx:for="{{item.teeDots}}"
+            wx:for-item="dot"
+            wx:for-index="dotIdx"
+            wx:key="key"
+            class="edit-tee-dot-hit"
+            data-player-id="{{item.playerId}}"
+            data-tee-key="{{dot.key}}"
+            bindtap="onEditTeeDotTap"
+          >
+            <view
+              class="edit-tee-dot {{dot.selected ? 'edit-tee-dot--selected' : ''}} {{dot.key === 'WHITE_T' ? 'edit-tee-dot--white' : ''}} {{dot.key === 'BLACK_T' ? 'edit-tee-dot--black' : ''}}"
+              style="background: {{dot.color}};"
+            ></view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="edit-tee-sheet__footer">
+      <view class="sheet-cancel-btn edit-tee-sheet__btn-cancel" bindtap="closeEditTeeSheet">取消</view>
+      <view class="sheet-cancel-btn edit-tee-sheet__btn-confirm" bindtap="confirmEditTeeSheet">确认</view>
+    </view>
+  </view>
+
   <!-- G5–G8：修改起始洞（1–18），写入 matchPlayMeta.source=manual -->
   <view wx:if="{{startHoleSheetVisible}}" class="sheet-overlay" bindtap="closeStartHoleSheet"></view>
   <view wx:if="{{startHoleSheetVisible}}" class="bottom-sheet start-hole-sheet" catchtap="noop">

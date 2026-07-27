@@ -447,24 +447,69 @@ const TEE_PALETTE = [
   { tee: '蓝T', teeColor: '#00aeef' }
 ];
 
+/** 修改T台弹层：黑 / 金 / 蓝 / 白 / 红 */
+const EDIT_TEE_OPTIONS = [
+  { key: 'BLACK_T', label: '黑T', color: '#111827' },
+  { key: 'GOLD_T', label: '金T', color: '#ce9224' },
+  { key: 'BLUE_T', label: '蓝T', color: '#00aeef' },
+  { key: 'WHITE_T', label: '白T', color: '#ffffff' },
+  { key: 'RED_T', label: '红T', color: '#dc2626' }
+];
+
+function isEditTeeKey(value) {
+  return (
+    value === 'BLACK_T' ||
+    value === 'GOLD_T' ||
+    value === 'BLUE_T' ||
+    value === 'WHITE_T' ||
+    value === 'RED_T'
+  );
+}
+
 /**
- * 记分页 T 台样式（无历史兼容）。
- * 1) tPosition BLUE_T/RED_T → 蓝/红
- * 2) 否则 gender === female → 红T，其它（含缺省）→ 蓝T
+ * 记分页 T 台样式。
+ * 1) 显式 tPosition（黑/金/蓝/白/红）优先
+ * 2) 否则 gender === female → 红T，其它 → 蓝T
  * @param {object} player
  * @param {number} [_fallbackIndex] 保留参数兼容调用方，不再参与配色
  * @returns {{ tPosition: string, tee: string, teeColor: string, colorClass: string }}
  */
 function resolveScoreTeeStyle(player, _fallbackIndex) {
   let tp = '';
-  if (player && (player.tPosition === 'BLUE_T' || player.tPosition === 'RED_T')) {
+  if (player && isEditTeeKey(player.tPosition)) {
     tp = player.tPosition;
+  } else if (player && isEditTeeKey(player.tee)) {
+    tp = player.tee;
   } else {
     const gender =
       (player && (player.gender === 'female' || player.gender === 'male') && player.gender) ||
       (player && (player.matchGender === 'female' || player.matchGender === 'male') && player.matchGender) ||
       'male';
     tp = gender === 'female' ? 'RED_T' : 'BLUE_T';
+  }
+  if (tp === 'BLACK_T') {
+    return {
+      tPosition: 'BLACK_T',
+      tee: '黑T',
+      teeColor: '#111827',
+      colorClass: 'border-black'
+    };
+  }
+  if (tp === 'GOLD_T') {
+    return {
+      tPosition: 'GOLD_T',
+      tee: '金T',
+      teeColor: '#ce9224',
+      colorClass: 'border-gold'
+    };
+  }
+  if (tp === 'WHITE_T') {
+    return {
+      tPosition: 'WHITE_T',
+      tee: '白T',
+      teeColor: '#ffffff',
+      colorClass: 'border-white'
+    };
   }
   if (tp === 'RED_T') {
     return {
@@ -505,7 +550,11 @@ function resolveScoreDisplayGender(player, playerId) {
 function applyScorePlayerTeeFields(player, index) {
   const p = player || {};
   const playerId = p.playerId || p.id || p.userId || '';
-  const rawTp = p.tPosition === 'BLUE_T' || p.tPosition === 'RED_T' ? p.tPosition : '';
+  const rawTp = isEditTeeKey(p.tPosition)
+    ? p.tPosition
+    : isEditTeeKey(p.tee)
+      ? p.tee
+      : '';
   const gender = resolveScoreDisplayGender(p, playerId);
   const teeStyle = resolveScoreTeeStyle(
     {
@@ -856,10 +905,7 @@ function buildMatchPlaySideMember(player) {
     player && (player.scorePlayerId || player.slotScorePlayerId || player.scoreOwnerId)
       ? String(player.scorePlayerId || player.slotScorePlayerId || player.scoreOwnerId).trim()
       : '';
-  const tPosition =
-    player && (player.tPosition === 'BLUE_T' || player.tPosition === 'RED_T')
-      ? player.tPosition
-      : '';
+  const tPosition = player && isEditTeeKey(player.tPosition) ? player.tPosition : '';
   return {
     playerId: playerId,
     name: (player && player.name) || '',
@@ -1576,6 +1622,9 @@ Page({
     isReadOnlyScore: false,
     showMoreSheet: false,
     halfSheetVisible: false,
+    /** 修改T台弹层（第一阶段：仅 UI / 本地态，不写盘） */
+    editTeeSheetVisible: false,
+    editTeePlayers: [],
     /** G5–G8：修改起始洞弹层（hole=真实洞号 1–18；label=A1–B9 仅展示） */
     startHoleSheetVisible: false,
     startHoleDraft: 1,
@@ -2505,9 +2554,9 @@ Page({
         : '';
       const record = (scorePlayerId && scoresByPlayer[scorePlayerId]) || (playerKey && scoresByPlayer[playerKey]) || {};
       const rawTp =
-        entry && (entry.tPosition === 'BLUE_T' || entry.tPosition === 'RED_T')
+        entry && isEditTeeKey(entry.tPosition)
           ? entry.tPosition
-          : entry && (entry.tee === 'BLUE_T' || entry.tee === 'RED_T')
+          : entry && isEditTeeKey(entry.tee)
             ? entry.tee
             : '';
       const profile = this._buildScoreTeamMatchPlayerProfile(
@@ -2885,12 +2934,11 @@ Page({
           groupPlayer.avatar ||
           groupPlayer.avatarUrl ||
           '';
-        const tPosition =
-          groupPlayer.tPosition === 'BLUE_T' || groupPlayer.tPosition === 'RED_T'
-            ? groupPlayer.tPosition
-            : groupPlayer.tee === 'BLUE_T' || groupPlayer.tee === 'RED_T'
-              ? groupPlayer.tee
-              : '';
+        const tPosition = isEditTeeKey(groupPlayer.tPosition)
+          ? groupPlayer.tPosition
+          : isEditTeeKey(groupPlayer.tee)
+            ? groupPlayer.tee
+            : '';
         const gender = resolveScoreDisplayGender(
           {
             gender: (profile && profile.gender) || groupPlayer.gender || '',
@@ -4782,6 +4830,253 @@ Page({
     this.setData({ halfSheetVisible: false });
   },
 
+  /**
+   * 修改T台：当前记分组球员列表（个人维度）。
+   * - 队内赛 G1–G8：当前组 match.groups[].players
+   * - 普通创建：_playersSource
+   * - stroke_entity 且无 groups：铺平 Entity members
+   */
+  _buildEditTeeSheetPlayers() {
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+    const rows = [];
+    const seen = {};
+
+    const pushPlayer = (raw) => {
+      const playerId = String(
+        (raw && (raw.playerId || raw.userId || raw.id)) || ''
+      ).trim();
+      if (!playerId || seen[playerId]) return;
+      seen[playerId] = true;
+      const gender = resolveScoreDisplayGender(raw, playerId);
+      let tPosition = isEditTeeKey(raw && raw.tPosition)
+        ? raw.tPosition
+        : isEditTeeKey(raw && raw.tee)
+          ? raw.tee
+          : '';
+      if (!tPosition) {
+        tPosition = applyScorePlayerTeeFields(
+          { playerId: playerId, gender: gender, tPosition: '' },
+          rows.length
+        ).tPosition;
+      }
+      const name =
+        (raw && (raw.name || raw.nickname || raw.competitionName || raw.matchNickname)) ||
+        playerId;
+      rows.push({
+        playerId: playerId,
+        name: this._shortName(name) || name || '球员',
+        avatar: mockAvatars.resolveAvatar(
+          (raw && (raw.avatar || raw.avatarUrl)) || '',
+          playerId
+        ),
+        gender: gender,
+        tPosition: tPosition,
+        teeDots: EDIT_TEE_OPTIONS.map((opt) => ({
+          key: opt.key,
+          label: opt.label,
+          color: opt.color,
+          selected: tPosition === opt.key
+        }))
+      });
+    };
+
+    if (group && Array.isArray(group.players) && group.players.length) {
+      const filled = listFilledPlayers(group);
+      filled.forEach((fp) => {
+        const entry =
+          (Array.isArray(group.players) &&
+            group.players.find((p) => {
+              const id = String((p && (p.userId || p.playerId || p.id)) || '').trim();
+              return id && isSameUserIdentity(id, fp.userId);
+            })) ||
+          {};
+        const profile = this._buildScoreTeamMatchPlayerProfile(match, fp.userId, entry);
+        pushPlayer({
+          playerId: fp.userId,
+          userId: fp.userId,
+          name: profile.name || entry.name || fp.userId,
+          avatar: profile.avatar || entry.avatar || '',
+          gender: profile.gender || entry.gender || '',
+          matchGender: profile.matchGender || entry.matchGender || '',
+          tPosition: entry.tPosition || entry.tee || '',
+          tee: entry.tee || ''
+        });
+      });
+      if (rows.length) return rows;
+    }
+
+    if (this.data.mode === 'stroke_entity') {
+      const nameMap = this._resolveEntityMemberNameMap();
+      (this._entitiesSource || []).forEach((entity) => {
+        const members = this._buildEntityMemberDisplay(entity, match, nameMap);
+        (members || []).forEach((m) => {
+          pushPlayer({
+            playerId: m.userId,
+            userId: m.userId,
+            name: m.name,
+            avatar: m.avatar,
+            gender: m.gender,
+            tPosition: m.tPosition
+          });
+        });
+      });
+      if (rows.length) return rows;
+    }
+
+    (this._playersSource || []).forEach((p) => {
+      pushPlayer(p);
+    });
+    return rows;
+  },
+
+  openEditTeeSheet() {
+    const editTeePlayers = this._buildEditTeeSheetPlayers();
+    if (!editTeePlayers.length) {
+      wx.showToast({ title: '暂无球员', icon: 'none' });
+      return;
+    }
+    this.setData({
+      editTeeSheetVisible: true,
+      editTeePlayers: editTeePlayers
+    });
+  },
+
+  closeEditTeeSheet() {
+    this.setData({
+      editTeeSheetVisible: false,
+      editTeePlayers: []
+    });
+  },
+
+  /** 从 editTeePlayers 解析 playerId → tPosition */
+  _editTeeMapFromSheet() {
+    const map = {};
+    (this.data.editTeePlayers || []).forEach((row) => {
+      if (!row || !isEditTeeKey(row.tPosition)) return;
+      const id = String(row.playerId || '').trim();
+      if (!id) return;
+      map[id] = row.tPosition;
+    });
+    return map;
+  },
+
+  _resolveEditTeeForPlayerId(teeMap, playerId) {
+    const key = String(playerId || '').trim();
+    if (!key || !teeMap) return '';
+    if (teeMap[key]) return teeMap[key];
+    const ids = Object.keys(teeMap);
+    for (let i = 0; i < ids.length; i++) {
+      if (isSameUserIdentity(ids[i], key)) return teeMap[ids[i]];
+    }
+    return '';
+  },
+
+  /** 同步内存记分源 / demoSlots 的 tPosition（不写 scoreData） */
+  _syncLocalPlayersTeeFromMap(teeMap) {
+    const patchOne = (p, index) => {
+      if (!p) return p;
+      const tee = this._resolveEditTeeForPlayerId(teeMap, p.playerId || p.id || p.userId);
+      if (!tee) return p;
+      const teeFields = applyScorePlayerTeeFields(
+        {
+          playerId: p.playerId || p.id || p.userId,
+          gender: p.gender || '',
+          matchGender: p.matchGender || '',
+          tPosition: tee
+        },
+        index
+      );
+      return Object.assign({}, p, {
+        tPosition: teeFields.tPosition,
+        gender: teeFields.gender || p.gender || '',
+        colorClass: teeFields.colorClass
+      });
+    };
+    if (Array.isArray(this._playersSource)) {
+      this._playersSource = this._playersSource.map(patchOne);
+    }
+    if (Array.isArray(this._demoSlots)) {
+      this._demoSlots = this._demoSlots.map((p, i) => (p ? patchOne(p, i) : null));
+    }
+  },
+
+  /**
+   * 将弹层 T 台选择写入持久化（不改 scoreData / matchPlayResult）
+   * - 普通创建：更新 _playersSource → persistSession → gameStore.playersSlots
+   * - 队内赛：更新 match.groups[].players.tPosition → saveMatch
+   */
+  _applyEditTeeChanges() {
+    const teeMap = this._editTeeMapFromSheet();
+    if (!Object.keys(teeMap).length) {
+      return { ok: false, reason: 'empty' };
+    }
+
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+
+    if (match && group && Array.isArray(group.players)) {
+      const groupId = String(group.groupId || '');
+      match.groups = (match.groups || []).map((g) => {
+        if (!g || String(g.groupId || '') !== groupId) return g;
+        const players = (Array.isArray(g.players) ? g.players : []).map((p) => {
+          if (!p) return p;
+          const id = String(p.userId || p.playerId || p.id || '').trim();
+          const tee = this._resolveEditTeeForPlayerId(teeMap, id);
+          if (!tee) return p;
+          return Object.assign({}, p, { tPosition: tee });
+        });
+        return Object.assign({}, g, { players: players });
+      });
+      teamMatchStore.saveMatch(match);
+      this._syncLocalPlayersTeeFromMap(teeMap);
+      return { ok: true, path: 'teamMatch' };
+    }
+
+    this._syncLocalPlayersTeeFromMap(teeMap);
+    this.persistSession();
+    return { ok: true, path: 'game' };
+  },
+
+  confirmEditTeeSheet() {
+    const result = this._applyEditTeeChanges();
+    if (!result || !result.ok) {
+      wx.showToast({ title: '请先选择T台', icon: 'none' });
+      return;
+    }
+    this.setData(
+      {
+        editTeeSheetVisible: false,
+        editTeePlayers: []
+      },
+      () => {
+        if (this.data.mode === 'stroke_entity') this.refreshEntities();
+        else this.refreshPlayers();
+      }
+    );
+    wx.showToast({ title: 'T台已更新', icon: 'success' });
+  },
+
+  /** 弹层本地选中态，确认前不写盘 */
+  onEditTeeDotTap(e) {
+    const playerId = String((e.currentTarget.dataset && e.currentTarget.dataset.playerId) || '').trim();
+    const teeKey = String((e.currentTarget.dataset && e.currentTarget.dataset.teeKey) || '').trim();
+    if (!playerId || !isEditTeeKey(teeKey)) return;
+    const next = (this.data.editTeePlayers || []).map((row) => {
+      if (!row || String(row.playerId) !== playerId) return row;
+      return Object.assign({}, row, {
+        tPosition: teeKey,
+        teeDots: EDIT_TEE_OPTIONS.map((opt) => ({
+          key: opt.key,
+          label: opt.label,
+          color: opt.color,
+          selected: opt.key === teeKey
+        }))
+      });
+    });
+    this.setData({ editTeePlayers: next });
+  },
+
   /** G5–G8：打开起始洞选择（1–18） */
   openStartHoleSheet() {
     const ms = this._matchState || this._readMatchState() || {};
@@ -4900,6 +5195,11 @@ Page({
 
     if (action === 'changeStartHole' || label === '修改起始洞') {
       this.openStartHoleSheet();
+      return;
+    }
+
+    if (label === '修改T台') {
+      this.openEditTeeSheet();
       return;
     }
 
