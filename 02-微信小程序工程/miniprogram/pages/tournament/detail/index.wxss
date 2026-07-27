@@ -2874,8 +2874,12 @@ page {
   background: rgba(255, 255, 255, 0.85);
   z-index: 15;
 }
+/* 半区内容：队名(可收缩省略) + 比分(固定宽)，互不挤压 */
 .mp-sb-progress__score {
   position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   width: 100%;
   height: 100%;
   color: #fff;
@@ -2883,53 +2887,67 @@ page {
   font-style: italic;
   z-index: 20;
   box-sizing: border-box;
+  min-width: 0;
+  gap: 12rpx;
 }
-/* 分队名：仍贴左右外边，不参与数字对称 */
+.mp-sb-progress__score--a {
+  justify-content: flex-start;
+  padding: 0 16rpx 0 24rpx;
+}
+.mp-sb-progress__score--b {
+  justify-content: flex-end;
+  padding: 0 24rpx 0 16rpx;
+}
+/* 分队名槽：固定占用剩余宽度，超出省略，不撑破卡片 */
 .mp-sb-progress__name {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.mp-sb-progress__name-text {
+  display: block;
+  width: 100%;
   font-size: 28rpx;
   font-weight: 900;
-  max-width: 46%;
+  font-style: normal; /* 顶部队名不斜体；球员昵称仍用 .mp-sb-side__name italic */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-sizing: border-box;
 }
-.mp-sb-progress__score--a .mp-sb-progress__name {
-  left: 28rpx;
+.mp-sb-progress__score--a .mp-sb-progress__name,
+.mp-sb-progress__score--a .mp-sb-progress__name-text {
+  text-align: left;
 }
-.mp-sb-progress__score--b .mp-sb-progress__name {
-  right: 28rpx;
+.mp-sb-progress__score--b .mp-sb-progress__name,
+.mp-sb-progress__score--b .mp-sb-progress__name-text {
+  text-align: right;
 }
-/* 数字槽：等宽 + 关于中线镜像；区内对齐，禁止文字级 left/transform 补偿 */
+/* 数字槽：固定宽度，不随队名伸缩 */
 .mp-sb-progress__num-slot {
   --mp-sb-num-slot-width: 80rpx;
-  --mp-sb-num-slot-gap: 15px; /* 数字区近中线边缘到中线的固定距离 */
-  position: absolute;
-  top: 0;
-  bottom: 0;
+  flex: 0 0 var(--mp-sb-num-slot-width);
   width: var(--mp-sb-num-slot-width);
+  height: 100%;
   display: flex;
   align-items: center;
   box-sizing: border-box;
+  min-width: var(--mp-sb-num-slot-width);
 }
-/* 红：区右缘 = 中线左侧 gap；区内右对齐 */
 .mp-sb-progress__num-slot.left {
-  right: var(--mp-sb-num-slot-gap);
   justify-content: flex-end;
   text-align: right;
 }
-/* 蓝：区左缘 = 中线右侧 gap；区内左对齐 */
 .mp-sb-progress__num-slot.right {
-  left: var(--mp-sb-num-slot-gap);
   justify-content: flex-start;
   text-align: left;
 }
 .mp-sb-progress__num {
   font-size: 44rpx;
   font-weight: 900;
-  font-style: normal; /* 测试：取消数字 italic，验证中线视觉对称 */
+  font-style: normal;
   line-height: 1;
   width: 100%;
 }
@@ -3157,22 +3175,33 @@ page {
   min-width: 0;
   overflow: visible;
 }
+/* 蓝方：昵称区整体右对齐（含组合多行） */
+.mp-sb-side__content--right .mp-sb-side__names {
+  align-items: flex-end;
+  text-align: right;
+}
+/* 得分榜卡片球员昵称：单人/组合统一斜体 */
 .mp-sb-side__name {
   display: block;
   font-size: 26rpx;
   font-weight: 700;
+  font-style: italic;
   line-height: 1.4; /* 不低于字号，避免上下裁切 */
   white-space: nowrap;
   max-width: 180rpx;
   overflow: visible; /* 取消 hidden，避免斜体/字重右上角被切 */
+  padding-right: 4rpx; /* 斜体字形外伸余量 */
+}
+.mp-sb-side__content--right .mp-sb-side__name {
+  text-align: right;
+  padding-right: 0;
+  padding-left: 4rpx; /* 右对齐时斜体左侧外伸余量 */
 }
 .mp-sb-side__identity--single .mp-sb-side__name {
   font-size: 28rpx;
   font-weight: 900;
-  font-style: italic;
   text-transform: uppercase;
   line-height: 1.4;
-  padding-right: 4rpx; /* 斜体字形外伸余量 */
 }
 /* 文案色随互斥 status class */
 .mp-sb-status.winner-a .mp-sb-side--left,
@@ -3296,7 +3325,7 @@ page {
 .mp-sb-center__chevron { transition: transform 0.2s ease; display: inline-block; }
 .mp-sb-center__chevron.is-open { transform: rotate(180deg); }
 .mp-sb-card__body {
-  padding: 24rpx 16rpx 28rpx;
+  padding: 20rpx 16rpx 28rpx;
   border-top: 1px solid var(--border);
   background: var(--bg-card);
 }
@@ -3320,8 +3349,18 @@ page {
   display: flex;
   justify-content: space-between;
   gap: 2rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 0;
   padding: 0 4rpx;
+}
+/* 卡片内直接展示：DETAILS 按钮下方，展开面板上方 */
+.mp-sb-holes--summary {
+  padding: 16rpx 16rpx 20rpx;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  box-sizing: border-box;
+}
+.mp-sb-details-panel {
+  padding-top: 0;
 }
 .mp-sb-dot {
   width: 30rpx;
@@ -3452,12 +3491,14 @@ page {
 .detail-page.dark-mode .mp-sb-card,
 .detail-page.dark-mode .mp-sb-summary,
 .detail-page.dark-mode .mp-sb-card__body,
+.detail-page.dark-mode .mp-sb-holes--summary,
 .detail-page.dark-mode .mp-sb-table__labels {
   background: var(--bg-card);
   color: var(--text-primary);
   border-color: var(--border-color);
 }
-.detail-page.dark-mode .mp-sb-card__body {
+.detail-page.dark-mode .mp-sb-card__body,
+.detail-page.dark-mode .mp-sb-holes--summary {
   border-top-color: var(--border);
 }
 .detail-page.dark-mode .mp-sb-coming-soon__text {

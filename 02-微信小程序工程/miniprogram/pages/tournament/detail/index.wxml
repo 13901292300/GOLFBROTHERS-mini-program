@@ -54,7 +54,9 @@
             <view wx:for="{{[1,2,3,4,5,6,7,8,9,10,11,12,13,14]}}" wx:key="*this" class="mp-sb-progress__line"></view>
           </view>
           <view class="mp-sb-progress__score mp-sb-progress__score--a">
-            <text class="mp-sb-progress__name">{{matchPlayScoreboard.teamA.name}}</text>
+            <view class="mp-sb-progress__name">
+              <text class="mp-sb-progress__name-text">{{matchPlayScoreboard.teamA.name}}</text>
+            </view>
             <view class="mp-sb-progress__num-slot left">
               <text class="mp-sb-progress__num">{{matchPlayScoreboard.teamA.score}}</text>
             </view>
@@ -69,7 +71,9 @@
             <view class="mp-sb-progress__num-slot right">
               <text class="mp-sb-progress__num">{{matchPlayScoreboard.teamB.score}}</text>
             </view>
-            <text class="mp-sb-progress__name">{{matchPlayScoreboard.teamB.name}}</text>
+            <view class="mp-sb-progress__name">
+              <text class="mp-sb-progress__name-text">{{matchPlayScoreboard.teamB.name}}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -461,18 +465,18 @@
                   </view>
 
                   <view class="mp-sb-center">
-                    <!-- 顶部：THRU / FINAL，固定位置 -->
+                    <!-- 顶部：THRU / FINAL，位置固定（不受 expanded 影响） -->
                     <view class="mp-sb-center__top">
                       <text wx:if="{{card.phaseLabel}}" class="mp-sb-center__phase">{{card.phaseLabel}}</text>
                     </view>
-                    <!-- 中部：比赛状态，高度可变化 -->
+                    <!-- 中部：UP/DN/TIED/VS，位置固定 -->
                     <view class="mp-sb-center__mid">
                       <view class="mp-sb-center__status {{card.statusLeadClass}}">
                         <text class="mp-sb-center__main">{{card.statusMain}}</text>
                         <text wx:if="{{card.statusSub}}" class="mp-sb-center__sub">{{card.statusSub}}</text>
                       </view>
                     </view>
-                    <!-- 底部：DETAILS，固定贴底，不参与 flex -->
+                    <!-- 底部：DETAILS 原位，不随展开移动 -->
                     <view class="mp-sb-center__bot">
                       <view
                         class="mp-sb-center__btn"
@@ -525,22 +529,25 @@
                 </view>
               </view>
 
+              <!-- 18洞走势：卡片内直接显示，位于 DETAILS 按钮下方，不属于 DETAILS 面板 -->
+              <view
+                wx:if="{{card.holeDots && card.holeDots.length}}"
+                class="mp-sb-holes mp-sb-holes--summary"
+              >
+                <view
+                  wx:for="{{card.holeDots}}"
+                  wx:for-item="dot"
+                  wx:key="n"
+                  class="mp-sb-dot {{dot.cls}}"
+                >{{dot.n}}</view>
+              </view>
+
+              <!-- DETAILS 展开内容：仅逐洞表 / comingSoon + 赛事图 -->
               <view wx:if="{{card.expanded}}" class="mp-sb-card__body">
-                <!-- 未开始：固定提示，不渲染洞表 -->
                 <view wx:if="{{card.detailsMode === 'comingSoon'}}" class="mp-sb-coming-soon">
                   <text class="mp-sb-coming-soon__text">Match details coming soon.....</text>
                 </view>
-                <block wx:else>
-                  <!-- 18 洞状态圆点：数字固定 Match Hole 1–18；颜色按比赛序洞胜负 -->
-                  <view class="mp-sb-holes">
-                    <view
-                      wx:for="{{card.holeDots}}"
-                      wx:for-item="dot"
-                      wx:key="n"
-                      class="mp-sb-dot {{dot.cls}}"
-                    >{{dot.n}}</view>
-                  </view>
-                  <!-- 左列固定标签 + 右侧洞数据横向滚动（不用 sticky） -->
+                <view wx:else class="mp-sb-details-panel">
                   <view class="mp-sb-table">
                     <view class="mp-sb-table__labels">
                       <view class="mp-sb-cell mp-sb-cell--label">Hole</view>
@@ -551,7 +558,6 @@
                     <scroll-view scroll-x class="mp-sb-table__scroll" enable-flex>
                       <view class="mp-sb-table__data">
                         <view class="mp-sb-row">
-                          <!-- HOLE：displayHole（如 A5/B1），列序从 startHole 环绕 -->
                           <view wx:for="{{card.holeLabels}}" wx:for-item="h" wx:for-index="hi" wx:key="hi" class="mp-sb-cell">{{h}}</view>
                         </view>
                         <view class="mp-sb-row">
@@ -574,14 +580,13 @@
                       </view>
                     </scroll-view>
                   </view>
-                  <!-- 与 G1–G4 领先榜展开同一图片源 scorecardAdImage / .sc-ad -->
                   <image
                     wx:if="{{scorecardAdImage}}"
                     class="sc-ad mp-sb-sc-ad"
                     src="{{scorecardAdImage}}"
                     mode="widthFix"
                   ></image>
-                </block>
+                </view>
               </view>
             </view>
           </view>

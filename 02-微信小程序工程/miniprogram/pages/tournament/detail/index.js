@@ -119,13 +119,17 @@ const TOURNAMENT_TABS = {
 };
 
 // 无 matchId / 未知状态时，沿用进行中 TAB 集，保持既有演示页视觉不变
-// G5–G8 比洞：进行中「领先榜」文案改为「得分榜」（仅 label，id/排序/点击不变）
+// G5–G8 比洞：leaderboard TAB 文案统一为「得分榜」（ongoing「领先榜」/ completed「成绩表」均改；id/排序/点击不变）
 function resolveTournamentTabs(status, match) {
   const base = TOURNAMENT_TABS[status] || TOURNAMENT_TABS.ongoing;
   const tabs = base.map((tab) => Object.assign({}, tab));
   if (isMatchPlayBoardMode(resolveGameMode(match))) {
     tabs.forEach((tab) => {
-      if (tab && tab.id === 'leaderboard' && tab.label === '领先榜') {
+      if (
+        tab &&
+        tab.id === 'leaderboard' &&
+        (tab.label === '领先榜' || tab.label === '成绩表')
+      ) {
         tab.label = '得分榜';
       }
     });
@@ -1500,11 +1504,23 @@ Page({
   _buildMatchPlayScoreboard(match, opts) {
     const board = buildMockMatchPlayScoreboard();
     const summary = this._buildMatchPlayTeamScoreSummary(match);
+    // 顶部总比分条队名：teamGroups[0]/[1].name；缺省回退 mock「红队/蓝队」
+    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    const teamAName =
+      teamGroups[0] && String(teamGroups[0].name || '').trim()
+        ? String(teamGroups[0].name).trim()
+        : (board.teamA && board.teamA.name) || '红队';
+    const teamBName =
+      teamGroups[1] && String(teamGroups[1].name || '').trim()
+        ? String(teamGroups[1].name).trim()
+        : (board.teamB && board.teamB.name) || '蓝队';
     const teamScores = {
       teamA: Object.assign({}, board.teamA, {
+        name: teamAName,
         score: this._formatMatchPlayTeamScore(summary.redScore)
       }),
       teamB: Object.assign({}, board.teamB, {
+        name: teamBName,
         score: this._formatMatchPlayTeamScore(summary.blueScore)
       })
     };
@@ -1552,13 +1568,18 @@ Page({
     const gameMode = resolveGameMode(match);
     const isG5 = isG5MatchPlayMode(gameMode);
     const templates = board.matches;
+    // 未开打：仍提供 18 个 empty 圆点供卡片底部走势条展示（不碰成绩计算）
+    const emptyHoleDots = [];
+    for (let di = 1; di <= 18; di++) {
+      emptyHoleDots.push({ n: di, cls: 'empty', result: '' });
+    }
     const emptyDetail = {
       holeColumns: [],
       holeLabels: [],
       pars: [],
       statusCells: [],
       scoreCells: [],
-      holeDots: []
+      holeDots: emptyHoleDots
     };
     const matches = groups.map((group, index) => {
       const base = Object.assign({}, templates[index] || templates[templates.length - 1]);
@@ -6473,10 +6494,11 @@ Page({
 
   /* ===== 更多功能面板 ===== */
   /**
-   * finished 状态下管理项禁用：
-   * - 未生成净杆：管理项 disabled，net_score 例外
-   * - 已生成净杆：全部管理项 disabled（含 net_score）
-   * - 查看类（领先榜/统计等）永不因此禁用
+   * finished 状态下 M 面板禁用规则（不按「全部管理项一刀切」）：
+   * - 查看类（领先榜/统计等）：永不因此禁用
+   * - 收费管理 manage_payment：G1–G8 结束后仍可点（查历史/补录/改支付状态）
+   * - 生成净杆 net_score：未生成可点；已生成则禁用（G5–G8 入口本身已隐藏）
+   * - 比赛结构管理（修改比赛/半场/分组/出发/选手/权限/取消/结束等）：禁用
    */
   _getMoreFeatureDisabledState(match, feature) {
     if (!feature || feature.empty) return false;
@@ -6485,6 +6507,9 @@ Page({
 
     const status = String((match && match.status) || '').trim().toLowerCase();
     if (status !== 'finished') return false;
+
+    // 财务：结束后仍可进入收费管理
+    if (permission === 'manage_payment') return false;
 
     const netGenerated = !!(
       match &&
@@ -6825,10 +6850,12 @@ Page({
       wx.showToast({ title: '比赛已经结束。', icon: 'none' });
       return;
     }
+    const isMatchPlay = isMatchPlayBoardMode(resolveGameMode(match));
     wx.showModal({
       title: '结束比赛',
-      content:
-        '确认结束本场比赛？\n\n结束后：\n- 比赛进入最终状态\n- 可生成净杆成绩\n- 领先榜作为最终成绩展示',
+      content: isMatchPlay
+        ? '比赛结束后，将锁定当前比赛结果。'
+        : '确认结束本场比赛？\n\n结束后：\n- 比赛进入最终状态\n- 可生成净杆成绩\n- 领先榜作为最终成绩展示',
       cancelText: '取消',
       confirmText: '确认',
       confirmColor: '#ce9224',
@@ -6851,6 +6878,7 @@ Page({
       return;
     }
     match.status = 'finished';
+    match.statusLabel = '已结束';
     match.finishedAt = Date.now();
     match.updatedAt = Date.now();
     teamMatchStore.saveMatch(match);
