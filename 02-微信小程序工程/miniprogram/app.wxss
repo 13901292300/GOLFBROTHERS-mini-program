@@ -44,6 +44,11 @@ page {
   --tab-indicator-color: var(--champion-gold);
 }
 
+/* 大字体：仅放大 TAB 字号 token，不改 --tab-height / 指示器 / 布局 */
+.font-large {
+  --tab-font-size: 30rpx;
+}
+
 /* 所有 TAB（首页顶部 / 记分页 / 其他 tab 组件）统一使用以下两类 */
 .tab-active {
   color: var(--tab-active-color);

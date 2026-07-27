@@ -1808,7 +1808,7 @@ page {
 .leaderboard-setting__btn--cancel { color: var(--text-secondary); background: var(--bg-subtle); border: 1px solid var(--border-color); }
 .leaderboard-setting__btn--confirm { color: #000; background: var(--champion-gold); border: 1px solid var(--champion-gold); }
 
-/* ===== 风格选择 sheet ===== */
+/* ===== 显示设置 sheet ===== */
 .style-sheet { position: fixed; left: 0; right: 0; bottom: 0; transform: translateY(100%); background: var(--bg-card); color: var(--text-primary); border-radius: 48rpx 48rpx 0 0; border: 1px solid var(--border); z-index: 260; transition: transform 0.25s ease; box-shadow: 0 -36rpx 80rpx rgba(0, 0, 0, 0.35); padding-bottom: max(40rpx, env(safe-area-inset-bottom)); }
 .style-sheet.active { transform: translateY(0); }
 .style-sheet__head { display: flex; align-items: flex-start; justify-content: space-between; padding: 36rpx 40rpx 8rpx; }
@@ -3556,4 +3556,27 @@ page {
 .detail-page.dark-mode .mp-sb-split--a .mp-sb-split__a,
 .detail-page.dark-mode .mp-sb-split--b .mp-sb-split__b {
   color: #fff;
+}
+/* ===== 大字体（fontScale=large）—— 仅覆盖核心阅读字号，不改布局几何 ===== */
+.detail-page.font-large .event-title__line {
+  font-size: 44rpx;
+}
+.detail-page.font-large .card-title {
+  font-size: 32rpx;
+}
+.detail-page.font-large .card-text,
+.detail-page.font-large .event-info-card-desc {
+  font-size: 28rpx;
+}
+.detail-page.font-large .player-name {
+  font-size: 32rpx;
+}
+.detail-page.font-large .leaderboard-total {
+  font-size: 36rpx;
+}
+.detail-page.font-large .info-row-value {
+  font-size: 28rpx;
+}
+.detail-page.font-large .info-row-label {
+  font-size: 26rpx;
 }

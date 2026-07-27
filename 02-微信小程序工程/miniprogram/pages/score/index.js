@@ -18,6 +18,7 @@ const holeLayout = require('../../utils/holeLayout.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const teeSheetManage = require('../../utils/teeSheetManage.js');
+const caddieScoringAccess = require('../../utils/caddieScoringAccess.js');
 const userDirectory = require('../../utils/userDirectory.js');
 const userStore = require('../../utils/userStore.js');
 const contactStore = require('../../utils/contactStore.js');
@@ -159,7 +160,7 @@ const MORE_MENU_ITEMS_COMPACT = [
   { icon: '✐', label: '球童记分', bg: 'bg-pga-blue' },
   { icon: '📖', label: '记账本', bg: 'bg-pga-blue' },
   { icon: '🪪', label: '海报', bg: 'bg-pga-blue' },
-  { icon: '🎨', label: '风格选择', bg: 'bg-pga-blue' },
+  { icon: '🎨', label: '显示设置', bg: 'bg-pga-blue' },
   { icon: '💬', label: '反馈', bg: 'bg-pga-blue' },
   { icon: '⏻', label: '结束比赛', bg: 'bg-gold', action: 'finish_match' }
 ];
@@ -175,7 +176,7 @@ const MORE_MENU_ITEMS_LEGACY_MAIN = [
   { icon: '✐', label: '球童记分', bg: 'bg-pga-blue' },
   { icon: '📖', label: '记账本', bg: 'bg-pga-blue' },
   { icon: '🪪', label: '海报', bg: 'bg-pga-blue' },
-  { icon: '🎨', label: '风格选择', bg: 'bg-pga-blue' },
+  { icon: '🎨', label: '显示设置', bg: 'bg-pga-blue' },
   { icon: '💬', label: '反馈', bg: 'bg-pga-blue' }
 ];
 const MORE_MENU_LEGACY_PLACEHOLDER = { empty: true, label: '__placeholder__' };
@@ -418,6 +419,45 @@ function formatMainScore(scoreVal, par, displayMode) {
   if (scoreVal === null || scoreVal === undefined || scoreVal === '') return '';
   if (displayMode === 'diff') return formatDiffWithPlus(scoreVal - par);
   return String(scoreVal);
+}
+
+/**
+ * 无成绩时洞格可显示的 T 台码数提示（接口预留）。
+ *
+ * target：
+ * - 单人：player，按 target.tPosition 取该洞距离
+ * - 多人组合：target.members 存在时，遍历成员 tPosition，取每人对应距离，返回最大距离
+ *
+ * 当前无真实 courseData，yardage 查找恒为空，最终返回 ''。
+ * @param {object} target player 或带 members 的组合实体
+ * @param {number} holeIndex 0–17
+ * @returns {string}
+ */
+function resolveHoleTeeYardage(target, holeIndex) {
+  /** @returns {number|null} 有 courseData 时返回码数，否则 null */
+  function yardageForTee(tPosition) {
+    // TODO: courseData?.holes?.[holeIndex]?.yardages?.[tPosition]
+    void holeIndex;
+    void tPosition;
+    return null;
+  }
+
+  if (!target) return '';
+
+  const members = Array.isArray(target.members) ? target.members : null;
+  if (members && members.length > 0) {
+    let max = null;
+    for (let i = 0; i < members.length; i += 1) {
+      const m = members[i];
+      const y = yardageForTee(m && m.tPosition);
+      if (y == null || !Number.isFinite(y)) continue;
+      if (max == null || y > max) max = y;
+    }
+    return max == null ? '' : String(max);
+  }
+
+  const y = yardageForTee(target.tPosition);
+  return y == null || !Number.isFinite(y) ? '' : String(y);
 }
 
 // 成绩状态判断统一走 groupsStore.getScoreStatus（与逐洞面板同一真源），此处只做记分格 class 名映射
@@ -1481,7 +1521,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
     scoreIdx += 1;
     const s = scores[hi];
 
-    // 空洞：保持空白，不参与计算
+    // 空洞：保持空白，不参与计算；displayHint 预留显示该洞 T 台码数
     if (!isFilledScore(s)) {
       return {
         type: 'hole',
@@ -1491,6 +1531,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         holeIndex: hi,
         score: '',
         mainStr: '',
+        displayHint: resolveHoleTeeYardage(player, hi),
         putts: '',
         diff: 0,
         diffStr: '',
@@ -1525,6 +1566,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       score: s,
       // 主数字显示：gross→实际杆数；diff→带符号本洞杆差（仅 UI 展示，不改底层数据）
       mainStr: formatMainScore(s, par, displayMode),
+      displayHint: '',
       putts: p,
       diff,
       // 右下角杆差：杆差模式下隐藏（主数字已是杆差，避免重复）
@@ -1542,7 +1584,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
 
   return Object.assign({}, player, {
     avatar: mockAvatars.resolveAvatar(player.avatar, player.playerId || player.id || player.name),
-    relScoreStr: totalFilled > 0 ? formatDiff(relScore) : '',
+    relScoreStr: totalFilled > 0 ? formatDiff(relScore) : '-',
     relScore,
     relClass: relScore < 0 ? 'diff-under' : relScore === 0 ? 'diff-even' : '',
     cells
@@ -1585,6 +1627,8 @@ Page({
     headerBarStyle: 'padding-top:52px;padding-right:96px;padding-bottom:16px;padding-left:16px;min-height:92px;box-sizing:border-box;display:flex;align-items:center;',
 
     themeClass: 'bright-mode',
+    fontScale: 'normal',
+    fontScaleClass: 'font-normal',
     activeTab: 'score',
     // 记分格主数字显示方式：'gross'=总杆 | 'diff'=本洞杆差（仅 UI 展示）
     scoreDisplayMode: 'gross',
@@ -1621,7 +1665,14 @@ Page({
     /** 记分面板只读：可进入查看，禁止改成绩 */
     isReadOnlyScore: false,
     showMoreSheet: false,
+    showStyleSheet: false,
     halfSheetVisible: false,
+    /** 球童记分 Sheet（本阶段仅 UI 打通，不读 store / 不生成码） */
+    caddieSheetVisible: false,
+    caddieSheetHasQr: false,
+    caddieSheetQrUrl: '',
+    caddieSheetGenerating: false,
+    caddieSheetScorers: [],
     /** 修改T台弹层（第一阶段：仅 UI / 本地态，不写盘） */
     editTeeSheetVisible: false,
     editTeePlayers: [],
@@ -1823,6 +1874,7 @@ Page({
     // 会话内本地状态回灌：同一会话再次进入该球局不丢失成绩
     this.hydrateFromSession();
     this._syncMoreMenuItems();
+    this._syncFontScale();
     wx.nextTick(() => this._tryApplyPendingMatchJoinBind());
   },
 
@@ -2109,6 +2161,37 @@ Page({
   // TODO: 接入真实 matchId 后改为 'scoreDisplayMode_' + matchId
   _displayModeKey() {
     return 'scoreDisplayMode_global';
+  },
+
+  /** 读取全局字体大小偏好（显示设置 → fontScale_global） */
+  _getFontScale() {
+    try {
+      const value = wx.getStorageSync('fontScale_global');
+      return value === 'large' ? 'large' : 'normal';
+    } catch (e) {
+      return 'normal';
+    }
+  },
+
+  /** 写入全局字体大小，并同步本页 class */
+  _setFontScale(value) {
+    const next = value === 'large' ? 'large' : 'normal';
+    try {
+      wx.setStorageSync('fontScale_global', next);
+    } catch (e) {}
+    this.setData({
+      fontScale: next,
+      fontScaleClass: next === 'large' ? 'font-large' : 'font-normal'
+    });
+  },
+
+  /** 将 fontScale_global 同步到本页 class（仅显示层） */
+  _syncFontScale() {
+    const fontScale = this._getFontScale();
+    this.setData({
+      fontScale: fontScale,
+      fontScaleClass: fontScale === 'large' ? 'font-large' : 'font-normal'
+    });
   },
 
   // 记分方式(技术/快捷)偏好缓存 key：稳定全局键，绝不绑定 hole/player/group
@@ -3352,6 +3435,7 @@ Page({
   // 只读取全局主题并渲染，本页不允许修改主题
   onShow() {
     this.applyTheme(getApp().getTheme());
+    this._syncFontScale();
     if (this.data.gameId && !this.data.noMatch) {
       this._refreshScorePageFromGame();
     } else if (this.data.gameId) {
@@ -5273,6 +5357,30 @@ Page({
       return;
     }
 
+    if (label === '统计数据') {
+      // 队内赛记分页菜单已过滤本项，此处不处理 matchId；仅普通创建带 gameId 进统计页
+      const gameId = this.data.gameId || '';
+      if (!gameId) {
+        wx.showToast({ title: '当前为演示模式', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({
+        url: '/pages/tournament/stats/index?gameId=' + encodeURIComponent(gameId),
+        fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
+
+    if (label === '球童记分') {
+      this.openCaddieScoringSheet();
+      return;
+    }
+
+    if (label === '显示设置') {
+      this.openStyleSheet();
+      return;
+    }
+
     if (label === '反馈') {
       const ms = this._matchState || this._readMatchState() || {};
       const matchId = ms.matchId || '';
@@ -5285,6 +5393,183 @@ Page({
         fail: () => wx.showToast({ title: '反馈页面尚未注册', icon: 'none' })
       });
     }
+  },
+
+  openStyleSheet() {
+    this.setData({
+      showStyleSheet: true,
+      fontScale: this._getFontScale()
+    });
+  },
+
+  closeStyleSheet() {
+    this.setData({ showStyleSheet: false });
+  },
+
+  onFontScaleChange(e) {
+    const value =
+      e && e.currentTarget && e.currentTarget.dataset
+        ? e.currentTarget.dataset.value
+        : '';
+    this._setFontScale(value);
+  },
+
+  /**
+   * 球童记分宿主：队内赛优先，否则普通 game；无宿主返回 null。
+   * @returns {{ kind:'game'|'match', entity:object, id:string, groupId:string }|null}
+   */
+  _resolveCaddieScoringHost() {
+    const ms = this._matchState || this._readMatchState() || null;
+    if (isTeamInternalScoreMatchContext(ms)) {
+      const matchId = ms && ms.matchId != null ? String(ms.matchId).trim() : '';
+      const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+      if (!match) return null;
+      return {
+        kind: 'match',
+        entity: match,
+        id: String(match.matchId || matchId),
+        groupId: String(this.data.groupId || (ms && ms.groupId) || '').trim()
+      };
+    }
+    const gameId = String(this.data.gameId || '').trim();
+    if (!gameId) return null;
+    const game = gameStore.getGame(gameId);
+    if (!game) return null;
+    return {
+      kind: 'game',
+      entity: game,
+      id: gameId,
+      groupId: String(this.data.groupId || '').trim()
+    };
+  },
+
+  openCaddieScoringSheet() {
+    const host = this._resolveCaddieScoringHost();
+    if (!host || !host.entity) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const entity = host.entity;
+    const access = caddieScoringAccess.normalizeCaddieScoringAccess(entity.caddieScoringAccess);
+    const hasQr = !!(access && access.qrCodeUrl && access.enabled);
+    this.setData({
+      caddieSheetVisible: true,
+      caddieSheetHasQr: hasQr,
+      caddieSheetQrUrl: hasQr ? access.qrCodeUrl : '',
+      caddieSheetGenerating: false,
+      caddieSheetScorers: caddieScoringAccess.listCaddieScorers(entity.tempAdmins) || []
+    });
+  },
+
+  closeCaddieSheet() {
+    this.setData({ caddieSheetVisible: false });
+  },
+
+  /** 将宿主 entity 上的球童授权状态同步到 Sheet data */
+  _refreshCaddieSheetFromEntity(entity) {
+    if (!entity) return;
+    const access = caddieScoringAccess.normalizeCaddieScoringAccess(entity.caddieScoringAccess);
+    const hasQr = !!(access && access.qrCodeUrl && access.enabled);
+    this.setData({
+      caddieSheetHasQr: hasQr,
+      caddieSheetQrUrl: hasQr ? access.qrCodeUrl : '',
+      caddieSheetGenerating: false,
+      caddieSheetScorers: caddieScoringAccess.listCaddieScorers(entity.tempAdmins) || []
+    });
+  },
+
+  onGenerateCaddieQr(e) {
+    const host = this._resolveCaddieScoringHost();
+    if (!host || !host.entity) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const detail = (e && e.detail) || {};
+    const regenerate = !!detail.regenerate;
+    if (regenerate && this.data.caddieSheetHasQr) {
+      wx.showModal({
+        title: '重新生成',
+        content: '重新生成后，旧二维码将失效。是否继续？',
+        cancelText: '取消',
+        confirmText: '重新生成',
+        success: (res) => {
+          if (res.confirm) this._doGenerateCaddieQr(host);
+        }
+      });
+      return;
+    }
+    this._doGenerateCaddieQr(host);
+  },
+
+  _doGenerateCaddieQr(host) {
+    if (!host || !host.entity || !host.id) {
+      wx.showToast({ title: '生成失败', icon: 'none' });
+      return;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    const createdBy = String(user.userId || '');
+    const groupId = String(host.groupId || '').trim();
+    this.setData({ caddieSheetGenerating: true });
+    try {
+      let access = null;
+      if (host.kind === 'match') {
+        access = caddieScoringAccess.createCaddieScoringAccess({
+          source: 'team_match',
+          matchId: host.id,
+          groupId: groupId,
+          createdBy: createdBy
+        });
+      } else {
+        access = caddieScoringAccess.createCaddieScoringAccess({
+          source: 'game',
+          gameId: host.id,
+          groupId: groupId,
+          createdBy: createdBy
+        });
+      }
+      if (!access || !access.qrCodeUrl) {
+        this.setData({ caddieSheetGenerating: false });
+        wx.showToast({ title: '生成失败', icon: 'none' });
+        return;
+      }
+      host.entity.caddieScoringAccess = access;
+      if (host.kind === 'match') {
+        teamMatchStore.saveMatch(host.entity);
+      } else {
+        gameStore.saveGame(host.entity);
+      }
+      this._refreshCaddieSheetFromEntity(host.entity);
+      wx.showToast({ title: '二维码已生成', icon: 'success' });
+    } catch (err) {
+      this.setData({ caddieSheetGenerating: false });
+      wx.showToast({ title: '生成失败', icon: 'none' });
+    }
+  },
+
+  onRemoveCaddie(e) {
+    const host = this._resolveCaddieScoringHost();
+    if (!host || !host.entity) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const userId =
+      e && e.detail && e.detail.userId != null ? String(e.detail.userId).trim() : '';
+    if (!userId) {
+      wx.showToast({ title: '待删除球童', icon: 'none' });
+      return;
+    }
+    const result = caddieScoringAccess.removeCaddieScoringPermission(host.entity, userId);
+    if (!result || !result.ok) {
+      wx.showToast({ title: '移除失败', icon: 'none' });
+      return;
+    }
+    if (host.kind === 'match') {
+      teamMatchStore.saveMatch(host.entity);
+    } else {
+      gameStore.saveGame(host.entity);
+    }
+    this._refreshCaddieSheetFromEntity(host.entity);
+    wx.showToast({ title: '已移除', icon: 'success' });
   },
 
   /* ===== 普通球局：成绩全部完成 → 确认结束弹窗 ===== */
@@ -5371,9 +5656,96 @@ Page({
   },
 
   _scoreEditBlocked() {
-    // 只读：禁止改成绩；不挡记分格进入（open* 已去掉本检查）
+    // 只读优先：finished / gameFinished / isReadOnlyScore
     if (this.data.isReadOnlyScore || this._resolveIsReadOnlyScore()) return true;
+    // 无记分修改权（非本组参赛本人且无 manage_scoring/球童权）
+    if (!this._canCurrentUserEditScores()) return true;
     return false;
+  },
+
+  /** 记分权限宿主：普通局 game / 队内赛 match；均无则 null（演示等） */
+  _resolveScorePermissionHost() {
+    const gameId = String(this.data.gameId || '').trim();
+    if (gameId) {
+      const game = gameStore.getGame(gameId);
+      if (game) return game;
+    }
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = ms.matchId ? String(ms.matchId).trim() : '';
+    if (matchId) return teamMatchStore.getMatchById(matchId) || null;
+    return null;
+  },
+
+  /**
+   * 当前用户是否为本组参赛球员：
+   * - 普通创建：gameStore 当前组 playersSlots
+   * - 队内赛：match.groups 当前组 players
+   */
+  _isCurrentUserInCurrentGroup(userId) {
+    const uid = String(userId || '').trim();
+    if (!uid) return false;
+
+    const gameId = String(this.data.gameId || '').trim();
+    if (gameId && gameStore.getGame(gameId)) {
+      const gi = this._gameGroupIndex != null ? Number(this._gameGroupIndex) || 0 : 0;
+      const group = gameStore.getGroup(gameId, gi) || {};
+      const slots = Array.isArray(group.playersSlots) ? group.playersSlots : [];
+      return slots.some((slot) => {
+        if (!slot) return false;
+        return isSameUserIdentity(slot.playerId || slot.userId || slot.id, uid);
+      });
+    }
+
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+    if (match && group) {
+      const players = Array.isArray(group.players) ? group.players : [];
+      return players.some((p) => {
+        if (!p) return false;
+        return isSameUserIdentity(p.userId || p.playerId || p.id, uid);
+      });
+    }
+
+    return false;
+  },
+
+  /**
+   * 当前用户是否为成绩宿主创建者（game/match：createdBy，兼容 creatorId / ownerId）
+   */
+  _isCurrentUserScoreOwner(userId) {
+    const uid = String(userId || '').trim();
+    if (!uid) return false;
+    const matchOrGame = this._resolveScorePermissionHost();
+    if (!matchOrGame) return false;
+    const ownerId = String(
+      matchOrGame.createdBy || matchOrGame.creatorId || matchOrGame.ownerId || ''
+    ).trim();
+    if (!ownerId) return false;
+    return isSameUserIdentity(ownerId, uid);
+  },
+
+  /**
+   * 允许改成绩：Owner 创建者 → A 本组参赛本人 → B canManageScoring
+   * 无 match/game 宿主时不额外拦截（仅 finished 控制，兼容演示）
+   */
+  _canCurrentUserEditScores() {
+    const user = gameStore.getCurrentUser() || {};
+    const userId = String(user.userId || '').trim();
+    if (!userId) return false;
+
+    if (this._isCurrentUserScoreOwner(userId)) return true;
+    if (this._isCurrentUserInCurrentGroup(userId)) return true;
+
+    const matchOrGame = this._resolveScorePermissionHost();
+    if (!matchOrGame) return true;
+
+    const ms = this._matchState || this._readMatchState() || {};
+    const groupId = String(this.data.groupId || ms.groupId || '').trim();
+    return !!caddieScoringAccess.canManageScoring(
+      matchOrGame,
+      userId,
+      groupId || undefined
+    );
   },
 
   _afterScoresPersisted() {

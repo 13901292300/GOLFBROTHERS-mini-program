@@ -441,7 +441,8 @@ const CHAT = [
 const FEATURES_COMMON = [
   { permission: 'leaderboard', glyph: '▦', label: '领先榜' },
   { permission: 'stats', glyph: '📈', label: '统计数据' },
-  { permission: 'feedback', glyph: '💬', label: '反馈' }
+  { permission: 'feedback', glyph: '💬', label: '反馈' },
+  { permission: 'theme', glyph: '🎨', label: '显示设置' }
 ];
 /** 查看类：finished 后仍可点，不受管理项禁用规则影响 */
 const FEATURES_VIEW_PERMISSION_SET = {
@@ -788,6 +789,8 @@ Page({
     // 领先榜
     scoringDisplay: 'strokeDiff', // gross | strokeDiff
     scorePanel: 'technical', // technical | quick
+    fontScale: 'normal', // normal | large（显示设置：字体大小）
+    fontScaleClass: 'font-normal',
     /** G5–G8：得分榜 UI 开关（仅展示 mock，不读真实成绩） */
     isMatchPlayScoreboard: false,
     matchPlayScoreboard: null,
@@ -869,6 +872,7 @@ Page({
       options && options.adminToken ? decodeURIComponent(String(options.adminToken)) : '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
+    this._syncFontScale();
     groupsStore.ensureInitialized();
     this._syncTournamentHoleLayout();
     this.setData({ courseName: groupsStore.getCourseName() });
@@ -3494,6 +3498,7 @@ Page({
       wx.setPageOrientation({ orientation: 'portrait' });
     }
     this.applyTheme(getApp().getTheme());
+    this._syncFontScale();
     // 不单靠 onHide：onShow 再认一次栈内 score，供 refresh 折叠 Details
     if (this._isReturningFromScorePage()) {
       this._resetMatchPlayExpandedOnReturn = true;
@@ -9474,12 +9479,49 @@ Page({
     }
   },
 
-  /* ===== 风格选择 ===== */
+  /* ===== 显示设置（字体大小） ===== */
+  _getFontScale() {
+    try {
+      return wx.getStorageSync('fontScale_global') === 'large' ? 'large' : 'normal';
+    } catch (e) {
+      return 'normal';
+    }
+  },
+
+  _syncFontScale() {
+    const fontScale = this._getFontScale();
+    this.setData({
+      fontScale: fontScale,
+      fontScaleClass: fontScale === 'large' ? 'font-large' : 'font-normal'
+    });
+  },
+
+  _setFontScale(value) {
+    const next = value === 'large' ? 'large' : 'normal';
+    try {
+      wx.setStorageSync('fontScale_global', next);
+    } catch (e) {}
+    this.setData({
+      fontScale: next,
+      fontScaleClass: next === 'large' ? 'font-large' : 'font-normal'
+    });
+  },
+
   openStyleSheet() {
-    this.setData({ showStyleSheet: true });
+    this.setData({
+      showStyleSheet: true,
+      fontScale: this._getFontScale()
+    });
   },
   closeStyleSheet() {
     this.setData({ showStyleSheet: false });
+  },
+  onFontScaleChange(e) {
+    const value =
+      e && e.currentTarget && e.currentTarget.dataset
+        ? e.currentTarget.dataset.value
+        : '';
+    this._setFontScale(value);
   },
   // 总杆/杆差切换：统一驱动 领先榜TOTAL + 逐洞详情面板，并写入全局缓存（与记分页同键）
   setScoringDisplay(e) {

@@ -337,6 +337,121 @@ function buildStatisticsRows(match) {
   return rows;
 }
 
+/**
+ * 普通创建：将 game.groups[].scoresByPlayer 归一为 match.scoreData 形状，
+ * 供统计页 _mapAdapterRowsToView / _countFilledHolesForStatsRow 复用。
+ * @param {object} game gameStore 球局
+ * @returns {{ scoreData: object }}
+ */
+function buildGameScoreDataContext(game) {
+  const scoreData = {};
+  if (!game || typeof game !== 'object') return { scoreData: scoreData };
+  const groups = listGameGroups(game);
+  groups.forEach((group) => {
+    const groupId = group && group.groupId != null ? String(group.groupId).trim() : '';
+    if (!groupId) return;
+    scoreData[groupId] = {
+      scoresByPlayer:
+        group.scoresByPlayer && typeof group.scoresByPlayer === 'object'
+          ? group.scoresByPlayer
+          : {}
+    };
+  });
+  return { scoreData: scoreData };
+}
+
+/** 与 gameStore.listGroups 同构（避免 adapter 反向依赖 gameStore） */
+function listGameGroups(game) {
+  if (!game) return [];
+  if (Array.isArray(game.groups) && game.groups.length) {
+    return game.groups;
+  }
+  return [
+    {
+      groupId: (game.gameId || 'legacy') + '-g1',
+      name: '第1组',
+      playersSlots: game.playersSlots || [],
+      scoresByPlayer: game.scoresByPlayer || {}
+    }
+  ];
+}
+
+/**
+ * 普通创建统计行：从 game.groups[].scoresByPlayer（及旧顶层兜底）读取成绩。
+ * 输出字段与 buildStatisticsRows 一致，供 _mapAdapterRowsToView 使用。
+ * @param {object} game gameStore 球局
+ * @returns {Array<object>}
+ */
+function buildGameStatisticsRows(game) {
+  if (!game || typeof game !== 'object') return [];
+  const pars = resolveMatchHolePars(game);
+  const groups = listGameGroups(game);
+  const rows = [];
+  const seen = {};
+
+  groups.forEach((group) => {
+    const groupId = group && group.groupId != null ? String(group.groupId).trim() : '';
+    const scoresByPlayer =
+      group && group.scoresByPlayer && typeof group.scoresByPlayer === 'object'
+        ? group.scoresByPlayer
+        : null;
+    const slots = Array.isArray(group && group.playersSlots) ? group.playersSlots : [];
+
+    slots.forEach((slot) => {
+      if (!slot || typeof slot !== 'object') return;
+      const playerId = resolveAnyPlayerId(slot);
+      if (!playerId) return;
+      const scoreOwnerId = resolveSlotScorePlayerId(slot, playerId);
+      const dedupeKey = scoreOwnerId || playerId;
+      if (seen[dedupeKey]) return;
+      seen[dedupeKey] = true;
+
+      const record = resolveScoresByPlayerRecord(scoresByPlayer, slot, playerId);
+      const scores = record && Array.isArray(record.scores) ? record.scores : [];
+      const putts = record && Array.isArray(record.putts) ? record.putts : [];
+      const fairways = record && Array.isArray(record.fairways) ? record.fairways : [];
+      const penalties = record && Array.isArray(record.penalties) ? record.penalties : [];
+      const sands = record && Array.isArray(record.sands) ? record.sands : [];
+      const holeStats = computePlayerHoleStats(scores, putts, pars, fairways, penalties, sands);
+
+      const genderDisplay = playerManage.getGenderDisplay(slot);
+      const name =
+        playerManage.resolveMatchNickname(slot) ||
+        (slot.name != null ? String(slot.name).trim() : '') ||
+        '未知球员';
+      const avatar = mockAvatars.resolveAvatar(
+        slot.avatar || slot.avatarUrl || '',
+        playerId
+      );
+
+      rows.push({
+        playerId: playerId,
+        scorePlayerId: scoreOwnerId || playerId,
+        groupId: groupId,
+        avatar: avatar,
+        name: name,
+        gender: genderDisplay.gender || '',
+        genderIcon: genderDisplay.icon || '',
+        teeColor: resolveTeeColor(slot, null),
+        eagle: holeStats.eagle,
+        birdie: holeStats.birdie,
+        par: holeStats.par,
+        bogey: holeStats.bogey,
+        doublePlus: holeStats.doublePlus,
+        girPercent: holeStats.girPercent,
+        putts: holeStats.putts,
+        fairwayPercent: holeStats.fairwayPercent,
+        sand: holeStats.sand,
+        penalty: holeStats.penalty,
+        stat8421: holeStats.stat8421,
+        total: holeStats.total
+      });
+    });
+  });
+
+  return rows;
+}
+
 /** G2/G3/G4：统计按 Stroke Entity；G1 / 其它：个人 */
 function shouldUseEntityStatistics(match) {
   const kind = resolveStrokeKind(resolveGameMode(match));
@@ -473,6 +588,8 @@ function buildEntityStatisticsRows(match) {
 module.exports = {
   buildStatisticsRows,
   buildEntityStatisticsRows,
+  buildGameStatisticsRows,
+  buildGameScoreDataContext,
   shouldUseEntityStatistics,
   computePlayerHoleStats,
   get8421Score,

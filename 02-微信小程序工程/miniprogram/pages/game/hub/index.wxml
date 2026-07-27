@@ -1,4 +1,4 @@
-<view class="detail-page {{themeClass}}" bindtap="onPageTap">
+<view class="detail-page {{themeClass}} {{fontScaleClass}}" bindtap="onPageTap">
   <!-- Header -->
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
@@ -8,7 +8,7 @@
         </view>
         <view>
           <text class="gb-header__eyebrow">GAME HUB</text>
-          <text class="gb-header__title">{{roundName}}</text>
+          <text class="gb-header__title">{{headerTitle}}</text>
         </view>
       </view>
     </view>
@@ -201,6 +201,7 @@
       watchers="{{watchers}}"
       messages="{{chat}}"
       theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
+      fontScale="{{fontScale}}"
     ></discussion>
   </view>
 
@@ -267,28 +268,29 @@
     </view>
   </view>
 
-  <!-- 风格选择 sheet（由「风格选择」功能项打开，与球队比赛一致） -->
+  <!-- 显示设置 sheet（由「显示设置」功能项打开，与球队比赛一致） -->
   <view wx:if="{{showStyleSheet}}" bindtap="closeStyleSheet" class="sheet-overlay"></view>
   <view class="style-sheet {{showStyleSheet ? 'active' : ''}}" catchtap="stopPropagation">
     <view class="style-sheet__head">
       <view>
-        <text class="style-sheet__title">风格选择</text>
+        <text class="style-sheet__title">显示设置</text>
         <text class="style-sheet__sub">这些设置会影响所有记分相关页面。</text>
       </view>
       <view bindtap="closeStyleSheet" class="style-sheet__close">✕</view>
     </view>
     <view class="style-section">
-      <text class="style-section-title">记分显示</text>
+      <text class="style-section-title">字体大小</text>
       <view class="style-option-row">
-        <view bindtap="setScoringDisplay" data-value="gross" class="style-option {{scoringDisplay === 'gross' ? 'active' : ''}}">总杆记分</view>
-        <view bindtap="setScoringDisplay" data-value="strokeDiff" class="style-option {{scoringDisplay === 'strokeDiff' ? 'active' : ''}}">杆差记分</view>
-      </view>
-    </view>
-    <view class="style-section">
-      <text class="style-section-title">记分面板</text>
-      <view class="style-option-row">
-        <view bindtap="setScorePanel" data-value="technical" class="style-option {{scorePanel === 'technical' ? 'active' : ''}}">技术面板</view>
-        <view bindtap="setScorePanel" data-value="quick" class="style-option {{scorePanel === 'quick' ? 'active' : ''}}">快捷面板</view>
+        <view
+          bindtap="onFontScaleChange"
+          data-value="normal"
+          class="style-option {{fontScale === 'normal' ? 'active' : ''}}"
+        >标准字体</view>
+        <view
+          bindtap="onFontScaleChange"
+          data-value="large"
+          class="style-option {{fontScale === 'large' ? 'active' : ''}}"
+        >大字体</view>
       </view>
     </view>
     <view class="style-done-wrap">

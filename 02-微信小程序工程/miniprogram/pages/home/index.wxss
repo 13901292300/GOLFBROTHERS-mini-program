@@ -1034,7 +1034,7 @@ page {
 }
 .ds-tab-item {
   position: relative;
-  font-size: 14px;
+  font-size: var(--tab-font-size);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1944,3 +1944,21 @@ page {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* ===== 大字体（fontScale=large）—— 仅覆盖卡片阅读字号，不改布局几何 ===== */
+.ds-app.font-large .ds-card-game-title {
+  font-size: 16px;
+}
+.ds-app.font-large .ds-card-game-meta {
+  font-size: 12px;
+}
+.ds-app.font-large .text-sm {
+  font-size: 16px;
+}
+.ds-app.font-large .text-base {
+  font-size: 18px;
+}
+.ds-app.font-large .text-9px {
+  font-size: 12px;
+}
+

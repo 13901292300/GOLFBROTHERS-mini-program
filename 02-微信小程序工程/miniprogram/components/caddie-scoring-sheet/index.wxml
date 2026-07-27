@@ -1,0 +1,92 @@
+<view wx:if="{{visible}}" class="css-root">
+  <view class="css-overlay" bindtap="onOverlayClose" catchtouchmove="stopPropagation"></view>
+
+  <view class="css-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="css-handle"></view>
+    <view class="css-head">
+      <text class="css-overline">CADDIE</text>
+      <text class="css-title">球童记分</text>
+      <text class="css-sub">生成本场球童记分二维码，球童扫码后即可获得记分权限。</text>
+    </view>
+
+    <scroll-view scroll-y class="css-body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="css-card">
+        <view class="css-card__head" bindtap="toggleQrExpanded">
+          <view class="css-card__head-main">
+            <text class="css-card__title">添加球童记分员</text>
+            <text class="css-card__desc">扫码授权本场记分（可为参赛球员记分）。</text>
+          </view>
+          <text class="css-card__toggle">{{qrExpanded ? '收起' : '展开二维码'}}</text>
+        </view>
+
+        <view class="css-scorer-list">
+          <text class="css-hint css-scorer-list__title">已扫码球童记分员</text>
+          <view wx:if="{{!scorers.length}}" class="css-scorer-list__empty">暂无球童记分员扫码加入</view>
+          <scroll-view wx:else scroll-x class="css-scorer-list__row" enable-flex="{{true}}">
+            <view
+              wx:for="{{scorers}}"
+              wx:key="userId"
+              class="css-scorer-item"
+              data-userid="{{item.userId}}"
+              bindtap="onScorerTap"
+            >
+              <image class="css-scorer-item__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <text class="css-scorer-item__name">{{item.nickname}}</text>
+              <text class="css-scorer-item__tag">记分员</text>
+            </view>
+          </scroll-view>
+        </view>
+
+        <view wx:if="{{qrExpanded}}" class="css-card__body">
+          <view wx:if="{{!hasQr}}" class="css-generate-wrap">
+            <view
+              class="css-btn css-btn--primary css-generate {{generating ? 'is-disabled' : ''}}"
+              bindtap="onGenerateQr"
+            >生成二维码</view>
+          </view>
+          <view wx:else class="css-qr-card">
+            <image class="css-qr-card__img" src="{{qrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}"></image>
+            <text class="css-hint css-qr-card__hint">扫码后获得本场记分权限</text>
+            <view class="css-qr-card__actions">
+              <view class="css-btn css-btn--ghost" bindtap="onRegenerateQr">重新生成</view>
+              <view class="css-btn css-btn--primary" bindtap="onSaveQrImage">保存图片</view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="css-footer">
+      <view class="css-btn css-btn--ghost css-footer__close" bindtap="onClose">关闭</view>
+    </view>
+  </view>
+
+  <!-- 删除球童确认层（UI） -->
+  <view
+    wx:if="{{manageVisible}}"
+    class="css-overlay css-overlay--top"
+    bindtap="closeManage"
+    catchtouchmove="stopPropagation"
+  ></view>
+  <view
+    wx:if="{{manageVisible}}"
+    class="css-sheet css-manage"
+    catchtap="stopPropagation"
+    catchtouchmove="stopPropagation"
+  >
+    <view class="css-handle"></view>
+    <view class="css-head">
+      <text class="css-overline">CADDIE</text>
+      <text class="css-title">球童记分员</text>
+    </view>
+    <view class="css-manage__body" wx:if="{{manageTarget}}">
+      <image class="css-manage__avatar" src="{{manageTarget.avatar}}" mode="aspectFill"></image>
+      <text class="css-manage__name">{{manageTarget.nickname}}</text>
+      <text class="css-hint css-manage__desc">该球童拥有本场比赛记分权限。</text>
+      <view class="css-manage__remove" bindtap="onConfirmRemove">移除记分权限</view>
+    </view>
+    <view class="css-footer">
+      <view class="css-btn css-btn--ghost css-footer__close" bindtap="closeManage">取消</view>
+    </view>
+  </view>
+</view>

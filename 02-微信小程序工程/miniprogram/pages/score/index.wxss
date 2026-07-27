@@ -666,6 +666,13 @@ page {
 /* 杆差模式：仅缩小主成绩文字（含正负号），圆圈/方框容器尺寸保持不变 */
 .hole-cell-score--diff { font-size: 40rpx; }
 
+/* 无成绩：T 台码数提示（浅灰小字） */
+.hole-cell-score--hint {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
 /* TOT 列：主题联动颜色，!important 防止任何局部/语义色覆盖 */
 .special-cell-val--tot,
 .tot-value { color: var(--tot-color) !important; }
@@ -1025,6 +1032,57 @@ page {
 .feature-item--empty { visibility: hidden; pointer-events: none; }
 .sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
 .sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
+
+/* 显示设置 Sheet（字体大小）—— 复用 sheet-overlay / bottom-sheet / sheet-cancel */
+.display-settings-sheet {
+  z-index: 190;
+  padding: 0 0 8rpx;
+}
+.display-settings-sheet__title {
+  margin: 0 48rpx 24rpx;
+}
+.display-settings-sheet__body {
+  padding: 0 48rpx 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.display-settings-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88rpx;
+  padding: 0 28rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-subtle, #f8fafc);
+  box-sizing: border-box;
+}
+.display-settings-option.is-active {
+  border-color: var(--champion-gold, #ce9224);
+  background: var(--cloud-blue, #002d62);
+}
+.display-settings-option__label {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+.display-settings-option.is-active .display-settings-option__label,
+.display-settings-option.is-active .display-settings-option__check {
+  color: #fff;
+}
+.display-settings-option__check {
+  font-size: 28rpx;
+  font-weight: 900;
+  color: var(--champion-gold, #ce9224);
+}
+.score-page.dark-mode .display-settings-option {
+  background: var(--bg-card, #1a1a1a);
+  border-color: var(--border-color, #333);
+}
+.score-page.dark-mode .display-settings-option__label {
+  color: var(--text-primary, #fff);
+}
 
 /* G5-G8: change start hole sheet */
 .start-hole-sheet { z-index: 190; padding: 0 40rpx 32rpx; }
@@ -3155,4 +3213,66 @@ page {
 
 .score-page.bright-mode .match-summary-label {
   color: #ce9224;
+}
+
+/* ===== 大字体（fontScale=large）—— 仅覆盖显示字号，不改布局几何 ===== */
+.font-large .hole-cell-score {
+  font-size: 58rpx;
+}
+
+.font-large .hole-cell-score--diff {
+  font-size: 50rpx;
+}
+
+.font-large .hole-cell-putt {
+  font-size: 22rpx;
+}
+
+.font-large .hole-cell-diff {
+  font-size: 22rpx;
+}
+
+.font-large .player-diff-score {
+  font-size: 48rpx;
+}
+
+.font-large .player-name-line {
+  font-size: 26rpx;
+}
+
+.font-large .hole-number {
+  font-size: 24rpx;
+}
+
+.font-large .par-val {
+  font-size: 28rpx;
+}
+
+/* PATCH 2.1：特殊格 / Entity / 比洞状态 */
+.font-large .special-cell-val {
+  font-size: 58rpx;
+}
+
+.font-large .special-cell-putt {
+  font-size: 22rpx;
+}
+
+.font-large .special-cell-diff {
+  font-size: 22rpx;
+}
+
+.font-large .entity-diff-score {
+  font-size: 40rpx;
+}
+
+.font-large .entity-name {
+  font-size: 32rpx;
+}
+
+.font-large .match-label-main {
+  font-size: 26rpx;
+}
+
+.font-large .match-cumulative {
+  font-size: 34rpx;
 }

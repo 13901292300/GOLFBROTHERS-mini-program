@@ -77,6 +77,8 @@ Page({
   data: {
     theme: 'bright',
     themeClass: 'bright-mode',
+    fontScale: 'normal',
+    fontScaleClass: 'font-normal',
     themeIcon: 'moon',
     currentMainSection: 'home',
     primaryTabActive: true,
@@ -245,6 +247,7 @@ Page({
     this._baseTournamentCards = this.data.tournamentCards.slice();
     this.initHeaderNav();
     this.initGlobalTheme();
+    this._syncFontScale();
     this.refreshUserProfile();
     if (options && options.section === 'profile') {
       this.showProfileSection();
@@ -262,10 +265,30 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    this._syncFontScale();
     this.refreshUserProfile();
     // 每次显示刷新进行中 GAME（持久化数据源 → 返回首页不丢失、刷新可恢复）
     this.refreshGames();
     this.refreshTeamMatchCards();
+  },
+
+  /** 读取全局字体大小偏好（显示设置 → fontScale_global） */
+  _getFontScale() {
+    try {
+      const value = wx.getStorageSync('fontScale_global');
+      return value === 'large' ? 'large' : 'normal';
+    } catch (e) {
+      return 'normal';
+    }
+  },
+
+  /** 将 fontScale_global 同步到本页 class（仅显示层） */
+  _syncFontScale() {
+    const fontScale = this._getFontScale();
+    this.setData({
+      fontScale: fontScale,
+      fontScaleClass: fontScale === 'large' ? 'font-large' : 'font-normal'
+    });
   },
 
   refreshUserProfile() {

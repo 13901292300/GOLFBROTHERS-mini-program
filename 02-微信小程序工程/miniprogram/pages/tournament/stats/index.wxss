@@ -16,6 +16,17 @@
   --stats-total-border: #fee2e2;
   --stats-score8421: #2563eb;
   --stats-footer-text: #9ca3af;
+  /*
+   * 横屏 4 人刚好铺满统计滚动区（不按人数动态缩放）：
+   * 行高 = (100vh − 顶栏 − 底栏 − 表头) / 4
+   * --stats-header-chrome 由页面按 statusBarHeight + 标题条写入
+   */
+  --stats-header-chrome: 62px;
+  --stats-footer-h: calc(22px + env(safe-area-inset-bottom, 0px));
+  --stats-thead-h: 28px;
+  --stats-row-h: calc(
+    (100vh - var(--stats-header-chrome) - var(--stats-footer-h) - var(--stats-thead-h)) / 4
+  );
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -55,7 +66,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px 6px;
+  padding: 2px 12px 4px;
+  height: 40px;
   min-height: 40px;
   box-sizing: border-box;
 }
@@ -111,6 +123,7 @@
 
 .stats-scroll {
   flex: 1;
+  height: 0;
   min-height: 0;
   width: 100%;
   background: var(--stats-card);
@@ -152,6 +165,7 @@
 }
 
 .stats-thead {
+  height: var(--stats-thead-h);
   background: var(--stats-thead-bg);
   color: var(--stats-thead-text);
   font-size: 10px;
@@ -161,20 +175,25 @@
   position: sticky;
   top: 0;
   z-index: 2;
+  box-sizing: border-box;
 }
 
 .stats-row {
+  height: var(--stats-row-h);
+  min-height: var(--stats-row-h);
   border-bottom: 1px solid var(--stats-row-border);
   background: var(--stats-card);
   color: var(--stats-text);
   font-size: 12px;
   font-weight: 600;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .st-cell {
   width: auto;
   min-width: 0;
-  padding: 8px 2px;
+  padding: 0 2px;
   text-align: center;
   box-sizing: border-box;
   border-left: 1px solid rgba(255, 255, 255, 0.18);
@@ -189,7 +208,7 @@
 
 /* 百分比列：min 保证 100%，fr 参与剩余空间分配 */
 .st-pct {
-  padding: 8px 4px;
+  padding: 0 4px;
   letter-spacing: 0;
   overflow: visible;
   text-overflow: clip;
@@ -199,8 +218,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px 8px 8px;
+  justify-content: flex-start;
+  gap: 8px;
+  height: 100%;
+  padding: 0 10px;
   text-align: left;
   border-left: 0 !important;
   overflow: hidden;
@@ -240,8 +261,8 @@
 }
 
 .st-avatar {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   flex-shrink: 0;
   background: #e5e7eb;
@@ -256,36 +277,36 @@
 .st-avatar-slot {
   position: relative;
   flex-shrink: 0;
-  height: 22px;
-  width: 22px;
+  height: 28px;
+  width: 28px;
 }
 .st-avatar-slot--single {
-  width: 22px;
+  width: 28px;
 }
 .st-avatar-slot--n1 {
-  width: 22px;
+  width: 28px;
 }
 .st-avatar-slot--n2 {
-  width: 34px;
+  width: 42px;
 }
 .st-avatar-slot--n3 {
-  width: 46px;
+  width: 56px;
 }
 .st-avatar-slot--n4 {
-  width: 58px;
+  width: 70px;
 }
 
 .st-paired-avatars {
   position: relative;
   width: 100%;
-  height: 22px;
+  height: 28px;
 }
 
 .st-pair-avatar {
   position: absolute;
   top: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
 }
 
 /* 对齐 score：前者更高 z-index，后者右移叠放 */
@@ -294,15 +315,15 @@
   z-index: 10;
 }
 .st-pair-avatar:nth-child(2) {
-  left: 12px;
+  left: 14px;
   z-index: 9;
 }
 .st-pair-avatar:nth-child(3) {
-  left: 24px;
+  left: 28px;
   z-index: 8;
 }
 .st-pair-avatar:nth-child(4) {
-  left: 36px;
+  left: 42px;
   z-index: 7;
 }
 
@@ -386,8 +407,11 @@
 
 .stats-footer {
   width: 100%;
+  height: var(--stats-footer-h);
   flex-shrink: 0;
-  padding: 4px 12px calc(4px + env(safe-area-inset-bottom));
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
   background: var(--stats-card);
   border-top: 1px solid var(--stats-cell-border);
   box-sizing: border-box;

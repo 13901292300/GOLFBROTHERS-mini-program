@@ -303,6 +303,9 @@ function normalizeTempAdmin(raw, fallbackAddedBy, grantableFeatures) {
   if (role) out.role = role;
   const status = String(raw.status || '').trim();
   if (status) out.status = status;
+  // 球童记分可选组范围：缺失/空 = 全场；有值则保留
+  const groupId = raw.groupId != null ? String(raw.groupId).trim() : '';
+  if (groupId) out.groupId = groupId;
   return out;
 }
 
@@ -352,6 +355,8 @@ function stripTempAdminsForSave(list, grantableFeatures) {
     if (admin.source) item.source = String(admin.source).trim();
     if (admin.role) item.role = String(admin.role).trim();
     if (admin.status) item.status = String(admin.status).trim();
+    const groupId = admin.groupId != null ? String(admin.groupId).trim() : '';
+    if (groupId) item.groupId = groupId;
     return item;
   });
 }

@@ -150,3 +150,17 @@
 .emoji-cell { height: 84rpx; display: flex; align-items: center; justify-content: center; font-size: 44rpx; border-radius: 12rpx; }
 .emoji-cell:active { background: rgba(0, 0, 0, 0.08); }
 .ds-dark .emoji-cell:active { background: rgba(255, 255, 255, 0.1); }
+
+/* ===== 大字体（fontScale=large）—— 仅覆盖正文/输入阅读字号 ===== */
+.font-large .chat-bubble {
+  font-size: 34rpx;
+}
+.font-large .discussion-input {
+  font-size: 34rpx;
+}
+.font-large .discussion-input__ph {
+  font-size: 34rpx;
+}
+.font-large .chat-meta {
+  font-size: 24rpx;
+}

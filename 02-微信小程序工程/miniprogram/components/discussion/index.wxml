@@ -1,5 +1,5 @@
 <!-- 统一讨论区聊天系统：自包含 flex 面板，填满宿主高度 -->
-<view class="ds-root {{theme === 'dark' ? 'ds-dark' : 'ds-bright'}} {{fixedInput ? 'ds-root--fixed-input' : ''}}">
+<view class="ds-root {{theme === 'dark' ? 'ds-dark' : 'ds-bright'}} {{fontScale === 'large' ? 'font-large' : 'font-normal'}} {{fixedInput ? 'ds-root--fixed-input' : ''}}">
 
   <!-- L1：围观行（面板顶部，不随聊天滚动）。垂直居中交给内层 .ws-track（不依赖 scroll-view 自身 flex，规避其居中失效） -->
   <scroll-view wx:if="{{showWatchersStrip}}" class="tab-watchers-strip" scroll-x>

@@ -1,6 +1,7 @@
 /**
  * 本场球童记分员授权（扫码获得 manage_scoring）
  * 扫码成功后写入 match.tempAdmins（source: caddie_qr），权限仅 manage_scoring。
+ * 可选 groupId：缺失/空 = 全场；有值 = 仅该组。
  */
 
 const tempAdminPermission = require('./tempAdminPermission.js');
@@ -56,7 +57,8 @@ function createCaddieScoringAccess(opts) {
     gameId: o.gameId,
     token: token
   });
-  return {
+  const groupId = o.groupId != null ? String(o.groupId).trim() : '';
+  const out = {
     accessId: accessId,
     token: token,
     pagePath: pagePath,
@@ -66,6 +68,9 @@ function createCaddieScoringAccess(opts) {
     enabled: true,
     claimedBy: []
   };
+  // 缺失或空串 = 全场；有值 = 仅该组
+  if (groupId) out.groupId = groupId;
+  return out;
 }
 
 function normalizeCaddieScoringAccess(raw) {
@@ -78,7 +83,8 @@ function normalizeCaddieScoringAccess(raw) {
   const pagePath = String(raw.pagePath || '').trim();
   const qrCodeUrl =
     String(raw.qrCodeUrl || '').trim() || (pagePath ? buildQrImageUrl(pagePath) : '');
-  return {
+  const groupId = raw.groupId != null ? String(raw.groupId).trim() : '';
+  const out = {
     accessId: String(raw.accessId || '').trim() || ('caddie_' + Date.now()),
     token: token,
     pagePath: pagePath,
@@ -88,6 +94,8 @@ function normalizeCaddieScoringAccess(raw) {
     enabled: raw.enabled !== false,
     claimedBy: claimedBy
   };
+  if (groupId) out.groupId = groupId;
+  return out;
 }
 
 function _entryUserId(raw) {
@@ -122,6 +130,20 @@ function filterNonCaddieTempAdmins(list) {
   });
 }
 
+function _entryGroupId(raw) {
+  if (!raw || typeof raw !== 'object') return '';
+  return raw.groupId != null ? String(raw.groupId).trim() : '';
+}
+
+/** 条目 groupId 是否覆盖目标组：空=全场；有值则需相等 */
+function _entryCoversGroup(entryGroupId, queryGroupId) {
+  const q = queryGroupId != null ? String(queryGroupId).trim() : '';
+  if (!q) return true;
+  const g = entryGroupId != null ? String(entryGroupId).trim() : '';
+  if (!g) return true;
+  return g === q;
+}
+
 /**
  * 从 tempAdmins 筛选已扫码球童记分员（供权限页回显）
  */
@@ -137,20 +159,24 @@ function listCaddieScorers(tempAdmins) {
     const nickname = String(
       raw.nickname || raw.name || raw.competitionName || raw.displayName || ''
     ).trim();
-    out.push({
+    const groupId = _entryGroupId(raw);
+    const item = {
       userId: userId,
       nickname: nickname || userId,
       avatar: mockAvatars.resolveAvatar(raw.avatar || raw.avatarUrl || '', userId),
       source: String(raw.source || '').trim() || 'caddie_qr',
       role: String(raw.role || '').trim(),
       permissions: Array.isArray(raw.permissions) ? raw.permissions.slice() : ['manage_scoring']
-    });
+    };
+    if (groupId) item.groupId = groupId;
+    out.push(item);
   });
   return out;
 }
 
 /**
  * 扫码成功：写入 / 补充 tempAdmins（仅 manage_scoring，不覆盖其它权限）
+ * 有 access.groupId 时写入条目；已有全场（无 groupId）条目再 claim 有 scope 码时保持全场。
  */
 function upsertCaddieTempAdmin(matchOrGame, profile, access) {
   if (!matchOrGame || typeof matchOrGame !== 'object') return null;
@@ -170,6 +196,8 @@ function upsertCaddieTempAdmin(matchOrGame, profile, access) {
   const avatar = mockAvatars.resolveAvatar(avatarRaw || '', uid);
   const addedBy =
     access && access.createdBy != null ? String(access.createdBy).trim() : '';
+  const accessGroupId =
+    access && access.groupId != null ? String(access.groupId).trim() : '';
 
   const idx = matchOrGame.tempAdmins.findIndex((a) => _entryUserId(a) === uid);
   if (idx >= 0) {
@@ -179,6 +207,7 @@ function upsertCaddieTempAdmin(matchOrGame, profile, access) {
     if (perms.indexOf('manage_scoring') < 0) perms.push('manage_scoring');
     const prevSource = String(existing.source || normalized.source || '').trim();
     const mergedPhone = phone || String(existing.phone || '').trim();
+    const existingGroupId = _entryGroupId(existing) || _entryGroupId(normalized);
     const next = {
       userId: uid,
       phone: mergedPhone,
@@ -191,6 +220,8 @@ function upsertCaddieTempAdmin(matchOrGame, profile, access) {
       addedBy: normalized.addedBy || addedBy,
       addedAt: normalized.addedAt || Date.now()
     };
+    // 已有全场（无 groupId）保持全场；已有组则保留，不因新码 scope 收窄
+    if (existingGroupId) next.groupId = existingGroupId;
     if (prevSource === 'admin_qr' || existing.role || normalized.role) {
       next.role =
         prevSource === 'admin_qr'
@@ -212,6 +243,7 @@ function upsertCaddieTempAdmin(matchOrGame, profile, access) {
     addedBy: addedBy,
     addedAt: Date.now()
   };
+  if (accessGroupId) created.groupId = accessGroupId;
   matchOrGame.tempAdmins.push(created);
   return created;
 }
@@ -259,6 +291,8 @@ function removeCaddieScoringPermission(matchOrGame, userId) {
     if (existing.role || normalized.role) {
       next.role = String(existing.role || normalized.role || '').trim();
     }
+    const keepGroupId = _entryGroupId(existing) || _entryGroupId(normalized);
+    if (keepGroupId) next.groupId = keepGroupId;
     matchOrGame.tempAdmins[idx] = next;
   }
 
@@ -299,33 +333,42 @@ function mergeTempAdminsPreservingCaddies(draftList, existingTempAdmins, grantab
       addedAt: normalized.addedAt || Date.now()
     };
     if (role) item.role = role;
+    const groupId = _entryGroupId(raw) || _entryGroupId(normalized);
+    if (groupId) item.groupId = groupId;
     preserved.push(item);
   });
   return stripped.concat(preserved);
 }
 
-function hasCaddieScoringAccess(matchOrGame, userId) {
+function hasCaddieScoringAccess(matchOrGame, userId, groupId) {
   const uid = String(userId || '').trim();
   if (!uid || !matchOrGame) return false;
+  const queryGroupId = groupId != null ? String(groupId).trim() : '';
   const list = Array.isArray(matchOrGame.tempAdmins) ? matchOrGame.tempAdmins : [];
-  if (list.some((a) => _entryUserId(a) === uid && isCaddieScorerEntry(a))) {
-    return true;
+  const caddieHit = list.find((a) => _entryUserId(a) === uid && isCaddieScorerEntry(a));
+  if (caddieHit) {
+    // 不传 groupId：旧行为（有球童权即 true）
+    if (!queryGroupId) return true;
+    return _entryCoversGroup(_entryGroupId(caddieHit), queryGroupId);
   }
   const access = normalizeCaddieScoringAccess(matchOrGame.caddieScoringAccess);
   if (!access || !access.enabled) return false;
-  return access.claimedBy.indexOf(uid) >= 0;
+  if (access.claimedBy.indexOf(uid) < 0) return false;
+  if (!queryGroupId) return true;
+  return _entryCoversGroup(access.groupId || '', queryGroupId);
 }
 
 /**
- * 是否可为本场任意球员记分：
- * - 临时管理员 manage_scoring
- * - 或球童扫码领取成功
+ * 是否可为本场记分：
+ * - 临时管理员 manage_scoring → 整场 true
+ * - 或球童扫码领取成功（可选 groupId 范围）
+ * @param {string} [groupId] 可选；不传保持旧行为
  */
-function canManageScoring(matchOrGame, userId) {
+function canManageScoring(matchOrGame, userId, groupId) {
   if (tempAdminPermission.hasTempAdminPermission(matchOrGame, userId, 'manage_scoring')) {
     return true;
   }
-  return hasCaddieScoringAccess(matchOrGame, userId);
+  return hasCaddieScoringAccess(matchOrGame, userId, groupId);
 }
 
 /**

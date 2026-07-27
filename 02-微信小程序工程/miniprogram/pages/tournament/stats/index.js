@@ -2,12 +2,14 @@
  * 赛事统计数据页
  * - 优先 statisticsAdapter（match.scoreData）→ dataSource='adapter'
  *   G1：buildStatisticsRows（个人）；G2/G3/G4：buildEntityStatisticsRows（组合）
+ * - 普通创建：gameId → buildGameStatisticsRows（game.groups[].scoresByPlayer）
  * - 仅显式 ?mock=1 → dataSource='mock'（mockStatisticsPlayers）
- * - 无 matchId / 无可用数据 → dataSource='empty'
+ * - 无 matchId / 无 gameId / 无可用数据 → dataSource='empty'
  * - sortField/sortOrder 默认 total/asc
  */
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const gameStore = require('../../../utils/gameStore.js');
 const statisticsAdapter = require('../../../utils/statisticsAdapter.js');
 
 const TEE_COLOR_TO_MARKER = {
@@ -331,6 +333,9 @@ Page({
   data: {
     statusBarHeight: 20,
     matchId: '',
+    gameId: '',
+    /** 顶栏占位：statusBarHeight + 标题条 40 + 底边 2，供 --stats-header-chrome */
+    statsHeaderChrome: 62,
     themeClass: 'bright-mode',
     title: 'Player Statistics',
     subtitle: '赛事统计',
@@ -345,6 +350,7 @@ Page({
   onLoad(options) {
     const opts = options || {};
     const matchId = opts.matchId ? String(opts.matchId) : '';
+    const gameId = opts.gameId ? String(opts.gameId) : '';
     let statusBarHeight = 20;
     try {
       const sys = wx.getSystemInfoSync();
@@ -355,7 +361,9 @@ Page({
     const loaded = this._loadStatisticsPageRows(opts);
     this.setData({
       matchId: matchId,
+      gameId: gameId,
       statusBarHeight: statusBarHeight,
+      statsHeaderChrome: statusBarHeight + 42,
       themeClass: this._resolveThemeClass(),
       sortField: 'total',
       sortOrder: 'asc',
@@ -377,36 +385,39 @@ Page({
   /**
    * 开发 mock 模式：
    * - 显式 ?mock=1 / ?dataSource=mock
-   * - 或无 matchId（本地直接打开统计页预览）
+   * - 或 matchId 与 gameId 皆空（本地直接打开统计页预览）
    */
   _isStatsMockMode(options) {
     const opts = options || {};
     const mockFlag = opts.mock === '1' || opts.mock === 'true' || opts.dataSource === 'mock';
     if (mockFlag) return true;
-    const id = opts.matchId != null ? String(opts.matchId).trim() : '';
-    return !id;
+    const matchId = opts.matchId != null ? String(opts.matchId).trim() : '';
+    const gameId = opts.gameId != null ? String(opts.gameId).trim() : '';
+    return !matchId && !gameId;
   },
 
   /**
    * 真实数据优先：matchId → getMatchById → buildStatisticsRows
+   * 普通创建：gameId → getGame → buildGameStatisticsRows
    * 开发 mock → mockStatisticsPlayers；非 mock 无数据 → empty
    */
   _loadStatisticsPageRows(options) {
     const opts = options || {};
-    const id = opts.matchId != null ? String(opts.matchId).trim() : '';
+    const matchId = opts.matchId != null ? String(opts.matchId).trim() : '';
+    const gameId = opts.gameId != null ? String(opts.gameId).trim() : '';
     const forceMock = this._isStatsMockMode(opts);
 
-    // 显式 mock 且未带真实 matchId：直接走 mock（保留开发预览）
-    // 若同时带有 matchId，仍优先尝试真实 adapter，失败再 mock
-    if (forceMock && !id) {
+    // 显式 mock 且未带真实 matchId/gameId：直接走 mock（保留开发预览）
+    // 若同时带有 id，仍优先尝试真实 adapter，失败再 mock
+    if (forceMock && !matchId && !gameId) {
       return {
         dataSource: 'mock',
         rows: this._loadMockStatisticsRows()
       };
     }
 
-    if (id) {
-      const match = teamMatchStore.getMatchById(id);
+    if (matchId) {
+      const match = teamMatchStore.getMatchById(matchId);
       if (match) {
         const useEntity = statisticsAdapter.shouldUseEntityStatistics(match);
         const adapterRows = useEntity
@@ -414,6 +425,21 @@ Page({
           : (statisticsAdapter.buildStatisticsRows(match) || []);
         if (adapterRows.length > 0) {
           const viewRows = this._mapAdapterRowsToView(match, adapterRows);
+          return {
+            dataSource: 'adapter',
+            rows: this._applyCurrentSort(viewRows, 'total', 'asc')
+          };
+        }
+      }
+    }
+
+    if (gameId) {
+      const game = gameStore.getGame(gameId);
+      if (game) {
+        const adapterRows = statisticsAdapter.buildGameStatisticsRows(game) || [];
+        if (adapterRows.length > 0) {
+          const scoreCtx = statisticsAdapter.buildGameScoreDataContext(game);
+          const viewRows = this._mapAdapterRowsToView(scoreCtx, adapterRows);
           return {
             dataSource: 'adapter',
             rows: this._applyCurrentSort(viewRows, 'total', 'asc')

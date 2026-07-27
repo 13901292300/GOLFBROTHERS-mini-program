@@ -118,3 +118,42 @@
   padding: 8px 18px;
   border-radius: 999px;
 }
+
+/* ===== 大字体（fontScale=large）—— 仅覆盖 Hub 核心阅读字号，不改布局几何 ===== */
+/* 球局标题 */
+.detail-page.font-large .gb-header__title {
+  font-size: 38rpx;
+}
+/* 分组卡：组名 / 开球时间 / 球员名 / Tee 文案 */
+.detail-page.font-large .tee-group-badge {
+  font-size: 30rpx;
+}
+.detail-page.font-large .tee-start-info {
+  font-size: 26rpx;
+}
+.detail-page.font-large .gb-group-player-name {
+  font-size: 26rpx;
+}
+.detail-page.font-large .gb-group-player-tee-text {
+  font-size: 22rpx;
+}
+/* 游戏 TAB：分组名 / 状态文字 / 小节标题 / 空态 */
+.detail-page.font-large .hub-game-row__name {
+  font-size: 17px;
+}
+.detail-page.font-large .hub-group-status {
+  font-size: 13px;
+}
+.detail-page.font-large .hub-section-title {
+  font-size: 14px;
+}
+.detail-page.font-large .hub-empty {
+  font-size: 15px;
+}
+/* 领先榜正文补充（player-name / leaderboard-total / info-row 已由 detail wxss 覆盖） */
+.detail-page.font-large .lr-thru {
+  font-size: 28rpx;
+}
+.detail-page.font-large .sc-course {
+  font-size: 24rpx;
+}

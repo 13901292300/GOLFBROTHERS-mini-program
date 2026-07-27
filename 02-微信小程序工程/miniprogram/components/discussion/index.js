@@ -30,6 +30,8 @@ Component({
     messages: { type: Array, value: [] },
     // 主题：'dark' | 'bright'（驱动聊天气泡等硬编码色，token 色走 CSS 变量自动继承）
     theme: { type: String, value: 'bright' },
+    // 字体大小：'normal' | 'large'（与 fontScale_global / 宿主显示设置对齐）
+    fontScale: { type: String, value: 'normal' },
     // 当前用户头像（发送的消息使用）
     selfAvatar: { type: String, value: SELF_AVATAR },
     // 输入栏是否固定到页面底部（默认 false，保持历史行为）

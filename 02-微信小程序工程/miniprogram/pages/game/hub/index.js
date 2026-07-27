@@ -44,7 +44,8 @@ const CHAT = [
 const FEATURES_COMMON = [
   { permission: 'leaderboard', glyph: '▦', label: '领先榜' },
   { permission: 'stats', glyph: '📈', label: '统计数据' },
-  { permission: 'feedback', glyph: '💬', label: '反馈' }
+  { permission: 'feedback', glyph: '💬', label: '反馈' },
+  { permission: 'theme', glyph: '🎨', label: '显示设置' }
 ];
 const FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
@@ -225,6 +226,7 @@ Page({
 
     courseName: '',
     roundName: '',
+    headerTitle: '球局详情',
     gameFormat: '',
     statusText: '进行中',
 
@@ -237,6 +239,8 @@ Page({
     openIndex: -1,
     openScorecard: null,
     scoreDisplayMode: 'gross', // gross | diff，跟随记分页全局记忆
+    fontScale: 'normal', // normal | large（显示设置：字体大小）
+    fontScaleClass: 'font-normal',
     // 领先榜逐洞面板下方广告：广告图片1 BRIGHT/DARK
     scorecardAdImage: '',
     // 更多功能面板（与球队比赛一致）
@@ -336,6 +340,7 @@ Page({
 
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
+    this._syncFontScale();
 
     const gameId = opt.gameId || '';
     if (!gameId) {
@@ -363,13 +368,18 @@ Page({
       groups: groups,
       activeTab: tab,
       currentGroupIndex: isNaN(currentGroupIndex) ? -1 : currentGroupIndex,
-      roundName: game.roundName || game.courseName || '高尔夫球局'
+      roundName: game.roundName || game.courseName || '高尔夫球局',
+      headerTitle: this._resolveHeaderTitle(game, groups)
     });
 
     this._hubDebug('onLoad_ready', { resolvedTab: tab });
     this._syncHubHoleLayout();
     this.applyMoreAccess();
     this.refreshGame();
+
+    const openCaddie =
+      opt.openCaddie === '1' || opt.openCaddie === 'true' || opt.openCaddie === 1;
+    this._pendingOpenCaddie = !!openCaddie;
 
     const caddieToken = opt.caddieToken ? decodeURIComponent(String(opt.caddieToken)) : '';
     if (caddieToken) {
@@ -387,6 +397,8 @@ Page({
         this.updateGroupScrollConstraint();
       });
     }
+
+    this._maybeOpenCaddieSheetFromQuery();
   },
 
   onReady() {
@@ -405,6 +417,7 @@ Page({
     if (!this.data.hubReady || !this._gameId) return;
 
     this.applyTheme(getApp().getTheme());
+    this._syncFontScale();
     // 逐洞详情显示模式跟随记分页全局记忆（与球队比赛同键）
     let mode = 'gross';
     try {
@@ -419,6 +432,15 @@ Page({
       wx.nextTick(() => this.setupTeeObserver());
     }
     wx.nextTick(() => this._refreshFabHitZones());
+    this._maybeOpenCaddieSheetFromQuery();
+  },
+
+  /** 记分页 openCaddie=1：game 就绪后打开权限管理 Sheet（含球童记分区） */
+  _maybeOpenCaddieSheetFromQuery() {
+    if (!this._pendingOpenCaddie) return;
+    if (!this.data.hubReady || !this._gameId) return;
+    this._pendingOpenCaddie = false;
+    wx.nextTick(() => this.openTempAdminSheet());
   },
 
   onHide() {
@@ -516,6 +538,13 @@ Page({
     });
   },
 
+  /** HEADER 标题：多组普通球局中间页固定「球局详情」；单组兜底仍用球局名（单组正常不进 Hub） */
+  _resolveHeaderTitle(game, groups) {
+    const list = Array.isArray(groups) ? groups : (game ? gameStore.listGroups(game) : []);
+    if (list.length > 1) return '球局详情';
+    return (game && (game.roundName || game.courseName)) || '高尔夫球局';
+  },
+
   initHeaderNav() {
     const header = createHeaderStyle();
     this.setData({
@@ -572,6 +601,7 @@ Page({
       groups: groups,
       courseName: game.courseName || '',
       roundName: game.roundName || game.courseName || '高尔夫球局',
+      headerTitle: this._resolveHeaderTitle(game, groups),
       gameFormat: game.gameMode || '个人比杆赛',
       statusText: matchStatus.getMatchStatusLabelZh(headerMs.statusKey),
       matchStatusBadge: headerMs.statusBadge,
@@ -2046,12 +2076,49 @@ Page({
     }, 300);
   },
 
-  /* ===== 风格选择 sheet ===== */
+  /* ===== 显示设置（字体大小） ===== */
+  _getFontScale() {
+    try {
+      return wx.getStorageSync('fontScale_global') === 'large' ? 'large' : 'normal';
+    } catch (e) {
+      return 'normal';
+    }
+  },
+
+  _syncFontScale() {
+    const fontScale = this._getFontScale();
+    this.setData({
+      fontScale: fontScale,
+      fontScaleClass: fontScale === 'large' ? 'font-large' : 'font-normal'
+    });
+  },
+
+  _setFontScale(value) {
+    const next = value === 'large' ? 'large' : 'normal';
+    try {
+      wx.setStorageSync('fontScale_global', next);
+    } catch (e) {}
+    this.setData({
+      fontScale: next,
+      fontScaleClass: next === 'large' ? 'font-large' : 'font-normal'
+    });
+  },
+
   openStyleSheet() {
-    this.setData({ showStyleSheet: true });
+    this.setData({
+      showStyleSheet: true,
+      fontScale: this._getFontScale()
+    });
   },
   closeStyleSheet() {
     this.setData({ showStyleSheet: false });
+  },
+  onFontScaleChange(e) {
+    const value =
+      e && e.currentTarget && e.currentTarget.dataset
+        ? e.currentTarget.dataset.value
+        : '';
+    this._setFontScale(value);
   },
   // 总杆/杆差：写入全局缓存（与记分页/球队比赛同键），并刷新已展开逐洞详情
   setScoringDisplay(e) {
