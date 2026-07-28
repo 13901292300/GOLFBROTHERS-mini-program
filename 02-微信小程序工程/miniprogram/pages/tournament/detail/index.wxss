@@ -1536,10 +1536,10 @@ page {
 .tee-quick-entry-float:active { background: #001d42; }
 /* 出发表列表内容容器：
    1) padding-bottom 预留安全间距，最后一组不被底部悬浮按钮遮挡（仅作用于内容区，不动 scroll root）
-   2) min-height 保证内容区足够高、可正常滚动，使 TAB 吸顶（JS 克隆）阈值始终可达，避免短内容时吸顶失效 */
+   2) min-height: 0 — 不强制撑高；组数少时避免无意义滚动（与 Hub 出发表一致） */
 .tee-sheet-list {
   box-sizing: border-box;
-  min-height: calc(100vh - 200rpx);
+  min-height: 0;
   padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
 }
 
