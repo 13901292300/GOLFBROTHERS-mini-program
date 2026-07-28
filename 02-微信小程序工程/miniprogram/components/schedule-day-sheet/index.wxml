@@ -1,4 +1,4 @@
-<view wx:if="{{visible}}" class="sds-root">
+<view wx:if="{{visible}}" class="sds-root {{themeClass}}">
   <view class="sds-overlay" bindtap="onOverlayTap" catchtouchmove="stopPropagation"></view>
 
   <view class="sds-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">

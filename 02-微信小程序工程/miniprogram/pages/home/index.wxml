@@ -590,6 +590,7 @@
     visible="{{scheduleDaySheetVisible}}"
     date="{{scheduleDaySheetDate}}"
     events="{{scheduleDaySheetEvents}}"
+    themeClass="{{themeClass}}"
     bind:close="onScheduleDaySheetClose"
     bind:add="onScheduleDaySheetAdd"
     bind:edit="onScheduleDaySheetEdit"
@@ -604,6 +605,7 @@
     date="{{scheduleEditorDate}}"
     schedule="{{scheduleEditorSchedule}}"
     mode="{{scheduleEditorMode}}"
+    themeClass="{{themeClass}}"
     bind:close="onScheduleEditorClose"
     bind:save="saveScheduleFromEditor"
     bind:saveNote="saveScheduleNoteFromEditor"
@@ -611,8 +613,8 @@
     bind:openMemberPicker="onScheduleEditorOpenMemberPicker"
   />
 
-  <!-- Schedule Remindee Picker -->
-  <view wx:if="{{scheduleRemindPickerVisible}}" class="fixed inset-0 z-440">
+  <!-- Schedule Remindee Picker（在 .ds-app 外，须自行挂 themeClass） -->
+  <view wx:if="{{scheduleRemindPickerVisible}}" class="schedule-remind-picker {{themeClass}} fixed inset-0 z-440">
     <view class="overlay-backdrop" bindtap="closeScheduleRemindeePicker"></view>
     <view class="overlay-panel max-w-md max-h-75vh flex flex-col {{scheduleRemindPanelOpen ? 'panel-open' : 'panel-closed'}}" style="padding:0">
       <view class="px-6 pt-6 pb-3 ds-overlay__fixed">
@@ -622,7 +624,7 @@
         </view>
         <view class="relative">
           <text class="absolute text-slate-300 text-xs" style="left:12px;top:50%;transform:translateY(-50%)">🔍</text>
-          <input value="{{scheduleRemindSearch}}" bindinput="onScheduleRemindSearchInput" placeholder="搜索好友昵称或ID" class="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-sm font-medium text-slate-700 border border-transparent" />
+          <input value="{{scheduleRemindSearch}}" bindinput="onScheduleRemindSearchInput" placeholder="搜索好友昵称或ID" placeholder-class="schedule-remind-search-ph" class="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-sm font-medium text-slate-700 border border-transparent" />
         </view>
       </view>
       <scroll-view scroll-y class="ds-overlay__grow px-6 pb-2">

@@ -64,7 +64,9 @@ Component({
   properties: {
     date: { type: String, value: '' },
     events: { type: Array, value: [] },
-    visible: { type: Boolean, value: false }
+    visible: { type: Boolean, value: false },
+    /** 与首页同源：dark-theme | bright-mode（组件 isolated，须自行挂载） */
+    themeClass: { type: String, value: 'bright-mode' }
   },
 
   data: {

@@ -7,6 +7,22 @@
   --sds-border: #e2e8f0;
   --sds-card: #ffffff;
   --sds-subtle: #f8fafc;
+  --sds-brand: #002d62;
+  --sds-handle: #e5e7eb;
+  --sds-avatar-ph: #e2e8f0;
+}
+
+/* 与首页 .ds-app.dark-theme 同源 surface / 文字 token；按钮底保留品牌蓝 */
+.sds-root.dark-theme {
+  --sds-blue: #E5EEFC;
+  --sds-text: #E5EEFC;
+  --sds-muted: #94A3B8;
+  --sds-border: rgba(148, 163, 184, 0.16);
+  --sds-card: #0B1220;
+  --sds-subtle: #121A2B;
+  --sds-brand: #002d62;
+  --sds-handle: rgba(148, 163, 184, 0.35);
+  --sds-avatar-ph: #1A2332;
 }
 
 .sds-overlay {
@@ -37,7 +53,7 @@
   width: 48px;
   height: 4px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: var(--sds-handle);
   margin: 12px auto 8px;
   flex-shrink: 0;
 }
@@ -220,7 +236,7 @@
   height: 22px;
   border-radius: 999px;
   flex-shrink: 0;
-  background: #e2e8f0;
+  background: var(--sds-avatar-ph);
 }
 
 .sds-member__avatar--ph {
@@ -266,7 +282,7 @@
 .sds-add-btn {
   height: 48px;
   border-radius: 999px;
-  background: var(--sds-blue);
+  background: var(--sds-brand);
   color: #fff;
   font-size: 15px;
   font-weight: 800;

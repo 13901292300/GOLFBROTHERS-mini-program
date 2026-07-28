@@ -1,4 +1,4 @@
-<view wx:if="{{visible}}" class="ses-root">
+<view wx:if="{{visible}}" class="ses-root {{themeClass}}">
   <view class="ses-overlay" bindtap="onOverlayTap" catchtouchmove="stopPropagation"></view>
 
   <view class="ses-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
@@ -20,6 +20,7 @@
           <textarea
             class="ses-textarea"
             placeholder="例如：记得给阿猫带球"
+            placeholder-class="ses-textarea-ph"
             value="{{note}}"
             maxlength="500"
             auto-height
@@ -35,6 +36,7 @@
           <textarea
             class="ses-textarea"
             placeholder="写下你的球局安排…"
+            placeholder-class="ses-textarea-ph"
             value="{{content}}"
             maxlength="500"
             auto-height

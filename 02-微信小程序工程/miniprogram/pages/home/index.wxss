@@ -1159,7 +1159,7 @@ page {
   display: block;
   font-size: 14px;
   font-weight: 900;
-  color: var(--slate-800);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1428,6 +1428,64 @@ page {
   font-style: italic;
   border-radius: 9999px;
   box-shadow: var(--shadow-gold-soft);
+}
+
+.schedule-remind-search-ph {
+  color: var(--text-muted);
+}
+
+/*
+ * 日程「选择被提醒人」弹层：位于 .ds-app 外，须自行承载 dark-theme token，
+ * 与 .create-overlay.dark-theme 同源。
+ */
+.schedule-remind-picker.dark-theme {
+  --bg-primary: #050816;
+  --bg-card: #0B1220;
+  --bg-subtle: #121A2B;
+  --bg-hover: #1A2332;
+  --border: var(--border-dark);
+  --border-hover: var(--border-dark-hover);
+  --text-primary: #E5EEFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --slate-50: #121A2B;
+  --slate-100: rgba(148, 163, 184, 0.16);
+  --slate-300: #94A3B8;
+  --slate-400: #94A3B8;
+  --slate-700: #E5EEFC;
+  --primary-blue: #E5EEFC;
+  --golf-blue: #E5EEFC;
+  color: var(--text-primary);
+}
+
+.schedule-remind-picker.dark-theme .text-golf-blue {
+  color: var(--text-primary);
+}
+
+.schedule-remind-picker.dark-theme .text-slate-300,
+.schedule-remind-picker.dark-theme .text-slate-400 {
+  color: var(--text-muted);
+}
+
+.schedule-remind-picker.dark-theme .text-slate-700 {
+  color: var(--text-primary);
+}
+
+.schedule-remind-picker.dark-theme .bg-slate-50 {
+  background-color: var(--bg-subtle);
+}
+
+.schedule-remind-picker.dark-theme .border-slate-100 {
+  border-color: var(--border);
+}
+
+.schedule-remind-picker.dark-theme .schedule-friend-row {
+  border-color: var(--border);
+}
+
+.schedule-remind-picker.dark-theme .schedule-select-state {
+  border-color: var(--border);
 }
 
 .ds-calendar-day--selected {

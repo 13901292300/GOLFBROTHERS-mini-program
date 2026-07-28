@@ -6,6 +6,23 @@
   --ses-border: #e2e8f0;
   --ses-card: #ffffff;
   --ses-subtle: #f8fafc;
+  --ses-brand: #002d62;
+  --ses-handle: #e5e7eb;
+  --ses-avatar-ph: #e2e8f0;
+  --ses-chip-bg: #ffffff;
+}
+
+/* 与首页 .ds-app.dark-theme 同源；主按钮底保留品牌蓝 */
+.ses-root.dark-theme {
+  --ses-blue: #E5EEFC;
+  --ses-muted: #94A3B8;
+  --ses-border: rgba(148, 163, 184, 0.16);
+  --ses-card: #0B1220;
+  --ses-subtle: #121A2B;
+  --ses-brand: #002d62;
+  --ses-handle: rgba(148, 163, 184, 0.35);
+  --ses-avatar-ph: #1A2332;
+  --ses-chip-bg: #121A2B;
 }
 
 .ses-overlay {
@@ -36,7 +53,7 @@
   width: 48px;
   height: 4px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: var(--ses-handle);
   margin: 12px auto 8px;
   flex-shrink: 0;
 }
@@ -122,6 +139,11 @@
   line-height: 1.45;
 }
 
+.ses-textarea-ph {
+  color: var(--ses-muted);
+  font-weight: 500;
+}
+
 .ses-members {
   display: flex;
   flex-direction: row;
@@ -147,7 +169,7 @@
   height: 24px;
   border-radius: 999px;
   flex-shrink: 0;
-  background: #e2e8f0;
+  background: var(--ses-avatar-ph);
 }
 
 .ses-member__avatar--ph {
@@ -182,7 +204,7 @@
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px dashed var(--ses-border);
-  background: #fff;
+  background: var(--ses-chip-bg);
 }
 
 .ses-add-member__plus {
@@ -237,6 +259,6 @@
 }
 
 .ses-btn--primary {
-  background: var(--ses-blue);
+  background: var(--ses-brand);
   color: #fff;
 }

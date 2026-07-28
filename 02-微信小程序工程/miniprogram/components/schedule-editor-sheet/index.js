@@ -37,7 +37,9 @@ Component({
     date: { type: String, value: '' },
     schedule: { type: Object, value: null },
     /** schedule：完整日程编辑；note：仅球队赛个人备注 */
-    mode: { type: String, value: 'schedule' }
+    mode: { type: String, value: 'schedule' },
+    /** 与首页同源：dark-theme | bright-mode（组件 isolated，须自行挂载） */
+    themeClass: { type: String, value: 'bright-mode' }
   },
 
   data: {
