@@ -2,10 +2,11 @@
   <view class="css-overlay" bindtap="onOverlayClose" catchtouchmove="stopPropagation"></view>
 
   <view class="css-sheet {{themeClass}}" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="css-handle"></view>
     <view class="css-head">
-      <text class="css-overline">CADDIE</text>
-      <text class="css-title">球童记分</text>
+      <text class="fst-main">球童记分</text>
+      <text class="fst-sub">CADDIE</text>
       <text class="css-sub">生成本场球童记分二维码，球童扫码后即可获得记分权限。</text>
     </view>
 
@@ -57,7 +58,7 @@
     </scroll-view>
 
     <view class="css-footer">
-      <view class="css-btn css-btn--ghost css-footer__close" bindtap="onClose">关闭</view>
+      <view class="css-btn css-btn--primary css-footer__close" bindtap="onClose">关闭</view>
     </view>
   </view>
 
@@ -74,10 +75,11 @@
     catchtap="stopPropagation"
     catchtouchmove="stopPropagation"
   >
+    <view class="sheet-top-accent"></view>
     <view class="css-handle"></view>
     <view class="css-head">
-      <text class="css-overline">CADDIE</text>
-      <text class="css-title">球童记分员</text>
+      <text class="fst-main">球童记分员</text>
+      <text class="fst-sub">CADDIE</text>
     </view>
     <view class="css-manage__body" wx:if="{{manageTarget}}">
       <image class="css-manage__avatar" src="{{manageTarget.avatar}}" mode="aspectFill"></image>
@@ -86,7 +88,7 @@
       <view class="css-manage__remove" bindtap="onConfirmRemove">移除记分权限</view>
     </view>
     <view class="css-footer">
-      <view class="css-btn css-btn--ghost css-footer__close" bindtap="closeManage">取消</view>
+      <view class="css-btn css-btn--primary css-footer__close" bindtap="closeManage">取消</view>
     </view>
   </view>
 </view>

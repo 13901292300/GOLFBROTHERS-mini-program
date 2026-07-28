@@ -50,6 +50,79 @@
   flex-direction: column;
 }
 
+/* ===== Phase1 UI 统一：Header / Footer / 左右 48rpx（仅样式） ===== */
+.half-course-sheet .half-sheet-head {
+  position: relative;
+  padding: 0 48rpx 24rpx;
+  text-align: left;
+}
+
+.half-course-sheet .sheet-head-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8rpx;
+  padding-right: 64rpx;
+}
+
+.half-course-sheet .fst-main {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--golf-blue, #002d62);
+  line-height: 1.3;
+}
+
+.half-course-sheet .fst-sub {
+  display: block;
+  font-size: 20rpx;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary, var(--text-muted, #9ca3af));
+  line-height: 1.3;
+}
+
+.half-course-sheet .half-sheet-close {
+  position: absolute;
+  right: 32rpx;
+  top: 0;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  color: var(--text-muted, #9ca3af);
+  line-height: 1;
+}
+
+.half-course-sheet .half-sheet-body {
+  max-height: 58vh;
+  padding: 0 48rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.half-course-sheet .half-sheet-footer {
+  padding: 12rpx 48rpx calc(12rpx + env(safe-area-inset-bottom));
+  flex-shrink: 0;
+}
+
+.half-course-sheet .half-confirm-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border: 0;
+  border-radius: 12rpx;
+  background: var(--golf-blue, #002d62);
+  color: var(--champion-gold, #ce9224);
+  font-size: 24rpx;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  padding: 0;
+  text-align: center;
+}
+
 /*
  * Dark：不依赖父页 .score-page.dark-mode（styleIsolation isolated）。
  * 记分页 themeClass 为 dark-mode；兼容 dark-theme 别名。
@@ -75,18 +148,31 @@
   background: var(--border-color);
 }
 
-.half-sheet.dark-mode .half-sheet-title,
+.half-sheet .sheet-top-accent {
+  display: none;
+}
+
+.half-sheet.dark-mode .sheet-top-accent,
+.half-sheet.dark-theme .sheet-top-accent {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: var(--golf-blue, #002d62);
+  flex-shrink: 0;
+}
+
+.half-sheet.dark-mode .fst-main,
 .half-sheet.dark-mode .half-course-name,
-.half-sheet.dark-theme .half-sheet-title,
+.half-sheet.dark-theme .fst-main,
 .half-sheet.dark-theme .half-course-name {
   color: var(--text-primary);
 }
 
-.half-sheet.dark-mode .half-sheet-eyebrow,
+.half-sheet.dark-mode .fst-sub,
 .half-sheet.dark-mode .half-hint,
 .half-sheet.dark-mode .half-sheet-close,
 .half-sheet.dark-mode .par-table__title,
-.half-sheet.dark-theme .half-sheet-eyebrow,
+.half-sheet.dark-theme .fst-sub,
 .half-sheet.dark-theme .half-hint,
 .half-sheet.dark-theme .half-sheet-close,
 .half-sheet.dark-theme .par-table__title {

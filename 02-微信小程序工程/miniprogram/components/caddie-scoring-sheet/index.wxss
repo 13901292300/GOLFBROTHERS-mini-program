@@ -11,6 +11,7 @@
   --css-avatar-ph: #e5e7eb;
   --css-qr-surface: #ffffff;
   --css-on-brand: #ffffff;
+  --champion-gold: #ce9224;
 }
 
 /* 记分页 themeClass 为 dark-mode；兼容 dark-theme 别名 */
@@ -48,7 +49,7 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  padding: 0 40rpx calc(24rpx + env(safe-area-inset-bottom));
+  padding: 0 48rpx calc(24rpx + env(safe-area-inset-bottom));
   background: var(--css-card);
   color: var(--css-blue);
   border-radius: 80rpx 80rpx 0 0;
@@ -62,6 +63,19 @@
   box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.55);
 }
 
+.css-sheet .sheet-top-accent {
+  display: none;
+}
+
+.css-sheet.dark-mode .sheet-top-accent,
+.css-sheet.dark-theme .sheet-top-accent {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: var(--css-blue, #002d62);
+  flex-shrink: 0;
+}
+
 .css-manage {
   z-index: 240;
   max-height: 70vh;
@@ -72,37 +86,47 @@
   height: 8rpx;
   border-radius: 999rpx;
   background: var(--css-handle);
-  margin: 24rpx auto 16rpx;
+  margin: 24rpx auto 40rpx;
   flex-shrink: 0;
 }
 
 .css-head {
   flex-shrink: 0;
-  padding: 8rpx 0 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8rpx;
+  padding: 0 0 24rpx;
 }
 
-.css-overline {
+/* 与记分页 Sheet Header 统一 */
+.css-head .fst-main {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--css-blue);
+  line-height: 1.3;
+}
+
+.css-root.dark-mode .css-head .fst-main,
+.css-root.dark-theme .css-head .fst-main {
+  color: var(--css-text);
+}
+
+.css-head .fst-sub {
   display: block;
   font-size: 20rpx;
-  line-height: 1.2;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  color: var(--css-accent);
-  margin-bottom: 8rpx;
-}
-
-.css-title {
-  display: block;
-  font-size: 34rpx;
-  font-weight: 900;
-  color: var(--css-text);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--css-muted);
   line-height: 1.3;
 }
 
 .css-sub {
   display: block;
-  margin-top: 10rpx;
-  font-size: 22rpx;
+  margin-top: 4rpx;
+  font-size: 20rpx;
   line-height: 1.5;
   color: var(--css-muted);
 }
@@ -268,23 +292,25 @@
 .css-btn {
   height: 88rpx;
   line-height: 88rpx;
-  border-radius: 16rpx;
+  border-radius: 12rpx;
   text-align: center;
-  font-size: 28rpx;
-  font-weight: 800;
+  font-size: 24rpx;
+  font-weight: 900;
+  letter-spacing: 0.18em;
   box-sizing: border-box;
 }
 
 .css-btn--primary {
   flex: 1;
   background: var(--css-blue);
-  color: var(--css-on-brand);
+  color: var(--champion-gold, #ce9224);
 }
 
 .css-btn--ghost {
   flex: 1;
-  background: var(--css-bg);
+  background: transparent;
   color: var(--css-text);
+  border: 2rpx solid var(--css-border);
 }
 
 .css-btn.is-disabled {

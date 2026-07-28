@@ -87,6 +87,10 @@ page {
 }
 
 .score-page {
+  /* Bottom Sheet 主按钮品牌色（页面内定义，避免 var(--golf-blue) 未声明失效） */
+  --golf-blue: #002d62;
+  --champion-gold: #ce9224;
+
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1013,13 +1017,35 @@ page {
 
 /* ===== 更多功能面板（与中间页 M 按钮 bottom-sheet 规范一致） ===== */
 .sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 150; }
-.bottom-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; color: var(--tour-blue); border-radius: 80rpx 80rpx 0 0; z-index: 180; box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35); padding-bottom: env(safe-area-inset-bottom); }
+.bottom-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; color: var(--tour-blue); border-radius: 80rpx 80rpx 0 0; overflow: hidden; z-index: 180; box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35); padding-bottom: env(safe-area-inset-bottom); }
 .sheet-handle { width: 96rpx; height: 8rpx; border-radius: 999rpx; background: #e5e7eb; margin: 24rpx auto 40rpx; }
 .feature-section { padding: 0 48rpx 24rpx; }
 .feature-section--menu { max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.feature-section-title { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 24rpx; padding: 0 4rpx; color: var(--tour-blue); }
-.fst-main { font-size: 24rpx; font-weight: 800; letter-spacing: 0.12em; }
-.fst-sub { font-style: normal; font-size: 20rpx; color: #9ca3af; letter-spacing: 0.08em; }
+/* Sheet Header 统一：左对齐主标题 + 副标题 */
+.feature-section-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8rpx;
+  margin: 0 0 24rpx;
+  padding: 0;
+  color: var(--golf-blue);
+}
+.fst-main {
+  font-size: 26rpx;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--golf-blue);
+  line-height: 1.3;
+}
+.fst-sub {
+  font-style: normal;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--text-secondary, #9ca3af);
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+}
 .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 24rpx; row-gap: 32rpx; }
 .feature-item { display: flex; flex-direction: column; align-items: center; min-height: 156rpx; }
 .feature-item.is-disabled {
@@ -1030,8 +1056,19 @@ page {
 .feature-icon.warning { background: #ffc107; color: var(--tour-blue); }
 .feature-label { color: var(--tour-blue); font-size: 20rpx; line-height: 1.2; font-weight: 800; text-align: center; }
 .feature-item--empty { visibility: hidden; pointer-events: none; }
-.sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
-.sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
+.sheet-cancel-wrap { padding: 4rpx 48rpx 48rpx; }
+.sheet-cancel-btn {
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  background: var(--golf-blue, #002d62);
+  color: var(--champion-gold, #ce9224);
+  border-radius: 12rpx;
+  font-weight: 900;
+  font-size: 24rpx;
+  letter-spacing: 0.18em;
+  box-sizing: border-box;
+}
 
 /* 显示设置 Sheet（字体大小）—— 复用 sheet-overlay / bottom-sheet / sheet-cancel */
 .display-settings-sheet {
@@ -1040,6 +1077,7 @@ page {
 }
 .display-settings-sheet__title {
   margin: 0 48rpx 24rpx;
+  /* 继承统一左对齐 Header，无需再改布局 */
 }
 .display-settings-sheet__body {
   padding: 0 48rpx 16rpx;
@@ -1124,25 +1162,15 @@ page {
 }
 
 /* G5-G8: change start hole sheet */
-.start-hole-sheet { z-index: 190; padding: 0 40rpx 32rpx; }
+.start-hole-sheet { z-index: 190; padding: 0 48rpx 32rpx; }
 .start-hole-sheet__title {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8rpx;
   margin-bottom: 28rpx;
-  padding: 0 8rpx;
 }
 
 /* 修改T台弹层 */
-.edit-tee-sheet { z-index: 190; padding: 0 40rpx 32rpx; max-height: 78vh; }
+.edit-tee-sheet { z-index: 190; padding: 0 48rpx 32rpx; max-height: 78vh; }
 .edit-tee-sheet__title {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8rpx;
   margin-bottom: 24rpx;
-  padding: 0 8rpx;
 }
 .edit-tee-sheet__list {
   max-height: 52vh;
@@ -1322,11 +1350,11 @@ page {
   color: var(--text-primary);
   box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.55);
 }
-.score-page.dark-mode .bottom-sheet--more-menu .sheet-top-accent {
+.score-page.dark-mode .bottom-sheet .sheet-top-accent {
   display: block;
   width: 100%;
   height: 3px;
-  background: var(--tour-blue);
+  background: var(--golf-blue, #002d62);
   flex-shrink: 0;
 }
 .score-page.dark-mode .bottom-sheet--more-menu .sheet-handle { background: var(--border-color); }

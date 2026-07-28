@@ -1,11 +1,14 @@
 <block wx:if="{{visible}}">
   <view catchtouchmove="noop" bindtap="onClose" class="sheet-overlay sheet-overlay--half"></view>
   <view class="bottom-sheet half-course-sheet half-sheet {{themeClass}}" catchtap="noop" catchtouchmove="noop">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="half-course-panel" catchtap="noop">
       <view class="half-sheet-head">
-        <text class="half-sheet-eyebrow">COURSE</text>
-        <text class="half-sheet-title">选择半场</text>
+        <view class="sheet-head-titles">
+          <text class="fst-main">选择半场</text>
+          <text class="fst-sub">COURSE</text>
+        </view>
         <view bindtap="onClose" class="half-sheet-close">×</view>
       </view>
       <scroll-view scroll-y class="half-sheet-body">
