@@ -2,6 +2,7 @@
  * 赛事统计数据页
  * - 优先 statisticsAdapter（match.scoreData）→ dataSource='adapter'
  *   G1：buildStatisticsRows（个人）；G2/G3/G4：buildEntityStatisticsRows（组合）
+ *   G5–G8 Match Play：buildMatchPlayStatisticsRows（分流，builder 暂留）
  * - 普通创建：gameId → buildGameStatisticsRows（game.groups[].scoresByPlayer）
  * - 仅显式 ?mock=1 → dataSource='mock'（mockStatisticsPlayers）
  * - 无 matchId / 无 gameId / 无可用数据 → dataSource='empty'
@@ -11,6 +12,10 @@ const mockAvatars = require('../../../utils/mockAvatars.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const gameStore = require('../../../utils/gameStore.js');
 const statisticsAdapter = require('../../../utils/statisticsAdapter.js');
+const {
+  resolveGameMode,
+  isMatchPlayBoardMode
+} = require('../../../utils/strokeEntityValidator.js');
 
 const TEE_COLOR_TO_MARKER = {
   '#dc2626': 'border-red',
@@ -419,12 +424,25 @@ Page({
     if (matchId) {
       const match = teamMatchStore.getMatchById(matchId);
       if (match) {
-        const useEntity = statisticsAdapter.shouldUseEntityStatistics(match);
-        const adapterRows = useEntity
-          ? (statisticsAdapter.buildEntityStatisticsRows(match) || [])
-          : (statisticsAdapter.buildStatisticsRows(match) || []);
+        // G5–G8 Match Play：与 G1–G4 比杆统计分流
+        const isMatchPlay = isMatchPlayBoardMode(resolveGameMode(match));
+        let adapterRows = [];
+        if (isMatchPlay) {
+          adapterRows = this._buildMatchPlayStatisticsRows(match) || [];
+        } else {
+          const useEntity = statisticsAdapter.shouldUseEntityStatistics(match);
+          adapterRows = useEntity
+            ? (statisticsAdapter.buildEntityStatisticsRows(match) || [])
+            : (statisticsAdapter.buildStatisticsRows(match) || []);
+        }
         if (adapterRows.length > 0) {
-          const viewRows = this._mapAdapterRowsToView(match, adapterRows);
+          // G6–G8：用合成 Entity score 上下文，避免 filledHoles 读不到 scoresBySide
+          const mapMatch =
+            isMatchPlay &&
+            typeof statisticsAdapter.buildMatchPlayScoreDataContext === 'function'
+              ? statisticsAdapter.buildMatchPlayScoreDataContext(match) || match
+              : match;
+          const viewRows = this._mapAdapterRowsToView(mapMatch, adapterRows);
           return {
             dataSource: 'adapter',
             rows: this._applyCurrentSort(viewRows, 'total', 'asc')
@@ -459,6 +477,19 @@ Page({
       dataSource: 'empty',
       rows: []
     };
+  },
+
+  /**
+   * G5–G8 Match Play 统计行 → statisticsAdapter.buildMatchPlayStatisticsRows
+   */
+  _buildMatchPlayStatisticsRows(match) {
+    if (
+      statisticsAdapter &&
+      typeof statisticsAdapter.buildMatchPlayStatisticsRows === 'function'
+    ) {
+      return statisticsAdapter.buildMatchPlayStatisticsRows(match) || [];
+    }
+    return [];
   },
 
   /**

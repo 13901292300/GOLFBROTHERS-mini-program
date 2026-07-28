@@ -6,6 +6,8 @@
  *
  * G1：buildStatisticsRows → scoresByPlayer（个人）
  * G2/G3/G4：buildEntityStatisticsRows → scoreEntities + teamScoresByEntity（组合）
+ * G5：buildMatchPlayStatisticsRows → buildStatisticsRows（个人比洞，scoresByPlayer）
+ * G6/G7/G8：buildMatchPlayStatisticsRows → scoresBySide 转 Entity 视图后复用 buildEntityStatisticsRows
  *
  * 洞状态：groupsStore.getScoreStatus
  * 标准杆：holeLayout.resolveLayoutFromContext
@@ -18,7 +20,16 @@ const playerManage = require('./playerManage.js');
 const tPosition = require('./tPosition.js');
 const mockAvatars = require('./mockAvatars.js');
 const matchStatus = require('./matchStatus.js');
-const { resolveStrokeKind, resolveGameMode } = require('./strokeEntityValidator.js');
+const {
+  resolveStrokeKind,
+  resolveGameMode,
+  isG5MatchPlayMode,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode,
+  isMatchPlayBoardMode,
+  buildRegisterTeamMap,
+  listFilledPlayers
+} = require('./strokeEntityValidator.js');
 
 const SCORE_CELL_COUNT = holeLayout.SCORE_CELL_COUNT || 18;
 
@@ -360,20 +371,57 @@ function buildGameScoreDataContext(game) {
   return { scoreData: scoreData };
 }
 
-/** 与 gameStore.listGroups 同构（避免 adapter 反向依赖 gameStore） */
+/** 组内是否存在带有效 playerId 的球员槽 */
+function groupHasValidPlayerSlots(group) {
+  const slots = Array.isArray(group && group.playersSlots) ? group.playersSlots : [];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (slot && typeof slot === 'object' && resolveAnyPlayerId(slot)) return true;
+  }
+  return false;
+}
+
+/**
+ * 顶层 playersSlots / scoresByPlayer 合成单组（历史单组兼容）。
+ * groupId：优先沿用 groups[0].groupId，否则 gameId-g1，保证稳定。
+ */
+function buildTopLevelFallbackGroup(game) {
+  const g0 = Array.isArray(game.groups) && game.groups[0] ? game.groups[0] : null;
+  const fromG0 =
+    g0 && g0.groupId != null && String(g0.groupId).trim() !== ''
+      ? String(g0.groupId).trim()
+      : '';
+  const groupId = fromG0 || ((game.gameId || 'legacy') + '-g1');
+  return {
+    groupId: groupId,
+    name: (g0 && g0.name) || '第1组',
+    playersSlots: Array.isArray(game.playersSlots) ? game.playersSlots : [],
+    scoresByPlayer:
+      game.scoresByPlayer && typeof game.scoresByPlayer === 'object'
+        ? game.scoresByPlayer
+        : {}
+  };
+}
+
+/**
+ * 与 gameStore.listGroups 同构（避免 adapter 反向依赖 gameStore）。
+ * 优先 game.groups；若 groups 存在但组内无有效 playersSlots/playerId，
+ * fallback 到顶层 game.playersSlots / game.scoresByPlayer（历史单组）。
+ */
 function listGameGroups(game) {
   if (!game) return [];
   if (Array.isArray(game.groups) && game.groups.length) {
-    return game.groups;
-  }
-  return [
-    {
-      groupId: (game.gameId || 'legacy') + '-g1',
-      name: '第1组',
-      playersSlots: game.playersSlots || [],
-      scoresByPlayer: game.scoresByPlayer || {}
+    let hasValidSlot = false;
+    for (let i = 0; i < game.groups.length; i++) {
+      if (groupHasValidPlayerSlots(game.groups[i])) {
+        hasValidSlot = true;
+        break;
+      }
     }
-  ];
+    if (hasValidSlot) return game.groups;
+    return [buildTopLevelFallbackGroup(game)];
+  }
+  return [buildTopLevelFallbackGroup(game)];
 }
 
 /**
@@ -585,11 +633,234 @@ function buildEntityStatisticsRows(match) {
   return rows;
 }
 
+/** 分队顺序（红/蓝）：来自 match.teamGroups */
+function resolveMatchPlayTeamOrder(match) {
+  const order = [];
+  const seen = {};
+  (Array.isArray(match && match.teamGroups) ? match.teamGroups : []).forEach((tg) => {
+    const id = tg && tg.id != null ? String(tg.id).trim() : '';
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    order.push(id);
+  });
+  return order;
+}
+
+/**
+ * 运行时解析一组比洞双方：sideId / sideKey / memberIds
+ * maxMembers：G6–G8 每方最多 2
+ */
+function resolveGroupMatchPlaySideMeta(match, group, maxMembers) {
+  const cap = maxMembers > 0 ? maxMembers : 2;
+  const teamMap = buildRegisterTeamMap(match);
+  const filled = listFilledPlayers(group);
+  const teamOrder = resolveMatchPlayTeamOrder(match);
+  const sides = [];
+
+  if (teamOrder.length >= 2) {
+    const byTeam = {};
+    teamOrder.forEach((tid) => {
+      byTeam[tid] = [];
+    });
+    filled.forEach((p) => {
+      const tid = teamMap[p.userId] || '';
+      if (!tid || !byTeam[tid]) return;
+      if (byTeam[tid].length >= cap) return;
+      byTeam[tid].push(p.userId);
+    });
+    const aId = teamOrder[0];
+    const bId = teamOrder[1];
+    const membersA = byTeam[aId] || [];
+    const membersB = byTeam[bId] || [];
+    if (membersA.length && membersB.length) {
+      sides.push({ sideId: aId, sideKey: 'A', memberIds: membersA.slice() });
+      sides.push({ sideId: bId, sideKey: 'B', memberIds: membersB.slice() });
+      return sides;
+    }
+  }
+
+  // 无分队顺序时：按出场序拆成 A/B
+  if (filled.length >= 2) {
+    const membersA = filled.slice(0, Math.min(cap, filled.length - 1)).map((p) => p.userId);
+    const membersB = filled
+      .slice(membersA.length, membersA.length + cap)
+      .map((p) => p.userId);
+    if (membersA.length && membersB.length) {
+      sides.push({
+        sideId: teamMap[membersA[0]] || 'A',
+        sideKey: 'A',
+        memberIds: membersA
+      });
+      sides.push({
+        sideId: teamMap[membersB[0]] || 'B',
+        sideKey: 'B',
+        memberIds: membersB
+      });
+    }
+  }
+  return sides;
+}
+
+function readScoresBySideRecord(scoresBySide, sideId, sideKey) {
+  const map =
+    scoresBySide && typeof scoresBySide === 'object' && !Array.isArray(scoresBySide)
+      ? scoresBySide
+      : null;
+  if (!map) return null;
+  const id = sideId != null ? String(sideId).trim() : '';
+  const key = sideKey != null ? String(sideKey).trim() : '';
+  if (id && map[id]) return map[id];
+  if (key && map[key]) return map[key];
+  if (key) {
+    const lower = key.toLowerCase();
+    if (map[lower]) return map[lower];
+  }
+  return null;
+}
+
+/**
+ * Match Play 临时统计 entityId：groupId + sideId，避免跨组 sideId 撞车。
+ * 仅用于统计视图，不写回原始 scoreData。
+ */
+function buildMatchPlayTempEntityId(groupId, sideId) {
+  const gid = groupId != null ? String(groupId).trim() : '';
+  const sid = sideId != null ? String(sideId).trim() : '';
+  if (!gid || !sid) return '';
+  return 'mp_' + gid + '_' + sid;
+}
+
+/**
+ * G6/G7/G8：将 scoresBySide 只读转换为 Entity 统计视图（不写盘）。
+ * scoreEntities / teamScoresByEntity.entityId = mp_${groupId}_${sideId}；
+ * 成绩仍按原始 sideId 从 scoresBySide 读取。
+ */
+function buildMatchPlaySideEntityViewMatch(match) {
+  const groups = Array.isArray(match && match.groups) ? match.groups : [];
+  const scoreEntities = {};
+  const nextScoreData = {};
+  const srcScoreData =
+    match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : {};
+
+  groups.forEach((group) => {
+    const groupId = group && group.groupId != null ? String(group.groupId).trim() : '';
+    if (!groupId) return;
+    const bucket = getGroupScoreData(match, groupId) || {};
+    const scoresBySide =
+      bucket.scoresBySide && typeof bucket.scoresBySide === 'object' ? bucket.scoresBySide : {};
+    const sides = resolveGroupMatchPlaySideMeta(match, group, 2);
+    const entities = [];
+    const teamScoresByEntity = [];
+    const seen = {};
+
+    sides.forEach((side) => {
+      if (!side || !side.sideId) return;
+      const sideId = String(side.sideId).trim();
+      const entityId = buildMatchPlayTempEntityId(groupId, sideId);
+      if (!entityId || seen[entityId]) return;
+      const memberIds = Array.isArray(side.memberIds) ? side.memberIds.filter(Boolean) : [];
+      if (!memberIds.length) return;
+      seen[entityId] = true;
+      entities.push({
+        entityId: entityId,
+        members: memberIds.slice()
+      });
+      const rec = readScoresBySideRecord(scoresBySide, sideId, side.sideKey) || {};
+      teamScoresByEntity.push({
+        teamId: entityId,
+        entityId: entityId,
+        scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
+        putts: Array.isArray(rec.putts) ? rec.putts.slice() : [],
+        fairways: Array.isArray(rec.fairways) ? rec.fairways.slice() : [],
+        penalties: Array.isArray(rec.penalties) ? rec.penalties.slice() : [],
+        sands: Array.isArray(rec.sands) ? rec.sands.slice() : []
+      });
+    });
+
+    // 仅有成绩、分队解析失败时：按 scoresBySide 键 + 组内同分队成员补实体
+    const teamMap = buildRegisterTeamMap(match);
+    const filled = listFilledPlayers(group);
+    Object.keys(scoresBySide).forEach((key) => {
+      const sideId = String(key).trim();
+      if (!sideId || sideId === 'A' || sideId === 'B' || sideId === 'a' || sideId === 'b') return;
+      const entityId = buildMatchPlayTempEntityId(groupId, sideId);
+      if (!entityId || seen[entityId]) return;
+      const rec = scoresBySide[key];
+      if (!rec || typeof rec !== 'object') return;
+      const memberIds = filled
+        .filter((p) => (teamMap[p.userId] || '') === sideId)
+        .map((p) => p.userId);
+      if (!memberIds.length) return;
+      seen[entityId] = true;
+      entities.push({ entityId: entityId, members: memberIds.slice() });
+      teamScoresByEntity.push({
+        teamId: entityId,
+        entityId: entityId,
+        scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
+        putts: Array.isArray(rec.putts) ? rec.putts.slice() : [],
+        fairways: Array.isArray(rec.fairways) ? rec.fairways.slice() : [],
+        penalties: Array.isArray(rec.penalties) ? rec.penalties.slice() : [],
+        sands: Array.isArray(rec.sands) ? rec.sands.slice() : []
+      });
+    });
+
+    scoreEntities[groupId] = entities;
+    const prev = srcScoreData[groupId] && typeof srcScoreData[groupId] === 'object'
+      ? srcScoreData[groupId]
+      : {};
+    nextScoreData[groupId] = Object.assign({}, prev, {
+      teamScoresByEntity: teamScoresByEntity,
+      scoresBySide: scoresBySide
+    });
+  });
+
+  return Object.assign({}, match, {
+    scoreEntities: scoreEntities,
+    scoreData: nextScoreData
+  });
+}
+
+/**
+ * G5–G8 Match Play 统计行（展示层，不含 UP/DN / Match Result）。
+ * - G5 → 复用 buildStatisticsRows（scoresByPlayer）
+ * - G6/G7/G8 → scoresBySide 转 Entity 视图后复用 buildEntityStatisticsRows
+ */
+function buildMatchPlayStatisticsRows(match) {
+  if (!match || typeof match !== 'object') return [];
+  const mode = resolveGameMode(match);
+  if (isG5MatchPlayMode(mode)) {
+    return buildStatisticsRows(match);
+  }
+  if (isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode)) {
+    return buildEntityStatisticsRows(buildMatchPlaySideEntityViewMatch(match));
+  }
+  if (isMatchPlayBoardMode(mode)) {
+    return buildStatisticsRows(match);
+  }
+  return [];
+}
+
+/**
+ * Match Play 映射用 score 上下文：供 _mapAdapterRowsToView / filledHoles 识别成绩。
+ * G5：原 match；G6–G8：含合成 teamScoresByEntity 的视图。
+ */
+function buildMatchPlayScoreDataContext(match) {
+  if (!match || typeof match !== 'object') return match;
+  const mode = resolveGameMode(match);
+  if (isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode)) {
+    return buildMatchPlaySideEntityViewMatch(match);
+  }
+  return match;
+}
+
 module.exports = {
   buildStatisticsRows,
   buildEntityStatisticsRows,
   buildGameStatisticsRows,
   buildGameScoreDataContext,
+  buildMatchPlayStatisticsRows,
+  buildMatchPlayScoreDataContext,
   shouldUseEntityStatistics,
   computePlayerHoleStats,
   get8421Score,

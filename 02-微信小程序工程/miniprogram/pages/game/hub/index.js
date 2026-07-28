@@ -826,6 +826,19 @@ Page({
       this.setData({ showMoreSheet: false, moreFabExpanded: false, activeTab: 'leaderboard' });
       return;
     }
+    if (permission === 'stats') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      const gameId = this._gameId || this.data.gameId || '';
+      if (!gameId) {
+        wx.showToast({ title: '当前为演示模式', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({
+        url: '/pages/tournament/stats/index?gameId=' + encodeURIComponent(gameId),
+        fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
     if (permission === 'cancel_match') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this._promptCancelGame();
