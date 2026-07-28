@@ -64,7 +64,7 @@
                   <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
                 </view>
                 <view class="ds-group-avatar-mosaic">
-                  <avatar-mosaic avatars="{{item.avatars}}" size="62"></avatar-mosaic>
+                  <avatar-mosaic avatars="{{item.displayAvatars}}" size="62"></avatar-mosaic>
                 </view>
                 <view class="ds-card-tour__body card">
                   <view class="card-top">
@@ -221,7 +221,7 @@
             </view>
             <view wx:for="{{plazaCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour">
               <view class="ds-group-avatar-mosaic">
-                <avatar-mosaic avatars="{{item.avatars}}" size="62"></avatar-mosaic>
+                <avatar-mosaic avatars="{{item.displayAvatars}}" size="62"></avatar-mosaic>
               </view>
               <view class="ds-card-tour__body card">
                 <view class="card-top">

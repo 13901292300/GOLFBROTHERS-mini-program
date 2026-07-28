@@ -172,6 +172,11 @@ Page({
           'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=100',
           'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100'
         ],
+        displayAvatars: [
+          'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=100',
+          'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=100',
+          'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100'
+        ],
         title: '周末业余邀请赛',
         progressWidth: '25%',
         progressMarkerLeft: gameProgress.buildMarkerLeft(4),
@@ -190,6 +195,12 @@ Page({
         live: false,
         avatarCount: 4,
         avatars: [
+          'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100',
+          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
+          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
+          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'
+        ],
+        displayAvatars: [
           'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100',
           'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
           'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
@@ -780,6 +791,7 @@ Page({
     const avatars = allPlayers
       .map((p) => mockAvatars.resolveAvatar(p.avatar, p.playerId))
       .filter(Boolean);
+    const displayAvatars = avatars.slice(0, 9);
     // 多组 Game → 进入 Game Hub 控制页；单组 → 直接进入记分
     const multi = Array.isArray(g.groups) && g.groups.length > 1;
     const navUrl = multi
@@ -795,6 +807,7 @@ Page({
       active: !!gold && !ended,
       live: !!gold && !ended && !progress.progressFinish,
       avatars: avatars,
+      displayAvatars: displayAvatars,
       title: g.roundName || g.courseName || '高尔夫球局',
       progressWidth: progress.progressWidth,
       progressMarkerLeft: progress.progressMarkerLeft,
