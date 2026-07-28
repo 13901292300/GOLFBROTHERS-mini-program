@@ -1,7 +1,7 @@
-<view wx:if="{{visible}}" class="css-root">
+<view wx:if="{{visible}}" class="css-root {{themeClass}}">
   <view class="css-overlay" bindtap="onOverlayClose" catchtouchmove="stopPropagation"></view>
 
-  <view class="css-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+  <view class="css-sheet {{themeClass}}" catchtap="stopPropagation" catchtouchmove="stopPropagation">
     <view class="css-handle"></view>
     <view class="css-head">
       <text class="css-overline">CADDIE</text>
@@ -70,7 +70,7 @@
   ></view>
   <view
     wx:if="{{manageVisible}}"
-    class="css-sheet css-manage"
+    class="css-sheet css-manage {{themeClass}}"
     catchtap="stopPropagation"
     catchtouchmove="stopPropagation"
   >

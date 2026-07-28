@@ -49,3 +49,101 @@
   display: flex;
   flex-direction: column;
 }
+
+/*
+ * Dark：不依赖父页 .score-page.dark-mode（styleIsolation isolated）。
+ * 记分页 themeClass 为 dark-mode；兼容 dark-theme 别名。
+ */
+.half-sheet.dark-mode,
+.half-sheet.dark-theme {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card: #111111;
+  --text-primary: #ffffff;
+  --text-secondary: #888888;
+  --text-muted: #888888;
+  --border-color: #222222;
+  --golf-blue: #002d62;
+  --data-blue: #00aeef;
+  --champion-gold: #ce9224;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.half-sheet.dark-mode .sheet-handle,
+.half-sheet.dark-theme .sheet-handle {
+  background: var(--border-color);
+}
+
+.half-sheet.dark-mode .half-sheet-title,
+.half-sheet.dark-mode .half-course-name,
+.half-sheet.dark-theme .half-sheet-title,
+.half-sheet.dark-theme .half-course-name {
+  color: var(--text-primary);
+}
+
+.half-sheet.dark-mode .half-sheet-eyebrow,
+.half-sheet.dark-mode .half-hint,
+.half-sheet.dark-mode .half-sheet-close,
+.half-sheet.dark-mode .par-table__title,
+.half-sheet.dark-theme .half-sheet-eyebrow,
+.half-sheet.dark-theme .half-hint,
+.half-sheet.dark-theme .half-sheet-close,
+.half-sheet.dark-theme .par-table__title {
+  color: var(--text-muted);
+}
+
+.half-sheet.dark-mode .half-col,
+.half-sheet.dark-mode .par-row,
+.half-sheet.dark-theme .half-col,
+.half-sheet.dark-theme .par-row {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.half-sheet.dark-mode .half-col__title,
+.half-sheet.dark-mode .par-row__total,
+.half-sheet.dark-theme .half-col__title,
+.half-sheet.dark-theme .par-row__total {
+  color: var(--text-primary);
+}
+
+.half-sheet.dark-mode .half-tag,
+.half-sheet.dark-mode .par-hole-cell,
+.half-sheet.dark-theme .half-tag,
+.half-sheet.dark-theme .par-hole-cell {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.half-sheet.dark-mode .half-tag.active,
+.half-sheet.dark-theme .half-tag.active {
+  background: var(--golf-blue);
+  border-color: var(--golf-blue);
+  color: #fff;
+}
+
+.half-sheet.dark-mode .par-row.active,
+.half-sheet.dark-theme .par-row.active {
+  background: rgba(0, 174, 239, 0.12);
+  border-color: var(--data-blue);
+}
+
+.half-sheet.dark-mode .par-row.active .par-row__code,
+.half-sheet.dark-theme .par-row.active .par-row__code {
+  color: var(--data-blue);
+}
+
+.half-sheet.dark-mode .par-side-tag,
+.half-sheet.dark-theme .par-side-tag {
+  background: var(--data-blue);
+  color: #001;
+}
+
+.half-sheet.dark-mode .par-row__code,
+.half-sheet.dark-mode .par-row__name,
+.half-sheet.dark-theme .par-row__code,
+.half-sheet.dark-theme .par-row__name {
+  color: var(--text-secondary);
+}

@@ -7,6 +7,24 @@
   --css-border: #e5e7eb;
   --css-bg: #f3f4f6;
   --css-card: #ffffff;
+  --css-handle: #e5e7eb;
+  --css-avatar-ph: #e5e7eb;
+  --css-qr-surface: #ffffff;
+  --css-on-brand: #ffffff;
+}
+
+/* 记分页 themeClass 为 dark-mode；兼容 dark-theme 别名 */
+.css-root.dark-mode,
+.css-root.dark-theme {
+  --css-text: #ffffff;
+  --css-muted: #888888;
+  --css-border: #222222;
+  --css-bg: #0a0a0a;
+  --css-card: #111111;
+  --css-handle: #222222;
+  --css-avatar-ph: #222222;
+  --css-qr-surface: #ffffff;
+  --css-on-brand: #ffffff;
 }
 
 .css-overlay {
@@ -37,6 +55,13 @@
   box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35);
 }
 
+.css-sheet.dark-mode,
+.css-sheet.dark-theme {
+  background: var(--css-card);
+  color: var(--css-text);
+  box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.55);
+}
+
 .css-manage {
   z-index: 240;
   max-height: 70vh;
@@ -46,7 +71,7 @@
   width: 96rpx;
   height: 8rpx;
   border-radius: 999rpx;
-  background: #e5e7eb;
+  background: var(--css-handle);
   margin: 24rpx auto 16rpx;
   flex-shrink: 0;
 }
@@ -180,7 +205,7 @@
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: var(--css-avatar-ph);
 }
 
 .css-scorer-item__name {
@@ -224,7 +249,7 @@
 .css-qr-card__img {
   width: 280rpx;
   height: 280rpx;
-  background: #fff;
+  background: var(--css-qr-surface);
   border-radius: 12rpx;
 }
 
@@ -253,7 +278,7 @@
 .css-btn--primary {
   flex: 1;
   background: var(--css-blue);
-  color: #fff;
+  color: var(--css-on-brand);
 }
 
 .css-btn--ghost {
@@ -286,9 +311,8 @@
   width: 84rpx;
   height: 84rpx;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: var(--css-avatar-ph);
 }
-
 .css-manage__name {
   margin-top: 16rpx;
   color: var(--css-text);

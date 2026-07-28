@@ -21,6 +21,11 @@ Component({
     source: {
       type: String,
       value: ''
+    },
+    /** 与记分页同源：dark-mode | bright-mode（组件 isolated，须自行挂载） */
+    themeClass: {
+      type: String,
+      value: ''
     }
   },
 

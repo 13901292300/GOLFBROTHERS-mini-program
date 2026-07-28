@@ -15,7 +15,9 @@ Component({
     /** 生成中（按钮禁用） */
     generating: { type: Boolean, value: false },
     /** 已授权球童列表：[{ userId, nickname, avatar }] */
-    scorers: { type: Array, value: [] }
+    scorers: { type: Array, value: [] },
+    /** 与记分页同源：dark-mode | bright-mode（组件 isolated，须自行挂载） */
+    themeClass: { type: String, value: '' }
   },
 
   data: {

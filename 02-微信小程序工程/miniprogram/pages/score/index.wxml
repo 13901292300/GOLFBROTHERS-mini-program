@@ -910,6 +910,7 @@
     visible="{{halfSheetVisible}}"
     game-id="{{gameId}}"
     mode="{{mode}}"
+    theme-class="{{themeClass}}"
     bind:close="closeHalfSheet"
     bind:confirm="onHalfCourseConfirmed"
   />
@@ -988,6 +989,7 @@
     qrUrl="{{caddieSheetQrUrl}}"
     generating="{{caddieSheetGenerating}}"
     scorers="{{caddieSheetScorers}}"
+    theme-class="{{themeClass}}"
     bind:close="closeCaddieSheet"
     bind:generateQr="onGenerateCaddieQr"
     bind:removeCaddie="onRemoveCaddie"

@@ -1,6 +1,6 @@
 <block wx:if="{{visible}}">
   <view catchtouchmove="noop" bindtap="onClose" class="sheet-overlay sheet-overlay--half"></view>
-  <view class="bottom-sheet half-course-sheet" catchtap="noop" catchtouchmove="noop">
+  <view class="bottom-sheet half-course-sheet half-sheet {{themeClass}}" catchtap="noop" catchtouchmove="noop">
     <view class="sheet-handle"></view>
     <view class="half-course-panel" catchtap="noop">
       <view class="half-sheet-head">

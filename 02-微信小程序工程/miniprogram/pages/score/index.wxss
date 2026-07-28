@@ -1076,12 +1076,51 @@ page {
   font-weight: 900;
   color: var(--champion-gold, #ce9224);
 }
+/* Bottom Sheet 通用 Dark：背景/标题/辅助字/边框走页面 token，避免白底 */
+.score-page.dark-mode .bottom-sheet {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.55);
+}
+.score-page.dark-mode .sheet-handle {
+  background: var(--border-color);
+}
+.score-page.dark-mode .feature-section-title,
+.score-page.dark-mode .fst-main {
+  color: var(--text-primary);
+}
+.score-page.dark-mode .fst-sub {
+  color: var(--text-secondary);
+}
+.score-page.dark-mode .feature-label {
+  color: var(--text-primary);
+}
+
+.score-page.dark-mode .display-settings-sheet {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
 .score-page.dark-mode .display-settings-option {
-  background: var(--bg-card, #1a1a1a);
-  border-color: var(--border-color, #333);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 .score-page.dark-mode .display-settings-option__label {
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
+}
+.score-page.dark-mode .display-settings-option.is-active {
+  background: var(--golf-blue, #002d62);
+  border-color: var(--champion-gold, #ce9224);
+}
+
+.score-page.dark-mode .edit-tee-sheet {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+.score-page.dark-mode .edit-tee-row {
+  border-bottom-color: var(--border-color);
+}
+.score-page.dark-mode .edit-tee-row__name {
+  color: var(--text-primary);
 }
 
 /* G5-G8: change start hole sheet */
@@ -1202,9 +1241,6 @@ page {
   background: transparent;
   color: var(--text-primary);
   border: 2rpx solid rgba(148, 163, 184, 0.45);
-}
-.score-page.dark-mode .edit-tee-sheet {
-  background: var(--bg-card, #0f172a);
 }
 .score-page.dark-mode .edit-tee-dot--white {
   border-color: rgba(226, 232, 240, 0.7);
