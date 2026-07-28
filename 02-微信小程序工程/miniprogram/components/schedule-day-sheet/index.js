@@ -2,7 +2,7 @@
  * schedule-day-sheet — 首页日程「某日事件列表」底部 Sheet（V1）
  *
  * 入参：date / events / visible
- * 出参：close | add | edit | viewMatch
+ * 出参：close | add | edit | viewMatch | editNote
  * 不写 scheduleStore。
  */
 
@@ -51,7 +51,8 @@ function decorateEvent(item) {
     sourceLabel: sourceLabel,
     actionLabel: actionLabel,
     actionMode: actionMode,
-    sourceId: raw.sourceId != null ? String(raw.sourceId) : ''
+    sourceId: raw.sourceId != null ? String(raw.sourceId) : '',
+    note: raw.note != null ? String(raw.note) : ''
   });
 }
 
@@ -127,6 +128,24 @@ Component({
       }
       if (!id) return;
       this.triggerEvent('edit', { id: id });
+    },
+
+    /** 球队赛：赛事信息区 → 详情 */
+    onMatchAreaTap(e) {
+      const ds =
+        e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset : {};
+      const matchId = ds.matchid != null ? String(ds.matchid) : '';
+      if (!matchId) return;
+      this.triggerEvent('viewMatch', { matchId: matchId });
+    },
+
+    /** 球队赛：备注区 → 编辑备注 */
+    onNoteAreaTap(e) {
+      const ds =
+        e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset : {};
+      const id = ds.id != null ? String(ds.id) : '';
+      if (!id) return;
+      this.triggerEvent('editNote', { id: id });
     }
   }
 });

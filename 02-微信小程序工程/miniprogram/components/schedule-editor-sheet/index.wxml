@@ -13,50 +13,68 @@
     </view>
 
     <scroll-view scroll-y class="ses-body" enhanced="{{true}}" show-scrollbar="{{false}}">
-      <view class="ses-section">
-        <text class="ses-label">内容</text>
-        <textarea
-          class="ses-textarea"
-          placeholder="写下你的球局安排…"
-          value="{{content}}"
-          maxlength="500"
-          auto-height
-          bindinput="onContentInput"
-        ></textarea>
-      </view>
+      <!-- 球队赛个人备注 -->
+      <block wx:if="{{isNoteMode}}">
+        <view class="ses-section">
+          <text class="ses-label">我的备注</text>
+          <textarea
+            class="ses-textarea"
+            placeholder="例如：记得给阿猫带球"
+            value="{{note}}"
+            maxlength="500"
+            auto-height
+            bindinput="onNoteInput"
+          ></textarea>
+        </view>
+      </block>
 
-      <view class="ses-section">
-        <text class="ses-label">提醒好友</text>
-        <view class="ses-members">
-          <view
-            wx:for="{{selectedMembers}}"
-            wx:key="userId"
-            class="ses-member"
-            data-userid="{{item.userId}}"
-            bindtap="onRemoveMember"
-          >
-            <image
-              wx:if="{{item.avatar}}"
-              class="ses-member__avatar"
-              src="{{item.avatar}}"
-              mode="aspectFill"
-            ></image>
-            <view wx:else class="ses-member__avatar ses-member__avatar--ph">
-              <text class="ses-member__ph">{{item.name ? item.name[0] : '?'}}</text>
+      <!-- 普通日程编辑 -->
+      <block wx:else>
+        <view class="ses-section">
+          <text class="ses-label">内容</text>
+          <textarea
+            class="ses-textarea"
+            placeholder="写下你的球局安排…"
+            value="{{content}}"
+            maxlength="500"
+            auto-height
+            bindinput="onContentInput"
+          ></textarea>
+        </view>
+
+        <view class="ses-section">
+          <text class="ses-label">提醒好友</text>
+          <view class="ses-members">
+            <view
+              wx:for="{{selectedMembers}}"
+              wx:key="userId"
+              class="ses-member"
+              data-userid="{{item.userId}}"
+              bindtap="onRemoveMember"
+            >
+              <image
+                wx:if="{{item.avatar}}"
+                class="ses-member__avatar"
+                src="{{item.avatar}}"
+                mode="aspectFill"
+              ></image>
+              <view wx:else class="ses-member__avatar ses-member__avatar--ph">
+                <text class="ses-member__ph">{{item.name ? item.name[0] : '?'}}</text>
+              </view>
+              <text class="ses-member__name">{{item.name}}</text>
             </view>
-            <text class="ses-member__name">{{item.name}}</text>
-          </view>
-          <view class="ses-add-member" bindtap="onOpenMemberPicker">
-            <text class="ses-add-member__plus">＋</text>
-            <text class="ses-add-member__text">添加提醒人</text>
+            <view class="ses-add-member" bindtap="onOpenMemberPicker">
+              <text class="ses-add-member__plus">＋</text>
+              <text class="ses-add-member__text">添加提醒人</text>
+            </view>
           </view>
         </view>
-      </view>
+      </block>
     </scroll-view>
 
-    <view class="ses-footer {{isEdit ? 'ses-footer--edit' : ''}}">
+    <view class="ses-footer {{isEdit && !isNoteMode ? 'ses-footer--edit' : ''}}">
       <view class="ses-btn ses-btn--ghost" bindtap="onCloseTap">取消</view>
-      <view wx:if="{{isEdit}}" class="ses-btn ses-btn--danger" bindtap="onDeleteTap">删除</view>
+      <view wx:if="{{isEdit && !isNoteMode}}" class="ses-btn ses-btn--danger" bindtap="onDeleteTap">删除</view>
       <view class="ses-btn ses-btn--primary" bindtap="onSaveTap">{{saveBtnLabel}}</view>
     </view>
   </view>

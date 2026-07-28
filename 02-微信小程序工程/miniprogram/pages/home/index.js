@@ -123,7 +123,9 @@ Page({
     showTournamentContent: false,
     showProfileContent: false,
     showPlazaContent: false,
+    showPlazaTournamentContent: false,
     plazaCards: [],
+    plazaTournamentCards: [],
     bottomNavActive: 'home',
     createOverlayVisible: false,
     createOverlayOpen: false,
@@ -151,6 +153,7 @@ Page({
     scheduleEditorVisible: false,
     scheduleEditorDate: '',
     scheduleEditorSchedule: null,
+    scheduleEditorMode: 'schedule',
     scheduleRemindPickerForEditor: false,
     scheduleRemindSearch: '',
     filteredScheduleFriends: [],
@@ -471,12 +474,13 @@ Page({
     this.setData({ eventsByDate: map });
   },
 
-  /** day-sheet 展示用：附带 sourceType / sourceId（不改 store） */
+  /** day-sheet 展示用：附带 sourceType / sourceId / note（不改 store） */
   _mapDaySheetEvents(list) {
     return (Array.isArray(list) ? list : []).map(function (item) {
       return {
         id: item.id,
         content: item.content != null ? String(item.content) : '',
+        note: item.note != null ? String(item.note) : '',
         members: Array.isArray(item.members) ? item.members : [],
         sourceType: item.sourceType != null ? String(item.sourceType) : 'self',
         sourceId: item.sourceId != null ? String(item.sourceId) : ''
@@ -514,7 +518,8 @@ Page({
     this.setData({
       scheduleEditorVisible: true,
       scheduleEditorDate: date || '',
-      scheduleEditorSchedule: null
+      scheduleEditorSchedule: null,
+      scheduleEditorMode: 'schedule'
     });
   },
 
@@ -530,7 +535,8 @@ Page({
     this.setData({
       scheduleEditorVisible: true,
       scheduleEditorDate: found.date || this.data.scheduleDaySheetDate,
-      scheduleEditorSchedule: found
+      scheduleEditorSchedule: found,
+      scheduleEditorMode: 'schedule'
     });
   },
 
@@ -543,10 +549,52 @@ Page({
     });
   },
 
+  /** 球队赛日程：打开个人备注编辑（不改 content/date） */
+  onScheduleEditNote(e) {
+    const id = e && e.detail && e.detail.id != null ? String(e.detail.id) : '';
+    if (!id) return;
+    const found = scheduleStore.getScheduleById(id);
+    if (!found) return;
+    if (String(found.sourceType || '') !== 'team_match') {
+      console.warn('[onScheduleEditNote] only team_match', id);
+      return;
+    }
+    this.setData({
+      scheduleEditorVisible: true,
+      scheduleEditorDate: found.date || this.data.scheduleDaySheetDate,
+      scheduleEditorSchedule: Object.assign({}, found, {
+        note: found.note != null ? String(found.note) : ''
+      }),
+      scheduleEditorMode: 'note'
+    });
+  },
+
+  /** 仅保存 note，不改 content / date / source* */
+  saveScheduleNoteFromEditor(e) {
+    const detail = e && e.detail ? e.detail : {};
+    const scheduleId = detail.scheduleId ? String(detail.scheduleId) : '';
+    if (!scheduleId) {
+      wx.showToast({ title: '日程缺失', icon: 'none' });
+      return;
+    }
+    const existing = scheduleStore.getScheduleById(scheduleId);
+    if (!existing || String(existing.sourceType || '') !== 'team_match') {
+      console.warn('[saveScheduleNoteFromEditor] blocked', scheduleId);
+      return;
+    }
+    const note = detail.note != null ? String(detail.note) : '';
+    scheduleStore.updateSchedule(scheduleId, { note: note });
+    this._refreshScheduleDaySheet(existing.date || this.data.scheduleDaySheetDate);
+    this._buildScheduleEventsByDate();
+    this._refreshScheduleCards();
+    wx.showToast({ title: '备注已保存', icon: 'success' });
+  },
+
   onScheduleEditorClose() {
     this.setData({
       scheduleEditorVisible: false,
-      scheduleEditorSchedule: null
+      scheduleEditorSchedule: null,
+      scheduleEditorMode: 'schedule'
     });
   },
 
@@ -575,7 +623,8 @@ Page({
       this.setData({
         scheduleDaySheetEvents: [],
         scheduleEditorVisible: false,
-        scheduleEditorSchedule: null
+        scheduleEditorSchedule: null,
+        scheduleEditorMode: 'schedule'
       });
       return;
     }
@@ -587,7 +636,8 @@ Page({
       scheduleDaySheetEvents: dayEvents,
       scheduleDaySheetVisible: true,
       scheduleEditorVisible: false,
-      scheduleEditorSchedule: null
+      scheduleEditorSchedule: null,
+      scheduleEditorMode: 'schedule'
     });
   },
 
@@ -757,10 +807,31 @@ Page({
     };
   },
 
-  refreshTeamMatchCards() {
-    const latestCards = teamMatchStore.listMatches()
+  /** 报名 TAB「所有报名」：仅 status === registering */
+  _buildAllRegisteringTournamentCards() {
+    return teamMatchStore.listMatches()
+      .filter((m) => String((m && m.status) || '').trim().toLowerCase() === 'registering')
       .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
       .filter(Boolean);
+  },
+
+  /** 报名 TAB「我的报名」：registering 且 registerInfo.users 含当前 userId（不含 registeredBy） */
+  _buildMyRegisteredTournamentCards() {
+    const user = gameStore.getCurrentUser() || {};
+    const currentUserId = String(user.userId || 'me');
+    return teamMatchStore.listMatches()
+      .filter((m) => String((m && m.status) || '').trim().toLowerCase() === 'registering')
+      .filter((m) => {
+        const users =
+          m && m.registerInfo && Array.isArray(m.registerInfo.users) ? m.registerInfo.users : [];
+        return users.some((item) => item && String(item.userId) === currentUserId);
+      })
+      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
+      .filter(Boolean);
+  },
+
+  refreshTeamMatchCards() {
+    const latestCards = this._buildAllRegisteringTournamentCards();
     this._myTournamentCards = latestCards;
     if (this.data.currentMainSection === 'tournament' && this.data.primaryTabActive) {
       this.setData({
@@ -835,8 +906,16 @@ Page({
       showScheduleContent: false,
       showTournamentContent: false,
       showProfileContent: false,
-      showPlazaContent: false
+      showPlazaContent: false,
+      showPlazaTournamentContent: false
     });
+  },
+
+  /** 广场「球队比赛」卡片（只读映射，不改 store） */
+  _buildPlazaTournamentCards() {
+    return teamMatchStore.listMatches()
+      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
+      .filter(Boolean);
   },
 
   setHeroTabsVisible(visible) {
@@ -859,14 +938,12 @@ Page({
   showTournamentSection() {
     this.setData({
       currentMainSection: 'tournament',
-      primaryTabText: '我的球队赛',
-      secondaryTabText: '所有球队赛'
+      primaryTabText: '所有报名',
+      secondaryTabText: '我的报名'
     });
     this.setHeroTabsVisible(true);
     this.hideMainContents();
-    const myCards = teamMatchStore.listMatches()
-      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
-      .filter(Boolean);
+    const myCards = this._buildAllRegisteringTournamentCards();
     this._myTournamentCards = myCards;
     this.setData({
       showTournamentContent: true,
@@ -876,15 +953,17 @@ Page({
     this.setBottomNavActive('tournament');
   },
 
-  // 广场 TAB：展示所有进行中 GAME（普通卡片，无金边）
+  // 广场 TAB：顶部双 TAB（普通球局 / 球队比赛）
   showPlazaSection() {
     this.refreshGames();
+    const plazaTournamentCards = this._buildPlazaTournamentCards();
     this.setData({
       currentMainSection: 'plaza',
-      primaryTabText: '广场',
-      secondaryTabText: ''
+      primaryTabText: '普通球局',
+      secondaryTabText: '球队比赛',
+      plazaTournamentCards: plazaTournamentCards
     });
-    this.setHeroTabsVisible(false);
+    this.setHeroTabsVisible(true);
     this.hideMainContents();
     this.setData({ showPlazaContent: true });
     this.setTabActive('primary');
@@ -917,15 +996,27 @@ Page({
         this.setData({ showMyContent: true });
       }
     } else if (section === 'tournament') {
+      // primary：所有报名；secondary：我的报名
       const cards = which === 'secondary'
-        ? (this._baseTournamentCards || [])
-        : (this._myTournamentCards || teamMatchStore.listMatches()
-          .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
-          .filter(Boolean));
+        ? this._buildMyRegisteredTournamentCards()
+        : (this._myTournamentCards || this._buildAllRegisteringTournamentCards());
       this.setData({
         showTournamentContent: true,
         tournamentCards: cards
       });
+    } else if (section === 'plaza') {
+      if (which === 'secondary') {
+        const cards = (this.data.plazaTournamentCards && this.data.plazaTournamentCards.length)
+          ? this.data.plazaTournamentCards
+          : this._buildPlazaTournamentCards();
+        this.setData({
+          showPlazaTournamentContent: true,
+          plazaTournamentCards: cards
+        });
+      } else {
+        this.refreshGames();
+        this.setData({ showPlazaContent: true });
+      }
     } else if (section === 'profile') {
       this.setData({ showProfileContent: true });
       if (which === 'secondary') {

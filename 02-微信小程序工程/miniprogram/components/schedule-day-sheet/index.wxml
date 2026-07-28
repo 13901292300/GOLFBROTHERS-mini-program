@@ -14,40 +14,68 @@
 
     <scroll-view scroll-y class="sds-body" enhanced="{{true}}" show-scrollbar="{{false}}">
       <block wx:if="{{displayEvents.length > 0}}">
-        <view
-          wx:for="{{displayEvents}}"
-          wx:key="id"
-          class="sds-event"
-          data-id="{{item.id}}"
-          data-mode="{{item.actionMode}}"
-          data-matchid="{{item.sourceId}}"
-          bindtap="onEventTap"
-        >
-          <view class="sds-event__top">
-            <text class="sds-event__source">{{item.sourceLabel}}</text>
-            <text class="sds-event__action">{{item.actionLabel}}</text>
-          </view>
-          <text class="sds-event__content">{{item.content || '（无内容）'}}</text>
-          <view wx:if="{{item.members && item.members.length}}" class="sds-members">
+        <block wx:for="{{displayEvents}}" wx:key="id">
+          <!-- 球队赛事：赛事区 / 备注区拆分点击 -->
+          <view wx:if="{{item.sourceType === 'team_match'}}" class="sds-event sds-event--team">
             <view
-              wx:for="{{item.members}}"
-              wx:for-item="m"
-              wx:key="userId"
-              class="sds-member"
+              class="sds-event__match"
+              data-matchid="{{item.sourceId}}"
+              bindtap="onMatchAreaTap"
             >
-              <image
-                wx:if="{{m.avatar}}"
-                class="sds-member__avatar"
-                src="{{m.avatar}}"
-                mode="aspectFill"
-              ></image>
-              <view wx:else class="sds-member__avatar sds-member__avatar--ph">
-                <text class="sds-member__ph-text">{{m.name ? m.name[0] : '?'}}</text>
+              <view class="sds-event__top">
+                <text class="sds-event__source">{{item.sourceLabel}}</text>
+                <text class="sds-event__action">{{item.actionLabel}}</text>
               </view>
-              <text class="sds-member__name">{{m.name}}</text>
+              <text class="sds-event__content">{{item.content || '（无内容）'}}</text>
+            </view>
+            <view
+              class="sds-event__note"
+              data-id="{{item.id}}"
+              bindtap="onNoteAreaTap"
+            >
+              <view class="sds-event__note-top">
+                <text class="sds-event__note-label">我的备注</text>
+                <text class="sds-event__note-action">编辑</text>
+              </view>
+              <text class="sds-event__note-text {{item.note ? '' : 'sds-event__note-text--empty'}}">{{item.note || '点击添加备注'}}</text>
             </view>
           </view>
-        </view>
+
+          <!-- 普通日程 / 好友提醒：整卡编辑 -->
+          <view
+            wx:else
+            class="sds-event"
+            data-id="{{item.id}}"
+            data-mode="{{item.actionMode}}"
+            data-matchid="{{item.sourceId}}"
+            bindtap="onEventTap"
+          >
+            <view class="sds-event__top">
+              <text class="sds-event__source">{{item.sourceLabel}}</text>
+              <text class="sds-event__action">{{item.actionLabel}}</text>
+            </view>
+            <text class="sds-event__content">{{item.content || '（无内容）'}}</text>
+            <view wx:if="{{item.members && item.members.length}}" class="sds-members">
+              <view
+                wx:for="{{item.members}}"
+                wx:for-item="m"
+                wx:key="userId"
+                class="sds-member"
+              >
+                <image
+                  wx:if="{{m.avatar}}"
+                  class="sds-member__avatar"
+                  src="{{m.avatar}}"
+                  mode="aspectFill"
+                ></image>
+                <view wx:else class="sds-member__avatar sds-member__avatar--ph">
+                  <text class="sds-member__ph-text">{{m.name ? m.name[0] : '?'}}</text>
+                </view>
+                <text class="sds-member__name">{{m.name}}</text>
+              </view>
+            </view>
+          </view>
+        </block>
       </block>
       <view wx:else class="sds-empty">
         <text class="sds-empty__text">今天还没有安排</text>

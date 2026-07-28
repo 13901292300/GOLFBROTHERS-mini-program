@@ -3304,7 +3304,8 @@ Page({
   },
 
   /**
-   * 将当前报名名单同步为 team_match 日程（已存在则跳过）
+   * 将当前报名名单同步为 team_match 日程：
+   * 无则 create；有则只更新 date / content（不改 ownerId / sourceType / sourceId）
    * @param {object} match
    */
   syncTeamMatchSchedules(match) {
@@ -3327,15 +3328,24 @@ Page({
               : ''
       ).trim();
       if (!ownerId) continue;
+      const payload = scheduleAdapter.createTeamMatchSchedule(match, user);
       const existing = scheduleStore.findSchedulesBySource(
         'team_match',
         matchId,
         ownerId
       );
-      if (existing && existing.length) continue;
-      scheduleStore.createSchedule(
-        scheduleAdapter.createTeamMatchSchedule(match, user)
-      );
+      if (existing && existing.length) {
+        for (let j = 0; j < existing.length; j++) {
+          const sch = existing[j];
+          if (!sch || !sch.id) continue;
+          scheduleStore.updateSchedule(sch.id, {
+            date: payload.date,
+            content: payload.content
+          });
+        }
+        continue;
+      }
+      scheduleStore.createSchedule(payload);
     }
   },
 

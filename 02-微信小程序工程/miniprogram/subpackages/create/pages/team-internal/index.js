@@ -2,6 +2,8 @@ const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const partnerConfigUtil = require('../../../../utils/partnerConfig.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const scheduleStore = require('../../../../utils/scheduleStore.js');
+const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
 const {
   createDefaultEventInfoList
 } = require('../../../../utils/eventInfoDefaults.js');
@@ -1683,6 +1685,8 @@ Page({
     }
 
     teamMatchStore.saveMatch(updated);
+    // 改期等基础信息变更后，同步已有报名用户的 team_match 日程 date/content
+    this.syncTeamMatchSchedules(updated);
     // 落盘成功后同步「原始赛制」，供下次校验失败回滚
     this._originalGameMode = updated.gameMode || this.data.gameMode || this._originalGameMode;
     wx.showToast({ title: '已保存修改', icon: 'success' });
@@ -1695,5 +1699,50 @@ Page({
         });
       }
     }, 400);
+  },
+
+  /**
+   * 与详情页 syncTeamMatchSchedules 对齐：无则 create，有则只更新 date/content
+   * @param {object} match
+   */
+  syncTeamMatchSchedules(match) {
+    if (!match || !match.matchId) return;
+    const matchId = String(match.matchId);
+    const users =
+      match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
+      if (!user) continue;
+      const ownerId = String(
+        user.userId != null
+          ? user.userId
+          : user.playerId != null
+            ? user.playerId
+            : user.id != null
+              ? user.id
+              : ''
+      ).trim();
+      if (!ownerId) continue;
+      const payload = scheduleAdapter.createTeamMatchSchedule(match, user);
+      const existing = scheduleStore.findSchedulesBySource(
+        'team_match',
+        matchId,
+        ownerId
+      );
+      if (existing && existing.length) {
+        for (let j = 0; j < existing.length; j++) {
+          const sch = existing[j];
+          if (!sch || !sch.id) continue;
+          scheduleStore.updateSchedule(sch.id, {
+            date: payload.date,
+            content: payload.content
+          });
+        }
+        continue;
+      }
+      scheduleStore.createSchedule(payload);
+    }
   }
 });

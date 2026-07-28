@@ -66,7 +66,7 @@ function normalizeMembers(members) {
 
 /**
  * 创建手工日程
- * @param {{ date?: string, content?: string, members?: Array, ownerId?: string, sourceType?: string, sourceUserId?: string }} data
+ * @param {{ date?: string, content?: string, note?: string, members?: Array, ownerId?: string, sourceType?: string, sourceUserId?: string }} data
  * @returns {object}
  */
 function createSchedule(data) {
@@ -77,6 +77,7 @@ function createSchedule(data) {
     type: 'manual',
     date: String(payload.date != null ? payload.date : ''),
     content: String(payload.content != null ? payload.content : ''),
+    note: payload.note != null ? String(payload.note) : '',
     members: normalizeMembers(payload.members),
     createdAt: now,
     updatedAt: now
@@ -100,9 +101,9 @@ function createSchedule(data) {
 }
 
 /**
- * 修改日程（仅 date / content / members）
+ * 修改日程（date / content / note / members；未传入的字段保持原值）
  * @param {string} id
- * @param {{ date?: string, content?: string, members?: Array }} patch
+ * @param {{ date?: string, content?: string, note?: string, members?: Array }} patch
  * @returns {object|null}
  */
 function updateSchedule(id, patch) {
@@ -120,11 +121,16 @@ function updateSchedule(id, patch) {
     type: 'manual',
     updatedAt: Date.now()
   });
+  // 旧数据无 note：读侧兼容为空串（仅在显式 patch note 或首次写入时落盘）
+  if (next.note == null) next.note = '';
   if (Object.prototype.hasOwnProperty.call(p, 'date')) {
     next.date = String(p.date != null ? p.date : '');
   }
   if (Object.prototype.hasOwnProperty.call(p, 'content')) {
     next.content = String(p.content != null ? p.content : '');
+  }
+  if (Object.prototype.hasOwnProperty.call(p, 'note')) {
+    next.note = p.note != null ? String(p.note) : '';
   }
   if (Object.prototype.hasOwnProperty.call(p, 'members')) {
     next.members = normalizeMembers(p.members);

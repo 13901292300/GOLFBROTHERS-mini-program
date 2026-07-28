@@ -247,6 +247,58 @@
           </view>
         </view>
 
+        <!-- 广场 · 球队比赛 -->
+        <view wx:if="{{showPlazaTournamentContent}}" id="plaza-tournament-content">
+          <view class="ds-main space-y-4">
+            <view wx:if="{{plazaTournamentCards.length === 0}}" class="ds-card-dashed p-8 flex flex-col items-center justify-center opacity-60">
+              <text class="text-xs font-bold text-slate-400 uppercase tracking-widest">暂无球队比赛</text>
+            </view>
+            <view wx:for="{{plazaTournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
+              <view class="ds-card-club-main">
+                <view class="ds-card-club__head">
+                  <view class="ds-card-club__avatar-col {{item.statusLabel ? 'has-status-label' : ''}}">
+                    <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
+                      <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
+                    </view>
+                    <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag">
+                      <text class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : (item.statusLabel === 'LIVE' || item.statusTone === 'live' ? 'badge-live live-badge-pulse' : 'badge-gold')}}">{{item.statusLabel}}</text>
+                    </view>
+                  </view>
+                  <view class="ds-card-club__content">
+                    <view class="ds-card-club__anchor">
+                      <view class="ds-card-club__date">
+                        <text class="text-base font-black ds-text-data tracking-tight leading-none">{{item.clubDate}}</text>
+                      </view>
+                      <view class="ds-card-club__title-wrap">
+                        <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                      </view>
+                    </view>
+                    <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
+                      <text>{{item.teamName}}</text>
+                    </view>
+                    <view class="ds-card-club__meta-row ds-text-muted text-9px">
+                      <view class="ds-card-club__meta-grow">
+                        <text>{{item.venue}}</text>
+                      </view>
+                      <view class="ds-card-club__meta-fixed">
+                        <text>👁</text>
+                      </view>
+                      <view class="ds-card-club__meta-fixed">
+                        <text>{{item.views}}</text>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              <view class="ds-club-footer">
+                <view class="ds-club-footer-line"></view>
+                <text class="ds-club-footer-label">CLUB</text>
+                <view class="ds-club-footer-line ds-club-footer-line--right"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+
         <!-- 我的菜单内容 -->
         <view wx:if="{{showProfileContent}}" id="profile-content" class="ds-page-profile">
           <view class="pb-32">
@@ -365,7 +417,7 @@
         <view bindtap="showTournamentSection" class="ds-bottom-nav-item {{bottomNavActive === 'tournament' ? 'ds-bottom-nav-item--active' : ''}}">
           <view class="item-inner">
             <text class="icon">📑</text>
-            <text class="bottom-tab-text">赛事</text>
+            <text class="bottom-tab-text">报名</text>
           </view>
         </view>
         <view bindtap="showProfileSection" class="ds-bottom-nav-item {{bottomNavActive === 'profile' ? 'ds-bottom-nav-item--active' : ''}}">
@@ -542,6 +594,7 @@
     bind:add="onScheduleDaySheetAdd"
     bind:edit="onScheduleDaySheetEdit"
     bind:viewMatch="onScheduleViewMatch"
+    bind:editNote="onScheduleEditNote"
   />
 
   <!-- Schedule editor sheet -->
@@ -550,8 +603,10 @@
     visible="{{scheduleEditorVisible}}"
     date="{{scheduleEditorDate}}"
     schedule="{{scheduleEditorSchedule}}"
+    mode="{{scheduleEditorMode}}"
     bind:close="onScheduleEditorClose"
     bind:save="saveScheduleFromEditor"
+    bind:saveNote="saveScheduleNoteFromEditor"
     bind:delete="deleteScheduleFromEditor"
     bind:openMemberPicker="onScheduleEditorOpenMemberPicker"
   />
