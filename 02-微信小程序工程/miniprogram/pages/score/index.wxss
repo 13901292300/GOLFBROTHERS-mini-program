@@ -16,6 +16,11 @@
   --text-primary: #ffffff;
   --text-secondary: #888888;
   --border-color: #222222;
+  /* style-sheet 兼容别名（对齐 detail/hub） */
+  --bg-subtle: #0a0a0a;
+  --text-muted: #888888;
+  --border: var(--border-color);
+  --border-hover: #333333;
 
   /* TOT 列主题联动：DARK = 冠军金（用字面量，避免嵌套 var 在部分基础库解析失败） */
   --tot-color: #CE9224;
@@ -52,6 +57,11 @@
   --text-primary: #0f172a;
   --text-secondary: #64748b;
   --border-color: #e2e8f0;
+  /* style-sheet 兼容别名（对齐 detail/hub） */
+  --bg-subtle: #f3f4f6;
+  --text-muted: #6b7280;
+  --border: var(--border-color);
+  --border-hover: #d1d5db;
 
   /* TOT 列主题联动：BRIGHT = PGA蓝 #002D62 */
   --tot-color: #002D62;
@@ -1069,6 +1079,22 @@ page {
   letter-spacing: 0.18em;
   box-sizing: border-box;
 }
+
+
+/* ===== 显示设置 sheet（对齐 Hub/M · detail .style-sheet） ===== */
+.style-sheet { position: fixed; left: 0; right: 0; bottom: 0; transform: translateY(100%); background: var(--bg-card); color: var(--text-primary); border-radius: 48rpx 48rpx 0 0; border: 1px solid var(--border); z-index: 260; transition: transform 0.25s ease; box-shadow: 0 -36rpx 80rpx rgba(0, 0, 0, 0.35); padding-bottom: max(40rpx, env(safe-area-inset-bottom)); }
+.style-sheet.active { transform: translateY(0); }
+.style-sheet__head { display: flex; align-items: flex-start; justify-content: space-between; padding: 36rpx 40rpx 8rpx; }
+.style-sheet__title { display: block; font-size: 32rpx; font-weight: 700; color: var(--text-primary); }
+.style-sheet__sub { display: block; font-size: 22rpx; color: var(--text-muted); margin-top: 8rpx; }
+.style-sheet__close { width: 56rpx; height: 56rpx; border-radius: 999rpx; background: var(--bg-subtle); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.style-section { padding: 36rpx 40rpx 0; }
+.style-section-title { display: block; font-size: 24rpx; font-weight: 700; color: var(--text-secondary); margin-bottom: 20rpx; }
+.style-option-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20rpx; }
+.style-option { height: 88rpx; line-height: 88rpx; text-align: center; border-radius: 12rpx; border: 1px solid var(--border-hover); background: var(--bg-subtle); color: var(--text-secondary); font-size: 26rpx; font-weight: 700; }
+.style-option.active { border-color: var(--champion-gold); background: var(--golf-blue); color: #fff; box-shadow: inset 0 -6rpx 0 var(--champion-gold); }
+.style-done-wrap { padding: 48rpx 40rpx 0; }
+.style-done-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--golf-blue); color: #fff; border-radius: 12rpx; font-weight: 700; font-size: 28rpx; }
 
 /* 显示设置 Sheet（字体大小）—— 复用 sheet-overlay / bottom-sheet / sheet-cancel */
 .display-settings-sheet {

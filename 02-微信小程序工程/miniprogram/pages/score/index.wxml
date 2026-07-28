@@ -995,35 +995,33 @@
     bind:removeCaddie="onRemoveCaddie"
   />
 
-  <!-- 显示设置：字体大小（与 detail/hub 共用 fontScale_global） -->
-  <view wx:if="{{showStyleSheet}}" class="sheet-overlay" bindtap="closeStyleSheet"></view>
-  <view wx:if="{{showStyleSheet}}" class="bottom-sheet display-settings-sheet" catchtap="noop">
-    <view class="sheet-top-accent"></view>
-    <view class="sheet-handle"></view>
-    <view class="feature-section-title display-settings-sheet__title">
-      <text class="fst-main">显示设置</text>
-      <text class="fst-sub">字体大小</text>
-    </view>
-    <view class="display-settings-sheet__body">
-      <view
-        class="display-settings-option {{fontScale === 'normal' ? 'is-active' : ''}}"
-        data-value="normal"
-        bindtap="onFontScaleChange"
-      >
-        <text class="display-settings-option__label">标准字体</text>
-        <text wx:if="{{fontScale === 'normal'}}" class="display-settings-option__check">✓</text>
+  <!-- 显示设置 sheet（结构对齐 Hub M 按钮；fontScale_global 逻辑不变） -->
+  <view wx:if="{{showStyleSheet}}" bindtap="closeStyleSheet" class="sheet-overlay"></view>
+  <view class="style-sheet {{showStyleSheet ? 'active' : ''}}" catchtap="noop">
+    <view class="style-sheet__head">
+      <view>
+        <text class="style-sheet__title">显示设置</text>
+        <text class="style-sheet__sub">这些设置会影响所有记分相关页面。</text>
       </view>
-      <view
-        class="display-settings-option {{fontScale === 'large' ? 'is-active' : ''}}"
-        data-value="large"
-        bindtap="onFontScaleChange"
-      >
-        <text class="display-settings-option__label">大字体</text>
-        <text wx:if="{{fontScale === 'large'}}" class="display-settings-option__check">✓</text>
+      <view bindtap="closeStyleSheet" class="style-sheet__close">✕</view>
+    </view>
+    <view class="style-section">
+      <text class="style-section-title">字体大小</text>
+      <view class="style-option-row">
+        <view
+          bindtap="onFontScaleChange"
+          data-value="normal"
+          class="style-option {{fontScale === 'normal' ? 'active' : ''}}"
+        >标准字体</view>
+        <view
+          bindtap="onFontScaleChange"
+          data-value="large"
+          class="style-option {{fontScale === 'large' ? 'active' : ''}}"
+        >大字体</view>
       </view>
     </view>
-    <view class="sheet-cancel-wrap">
-      <view class="sheet-cancel-btn" bindtap="closeStyleSheet">关闭</view>
+    <view class="style-done-wrap">
+      <view bindtap="closeStyleSheet" class="style-done-btn">完成</view>
     </view>
   </view>
 
