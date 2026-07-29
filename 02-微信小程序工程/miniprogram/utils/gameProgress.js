@@ -193,8 +193,13 @@ function confirmFinishGame(gameId, groupIndex) {
   if (!gameId) return null;
   const game = gameStore.getGame(gameId);
   if (!game || isGameEnded(game)) return game;
+  const gi = groupIndex || 0;
+  // 单组个人比杆：结束时确认位成绩归属 / 删除无绑定位成绩
+  if (typeof gameStore.finalizeSingleGroupIndividualStrokeScores === 'function') {
+    gameStore.finalizeSingleGroupIndividualStrokeScores(gameId, gi);
+  }
   gameStore.updateGame(gameId, { status: matchStatus.FINISHED_STORAGE_STATUS });
-  gameStore.updateGroupStatus(gameId, groupIndex || 0, matchStatus.FINISHED_STORAGE_STATUS);
+  gameStore.updateGroupStatus(gameId, gi, matchStatus.FINISHED_STORAGE_STATUS);
   return gameStore.getGame(gameId);
 }
 

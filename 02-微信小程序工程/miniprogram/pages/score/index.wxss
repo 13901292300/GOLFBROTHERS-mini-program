@@ -469,6 +469,454 @@ page {
   background: var(--bg-primary);
 }
 
+/* ===== Shell：G1 basic / 普通创建单组 game-single（左 player-column + 右 score-track）===== */
+.scoreboard-shell,
+.scoreboard-shell--basic,
+.scoreboard-shell--game-single {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.player-column {
+  flex-shrink: 0;
+  width: 128rpx;
+  min-width: 128rpx;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
+.player-column__inner {
+  width: 100%;
+}
+
+.player-column__spacer {
+  width: 100%;
+  border-bottom: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
+.player-column__spacer.shell-row--head {
+  background: var(--bg-card);
+}
+
+.player-column__spacer.shell-row--par {
+  background: var(--bg-primary);
+}
+
+.player-column__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  box-sizing: border-box;
+}
+
+.player-column__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 12rpx 8rpx;
+  box-sizing: border-box;
+}
+
+.player-column__card .player-avatar-img {
+  width: 64rpx;
+  height: 64rpx;
+  flex-shrink: 0;
+}
+
+/* 昵称：字阶/字重/斜体/大写由 .player-name-line 提供；此处仅列内居中与宽度 */
+.player-column__name {
+  max-width: 100%;
+  text-align: center;
+}
+
+.score-track {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.score-track__inner {
+  display: inline-block;
+  min-width: 100%;
+}
+
+.shell-row--head {
+  min-height: 112rpx;
+  box-sizing: border-box;
+}
+
+.shell-row--par {
+  min-height: 72rpx;
+  box-sizing: border-box;
+}
+
+.shell-row--player {
+  height: 156rpx;
+  min-height: 156rpx;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell .scoreboard-row.shell-row--head,
+.scoreboard-shell .scoreboard-row.shell-row--par,
+.scoreboard-shell .scoreboard-row.shell-row--player {
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* TEMP 视觉测试：确认 G1 basic 前缀列是否命中（测完删除） */
+.scoreboard-shell--basic .track-lead-diff {
+  background: red !important;
+}
+.scoreboard-shell--basic .track-lead-tee {
+  background: blue !important;
+}
+
+/* score-track 前缀：diff + T 固定列宽（禁止 flex 收缩） */
+.scoreboard-shell--basic .track-lead-diff,
+.scoreboard-shell--game-single .track-lead-diff,
+.track-lead-diff {
+  width: 96rpx !important;
+  min-width: 96rpx !important;
+  max-width: 96rpx !important;
+  flex: 0 0 96rpx !important;
+  flex-shrink: 0 !important;
+  justify-content: center;
+  padding: 8rpx 4rpx;
+  background: var(--bg-secondary);
+  border-right: none;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--basic .track-lead-tee,
+.track-lead-tee {
+  width: 32rpx !important;
+  min-width: 32rpx !important;
+  max-width: 32rpx !important;
+  flex: 0 0 32rpx !important;
+  flex-shrink: 0 !important;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  position: relative;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.track-lead-diff--head,
+.track-lead-tee--head {
+  background: var(--bg-card);
+}
+
+.track-lead-diff--par,
+.track-lead-tee--par {
+  background: var(--bg-primary);
+}
+
+.track-lead-diff__wrap {
+  flex: none;
+  flex-shrink: 0;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  opacity: 1 !important;
+}
+
+.scoreboard-shell--basic .track-lead-diff .player-diff-score {
+  font-size: 32rpx;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+/* game-single：diff 字阶对齐 G5（40rpx）；颜色/under·even·over 仍走全局 */
+.scoreboard-shell--game-single .track-lead-diff .player-diff-score {
+  font-size: 40rpx;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* 普通创建单组：双栏 player-column + score-track（diff/T 在 track 内随横滑） */
+.scoreboard-shell--game-single {
+  position: relative;
+}
+
+/* HOLE/PAR 方案A：初始标签 — 宽=身份区(128+96+6)，水平中心对齐；HOLE/PAR 分占 head/par 行 */
+.scoreboard-shell--game-single .hole-par-normal-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 230rpx;
+  height: 184rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  will-change: transform;
+}
+.scoreboard-shell--game-single .hole-par-normal-container__hole,
+.scoreboard-shell--game-single .hole-par-normal-container__par {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.scoreboard-shell--game-single .hole-par-normal-container__hole {
+  height: 112rpx;
+}
+.scoreboard-shell--game-single .hole-par-normal-container__par {
+  height: 72rpx;
+}
+/* HOLE/PAR 字阶对齐 G5 col-head/par-label；保留光学上移 */
+.scoreboard-shell--game-single .hole-par-normal-container__hole text,
+.scoreboard-shell--game-single .hole-par-normal-container__par text {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+.scoreboard-shell--game-single .hole-par-normal-container__hole text {
+  transform: translateY(-3rpx);
+}
+.scoreboard-shell--game-single .hole-par-normal-container__par text {
+  transform: translateY(-2rpx);
+}
+
+/* HOLE/PAR 方案A：吸边紧凑标签 — 宽=player-column 128rpx，水平中心对齐头像区；HOLE/PAR 分占 head/par 行 */
+.scoreboard-shell--game-single .hole-par-compact-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 128rpx;
+  height: 184rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+/* Phase1：compact 保留节点但不参与显示 */
+.scoreboard-shell--game-single .hole-par-compact-container--phase1-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+.scoreboard-shell--game-single .hole-par-compact-container__hole,
+.scoreboard-shell--game-single .hole-par-compact-container__par {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.scoreboard-shell--game-single .hole-par-compact-container__hole {
+  height: 112rpx;
+}
+.scoreboard-shell--game-single .hole-par-compact-container__par {
+  height: 72rpx;
+}
+/* compact 与 normal 统一字阶；保留光学上移 */
+.scoreboard-shell--game-single .hole-par-compact-container__hole text,
+.scoreboard-shell--game-single .hole-par-compact-container__par text {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+.scoreboard-shell--game-single .hole-par-compact-container__hole text {
+  transform: translateY(-3rpx);
+}
+.scoreboard-shell--game-single .hole-par-compact-container__par text {
+  transform: translateY(-2rpx);
+}
+.scoreboard-shell--game-single .player-column {
+  position: relative;
+  z-index: 3;
+  background: transparent;
+  border-right-color: transparent;
+}
+/* game-single：头像对齐 G5 80rpx；色环/colorClass 仍走全局 .player-avatar-img */
+.scoreboard-shell--game-single .player-column__card .player-avatar-img {
+  width: 80rpx;
+  height: 80rpx;
+}
+.scoreboard-shell--game-single .score-track {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+.scoreboard-shell--game-single .player-column__spacer.shell-row--head,
+.scoreboard-shell--game-single .player-column__spacer.shell-row--par,
+.scoreboard-shell--game-single .player-column__row {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--head,
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--par,
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player {
+  background: transparent;
+}
+/* 身份区统一底：diff + T + sticky overlay = player-column */
+.scoreboard-shell--game-single .track-lead-diff,
+.scoreboard-shell--game-single .track-lead-diff--head,
+.scoreboard-shell--game-single .track-lead-diff--par,
+.scoreboard-shell--game-single .track-lead-tee,
+.scoreboard-shell--game-single .track-lead-tee--head,
+.scoreboard-shell--game-single .track-lead-tee--par {
+  background: var(--bg-secondary) !important;
+}
+/* 普通洞 A1–A18：主题底（BRIGHT≈白）；排除 special，OUT/IN/TOT 仍走全局 special */
+.scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head),
+.scoreboard-shell--game-single .scoreboard-row--par > .scoreboard-cell:nth-child(n + 3):not(.scoreboard-cell--special-par),
+.scoreboard-shell--game-single .scoreboard-row--player .score-cell:not(.scoreboard-cell--special-cell) {
+  background: var(--bg-primary);
+}
+/* DARK：表头与项目记分表头一致（--bg-card）；BRIGHT 仍用上方 --bg-primary（#ffffff） */
+.score-page.dark-mode .scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head) {
+  background: var(--bg-card);
+}
+/* track 内 T 列：宽=T线；底色同身份区 */
+.scoreboard-shell--game-single .track-lead-tee {
+  width: 6rpx !important;
+  min-width: 6rpx !important;
+  max-width: 6rpx !important;
+  flex: 0 0 6rpx !important;
+  flex-shrink: 0 !important;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: none;
+  overflow: visible;
+  box-sizing: border-box;
+}
+/* track 与 sticky overlay 共用同一套 T marker 高度（勿拆成不同 height） */
+.scoreboard-shell--game-single .track-lead-tee .player-tee-marker,
+.scoreboard-shell--game-single .track-lead-tee .track-lead-tee__mark,
+.scoreboard-shell--game-single .tee-sticky-overlay__row .player-tee-marker,
+.scoreboard-shell--game-single .tee-sticky-overlay__row .track-lead-tee__mark {
+  position: static;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  transform: none;
+  width: 100%;
+  height: 50%;
+  margin: 0;
+  flex-shrink: 0;
+}
+/* T sticky overlay：宽=T线；左缘=player-column 右缘；高度=表内容（head+par+players） */
+.scoreboard-shell--game-single .tee-sticky-overlay {
+  position: absolute;
+  left: 128rpx;
+  top: 0;
+  /* 禁止 bottom/height:100% 撑满 shell，避免底部灰色延长线 */
+  width: 6rpx;
+  height: auto;
+  max-height: 100%;
+  z-index: 2;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-sizing: border-box;
+}
+.scoreboard-shell--game-single .tee-sticky-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+.scoreboard-shell--game-single .tee-sticky-overlay__inner {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  background: transparent;
+}
+/* head/par spacer：不覆盖 shell-row 的 height/min-height/padding/box-sizing；底边与 scoreboard-row 一致 */
+.scoreboard-shell--game-single .tee-sticky-overlay__spacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-color);
+}
+/* player row：与 .shell-row--player 同高，禁止 height:auto 导致子级 % 高度为 0 */
+.scoreboard-shell--game-single .tee-sticky-overlay__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 156rpx;
+  min-height: 156rpx;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: var(--bg-secondary) !important;
+  box-sizing: border-box;
+}
+/* sticky 显示时隐藏 track 内原始 T，避免双线（不改 DOM） */
+.scoreboard-shell--game-single.is-tee-sticky .score-track .track-lead-tee .player-tee-marker,
+.scoreboard-shell--game-single.is-tee-sticky .score-track .track-lead-tee .track-lead-tee__mark {
+  opacity: 0;
+}
+
+.track-lead-tee__mark,
+.track-lead-tee .player-tee-marker {
+  position: static;
+  flex-shrink: 0;
+  width: 6rpx;
+  height: 48rpx;
+  top: auto;
+  right: auto;
+  bottom: auto;
+}
+
 .scoreboard-inner { display: inline-block; min-width: 100%; }
 
 .scoreboard-row {
@@ -1067,12 +1515,14 @@ page {
 .feature-label { color: var(--tour-blue); font-size: 20rpx; line-height: 1.2; font-weight: 800; text-align: center; }
 .feature-item--empty { visibility: hidden; pointer-events: none; }
 .sheet-cancel-wrap { padding: 4rpx 48rpx 48rpx; }
+/* Score Sheet 主按钮规范：88 / 12 / 蓝底白字 */
 .sheet-cancel-btn {
   height: 88rpx;
   line-height: 88rpx;
   text-align: center;
   background: var(--golf-blue, #002d62);
-  color: var(--champion-gold, #ce9224);
+  color: #ffffff;
+  border: none;
   border-radius: 12rpx;
   font-weight: 900;
   font-size: 24rpx;
@@ -1096,50 +1546,6 @@ page {
 .style-done-wrap { padding: 48rpx 40rpx 0; }
 .style-done-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--golf-blue); color: #fff; border-radius: 12rpx; font-weight: 700; font-size: 28rpx; }
 
-/* 显示设置 Sheet（字体大小）—— 复用 sheet-overlay / bottom-sheet / sheet-cancel */
-.display-settings-sheet {
-  z-index: 190;
-  padding: 0 0 8rpx;
-}
-.display-settings-sheet__title {
-  margin: 0 48rpx 24rpx;
-  /* 继承统一左对齐 Header，无需再改布局 */
-}
-.display-settings-sheet__body {
-  padding: 0 48rpx 16rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-.display-settings-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 88rpx;
-  padding: 0 28rpx;
-  border-radius: 12rpx;
-  border: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-subtle, #f8fafc);
-  box-sizing: border-box;
-}
-.display-settings-option.is-active {
-  border-color: var(--champion-gold, #ce9224);
-  background: var(--cloud-blue, #002d62);
-}
-.display-settings-option__label {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: var(--text-primary, #111827);
-}
-.display-settings-option.is-active .display-settings-option__label,
-.display-settings-option.is-active .display-settings-option__check {
-  color: #fff;
-}
-.display-settings-option__check {
-  font-size: 28rpx;
-  font-weight: 900;
-  color: var(--champion-gold, #ce9224);
-}
 /* Bottom Sheet 通用 Dark：背景/标题/辅助字/边框走页面 token，避免白底 */
 .score-page.dark-mode .bottom-sheet {
   background: var(--bg-card);
@@ -1159,27 +1565,13 @@ page {
 .score-page.dark-mode .feature-label {
   color: var(--text-primary);
 }
-
-.score-page.dark-mode .display-settings-sheet {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
-.score-page.dark-mode .display-settings-option {
-  background: var(--bg-secondary);
-  border-color: var(--border-color);
-}
-.score-page.dark-mode .display-settings-option__label {
-  color: var(--text-primary);
-}
-.score-page.dark-mode .display-settings-option.is-active {
+/* Dark 主按钮保持蓝底白字，不受文字 token 影响 */
+.score-page.dark-mode .sheet-cancel-btn {
   background: var(--golf-blue, #002d62);
-  border-color: var(--champion-gold, #ce9224);
+  color: #ffffff;
+  border: none;
 }
 
-.score-page.dark-mode .edit-tee-sheet {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
 .score-page.dark-mode .edit-tee-row {
   border-bottom-color: var(--border-color);
 }
@@ -1187,15 +1579,17 @@ page {
   color: var(--text-primary);
 }
 
-/* G5-G8: change start hole sheet */
-.start-hole-sheet { z-index: 190; padding: 0 48rpx 32rpx; }
-.start-hole-sheet__title {
-  margin-bottom: 28rpx;
+/* ===== 编辑类 Sheet 统一：修改T台 / 修改起始洞（Header=fst，Footer/按钮同规） ===== */
+.edit-tee-sheet,
+.start-hole-sheet {
+  z-index: 190;
+  padding: 0 48rpx 32rpx;
 }
-
-/* 修改T台弹层 */
-.edit-tee-sheet { z-index: 190; padding: 0 48rpx 32rpx; max-height: 78vh; }
-.edit-tee-sheet__title {
+.edit-tee-sheet {
+  max-height: 78vh;
+}
+.edit-tee-sheet__title,
+.start-hole-sheet__title {
   margin-bottom: 24rpx;
 }
 .edit-tee-sheet__list {
@@ -1282,20 +1676,6 @@ page {
 .edit-tee-dot--selected.edit-tee-dot--black {
   border-color: transparent;
 }
-.edit-tee-sheet__footer {
-  display: flex;
-  gap: 20rpx;
-  padding-bottom: 16rpx;
-}
-.edit-tee-sheet__btn-cancel,
-.edit-tee-sheet__btn-confirm {
-  flex: 1;
-}
-.edit-tee-sheet__btn-cancel {
-  background: transparent;
-  color: var(--text-primary);
-  border: 2rpx solid rgba(148, 163, 184, 0.45);
-}
 .score-page.dark-mode .edit-tee-dot--white {
   border-color: rgba(226, 232, 240, 0.7);
 }
@@ -1322,7 +1702,7 @@ page {
   height: 80rpx;
   border-radius: 999rpx;
   border: none;
-  background: var(--cloud-blue, #002d62);
+  background: #002d62;
   color: #fff;
   font-size: 28rpx;
   font-weight: 800;
@@ -1332,58 +1712,77 @@ page {
   box-sizing: border-box;
 }
 .start-hole-cell--active {
-  background: var(--champion-gold, #ce9224);
+  background: #ce9224;
   border: none;
   color: #fff;
 }
-.start-hole-sheet__footer {
-  display: flex;
-  gap: 20rpx;
-  padding-bottom: 16rpx;
-}
-.start-hole-sheet__btn-cancel,
-.start-hole-sheet__btn-confirm {
-  flex: 1;
-}
-.start-hole-sheet__btn-cancel {
-  background: #e5e7eb;
-  color: var(--cloud-blue, #002d62);
-}
-.score-page.dark-mode .start-hole-sheet {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
 .score-page.dark-mode .start-hole-cell {
-  background: var(--cloud-blue, #002d62);
+  background: #002d62;
   border: none;
   color: #fff;
 }
 .score-page.dark-mode .start-hole-cell--active {
-  background: var(--champion-gold, #ce9224);
+  background: #ce9224;
   border: none;
   color: #fff;
 }
+
+/* 编辑类 Footer + 取消/确认（确认继承主按钮；取消描边次级） */
+.edit-tee-sheet__footer,
+.start-hole-sheet__footer {
+  display: flex;
+  gap: 20rpx;
+  padding: 12rpx 0 16rpx;
+  flex-shrink: 0;
+}
+.edit-tee-sheet__btn-cancel,
+.edit-tee-sheet__btn-confirm,
+.start-hole-sheet__btn-cancel,
+.start-hole-sheet__btn-confirm {
+  flex: 1;
+}
+.edit-tee-sheet__btn-cancel,
+.start-hole-sheet__btn-cancel {
+  background: transparent;
+  color: var(--text-primary, #111827);
+  border: 2rpx solid rgba(148, 163, 184, 0.45);
+  font-weight: 900;
+  font-size: 24rpx;
+}
+.edit-tee-sheet__btn-confirm,
+.start-hole-sheet__btn-confirm {
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  font-weight: 900;
+  background: var(--golf-blue, #002d62);
+  color: #ffffff;
+  border: none;
+}
+.score-page.dark-mode .edit-tee-sheet__btn-cancel,
 .score-page.dark-mode .start-hole-sheet__btn-cancel {
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-primary);
+  border-color: var(--border-color);
+}
+.score-page.dark-mode .edit-tee-sheet__btn-confirm,
+.score-page.dark-mode .start-hole-sheet__btn-confirm {
+  background: var(--golf-blue, #002d62);
+  color: #ffffff;
+  border: none;
 }
 
-/* More 弹窗 — DARK 模式（复用页面 Theme Token + 卡片顶部分隔线） */
+/* More / 编辑 Sheet — DARK：顶蓝线 + handle（通用 bottom-sheet） */
 .bottom-sheet--more-menu { overflow: hidden; }
 .sheet-top-accent { display: none; }
-.score-page.dark-mode .bottom-sheet--more-menu {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.55);
-}
 .score-page.dark-mode .bottom-sheet .sheet-top-accent {
   display: block;
   width: 100%;
   height: 3px;
-  background: var(--golf-blue, #002d62);
+  background: #002d62;
   flex-shrink: 0;
 }
-.score-page.dark-mode .bottom-sheet--more-menu .sheet-handle { background: var(--border-color); }
 .score-page.dark-mode .bottom-sheet--more-menu .feature-section-title,
 .score-page.dark-mode .bottom-sheet--more-menu .feature-label { color: var(--text-primary); }
 .score-page.dark-mode .bottom-sheet--more-menu .fst-sub { color: var(--text-secondary); }

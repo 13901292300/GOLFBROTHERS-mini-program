@@ -11,7 +11,8 @@
  *     groupId, name,
  *     status: 'not_started' | 'in_progress' | 'finished',
  *     playersSlots: [ { playerId, name, avatar } | null ],
- *     scoresByPlayer: { [playerId]: { scores:[...18], putts:[...18], fairways?:[...18], penalties?:[...18], sands?:[...18] } }
+ *     scoresByPlayer: { [playerId]: { scores:[...18], putts:[...18], fairways?:[...18], penalties?:[...18], sands?:[...18] } },
+ *     scoresBySlot: [ record|null, ... ]  // 与 playersSlots 下标对齐；进行中位成绩（game-single）
  *   } ],
  *   status: 'active' | 'finished',
  *   currentRound: 1,
@@ -141,7 +142,8 @@ function listGroups(game) {
       ? matchStatus.FINISHED_STORAGE_STATUS
       : 'not_started',
     playersSlots: game.playersSlots || [],
-    scoresByPlayer: game.scoresByPlayer || {}
+    scoresByPlayer: game.scoresByPlayer || {},
+    scoresBySlot: Array.isArray(game.scoresBySlot) ? game.scoresBySlot : []
   }];
 }
 
@@ -152,45 +154,87 @@ function getGroup(gameId, groupIndex) {
   return listGroups(game)[groupIndex || 0] || null;
 }
 
+function _buildScoreRecord(prev, scores, putts, fairways, penalties, sands) {
+  const rec = {
+    scores: (scores || []).slice(),
+    putts: (putts || []).slice()
+  };
+  if (fairways != null) {
+    rec.fairways = (fairways || []).slice();
+  } else if (prev && Array.isArray(prev.fairways)) {
+    rec.fairways = prev.fairways.slice();
+  }
+  if (penalties != null) {
+    rec.penalties = (penalties || []).slice();
+  } else if (prev && Array.isArray(prev.penalties)) {
+    rec.penalties = prev.penalties.slice();
+  }
+  if (sands != null) {
+    rec.sands = (sands || []).slice();
+  } else if (prev && Array.isArray(prev.sands)) {
+    rec.sands = prev.sands.slice();
+  }
+  return rec;
+}
+
+function _cloneScoreRecord(rec) {
+  if (!rec || typeof rec !== 'object') return null;
+  const out = {
+    scores: Array.isArray(rec.scores) ? rec.scores.slice() : [],
+    putts: Array.isArray(rec.putts) ? rec.putts.slice() : []
+  };
+  if (Array.isArray(rec.fairways)) out.fairways = rec.fairways.slice();
+  if (Array.isArray(rec.penalties)) out.penalties = rec.penalties.slice();
+  if (Array.isArray(rec.sands)) out.sands = rec.sands.slice();
+  return out;
+}
+
+/**
+ * 读取某槽位成绩：优先 scoresBySlot[slotIndex]，否则回退 scoresByPlayer[playerId]（旧数据兼容）。
+ */
+function resolveGroupSlotScoreRecord(group, slotIndex, playerId) {
+  const si = Number(slotIndex);
+  if (group && Array.isArray(group.scoresBySlot) && si >= 0 && group.scoresBySlot[si]) {
+    return _cloneScoreRecord(group.scoresBySlot[si]) || { scores: [], putts: [] };
+  }
+  const pid = playerId != null ? String(playerId).trim() : '';
+  if (pid && group && group.scoresByPlayer && group.scoresByPlayer[pid]) {
+    return _cloneScoreRecord(group.scoresByPlayer[pid]) || { scores: [], putts: [] };
+  }
+  return { scores: [], putts: [] };
+}
+
 /** 写入某组某球员逐洞成绩（持久化，刷新可恢复） */
 function setGroupPlayerScores(gameId, groupIndex, playerId, scores, putts, fairways, penalties, sands) {
   const list = _readAll();
   const idx = list.findIndex((g) => g && g.gameId === gameId);
   if (idx < 0) return null;
   const game = list[idx];
-  const buildRecord = (prev) => {
-    const rec = {
-      scores: (scores || []).slice(),
-      putts: (putts || []).slice()
-    };
-    if (fairways != null) {
-      rec.fairways = (fairways || []).slice();
-    } else if (prev && Array.isArray(prev.fairways)) {
-      rec.fairways = prev.fairways.slice();
-    }
-    if (penalties != null) {
-      rec.penalties = (penalties || []).slice();
-    } else if (prev && Array.isArray(prev.penalties)) {
-      rec.penalties = prev.penalties.slice();
-    }
-    if (sands != null) {
-      rec.sands = (sands || []).slice();
-    } else if (prev && Array.isArray(prev.sands)) {
-      rec.sands = prev.sands.slice();
-    }
-    return rec;
-  };
   if (!Array.isArray(game.groups) || !game.groups.length) {
     // 旧结构：写顶层
     game.scoresByPlayer = game.scoresByPlayer || {};
-    game.scoresByPlayer[playerId] = buildRecord(game.scoresByPlayer[playerId]);
+    game.scoresByPlayer[playerId] = _buildScoreRecord(
+      game.scoresByPlayer[playerId],
+      scores,
+      putts,
+      fairways,
+      penalties,
+      sands
+    );
     teeSheetManage.inferStartHoleIfNeededForGameGroup(game);
   } else {
     const gi = groupIndex || 0;
     const grp = game.groups[gi];
     if (!grp) return null;
     grp.scoresByPlayer = grp.scoresByPlayer || {};
-    grp.scoresByPlayer[playerId] = buildRecord(grp.scoresByPlayer[playerId]);
+    grp.scoresByPlayer[playerId] = _buildScoreRecord(
+      grp.scoresByPlayer[playerId],
+      scores,
+      putts,
+      fairways,
+      penalties,
+      sands
+    );
     teeSheetManage.inferStartHoleIfNeededForGameGroup(grp);
   }
   list[idx] = game;
@@ -198,7 +242,45 @@ function setGroupPlayerScores(gameId, groupIndex, playerId, scores, putts, fairw
   return game;
 }
 
-/** 按 playersSlots 合并成绩：保留仍在名单中的球员；移除已删除球员 */
+/**
+ * 写入某组某槽位成绩（与 playersSlots 下标对齐；不改绑定球员）。
+ * 用于 game-single 进行中「成绩属于位置」。
+ */
+function setGroupSlotScores(gameId, groupIndex, slotIndex, scores, putts, fairways, penalties, sands) {
+  const list = _readAll();
+  const idx = list.findIndex((g) => g && g.gameId === gameId);
+  if (idx < 0) return null;
+  const game = list[idx];
+  const si = Number(slotIndex);
+  if (si < 0 || !Number.isFinite(si)) return null;
+
+  const writeSlot = (target) => {
+    const arr = Array.isArray(target.scoresBySlot) ? target.scoresBySlot.slice() : [];
+    while (arr.length <= si) arr.push(null);
+    arr[si] = _buildScoreRecord(arr[si], scores, putts, fairways, penalties, sands);
+    target.scoresBySlot = arr;
+  };
+
+  if (!Array.isArray(game.groups) || !game.groups.length) {
+    if ((groupIndex || 0) !== 0) return null;
+    writeSlot(game);
+    teeSheetManage.inferStartHoleIfNeededForGameGroup(game);
+  } else {
+    const gi = groupIndex || 0;
+    const grp = game.groups[gi];
+    if (!grp) return null;
+    writeSlot(grp);
+    teeSheetManage.inferStartHoleIfNeededForGameGroup(grp);
+  }
+  list[idx] = game;
+  _writeAll(list);
+  return game;
+}
+
+/**
+ * 按 playersSlots 合并 scoresByPlayer：保留仍在名单中的球员；移除已删除球员。
+ * 仅处理 scoresByPlayer，禁止用于裁剪 scoresBySlot（位成绩与绑定无关）。
+ */
 function mergeScoresForPlayersSlots(oldScores, playersSlots) {
   const prev = oldScores || {};
   const next = {};
@@ -223,9 +305,16 @@ function mergeScoresForPlayersSlots(oldScores, playersSlots) {
   return next;
 }
 
+/** 深拷贝 scoresBySlot，供名单变更时原样保留 */
+function _cloneScoresBySlot(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((rec) => (rec ? _cloneScoreRecord(rec) : null));
+}
+
 /**
  * 写入某组球员槽位（记分页增删球员后同步 GAME 数据源）
  * - 更新 groups[gi].playersSlots / scoresByPlayer
+ * - 保留 scoresBySlot（无人绑定时不得删除位成绩）
  * - 第 1 组同步顶层 playersSlots（首页卡片头像）
  */
 function setGroupPlayersSlots(gameId, groupIndex, playersSlots) {
@@ -247,13 +336,21 @@ function setGroupPlayersSlots(gameId, groupIndex, playersSlots) {
 
   if (!Array.isArray(game.groups) || !game.groups.length) {
     if (gi !== 0) return null;
+    const keptSlotScores = _cloneScoresBySlot(game.scoresBySlot);
     game.playersSlots = slots.slice();
     game.scoresByPlayer = mergeScoresForPlayersSlots(game.scoresByPlayer, slots);
+    game.scoresBySlot = keptSlotScores;
   } else if (game.groups[gi]) {
+    const keptSlotScores = _cloneScoresBySlot(game.groups[gi].scoresBySlot);
     game.groups[gi].playersSlots = slots;
     game.groups[gi].scoresByPlayer = mergeScoresForPlayersSlots(game.groups[gi].scoresByPlayer, slots);
+    game.groups[gi].scoresBySlot = keptSlotScores;
     if (gi === 0) {
       game.playersSlots = slots.slice();
+      // 顶层仅同步名单头像；位成绩以组内为准，避免误清
+      if (!Array.isArray(game.scoresBySlot) || !game.scoresBySlot.length) {
+        game.scoresBySlot = _cloneScoresBySlot(keptSlotScores);
+      }
     }
   } else {
     return null;
@@ -312,6 +409,83 @@ function isMultiGroup(game) {
   return listGroups(game).length > 1;
 }
 
+/** 普通创建单组个人比杆（非多组、非团队/最佳球位等） */
+function isSingleGroupIndividualStrokeGame(game) {
+  if (!game) return false;
+  if (isMultiGroup(game)) return false;
+  const mode = String(game.gameMode || '').trim();
+  return mode === '个人比杆赛' || mode === 'individual_stroke';
+}
+
+/**
+ * 比赛结束：确认位成绩归属（仅单组个人比杆）。
+ * - 有绑定球员：scoresBySlot[i] → scoresByPlayer[playerId]（最终成绩）
+ * - 无绑定：删除该位成绩
+ * - 结算后清空 scoresBySlot，不保留无主成绩
+ */
+function finalizeSingleGroupIndividualStrokeScores(gameId, groupIndex) {
+  const list = _readAll();
+  const idx = list.findIndex((g) => g && g.gameId === gameId);
+  if (idx < 0) return null;
+  const game = list[idx];
+  if (!isSingleGroupIndividualStrokeGame(game)) return game;
+
+  const gi = groupIndex || 0;
+  const applyFinalize = (target) => {
+    if (!target || typeof target !== 'object') return;
+    const playersSlots = Array.isArray(target.playersSlots) ? target.playersSlots : [];
+    const scoresBySlot = Array.isArray(target.scoresBySlot) ? target.scoresBySlot : [];
+    const prevByPlayer =
+      target.scoresByPlayer && typeof target.scoresByPlayer === 'object'
+        ? target.scoresByPlayer
+        : {};
+    const len = Math.max(playersSlots.length, scoresBySlot.length);
+    const nextByPlayer = {};
+    const view = {
+      scoresBySlot: scoresBySlot,
+      scoresByPlayer: prevByPlayer
+    };
+
+    for (let i = 0; i < len; i++) {
+      const binding = playersSlots[i];
+      const pid =
+        binding && (binding.playerId != null || binding.id != null)
+          ? String(binding.playerId || binding.id).trim()
+          : '';
+      if (!pid) {
+        // 无绑定：丢弃该位成绩
+        continue;
+      }
+      const rec = resolveGroupSlotScoreRecord(view, i, pid);
+      nextByPlayer[pid] = _cloneScoreRecord(rec) || { scores: [], putts: [] };
+    }
+
+    target.scoresByPlayer = nextByPlayer;
+    target.scoresBySlot = [];
+  };
+
+  if (!Array.isArray(game.groups) || !game.groups.length) {
+    if (gi !== 0) return game;
+    applyFinalize(game);
+  } else {
+    const grp = game.groups[gi];
+    if (!grp) return game;
+    applyFinalize(grp);
+    if (gi === 0) {
+      // 顶层与第 1 组最终成绩对齐，避免遗留无主位成绩
+      game.scoresByPlayer = Object.assign({}, grp.scoresByPlayer || {});
+      game.scoresBySlot = [];
+      if (Array.isArray(grp.playersSlots)) {
+        game.playersSlots = grp.playersSlots.slice();
+      }
+    }
+  }
+
+  list[idx] = game;
+  _writeAll(list);
+  return game;
+}
+
 /** 创建者所在组下标；不在任何组则 -1 */
 function findCreatorGroupIndex(game) {
   if (!game) return -1;
@@ -353,10 +527,14 @@ module.exports = {
   getGroup,
   listGroups,
   setGroupPlayerScores,
+  setGroupSlotScores,
+  resolveGroupSlotScoreRecord,
   setGroupPlayersSlots,
   setGroupTeamScores,
   updateGroupStatus,
   isMultiGroup,
+  isSingleGroupIndividualStrokeGame,
+  finalizeSingleGroupIndividualStrokeScores,
   findCreatorGroupIndex,
   isCreatorInGame,
   removeGame
