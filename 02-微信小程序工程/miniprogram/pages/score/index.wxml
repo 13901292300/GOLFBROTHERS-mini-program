@@ -586,7 +586,7 @@
       </view>
 
       <!-- Legacy：G5–G8 / fourball / entity 等 -->
-      <scroll-view wx:else class="scoreboard-scroll" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
+      <scroll-view wx:else class="scoreboard-scroll {{isFourballPair22 ? 'is-fourball-pair22' : ''}}" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
         <view class="scoreboard-inner">
           <!-- thead row 1: Hole labels -->
           <view class="scoreboard-row scoreboard-row--head">
@@ -629,7 +629,7 @@
             class="scoreboard-row scoreboard-row--player"
           >
             <!-- pair(2人)：四人四球原型并排双头像；single(1人)：个人比杆样式；team(>=3人)：球队样式 -->
-            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'single' ? 'bestball-single-cell' : (item.kind === 'pair' ? 'bestball-pair-cell' : 'bestball-mode-cell')}}">
+            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'single' ? 'bestball-single-cell' : (item.kind === 'pair' ? 'bestball-pair-cell bestball-pair-cell--split' : 'bestball-mode-cell')}}">
               <block wx:if="{{item.kind === 'single'}}">
                 <view class="player-card">
                   <view class="player-top-line">
@@ -643,22 +643,23 @@
                 <view class="player-tee-marker {{item.colorClass}}"></view>
               </block>
               <block wx:elif="{{item.kind === 'pair'}}">
-                <view class="player-cell-content">
+                <!-- identity | diff | T：仅视觉分区；头像坐标 / transform / 缩进变量不变 -->
+                <view class="pair-identity">
                   <view class="paired-avatars">
                     <view class="pair-avatar-group">
                       <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
                         <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
                       </view>
                     </view>
-                    <view class="player-diff-wrap">
-                      <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
-                    </view>
                   </view>
                   <view class="paired-names">
                     <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
                   </view>
                 </view>
-                <view class="tee-marker-strip-right">
+                <view class="pair-diff">
+                  <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                </view>
+                <view class="pair-tee">
                   <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="tee-half" style="background:{{pm.teeColor}};"></view>
                 </view>
               </block>

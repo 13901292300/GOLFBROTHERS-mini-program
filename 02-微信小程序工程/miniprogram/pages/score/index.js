@@ -99,6 +99,14 @@ const PAIR_SWIPE_GEOM = {
   SECOND_SHIFT_MAX: 68
 };
 
+/** 普通创建 fourball_best 2+2 split：两阶段横滑（仅 isFourballPair22） */
+const FB22_PHASE1_SCROLL_PX = 72; // 阶段1：只压缩 identity → 半遮挡
+const FB22_PHASE2_SCROLL_PX = 72; // 阶段2：预留（本轮 diff 保持 96，不消失）
+const FB22_DIFF_W = 96;
+const FB22_TEE_W = 8;
+const FB22_PAD_L = 24; // 与 split padding-right:0 对齐，只计左 pad
+const FB22_IDENTITY_END = 148; // 阶段1终点：identity 固定宽
+
 const PLAYER_SEEDS = [
   {
     id: 'p1',
@@ -1745,6 +1753,8 @@ Page({
     useStrokeScoreShell: false,
     /** 比洞 UI Shell：本阶段仅球队赛 G5；G6–G8 仍走 legacy（与 useStrokeScoreShell 独立） */
     useMatchPlayScoreShell: false,
+    /** 普通创建 fourball_best 纯 2+2：Legacy HOLE/PAR 样式开关（不影响记分/列宽） */
+    isFourballPair22: false,
     /** match-play：T sticky overlay 是否显示（独立于 isTeeStickyVisible / useStrokeScoreShell） */
     isMatchPlayTeeStickyVisible: false,
     /** match-play：HOLE/PAR normal overlay 横向 transform（独立于 holeParNormalStyle） */
@@ -2185,6 +2195,7 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
+      isFourballPair22: false,
       moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -2295,12 +2306,18 @@ Page({
     const menuPanels = this.data.gameId
       ? resolveNormalGameMoreMenu(this.data.gameId, ms)
       : resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: groupCount });
+    // 纯 2+2：每组恰好 2 人（排除 4+0 / 3+1 / 2+1+1）；仅供 HOLE/PAR WXSS 限定
+    const groupsForPair22 = this._engineGroups || [];
+    const isFourballPair22 =
+      groupsForPair22.length > 0 &&
+      groupsForPair22.every((g) => (g.members || []).length === 2);
     this.setData({
       mode: 'fourball_best',
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
+      isFourballPair22: isFourballPair22,
       moreMenuItems: menuPanels.moreMenuItems,
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
@@ -2495,6 +2512,72 @@ Page({
     const secondLeft = G.AV2_LEFT + secondShift;
     const contentLeft = Math.min(G.AV1_LEFT, secondLeft);
     return gap - contentLeft;
+  },
+
+  /**
+   * 2+2 split：在 identity 段宽度内居中头像组（不用 colWidth−2×pad）
+   */
+  _computePair22IdentityContainerShift(identityWidth, progress) {
+    if (progress <= 0) return 0;
+    const contentWidth = this._computePairSwipeContentWidth(progress);
+    const gap = (identityWidth - contentWidth) / 2;
+    const G = PAIR_SWIPE_GEOM;
+    const secondShift = -(G.SECOND_SHIFT_MAX * progress);
+    const secondLeft = G.AV2_LEFT + secondShift;
+    const contentLeft = Math.min(G.AV1_LEFT, secondLeft);
+    return gap - contentLeft;
+  },
+
+  /**
+   * 普通创建 fourball_best 2+2：两阶段横滑
+   * 阶段1：只压缩 identity（diff=96 / tee=8 固定）
+   * 阶段2：identity 锁定；本轮 diff 仍保持 96（先验证四区域稳定）
+   */
+  _applyFourballPair22Scroll(scrollLeft) {
+    const left = Math.max(0, Number(scrollLeft) || 0);
+    const startCol = this._computeBestballColStartWidth();
+    const identityStart = Math.max(
+      FB22_IDENTITY_END,
+      startCol - FB22_PAD_L - FB22_DIFF_W - FB22_TEE_W
+    );
+
+    const p1 = Math.min(1, Math.max(0, left / FB22_PHASE1_SCROLL_PX));
+    const eased1 = 1 - Math.pow(1 - p1, 3);
+    // 阶段2进度预留（本轮不驱动 diff 收窄）
+    const p2 = Math.min(
+      1,
+      Math.max(0, (left - FB22_PHASE1_SCROLL_PX) / FB22_PHASE2_SCROLL_PX)
+    );
+
+    const identityW =
+      p1 <= 0
+        ? identityStart
+        : identityStart - (identityStart - FB22_IDENTITY_END) * eased1;
+
+    // 阶段1/2：diff 均保持 96（验收：diff 不消失、不侵入 identity）
+    const diffColW = FB22_DIFF_W;
+    const diffOpacity = 1;
+
+    const colWidth = FB22_PAD_L + identityW + diffColW + FB22_TEE_W;
+    const pairSecondShift = -(PAIR_SWIPE_GEOM.SECOND_SHIFT_MAX * p1);
+    const pairContainerShift =
+      p1 > 0 ? this._computePair22IdentityContainerShift(identityW, p1) : 0;
+
+    const style = this._buildScoreboardStyleVars({
+      colWidth: colWidth,
+      paddingX: FB22_PAD_L,
+      diffOpacity: diffOpacity,
+      nameWidth: 192,
+      bestDiffGrow: 1,
+      diffColW: diffColW,
+      pairSecondShift: pairSecondShift,
+      pairContainerShift: pairContainerShift,
+      labelSize: 30
+    });
+    if (style !== this.data.scoreboardStyle) {
+      this.setData({ scoreboardStyle: style });
+    }
+    return { p1: p1, p2: p2, identityW: identityW, colWidth: colWidth };
   },
 
   _buildScoreboardStyleVars(opts) {
@@ -2827,6 +2910,7 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: isTeamG1Stroke,
       useMatchPlayScoreShell: isG5Only,
+      isFourballPair22: false,
       columns: isMatchPlayBoard ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
@@ -2969,6 +3053,7 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
+      isFourballPair22: false,
       matchSidesView: [],
       moreMenuItems: entityMoreMenu
     });
@@ -3452,6 +3537,7 @@ Page({
       useGameStrokeShell: useGameStrokeShell,
       useStrokeScoreShell: useStrokeScoreShell,
       useMatchPlayScoreShell: false,
+      isFourballPair22: false,
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -5488,6 +5574,13 @@ Page({
       return;
     }
     const scrollLeft = e.detail.scrollLeft || 0;
+
+    // 普通创建 fourball_best 纯 2+2 split：两阶段横滑（不影响 entity / G5–G8 / 非 pair）
+    if (isBest && this.data.isFourballPair22) {
+      this._applyFourballPair22Scroll(scrollLeft);
+      return;
+    }
+
     const progress = Math.min(1, Math.max(0, scrollLeft / 72));
     const eased = 1 - Math.pow(1 - progress, 3);
     const entityHasPair =

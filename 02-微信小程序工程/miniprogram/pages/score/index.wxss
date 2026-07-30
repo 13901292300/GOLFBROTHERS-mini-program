@@ -477,6 +477,138 @@ page {
   background: var(--bg-primary);
 }
 
+/*
+ * 普通创建 fourball_best 纯 2+2：HOLE/PAR 对齐 score-shell-ui-v2.4（game-single）视觉。
+ * 限定：.scoreboard-scroll.is-fourball-pair22（仅全组 size===2 时挂上；不改列宽 / pair / 成绩行）
+ * TOTAL 无 tot-head class：列序末格 :last-child（buildColumns idx===20）
+ */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row.scoreboard-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: transparent;
+  border-bottom: none;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row.scoreboard-row--par {
+  height: 72rpx;
+  min-height: 72rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: transparent;
+}
+
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head > .scoreboard-cell {
+  height: 112rpx;
+  min-height: 112rpx;
+  box-sizing: border-box;
+}
+
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell {
+  height: 72rpx;
+  min-height: 72rpx;
+  box-sizing: border-box;
+}
+
+/* HOLE 左侧 = 交叉蓝（对齐 game-single head spacer / lead--head） */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .sticky-col {
+  background: var(--score-header-intersection);
+  /* 压缩原 32+32，保证 112 行内居中；不改 --player-col-width */
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* HOLE 1–18 + OUT/IN 头 = hole 蓝 */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--head,
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--special-head {
+  background: var(--score-header-hole);
+}
+
+/* HOLE TOTAL 头 = 交叉蓝（压过 special-head） */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--special-head:last-child {
+  background: var(--score-header-intersection);
+}
+
+/* PAR 左侧 = 身份蓝 */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par .sticky-col {
+  background: var(--score-header-identity);
+}
+
+/* PAR 1–18 洞格 */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell:not(.sticky-col):not(.scoreboard-cell--special-par) {
+  background: var(--bg-primary);
+}
+
+/* PAR OUT/IN = hole 蓝（对齐 hole-special-col） */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell--special-par {
+  background: var(--score-header-hole);
+}
+
+/* PAR TOTAL = 身份蓝（对齐 tot-col） */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell--special-par:last-child {
+  background: var(--score-header-identity);
+}
+
+/* HOLE / PAR 文案：对齐 hole-par-normal-container 字阶与光学上移 */
+.scoreboard-scroll.is-fourball-pair22 .col-head-label,
+.scoreboard-scroll.is-fourball-pair22 .col-par-label {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 20rpx;
+  font-weight: 900;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.scoreboard-scroll.is-fourball-pair22 .col-head-label {
+  transform: translateY(-3rpx);
+}
+
+.scoreboard-scroll.is-fourball-pair22 .col-par-label {
+  transform: translateY(-2rpx);
+}
+
+/* 洞号圆：与基准共用全局数值，提高优先级避免被其它 Legacy 规则干扰 */
+.scoreboard-scroll.is-fourball-pair22 .hole-number,
+.scoreboard-scroll.is-fourball-pair22 .hole-label-circle {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 900;
+}
+
+.scoreboard-scroll.is-fourball-pair22 .hole-number {
+  background: #002d62 !important;
+  color: #ffffff !important;
+  border: 1px solid #002d62;
+}
+
+/* OUT/IN/TOTAL 圆标：对齐基准 special（bright / dark token） */
+.scoreboard-scroll.is-fourball-pair22 .hole-label-circle--special {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.score-page.dark-mode .scoreboard-scroll.is-fourball-pair22 .hole-label-circle--special {
+  background: var(--score-header-identity);
+  border: 1px solid var(--score-header-intersection);
+  color: var(--text-secondary);
+}
+
+/* PAR 数字：与基准 par-val 一致 */
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par .par-val {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 /* ===== Shell：G1 basic / 普通创建单组 game-single（左 player-column + 右 score-track）===== */
 .scoreboard-shell,
 .scoreboard-shell--basic,
@@ -3916,12 +4048,107 @@ page {
   padding-bottom: 0;
 }
 
+/* Legacy pair（entity 等）：content + absolute diff/tee */
 .bestball-pair-cell .player-cell-content {
   width: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 12rpx;
+}
+
+/*
+ * fourball_best pair 视觉分区：identity | diff | T（第三段，非 absolute）
+ * 不改 sticky / --player-col-width / --pair-*-shift / --bb-diff-col-w 滚动逻辑
+ * 不碰 .tee-marker-strip-right（entity 旧路径）
+ */
+.bestball-pair-cell.bestball-pair-cell--split {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  /* T 贴浅色 sticky 右缘；左 padding 保留给头像坐标系 */
+  padding-right: 0;
+  /* 取消 width/padding transition，避免横滑时 sticky 与成绩区脱节 */
+  transition: none;
+}
+
+/* 2+2：整列 sticky 同步取消宽过渡（HOLE/PAR 左列共用 --player-col-width） */
+.scoreboard-scroll.is-fourball-pair22 .sticky-col {
+  transition: none;
+}
+
+.scoreboard-scroll.is-fourball-pair22 .player-cell {
+  transition: none;
+}
+
+.bestball-pair-cell--split .pair-identity {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12rpx;
+  /* 防止第二头像/transform 画进 diff/T */
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bestball-pair-cell--split .pair-diff {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--bb-diff-col-w, 96rpx);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: var(--player-diff-opacity, 1);
+  overflow: hidden;
+  transition: none;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+.bestball-pair-cell--split .pair-diff .player-diff-score {
+  font-size: 40rpx;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+/* 独立 T 段：显式取消任何 absolute/right 残留，固定在 flex 第三段 */
+.bestball-pair-cell--split .pair-tee {
+  position: static;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 0 0 8rpx;
+  width: 8rpx;
+  min-width: 8rpx;
+  max-width: 8rpx;
+  height: auto;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+.bestball-pair-cell--split .pair-tee .tee-half {
+  position: static;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .paired-avatars {
@@ -3965,6 +4192,7 @@ page {
   height: 72rpx;
 }
 
+/* entity 等仍把 diff 叠在头像区右侧 */
 .paired-avatars .player-diff-wrap {
   position: absolute;
   right: 0;
