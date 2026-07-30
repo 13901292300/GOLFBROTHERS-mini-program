@@ -586,7 +586,7 @@
       </view>
 
       <!-- Legacy：G5–G8 / fourball / entity 等 -->
-      <scroll-view wx:else class="scoreboard-scroll {{isFourballPair22 ? 'is-fourball-pair22' : ''}}" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
+      <scroll-view wx:else class="scoreboard-scroll {{isFourballPairLayout ? 'is-fourball-pair22' : ''}}" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
         <view class="scoreboard-inner">
           <!-- thead row 1: Hole labels -->
           <view class="scoreboard-row scoreboard-row--head">
@@ -628,9 +628,30 @@
             wx:for-index="gIdx"
             class="scoreboard-row scoreboard-row--player"
           >
-            <!-- pair(2人)：四人四球原型并排双头像；single(1人)：个人比杆样式；team(>=3人)：球队样式 -->
-            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'single' ? 'bestball-single-cell' : (item.kind === 'pair' ? 'bestball-pair-cell bestball-pair-cell--split' : 'bestball-mode-cell')}}">
-              <block wx:if="{{item.kind === 'single'}}">
+            <!-- pair / layout-single：pair22 split；其它 single：旧居中；team：球队样式 -->
+            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'pair' || (item.kind === 'single' && isFourballPairLayout) ? 'bestball-pair-cell bestball-pair-cell--split' : (item.kind === 'single' ? 'bestball-single-cell' : 'bestball-mode-cell')}}">
+              <block wx:if="{{item.kind === 'single' && isFourballPairLayout}}">
+                <!-- 2+1 单人：头像必须在 pair-avatar-group 内，与双头像共用 container-shift / second-shift -->
+                <view class="pair-identity pair-identity--single">
+                  <view class="paired-avatars">
+                    <view class="pair-avatar-group">
+                      <view class="avatar-with-diff avatar-with-diff--single">
+                        <image class="player-avatar-img" src="{{item.avatar}}" mode="aspectFill"></image>
+                      </view>
+                    </view>
+                  </view>
+                  <view class="paired-names">
+                    <text class="player-name-line player-name-line--single">{{isFourballPair22NamesCompact ? (item.displayName || item.name) : item.name}}</text>
+                  </view>
+                </view>
+                <view class="pair-diff">
+                  <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr || '-'}}</text>
+                </view>
+                <view class="pair-tee">
+                  <view class="tee-half" style="background:{{item.teeColor}};"></view>
+                </view>
+              </block>
+              <block wx:elif="{{item.kind === 'single'}}">
                 <view class="player-card">
                   <view class="player-top-line">
                     <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
@@ -657,7 +678,7 @@
                   </view>
                 </view>
                 <view class="pair-diff">
-                  <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
+                  <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr || '-'}}</text>
                 </view>
                 <view class="pair-tee">
                   <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="tee-half" style="background:{{pm.teeColor}};"></view>

@@ -4264,6 +4264,27 @@ page {
   height: 80rpx;
 }
 
+/*
+ * 2+1 single：挂在 pair-avatar-group 内（已有 container-shift−8）。
+ * 组合中心随第二头像 --pair-second-shift 左移：center = 116 + shift/2 → left = 76 + shift/2
+ * （与双头像同一套 CSS 变量，无第二套 scroll 几何）
+ */
+.scoreboard-scroll.is-fourball-pair22 .pair-identity--single .avatar-with-diff--single {
+  left: calc(76rpx + var(--pair-second-shift, 0rpx) * 0.5);
+  z-index: 10;
+}
+
+/* 昵称与头像同坐标系：paired-names 补上与 group 相同的 −8，left 跟 second-shift */
+.scoreboard-scroll.is-fourball-pair22 .pair-identity--single .paired-names {
+  transform: translateX(calc(var(--pair-container-shift, 0rpx) - 8rpx));
+}
+
+.scoreboard-scroll.is-fourball-pair22 .pair-identity--single .player-name-line--single {
+  left: calc(76rpx + var(--pair-second-shift, 0rpx) * 0.5);
+  width: 80rpx;
+  max-width: 80rpx;
+}
+
 /* entity 等仍把 diff 叠在头像区右侧 */
 .paired-avatars .player-diff-wrap {
   position: absolute;

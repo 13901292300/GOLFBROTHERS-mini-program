@@ -114,6 +114,31 @@ const FB22_PAIR_GEOM = {
   SECOND_SHIFT_MAX: 64
 };
 
+/**
+ * fourball_best 视觉门控（不改成绩模型）
+ * - isFourballPair22：纯 2+2（业务字段，含义不变）
+ * - isFourballPairLayout：2+2 或 2+1（有 pair 且无 ≥3 人组）→ 复用 pair22 布局/横滑
+ */
+function resolveFourballPairFlags(groups) {
+  const list = Array.isArray(groups) ? groups : [];
+  if (!list.length) {
+    return { isFourballPair22: false, isFourballPairLayout: false };
+  }
+  let hasPair = false;
+  let allAtMostTwo = true;
+  let allExactlyTwo = true;
+  for (let i = 0; i < list.length; i++) {
+    const n = ((list[i] && list[i].members) || []).length;
+    if (n === 2) hasPair = true;
+    if (n !== 2) allExactlyTwo = false;
+    if (n > 2) allAtMostTwo = false;
+  }
+  return {
+    isFourballPair22: allExactlyTwo,
+    isFourballPairLayout: allAtMostTwo && hasPair
+  };
+}
+
 const PLAYER_SEEDS = [
   {
     id: 'p1',
@@ -763,7 +788,7 @@ function buildTeamBestColumns(scores, putts, displayMode) {
       mainStr: formatMainScore(s, par, displayMode),
       putts: p,
       diff,
-      diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
+      diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff, true),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
       scoreClass: bestScoreClass(diff)
     };
@@ -1760,9 +1785,11 @@ Page({
     useStrokeScoreShell: false,
     /** 比洞 UI Shell：本阶段仅球队赛 G5；G6–G8 仍走 legacy（与 useStrokeScoreShell 独立） */
     useMatchPlayScoreShell: false,
-    /** 普通创建 fourball_best 纯 2+2：Legacy HOLE/PAR 样式开关（不影响记分/列宽） */
+    /** 普通创建 fourball_best 纯 2+2：业务判定（每组恰好 2 人） */
     isFourballPair22: false,
-    /** fourball 2+2：identity 压缩完成后切换短昵称（不影响横滑宽度） */
+    /** fourball pair 视觉布局：2+2 或 2+1（有 pair 且无 ≥3）；驱动 CSS class / 横滑 */
+    isFourballPairLayout: false,
+    /** fourball pair 布局：identity 压缩完成后切换短昵称（不影响横滑宽度） */
     isFourballPair22NamesCompact: false,
     /** match-play：T sticky overlay 是否显示（独立于 isTeeStickyVisible / useStrokeScoreShell） */
     isMatchPlayTeeStickyVisible: false,
@@ -2205,6 +2232,7 @@ Page({
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
       isFourballPair22: false,
+      isFourballPairLayout: false,
       moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -2315,18 +2343,16 @@ Page({
     const menuPanels = this.data.gameId
       ? resolveNormalGameMoreMenu(this.data.gameId, ms)
       : resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: groupCount });
-    // 纯 2+2：每组恰好 2 人（排除 4+0 / 3+1 / 2+1+1）；仅供 HOLE/PAR WXSS 限定
-    const groupsForPair22 = this._engineGroups || [];
-    const isFourballPair22 =
-      groupsForPair22.length > 0 &&
-      groupsForPair22.every((g) => (g.members || []).length === 2);
+    // pair22 业务 / pair 布局（2+2∪2+1）视觉门控；不改成绩模型
+    const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
     this.setData({
       mode: 'fourball_best',
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
-      isFourballPair22: isFourballPair22,
+      isFourballPair22: pairFlags.isFourballPair22,
+      isFourballPairLayout: pairFlags.isFourballPairLayout,
       moreMenuItems: menuPanels.moreMenuItems,
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
@@ -2666,9 +2692,14 @@ Page({
       const m0 = members[0] || {};
       let pairMembers = [];
       let colorClass = 'border-white';
+      let teeColor = '';
+      let displayName = '';
       if (kind === 'single') {
         const style = resolveScoreTeeStyle(m0, gpos);
         colorClass = style.colorClass;
+        teeColor = style.teeColor || '';
+        const short = this._shortName(m0.name) || m0.name || '球员';
+        displayName = short.length > 2 ? short.charAt(0) + '…' : short;
         gpos += 1;
       } else if (kind === 'pair') {
         const PAIR_LEFT = ['24rpx', '128rpx'];
@@ -2677,11 +2708,10 @@ Page({
           gpos += 1;
           const name = this._shortName(m.name) || m.name || '球员';
           // 仅 fourball pair 展示用；原 name 保留完整短名
-          const displayName =
-            name.length > 2 ? name.charAt(0) + '…' : name;
+          const dn = name.length > 2 ? name.charAt(0) + '…' : name;
           return {
             name: name,
-            displayName: displayName,
+            displayName: dn,
             avatar: m.avatar || '',
             teeColor: style.teeColor,
             left: PAIR_LEFT[mi] || (24 + mi * 104) + 'rpx',
@@ -2691,6 +2721,7 @@ Page({
       } else {
         gpos += size;
       }
+      const shortName = this._shortName(m0.name) || m0.name || g.name;
       return {
         id: g.id,
         groupIndex: gi,
@@ -2698,9 +2729,11 @@ Page({
         isSingle: kind === 'single',
         // 球队/单人标题：严格按赛制（最佳球位/最好成绩），禁止使用队伍名/索引
         label: bestLabel,
-        name: this._shortName(m0.name) || m0.name || g.name,
+        name: shortName,
+        displayName: kind === 'single' ? displayName : '',
         avatar: m0.avatar || '',
         colorClass: kind === 'single' ? colorClass : '',
+        teeColor: kind === 'single' ? teeColor : '',
         pairMembers: pairMembers,
         columns: t.columns,
         teamDiffStr: t.teamDiffStr,
@@ -2936,6 +2969,7 @@ Page({
       useStrokeScoreShell: isTeamG1Stroke,
       useMatchPlayScoreShell: isG5Only,
       isFourballPair22: false,
+      isFourballPairLayout: false,
       columns: isMatchPlayBoard ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
@@ -3079,6 +3113,7 @@ Page({
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
       isFourballPair22: false,
+      isFourballPairLayout: false,
       matchSidesView: [],
       moreMenuItems: entityMoreMenu
     });
@@ -3563,6 +3598,7 @@ Page({
       useStrokeScoreShell: useStrokeScoreShell,
       useMatchPlayScoreShell: false,
       isFourballPair22: false,
+      isFourballPairLayout: false,
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -4218,6 +4254,9 @@ Page({
       patch.isG5MatchPlay = false;
       patch.matchSidesView = [];
       patch.bestTeams = this._buildBestTeams(displayMode);
+      const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
+      patch.isFourballPair22 = pairFlags.isFourballPair22;
+      patch.isFourballPairLayout = pairFlags.isFourballPairLayout;
       if (this.data.bestHasMatch) {
         const team = this._teamBestColumns(displayMode);
         patch.bestColumns = team.columns;
@@ -5600,8 +5639,8 @@ Page({
     }
     const scrollLeft = e.detail.scrollLeft || 0;
 
-    // 普通创建 fourball_best 纯 2+2 split：两阶段横滑（不影响 entity / G5–G8 / 非 pair）
-    if (isBest && this.data.isFourballPair22) {
+    // fourball pair 布局（2+2 / 2+1）：两阶段横滑（不影响 entity / G5–G8 / 3+1）
+    if (isBest && this.data.isFourballPairLayout) {
       this._applyFourballPair22Scroll(scrollLeft);
       return;
     }
