@@ -1180,7 +1180,8 @@ page {
   height: 100rpx;
   min-height: 100rpx;
   justify-content: center;
-  background: #08111d;
+  /* 对齐 FINAL 胜洞格 .match-status-cell--tot（DARK） */
+  background: rgba(0, 45, 98, 0.22);
 }
 
 /* 胜洞走势标题 overlay：初始覆盖头像+diff+T（230rpx），与 HOLE/PAR 共用横移 style */
@@ -1200,12 +1201,8 @@ page {
   pointer-events: none;
   box-sizing: border-box;
   will-change: transform;
-  background: linear-gradient(
-    90deg,
-    rgba(206, 146, 36, 0.08),
-    rgba(0, 45, 98, 0.14),
-    rgba(206, 146, 36, 0.06)
-  );
+  /* 透出下层 FINAL 固定区底色，避免横移时涂到洞列 */
+  background: transparent;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1219,13 +1216,13 @@ page {
   padding: 0 8rpx;
 }
 
-/* 吸边 compact：贴头像列 128rpx，阈值后显示 */
+/* 吸边 compact：宽=头像列 128 + T线 6，阈值后显示 */
 .scoreboard-shell--match-play .match-play-status-title-compact {
   position: absolute;
   left: 0;
   top: 340rpx;
   z-index: 4;
-  width: 128rpx;
+  width: 134rpx;
   height: 100rpx;
   display: flex;
   align-items: center;
@@ -1236,12 +1233,7 @@ page {
   box-sizing: border-box;
   opacity: 0;
   visibility: hidden;
-  background: linear-gradient(
-    90deg,
-    rgba(206, 146, 36, 0.08),
-    rgba(0, 45, 98, 0.14),
-    rgba(206, 146, 36, 0.06)
-  );
+  background: rgba(0, 45, 98, 0.22);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1354,7 +1346,8 @@ page {
 .scoreboard-shell--match-play .track-lead-tee--status {
   height: 100rpx;
   min-height: 100rpx;
-  background: #08111d !important;
+  /* 对齐 FINAL 胜洞格 .match-status-cell--tot（DARK） */
+  background: rgba(0, 45, 98, 0.22) !important;
 }
 
 .scoreboard-shell--match-play .scoreboard-row.scoreboard-row--head,
@@ -1480,7 +1473,8 @@ page {
   margin: 0;
   padding: 0;
   border-bottom: 1px solid var(--border-color);
-  background: #08111d !important;
+  /* 对齐 FINAL 胜洞格 .match-status-cell--tot（DARK） */
+  background: rgba(0, 45, 98, 0.22) !important;
   box-sizing: border-box;
 }
 
@@ -1489,16 +1483,13 @@ page {
   opacity: 0;
 }
 
+/* 胜洞趋势固定区 + compact + sticky T 状态段：对齐 FINAL bright */
 .score-page.bright-mode .scoreboard-shell--match-play .match-play-status-row,
 .score-page.bright-mode .scoreboard-shell--match-play .track-lead-diff--status,
 .score-page.bright-mode .scoreboard-shell--match-play .track-lead-tee--status,
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-compact,
 .score-page.bright-mode .scoreboard-shell--match-play .match-play-tee-sticky-overlay__status {
-  background: #f8fafc !important;
-}
-
-.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-normal,
-.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-compact {
-  background: #ffffff;
+  background: rgba(0, 45, 98, 0.04) !important;
 }
 
 .score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-normal .match-label-main,
