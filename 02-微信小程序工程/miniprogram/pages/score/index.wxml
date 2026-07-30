@@ -216,9 +216,9 @@
         </scroll-view>
       </view>
 
-      <!-- ===== 普通创建 + 单组 + 个人比杆：player-column + score-track（diff/T 在 track 内）===== -->
+      <!-- ===== 普通创建 + 个人比杆（单组/多组）：player-column + score-track；成绩读写仍由 isSingleGroupGame 分流 ===== -->
       <view
-        wx:elif="{{mode === 'game' && isSingleGroupGame && formatType === 'individual_stroke'}}"
+        wx:elif="{{mode === 'game' && useGameStrokeShell}}"
         class="scoreboard-shell scoreboard-shell--game-single {{isTeeStickyVisible ? 'is-tee-sticky' : ''}}"
         style="{{scoreboardStyle}}"
       >
