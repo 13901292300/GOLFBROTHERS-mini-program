@@ -797,6 +797,10 @@ page {
 .scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player {
   background: transparent;
 }
+/* 记分行横向分隔：score-cell 铺底会盖住 row 的 border-bottom，改由 cell 自身绘制 */
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player .score-cell {
+  border-bottom: 1px solid var(--border-color);
+}
 /* 身份区统一底：diff + T + sticky overlay = player-column */
 .scoreboard-shell--game-single .track-lead-diff,
 .scoreboard-shell--game-single .track-lead-diff--head,
@@ -896,7 +900,7 @@ page {
   min-height: 156rpx;
   margin: 0;
   padding: 0;
-  border: none;
+  border-bottom: 1px solid var(--border-color);
   background: var(--bg-secondary) !important;
   box-sizing: border-box;
 }
