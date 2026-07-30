@@ -586,7 +586,7 @@
       </view>
 
       <!-- Legacy：G5–G8 / fourball / entity 等 -->
-      <scroll-view wx:else class="scoreboard-scroll {{isFourballPairLayout ? 'is-fourball-pair22' : ''}}" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
+      <scroll-view wx:else class="scoreboard-scroll {{isFourballPairLayout ? 'is-fourball-pair22' : ''}} {{isFourballTeamLayout ? 'is-fourball-team-layout' : ''}}" scroll-x scroll-y bindscroll="onScoreboardScroll" style="{{scoreboardStyle}}">
         <view class="scoreboard-inner">
           <!-- thead row 1: Hole labels -->
           <view class="scoreboard-row scoreboard-row--head">
@@ -628,8 +628,8 @@
             wx:for-index="gIdx"
             class="scoreboard-row scoreboard-row--player"
           >
-            <!-- pair / layout-single：pair22 split；其它 single：旧居中；team：球队样式 -->
-            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'pair' || (item.kind === 'single' && isFourballPairLayout) ? 'bestball-pair-cell bestball-pair-cell--split' : (item.kind === 'single' ? 'bestball-single-cell' : 'bestball-mode-cell')}}">
+            <!-- pair / layout-single / 4+0 team：split；其它 single：旧居中；其它 team：旧球队样式 -->
+            <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'pair' || (item.kind === 'single' && isFourballPairLayout) || (item.kind === 'team' && isFourballTeamLayout) ? 'bestball-pair-cell bestball-pair-cell--split' : (item.kind === 'single' ? 'bestball-single-cell' : 'bestball-mode-cell')}}">
               <block wx:if="{{item.kind === 'single' && isFourballPairLayout}}">
                 <!-- 2+1 单人：头像必须在 pair-avatar-group 内，与双头像共用 container-shift / second-shift -->
                 <view class="pair-identity pair-identity--single">
@@ -682,6 +682,27 @@
                 </view>
                 <view class="pair-tee">
                   <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="tee-half" style="background:{{pm.teeColor}};"></view>
+                </view>
+              </block>
+              <block wx:elif="{{item.kind === 'team' && isFourballTeamLayout}}">
+                <!-- 4+0：identity 业务文案 | diff | teamMembers 仅供四色 T；头像仍在 roster-strip -->
+                <view class="pair-identity pair-identity--team">
+                  <view class="bestball-mode-wrap">
+                    <text class="bestball-mode-kicker">TEAM SCORE</text>
+                    <text class="bestball-mode-main">{{item.label}}</text>
+                  </view>
+                </view>
+                <view class="pair-diff">
+                  <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr || '-'}}</text>
+                </view>
+                <view class="pair-tee pair-tee--quad">
+                  <view
+                    wx:for="{{item.teamMembers}}"
+                    wx:for-item="tm"
+                    wx:key="name"
+                    class="tee-half"
+                    style="background:{{tm.teeColor}};"
+                  ></view>
                 </view>
               </block>
               <block wx:else>

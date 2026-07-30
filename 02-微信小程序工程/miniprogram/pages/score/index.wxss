@@ -478,11 +478,12 @@ page {
 }
 
 /*
- * 普通创建 fourball_best 纯 2+2：HOLE/PAR 对齐 score-shell-ui-v2.4（game-single）视觉。
- * 限定：.scoreboard-scroll.is-fourball-pair22（仅全组 size===2 时挂上；不改列宽 / pair / 成绩行）
+ * 普通创建 fourball_best 2+2 / 4+0：HOLE/PAR/TOT 对齐 score-shell-ui-v2.4（game-single）视觉。
+ * 门控：.is-fourball-pair22（2+2/2+1）| .is-fourball-team-layout（4+0）；selector 合并，不复制两套。
  * TOTAL 无 tot-head class：列序末格 :last-child（buildColumns idx===20）
  */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row.scoreboard-row--head {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row.scoreboard-row--head,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row.scoreboard-row--head {
   height: 112rpx;
   min-height: 112rpx;
   box-sizing: border-box;
@@ -493,7 +494,8 @@ page {
   box-shadow: 0 1px 0 var(--border-color);
 }
 
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row.scoreboard-row--par {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row.scoreboard-row--par,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row.scoreboard-row--par {
   height: 72rpx;
   min-height: 72rpx;
   box-sizing: border-box;
@@ -501,25 +503,29 @@ page {
   background: transparent;
 }
 
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head > .scoreboard-cell {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head > .scoreboard-cell,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--head > .scoreboard-cell {
   height: 112rpx;
   min-height: 112rpx;
   box-sizing: border-box;
 }
 
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par > .scoreboard-cell {
   height: 72rpx;
   min-height: 72rpx;
   box-sizing: border-box;
 }
 
 /* PAR 成绩区 cell：普通表格底边（cell 自画，避免铺底盖住 row border） */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell:not(.sticky-col) {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell:not(.sticky-col),
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par > .scoreboard-cell:not(.sticky-col) {
   border-bottom: 1px solid var(--border-color);
 }
 
 /* HOLE 左侧 = 交叉蓝（对齐 game-single head spacer / lead--head） */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .sticky-col {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .sticky-col,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--head .sticky-col {
   background: var(--score-header-intersection);
   /* 压缩原 32+32，保证 112 行内居中；不改 --player-col-width */
   padding-top: 0;
@@ -528,47 +534,57 @@ page {
 
 /* HOLE 1–18 + OUT/IN 头 = hole 蓝 */
 .scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--head,
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--special-head {
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--head .scoreboard-cell--head,
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--special-head,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--head .scoreboard-cell--special-head {
   background: var(--score-header-hole);
 }
 
 /* HOLE TOTAL 头 = 交叉蓝（压过 special-head） */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--special-head:last-child {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--head .scoreboard-cell--special-head:last-child,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--head .scoreboard-cell--special-head:last-child {
   background: var(--score-header-intersection);
 }
 
 /* PAR 左侧 = 身份蓝；底边交叉蓝（对齐 game-single 身份区） */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .sticky-col {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .sticky-col,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par > .sticky-col {
   background: var(--score-header-identity);
   border-bottom: 1px solid var(--score-header-intersection);
   box-sizing: border-box;
 }
 
 /* PAR 1–18 洞格 */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell:not(.sticky-col):not(.scoreboard-cell--special-par) {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell:not(.sticky-col):not(.scoreboard-cell--special-par),
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par > .scoreboard-cell:not(.sticky-col):not(.scoreboard-cell--special-par) {
   background: var(--bg-primary);
 }
 
 /* PAR OUT/IN = hole 蓝（对齐 hole-special-col） */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell--special-par {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell--special-par,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par > .scoreboard-cell--special-par {
   background: var(--score-header-hole);
 }
 
 /* PAR TOTAL = 身份蓝（对齐 tot-col）；底边交叉蓝（PAR 无 score-cell--total class） */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell--special-par:last-child {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par > .scoreboard-cell--special-par:last-child,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par > .scoreboard-cell--special-par:last-child {
   background: var(--score-header-identity);
   border-bottom: 1px solid var(--score-header-intersection);
   box-sizing: border-box;
 }
 
 /* 兼容命名：若日后 PAR 挂上 score-cell--total，同交叉蓝底边 */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par .score-cell--total {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par .score-cell--total,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par .score-cell--total {
   border-bottom: 1px solid var(--score-header-intersection);
 }
 
 /* HOLE / PAR 文案：对齐 hole-par-normal-container 字阶与光学上移 */
 .scoreboard-scroll.is-fourball-pair22 .col-head-label,
-.scoreboard-scroll.is-fourball-pair22 .col-par-label {
+.scoreboard-scroll.is-fourball-team-layout .col-head-label,
+.scoreboard-scroll.is-fourball-pair22 .col-par-label,
+.scoreboard-scroll.is-fourball-team-layout .col-par-label {
   display: block;
   width: 100%;
   text-align: center;
@@ -580,17 +596,21 @@ page {
   text-transform: uppercase;
 }
 
-.scoreboard-scroll.is-fourball-pair22 .col-head-label {
+.scoreboard-scroll.is-fourball-pair22 .col-head-label,
+.scoreboard-scroll.is-fourball-team-layout .col-head-label {
   transform: translateY(-3rpx);
 }
 
-.scoreboard-scroll.is-fourball-pair22 .col-par-label {
+.scoreboard-scroll.is-fourball-pair22 .col-par-label,
+.scoreboard-scroll.is-fourball-team-layout .col-par-label {
   transform: translateY(-2rpx);
 }
 
 /* 洞号圆：与基准共用全局数值，提高优先级避免被其它 Legacy 规则干扰 */
 .scoreboard-scroll.is-fourball-pair22 .hole-number,
-.scoreboard-scroll.is-fourball-pair22 .hole-label-circle {
+.scoreboard-scroll.is-fourball-team-layout .hole-number,
+.scoreboard-scroll.is-fourball-pair22 .hole-label-circle,
+.scoreboard-scroll.is-fourball-team-layout .hole-label-circle {
   width: 64rpx;
   height: 64rpx;
   border-radius: 999rpx;
@@ -598,39 +618,46 @@ page {
   font-weight: 900;
 }
 
-.scoreboard-scroll.is-fourball-pair22 .hole-number {
+.scoreboard-scroll.is-fourball-pair22 .hole-number,
+.scoreboard-scroll.is-fourball-team-layout .hole-number {
   background: #002d62 !important;
   color: #ffffff !important;
   border: 1px solid #002d62;
 }
 
 /* OUT/IN/TOTAL 圆标：对齐基准 special（bright / dark token） */
-.scoreboard-scroll.is-fourball-pair22 .hole-label-circle--special {
+.scoreboard-scroll.is-fourball-pair22 .hole-label-circle--special,
+.scoreboard-scroll.is-fourball-team-layout .hole-label-circle--special {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
 }
 
-.score-page.dark-mode .scoreboard-scroll.is-fourball-pair22 .hole-label-circle--special {
+.score-page.dark-mode .scoreboard-scroll.is-fourball-pair22 .hole-label-circle--special,
+.score-page.dark-mode .scoreboard-scroll.is-fourball-team-layout .hole-label-circle--special {
   background: var(--score-header-identity);
   border: 1px solid var(--score-header-intersection);
   color: var(--text-secondary);
 }
 
 /* PAR 数字：与基准 par-val 一致 */
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par .par-val {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--par .par-val,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--par .par-val {
   font-size: 24rpx;
   font-weight: 700;
   color: var(--text-secondary);
 }
 
-/* 2+2 成绩格 special：OUT/IN=hole蓝，TOTAL=身份蓝（对齐 game-single；不改 columns） */
+/* 成绩格 special：OUT/IN=hole蓝，TOTAL=身份蓝（对齐 game-single；不改 columns） */
 .scoreboard-scroll.is-fourball-pair22 .scoreboard-row--player > .score-cell:nth-child(11),
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--player > .score-cell:nth-child(21) {
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--player > .score-cell:nth-child(11),
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--player > .score-cell:nth-child(21),
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--player > .score-cell:nth-child(21) {
   background: var(--score-header-hole);
 }
 
-.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--player > .score-cell.score-cell--total {
+.scoreboard-scroll.is-fourball-pair22 .scoreboard-row--player > .score-cell.score-cell--total,
+.scoreboard-scroll.is-fourball-team-layout .scoreboard-row--player > .score-cell.score-cell--total {
   background: var(--score-header-identity);
   border-bottom: 1px solid var(--score-header-intersection);
   box-sizing: border-box;
@@ -4101,8 +4128,9 @@ page {
   transition: none;
 }
 
-/* 2+2：整段 sticky 身份区统一身份蓝（identity/diff 同色，diff 不再单独铺底） */
-.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split {
+/* 2+2 / 4+0：整段 sticky 身份区统一身份蓝（identity/diff 同色，diff 不再单独铺底） */
+.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split,
+.scoreboard-scroll.is-fourball-team-layout .bestball-pair-cell--split {
   background: var(--score-header-identity);
   /* 交叉蓝：右缘增强 + 身份区底边（头像/diff/T）；成绩格仍用 border-color */
   box-shadow:
@@ -4110,12 +4138,14 @@ page {
     inset 0 -1px 0 var(--score-header-intersection);
 }
 
-/* 2+2：整列 sticky 同步取消宽过渡（HOLE/PAR 左列共用 --player-col-width） */
-.scoreboard-scroll.is-fourball-pair22 .sticky-col {
+/* 2+2 / 4+0：整列 sticky 同步取消宽过渡（HOLE/PAR 左列共用 --player-col-width） */
+.scoreboard-scroll.is-fourball-pair22 .sticky-col,
+.scoreboard-scroll.is-fourball-team-layout .sticky-col {
   transition: none;
 }
 
-.scoreboard-scroll.is-fourball-pair22 .player-cell {
+.scoreboard-scroll.is-fourball-pair22 .player-cell,
+.scoreboard-scroll.is-fourball-team-layout .player-cell {
   transition: none;
 }
 
@@ -4153,15 +4183,17 @@ page {
   line-height: 1.2;
 }
 
-/* fourball 2+2：pair-diff 宽跟 --bb-diff-col-w（阶段2 96→0）；背景继承 --split */
-.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split .pair-diff {
+/* fourball 2+2 / 4+0：pair-diff 宽跟 --bb-diff-col-w（阶段2 96→0）；背景继承 --split */
+.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split .pair-diff,
+.scoreboard-scroll.is-fourball-team-layout .bestball-pair-cell--split .pair-diff {
   width: var(--bb-diff-col-w, 96rpx);
   min-width: 0;
   max-width: var(--bb-diff-col-w, 96rpx);
   flex: 0 0 var(--bb-diff-col-w, 96rpx);
 }
 
-.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split .pair-diff .player-diff-score {
+.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split .pair-diff .player-diff-score,
+.scoreboard-scroll.is-fourball-team-layout .bestball-pair-cell--split .pair-diff .player-diff-score {
   white-space: nowrap;
 }
 
@@ -4186,8 +4218,9 @@ page {
   box-sizing: border-box;
 }
 
-/* 2+2：T 宽对齐 game-single track-lead-tee（6rpx）；保留双色满高 tee-half */
-.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split .pair-tee {
+/* 2+2 / 4+0：T 宽对齐 game-single track-lead-tee（6rpx）；保留满高 tee-half */
+.scoreboard-scroll.is-fourball-pair22 .bestball-pair-cell--split .pair-tee,
+.scoreboard-scroll.is-fourball-team-layout .bestball-pair-cell--split .pair-tee {
   flex: 0 0 6rpx;
   width: 6rpx;
   min-width: 6rpx;
@@ -4205,6 +4238,34 @@ page {
   min-height: 0;
   margin: 0;
   padding: 0;
+}
+
+/* 4+0：四人 T 各占 25% 高度（flex 均分） */
+.bestball-pair-cell--split .pair-tee.pair-tee--quad .tee-half {
+  flex: 1 1 25%;
+  max-height: 25%;
+}
+
+/* 4+0：identity 仅 TEAM SCORE + label（teamMembers 只进 tee） */
+.bestball-pair-cell--split .pair-identity--team {
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.bestball-pair-cell--split .pair-identity--team .bestball-mode-wrap {
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  min-width: 0;
+  padding: 0 4rpx;
+  box-sizing: border-box;
+  transform: translateX(-3rpx);
+}
+
+.bestball-pair-cell--split .pair-identity--team .bestball-mode-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .paired-avatars {

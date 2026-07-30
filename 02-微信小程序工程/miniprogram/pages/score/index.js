@@ -139,6 +139,15 @@ function resolveFourballPairFlags(groups) {
   };
 }
 
+/** fourball_best 4+0：存在成员数恰好为 4 的组（独立于 isFourballPair22 / pairLayout） */
+function resolveFourballTeamLayoutFlag(groups) {
+  const list = Array.isArray(groups) ? groups : [];
+  for (let i = 0; i < list.length; i++) {
+    if (((list[i] && list[i].members) || []).length === 4) return true;
+  }
+  return false;
+}
+
 const PLAYER_SEEDS = [
   {
     id: 'p1',
@@ -1789,6 +1798,8 @@ Page({
     isFourballPair22: false,
     /** fourball pair 视觉布局：2+2 或 2+1（有 pair 且无 ≥3）；驱动 CSS class / 横滑 */
     isFourballPairLayout: false,
+    /** fourball 4+0：存在 4 人 team 组；独立 flag，不复用 isFourballPair22 */
+    isFourballTeamLayout: false,
     /** fourball pair 布局：identity 压缩完成后切换短昵称（不影响横滑宽度） */
     isFourballPair22NamesCompact: false,
     /** match-play：T sticky overlay 是否显示（独立于 isTeeStickyVisible / useStrokeScoreShell） */
@@ -2233,6 +2244,7 @@ Page({
       useMatchPlayScoreShell: false,
       isFourballPair22: false,
       isFourballPairLayout: false,
+      isFourballTeamLayout: false,
       moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -2343,8 +2355,9 @@ Page({
     const menuPanels = this.data.gameId
       ? resolveNormalGameMoreMenu(this.data.gameId, ms)
       : resolveMoreMenuPanels('fourball_best', { hasRealMatch: hasMatch, groupCount: groupCount });
-    // pair22 业务 / pair 布局（2+2∪2+1）视觉门控；不改成绩模型
+    // pair22 / pair 布局 / 4+0 team 布局门控；不改成绩模型
     const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
+    const isFourballTeamLayout = resolveFourballTeamLayoutFlag(this._engineGroups || []);
     this.setData({
       mode: 'fourball_best',
       isSingleGroupGame: false,
@@ -2353,6 +2366,7 @@ Page({
       useMatchPlayScoreShell: false,
       isFourballPair22: pairFlags.isFourballPair22,
       isFourballPairLayout: pairFlags.isFourballPairLayout,
+      isFourballTeamLayout: isFourballTeamLayout,
       moreMenuItems: menuPanels.moreMenuItems,
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
@@ -2497,7 +2511,7 @@ Page({
     return buildTeamBestColumns(tb.scores, tb.putts, displayMode);
   },
 
-  // 组合记分行第一列起始宽度：pair(2人)需容纳双头像 + 杆差列间距
+  // 组合记分行第一列起始宽度：pair(2人)/team(4人)需容纳 identity + diff + tee
   _computeBestballColStartWidth() {
     const groups = this._engineGroups || [];
     const PAD = 24;
@@ -2506,7 +2520,8 @@ Page({
     let need = 300;
     groups.forEach((g) => {
       const n = (g.members || []).length;
-      if (n === 2) {
+      // 2+2 / 4+0：同一初始总宽，供 _applyFourballPair22Scroll 推导 identityStart
+      if (n === 2 || n === 4) {
         const avatarSpanEnd = 128 + 72;
         const inner = avatarSpanEnd + GAP + DIFF_W;
         need = Math.max(need, inner + PAD * 2);
@@ -2566,8 +2581,8 @@ Page({
   },
 
   /**
-   * 普通创建 fourball_best 2+2：两阶段横滑
-   * 阶段1：只压缩 identity（diff=96 / tee=8 固定）
+   * 普通创建 fourball_best pair/4+0：两阶段横滑
+   * 阶段1：只压缩 identity→148（diff=96 / tee=6 固定）
    * 阶段2：identity 锁定；diff 96→0
    */
   _applyFourballPair22Scroll(scrollLeft) {
@@ -2668,6 +2683,16 @@ Page({
     if (!hasMatch) {
       const proto = buildBestBallColumns(displayMode);
       const d = BEST_SPECIAL[20].diff;
+      const demoMembers = (this._playersSource || []).slice(0, 4).map((m, mi) => {
+        const name = this._shortName(m && m.name) || (m && m.name) || '球员';
+        const dn = name.length > 2 ? name.charAt(0) + '…' : name;
+        const palette = TEE_PALETTE[mi % TEE_PALETTE.length];
+        return {
+          name: name,
+          displayName: dn,
+          teeColor: (palette && palette.teeColor) || ''
+        };
+      });
       return [{
         id: 'demo-team',
         groupIndex: 0,
@@ -2677,6 +2702,7 @@ Page({
         name: '',
         avatar: '',
         pairMembers: [],
+        teamMembers: demoMembers,
         columns: proto,
         teamDiffStr: formatDiff(d),
         teamDiffClass: d < 0 ? 'diff-under' : d > 0 ? 'diff-over' : 'diff-even'
@@ -2691,6 +2717,7 @@ Page({
       const kind = size === 1 ? 'single' : size === 2 ? 'pair' : 'team';
       const m0 = members[0] || {};
       let pairMembers = [];
+      let teamMembers = [];
       let colorClass = 'border-white';
       let teeColor = '';
       let displayName = '';
@@ -2719,7 +2746,23 @@ Page({
           };
         });
       } else {
-        gpos += size;
+        // team（含 4+0）：展示用文字名 + teeColor；与 roster 同序配色；不进 sticky 头像
+        teamMembers = members.map((m, mi) => {
+          const style = resolveScoreTeeStyle(m, gpos);
+          const palette = TEE_PALETTE[mi % TEE_PALETTE.length];
+          gpos += 1;
+          const name = this._shortName(m.name) || m.name || '球员';
+          const dn = name.length > 2 ? name.charAt(0) + '…' : name;
+          const hasExplicitTee =
+            !!(m && (isEditTeeKey(m.tPosition) || isEditTeeKey(m.tee)));
+          return {
+            name: name,
+            displayName: dn,
+            teeColor: hasExplicitTee
+              ? style.teeColor || (palette && palette.teeColor) || ''
+              : (palette && palette.teeColor) || style.teeColor || ''
+          };
+        });
       }
       const shortName = this._shortName(m0.name) || m0.name || g.name;
       return {
@@ -2735,6 +2778,7 @@ Page({
         colorClass: kind === 'single' ? colorClass : '',
         teeColor: kind === 'single' ? teeColor : '',
         pairMembers: pairMembers,
+        teamMembers: teamMembers,
         columns: t.columns,
         teamDiffStr: t.teamDiffStr,
         teamDiffClass: t.teamDiffClass
@@ -2970,6 +3014,7 @@ Page({
       useMatchPlayScoreShell: isG5Only,
       isFourballPair22: false,
       isFourballPairLayout: false,
+      isFourballTeamLayout: false,
       columns: isMatchPlayBoard ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
@@ -3113,6 +3158,7 @@ Page({
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
       isFourballPair22: false,
+      isFourballTeamLayout: false,
       isFourballPairLayout: false,
       matchSidesView: [],
       moreMenuItems: entityMoreMenu
@@ -3599,6 +3645,7 @@ Page({
       useMatchPlayScoreShell: false,
       isFourballPair22: false,
       isFourballPairLayout: false,
+      isFourballTeamLayout: false,
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -4257,6 +4304,7 @@ Page({
       const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
       patch.isFourballPair22 = pairFlags.isFourballPair22;
       patch.isFourballPairLayout = pairFlags.isFourballPairLayout;
+      patch.isFourballTeamLayout = resolveFourballTeamLayoutFlag(this._engineGroups || []);
       if (this.data.bestHasMatch) {
         const team = this._teamBestColumns(displayMode);
         patch.bestColumns = team.columns;
@@ -5639,8 +5687,8 @@ Page({
     }
     const scrollLeft = e.detail.scrollLeft || 0;
 
-    // fourball pair 布局（2+2 / 2+1）：两阶段横滑（不影响 entity / G5–G8 / 3+1）
-    if (isBest && this.data.isFourballPairLayout) {
+    // fourball pair（2+2 / 2+1）或 4+0 team：两阶段横滑（不影响 entity / G5–G8 / 3+0）
+    if (isBest && (this.data.isFourballPairLayout || this.data.isFourballTeamLayout)) {
       this._applyFourballPair22Scroll(scrollLeft);
       return;
     }
