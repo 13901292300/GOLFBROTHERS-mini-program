@@ -1755,6 +1755,8 @@ Page({
     useMatchPlayScoreShell: false,
     /** 普通创建 fourball_best 纯 2+2：Legacy HOLE/PAR 样式开关（不影响记分/列宽） */
     isFourballPair22: false,
+    /** fourball 2+2：identity 压缩完成后切换短昵称（不影响横滑宽度） */
+    isFourballPair22NamesCompact: false,
     /** match-play：T sticky overlay 是否显示（独立于 isTeeStickyVisible / useStrokeScoreShell） */
     isMatchPlayTeeStickyVisible: false,
     /** match-play：HOLE/PAR normal overlay 横向 transform（独立于 holeParNormalStyle） */
@@ -2574,8 +2576,16 @@ Page({
       pairContainerShift: pairContainerShift,
       labelSize: 30
     });
-    if (style !== this.data.scoreboardStyle) {
-      this.setData({ scoreboardStyle: style });
+    // 仅展示态：identity 压到 148 后切短昵称；不改横滑宽度/CSS 变量计算
+    const namesCompact = p1 >= 1;
+    if (
+      style !== this.data.scoreboardStyle ||
+      namesCompact !== this.data.isFourballPair22NamesCompact
+    ) {
+      this.setData({
+        scoreboardStyle: style,
+        isFourballPair22NamesCompact: namesCompact
+      });
     }
     return { p1: p1, p2: p2, identityW: identityW, colWidth: colWidth };
   },
@@ -2655,8 +2665,13 @@ Page({
         pairMembers = members.map((m, mi) => {
           const style = resolveScoreTeeStyle(m, gpos);
           gpos += 1;
+          const name = this._shortName(m.name) || m.name || '球员';
+          // 仅 fourball pair 展示用；原 name 保留完整短名
+          const displayName =
+            name.length > 2 ? name.charAt(0) + '…' : name;
           return {
-            name: this._shortName(m.name) || m.name || '球员',
+            name: name,
+            displayName: displayName,
             avatar: m.avatar || '',
             teeColor: style.teeColor,
             left: PAIR_LEFT[mi] || (24 + mi * 104) + 'rpx',

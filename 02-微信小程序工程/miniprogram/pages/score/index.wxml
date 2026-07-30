@@ -653,7 +653,7 @@
                     </view>
                   </view>
                   <view class="paired-names">
-                    <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
+                    <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{isFourballPair22NamesCompact ? (pm.displayName || pm.name) : pm.name}}</text>
                   </view>
                 </view>
                 <view class="pair-diff">
