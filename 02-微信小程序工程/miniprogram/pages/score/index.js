@@ -101,11 +101,18 @@ const PAIR_SWIPE_GEOM = {
 
 /** 普通创建 fourball_best 2+2 split：两阶段横滑（仅 isFourballPair22） */
 const FB22_PHASE1_SCROLL_PX = 72; // 阶段1：只压缩 identity → 半遮挡
-const FB22_PHASE2_SCROLL_PX = 72; // 阶段2：预留（本轮 diff 保持 96，不消失）
+const FB22_PHASE2_SCROLL_PX = 72; // 阶段2：diff 96→0
 const FB22_DIFF_W = 96;
-const FB22_TEE_W = 8;
+const FB22_TEE_W = 6;
 const FB22_PAD_L = 24; // 与 split padding-right:0 对齐，只计左 pad
 const FB22_IDENTITY_END = 148; // 阶段1终点：identity 固定宽
+/** pair22：80 头像半遮挡几何（第二中心 = 第一右缘 → shift −64；不影响 entity 72 几何） */
+const FB22_PAIR_GEOM = {
+  AVATAR_W: 80,
+  AV1_LEFT: 24,
+  AV2_LEFT: 128,
+  SECOND_SHIFT_MAX: 64
+};
 
 const PLAYER_SEEDS = [
   {
@@ -2518,22 +2525,24 @@ Page({
 
   /**
    * 2+2 split：在 identity 段宽度内居中头像组（不用 colWidth−2×pad）
+   * 几何用 FB22_PAIR_GEOM（80 头像 / shift −64），不改 PAIR_SWIPE_GEOM（entity 等）
    */
   _computePair22IdentityContainerShift(identityWidth, progress) {
     if (progress <= 0) return 0;
-    const contentWidth = this._computePairSwipeContentWidth(progress);
-    const gap = (identityWidth - contentWidth) / 2;
-    const G = PAIR_SWIPE_GEOM;
+    const G = FB22_PAIR_GEOM;
     const secondShift = -(G.SECOND_SHIFT_MAX * progress);
     const secondLeft = G.AV2_LEFT + secondShift;
     const contentLeft = Math.min(G.AV1_LEFT, secondLeft);
+    const contentRight = Math.max(G.AV1_LEFT + G.AVATAR_W, secondLeft + G.AVATAR_W);
+    const contentWidth = contentRight - contentLeft;
+    const gap = (identityWidth - contentWidth) / 2;
     return gap - contentLeft;
   },
 
   /**
    * 普通创建 fourball_best 2+2：两阶段横滑
    * 阶段1：只压缩 identity（diff=96 / tee=8 固定）
-   * 阶段2：identity 锁定；本轮 diff 仍保持 96（先验证四区域稳定）
+   * 阶段2：identity 锁定；diff 96→0
    */
   _applyFourballPair22Scroll(scrollLeft) {
     const left = Math.max(0, Number(scrollLeft) || 0);
@@ -2545,23 +2554,24 @@ Page({
 
     const p1 = Math.min(1, Math.max(0, left / FB22_PHASE1_SCROLL_PX));
     const eased1 = 1 - Math.pow(1 - p1, 3);
-    // 阶段2进度预留（本轮不驱动 diff 收窄）
     const p2 = Math.min(
       1,
       Math.max(0, (left - FB22_PHASE1_SCROLL_PX) / FB22_PHASE2_SCROLL_PX)
     );
+    const eased2 = 1 - Math.pow(1 - p2, 3);
 
     const identityW =
       p1 <= 0
         ? identityStart
         : identityStart - (identityStart - FB22_IDENTITY_END) * eased1;
 
-    // 阶段1/2：diff 均保持 96（验收：diff 不消失、不侵入 identity）
-    const diffColW = FB22_DIFF_W;
-    const diffOpacity = 1;
+    // 阶段2：p2 0→1 → diff 96→0（与 identity 同 cubic ease-out）
+    const diffProgress = eased2;
+    const diffColW = FB22_DIFF_W * (1 - diffProgress);
+    const diffOpacity = 1 - diffProgress;
 
     const colWidth = FB22_PAD_L + identityW + diffColW + FB22_TEE_W;
-    const pairSecondShift = -(PAIR_SWIPE_GEOM.SECOND_SHIFT_MAX * p1);
+    const pairSecondShift = -(FB22_PAIR_GEOM.SECOND_SHIFT_MAX * p1);
     const pairContainerShift =
       p1 > 0 ? this._computePair22IdentityContainerShift(identityW, p1) : 0;
 

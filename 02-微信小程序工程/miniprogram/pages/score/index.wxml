@@ -684,7 +684,7 @@
               bindtap="onScoreCellTap"
               data-player-idx="{{gIdx}}"
               data-col-idx="{{cIdx}}"
-              class="scoreboard-cell score-cell {{col.isSpecial ? 'scoreboard-cell--special-cell' : ''}}"
+              class="scoreboard-cell score-cell {{col.isSpecial ? 'scoreboard-cell--special-cell' : ''}} {{col.isTot ? 'score-cell--total' : ''}}"
             >
               <block wx:if="{{col.isSpecial}}">
                 <view class="special-cell-inner">
