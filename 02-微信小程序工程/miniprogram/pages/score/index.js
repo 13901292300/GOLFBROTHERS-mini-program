@@ -1739,8 +1739,10 @@ Page({
     isG5MatchPlay: false,
     /** 普通创建 + 单组 + 个人比杆：成绩槽位上下文（preferScoresBySlot）；勿当 UI shell 开关 */
     isSingleGroupGame: false,
-    /** 普通创建 + 个人比杆：新版 scoreboard-shell UI（单组/多组共用，与成绩读写解耦） */
+    /** 普通创建 + 个人比杆：新版 shell UI（兼容保留；统一开关见 useStrokeScoreShell） */
     useGameStrokeShell: false,
+    /** 个人比杆 UI Shell：普通创建个人比杆 + 球队赛 G1；不含 G5–G8 / 其它 individual_stroke */
+    useStrokeScoreShell: false,
     /** game-single：T sticky overlay 是否显示（scrollLeft >= diff 宽） */
     isTeeStickyVisible: false,
     /** game-single：HOLE/PAR compact 预留（Phase1 不用于显隐切换） */
@@ -2175,6 +2177,7 @@ Page({
       mode: 'standard',
       isSingleGroupGame: false,
       useGameStrokeShell: false,
+      useStrokeScoreShell: false,
       moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -2289,6 +2292,7 @@ Page({
       mode: 'fourball_best',
       isSingleGroupGame: false,
       useGameStrokeShell: false,
+      useStrokeScoreShell: false,
       moreMenuItems: menuPanels.moreMenuItems,
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
@@ -2802,12 +2806,18 @@ Page({
       : isMatchPlayBoard && gameMode
         ? gameMode
         : '个人比杆赛';
+    // UI Shell：仅球队赛 G1（个人比杆）；G5–G8 / 无 match 演示不进新壳
+    const isTeamG1Stroke =
+      !!matchId &&
+      !isMatchPlayBoard &&
+      (gameMode === '个人比杆赛' || gameMode === 'individual_stroke');
     this.setData({
       mode: 'individual_stroke',
       isG5MatchPlay: isMatchPlayBoard,
       isMatchPlayScoreMode: matchPlayScoreMode,
       isSingleGroupGame: false,
       useGameStrokeShell: false,
+      useStrokeScoreShell: isTeamG1Stroke,
       columns: isMatchPlayBoard ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
@@ -2823,6 +2833,9 @@ Page({
       layoutType: 'standard',
       playerCount: this._playersSource.length || 4,
       bestRoster: [],
+      isTeeStickyVisible: false,
+      isHoleParCompact: false,
+      holeParNormalStyle: 'transform: translateX(0px);',
       // G5 显示个人比洞赛；G6/G7/G8 显示赛制名；G1 及其他个人行保持个人比杆赛
       'match.format': formatLabel
     });
@@ -2940,6 +2953,7 @@ Page({
       isG5MatchPlay: false,
       isSingleGroupGame: false,
       useGameStrokeShell: false,
+      useStrokeScoreShell: false,
       matchSidesView: [],
       moreMenuItems: entityMoreMenu
     });
@@ -3399,9 +3413,10 @@ Page({
     // 个人比杆（排除四人两球 / 最佳球位等）
     const isIndividualStrokeScore =
       gameModeLabel === '个人比杆赛' || formatType === 'individual_stroke';
-    // 成绩槽位：仅单组；UI shell：单组+多组（useGameStrokeShell）
+    // 成绩槽位：仅单组；UI shell：普通创建个人比杆（单/多组）
     const isSingleGroupGame = groupCount <= 1 && isIndividualStrokeScore;
     const useGameStrokeShell = isIndividualStrokeScore;
+    const useStrokeScoreShell = isIndividualStrokeScore;
     const group = this._loadPlayersFromGameGroup(gameId, groupIndex, {
       colorClasses: true,
       preferScoresBySlot: isSingleGroupGame
@@ -3420,6 +3435,7 @@ Page({
       playerCount: this._playersSource.length || 4,
       isSingleGroupGame: isSingleGroupGame,
       useGameStrokeShell: useGameStrokeShell,
+      useStrokeScoreShell: useStrokeScoreShell,
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -4058,8 +4074,8 @@ Page({
       players = this._playersSource.map((p, i) => enrichPlayerG5(p, i, displayMode));
     } else {
       this._matchSidesSource = [];
-      // game 个人比杆新版 shell：成绩格右下角平标准杆显示 0；头像旁 relScore 仍用 formatDiff → E
-      const cellEvenDiffAsZero = this.data.mode === 'game' && !!this.data.useGameStrokeShell;
+      // 个人比杆新版 shell（普通创建 / 球队 G1）：成绩格右下角平标准杆显示 0；头像旁 relScore 仍用 formatDiff → E
+      const cellEvenDiffAsZero = !!this.data.useStrokeScoreShell;
       players = this._playersSource.map((p, i) =>
         enrichPlayer(p, i, displayMode, {
           hideCorners: matchPlayScoreMode,
@@ -5337,9 +5353,9 @@ Page({
     this._syncShellScrollTop('scoreTrackScrollTop', top);
   },
 
-  /** 新版 game 个人比杆 shell UI（单组/多组）；与 _isGameSingleScoreContext 解耦 */
+  /** 个人比杆新版 shell UI（普通创建 / 球队 G1）；与 _isGameSingleScoreContext 解耦 */
   _isGameSingleShell() {
-    return this.data.mode === 'game' && !!this.data.useGameStrokeShell;
+    return !!this.data.useStrokeScoreShell;
   },
 
   /** game-single：窗口宽（rpx→px） */

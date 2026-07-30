@@ -578,14 +578,6 @@ page {
   border-bottom: 1px solid var(--border-color);
 }
 
-/* TEMP 视觉测试：确认 G1 basic 前缀列是否命中（测完删除） */
-.scoreboard-shell--basic .track-lead-diff {
-  background: red !important;
-}
-.scoreboard-shell--basic .track-lead-tee {
-  background: blue !important;
-}
-
 /* score-track 前缀：diff + T 固定列宽（禁止 flex 收缩） */
 .scoreboard-shell--basic .track-lead-diff,
 .scoreboard-shell--game-single .track-lead-diff,
