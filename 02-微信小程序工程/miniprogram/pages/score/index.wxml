@@ -183,7 +183,7 @@
                 wx:for="{{columns}}"
                 wx:key="colIdx"
                 wx:for-index="ci"
-                class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}}"
+                class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}} {{item.isTot ? 'scoreboard-cell--tot-head' : ''}}"
               >
                 <view class="hole-label-wrap">
                   <view class="hole-label-circle {{item.isSpecial ? 'hole-label-circle--special' : (item.isStartHole ? 'hole-label-circle--start' : 'hole-number')}}">{{item.label}}</view>
@@ -197,7 +197,7 @@
                 wx:for="{{columns}}"
                 wx:key="colIdx"
                 wx:for-index="ci"
-                class="scoreboard-cell {{item.isSpecial ? 'scoreboard-cell--special-par' : ''}}"
+                class="scoreboard-cell {{item.isSpecial ? 'scoreboard-cell--special-par' : ''}} {{item.isOut || item.isIn ? 'scoreboard-cell--hole-special-col' : ''}} {{item.isTot ? 'scoreboard-cell--tot-col' : ''}}"
               >
                 <text class="par-val">{{item.par}}</text>
               </view>
@@ -224,7 +224,7 @@
                 bindtap="onScoreCellTap"
                 data-player-idx="{{pIdx}}"
                 data-col-idx="{{cIdx}}"
-                class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
+                class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}}"
               >
                 <block wx:if="{{cell.type === 'special'}}">
                   <view class="special-cell-inner">
@@ -248,6 +248,226 @@
                 </block>
               </view>
             </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- ===== 比洞 Shell：G5；布局对齐 stroke shell（track lead + T sticky overlay）===== -->
+      <view
+        wx:elif="{{useMatchPlayScoreShell}}"
+        class="scoreboard-shell scoreboard-shell--match-play {{isMatchPlayTeeStickyVisible ? 'is-match-play-tee-sticky' : ''}}"
+        style="{{scoreboardStyle}}"
+      >
+        <scroll-view
+          class="player-column"
+          scroll-y
+          scroll-top="{{identityPanelScrollTop}}"
+          bindscroll="onIdentityPanelScroll"
+          show-scrollbar="{{false}}"
+        >
+          <view class="player-column__inner">
+            <view class="shell-row shell-row--head player-column__spacer"></view>
+            <view class="shell-row shell-row--par player-column__spacer"></view>
+            <block
+              wx:for="{{matchSidesView}}"
+              wx:key="sideId"
+              wx:for-index="sIdx"
+            >
+              <view class="shell-row shell-row--player player-column__row match-play-side-row">
+                <block wx:if="{{item.kind === 'single'}}">
+                  <view class="player-column__card">
+                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <text class="player-name-line player-column__name">{{item.name}}</text>
+                  </view>
+                </block>
+                <block wx:else>
+                  <view class="player-column__card match-play-pair-card">
+                    <view class="pair-avatar-group">
+                      <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
+                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                      </view>
+                    </view>
+                    <view class="paired-names">
+                      <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
+                    </view>
+                  </view>
+                </block>
+              </view>
+              <!-- 高度占位；标题改由 shell overlay 承载，勿写回 player-column -->
+              <view
+                wx:if="{{sIdx === 0}}"
+                class="shell-row match-status-row player-column__row match-play-status-row"
+              ></view>
+            </block>
+          </view>
+        </scroll-view>
+
+        <!-- HOLE/PAR overlay：独立于 G1；宽=身份+diff+T，随横滑 translate -->
+        <view class="match-play-hole-par-normal" style="{{matchPlayHoleParNormalStyle}}">
+          <view class="match-play-hole-par-normal__hole">
+            <text>HOLE</text>
+          </view>
+          <view class="match-play-hole-par-normal__par">
+            <text>PAR</text>
+          </view>
+        </view>
+        <view class="match-play-hole-par-compact match-play-hole-par-compact--hidden">
+          <view class="match-play-hole-par-compact__hole">
+            <text>HOLE</text>
+          </view>
+          <view class="match-play-hole-par-compact__par">
+            <text>PAR</text>
+          </view>
+        </view>
+
+        <!-- 胜洞走势标题 overlay：同 HOLE/PAR 横移；吸边后切 compact（128rpx） -->
+        <view
+          class="match-play-status-title-normal {{isMatchPlayTeeStickyVisible ? 'is-faded' : ''}}"
+          style="{{matchPlayHoleParNormalStyle}}"
+        >
+          <view class="match-label-wrap">
+            <text class="match-label-kicker">MATCH</text>
+            <text class="match-label-main">胜洞走势</text>
+          </view>
+        </view>
+        <view
+          class="match-play-status-title-compact {{isMatchPlayTeeStickyVisible ? 'is-visible' : ''}}"
+        >
+          <view class="match-label-wrap">
+            <text class="match-label-kicker">MATCH</text>
+            <text class="match-label-main">胜洞走势</text>
+          </view>
+        </view>
+
+        <!-- T 吸边副本：贴 player-column 右缘；独立于 G1 isTeeStickyVisible -->
+        <scroll-view
+          class="match-play-tee-sticky-overlay {{isMatchPlayTeeStickyVisible ? 'is-visible' : ''}}"
+          scroll-y
+          scroll-top="{{identityPanelScrollTop}}"
+          show-scrollbar="{{false}}"
+        >
+          <view class="match-play-tee-sticky-overlay__inner">
+            <view class="shell-row shell-row--head match-play-tee-sticky-overlay__spacer"></view>
+            <view class="shell-row shell-row--par match-play-tee-sticky-overlay__spacer"></view>
+            <block
+              wx:for="{{matchSidesView}}"
+              wx:key="sideId"
+              wx:for-index="sIdx"
+            >
+              <view class="shell-row shell-row--player match-play-tee-sticky-overlay__row">
+                <view class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
+              </view>
+              <view
+                wx:if="{{sIdx === 0}}"
+                class="shell-row match-status-row match-play-tee-sticky-overlay__status"
+              ></view>
+            </block>
+          </view>
+        </scroll-view>
+
+        <scroll-view
+          class="score-track"
+          scroll-x
+          scroll-y
+          scroll-top="{{scoreTrackScrollTop}}"
+          bindscroll="onScoreTrackScroll"
+          show-scrollbar="{{false}}"
+        >
+          <view class="score-track__inner">
+            <view class="scoreboard-row scoreboard-row--head shell-row shell-row--head">
+              <view class="scoreboard-cell track-lead-diff track-lead-diff--head"></view>
+              <view class="scoreboard-cell track-lead-tee track-lead-tee--head"></view>
+              <view
+                wx:for="{{columns}}"
+                wx:key="colIdx"
+                wx:for-index="ci"
+                class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}} {{item.isTot ? 'scoreboard-cell--tot-head' : ''}}"
+              >
+                <view class="hole-label-wrap">
+                  <view class="hole-label-circle {{item.isSpecial ? 'hole-label-circle--special' : (item.isStartHole ? 'hole-label-circle--start' : 'hole-number')}}">{{item.label}}</view>
+                </view>
+              </view>
+            </view>
+            <view class="scoreboard-row scoreboard-row--par shell-row shell-row--par">
+              <view class="scoreboard-cell track-lead-diff track-lead-diff--par"></view>
+              <view class="scoreboard-cell track-lead-tee track-lead-tee--par"></view>
+              <view
+                wx:for="{{columns}}"
+                wx:key="colIdx"
+                wx:for-index="ci"
+                class="scoreboard-cell {{item.isSpecial ? 'scoreboard-cell--special-par' : ''}} {{item.isOut || item.isIn ? 'scoreboard-cell--hole-special-col' : ''}} {{item.isTot ? 'scoreboard-cell--tot-col' : ''}}"
+              >
+                <text class="par-val">{{item.par}}</text>
+              </view>
+            </view>
+            <block
+              wx:for="{{matchSidesView}}"
+              wx:key="sideId"
+              wx:for-index="sIdx"
+            >
+              <view class="scoreboard-row scoreboard-row--player shell-row shell-row--player match-play-side-row">
+                <view class="scoreboard-cell track-lead-diff">
+                  <view class="player-diff-wrap track-lead-diff__wrap">
+                    <text class="player-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
+                  </view>
+                </view>
+                <view class="scoreboard-cell track-lead-tee">
+                  <view class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
+                </view>
+                <view
+                  wx:for="{{item.cells}}"
+                  wx:for-item="cell"
+                  wx:key="colIdx"
+                  wx:for-index="cIdx"
+                  bindtap="onMatchSideScoreCellTap"
+                  data-side-idx="{{sIdx}}"
+                  data-col-idx="{{cIdx}}"
+                  class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}}"
+                >
+                  <block wx:if="{{cell.type === 'special'}}">
+                    <view class="special-cell-inner">
+                      <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                      <view class="special-cell-meta">
+                        <text class="special-cell-putt">{{cell.puttTotal}}</text>
+                        <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                      </view>
+                    </view>
+                  </block>
+                  <block wx:else>
+                    <view class="hole-cell-inner">
+                      <view class="{{cell.scoreClass}}">
+                        <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
+                      </view>
+                      <view class="hole-cell-meta">
+                        <text class="hole-cell-putt">{{cell.putts}}</text>
+                        <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                      </view>
+                    </view>
+                  </block>
+                </view>
+              </view>
+              <view
+                wx:if="{{sIdx === 0}}"
+                class="scoreboard-row match-status-row"
+              >
+                <view class="scoreboard-cell track-lead-diff track-lead-diff--status"></view>
+                <view class="scoreboard-cell track-lead-tee track-lead-tee--status"></view>
+                <view
+                  wx:for="{{matchStatusView.rowCells}}"
+                  wx:for-item="msCell"
+                  wx:key="colIdx"
+                  class="scoreboard-cell match-status-cell {{msCell.isSpecial || msCell.isTot ? 'scoreboard-cell--special-cell' : ''}} {{msCell.isTot || msCell.showFinal ? 'match-status-cell--tot match-status-summary' : ''}}"
+                >
+                  <view wx:if="{{msCell.showWinA}}" class="match-win-line match-win-line--a"></view>
+                  <view wx:if="{{msCell.showWinB}}" class="match-win-line match-win-line--b"></view>
+                  <view class="match-cell-inner">
+                    <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-summary-label">FINAL</text>
+                    <text wx:if="{{msCell.isTot || msCell.showFinal}}" class="match-cumulative {{msCell.leadClass || matchStatusView.currentLeadClass}}">{{msCell.text || matchStatusView.currentLabel}}</text>
+                    <text wx:elif="{{msCell.showStanding}}" class="match-cumulative {{msCell.leadClass}}">{{msCell.standingText}}</text>
+                  </view>
+                </view>
+              </view>
+            </block>
           </view>
         </scroll-view>
       </view>

@@ -1743,6 +1743,12 @@ Page({
     useGameStrokeShell: false,
     /** 个人比杆 UI Shell：普通创建个人比杆 + 球队赛 G1；不含 G5–G8 / 其它 individual_stroke */
     useStrokeScoreShell: false,
+    /** 比洞 UI Shell：本阶段仅球队赛 G5；G6–G8 仍走 legacy（与 useStrokeScoreShell 独立） */
+    useMatchPlayScoreShell: false,
+    /** match-play：T sticky overlay 是否显示（独立于 isTeeStickyVisible / useStrokeScoreShell） */
+    isMatchPlayTeeStickyVisible: false,
+    /** match-play：HOLE/PAR normal overlay 横向 transform（独立于 holeParNormalStyle） */
+    matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
     /** game-single：T sticky overlay 是否显示（scrollLeft >= diff 宽） */
     isTeeStickyVisible: false,
     /** game-single：HOLE/PAR compact 预留（Phase1 不用于显隐切换） */
@@ -2178,6 +2184,7 @@ Page({
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
+      useMatchPlayScoreShell: false,
       moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -2293,6 +2300,7 @@ Page({
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
+      useMatchPlayScoreShell: false,
       moreMenuItems: menuPanels.moreMenuItems,
       playerCount: this._playersSource.length || 4,
       scoringMode: 'best_ball',
@@ -2818,6 +2826,7 @@ Page({
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: isTeamG1Stroke,
+      useMatchPlayScoreShell: isG5Only,
       columns: isMatchPlayBoard ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
@@ -2834,6 +2843,8 @@ Page({
       playerCount: this._playersSource.length || 4,
       bestRoster: [],
       isTeeStickyVisible: false,
+      isMatchPlayTeeStickyVisible: false,
+      matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
       // G5 显示个人比洞赛；G6/G7/G8 显示赛制名；G1 及其他个人行保持个人比杆赛
@@ -2845,6 +2856,9 @@ Page({
       this.setData({
         isG5MatchPlay: true,
         isMatchPlayScoreMode: true,
+        useMatchPlayScoreShell: isG5Only,
+        isMatchPlayTeeStickyVisible: false,
+        matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
         columns: buildG5Columns(),
         'match.format': formatLabel,
         'gameContext.format': formatLabel
@@ -2954,6 +2968,7 @@ Page({
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
+      useMatchPlayScoreShell: false,
       matchSidesView: [],
       moreMenuItems: entityMoreMenu
     });
@@ -3436,6 +3451,7 @@ Page({
       isSingleGroupGame: isSingleGroupGame,
       useGameStrokeShell: useGameStrokeShell,
       useStrokeScoreShell: useStrokeScoreShell,
+      useMatchPlayScoreShell: false,
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -4106,6 +4122,8 @@ Page({
     if (this.data.mode === 'individual_stroke') {
       patch.isG5MatchPlay = isMatchPlayBoard;
       patch.isMatchPlayScoreMode = matchPlayScoreMode;
+      // UI Shell：本阶段仅 G5；与 useStrokeScoreShell 独立，不改成绩逻辑
+      patch.useMatchPlayScoreShell = isG5Only;
       if (isMatchPlayBoard) {
         patch['match.format'] = boardFormatLabel;
         if (this.data.gameContext && this.data.gameContext.ready) {
@@ -5390,6 +5408,38 @@ Page({
     this.setData({ isTeeStickyVisible: visible });
   },
 
+  /** match-play T sticky：独立 UI 状态，不改 G1 _syncGameSingleTeeSticky */
+  _syncMatchPlayTeeSticky(scrollLeft) {
+    if (!this.data.useMatchPlayScoreShell) {
+      if (this.data.isMatchPlayTeeStickyVisible) {
+        this.setData({ isMatchPlayTeeStickyVisible: false });
+      }
+      return;
+    }
+    const left = Math.max(0, Number(scrollLeft) || 0);
+    const visible = left + 0.5 >= this._getGameSingleTeeStickyThresholdPx();
+    if (visible === !!this.data.isMatchPlayTeeStickyVisible) return;
+    this.setData({ isMatchPlayTeeStickyVisible: visible });
+  },
+
+  /** match-play HOLE/PAR overlay 横移：独立于 _syncGameSingleHoleParMove */
+  _syncMatchPlayHoleParMove(scrollLeft) {
+    if (!this.data.useMatchPlayScoreShell) {
+      if (this.data.matchPlayHoleParNormalStyle !== 'transform: translateX(0px);') {
+        this.setData({ matchPlayHoleParNormalStyle: 'transform: translateX(0px);' });
+      }
+      return;
+    }
+    const left = Math.max(0, Number(scrollLeft) || 0);
+    const threshold = this._getGameSingleTeeStickyThresholdPx();
+    const progress = threshold > 0 ? Math.min(1, left / threshold) : 0;
+    const travelPx = (51 * this._getGameSingleWindowWidth()) / 750;
+    const tx = -travelPx * progress;
+    const style = 'transform: translateX(' + tx + 'px);';
+    if (style === this.data.matchPlayHoleParNormalStyle) return;
+    this.setData({ matchPlayHoleParNormalStyle: style });
+  },
+
   /**
    * Phase1：hole-par-normal 随 scrollLeft 左移（中心 115→64rpx，行程 51rpx）
    * 进度与 T sticky 阈值对齐；不切换 compact / 不隐藏 normal
@@ -5415,6 +5465,8 @@ Page({
     const scrollLeft = (e.detail && e.detail.scrollLeft) || 0;
     this._syncGameSingleTeeSticky(scrollLeft);
     this._syncGameSingleHoleParMove(scrollLeft);
+    this._syncMatchPlayTeeSticky(scrollLeft);
+    this._syncMatchPlayHoleParMove(scrollLeft);
 
     if (this._shellScrollLock === 'identity') return;
     const top = e.detail.scrollTop || 0;

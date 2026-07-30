@@ -16,6 +16,10 @@
   --text-primary: #ffffff;
   --text-secondary: #888888;
   --border-color: #222222;
+  /* HEADER 三色 DARK：hole 最浅 → identity 中 → intersection 最深（相对纯黑成绩区拉开） */
+  --score-header-hole: #202b3a;
+  --score-header-identity: #172231;
+  --score-header-intersection: #0d1724;
   /* style-sheet 兼容别名（对齐 detail/hub） */
   --bg-subtle: #0a0a0a;
   --text-muted: #888888;
@@ -57,6 +61,10 @@
   --text-primary: #0f172a;
   --text-secondary: #64748b;
   --border-color: #e2e8f0;
+  /* HEADER 三色 V2.2：hole 最浅 → identity 中 → intersection 最深 */
+  --score-header-hole: #f4f7fb;
+  --score-header-identity: #e2eaf3;
+  --score-header-intersection: #c2d2e4;
   /* style-sheet 兼容别名（对齐 detail/hub） */
   --bg-subtle: #f3f4f6;
   --text-muted: #6b7280;
@@ -472,7 +480,8 @@ page {
 /* ===== Shell：G1 basic / 普通创建单组 game-single（左 player-column + 右 score-track）===== */
 .scoreboard-shell,
 .scoreboard-shell--basic,
-.scoreboard-shell--game-single {
+.scoreboard-shell--game-single,
+.scoreboard-shell--match-play {
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -489,7 +498,7 @@ page {
   min-width: 128rpx;
   height: 100%;
   background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  border-right: none;
   box-sizing: border-box;
 }
 
@@ -504,7 +513,11 @@ page {
 }
 
 .player-column__spacer.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  border-bottom: none;
   background: var(--bg-card);
+  box-sizing: border-box;
 }
 
 .player-column__spacer.shell-row--par {
@@ -557,6 +570,7 @@ page {
 }
 
 .shell-row--head {
+  height: 112rpx;
   min-height: 112rpx;
   box-sizing: border-box;
 }
@@ -615,7 +629,10 @@ page {
 
 .track-lead-diff--head,
 .track-lead-tee--head {
+  height: 112rpx;
+  min-height: 112rpx;
   background: var(--bg-card);
+  box-sizing: border-box;
 }
 
 .track-lead-diff--par,
@@ -763,9 +780,9 @@ page {
   position: relative;
   z-index: 3;
   background: transparent;
-  border-right-color: transparent;
+  border-right: none;
 }
-/* game-single：头像对齐 G5 80rpx；色环/colorClass 仍走全局 .player-avatar-img */
+/* game-single：头像对齐 G5 80rpx；T 色仅走 T 线，头像无色环 */
 .scoreboard-shell--game-single .player-column__card .player-avatar-img {
   width: 80rpx;
   height: 80rpx;
@@ -777,11 +794,22 @@ page {
   margin: 0;
   padding: 0;
 }
-.scoreboard-shell--game-single .player-column__spacer.shell-row--head,
+/* HEADER：身份蓝（头像列 / lead 身）；TOTAL 头=交叉；TOTAL 身=身份 */
 .scoreboard-shell--game-single .player-column__spacer.shell-row--par,
 .scoreboard-shell--game-single .player-column__row {
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  background: var(--score-header-identity);
+  border-right: none;
+  /* identity 区行分隔：交叉蓝，避免与 identity 底色过近 */
+  border-bottom: 1px solid var(--score-header-intersection);
+  box-sizing: border-box;
+}
+/* HOLE × 身份交叉蓝（仅 head；无右边框/底边，底边由 track header row 统一绘制） */
+.scoreboard-shell--game-single .player-column__spacer.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  background: var(--score-header-intersection);
+  border-right: none;
+  border-bottom: none;
   box-sizing: border-box;
 }
 .scoreboard-shell--game-single .scoreboard-row.scoreboard-row--head,
@@ -793,24 +821,63 @@ page {
 .scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player .score-cell {
   border-bottom: 1px solid var(--border-color);
 }
-/* 身份区统一底：diff + T + sticky overlay = player-column */
+/* lead 身份蓝；HOLE 行 lead 用交叉蓝覆盖 */
 .scoreboard-shell--game-single .track-lead-diff,
-.scoreboard-shell--game-single .track-lead-diff--head,
 .scoreboard-shell--game-single .track-lead-diff--par,
 .scoreboard-shell--game-single .track-lead-tee,
-.scoreboard-shell--game-single .track-lead-tee--head,
 .scoreboard-shell--game-single .track-lead-tee--par {
-  background: var(--bg-secondary) !important;
+  background: var(--score-header-identity) !important;
 }
-/* 普通洞 A1–A18：主题底（BRIGHT≈白）；排除 special，OUT/IN/TOT 仍走全局 special */
-.scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head),
+/* diff/T 身份区行分隔（par + 球员行；head 仍由 header row 统一绘制） */
+.scoreboard-shell--game-single .track-lead-diff--par,
+.scoreboard-shell--game-single .track-lead-tee--par,
+.scoreboard-shell--game-single .scoreboard-row--player .track-lead-diff,
+.scoreboard-shell--game-single .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--score-header-intersection);
+  box-sizing: border-box;
+}
+.scoreboard-shell--game-single .track-lead-diff--head,
+.scoreboard-shell--game-single .track-lead-tee--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  background: var(--score-header-intersection) !important;
+  box-sizing: border-box;
+}
+/* head 底边由 row 绘制且不占高度，保证与左侧 spacer 交叉蓝同高 112rpx */
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--head.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  border-bottom: none;
+  box-shadow: 0 1px 0 var(--border-color);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+/* HOLE 行：1–18 + OUT/IN = HOLE蓝；TOTAL 头 = 交叉蓝（HOLE×身份） */
+.scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head) {
+  background: var(--score-header-hole);
+}
+.scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--special-head {
+  background: var(--score-header-hole);
+}
+.scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-intersection);
+}
+/* OUT/IN 整列身 = HOLE蓝（与 1–18 一致；覆盖 special-par / special-cell） */
+.scoreboard-shell--game-single .scoreboard-cell--hole-special-col {
+  background: var(--score-header-hole);
+}
+/* TOTAL 身（PAR + 成绩格）= 身份蓝；行分隔用交叉蓝（不影响 1–18/OUT/IN） */
+.scoreboard-shell--game-single .scoreboard-cell--tot-col {
+  background: var(--score-header-identity);
+}
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--par .scoreboard-cell--tot-col,
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  border-bottom: 1px solid var(--score-header-intersection);
+}
+/* PAR 行 / 成绩格：保持原规则 */
 .scoreboard-shell--game-single .scoreboard-row--par > .scoreboard-cell:nth-child(n + 3):not(.scoreboard-cell--special-par),
 .scoreboard-shell--game-single .scoreboard-row--player .score-cell:not(.scoreboard-cell--special-cell) {
   background: var(--bg-primary);
-}
-/* DARK：表头与项目记分表头一致（--bg-card）；BRIGHT 仍用上方 --bg-primary（#ffffff） */
-.score-page.dark-mode .scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head) {
-  background: var(--bg-card);
 }
 /* track 内 T 列：宽=T线；底色同身份区 */
 .scoreboard-shell--game-single .track-lead-tee {
@@ -872,15 +939,18 @@ page {
   min-height: 0;
   background: transparent;
 }
-/* head/par spacer：不覆盖 shell-row 的 height/min-height/padding/box-sizing；底边与 scoreboard-row 一致 */
+/* head spacer = 交叉蓝；par spacer = 身份蓝（与 lead 对齐） */
 .scoreboard-shell--game-single .tee-sticky-overlay__spacer {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   margin: 0;
-  background: var(--bg-secondary) !important;
+  background: var(--score-header-identity) !important;
   border-bottom: 1px solid var(--border-color);
+}
+.scoreboard-shell--game-single .tee-sticky-overlay__inner > .tee-sticky-overlay__spacer.shell-row--head {
+  background: var(--score-header-intersection) !important;
 }
 /* player row：与 .shell-row--player 同高，禁止 height:auto 导致子级 % 高度为 0 */
 .scoreboard-shell--game-single .tee-sticky-overlay__row {
@@ -893,13 +963,547 @@ page {
   margin: 0;
   padding: 0;
   border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary) !important;
+  background: var(--score-header-identity) !important;
   box-sizing: border-box;
 }
 /* sticky 显示时隐藏 track 内原始 T，避免双线（不改 DOM） */
 .scoreboard-shell--game-single.is-tee-sticky .score-track .track-lead-tee .player-tee-marker,
 .scoreboard-shell--game-single.is-tee-sticky .score-track .track-lead-tee .track-lead-tee__mark {
   opacity: 0;
+}
+
+/* ===== Match Play Shell：对齐 stroke shell（player-column + HOLE/PAR overlay + track lead + T sticky）===== */
+.scoreboard-shell--match-play {
+  position: relative;
+}
+
+.scoreboard-shell--match-play .player-column {
+  width: 128rpx;
+  min-width: 128rpx;
+  height: 100%;
+  position: relative;
+  z-index: 3;
+  background: transparent;
+  border-right: none;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .score-track {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+/* HOLE/PAR normal：宽 230rpx，仅文字+横移（无铺底，同 game-single，避免 translate 时蓝底伸入洞列） */
+.scoreboard-shell--match-play .match-play-hole-par-normal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 230rpx;
+  height: 184rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  will-change: transform;
+  background: transparent;
+  opacity: 1;
+  visibility: visible;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-normal__hole,
+.scoreboard-shell--match-play .match-play-hole-par-normal__par {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-normal__hole {
+  height: 112rpx;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-normal__par {
+  height: 72rpx;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-normal__hole text,
+.scoreboard-shell--match-play .match-play-hole-par-normal__par text {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-normal__hole text {
+  transform: translateY(-3rpx);
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-normal__par text {
+  transform: translateY(-2rpx);
+}
+
+/* compact：宽=头像列 128rpx + 浅蓝底；仅 T sticky 吸边后显示 */
+.scoreboard-shell--match-play .match-play-hole-par-compact {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 128rpx;
+  height: 184rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  /* 吸边时：上 HOLE 交叉蓝 + 下 PAR 身份蓝（实色分段，非 rgba） */
+  background: linear-gradient(
+    to bottom,
+    var(--score-header-intersection) 0,
+    var(--score-header-intersection) 112rpx,
+    var(--score-header-identity) 112rpx,
+    var(--score-header-identity) 100%
+  );
+  opacity: 0;
+  visibility: hidden;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-compact--hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* 未吸边：只允许 normal；compact 强制隐藏（互斥） */
+.scoreboard-shell--match-play:not(.is-match-play-tee-sticky) .match-play-hole-par-normal {
+  opacity: 1;
+  visibility: visible;
+}
+
+.scoreboard-shell--match-play:not(.is-match-play-tee-sticky) .match-play-hole-par-compact,
+.scoreboard-shell--match-play:not(.is-match-play-tee-sticky) .match-play-hole-par-compact.match-play-hole-par-compact--hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* 已吸边：只允许 compact；normal 强制隐藏（互斥） */
+.scoreboard-shell--match-play.is-match-play-tee-sticky .match-play-hole-par-normal {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.scoreboard-shell--match-play.is-match-play-tee-sticky .match-play-hole-par-compact,
+.scoreboard-shell--match-play.is-match-play-tee-sticky .match-play-hole-par-compact.match-play-hole-par-compact--hidden {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-compact__hole,
+.scoreboard-shell--match-play .match-play-hole-par-compact__par {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-compact__hole {
+  height: 112rpx;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-compact__par {
+  height: 72rpx;
+}
+
+.scoreboard-shell--match-play .match-play-hole-par-compact__hole text,
+.scoreboard-shell--match-play .match-play-hole-par-compact__par text {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.scoreboard-shell--match-play .player-column__card .player-avatar-img {
+  width: 80rpx;
+  height: 80rpx;
+}
+
+/* HEADER V2：身份蓝 / HOLE×lead 交叉蓝 */
+.scoreboard-shell--match-play .player-column__spacer.shell-row--par,
+.scoreboard-shell--match-play .player-column__row {
+  background: var(--score-header-identity);
+  border-right: none;
+  /* identity 区行分隔：交叉蓝，避免与 identity 底色过近 */
+  border-bottom: 1px solid var(--score-header-intersection);
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .player-column__spacer.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  background: var(--score-header-intersection);
+  border-right: none;
+  border-bottom: none;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .match-play-side-row {
+  height: 156rpx;
+  min-height: 156rpx;
+}
+
+.scoreboard-shell--match-play .match-play-status-row {
+  height: 100rpx;
+  min-height: 100rpx;
+  justify-content: center;
+  background: #08111d;
+}
+
+/* 胜洞走势标题 overlay：初始覆盖头像+diff+T（230rpx），与 HOLE/PAR 共用横移 style */
+.scoreboard-shell--match-play .match-play-status-title-normal {
+  position: absolute;
+  /* head 112 + par 72 + Side A 156 */
+  left: 0;
+  top: 340rpx;
+  z-index: 4;
+  width: 230rpx;
+  height: 100rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  will-change: transform;
+  background: linear-gradient(
+    90deg,
+    rgba(206, 146, 36, 0.08),
+    rgba(0, 45, 98, 0.14),
+    rgba(206, 146, 36, 0.06)
+  );
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--match-play .match-play-status-title-normal.is-faded {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.scoreboard-shell--match-play .match-play-status-title-normal .match-label-wrap {
+  width: 100%;
+  padding: 0 8rpx;
+}
+
+/* 吸边 compact：贴头像列 128rpx，阈值后显示 */
+.scoreboard-shell--match-play .match-play-status-title-compact {
+  position: absolute;
+  left: 0;
+  top: 340rpx;
+  z-index: 4;
+  width: 128rpx;
+  height: 100rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    90deg,
+    rgba(206, 146, 36, 0.08),
+    rgba(0, 45, 98, 0.14),
+    rgba(206, 146, 36, 0.06)
+  );
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--match-play .match-play-status-title-compact.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.scoreboard-shell--match-play .match-play-status-title-compact .match-label-wrap {
+  width: 100%;
+  padding: 0 4rpx;
+}
+
+.scoreboard-shell--match-play .match-play-status-title-compact .match-label-main {
+  font-size: 20rpx;
+}
+
+/* track-lead：与 game-single 同宽（diff 96 / T 6）；底色见下方 HEADER V2 */
+.scoreboard-shell--match-play .track-lead-diff,
+.scoreboard-shell--match-play .track-lead-diff--head,
+.scoreboard-shell--match-play .track-lead-diff--par,
+.scoreboard-shell--match-play .track-lead-diff--status {
+  width: 96rpx !important;
+  min-width: 96rpx !important;
+  max-width: 96rpx !important;
+  flex: 0 0 96rpx !important;
+  flex-shrink: 0 !important;
+  justify-content: center;
+  padding: 8rpx 4rpx;
+  border-right: none;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .track-lead-diff .player-diff-score {
+  font-size: 40rpx;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.scoreboard-shell--match-play .track-lead-tee,
+.scoreboard-shell--match-play .track-lead-tee--head,
+.scoreboard-shell--match-play .track-lead-tee--par,
+.scoreboard-shell--match-play .track-lead-tee--status {
+  width: 6rpx !important;
+  min-width: 6rpx !important;
+  max-width: 6rpx !important;
+  flex: 0 0 6rpx !important;
+  flex-shrink: 0 !important;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: none;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .track-lead-tee .player-tee-marker,
+.scoreboard-shell--match-play .track-lead-tee .track-lead-tee__mark,
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__row .player-tee-marker,
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__row .track-lead-tee__mark {
+  position: static;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  transform: none;
+  width: 100%;
+  height: 50%;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* HEADER V2：lead 身份蓝；HOLE 行 lead 交叉蓝 */
+.scoreboard-shell--match-play .track-lead-diff,
+.scoreboard-shell--match-play .track-lead-diff--par,
+.scoreboard-shell--match-play .track-lead-tee,
+.scoreboard-shell--match-play .track-lead-tee--par {
+  background: var(--score-header-identity) !important;
+}
+
+/* diff/T 身份区行分隔（par + 球员行；head 仍由 header row 统一绘制） */
+.scoreboard-shell--match-play .track-lead-diff--par,
+.scoreboard-shell--match-play .track-lead-tee--par,
+.scoreboard-shell--match-play .scoreboard-row--player .track-lead-diff,
+.scoreboard-shell--match-play .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--score-header-intersection);
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .track-lead-diff--head,
+.scoreboard-shell--match-play .track-lead-tee--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  background: var(--score-header-intersection) !important;
+  box-sizing: border-box;
+}
+/* head 底边由 row 绘制且不占高度，保证与左侧 spacer 交叉蓝同高 112rpx */
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--head.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  border-bottom: none;
+  box-shadow: 0 1px 0 var(--border-color);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .track-lead-diff--status,
+.scoreboard-shell--match-play .track-lead-tee--status {
+  height: 100rpx;
+  min-height: 100rpx;
+  background: #08111d !important;
+}
+
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--head,
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--par,
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--player {
+  background: transparent;
+}
+
+/* 与 game-single 一致：HOLE/PAR 行保留分隔线；球员行仍由 cell 绘底边 */
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--head,
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--par {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--player {
+  border-bottom: none;
+}
+
+/* HOLE 1–18 = HOLE蓝；FINAL 头 = 交叉蓝；FINAL 身 = 身份蓝 */
+.scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head) {
+  background: var(--score-header-hole);
+}
+
+.scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell--special-head {
+  background: var(--score-header-hole);
+}
+
+.scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-intersection);
+}
+
+/* OUT/IN 整列身 = HOLE蓝（与 1–18 一致） */
+.scoreboard-shell--match-play .scoreboard-cell--hole-special-col {
+  background: var(--score-header-hole);
+}
+
+.scoreboard-shell--match-play .scoreboard-cell--tot-col {
+  background: var(--score-header-identity);
+}
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--par .scoreboard-cell--tot-col,
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  border-bottom: 1px solid var(--score-header-intersection);
+}
+
+/* PAR 行洞格：保持原规则 */
+.scoreboard-shell--match-play .scoreboard-row--par > .scoreboard-cell:nth-child(n + 3):not(.scoreboard-cell--special-par) {
+  background: var(--bg-primary);
+}
+
+.scoreboard-shell--match-play .scoreboard-row.scoreboard-row--player .score-cell {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--match-play .scoreboard-row.match-status-row .match-status-cell,
+.scoreboard-shell--match-play .scoreboard-row.match-status-row .track-lead-diff--status,
+.scoreboard-shell--match-play .scoreboard-row.match-status-row .track-lead-tee--status {
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* match-play T sticky overlay（独立类名，不改 G1 tee-sticky-overlay） */
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay {
+  position: absolute;
+  left: 128rpx;
+  top: 0;
+  width: 6rpx;
+  height: auto;
+  max-height: 100%;
+  z-index: 2;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__inner {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  background: transparent;
+}
+
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__spacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  background: var(--score-header-identity) !important;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__inner > .match-play-tee-sticky-overlay__spacer.shell-row--head {
+  background: var(--score-header-intersection) !important;
+}
+
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 156rpx;
+  min-height: 156rpx;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--score-header-identity) !important;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__status {
+  width: 100%;
+  height: 100rpx;
+  min-height: 100rpx;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: #08111d !important;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--match-play.is-match-play-tee-sticky .score-track .track-lead-tee .player-tee-marker,
+.scoreboard-shell--match-play.is-match-play-tee-sticky .score-track .track-lead-tee .track-lead-tee__mark {
+  opacity: 0;
+}
+
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-row,
+.score-page.bright-mode .scoreboard-shell--match-play .track-lead-diff--status,
+.score-page.bright-mode .scoreboard-shell--match-play .track-lead-tee--status,
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-tee-sticky-overlay__status {
+  background: #f8fafc !important;
+}
+
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-normal,
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-compact {
+  background: #ffffff;
+}
+
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-normal .match-label-main,
+.score-page.bright-mode .scoreboard-shell--match-play .match-play-status-title-compact .match-label-main {
+  color: #002d62;
 }
 
 .track-lead-tee__mark,
@@ -1008,6 +1612,13 @@ page {
   color: var(--text-secondary);
 }
 
+/* DARK：OUT/IN/TOTAL special label 独立于 HOLE 数字圆标（不套用蓝底白字） */
+.score-page.dark-mode .hole-label-circle--special {
+  background: var(--score-header-identity);
+  border: 1px solid var(--score-header-intersection);
+  color: var(--text-secondary);
+}
+
 /* Player cell */
 .player-cell {
   justify-content: flex-start;
@@ -1035,14 +1646,17 @@ page {
   height: 80rpx;
   border-radius: 999rpx;
   flex-shrink: 0;
-  border-width: 4rpx;
-  border-style: solid;
+  /* T 色统一由 T 线展示；取消头像 colorClass / 内联 teeColor 色环 */
+  border: none !important;
 }
 
-.player-avatar-img.border-red { border-color: #dc2626; }
-.player-avatar-img.border-gold { border-color: var(--champion-gold); }
-.player-avatar-img.border-white { border-color: var(--text-primary); }
-.player-avatar-img.border-light { border-color: #00aeef; }
+.player-avatar-img.border-red,
+.player-avatar-img.border-gold,
+.player-avatar-img.border-white,
+.player-avatar-img.border-light,
+.player-avatar-img.border-black {
+  border: none !important;
+}
 
 .player-diff-wrap {
   flex: 1;
