@@ -42,6 +42,11 @@
   background: #fff;
 }
 
+/* Dark 顶蓝线需被顶圆角裁切（与 Hub/Score bottom-sheet 一致） */
+.half-sheet {
+  overflow: hidden;
+}
+
 .half-course-sheet .half-course-panel {
   pointer-events: auto;
   flex: 1;
@@ -115,7 +120,7 @@
   border: 0;
   border-radius: 12rpx;
   background: var(--golf-blue, #002d62);
-  color: var(--champion-gold, #ce9224);
+  color: #ffffff;
   font-size: 24rpx;
   font-weight: 900;
   letter-spacing: 0.18em;

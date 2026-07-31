@@ -970,6 +970,7 @@
   <!-- 更多功能 bottom sheet -->
   <view wx:if="{{showMoreSheet}}" bindtap="closeMoreSheet" class="sheet-overlay"></view>
   <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="feature-section">
       <view class="feature-section-title"><text class="fst-main">{{featuresSectionCommonMain}}</text><text wx:if="{{featuresSectionCommonSub}}" class="fst-sub">{{featuresSectionCommonSub}}</text></view>
@@ -1042,6 +1043,7 @@
   <!-- 领先榜查看设置 -->
   <view wx:if="{{showLeaderboardSettingSheet}}" bindtap="closeLeaderboardSettingSheet" class="sheet-overlay"></view>
   <view wx:if="{{showLeaderboardSettingSheet}}" class="bottom-sheet leaderboard-setting-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="leaderboard-setting__head">
       <view>
@@ -1271,6 +1273,7 @@
   <!-- 报名弹窗：分组选择 + 比赛名 + 手机号 + 确认报名 -->
   <view wx:if="{{registerSheetVisible}}" bindtap="closeRegisterSheet" class="sheet-overlay"></view>
   <view wx:if="{{registerSheetVisible}}" class="bottom-sheet register-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <text class="register-sheet__title">赛事报名</text>
@@ -1328,6 +1331,7 @@
   <!-- Patch 3：替他人报名 · 选择代表分队（复用报名弹窗分队标签视觉，不写盘） -->
   <view wx:if="{{proxyGroupSheetVisible}}" bindtap="cancelProxyGroupSheet" class="sheet-overlay"></view>
   <view wx:if="{{proxyGroupSheetVisible}}" class="bottom-sheet register-sheet proxy-group-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <text class="register-sheet__overline">Select Group</text>
@@ -1370,6 +1374,7 @@
   <!-- 权限管理（临时管理员二维码 + 球童记分员二维码） -->
   <view wx:if="{{tempAdminSheetVisible}}" bindtap="cancelTempAdminSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
   <view wx:if="{{tempAdminSheetVisible}}" class="bottom-sheet register-sheet temp-admin-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <view class="register-sheet__close" bindtap="cancelTempAdminSheet">×</view>
@@ -1512,6 +1517,7 @@
   <!-- 球童记分员管理 -->
   <view wx:if="{{caddieManageSheetVisible}}" bindtap="closeCaddieScorerManage" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
   <view wx:if="{{caddieManageSheetVisible}}" class="bottom-sheet register-sheet caddie-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <text class="register-sheet__overline">CADDIE</text>
@@ -1532,6 +1538,7 @@
     visible="{{halfSheetVisible}}"
     match-id="{{matchId}}"
     source="team_match"
+    theme-class="{{themeClass}}"
     bind:close="closeHalfSheet"
     bind:confirm="onHalfCourseConfirmed"
   />
@@ -1548,6 +1555,7 @@
   <!-- 选手管理（本场报名快照） -->
   <view wx:if="{{playerManageSheetVisible}}" bindtap="cancelPlayerManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
   <view wx:if="{{playerManageSheetVisible}}" class="bottom-sheet register-sheet player-manage-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <view class="register-sheet__close" bindtap="cancelPlayerManageSheet">×</view>
@@ -1656,6 +1664,7 @@
   <!-- 选手管理 · 分队筛选 -->
   <view wx:if="{{playerManageFilterPickVisible}}" bindtap="closePlayerManageFilterPicker" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
   <view wx:if="{{playerManageFilterPickVisible}}" class="bottom-sheet register-sheet player-team-pick-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <text class="register-sheet__overline">FILTER</text>
@@ -1681,6 +1690,7 @@
   <!-- 选手管理 · 选择分队 -->
   <view wx:if="{{playerTeamPickVisible}}" bindtap="closePlayerManageTeamPicker" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
   <view wx:if="{{playerTeamPickVisible}}" class="bottom-sheet register-sheet player-team-pick-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <text class="register-sheet__overline">TEAM</text>
@@ -1706,6 +1716,7 @@
   <!-- 收费管理（极简实收登记） -->
   <view wx:if="{{showPaymentSheet}}" bindtap="closePaymentSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
   <view wx:if="{{showPaymentSheet}}" class="bottom-sheet register-sheet payment-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <view class="payment-sheet__close" bindtap="closePaymentSheet">×</view>
@@ -1798,6 +1809,7 @@
   <!-- 出发管理 -->
   <view wx:if="{{teeSheetManageSheetVisible}}" bindtap="cancelTeeSheetManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
   <view wx:if="{{teeSheetManageSheetVisible}}" class="bottom-sheet register-sheet tee-sheet-manage-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
       <view class="register-sheet__close" bindtap="cancelTeeSheetManageSheet">×</view>

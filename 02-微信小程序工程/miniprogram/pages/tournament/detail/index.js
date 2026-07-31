@@ -6202,6 +6202,85 @@ Page({
     });
   },
 
+  /**
+   * 出发表 LIVE 角标洞数：
+   * - G6/G7/G8：双方 Side 共同完成洞数（scoresBySide / _resolveMatchPlayGroupSideScores）
+   * - G5 及比杆：组内个人最大 thru（scoresByPlayer）
+   */
+  _resolveTeeSheetLiveHoleCount(match, group) {
+    if (!match || !group) return 0;
+    const gameMode = resolveGameMode(match);
+    if (isG6G7MatchPlayMode(gameMode) || isG8MatchPlayMode(gameMode)) {
+      const teamIds = this._resolveMatchPlaySideTeamIds(match);
+      const sideScores = this._resolveMatchPlayGroupSideScores(match, group, teamIds, false);
+      const summary = this._buildMatchPlayResultSummary(
+        sideScores.scoresA,
+        sideScores.scoresB,
+        sideScores.startHole
+      );
+      return Number(summary && summary.thru) || 0;
+    }
+    const players = Array.isArray(group.players) ? group.players.filter(Boolean) : [];
+    let maxThru = 0;
+    players.forEach((p) => {
+      const pid = this._resolveAnyPlayerId(p);
+      const thru = (this._computeMatchLeaderboardStats(match, group, p, pid) || {}).thru || 0;
+      if (thru > maxThru) maxThru = thru;
+    });
+    return maxThru;
+  },
+
+  /**
+   * LIVE 出发表角标：洞数 + 可选用时（如 3H 45'）。
+   * 用时来自 scoreData[groupId].firstScoreAt；不改 statusKey / matchStatus。
+   */
+  _applyLiveHoleStatusBadgeToTeeGroups(match, teeGroups) {
+    const list = Array.isArray(teeGroups) ? teeGroups : [];
+    if (!list.length) return list;
+    const groups = match && Array.isArray(match.groups) ? match.groups : [];
+    const groupById = {};
+    groups.forEach((g) => {
+      if (!g || g.groupId == null) return;
+      groupById[String(g.groupId)] = g;
+    });
+    const scoreData =
+      match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+        ? match.scoreData
+        : null;
+    return list.map((card) => {
+      if (!card || card.statusKey !== 'live') return card;
+      const groupId =
+        card.groupId != null || card.id != null ? String(card.groupId || card.id) : '';
+      let holeCount = 0;
+      if (match) {
+        holeCount = this._resolveTeeSheetLiveHoleCount(match, groupById[groupId] || null);
+      } else if (groupId) {
+        const g = groupsStore.getGroup(groupId);
+        const players = g && Array.isArray(g.players) ? g.players.filter(Boolean) : [];
+        players.forEach((p) => {
+          const thru = (groupsStore.computePlayerStats(p) || {}).thru || 0;
+          if (thru > holeCount) holeCount = thru;
+        });
+      }
+      let statusBadge = String(holeCount) + 'H';
+      const bucket =
+        scoreData && groupId && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+          ? scoreData[groupId]
+          : null;
+      const firstScoreAt = bucket ? Number(bucket.firstScoreAt) : NaN;
+      if (Number.isFinite(firstScoreAt) && firstScoreAt > 0) {
+        const finishedScoreAt = bucket ? Number(bucket.finishedScoreAt) : NaN;
+        const endMs =
+          Number.isFinite(finishedScoreAt) && finishedScoreAt > 0
+            ? finishedScoreAt
+            : Date.now();
+        const minutes = Math.floor((endMs - firstScoreAt) / 60000);
+        statusBadge = statusBadge + ' ' + String(minutes < 0 ? 0 : minutes) + "'";
+      }
+      return Object.assign({}, card, { statusBadge: statusBadge });
+    });
+  },
+
   refreshGroupsDerived() {
     this._syncTournamentHoleLayout();
     groupsStore.ensureInitialized();
@@ -6209,7 +6288,7 @@ Page({
     let teeGroups = [];
     let match = null;
     if (demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
-      teeGroups = groupsStore.getTeeGroupsView();
+      teeGroups = this._applyLiveHoleStatusBadgeToTeeGroups(null, groupsStore.getTeeGroupsView());
     } else {
       match = matchId ? teamMatchStore.getMatchById(matchId) : null;
       if (match && Array.isArray(match.groups) && match.groups.length) {
@@ -6220,6 +6299,7 @@ Page({
         });
         teeGroups = this._mergeTeeSheetPlayerTeeInfo(match, teeGroups, playerLookup);
         teeGroups = this._applyMatchPlayStartHoleToTeeGroups(match, teeGroups);
+        teeGroups = this._applyLiveHoleStatusBadgeToTeeGroups(match, teeGroups);
       } else {
         teeGroups = [];
       }
@@ -6997,6 +7077,21 @@ Page({
       wx.showToast({ title: '比赛已经结束。', icon: 'none' });
       return;
     }
+    match.scoreData =
+      match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+        ? match.scoreData
+        : {};
+    (Array.isArray(match.groups) ? match.groups : []).forEach((g) => {
+      const groupId = g && g.groupId != null ? String(g.groupId) : '';
+      if (!groupId) return;
+      const bucket =
+        match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
+          ? match.scoreData[groupId]
+          : null;
+      if (!bucket) return;
+      teamMatchStore.forceGroupScoreBucketFinishedScoreAt(bucket);
+      match.scoreData[groupId] = bucket;
+    });
     match.status = 'finished';
     match.statusLabel = '已结束';
     match.finishedAt = Date.now();
@@ -8135,6 +8230,7 @@ Page({
         )
       : [];
     teeGroups = this._applyMatchPlayStartHoleToTeeGroups(match, teeGroups);
+    teeGroups = this._applyLiveHoleStatusBadgeToTeeGroups(match, teeGroups);
     this.setData(
       Object.assign(this._buildGroupsTabStatePatch(match), {
         teeGroups: teeGroups

@@ -20,6 +20,8 @@
   --score-header-hole: #202b3a;
   --score-header-identity: #172231;
   --score-header-intersection: #0d1724;
+  /* fourball 成绩行横线：比 --border-color 更可读，仍弱于成绩主体 */
+  --fourball-score-row-border: #3f3f46;
   /* style-sheet 兼容别名（对齐 detail/hub） */
   --bg-subtle: #0a0a0a;
   --text-muted: #888888;
@@ -65,6 +67,8 @@
   --score-header-hole: #f4f7fb;
   --score-header-identity: #e2eaf3;
   --score-header-intersection: #c2d2e4;
+  /* fourball 成绩行横线：Light 保持现有浅灰 */
+  --fourball-score-row-border: var(--border-color);
   /* style-sheet 兼容别名（对齐 detail/hub） */
   --bg-subtle: #f3f4f6;
   --text-muted: #6b7280;
@@ -851,6 +855,33 @@ page {
   white-space: nowrap;
 }
 
+/*
+ * fourball 双球员壳：type=single（members 仅 1 人）时 identity 内头像/昵称居中。
+ * 列宽与 collapse 不变；type=pair 双头像不受影响。
+ */
+.scoreboard-shell--fourball .fourball-pair-identity--single .avatar-group {
+  justify-content: center;
+}
+
+.scoreboard-shell--fourball .fourball-pair-identity--single .avatar-group__item,
+.scoreboard-shell--fourball .fourball-pair-identity--single .avatar-group__item--first {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.scoreboard-shell--fourball .fourball-pair-identity--single .name-group {
+  justify-content: center;
+  /* single 无 pair-name-compact；collapse 后仍显示单昵称，禁止随 --fourball-identity-collapse 淡出 */
+  opacity: 1;
+}
+
+.scoreboard-shell--fourball .fourball-pair-identity--single .name-group__name {
+  flex: 0 1 auto;
+  max-width: 100%;
+  width: auto;
+  text-align: center;
+}
+
 /* Phase5.2-d：折叠昵称 combined（整串）/ dual（短侧优先宽，长侧省略） */
 .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact {
   position: absolute;
@@ -1060,16 +1091,24 @@ page {
 .scoreboard-shell--fourball .scoreboard-row {
   display: flex;
   min-width: max-content;
-  border-bottom: 1px solid var(--border-color);
   position: relative;
   z-index: 1;
+}
+
+/* 横线统一由 cell/lead 自绘；提高优先级，压过通用 .scoreboard-shell .shell-row border */
+.scoreboard-shell.scoreboard-shell--fourball .scoreboard-row.shell-row--head,
+.scoreboard-shell.scoreboard-shell--fourball .scoreboard-row.shell-row--par,
+.scoreboard-shell.scoreboard-shell--fourball .scoreboard-row.shell-row--player,
+.scoreboard-shell.scoreboard-shell--fourball .scoreboard-row.scoreboard-row--head,
+.scoreboard-shell.scoreboard-shell--fourball .scoreboard-row.scoreboard-row--par,
+.scoreboard-shell.scoreboard-shell--fourball .scoreboard-row.scoreboard-row--player {
+  border-bottom: none;
+  box-shadow: none;
 }
 
 .scoreboard-shell--fourball .scoreboard-row.shell-row--head {
   height: 112rpx;
   min-height: 112rpx;
-  border-bottom: none;
-  box-shadow: 0 1px 0 var(--border-color);
 }
 
 .scoreboard-shell--fourball .scoreboard-row.shell-row--par {
@@ -1116,11 +1155,6 @@ page {
   background-color: var(--score-header-identity);
 }
 
-.scoreboard-shell--fourball .scoreboard-row.scoreboard-row--par .scoreboard-cell--tot-col {
-  border-bottom: 1px solid var(--score-header-intersection);
-  box-sizing: border-box;
-}
-
 .scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell:not(.scoreboard-cell--special-par):not(.scoreboard-cell--tot-col):not(.scoreboard-cell--hole-special-col) {
   background: var(--bg-primary);
 }
@@ -1133,7 +1167,21 @@ page {
   background-color: var(--bg-primary);
 }
 
-/* OUT/IN 成绩区：覆盖默认 bg-primary → 18洞浅底；TOTAL 保持身份蓝 */
+/*
+ * 横向业务分隔线唯一来源：HOLE/PAR/成绩 cell + 同行 lead
+ * Light = --border-color；Dark = 增强灰（--fourball-score-row-border）
+ */
+.scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell--head,
+.scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell,
+.scoreboard-shell--fourball .scoreboard-row.scoreboard-row--player .score-cell,
+.scoreboard-shell--fourball .fourball-track-lead--head,
+.scoreboard-shell--fourball .fourball-track-lead--par,
+.scoreboard-shell--fourball .scoreboard-row--player .fourball-track-lead {
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+
+/* OUT/IN 成绩区：覆盖默认 bg-primary → 18洞浅底；TOTAL 保持身份蓝（横线跟上方统一 token） */
 .scoreboard-shell--fourball .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col {
   background: var(--score-header-hole);
   background-color: var(--score-header-hole);
@@ -1143,8 +1191,6 @@ page {
 .scoreboard-shell--fourball .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
   background: var(--score-header-identity);
   background-color: var(--score-header-identity);
-  border-bottom: 1px solid var(--score-header-intersection);
-  box-sizing: border-box;
 }
 
 /* track lead：中间层；固定宽，禁止 opacity/width collapse */
@@ -1179,11 +1225,6 @@ page {
 
 .scoreboard-shell--fourball .fourball-track-lead--head {
   background: var(--score-header-intersection);
-}
-
-.scoreboard-shell--fourball .fourball-track-lead--par,
-.scoreboard-shell--fourball .scoreboard-row--player .fourball-track-lead {
-  border-bottom: 1px solid var(--score-header-intersection);
 }
 
 .scoreboard-shell--fourball .fourball-track-lead__diff {
@@ -1325,12 +1366,13 @@ page {
   flex-shrink: 0 !important;
   padding: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  /* 成绩行 T 线：与行同高（顶/底对齐），子色块用 height:100% / flex 均分 */
+  align-items: stretch;
+  justify-content: stretch;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -1372,6 +1414,69 @@ page {
 /* 普通创建单组：双栏 player-column + score-track（diff/T 在 track 内随横滑） */
 .scoreboard-shell--game-single {
   position: relative;
+}
+
+/*
+ * 纯 4+0：HOLE 以下完全复用 game-single；
+ * 仅身份列改为 TEAM SCORE + 赛制名（宽仍 128rpx）。
+ * HOLE 以上球员卡片走页面级 .bestball-roster-strip，不进本壳。
+ */
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .player-column__card--team-score {
+  padding: 12rpx 6rpx;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .player-column__card--team-score .bestball-mode-wrap {
+  width: 100%;
+  padding-right: 0;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .player-column__card--team-score .bestball-mode-kicker {
+  font-size: 14rpx;
+  letter-spacing: 0.12em;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .player-column__card--team-score .bestball-mode-main {
+  font-size: 24rpx;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 4+0：成绩行合成 T 线 — 满行高、四色上下均分；不改列宽 / 行高 */
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-tee {
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+  padding: 0;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .track-lead-tee__composite,
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .tee-sticky-overlay__row .track-lead-tee__composite {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .track-lead-tee__seg {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40 .tee-sticky-overlay__row {
+  align-items: stretch;
+  padding: 0;
+}
+
+.scoreboard-shell--game-single.scoreboard-shell--fourball40.is-tee-sticky
+  .score-track
+  .track-lead-tee__composite {
+  opacity: 0;
 }
 
 /* HOLE/PAR 方案A：初始标签 — 宽=身份区(128+96+6)，水平中心对齐；HOLE/PAR 分占 head/par 行 */
@@ -1586,7 +1691,7 @@ page {
 .scoreboard-shell--game-single .scoreboard-row--player .score-cell:not(.scoreboard-cell--special-cell) {
   background: var(--bg-primary);
 }
-/* track 内 T 列：宽=T线；底色同身份区 */
+/* track 内 T 列：宽=T线；底色同身份区；高度随成绩行 stretch */
 .scoreboard-shell--game-single .track-lead-tee {
   width: 6rpx !important;
   min-width: 6rpx !important;
@@ -1596,13 +1701,13 @@ page {
   padding: 0;
   margin: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   border-right: none;
-  overflow: visible;
+  overflow: hidden;
   box-sizing: border-box;
 }
-/* track 与 sticky overlay 共用同一套 T marker 高度（勿拆成不同 height） */
+/* track 与 sticky overlay 共用：单色 T = 满行高 */
 .scoreboard-shell--game-single .track-lead-tee .player-tee-marker,
 .scoreboard-shell--game-single .track-lead-tee .track-lead-tee__mark,
 .scoreboard-shell--game-single .tee-sticky-overlay__row .player-tee-marker,
@@ -1613,9 +1718,11 @@ page {
   bottom: auto;
   transform: none;
   width: 100%;
-  height: 50%;
+  height: 100%;
+  align-self: stretch;
   margin: 0;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 /* T sticky overlay：宽=T线；左缘=player-column 右缘；高度=表内容（head+par+players） */
 .scoreboard-shell--game-single .tee-sticky-overlay {
@@ -1659,11 +1766,11 @@ page {
 .scoreboard-shell--game-single .tee-sticky-overlay__inner > .tee-sticky-overlay__spacer.shell-row--head {
   background: var(--score-header-intersection) !important;
 }
-/* player row：与 .shell-row--player 同高，禁止 height:auto 导致子级 % 高度为 0 */
+/* player row：与 .shell-row--player 同高；stretch 使 T 线顶底对齐成绩行 */
 .scoreboard-shell--game-single .tee-sticky-overlay__row {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   width: 100%;
   height: 156rpx;
   min-height: 156rpx;
@@ -1993,10 +2100,10 @@ page {
   padding: 0;
   margin: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   border-right: none;
-  overflow: visible;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -2010,9 +2117,11 @@ page {
   bottom: auto;
   transform: none;
   width: 100%;
-  height: 50%;
+  height: 100%;
+  align-self: stretch;
   margin: 0;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 /* HEADER V2：lead 身份蓝；HOLE 行 lead 交叉蓝 */
@@ -2161,8 +2270,8 @@ page {
 
 .scoreboard-shell--match-play .match-play-tee-sticky-overlay__row {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   width: 100%;
   height: 156rpx;
   min-height: 156rpx;
@@ -2204,15 +2313,18 @@ page {
   color: #002d62;
 }
 
+/* 公共单色 T：高度 = 成绩行（父级 track-lead-tee / sticky row）100% */
 .track-lead-tee__mark,
 .track-lead-tee .player-tee-marker {
   position: static;
   flex-shrink: 0;
   width: 6rpx;
-  height: 48rpx;
+  height: 100%;
+  align-self: stretch;
   top: auto;
   right: auto;
   bottom: auto;
+  box-sizing: border-box;
 }
 
 .scoreboard-inner { display: inline-block; min-width: 100%; }
@@ -2387,11 +2499,12 @@ page {
   transition: max-width 0.25s ease;
 }
 
+/* Legacy 身份列绝对定位 T：顶底贴齐成绩行（不再只盖头像区中段） */
 .player-tee-marker {
   position: absolute;
   right: 0;
-  top: 25%;
-  bottom: 25%;
+  top: 0;
+  bottom: 0;
   width: 6rpx;
 }
 
@@ -4467,6 +4580,17 @@ page {
   bottom: 0;
   width: 6rpx;
   background: var(--tee-color, #ce9224);
+}
+
+/* 3+0：第 4 槽空白占位 — 尺寸/间距与实卡一致，不参与内容展示 */
+.bestball-player-card--empty {
+  background: transparent;
+  border-color: transparent;
+  pointer-events: none;
+}
+
+.bestball-player-card--empty::before {
+  display: none;
 }
 
 /* 分组高亮（仅视觉：背景 + 边框）：同一 group 内球员共享同一高亮，区分不同组。

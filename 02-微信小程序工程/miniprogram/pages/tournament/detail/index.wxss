@@ -810,7 +810,7 @@ page {
   text-align: center;
   padding: 26rpx 0;
   border-radius: 16rpx;
-  background: var(--champion-gold, #c8a24a);
+  background: var(--champion-gold, #ce9224);
   color: #ffffff;
   font-size: 32rpx;
   font-weight: 900;
@@ -1036,6 +1036,10 @@ page {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.detail-page.dark-mode .groups-composition-line__label,
+.detail-page.dark-mode .groups-pairing-card__label {
+  color: var(--text-primary);
 }
 .groups-composition-line__names {
   flex: 1;
@@ -1507,7 +1511,7 @@ page {
   align-items: center;
   justify-content: flex-end;
   color: var(--text-muted);
-  font-size: 26rpx;
+  font-size: 22rpx;
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
@@ -1570,8 +1574,8 @@ page {
   width: 60rpx;
   height: 60rpx;
   border-radius: 999rpx;
-  background: var(--tour-blue);
-  color: var(--champion-gold);
+  background: #002D62;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1593,14 +1597,16 @@ page {
   color: #ffffff;
 }
 .fab-label {
+  color: #ffffff;
   letter-spacing: 0.02em;
   line-height: 1;
 }
 
 /* ===== Bottom sheet ===== */
 .sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 150; }
-.bottom-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; color: var(--tour-blue); border-radius: 80rpx 80rpx 0 0; z-index: 180; box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35); padding-bottom: env(safe-area-inset-bottom); }
+.bottom-sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; color: var(--tour-blue); border-radius: 80rpx 80rpx 0 0; z-index: 180; box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.35); padding-bottom: env(safe-area-inset-bottom); overflow: hidden; }
 .sheet-handle { width: 96rpx; height: 8rpx; border-radius: 999rpx; background: #e5e7eb; margin: 24rpx auto 40rpx; }
+.sheet-top-accent { display: none; }
 .feature-section { padding: 0 48rpx 24rpx; }
 .feature-section-title { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 24rpx; padding: 0 4rpx; color: var(--tour-blue); }
 .fst-main { font-size: 24rpx; font-weight: 800; letter-spacing: 0.12em; }
@@ -1619,7 +1625,7 @@ page {
 .feature-icon.state { background: #f97316; color: #fff; }
 .feature-label { color: var(--tour-blue); font-size: 20rpx; line-height: 1.2; font-weight: 800; text-align: center; }
 .sheet-cancel-wrap { padding: 4rpx 80rpx 48rpx; }
-.sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: var(--tour-blue); color: var(--champion-gold); border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
+.sheet-cancel-btn { height: 88rpx; line-height: 88rpx; text-align: center; background: #002D62; color: #ffffff; border-radius: 12rpx; font-weight: 900; font-size: 24rpx; letter-spacing: 0.18em; }
 
 /* 替他人报名 · 手工添加底部弹窗（对齐记分页 manual-sheet） */
 .manual-sheet-mask {
@@ -1773,7 +1779,7 @@ page {
 }
 
 .manual-sheet__btn--confirm {
-  color: #000000;
+  color: #ffffff;
   background: var(--champion-gold, #ce9224);
   border: 1px solid var(--champion-gold, #ce9224);
 }
@@ -1785,6 +1791,13 @@ page {
   box-shadow: 0 -48rpx 120rpx rgba(0, 0, 0, 0.55);
 }
 .detail-page.dark-mode .sheet-handle { background: var(--border); }
+.detail-page.dark-mode .bottom-sheet .sheet-top-accent {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: #002d62;
+  flex-shrink: 0;
+}
 .detail-page.dark-mode .feature-section-title,
 .detail-page.dark-mode .feature-label { color: var(--text-primary); }
 .detail-page.dark-mode .fst-sub { color: var(--text-muted); }
@@ -1806,7 +1819,7 @@ page {
 .leaderboard-setting__footer { display: flex; gap: 20rpx; margin-top: 40rpx; }
 .leaderboard-setting__btn { flex: 1; height: 88rpx; border-radius: 20rpx; display: flex; align-items: center; justify-content: center; font-size: 28rpx; font-weight: 900; }
 .leaderboard-setting__btn--cancel { color: var(--text-secondary); background: var(--bg-subtle); border: 1px solid var(--border-color); }
-.leaderboard-setting__btn--confirm { color: #000; background: var(--champion-gold); border: 1px solid var(--champion-gold); }
+.leaderboard-setting__btn--confirm { color: #ffffff; background: var(--champion-gold); border: 1px solid var(--champion-gold); }
 
 /* ===== 显示设置 sheet ===== */
 .style-sheet { position: fixed; left: 0; right: 0; bottom: 0; transform: translateY(100%); background: var(--bg-card); color: var(--text-primary); border-radius: 48rpx 48rpx 0 0; border: 1px solid var(--border); z-index: 260; transition: transform 0.25s ease; box-shadow: 0 -36rpx 80rpx rgba(0, 0, 0, 0.35); padding-bottom: max(40rpx, env(safe-area-inset-bottom)); }

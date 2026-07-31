@@ -924,9 +924,13 @@ Page({
     });
   },
 
-  /** 广场「球队比赛」卡片（只读映射，不改 store） */
+  /** 广场「球队比赛」卡片（只读映射，不改 store）；仅 ongoing / finished，排除 registering */
   _buildPlazaTournamentCards() {
     return teamMatchStore.listMatches()
+      .filter((m) => {
+        const status = String((m && m.status) || '').trim().toLowerCase();
+        return status === 'ongoing' || status === 'finished';
+      })
       .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
       .filter(Boolean);
   },

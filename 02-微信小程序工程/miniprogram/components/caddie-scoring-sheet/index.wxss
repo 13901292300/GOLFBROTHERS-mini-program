@@ -303,7 +303,7 @@
 .css-btn--primary {
   flex: 1;
   background: var(--css-blue);
-  color: var(--champion-gold, #ce9224);
+  color: #ffffff;
 }
 
 .css-btn--ghost {

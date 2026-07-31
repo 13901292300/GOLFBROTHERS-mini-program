@@ -21,6 +21,7 @@ const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
 const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../utils/playerManage.js');
 const teeSheetManage = require('../../../utils/teeSheetManage.js');
+const gameProgress = require('../../../utils/gameProgress.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -641,8 +642,16 @@ Page({
     return groupsStore.buildGameTeeSheetView(game).map((card) => {
       const teeTime = teeSheetManage.resolveGroupTeeTime(card) || matchTeeTime;
       const startHole = teeSheetManage.resolveGroupStartHole(card);
+      const statusKey = card.statusKey;
+      // LIVE：右上角显示已完成洞数（如 9H），不展示 LIVE 文案
+      let statusBadge = card.statusBadge;
+      if (statusKey === 'live') {
+        const completedHoles = gameProgress.countCompletedHoles(game, card.groupIndex) || 0;
+        statusBadge = String(completedHoles) + 'H';
+      }
       return Object.assign({}, card, {
-        statusText: matchStatus.getMatchStatusLabelZh(card.statusKey),
+        statusBadge: statusBadge,
+        statusText: matchStatus.getMatchStatusLabelZh(statusKey),
         time: teeTime || '待设置',
         hole: startHole != null ? startHole + '号洞' : '待分配',
         teeTime: teeTime,

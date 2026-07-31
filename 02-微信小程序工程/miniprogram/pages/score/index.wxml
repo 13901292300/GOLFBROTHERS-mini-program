@@ -77,33 +77,33 @@
         <!-- Context Panel 已移至 .score-page 根级浮层（position:fixed），不再参与本容器布局流 -->
       </view>
 
-      <!-- Best Ball Roster Strip：fourball_best 演示 + stroke_entity 4+0（team，1–4 人均可）；2+2 pair 名册为空 -->
+      <!-- Best Ball Roster Strip：示例 / 纯 4+0 / 纯 3+0（第 4 槽 isEmpty 空白占位，不重算 grid） -->
       <view wx:if="{{(mode === 'fourball_best' || mode === 'stroke_entity') && bestRoster.length}}" class="bestball-roster-strip">
         <view class="bestball-roster-inner">
           <view
             wx:for="{{bestRoster}}"
             wx:key="playerId"
-            class="bestball-player-card {{item.groupClass}}"
+            class="bestball-player-card {{item.groupClass}} {{item.isEmpty ? 'bestball-player-card--empty' : ''}}"
             style="--tee-color:{{item.teeColor}};"
           >
-            <!-- 左：球员区（头像在上、昵称在下，纵向居中） -->
-            <view class="bestball-player-id">
-              <image class="bestball-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
-              <text class="bestball-player-name">{{item.name}}</text>
-            </view>
-            <!-- 右：T台区（独立固定右侧，不参与球员头像/昵称布局） -->
-            <view class="bestball-tee-line">
-              <view class="bestball-tee-dot"></view>
-              <text>{{item.tee}}</text>
-            </view>
+            <block wx:if="{{!item.isEmpty}}">
+              <view class="bestball-player-id">
+                <image class="bestball-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+                <text class="bestball-player-name">{{item.name}}</text>
+              </view>
+              <view class="bestball-tee-line">
+                <view class="bestball-tee-dot"></view>
+                <text>{{item.tee}}</text>
+              </view>
+            </block>
           </view>
         </view>
       </view>
 
-      <!-- ===== 个人比杆统一 Shell：普通创建个人比杆 + 球队赛 G1（useStrokeScoreShell）===== -->
+      <!-- ===== 个人比杆统一 Shell：普通创建个人比杆 + 球队赛 G1；纯 4+0 HOLE 以下同壳 ===== -->
       <view
         wx:if="{{useStrokeScoreShell}}"
-        class="scoreboard-shell scoreboard-shell--game-single {{isTeeStickyVisible ? 'is-tee-sticky' : ''}}"
+        class="scoreboard-shell scoreboard-shell--game-single {{isFourball40StrokeShell ? 'scoreboard-shell--fourball40' : ''}} {{isTeeStickyVisible ? 'is-tee-sticky' : ''}}"
         style="{{scoreboardStyle}}"
       >
         <scroll-view
@@ -121,7 +121,14 @@
               wx:key="id"
               class="shell-row shell-row--player player-column__row"
             >
-              <view class="player-column__card">
+              <!-- 4+0/3+0/3+1 组合行：TEAM SCORE + 赛制名；3+1 单人行走下方个人比杆身份 -->
+              <view wx:if="{{isFourball40StrokeShell && item.rowKind !== 'single'}}" class="player-column__card player-column__card--team-score">
+                <view class="bestball-mode-wrap">
+                  <text class="bestball-mode-kicker">TEAM SCORE</text>
+                  <text class="bestball-mode-main">{{strokeShellFormatLabel}}</text>
+                </view>
+              </view>
+              <view wx:else class="player-column__card">
                 <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
                 <text class="player-name-line player-column__name">{{item.name}}</text>
               </view>
@@ -162,7 +169,17 @@
               wx:key="id"
               class="shell-row shell-row--player tee-sticky-overlay__row"
             >
-              <view class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
+              <!-- 4+0：合成 T 线（满行高，四色上下拼接）；其它模式保持单色 T -->
+              <view wx:if="{{isFourball40StrokeShell && item.teeSegments.length}}" class="track-lead-tee__composite">
+                <view
+                  wx:for="{{item.teeSegments}}"
+                  wx:for-item="seg"
+                  wx:key="key"
+                  class="track-lead-tee__seg"
+                  style="background:{{seg.teeColor}};"
+                ></view>
+              </view>
+              <view wx:else class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
             </view>
           </view>
         </scroll-view>
@@ -214,7 +231,17 @@
                 </view>
               </view>
               <view class="scoreboard-cell track-lead-tee">
-                <view class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
+                <!-- 4+0：合成 T 线（满行高，四色上下拼接）；其它模式保持单色 T -->
+                <view wx:if="{{isFourball40StrokeShell && item.teeSegments.length}}" class="track-lead-tee__composite">
+                  <view
+                    wx:for="{{item.teeSegments}}"
+                    wx:for-item="seg"
+                    wx:key="key"
+                    class="track-lead-tee__seg"
+                    style="background:{{seg.teeColor}};"
+                  ></view>
+                </view>
+                <view wx:else class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
               </view>
               <view
                 wx:for="{{item.cells}}"
@@ -222,7 +249,7 @@
                 wx:key="colIdx"
                 wx:for-index="cIdx"
                 bindtap="onScoreCellTap"
-                data-player-idx="{{pIdx}}"
+                data-player-idx="{{item.sourceGroupIndex != null ? item.sourceGroupIndex : pIdx}}"
                 data-col-idx="{{cIdx}}"
                 class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}}"
               >
@@ -496,7 +523,7 @@
               class="shell-row shell-row--player fourball-player-column__row"
             >
               <view
-                class="fourball-pair-identity"
+                class="fourball-pair-identity {{item.type === 'single' ? 'fourball-pair-identity--single' : ''}}"
                 data-fourball-geometry="identity"
               >
                 <view class="avatar-group" data-fourball-geometry="avatar-group">
@@ -824,7 +851,7 @@
             wx:for-index="gIdx"
             class="scoreboard-row scoreboard-row--player"
           >
-            <!-- pair / layout-single / 4+0 team：split；其它 single：旧居中；其它 team：旧球队样式 -->
+            <!-- pair / layout-single / 4+0 team layout：split；其它 team：mode 文案 -->
             <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'pair' || (item.kind === 'single' && isFourballPairLayout) || (item.kind === 'team' && isFourballTeamLayout) ? 'bestball-pair-cell bestball-pair-cell--split' : (item.kind === 'single' ? 'bestball-single-cell' : 'bestball-mode-cell')}}">
               <block wx:if="{{item.kind === 'single' && isFourballPairLayout}}">
                 <!-- 2+1 单人：头像必须在 pair-avatar-group 内，与双头像共用 container-shift / second-shift -->
@@ -881,7 +908,7 @@
                 </view>
               </block>
               <block wx:elif="{{item.kind === 'team' && isFourballTeamLayout}}">
-                <!-- 4+0：identity 业务文案 | diff | teamMembers 仅供四色 T；头像仍在 roster-strip -->
+                <!-- 4+0 split（Legacy 兜底；纯 4+0 已走 isFourball40StrokeShell） -->
                 <view class="pair-identity pair-identity--team">
                   <view class="bestball-mode-wrap">
                     <text class="bestball-mode-kicker">TEAM SCORE</text>
@@ -991,7 +1018,7 @@
                 </view>
               </block>
               <block wx:else>
-                <!-- team（G2/G3 4+0）：与 fourball_best「四人最佳球位挑战-18」同构 — sticky 仅 TEAM SCORE；头像在 bestRoster 名册条 -->
+                <!-- team Legacy 兜底（纯 4+0 已走 isFourball40StrokeShell） -->
                 <view class="bestball-mode-layout">
                   <view class="bestball-mode-wrap">
                     <text class="bestball-mode-kicker">TEAM SCORE</text>

@@ -49,16 +49,65 @@ function hasAnyScoreInGameGroup(group) {
   });
 }
 
-function hasAnyScoreInGroup(group, source) {
-  return source === 'groups'
-    ? hasAnyScoreInGroupsStoreGroup(group)
-    : hasAnyScoreInGameGroup(group);
+/** 成绩数组是否含任意有效洞 */
+function hasAnyFilledScoreInArray(scores) {
+  return Array.isArray(scores) && scores.some(isFilledScore);
+}
+
+/**
+ * 球队比赛：是否存在至少一洞成绩（只读 match.scoreData[groupId]）
+ * 覆盖 scoresByPlayer / teamScoresByEntity / scoresBySide，不碰 game 组字段。
+ */
+function hasAnyScoreInMatchScoreData(group, scoreData) {
+  if (!group || !scoreData || typeof scoreData !== 'object' || Array.isArray(scoreData)) {
+    return false;
+  }
+  const groupId = group.groupId != null ? String(group.groupId) : '';
+  if (!groupId) return false;
+  const bucket = scoreData[groupId];
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return false;
+
+  const scoresByPlayer = bucket.scoresByPlayer;
+  if (scoresByPlayer && typeof scoresByPlayer === 'object' && !Array.isArray(scoresByPlayer)) {
+    const hasPlayer = Object.keys(scoresByPlayer).some((pid) => {
+      const rec = scoresByPlayer[pid];
+      return hasAnyFilledScoreInArray(rec && rec.scores);
+    });
+    if (hasPlayer) return true;
+  }
+
+  const entities = bucket.teamScoresByEntity;
+  if (Array.isArray(entities) && entities.some((e) => hasAnyFilledScoreInArray(e && e.scores))) {
+    return true;
+  }
+
+  const scoresBySide = bucket.scoresBySide;
+  if (scoresBySide && typeof scoresBySide === 'object' && !Array.isArray(scoresBySide)) {
+    const hasSide = Object.keys(scoresBySide).some((sideId) => {
+      const rec = scoresBySide[sideId];
+      return hasAnyFilledScoreInArray(rec && rec.scores);
+    });
+    if (hasSide) return true;
+  }
+
+  return false;
+}
+
+function hasAnyScoreInGroup(group, source, options) {
+  if (source === 'groups') return hasAnyScoreInGroupsStoreGroup(group);
+  if (source === 'match') {
+    return hasAnyScoreInMatchScoreData(group, options && options.scoreData);
+  }
+  return hasAnyScoreInGameGroup(group);
 }
 
 /**
  * 统一状态计算（唯一入口）
- * @param {object} groupData - 单组数据（groupsStore 组 或 gameStore 组）
- * @param {{ source?: 'groups'|'game' }} [options]
+ * @param {object} groupData - 单组数据（groupsStore 组 / gameStore 组 / 球队赛正式组）
+ * @param {{ source?: 'groups'|'game'|'match', scoreData?: object }} [options]
+ *   - game：读 group.playersSlots + group.scoresByPlayer（普通球局，不变）
+ *   - groups：读 groupsStore players.holes
+ *   - match：读 options.scoreData[groupId]（球队比赛）
  * @returns {{
  *   status: string,
  *   statusKey: 'upcoming'|'live'|'completed',
@@ -69,7 +118,8 @@ function hasAnyScoreInGroup(group, source) {
  * }}
  */
 function getMatchStatus(groupData, options) {
-  const source = (options && options.source) || 'game';
+  const opts = options || {};
+  const source = opts.source || 'game';
   if (!groupData) {
     return {
       status: UPCOMING,
@@ -90,7 +140,7 @@ function getMatchStatus(groupData, options) {
       isUpcoming: false
     };
   }
-  if (hasAnyScoreInGroup(groupData, source)) {
+  if (hasAnyScoreInGroup(groupData, source, opts)) {
     return {
       status: LIVE,
       statusKey: 'live',
@@ -147,6 +197,7 @@ module.exports = {
   isFilledScore,
   isGroupConfirmedFinished,
   hasAnyScoreInGroup,
+  hasAnyScoreInMatchScoreData,
   getMatchStatus,
   getMatchStatusForGameGroup,
   getMatchStatusForTournamentGroup,

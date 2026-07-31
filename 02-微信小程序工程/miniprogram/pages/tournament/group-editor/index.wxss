@@ -9,8 +9,6 @@
   --text-primary: #f1f5f9;
   --text-secondary: #e5e7f9;
   --text-muted: #888888;
-  --tour-blue: #3b82f6;
-  --champion-gold: #c8a24a;
   --error: #ef4444;
   --shadow-card: 0 8rpx 24rpx rgba(0, 0, 0, 0.35);
 }
@@ -26,7 +24,6 @@
   --text-secondary: #374151;
   --text-muted: #6b7280;
   --tour-blue: #002d62;
-  --champion-gold: #c8a24a;
   --error: #ef4444;
   --shadow-card: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
 }
@@ -142,6 +139,10 @@ page {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.group-editor-page.dark-mode .composition-preview__label,
+.group-editor-page.dark-mode .pairing-card__label {
+  color: var(--text-primary);
 }
 .composition-preview__names {
   flex: 1;

@@ -148,6 +148,66 @@ function resolveFourballTeamLayoutFlag(groups) {
   return false;
 }
 
+/**
+ * 普通创建纯 4+0 / 3+0：所有组成绩行均为恰好 4 人或恰好 3 人（全组同规模）。
+ * 排除 2+2 / 2+1 / 3+1；不改成绩模型。4+0 / 3+0 行为不变。
+ */
+function resolveFourball40StrokeShellFlag(groups) {
+  const list = Array.isArray(groups) ? groups : [];
+  if (!list.length) return false;
+  let size = 0;
+  for (let i = 0; i < list.length; i++) {
+    const n = ((list[i] && list[i].members) || []).length;
+    if (n !== 3 && n !== 4) return false;
+    if (!size) size = n;
+    else if (n !== size) return false;
+  }
+  return size === 3 || size === 4;
+}
+
+/**
+ * 普通创建 3+1：恰好两组，规模为 3 与 1（顺序不限）。
+ * 走与 3+0 同一 stroke shell；顶部名册仍只展示三人组 + 空位。
+ */
+function resolveFourball31StrokeShellFlag(groups) {
+  const list = Array.isArray(groups) ? groups : [];
+  if (list.length !== 2) return false;
+  let hasTriple = false;
+  let hasSingle = false;
+  for (let i = 0; i < list.length; i++) {
+    const n = ((list[i] && list[i].members) || []).length;
+    if (n === 3) hasTriple = true;
+    else if (n === 1) hasSingle = true;
+    else return false;
+  }
+  return hasTriple && hasSingle;
+}
+
+/** 4+0 / 3+0 / 3+1 共用个人比杆壳门控（不改各模式成绩模型） */
+function resolveStrokeTeamShellFlag(groups) {
+  return resolveFourball40StrokeShellFlag(groups) || resolveFourball31StrokeShellFlag(groups);
+}
+
+/**
+ * 3+0：在既有 4 列 grid 上补第 4 个空白占位；4+0（已满 4）原样返回。
+ * 不重算列宽、不均分 3 卡。
+ */
+function padBestRosterFourSlots(roster) {
+  const list = Array.isArray(roster) ? roster.slice(0, 4) : [];
+  while (list.length < 4) {
+    list.push({
+      playerId: '__empty_slot_' + list.length,
+      name: '',
+      avatar: '',
+      tee: '',
+      teeColor: 'transparent',
+      groupClass: '',
+      isEmpty: true
+    });
+  }
+  return list;
+}
+
 const PLAYER_SEEDS = [
   {
     id: 'p1',
@@ -1794,7 +1854,7 @@ Page({
     useStrokeScoreShell: false,
     /** 比洞 UI Shell：本阶段仅球队赛 G5；G6–G8 仍走 legacy（与 useStrokeScoreShell 独立） */
     useMatchPlayScoreShell: false,
-    /** fourball UI Shell v2：仅 fourball_best 纯 2+2（pair22）启用；2+1/4+0 仍 Legacy */
+    /** fourball UI Shell v2：fourball_best + pair 布局（全组≤2 且含双人）；单人行展示居中退化 */
     useFourballScoreShell: false,
     /** fourball shell v2 行数据适配层（由 bestTeams 派生） */
     fourballRowsView: [],
@@ -1814,6 +1874,12 @@ Page({
     isFourballPairLayout: false,
     /** fourball 4+0：存在 4 人 team 组；独立 flag，不复用 isFourballPair22 */
     isFourballTeamLayout: false,
+    /**
+     * 普通创建纯 4+0 / 3+0 / 3+1：HOLE 以上 = 示例球员卡片（3+0/3+1 第 4 槽空白）；
+     * HOLE 以下 = 个人比杆 useStrokeScoreShell；3+1 另多一行单人成绩。
+     */
+    isFourball40StrokeShell: false,
+    strokeShellFormatLabel: '',
     /** fourball pair 布局：identity 压缩完成后切换短昵称（不影响横滑宽度） */
     isFourballPair22NamesCompact: false,
     /** match-play：T sticky overlay 是否显示（独立于 isTeeStickyVisible / useStrokeScoreShell） */
@@ -2260,6 +2326,8 @@ Page({
       isFourballPair22: false,
       isFourballPairLayout: false,
       isFourballTeamLayout: false,
+      isFourball40StrokeShell: false,
+      strokeShellFormatLabel: '',
       moreMenuItems: menuPanels.moreMenuItems,
       scoringMode: 'stroke',
       layoutType: 'standard',
@@ -2363,6 +2431,14 @@ Page({
 
     // 第一列标题：真实比赛由 matchState.formatType 驱动；演示态固定「最佳球位」原型
     const label = hasMatch ? this._labelForFormat(ms && ms.formatType) : '最佳球位';
+    // 4+0 身份文案：创建时保存的赛制名称；演示态用首页示例赛制名
+    const formatLabel =
+      (hasMatch &&
+        ms &&
+        ms.course &&
+        String(ms.course.gameMode || ms.course.format || '').trim()) ||
+      String((this.data.match && this.data.match.format) || '').trim() ||
+      label;
     // 真实比赛：球队记分行 = 各组逐洞最佳（best across groups）派生；演示态保留原型数据
     const team = hasMatch ? this._teamBestColumns(this.data.scoreDisplayMode) : null;
     const colStartW = this._computeBestballColStartWidth();
@@ -2373,20 +2449,24 @@ Page({
     // pair22 / pair 布局 / 4+0 team 布局门控；不改成绩模型
     const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
     const isFourballTeamLayout = resolveFourballTeamLayoutFlag(this._engineGroups || []);
-    // Legacy 仍用 bestTeams；fourballRowsView 仅作未来 shell 适配，不替换渲染源
+    const isFourball40StrokeShell = resolveStrokeTeamShellFlag(this._engineGroups || []);
+    // Legacy 仍用 bestTeams；4+0/3+0/3+1 另走个人比杆 shell（playersView）
     const bestTeams = this._buildBestTeams(this.data.scoreDisplayMode, hasMatch, label);
     this.setData({
       mode: 'fourball_best',
       isSingleGroupGame: false,
       useGameStrokeShell: false,
-      useStrokeScoreShell: false,
+      useStrokeScoreShell: isFourball40StrokeShell,
       useMatchPlayScoreShell: false,
-      useFourballScoreShell: this._resolveFourballScoreShell(),
+      useFourballScoreShell: isFourball40StrokeShell ? false : this._resolveFourballScoreShell(),
       fourballTeeStickyVisible: false,
       fourballScrollLeft: 0,
       fourballIdentityCollapseProgress: 0,
       fourballTrackInnerStyle: 'transform: translateX(0px);',
       fourballHoleParOffsetX: 0,
+      isTeeStickyVisible: false,
+      isHoleParCompact: false,
+      holeParNormalStyle: 'transform: translateX(0px);',
       isFourballPair22: pairFlags.isFourballPair22,
       isFourballPairLayout: pairFlags.isFourballPairLayout,
       isFourballTeamLayout: isFourballTeamLayout,
@@ -2395,8 +2475,13 @@ Page({
       scoringMode: 'best_ball',
       layoutType: 'fourball',
       bestHasMatch: hasMatch,
-      // 名册条：真实比赛由分组结构派生（带 groupClass 高亮）；演示态走原型
-      bestRoster: hasMatch ? this._buildRosterFromGroups() : buildBestRoster(this._playersSource),
+      // 4+0 / 3+0 / 3+1：名册仅 ≥3 人组（_buildRosterFromGroups）；3+0/3+1 补空白第 4 槽
+      bestRoster: (function () {
+        const raw = hasMatch
+          ? this._buildRosterFromGroups()
+          : buildBestRoster(this._playersSource);
+        return isFourball40StrokeShell ? padBestRosterFourSlots(raw) : raw;
+      }.call(this)),
       bestLabel: label,
       // 记分行：按组渲染（每组一行）；多人组=球队样式，单人组=个人比杆样式
       bestTeams: bestTeams,
@@ -2407,8 +2492,19 @@ Page({
       bestTeamDiffClass: hasMatch
         ? team.teamDiffClass
         : (BEST_SPECIAL[20].diff < 0 ? 'diff-under' : BEST_SPECIAL[20].diff > 0 ? 'diff-over' : 'diff-even'),
-      scoreboardStyle: this._buildScoreboardStyleVars({ colWidth: colStartW, bestDiffGrow: 1 }),
-      'match.format': label
+      // 4+0/3+0/3+1 身份列宽对齐个人比杆 G1；nameWidth=96 供 3+1 单人行与个人比杆同截断
+      scoreboardStyle: this._buildScoreboardStyleVars(
+        isFourball40StrokeShell
+          ? { colWidth: G1_IDENTITY_COL_WIDTH, paddingX: 12, diffOpacity: 1, nameWidth: 96 }
+          : { colWidth: colStartW, bestDiffGrow: 1 }
+      ),
+      'match.format': formatLabel,
+      isFourball40StrokeShell: isFourball40StrokeShell,
+      // 身份列主文案对齐示例：TEAM SCORE / 最佳球位
+      strokeShellFormatLabel: isFourball40StrokeShell ? label : '',
+      playersView: isFourball40StrokeShell
+        ? this._buildFourball40PlayersView(this.data.scoreDisplayMode, label, hasMatch)
+        : this.data.playersView
     });
 
     // 球场信息继承：球场名称 / 开球时间等全部来自 matchState.course
@@ -2694,6 +2790,20 @@ Page({
   // 短名（去掉「T. 」等前缀）
   _shortName(name) {
     return name && name.indexOf('.') >= 0 ? name.split('.').pop().trim() : name;
+  },
+
+  /** 从个人比杆同源席位(_playersSource)按 playerId 取球员（复用同一 name 字段，不另解昵称） */
+  _findPlayersSourceById(playerId) {
+    const key = String(playerId || '').trim();
+    if (!key) return null;
+    const list = this._playersSource || [];
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      if (!p) continue;
+      const id = p.playerId || p.id || p.userId || '';
+      if (id && isSameUserIdentity(id, key)) return p;
+    }
+    return null;
   },
 
   // 按组构建记分行（每组一行），按组规模分流第一列渲染方式（kind）：
@@ -3040,6 +3150,8 @@ Page({
       isFourballPair22: false,
       isFourballPairLayout: false,
       isFourballTeamLayout: false,
+      isFourball40StrokeShell: false,
+      strokeShellFormatLabel: '',
       columns: isMatchPlayBoard ? buildG5Columns() : buildColumns(),
       groupId: groupId || '',
       gameFinished: matchGroup
@@ -3186,6 +3298,8 @@ Page({
       isFourballPair22: false,
       isFourballTeamLayout: false,
       isFourballPairLayout: false,
+      isFourball40StrokeShell: false,
+      strokeShellFormatLabel: '',
       matchSidesView: [],
       moreMenuItems: entityMoreMenu
     });
@@ -3475,7 +3589,6 @@ Page({
       colWidth: colStartW,
       bestDiffGrow: 1
     });
-    // 4+0 team：名册与演示同构（1–4 人均显示）；2+2 pair → []
     const bestRoster = this._buildEntityRosterFromEntitiesView(entitiesView);
     const patch = {
       entitiesView: entitiesView,
@@ -3484,9 +3597,107 @@ Page({
       isMatchPlayScoreMode: matchPlayScoreMode,
       isG5MatchPlay: false,
       matchSidesView: [],
-      mode: 'stroke_entity'
+      mode: 'stroke_entity',
+      useStrokeScoreShell: false,
+      useMatchPlayScoreShell: false,
+      useFourballScoreShell: false,
+      isFourball40StrokeShell: false,
+      strokeShellFormatLabel: ''
     };
     this.setData(this._attachM2ScoreboardToPatch(patch));
+  },
+
+  /**
+   * 4+0 / 3+0 / 3+1：用个人比杆 enrichPlayer 派生成绩行（一组一行；演示态灌入原型洞差）。
+   * 3+1：三人组 → TEAM SCORE + 合成 T；单人组 → 个人比杆行（昵称 + 单色 T）。
+   * 不改 _engineGroups / 成绩存储。
+   */
+  _buildFourball40PlayersView(displayMode, formatLabel, hasMatch) {
+    const groups = this._engineGroups || [];
+    const label = String(formatLabel || '').trim() || '最佳球位';
+    const pars = holePars();
+    const demoScores = BEST_PATTERN.map((diff, hi) => Number(pars[hi]) + Number(diff));
+    const demoPutts = demoScores.map(() => 2);
+    const list = groups.length
+      ? groups
+      : [{ id: 'demo-team', members: (this._playersSource || []).slice(0, 4), scores: [], putts: [] }];
+    const rows = list.map((g, gi) => {
+      let scores = Array.isArray(g.scores) ? g.scores.slice() : [];
+      let putts = Array.isArray(g.putts) ? g.putts.slice() : [];
+      if (!hasMatch && !scores.some(isFilledScore)) {
+        scores = demoScores.slice();
+        putts = demoPutts.slice();
+      }
+      const members = ((g && g.members) || []).slice(0, 4);
+      const isSingleRow = members.length === 1;
+      // 3+1 单人行：与个人比杆同一 enrichPlayer 路径——席位 name / avatar / T，无另解昵称、无合成 T
+      if (isSingleRow) {
+        const m0 = members[0] || {};
+        const pid = (m0 && (m0.playerId || m0.id || m0.userId)) || '';
+        const sourcePlayer = this._findPlayersSourceById(pid) || m0;
+        const sourceIdx = (this._playersSource || []).findIndex(
+          (p) => p && isSameUserIdentity(p.playerId || p.id || p.userId, pid)
+        );
+        const style = resolveScoreTeeStyle(sourcePlayer, sourceIdx >= 0 ? sourceIdx : gi * 4);
+        // 与 refreshPlayers 个人比杆一致：enrichPlayer(p) 直接使用 p.name
+        const enriched = enrichPlayer(
+          {
+            id: (g && g.id) || 'team-' + gi,
+            name: (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
+            avatar: (sourcePlayer && sourcePlayer.avatar) || (m0 && m0.avatar) || '',
+            colorClass: style.colorClass || 'border-light',
+            tPosition: sourcePlayer.tPosition || m0.tPosition || '',
+            gender: sourcePlayer.gender || m0.gender || '',
+            scores: scores,
+            putts: putts
+          },
+          gi,
+          displayMode,
+          { cellEvenDiffAsZero: true }
+        );
+        return Object.assign({}, enriched, {
+          rowKind: 'single',
+          teeSegments: [],
+          sourceGroupIndex: gi
+        });
+      }
+      // 合成 T 线：复用既有 resolveScoreTeeStyle / TEE_PALETTE（与 Legacy 4+0 teamMembers 一致）
+      const teeSegments = members.map((m, mi) => {
+        const style = resolveScoreTeeStyle(m, gi * 4 + mi);
+        const palette = TEE_PALETTE[mi % TEE_PALETTE.length];
+        const hasExplicitTee = !!(m && (isEditTeeKey(m.tPosition) || isEditTeeKey(m.tee)));
+        return {
+          key: 'tee-' + gi + '-' + mi,
+          teeColor: hasExplicitTee
+            ? style.teeColor || (palette && palette.teeColor) || ''
+            : (palette && palette.teeColor) || style.teeColor || ''
+        };
+      });
+      const m0 = members[0] || {};
+      const style = resolveScoreTeeStyle(m0, gi);
+      const enriched = enrichPlayer(
+        {
+          id: (g && g.id) || 'team-' + gi,
+          name: label,
+          avatar: '',
+          colorClass: style.colorClass || 'border-light',
+          scores: scores,
+          putts: putts
+        },
+        gi,
+        displayMode,
+        { cellEvenDiffAsZero: true }
+      );
+      return Object.assign({}, enriched, {
+        rowKind: 'team',
+        teeSegments: teeSegments,
+        sourceGroupIndex: gi
+      });
+    });
+    // 3+1：TEAM SCORE 在上、单人在下（点格用 sourceGroupIndex，不依赖展示序）
+    const teamRows = rows.filter((r) => r && r.rowKind !== 'single');
+    const singleRows = rows.filter((r) => r && r.rowKind === 'single');
+    return teamRows.concat(singleRows);
   },
 
   /**
@@ -3673,6 +3884,8 @@ Page({
       isFourballPair22: false,
       isFourballPairLayout: false,
       isFourballTeamLayout: false,
+      isFourball40StrokeShell: false,
+      strokeShellFormatLabel: '',
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -4327,7 +4540,6 @@ Page({
       patch.isMatchPlayScoreMode = false;
       patch.isG5MatchPlay = false;
       patch.matchSidesView = [];
-      patch.useFourballScoreShell = this._resolveFourballScoreShell();
       const bestTeams = this._buildBestTeams(displayMode);
       patch.bestTeams = bestTeams;
       patch.fourballRowsView = this._buildFourballRowsView(bestTeams);
@@ -4335,15 +4547,50 @@ Page({
       patch.isFourballPair22 = pairFlags.isFourballPair22;
       patch.isFourballPairLayout = pairFlags.isFourballPairLayout;
       patch.isFourballTeamLayout = resolveFourballTeamLayoutFlag(this._engineGroups || []);
+      const isFourball40StrokeShell = resolveStrokeTeamShellFlag(this._engineGroups || []);
+      const msLive = this._matchState || this._readMatchState() || {};
+      const formatLabel =
+        String(
+          (msLive.course && (msLive.course.gameMode || msLive.course.format)) ||
+            (this.data.match && this.data.match.format) ||
+            this.data.bestLabel ||
+            ''
+        ).trim();
       if (this.data.bestHasMatch) {
         const team = this._teamBestColumns(displayMode);
         patch.bestColumns = team.columns;
         patch.bestTeamDiffStr = team.teamDiffStr;
         patch.bestTeamDiffClass = team.teamDiffClass;
-        patch.bestRoster = this._buildRosterFromGroups();
+        // 3+1：_buildRosterFromGroups 本就只收 ≥3 人组 → 三人 + 空位，不含单人
+        patch.bestRoster = isFourball40StrokeShell
+          ? padBestRosterFourSlots(this._buildRosterFromGroups())
+          : this._buildRosterFromGroups();
       } else {
         patch.bestColumns = buildBestBallColumns(displayMode);
-        patch.bestRoster = buildBestRoster(this._playersSource);
+        patch.bestRoster = isFourball40StrokeShell
+          ? padBestRosterFourSlots(buildBestRoster(this._playersSource))
+          : buildBestRoster(this._playersSource);
+      }
+      patch.useStrokeScoreShell = isFourball40StrokeShell;
+      patch.useFourballScoreShell = isFourball40StrokeShell
+        ? false
+        : this._resolveFourballScoreShell();
+      patch.isFourball40StrokeShell = isFourball40StrokeShell;
+      const identityLabel = String(this.data.bestLabel || formatLabel || '').trim() || '最佳球位';
+      patch.strokeShellFormatLabel = isFourball40StrokeShell ? identityLabel : '';
+      if (isFourball40StrokeShell) {
+        patch.playersView = this._buildFourball40PlayersView(
+          displayMode,
+          identityLabel,
+          !!this.data.bestHasMatch
+        );
+        // 与个人比杆 G1 同一套 scoreboardStyle（含 --player-name-width:96rpx）
+        patch.scoreboardStyle = this._buildScoreboardStyleVars({
+          colWidth: G1_IDENTITY_COL_WIDTH,
+          paddingX: 12,
+          diffOpacity: 1,
+          nameWidth: 96
+        });
       }
     }
     // G5–G8：比洞状态 + 展示列（18+FINAL）；G1 恢复标准 OUT/IN/TOT 列
@@ -5606,12 +5853,13 @@ Page({
 
   /**
    * fourball score shell v2 门控。
-   * Phase3：仅 fourball_best 纯 2+2（isFourballPair22）启用新壳；2+1/4+0 仍走 Legacy。
+   * 复用 isFourballPairLayout（有双人组且全组 ≤2）：纯 2+2 与含单人行的组合同壳；
+   * 单人行由展示层居中退化，不另开模式。4+0 仍 Legacy。
    */
   _resolveFourballScoreShell() {
     if (this.data.mode !== 'fourball_best') return false;
     const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
-    return !!pairFlags.isFourballPair22;
+    return !!pairFlags.isFourballPairLayout;
   },
 
   /**

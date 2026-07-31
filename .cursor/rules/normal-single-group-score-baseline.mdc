@@ -1,0 +1,51 @@
+---
+description: 普通创建单组个人比杆记分页基线锁定——后续赛制开发不得改动该稳定路径
+globs: 02-微信小程序工程/miniprogram/pages/score/**/*.{js,wxml,wxss},02-微信小程序工程/miniprogram/utils/gameStore.js,02-微信小程序工程/miniprogram/utils/matchState.js
+alwaysApply: false
+---
+
+# 普通创建单组记分页基线（LOCKED）
+
+门控条件（同时满足）：
+
+- `mode === 'game'`
+- `isSingleGroupGame === true`（`groupCount <= 1` 且 `个人比杆赛` / `individual_stroke`）
+- `useStrokeScoreShell === true`
+- WXML：`scoreboard-shell--game-single`（且 **非** `isFourball40StrokeShell`）
+
+建议 Git Tag：`baseline/normal-single-group-score`
+
+## 禁止
+
+后续开发（多组 / 队内赛 G1–G8 / 队际赛 / 系列赛 / 4+0·2+2 等）**禁止直接修改**下列稳定路径；需要复用时用适配层、新分支或新组件。
+
+### 禁止改动的入口与装配
+
+- `matchState.enterScorePage` / `matchState.buildFromGame`（个人比杆 → `mode: 'game'`）
+- `pages/score/index.js` → `onLoad` 中 `mode === 'game'` 分支
+- `initGameMode`
+- `_isGameSingleScoreContext`
+- `_loadPlayersFromGameGroup`（含 `preferScoresBySlot` 单组语义）
+- `refreshPlayers` 中 `useStrokeScoreShell` 且非 fourball40 / 非比洞 的个人比杆 enrich 路径
+
+### 禁止改动的保存 / 回显
+
+- `persistSession` 中 `_isGameSingleScoreContext()` 双写分支
+- `_flushGameSingleOccupiedScoresToStore`
+- `_readGameSingleSlotScores` / `_gameSingleSlotHasScores` / `_resolvePlayerSlotIndex`
+- `gameStore.setGroupSlotScores` / `setGroupPlayerScores` / `resolveGroupSlotScoreRecord`
+- `gameStore.isSingleGroupIndividualStrokeGame` / `finalizeSingleGroupIndividualStrokeScores`
+- `confirmScoreInput` → `_playersSource` 写入 → `persistSession`（个人比杆路径，勿并入 entity/side）
+
+### 禁止改动的 UI / 交互（单组个人比杆）
+
+- WXML：`wx:if="{{useStrokeScoreShell}}"` 且非 `isFourball40StrokeShell` 的身份列 / 成绩行 / HOLE·PAR / T sticky
+- WXSS：`.scoreboard-shell--game-single` 下公共行高、成绩格、T 线满行高（`height: 100%`）、横滑与 sticky（勿为他赛制改公共规则；他赛制用独立 modifier）
+- `onScoreTrackScroll`、T sticky / HOLE·PAR compact 相关（G1 game-single 共用路径时只加分支，不改默认）
+
+## 允许
+
+- 新增 `wx:elif` / 新 shell class / 新 util
+- 在 `isFourball40StrokeShell`、`useFourballScoreShell`、`stroke_entity`、`match-play` 等**已有或新建**分支内改动
+- 通过适配层调用 gameStore，不改单组 slot 语义
+---

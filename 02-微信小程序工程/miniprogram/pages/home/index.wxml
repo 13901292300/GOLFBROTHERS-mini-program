@@ -59,7 +59,6 @@
             <block wx:for="{{myCards}}" wx:key="id">
               <!-- Tour cards -->
               <view wx:if="{{item.type === 'tour'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour {{item.active ? 'ds-card-active' : ''}}">
-                <text wx:if="{{item.live}}" class="ds-live-badge live-badge-pulse">LIVE</text>
                 <view class="card-action-layer">
                   <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
                 </view>

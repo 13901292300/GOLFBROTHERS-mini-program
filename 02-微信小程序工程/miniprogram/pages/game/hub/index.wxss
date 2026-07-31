@@ -1,6 +1,32 @@
 /* 复用赛事详情页统一样式（Header / TAB 吸顶 / 领先榜 / 分组卡 / 讨论区 / ds-card 等） */
 @import "../../tournament/detail/index.wxss";
 
+/* ===== Hub Bottom Sheet · Dark 顶蓝线（仅 .bottom-sheet，不影响 .style-sheet） ===== */
+.detail-page .bottom-sheet {
+  overflow: hidden;
+}
+.detail-page.bright-mode .bottom-sheet .sheet-top-accent {
+  display: none;
+}
+.detail-page.dark-mode .bottom-sheet .sheet-top-accent {
+  display: block;
+  height: 3px;
+  background: #002d62;
+}
+
+/* Hub M FAB / M 弹窗取消：蓝底白字（页面覆盖，不改 detail 公共 class） */
+.detail-page .leaderboard-fab {
+  background: #002D62;
+  color: #ffffff;
+}
+.detail-page .leaderboard-fab .fab-label {
+  color: #ffffff;
+}
+.detail-page .bottom-sheet .sheet-cancel-btn {
+  background: #002D62;
+  color: #ffffff;
+}
+
 /* ===== Game Hub 专属 ===== */
 
 /* 分组表「空间约束型滚动」：
@@ -129,6 +155,9 @@
   font-size: 30rpx;
 }
 .detail-page.font-large .tee-start-info {
+  font-size: 26rpx;
+}
+.detail-page.font-large .tee-status {
   font-size: 26rpx;
 }
 .detail-page.font-large .gb-group-player-name {

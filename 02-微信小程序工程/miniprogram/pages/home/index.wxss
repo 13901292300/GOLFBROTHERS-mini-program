@@ -691,7 +691,6 @@ page {
   height: auto;
   min-height: 64px;
   justify-content: flex-start;
-  gap: 8px;
 }
 .ds-card-club__status-tag {
   flex-shrink: 0;
@@ -699,6 +698,7 @@ page {
   align-items: center;
   justify-content: center;
   width: 100%;
+  margin-top: 22px;
 }
 /* 与创建页 ds-badge 规范一致 */
 .ds-badge {

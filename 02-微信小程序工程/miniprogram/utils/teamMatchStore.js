@@ -115,6 +115,8 @@ function normalizeScoreData(scoreData) {
  * - teamScoresByEntity：Entity 组合（比杆）
  * - scoresBySide：G6/G7/G8 比洞 Side（组合，非个人）
  * - matchPlayMeta：G5–G8 比洞起始洞（Phase1-D，可选）
+ * - firstScoreAt：该组第一笔有效洞成绩时间戳（可选）
+ * - finishedScoreAt：该组成绩主体记满 18 洞时间戳（可选；非比洞 clinch）
  */
 function normalizeMatchPlayMeta(meta) {
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
@@ -126,6 +128,142 @@ function normalizeMatchPlayMeta(meta) {
     startHole: Math.floor(sh),
     source: source
   };
+}
+
+function normalizeFirstScoreAt(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function isFilledHoleScore(s) {
+  return s !== null && s !== undefined && s !== '';
+}
+
+function scoresArrayHasFilled(scores) {
+  return Array.isArray(scores) && scores.some(isFilledHoleScore);
+}
+
+/** 组成绩桶是否已有任意有效洞成绩（三桶任一） */
+function groupScoreBucketHasAnyFilledScore(bucket) {
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return false;
+  const scoresByPlayer = bucket.scoresByPlayer;
+  if (scoresByPlayer && typeof scoresByPlayer === 'object' && !Array.isArray(scoresByPlayer)) {
+    const keys = Object.keys(scoresByPlayer);
+    for (let i = 0; i < keys.length; i++) {
+      const rec = scoresByPlayer[keys[i]];
+      if (scoresArrayHasFilled(rec && rec.scores)) return true;
+    }
+  }
+  const entities = bucket.teamScoresByEntity;
+  if (Array.isArray(entities)) {
+    for (let i = 0; i < entities.length; i++) {
+      if (scoresArrayHasFilled(entities[i] && entities[i].scores)) return true;
+    }
+  }
+  const scoresBySide = bucket.scoresBySide;
+  if (scoresBySide && typeof scoresBySide === 'object' && !Array.isArray(scoresBySide)) {
+    const sideKeys = Object.keys(scoresBySide);
+    for (let i = 0; i < sideKeys.length; i++) {
+      const rec = scoresBySide[sideKeys[i]];
+      if (scoresArrayHasFilled(rec && rec.scores)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 首次有效洞成绩时写入 firstScoreAt；已有则不覆盖。
+ * 就地改 bucket 并返回同一对象。
+ */
+function ensureGroupScoreBucketFirstScoreAt(bucket) {
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return bucket;
+  if (normalizeFirstScoreAt(bucket.firstScoreAt) != null) return bucket;
+  if (!groupScoreBucketHasAnyFilledScore(bucket)) return bucket;
+  bucket.firstScoreAt = Date.now();
+  return bucket;
+}
+
+/** scores[0..17] 是否全部为有效洞成绩（不看 clinch / thru） */
+function scoresArrayHasCompleted18Holes(scores) {
+  if (!Array.isArray(scores)) return false;
+  for (let h = 0; h < 18; h++) {
+    if (!isFilledHoleScore(scores[h])) return false;
+  }
+  return true;
+}
+
+/**
+ * 组成绩主体是否已全部记满 18 洞。
+ * 优先判定有主体的桶：scoresBySide → teamScoresByEntity → scoresByPlayer。
+ * 不使用 matchPlay clinch / thru / status。
+ */
+function groupScoreBucketHasCompleted18Holes(bucket) {
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return false;
+
+  const scoresBySide =
+    bucket.scoresBySide && typeof bucket.scoresBySide === 'object' && !Array.isArray(bucket.scoresBySide)
+      ? bucket.scoresBySide
+      : null;
+  if (scoresBySide) {
+    const sideKeys = Object.keys(scoresBySide);
+    if (sideKeys.length) {
+      for (let i = 0; i < sideKeys.length; i++) {
+        const rec = scoresBySide[sideKeys[i]];
+        if (!scoresArrayHasCompleted18Holes(rec && rec.scores)) return false;
+      }
+      return true;
+    }
+  }
+
+  const entities = Array.isArray(bucket.teamScoresByEntity) ? bucket.teamScoresByEntity : [];
+  const entityList = entities.filter((e) => e && typeof e === 'object');
+  if (entityList.length) {
+    for (let i = 0; i < entityList.length; i++) {
+      if (!scoresArrayHasCompleted18Holes(entityList[i].scores)) return false;
+    }
+    return true;
+  }
+
+  const scoresByPlayer =
+    bucket.scoresByPlayer &&
+    typeof bucket.scoresByPlayer === 'object' &&
+    !Array.isArray(bucket.scoresByPlayer)
+      ? bucket.scoresByPlayer
+      : null;
+  if (!scoresByPlayer) return false;
+  const playerKeys = Object.keys(scoresByPlayer);
+  if (!playerKeys.length) return false;
+  for (let i = 0; i < playerKeys.length; i++) {
+    const rec = scoresByPlayer[playerKeys[i]];
+    if (!scoresArrayHasCompleted18Holes(rec && rec.scores)) return false;
+  }
+  return true;
+}
+
+/**
+ * 成绩主体记满 18 洞时写入 finishedScoreAt；已有则不覆盖。
+ * 就地改 bucket 并返回同一对象。
+ */
+function ensureGroupScoreBucketFinishedScoreAt(bucket) {
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return bucket;
+  if (normalizeFirstScoreAt(bucket.finishedScoreAt) != null) return bucket;
+  if (!groupScoreBucketHasCompleted18Holes(bucket)) return bucket;
+  bucket.finishedScoreAt = Date.now();
+  return bucket;
+}
+
+/**
+ * 主动结束比赛时冻结 finishedScoreAt（可不打满 18 洞）。
+ * - 已有 finishedScoreAt：不覆盖
+ * - 无 firstScoreAt：不写（尚未开打不计时）
+ * - 否则：finishedScoreAt = Date.now()
+ */
+function forceGroupScoreBucketFinishedScoreAt(bucket) {
+  if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return bucket;
+  if (normalizeFirstScoreAt(bucket.finishedScoreAt) != null) return bucket;
+  if (normalizeFirstScoreAt(bucket.firstScoreAt) == null) return bucket;
+  bucket.finishedScoreAt = Date.now();
+  return bucket;
 }
 
 function normalizeGroupScoreBucket(groupScore) {
@@ -140,12 +278,16 @@ function normalizeGroupScoreBucket(groupScore) {
       ? g.scoresBySide
       : {};
   const matchPlayMeta = normalizeMatchPlayMeta(g.matchPlayMeta);
+  const firstScoreAt = normalizeFirstScoreAt(g.firstScoreAt);
+  const finishedScoreAt = normalizeFirstScoreAt(g.finishedScoreAt);
   const out = {
     scoresByPlayer: scoresByPlayer,
     teamScoresByEntity: teamScoresByEntity,
     scoresBySide: scoresBySide
   };
   if (matchPlayMeta) out.matchPlayMeta = matchPlayMeta;
+  if (firstScoreAt != null) out.firstScoreAt = firstScoreAt;
+  if (finishedScoreAt != null) out.finishedScoreAt = finishedScoreAt;
   return out;
 }
 
@@ -912,6 +1054,8 @@ function migrateComboScoresToIndividualStroke(match, targetGameMode) {
       scoresBySide: preserved.scoresBySide
     };
     if (preserved.matchPlayMeta) out[gid].matchPlayMeta = preserved.matchPlayMeta;
+    if (preserved.firstScoreAt != null) out[gid].firstScoreAt = preserved.firstScoreAt;
+    if (preserved.finishedScoreAt != null) out[gid].finishedScoreAt = preserved.finishedScoreAt;
   });
 
   return out;
@@ -1407,9 +1551,15 @@ module.exports = {
   shouldMigrateComboScoresToIndividualStroke,
   shouldClearComboArtifactsForPersonalMatchPlay,
   migrateComboScoresToIndividualStroke,
-  normalizeGroupScoreBucket,
-  normalizeMatchPlayMeta,
-  normalizeSideScoreRecord,
+  normalizeGroupScoreBucket: normalizeGroupScoreBucket,
+  normalizeMatchPlayMeta: normalizeMatchPlayMeta,
+  normalizeSideScoreRecord: normalizeSideScoreRecord,
+  normalizeFirstScoreAt: normalizeFirstScoreAt,
+  groupScoreBucketHasAnyFilledScore: groupScoreBucketHasAnyFilledScore,
+  ensureGroupScoreBucketFirstScoreAt: ensureGroupScoreBucketFirstScoreAt,
+  groupScoreBucketHasCompleted18Holes: groupScoreBucketHasCompleted18Holes,
+  ensureGroupScoreBucketFinishedScoreAt: ensureGroupScoreBucketFinishedScoreAt,
+  forceGroupScoreBucketFinishedScoreAt: forceGroupScoreBucketFinishedScoreAt,
   clearFormalGroupsOnMatch,
   clearFormalPairingsOnMatch,
   resolveGroupSlots,
@@ -1436,3 +1586,11 @@ module.exports = {
   normalizeRegisterInfo,
   createDefaultRegisterInfo
 };
+
+// 显式挂载：避免部分运行时未拿到 object shorthand 导出
+module.exports.ensureGroupScoreBucketFirstScoreAt = ensureGroupScoreBucketFirstScoreAt;
+module.exports.ensureGroupScoreBucketFinishedScoreAt = ensureGroupScoreBucketFinishedScoreAt;
+module.exports.forceGroupScoreBucketFinishedScoreAt = forceGroupScoreBucketFinishedScoreAt;
+module.exports.groupScoreBucketHasCompleted18Holes = groupScoreBucketHasCompleted18Holes;
+module.exports.normalizeFirstScoreAt = normalizeFirstScoreAt;
+module.exports.groupScoreBucketHasAnyFilledScore = groupScoreBucketHasAnyFilledScore;

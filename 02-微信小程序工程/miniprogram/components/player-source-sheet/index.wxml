@@ -1,6 +1,7 @@
 <block wx:if="{{visible}}">
   <view class="pss-mask" bindtap="onMaskTap"></view>
   <view class="pss-sheet {{themeClass}}" catchtap="noop">
+    <view class="pss-top-accent"></view>
     <view class="pss-handle"></view>
     <view class="pss-header">
       <view>

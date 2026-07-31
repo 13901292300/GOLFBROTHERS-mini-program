@@ -585,8 +585,20 @@ function buildTeeSheetTabView(matchOrGame, options) {
     const teeTime = resolveGroupTeeTime(g) || matchTeeTime;
     const startHole = resolveGroupStartHole(g);
     const displayPlayers = resolveGroupDisplayPlayers(g, playerLookup);
+    const source = opts.source || 'match';
+    // 球队赛 source:'match'：把 match.scoreData 传入状态中心；普通局 source:'game' 不传，逻辑不变
+    const statusOpts =
+      source === 'match'
+        ? {
+            source: 'match',
+            scoreData:
+              (matchOrGame && matchOrGame.scoreData) ||
+              opts.scoreData ||
+              null
+          }
+        : { source: source };
     const ms = matchStatus.getMatchStatus
-      ? matchStatus.getMatchStatus(g, { source: opts.source || 'match' })
+      ? matchStatus.getMatchStatus(g, statusOpts)
       : { statusBadge: '', statusKey: '', status: '' };
     return {
       id: resolveGroupId(g, index),
