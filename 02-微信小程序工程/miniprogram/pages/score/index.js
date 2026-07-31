@@ -3590,6 +3590,7 @@ Page({
       bestDiffGrow: 1
     });
     const bestRoster = this._buildEntityRosterFromEntitiesView(entitiesView);
+    const useEntityFourballShell = this._resolveStrokeEntityFourballShell(entitiesView);
     const patch = {
       entitiesView: entitiesView,
       bestRoster: bestRoster,
@@ -3600,10 +3601,20 @@ Page({
       mode: 'stroke_entity',
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
-      useFourballScoreShell: false,
+      useFourballScoreShell: useEntityFourballShell,
       isFourball40StrokeShell: false,
       strokeShellFormatLabel: ''
     };
+    if (useEntityFourballShell) {
+      patch.fourballRowsView = this._buildFourballRowsViewFromEntities(entitiesView);
+      patch.isFourballPair22 = true;
+      patch.isFourballPairLayout = true;
+      patch.fourballTeeStickyVisible = false;
+      patch.fourballScrollLeft = 0;
+      patch.fourballIdentityCollapseProgress = 0;
+      patch.fourballTrackInnerStyle = 'transform: translateX(0px);';
+      patch.fourballHoleParOffsetX = 0;
+    }
     this.setData(this._attachM2ScoreboardToPatch(patch));
   },
 
@@ -5855,11 +5866,114 @@ Page({
    * fourball score shell v2 门控。
    * 复用 isFourballPairLayout（有双人组且全组 ≤2）：纯 2+2 与含单人行的组合同壳；
    * 单人行由展示层居中退化，不另开模式。4+0 仍 Legacy。
+   * 仅服务 mode === 'fourball_best'；队内 G2/G3 走 _resolveStrokeEntityFourballShell。
    */
   _resolveFourballScoreShell() {
     if (this.data.mode !== 'fourball_best') return false;
     const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
     return !!pairFlags.isFourballPairLayout;
+  },
+
+  /**
+   * 队内赛 G2/G3 纯 2+2：接入已有 useFourballScoreShell（不改 fourball_best 门控）。
+   * 2+1 / 4+0 / G4 返回 false，保持 Legacy entitiesView。
+   * @param {Array} [entitiesViewArg] refreshEntities 刚生成的视图；缺省读 data.entitiesView
+   */
+  _resolveStrokeEntityFourballShell(entitiesViewArg) {
+    // refreshEntities 同步调用时 setData(mode) 可能未落盘；传入 entitiesView 视为 entity 刷新上下文
+    const modeOk =
+      this.data.mode === 'stroke_entity' || Array.isArray(entitiesViewArg);
+    if (!modeOk) return false;
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId = (ms && ms.matchId) || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const gameMode = this._resolveTeamMatchGameMode(match, ms);
+    if (resolveStrokeKind(gameMode) !== 'g2g3') return false;
+    if (isMatchPlayBoardMode(gameMode)) return false;
+    const rows = Array.isArray(entitiesViewArg)
+      ? entitiesViewArg
+      : this.data.entitiesView || [];
+    if (!rows.length) return false;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const n = Array.isArray(row && row.members) ? row.members.length : 0;
+      if (n !== 2) return false;
+    }
+    return true;
+  },
+
+  /**
+   * entitiesView → fourballRowsView（与 _buildFourballRowsView 同构）。
+   * 仅展示适配；不改 entity / scoreEntities / teamScoresByEntity / persist。
+   * 仅处理 members.length === 2 的 pair 行。
+   */
+  _buildFourballRowsViewFromEntities(entitiesView) {
+    const rows = Array.isArray(entitiesView) ? entitiesView : [];
+    const out = [];
+    rows.forEach((entity, idx) => {
+      const memberCount = Array.isArray(entity && entity.members) ? entity.members.length : 0;
+      if (memberCount !== 2) return;
+      const pairMembers = Array.isArray(entity && entity.pairMembers) ? entity.pairMembers : [];
+      const identityMembers = pairMembers.slice(0, 2).map((m) => ({
+        name: (m && m.name) || '球员',
+        avatar: (m && m.avatar) || '',
+        teeColor: (m && m.teeColor) || ''
+      }));
+      while (identityMembers.length < 2) {
+        identityMembers.push({ name: '球员', avatar: '', teeColor: '' });
+      }
+      const name0 = identityMembers[0].name || '';
+      const name1 = identityMembers[1].name || '';
+      const cells = Array.isArray(entity && entity.cells) ? entity.cells : [];
+      const columns = cells.map((cell, colIdx) => {
+        const c = cell || {};
+        if (c.type === 'special') {
+          return {
+            colIdx: c.colIdx != null ? c.colIdx : colIdx,
+            label: c.label || '',
+            par: c.par,
+            isSpecial: true,
+            isTot: !!c.isTot,
+            score: c.val,
+            putts: c.puttTotal,
+            diffStr: c.diffStr || '',
+            diffClass: c.diffClass || 'diff-even',
+            mainStr: '',
+            scoreClass: '',
+            holeIndex: c.holeIndex
+          };
+        }
+        return {
+          colIdx: c.colIdx != null ? c.colIdx : colIdx,
+          label: c.label || '',
+          par: c.par,
+          isSpecial: false,
+          isTot: false,
+          score: c.score,
+          mainStr: c.mainStr != null ? c.mainStr : '',
+          putts: c.putts,
+          diffStr: c.diffStr || '',
+          diffClass: c.diffClass || 'diff-even',
+          scoreClass: c.scoreClass || '',
+          holeIndex: c.holeIndex
+        };
+      });
+      const id =
+        (entity && entity.entityId != null && String(entity.entityId)) ||
+        'entity-fb-' + idx;
+      out.push({
+        id: id,
+        type: 'pair',
+        identity: { members: identityMembers },
+        collapsedNameView: this._buildFourballCollapsedNameView(name0, name1),
+        lead: {
+          diff: (entity && entity.teamDiffStr) || '',
+          tee: [identityMembers[0].teeColor, identityMembers[1].teeColor]
+        },
+        columns: columns
+      });
+    });
+    return out;
   },
 
   /**
@@ -10717,6 +10831,16 @@ Page({
     if (isG5MatchPlay) {
       if (cIdx === G5_FINAL_COL_IDX) return;
     } else if (SPECIAL_IDX.includes(cIdx)) {
+      return;
+    }
+
+    // 队内 G2/G3 2+2 fourball shell：点格走 Entity 记分，禁止 openTeamScoreInput
+    if (this.data.mode === 'stroke_entity' && this.data.useFourballScoreShell) {
+      const entityIndex = Number(playerIdx);
+      const holeIndex = resolveHoleIndexFromColIdx(cIdx, false);
+      if (!Number.isFinite(entityIndex) || entityIndex < 0) return;
+      if (holeIndex < 0) return;
+      this.openEntityScoreInput(entityIndex, holeIndex);
       return;
     }
 
