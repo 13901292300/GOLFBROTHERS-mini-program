@@ -472,14 +472,16 @@
         </scroll-view>
       </view>
 
-      <!-- ===== fourball shell v2：仅 pair22；Phase4 分层（identity 固定 + track lead + 独立横滑）===== -->
+      <!-- ===== fourball shell v2：仅 pair22；Phase4 分层 + Phase6 tee sticky ===== -->
       <view
         wx:elif="{{useFourballScoreShell}}"
-        class="scoreboard-shell scoreboard-shell--fourball"
+        class="scoreboard-shell scoreboard-shell--fourball {{fourballTeeStickyVisible ? 'is-fourball-tee-sticky' : ''}}"
+        style="--fourball-identity-collapse:{{fourballIdentityCollapseProgress}};"
       >
         <!-- 固定身份层：不响应 scrollLeft / 不折叠 -->
         <scroll-view
           class="fourball-player-column"
+          data-fourball-geometry="player-column"
           scroll-y
           scroll-top="{{identityPanelScrollTop}}"
           bindscroll="onIdentityPanelScroll"
@@ -493,26 +495,86 @@
               wx:key="id"
               class="shell-row shell-row--player fourball-player-column__row"
             >
-              <view class="fourball-identity">
-                <view
-                  wx:for="{{item.identity.members}}"
-                  wx:for-item="m"
-                  wx:key="name"
-                  class="fourball-identity__member"
-                >
-                  <image class="fourball-identity__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
-                  <text class="fourball-identity__name">{{m.name}}</text>
+              <view
+                class="fourball-pair-identity"
+                data-fourball-geometry="identity"
+              >
+                <view class="avatar-group" data-fourball-geometry="avatar-group">
+                  <view
+                    wx:for="{{item.identity.members}}"
+                    wx:for-item="m"
+                    wx:for-index="mIdx"
+                    wx:key="name"
+                    class="avatar-group__item {{mIdx === 1 ? 'avatar-group__item--second' : 'avatar-group__item--first'}}"
+                  >
+                    <image class="avatar-group__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
+                  </view>
+                </view>
+                <view class="name-stack">
+                  <view class="name-group">
+                    <text
+                      wx:for="{{item.identity.members}}"
+                      wx:for-item="m"
+                      wx:for-index="mIdx"
+                      wx:key="name"
+                      class="name-group__name"
+                    >{{m.name}}</text>
+                  </view>
+                  <!-- Phase5.2-d：折叠昵称自适应 combined / dual（仅 pair22 shell） -->
+                  <view
+                    wx:if="{{item.type === 'pair' && item.collapsedNameView}}"
+                    class="pair-name-compact pair-name-compact--{{item.collapsedNameView.mode}}"
+                  >
+                    <text wx:if="{{item.collapsedNameView.mode === 'combined'}}" class="pair-name-compact__text">{{item.collapsedNameView.text}}</text>
+                    <block wx:else>
+                      <text class="pair-name-compact__part" style="{{item.collapsedNameView.leftStyle}}">{{item.collapsedNameView.left}}</text>
+                      <text class="pair-name-compact__sep">/</text>
+                      <text class="pair-name-compact__part" style="{{item.collapsedNameView.rightStyle}}">{{item.collapsedNameView.right}}</text>
+                    </block>
+                  </view>
                 </view>
               </view>
             </view>
           </view>
         </scroll-view>
 
-        <!-- HOLE/PAR 显示层（Phase4 静态；不随 identity 变化） -->
-        <view class="fourball-hole-par-overlay">
+        <!-- Phase7.4：宽= identity+diff+tee；阶段2 用 fourballHoleParOffsetX 跟 lead，吸边后封顶 -->
+        <view
+          class="fourball-hole-par-overlay"
+          style="transform: translateX({{fourballHoleParOffsetX}}px);"
+        >
           <view class="fourball-hole-par-overlay__hole"><text>HOLE</text></view>
           <view class="fourball-hole-par-overlay__par"><text>PAR</text></view>
         </view>
+
+        <!-- Phase6：T sticky，贴 player-column 右缘；双色半条复用 lead.tee / members.teeColor -->
+        <scroll-view
+          class="fourball-tee-sticky-overlay {{fourballTeeStickyVisible ? 'is-visible' : ''}}"
+          scroll-y
+          scroll-top="{{identityPanelScrollTop}}"
+          show-scrollbar="{{false}}"
+        >
+          <view class="fourball-tee-sticky-overlay__inner">
+            <view class="shell-row shell-row--head fourball-tee-sticky-overlay__spacer"></view>
+            <view class="shell-row shell-row--par fourball-tee-sticky-overlay__spacer"></view>
+            <view
+              wx:for="{{fourballRowsView}}"
+              wx:key="id"
+              class="shell-row shell-row--player fourball-tee-sticky-overlay__row"
+            >
+              <view class="fourball-tee-sticky-overlay__strip">
+                <view
+                  class="tee-left"
+                  style="background:{{item.lead.tee[0] || (item.identity.members[0] && item.identity.members[0].teeColor) || ''}};"
+                ></view>
+                <view
+                  class="tee-right"
+                  style="background:{{item.lead.tee[1] || (item.identity.members[1] && item.identity.members[1].teeColor) || ''}};"
+                ></view>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
 
         <!-- 独立横滑层：前缀 lead(diff+tee) + 成绩格；成绩左滑自然覆盖 lead -->
         <scroll-view
@@ -523,7 +585,7 @@
           bindscroll="onFourballScoreTrackScroll"
           show-scrollbar="{{false}}"
         >
-          <view class="fourball-score-track__inner">
+          <view class="fourball-score-track__inner" style="{{fourballTrackInnerStyle}}">
             <view class="scoreboard-row scoreboard-row--head shell-row shell-row--head">
               <view class="fourball-track-lead fourball-track-lead--diff fourball-track-lead--head"></view>
               <view class="fourball-track-lead fourball-track-lead--tee fourball-track-lead--head"></view>
@@ -554,7 +616,10 @@
               wx:for-index="gIdx"
               class="scoreboard-row scoreboard-row--player shell-row shell-row--player"
             >
-              <view class="fourball-track-lead fourball-track-lead--diff">
+              <view
+                class="fourball-track-lead fourball-track-lead--diff"
+                data-fourball-geometry="lead"
+              >
                 <text class="fourball-track-lead__diff">{{item.lead.diff || '-'}}</text>
               </view>
               <view class="fourball-track-lead fourball-track-lead--tee">
@@ -575,7 +640,7 @@
                 bindtap="onScoreCellTap"
                 data-player-idx="{{gIdx}}"
                 data-col-idx="{{cIdx}}"
-                class="scoreboard-cell score-cell {{col.isSpecial ? 'scoreboard-cell--special-cell' : ''}} {{col.isTot ? 'score-cell--total' : ''}}"
+                class="scoreboard-cell score-cell {{col.isSpecial ? 'scoreboard-cell--special-cell' : ''}} {{col.isSpecial && !col.isTot ? 'scoreboard-cell--hole-special-col' : ''}} {{col.isTot ? 'score-cell--total scoreboard-cell--tot-col' : ''}}"
               >
                 <block wx:if="{{col.isSpecial}}">
                   <view class="special-cell-inner">
