@@ -667,7 +667,8 @@ page {
 .scoreboard-shell,
 .scoreboard-shell--basic,
 .scoreboard-shell--game-single,
-.scoreboard-shell--match-play {
+.scoreboard-shell--match-play,
+.scoreboard-shell--fourball {
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -676,6 +677,231 @@ page {
   align-items: stretch;
   background: var(--bg-primary);
   overflow: hidden;
+}
+
+/* ===== fourball shell v2（Phase4：identity 固定 + track lead + 独立横滑；不改 Legacy）===== */
+.scoreboard-shell--fourball {
+  position: relative;
+}
+
+/* identity 固定宽；禁止 width transition / scrollLeft 驱动缩列 */
+.scoreboard-shell--fourball .fourball-player-column {
+  flex-shrink: 0;
+  width: 220rpx;
+  min-width: 220rpx;
+  max-width: 220rpx;
+  height: 100%;
+  position: relative;
+  z-index: 3;
+  background: var(--score-header-identity);
+  box-sizing: border-box;
+  transition: none;
+}
+
+.scoreboard-shell--fourball .fourball-player-column__inner {
+  width: 100%;
+}
+
+.scoreboard-shell--fourball .fourball-player-column__spacer {
+  width: 100%;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--score-header-intersection);
+}
+
+.scoreboard-shell--fourball .fourball-player-column__spacer.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  background: var(--score-header-intersection);
+  border-bottom: none;
+}
+
+.scoreboard-shell--fourball .fourball-player-column__spacer.shell-row--par {
+  height: 72rpx;
+  min-height: 72rpx;
+  background: var(--score-header-identity);
+}
+
+.scoreboard-shell--fourball .fourball-player-column__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 156rpx;
+  min-height: 156rpx;
+  box-sizing: border-box;
+  background: var(--score-header-identity);
+  border-bottom: 1px solid var(--score-header-intersection);
+}
+
+.scoreboard-shell--fourball .fourball-identity {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  width: 100%;
+  padding: 8rpx 12rpx;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--fourball .fourball-identity__member {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.scoreboard-shell--fourball .fourball-identity__avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+}
+
+.scoreboard-shell--fourball .fourball-identity__name {
+  max-width: 100%;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* HOLE/PAR overlay：宽≈ identity(220)+diff(96)+tee(6)；不响应横滑折叠 */
+.scoreboard-shell--fourball .fourball-hole-par-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 322rpx;
+  height: 184rpx;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--fourball .fourball-hole-par-overlay__hole,
+.scoreboard-shell--fourball .fourball-hole-par-overlay__par {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.scoreboard-shell--fourball .fourball-hole-par-overlay__hole {
+  height: 112rpx;
+}
+
+.scoreboard-shell--fourball .fourball-hole-par-overlay__par {
+  height: 72rpx;
+}
+
+.scoreboard-shell--fourball .fourball-hole-par-overlay__hole text,
+.scoreboard-shell--fourball .fourball-hole-par-overlay__par text {
+  color: var(--text-secondary);
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+/* score-track：最低层；lead 在 track 内随横滑，成绩列自然覆盖 lead */
+.scoreboard-shell--fourball .fourball-score-track {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+.scoreboard-shell--fourball .fourball-score-track__inner {
+  display: inline-block;
+  min-width: 100%;
+}
+
+.scoreboard-shell--fourball .scoreboard-row {
+  display: flex;
+  min-width: max-content;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-shell--fourball .scoreboard-row.shell-row--head {
+  height: 112rpx;
+  min-height: 112rpx;
+  border-bottom: none;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.scoreboard-shell--fourball .scoreboard-row.shell-row--par {
+  min-height: 72rpx;
+}
+
+.scoreboard-shell--fourball .scoreboard-row.shell-row--player {
+  height: 156rpx;
+  min-height: 156rpx;
+}
+
+.scoreboard-shell--fourball .scoreboard-cell {
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* track lead：固定宽，禁止 opacity/width collapse（非 Legacy --bb-diff-col-w 模型） */
+.scoreboard-shell--fourball .fourball-track-lead {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: var(--score-header-identity);
+  transition: none;
+  opacity: 1;
+}
+
+.scoreboard-shell--fourball .fourball-track-lead--diff {
+  width: 96rpx;
+  min-width: 96rpx;
+  max-width: 96rpx;
+}
+
+.scoreboard-shell--fourball .fourball-track-lead--tee {
+  width: 6rpx;
+  min-width: 6rpx;
+  max-width: 6rpx;
+  padding: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.scoreboard-shell--fourball .fourball-track-lead--head {
+  background: var(--score-header-intersection);
+}
+
+.scoreboard-shell--fourball .fourball-track-lead--par,
+.scoreboard-shell--fourball .scoreboard-row--player .fourball-track-lead {
+  border-bottom: 1px solid var(--score-header-intersection);
+}
+
+.scoreboard-shell--fourball .fourball-track-lead__diff {
+  font-size: 40rpx;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.scoreboard-shell--fourball .fourball-track-lead__tee-half {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
 }
 
 .player-column {

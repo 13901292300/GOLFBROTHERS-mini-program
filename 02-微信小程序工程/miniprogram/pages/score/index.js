@@ -1794,6 +1794,12 @@ Page({
     useStrokeScoreShell: false,
     /** 比洞 UI Shell：本阶段仅球队赛 G5；G6–G8 仍走 legacy（与 useStrokeScoreShell 独立） */
     useMatchPlayScoreShell: false,
+    /** fourball UI Shell v2：仅 fourball_best 纯 2+2（pair22）启用；2+1/4+0 仍 Legacy */
+    useFourballScoreShell: false,
+    /** fourball shell v2 行数据适配层（由 bestTeams 派生） */
+    fourballRowsView: [],
+    /** fourball shell track 横滑位置（Phase4：只记录，不驱动 identity） */
+    fourballScrollLeft: 0,
     /** 普通创建 fourball_best 纯 2+2：业务判定（每组恰好 2 人） */
     isFourballPair22: false,
     /** fourball pair 视觉布局：2+2 或 2+1（有 pair 且无 ≥3）；驱动 CSS class / 横滑 */
@@ -2242,6 +2248,7 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
+      useFourballScoreShell: this._resolveFourballScoreShell(),
       isFourballPair22: false,
       isFourballPairLayout: false,
       isFourballTeamLayout: false,
@@ -2358,12 +2365,15 @@ Page({
     // pair22 / pair 布局 / 4+0 team 布局门控；不改成绩模型
     const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
     const isFourballTeamLayout = resolveFourballTeamLayoutFlag(this._engineGroups || []);
+    // Legacy 仍用 bestTeams；fourballRowsView 仅作未来 shell 适配，不替换渲染源
+    const bestTeams = this._buildBestTeams(this.data.scoreDisplayMode, hasMatch, label);
     this.setData({
       mode: 'fourball_best',
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
+      useFourballScoreShell: this._resolveFourballScoreShell(),
       isFourballPair22: pairFlags.isFourballPair22,
       isFourballPairLayout: pairFlags.isFourballPairLayout,
       isFourballTeamLayout: isFourballTeamLayout,
@@ -2376,7 +2386,8 @@ Page({
       bestRoster: hasMatch ? this._buildRosterFromGroups() : buildBestRoster(this._playersSource),
       bestLabel: label,
       // 记分行：按组渲染（每组一行）；多人组=球队样式，单人组=个人比杆样式
-      bestTeams: this._buildBestTeams(this.data.scoreDisplayMode, hasMatch, label),
+      bestTeams: bestTeams,
+      fourballRowsView: this._buildFourballRowsView(bestTeams),
       // 兼容字段（best across groups，供需要时读取，不再用于行渲染）
       bestColumns: hasMatch ? team.columns : buildBestBallColumns(this.data.scoreDisplayMode),
       bestTeamDiffStr: hasMatch ? team.teamDiffStr : formatDiff(BEST_SPECIAL[20].diff),
@@ -3012,6 +3023,7 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: isTeamG1Stroke,
       useMatchPlayScoreShell: isG5Only,
+      useFourballScoreShell: this._resolveFourballScoreShell(),
       isFourballPair22: false,
       isFourballPairLayout: false,
       isFourballTeamLayout: false,
@@ -3157,6 +3169,7 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: false,
       useMatchPlayScoreShell: false,
+      useFourballScoreShell: this._resolveFourballScoreShell(),
       isFourballPair22: false,
       isFourballTeamLayout: false,
       isFourballPairLayout: false,
@@ -3643,6 +3656,7 @@ Page({
       useGameStrokeShell: useGameStrokeShell,
       useStrokeScoreShell: useStrokeScoreShell,
       useMatchPlayScoreShell: false,
+      useFourballScoreShell: this._resolveFourballScoreShell(),
       isFourballPair22: false,
       isFourballPairLayout: false,
       isFourballTeamLayout: false,
@@ -4300,7 +4314,10 @@ Page({
       patch.isMatchPlayScoreMode = false;
       patch.isG5MatchPlay = false;
       patch.matchSidesView = [];
-      patch.bestTeams = this._buildBestTeams(displayMode);
+      patch.useFourballScoreShell = this._resolveFourballScoreShell();
+      const bestTeams = this._buildBestTeams(displayMode);
+      patch.bestTeams = bestTeams;
+      patch.fourballRowsView = this._buildFourballRowsView(bestTeams);
       const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
       patch.isFourballPair22 = pairFlags.isFourballPair22;
       patch.isFourballPairLayout = pairFlags.isFourballPairLayout;
@@ -5574,6 +5591,77 @@ Page({
     return !!this.data.useStrokeScoreShell;
   },
 
+  /**
+   * fourball score shell v2 门控。
+   * Phase3：仅 fourball_best 纯 2+2（isFourballPair22）启用新壳；2+1/4+0 仍走 Legacy。
+   */
+  _resolveFourballScoreShell() {
+    if (this.data.mode !== 'fourball_best') return false;
+    const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
+    return !!pairFlags.isFourballPair22;
+  },
+
+  /**
+   * bestTeams → fourballRowsView 适配层（不改 bestTeams / 不改成绩模型）。
+   * columns / members 尽量保留原数组引用，供未来 shell 消费。
+   */
+  _buildFourballRowsView(bestTeams) {
+    const rows = Array.isArray(bestTeams) ? bestTeams : [];
+    return rows.map((item, idx) => {
+      const kind = (item && item.kind) || 'single';
+      const id = (item && item.id != null ? item.id : '') || 'fb-row-' + idx;
+      const columns = item && item.columns ? item.columns : [];
+      const diff = (item && item.teamDiffStr) || '';
+
+      if (kind === 'pair') {
+        const members = (item && item.pairMembers) || [];
+        const tee = members.map((m) => (m && m.teeColor) || '');
+        return {
+          id: id,
+          type: 'pair',
+          identity: { members: members },
+          lead: { diff: diff, tee: tee },
+          columns: columns
+        };
+      }
+
+      if (kind === 'team') {
+        // teamMembers 来自 _buildBestTeams；若缺失则不猜测 roster，保持空数组
+        const members = (item && Array.isArray(item.teamMembers) && item.teamMembers.length)
+          ? item.teamMembers
+          : [];
+        const tee = members.length
+          ? members.map((m) => (m && m.teeColor) || '')
+          : [];
+        return {
+          id: id,
+          type: 'team',
+          identity: { members: members },
+          lead: { diff: diff, tee: tee },
+          columns: columns
+        };
+      }
+
+      // single（含 2+1）：从行级字段组装单成员，避免丢行
+      const singleMember = {
+        name: (item && (item.name || '')) || '',
+        displayName: (item && (item.displayName || item.name || '')) || '',
+        avatar: (item && (item.avatar || '')) || '',
+        teeColor: (item && (item.teeColor || '')) || ''
+      };
+      return {
+        id: id,
+        type: 'single',
+        identity: { members: [singleMember] },
+        lead: {
+          diff: diff,
+          tee: singleMember.teeColor ? [singleMember.teeColor] : []
+        },
+        columns: columns
+      };
+    });
+  },
+
   /** game-single：窗口宽（rpx→px） */
   _getGameSingleWindowWidth() {
     if (this._gameSingleWindowWidthCache != null) return this._gameSingleWindowWidthCache;
@@ -5669,6 +5757,25 @@ Page({
     if (this._shellScrollLock === 'identity') return;
     const top = e.detail.scrollTop || 0;
     // 纯横滑时 scrollTop 不变，跳过纵同步
+    if (this._lastTrackScrollTop != null && Math.abs(this._lastTrackScrollTop - top) < 0.5) {
+      return;
+    }
+    this._lastTrackScrollTop = top;
+    this._shellScrollLock = 'track';
+    this._syncShellScrollTop('identityPanelScrollTop', top);
+  },
+
+  /**
+   * fourball shell track 横滑（独立于 Legacy onScoreboardScroll / G1 onScoreTrackScroll）。
+   * Phase4：只记录 fourballScrollLeft；不做 identity 折叠 / diff 渐隐。
+   */
+  onFourballScoreTrackScroll(e) {
+    const scrollLeft = Math.max(0, Number((e.detail && e.detail.scrollLeft) || 0));
+    if (scrollLeft !== this.data.fourballScrollLeft) {
+      this.setData({ fourballScrollLeft: scrollLeft });
+    }
+    if (this._shellScrollLock === 'identity') return;
+    const top = (e.detail && e.detail.scrollTop) || 0;
     if (this._lastTrackScrollTop != null && Math.abs(this._lastTrackScrollTop - top) < 0.5) {
       return;
     }
@@ -10956,8 +11063,10 @@ Page({
   refreshTeamColumns() {
     const displayMode = this.data.scoreDisplayMode;
     const team = this._teamBestColumns(displayMode);
+    const bestTeams = this._buildBestTeams(displayMode);
     this.setData({
-      bestTeams: this._buildBestTeams(displayMode),
+      bestTeams: bestTeams,
+      fourballRowsView: this._buildFourballRowsView(bestTeams),
       bestColumns: team.columns,
       bestTeamDiffStr: team.teamDiffStr,
       bestTeamDiffClass: team.teamDiffClass

@@ -472,6 +472,137 @@
         </scroll-view>
       </view>
 
+      <!-- ===== fourball shell v2：仅 pair22；Phase4 分层（identity 固定 + track lead + 独立横滑）===== -->
+      <view
+        wx:elif="{{useFourballScoreShell}}"
+        class="scoreboard-shell scoreboard-shell--fourball"
+      >
+        <!-- 固定身份层：不响应 scrollLeft / 不折叠 -->
+        <scroll-view
+          class="fourball-player-column"
+          scroll-y
+          scroll-top="{{identityPanelScrollTop}}"
+          bindscroll="onIdentityPanelScroll"
+          show-scrollbar="{{false}}"
+        >
+          <view class="fourball-player-column__inner">
+            <view class="shell-row shell-row--head fourball-player-column__spacer"></view>
+            <view class="shell-row shell-row--par fourball-player-column__spacer"></view>
+            <view
+              wx:for="{{fourballRowsView}}"
+              wx:key="id"
+              class="shell-row shell-row--player fourball-player-column__row"
+            >
+              <view class="fourball-identity">
+                <view
+                  wx:for="{{item.identity.members}}"
+                  wx:for-item="m"
+                  wx:key="name"
+                  class="fourball-identity__member"
+                >
+                  <image class="fourball-identity__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
+                  <text class="fourball-identity__name">{{m.name}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+
+        <!-- HOLE/PAR 显示层（Phase4 静态；不随 identity 变化） -->
+        <view class="fourball-hole-par-overlay">
+          <view class="fourball-hole-par-overlay__hole"><text>HOLE</text></view>
+          <view class="fourball-hole-par-overlay__par"><text>PAR</text></view>
+        </view>
+
+        <!-- 独立横滑层：前缀 lead(diff+tee) + 成绩格；成绩左滑自然覆盖 lead -->
+        <scroll-view
+          class="fourball-score-track"
+          scroll-x
+          scroll-y
+          scroll-top="{{scoreTrackScrollTop}}"
+          bindscroll="onFourballScoreTrackScroll"
+          show-scrollbar="{{false}}"
+        >
+          <view class="fourball-score-track__inner">
+            <view class="scoreboard-row scoreboard-row--head shell-row shell-row--head">
+              <view class="fourball-track-lead fourball-track-lead--diff fourball-track-lead--head"></view>
+              <view class="fourball-track-lead fourball-track-lead--tee fourball-track-lead--head"></view>
+              <view
+                wx:for="{{columns}}"
+                wx:key="colIdx"
+                class="scoreboard-cell scoreboard-cell--head {{item.isSpecial ? 'scoreboard-cell--special-head' : ''}} {{item.isTot ? 'scoreboard-cell--tot-head' : ''}}"
+              >
+                <view class="hole-label-wrap">
+                  <view class="hole-label-circle {{item.isSpecial ? 'hole-label-circle--special' : (item.isStartHole ? 'hole-label-circle--start' : 'hole-number')}}">{{item.label}}</view>
+                </view>
+              </view>
+            </view>
+            <view class="scoreboard-row scoreboard-row--par shell-row shell-row--par">
+              <view class="fourball-track-lead fourball-track-lead--diff fourball-track-lead--par"></view>
+              <view class="fourball-track-lead fourball-track-lead--tee fourball-track-lead--par"></view>
+              <view
+                wx:for="{{columns}}"
+                wx:key="colIdx"
+                class="scoreboard-cell {{item.isSpecial ? 'scoreboard-cell--special-par' : ''}} {{item.isOut || item.isIn ? 'scoreboard-cell--hole-special-col' : ''}} {{item.isTot ? 'scoreboard-cell--tot-col' : ''}}"
+              >
+                <text class="par-val">{{item.par}}</text>
+              </view>
+            </view>
+            <view
+              wx:for="{{fourballRowsView}}"
+              wx:key="id"
+              wx:for-index="gIdx"
+              class="scoreboard-row scoreboard-row--player shell-row shell-row--player"
+            >
+              <view class="fourball-track-lead fourball-track-lead--diff">
+                <text class="fourball-track-lead__diff">{{item.lead.diff || '-'}}</text>
+              </view>
+              <view class="fourball-track-lead fourball-track-lead--tee">
+                <view
+                  wx:for="{{item.lead.tee}}"
+                  wx:for-item="teeColor"
+                  wx:for-index="teeIdx"
+                  wx:key="teeIdx"
+                  class="fourball-track-lead__tee-half"
+                  style="background:{{teeColor}};"
+                ></view>
+              </view>
+              <view
+                wx:for="{{item.columns}}"
+                wx:for-item="col"
+                wx:key="colIdx"
+                wx:for-index="cIdx"
+                bindtap="onScoreCellTap"
+                data-player-idx="{{gIdx}}"
+                data-col-idx="{{cIdx}}"
+                class="scoreboard-cell score-cell {{col.isSpecial ? 'scoreboard-cell--special-cell' : ''}} {{col.isTot ? 'score-cell--total' : ''}}"
+              >
+                <block wx:if="{{col.isSpecial}}">
+                  <view class="special-cell-inner">
+                    <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{col.score}}</text>
+                    <view class="special-cell-meta">
+                      <text class="special-cell-putt">{{col.putts}}</text>
+                      <text class="special-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
+                    </view>
+                  </view>
+                </block>
+                <block wx:else>
+                  <view class="hole-cell-inner">
+                    <view class="{{col.scoreClass}}">
+                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}}">{{col.mainStr}}</text>
+                    </view>
+                    <view class="hole-cell-meta">
+                      <text class="hole-cell-putt">{{col.putts}}</text>
+                      <text class="hole-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
+                    </view>
+                  </view>
+                </block>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
       <!-- ===== 保留 basic：非 G1 的 individual_stroke 演示等（G1 已走 useStrokeScoreShell）===== -->
       <view
         wx:elif="{{mode === 'individual_stroke' && !isG5MatchPlay}}"
