@@ -620,10 +620,11 @@ function formatDiff(diff) {
   return diff > 0 ? '+' + diff : String(diff);
 }
 
-// 记分格右下角 diff：负数带 -，正数不带符号；平标准杆默认 E，game-single 可改为 0
-function formatCellDiff(diff, evenAsZero) {
-  if (diff === 0) return evenAsZero ? '0' : 'E';
-  return String(diff);
+// 记分格右下角 diff：统一 -N / 0 / +N（禁止 E；evenAsZero 参数已废弃，忽略）
+function formatCellDiff(diff) {
+  const n = Number(diff);
+  if (!Number.isFinite(n) || n === 0) return '0';
+  return n > 0 ? '+' + n : String(n);
 }
 
 // 杆差模式主数字：diff>0 显示 +N，diff=0 显示 0，diff<0 显示 -N
@@ -889,8 +890,12 @@ function buildBestBallColumns(displayMode) {
       mainStr: isSpecial ? String(score) : formatMainScore(score, par, displayMode),
       putts,
       diff,
-      // 右下角杆差：洞格在 diff 模式下隐藏（主数字已是杆差）；汇总列始终展示
-      diffStr: isSpecial ? formatDiff(diff) : (displayMode === 'diff' ? '' : formatDiff(diff)),
+      // 右下角杆差：洞格统一 formatCellDiff；汇总列仍用 formatDiff
+      diffStr: isSpecial
+        ? formatDiff(diff)
+        : displayMode === 'diff'
+          ? ''
+          : formatCellDiff(diff),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
       scoreClass: isSpecial ? '' : bestScoreClass(diff)
     };
@@ -961,7 +966,7 @@ function buildTeamBestColumns(scores, putts, displayMode) {
       mainStr: formatMainScore(s, par, displayMode),
       putts: p,
       diff,
-      diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff, true),
+      diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
       scoreClass: bestScoreClass(diff)
     };
@@ -1698,7 +1703,6 @@ function sliceSands(sands) {
 
 function enrichPlayer(player, pIdx, displayMode, options) {
   const hideCorners = !!(options && options.hideCorners);
-  const cellEvenDiffAsZero = !!(options && options.cellEvenDiffAsZero);
   const scores = player.scores || [];
   const putts = player.putts || [];
 
@@ -1789,8 +1793,8 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       displayHint: '',
       putts: p,
       diff,
-      // 右下角杆差：杆差模式下隐藏（主数字已是杆差，避免重复）
-      diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff, cellEvenDiffAsZero),
+      // 右下角杆差：杆差模式下隐藏（主数字已是杆差，避免重复）；平杆统一 0
+      diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
       scoreClass: scoreStyle(diff),
       triangleClass:
         hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
@@ -3839,8 +3843,7 @@ Page({
             putts: putts
           },
           gi,
-          displayMode,
-          { cellEvenDiffAsZero: true }
+          displayMode
         );
         return Object.assign({}, enriched, {
           rowKind: 'single',
@@ -3872,8 +3875,7 @@ Page({
           putts: putts
         },
         gi,
-        displayMode,
-        { cellEvenDiffAsZero: true }
+        displayMode
       );
       return Object.assign({}, enriched, {
         rowKind: 'team',
@@ -4711,12 +4713,10 @@ Page({
       players = this._playersSource.map((p, i) => enrichPlayerG5(p, i, displayMode));
     } else {
       this._matchSidesSource = [];
-      // 个人比杆新版 shell（普通创建 / 球队 G1）：成绩格右下角平标准杆显示 0；头像旁 relScore 仍用 formatDiff → E
-      const cellEvenDiffAsZero = !!this.data.useStrokeScoreShell;
+      // 洞格右下角统一 formatCellDiff（0/+N/-N）；头像旁 relScore 仍用 formatDiff
       players = this._playersSource.map((p, i) =>
         enrichPlayer(p, i, displayMode, {
-          hideCorners: matchPlayScoreMode,
-          cellEvenDiffAsZero: cellEvenDiffAsZero
+          hideCorners: matchPlayScoreMode
         })
       );
     }
@@ -6127,8 +6127,7 @@ Page({
           putts: putts
         },
         gi,
-        displayMode,
-        { cellEvenDiffAsZero: true }
+        displayMode
       );
       return Object.assign({}, enriched, {
         rowKind: 'team',
