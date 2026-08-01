@@ -5968,6 +5968,7 @@ Page({
         collapsedNameView: this._buildFourballCollapsedNameView(name0, name1),
         lead: {
           diff: (entity && entity.teamDiffStr) || '',
+          diffClass: (entity && (entity.teamDiffClass || entity.relClass)) || '',
           tee: [identityMembers[0].teeColor, identityMembers[1].teeColor]
         },
         columns: columns
@@ -6078,6 +6079,7 @@ Page({
       const id = (item && item.id != null ? item.id : '') || 'fb-row-' + idx;
       const columns = item && item.columns ? item.columns : [];
       const diff = (item && item.teamDiffStr) || '';
+      const diffClass = (item && (item.teamDiffClass || item.relClass)) || '';
 
       if (kind === 'pair') {
         const members = (item && item.pairMembers) || [];
@@ -6089,7 +6091,7 @@ Page({
           type: 'pair',
           identity: { members: members },
           collapsedNameView: this._buildFourballCollapsedNameView(name0, name1),
-          lead: { diff: diff, tee: tee },
+          lead: { diff: diff, diffClass: diffClass, tee: tee },
           columns: columns
         };
       }
@@ -6106,7 +6108,7 @@ Page({
           id: id,
           type: 'team',
           identity: { members: members },
-          lead: { diff: diff, tee: tee },
+          lead: { diff: diff, diffClass: diffClass, tee: tee },
           columns: columns
         };
       }
@@ -6124,6 +6126,7 @@ Page({
         identity: { members: [singleMember] },
         lead: {
           diff: diff,
+          diffClass: diffClass,
           tee: singleMember.teeColor ? [singleMember.teeColor] : []
         },
         columns: columns

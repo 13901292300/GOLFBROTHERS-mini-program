@@ -647,7 +647,7 @@
                 class="fourball-track-lead fourball-track-lead--diff"
                 data-fourball-geometry="lead"
               >
-                <text class="fourball-track-lead__diff">{{item.lead.diff || '-'}}</text>
+                <text class="fourball-track-lead__diff {{item.lead.diffClass}}">{{item.lead.diff || '-'}}</text>
               </view>
               <view class="fourball-track-lead fourball-track-lead--tee">
                 <view
