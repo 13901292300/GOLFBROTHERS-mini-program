@@ -2727,7 +2727,11 @@ page {
 
 .player-tee-marker.border-red { background: #dc2626; }
 .player-tee-marker.border-gold { background: var(--champion-gold); }
-.player-tee-marker.border-white { background: var(--text-primary); }
+/* 白T：真实白色；细描边避免浅色 identity 底上消失（勿用 --text-primary，亮色主题会变成近黑） */
+.player-tee-marker.border-white {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.28);
+}
 .player-tee-marker.border-light { background: #00aeef; }
 .player-tee-marker.border-black { background: #111827; }
 
