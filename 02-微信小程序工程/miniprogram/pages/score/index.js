@@ -3355,9 +3355,9 @@ Page({
   },
 
   /**
-   * 第一列 kind：按赛制，不按 members.length
+   * 第一列 kind：
    * - G4（entityType=pair / 四人两球）：永远 pair
-   * - G2/G3：仅认 match.strokeCompositionMode（2+2→pair，4+0→team）
+   * - G2/G3：认 match.strokeCompositionMode；2+2 下按 members.length 区分 pair/single（对齐普通局面 2+1）
    *   不用旧 entity.compositionMode 覆盖当前比赛组合模式（LIVE 2+2→4+0）
    */
   _resolveEntityRowKind(entity, match) {
@@ -3369,7 +3369,12 @@ Page({
       return 'pair';
     }
     const compositionMode = resolveCompositionMode(match);
-    return compositionMode === '2+2' ? 'pair' : 'team';
+    if (compositionMode === '2+2') {
+      const n = Array.isArray(entity && entity.members) ? entity.members.length : 0;
+      if (n === 1) return 'single';
+      return 'pair';
+    }
+    return 'team';
   },
 
   /** groups.players 座位上的展示兜底（LIVE 与报名同源 userId） */
@@ -3606,9 +3611,12 @@ Page({
       strokeShellFormatLabel: ''
     };
     if (useEntityFourballShell) {
+      const entityPairFlags = resolveFourballPairFlags(
+        entitiesView.map((row) => ({ members: (row && row.members) || [] }))
+      );
       patch.fourballRowsView = this._buildFourballRowsViewFromEntities(entitiesView);
-      patch.isFourballPair22 = true;
-      patch.isFourballPairLayout = true;
+      patch.isFourballPair22 = entityPairFlags.isFourballPair22;
+      patch.isFourballPairLayout = entityPairFlags.isFourballPairLayout;
       patch.fourballTeeStickyVisible = false;
       patch.fourballScrollLeft = 0;
       patch.fourballIdentityCollapseProgress = 0;
@@ -5875,8 +5883,8 @@ Page({
   },
 
   /**
-   * 队内赛 G2/G3 纯 2+2：接入已有 useFourballScoreShell（不改 fourball_best 门控）。
-   * 2+1 / 4+0 / G4 返回 false，保持 Legacy entitiesView。
+   * 队内赛 G2/G3 pair 布局（2+2 / 2+1）：接入 useFourballScoreShell（不改 fourball_best 门控）。
+   * 对齐 resolveFourballPairFlags：有 pair 且全组 ≤2；3+/4+0 / G4 返回 false。
    * @param {Array} [entitiesViewArg] refreshEntities 刚生成的视图；缺省读 data.entitiesView
    */
   _resolveStrokeEntityFourballShell(entitiesViewArg) {
@@ -5894,38 +5902,23 @@ Page({
       ? entitiesViewArg
       : this.data.entitiesView || [];
     if (!rows.length) return false;
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const n = Array.isArray(row && row.members) ? row.members.length : 0;
-      if (n !== 2) return false;
-    }
-    return true;
+    const pairFlags = resolveFourballPairFlags(
+      rows.map((row) => ({ members: (row && row.members) || [] }))
+    );
+    return !!pairFlags.isFourballPairLayout;
   },
 
   /**
    * entitiesView → fourballRowsView（与 _buildFourballRowsView 同构）。
    * 仅展示适配；不改 entity / scoreEntities / teamScoresByEntity / persist。
-   * 仅处理 members.length === 2 的 pair 行。
+   * 支持 pair（2 人）与 single（1 人 / 2+1）。
    */
   _buildFourballRowsViewFromEntities(entitiesView) {
     const rows = Array.isArray(entitiesView) ? entitiesView : [];
     const out = [];
-    rows.forEach((entity, idx) => {
-      const memberCount = Array.isArray(entity && entity.members) ? entity.members.length : 0;
-      if (memberCount !== 2) return;
-      const pairMembers = Array.isArray(entity && entity.pairMembers) ? entity.pairMembers : [];
-      const identityMembers = pairMembers.slice(0, 2).map((m) => ({
-        name: (m && m.name) || '球员',
-        avatar: (m && m.avatar) || '',
-        teeColor: (m && m.teeColor) || ''
-      }));
-      while (identityMembers.length < 2) {
-        identityMembers.push({ name: '球员', avatar: '', teeColor: '' });
-      }
-      const name0 = identityMembers[0].name || '';
-      const name1 = identityMembers[1].name || '';
+    const mapColumns = (entity) => {
       const cells = Array.isArray(entity && entity.cells) ? entity.cells : [];
-      const columns = cells.map((cell, colIdx) => {
+      return cells.map((cell, colIdx) => {
         const c = cell || {};
         if (c.type === 'special') {
           return {
@@ -5958,17 +5951,67 @@ Page({
           holeIndex: c.holeIndex
         };
       });
+    };
+    rows.forEach((entity, idx) => {
+      const memberCount = Array.isArray(entity && entity.members) ? entity.members.length : 0;
       const id =
         (entity && entity.entityId != null && String(entity.entityId)) ||
         'entity-fb-' + idx;
+      const diff = (entity && entity.teamDiffStr) || '';
+      const diffClass = (entity && (entity.teamDiffClass || entity.relClass)) || '';
+      const columns = mapColumns(entity);
+
+      if (memberCount === 1) {
+        const m0 =
+          (Array.isArray(entity && entity.memberDisplay) && entity.memberDisplay[0]) || null;
+        const teeStyle = resolveScoreTeeStyle(m0 || entity, idx);
+        const teeColor =
+          (teeStyle && teeStyle.teeColor) ||
+          this._m2TeeColorFromClass(entity && entity.colorClass) ||
+          '';
+        const singleMember = {
+          name: (entity && (entity.name || '')) || (m0 && m0.name) || '球员',
+          displayName:
+            (entity && (entity.displayName || entity.name || '')) ||
+            (m0 && m0.name) ||
+            '球员',
+          avatar: (entity && (entity.avatar || '')) || (m0 && m0.avatar) || '',
+          teeColor: teeColor
+        };
+        out.push({
+          id: id,
+          type: 'single',
+          identity: { members: [singleMember] },
+          lead: {
+            diff: diff,
+            diffClass: diffClass,
+            tee: teeColor ? [teeColor] : []
+          },
+          columns: columns
+        });
+        return;
+      }
+
+      if (memberCount !== 2) return;
+      const pairMembers = Array.isArray(entity && entity.pairMembers) ? entity.pairMembers : [];
+      const identityMembers = pairMembers.slice(0, 2).map((m) => ({
+        name: (m && m.name) || '球员',
+        avatar: (m && m.avatar) || '',
+        teeColor: (m && m.teeColor) || ''
+      }));
+      while (identityMembers.length < 2) {
+        identityMembers.push({ name: '球员', avatar: '', teeColor: '' });
+      }
+      const name0 = identityMembers[0].name || '';
+      const name1 = identityMembers[1].name || '';
       out.push({
         id: id,
         type: 'pair',
         identity: { members: identityMembers },
         collapsedNameView: this._buildFourballCollapsedNameView(name0, name1),
         lead: {
-          diff: (entity && entity.teamDiffStr) || '',
-          diffClass: (entity && (entity.teamDiffClass || entity.relClass)) || '',
+          diff: diff,
+          diffClass: diffClass,
           tee: [identityMembers[0].teeColor, identityMembers[1].teeColor]
         },
         columns: columns
