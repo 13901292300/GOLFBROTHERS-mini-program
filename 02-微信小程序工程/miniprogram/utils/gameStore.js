@@ -361,6 +361,31 @@ function setGroupPlayersSlots(gameId, groupIndex, playersSlots) {
   return game;
 }
 
+function _isFilledTeamScore(s) {
+  return s !== null && s !== undefined && s !== '';
+}
+
+/** teamScoresByEntity 是否含任意有效洞成绩 */
+function _teamEntitiesHaveAnyFilledScore(entities) {
+  return (
+    Array.isArray(entities) &&
+    entities.some(
+      (e) => Array.isArray(e && e.scores) && e.scores.some(_isFilledTeamScore)
+    )
+  );
+}
+
+/**
+ * 首次有效团队成绩时写入 firstScoreAt（对齐队内赛 scoreData.firstScoreAt）；已有不覆盖。
+ */
+function _ensureGroupFirstScoreAt(group, entities) {
+  if (!group || typeof group !== 'object') return;
+  const existing = Number(group.firstScoreAt);
+  if (Number.isFinite(existing) && existing > 0) return;
+  if (!_teamEntitiesHaveAnyFilledScore(entities)) return;
+  group.firstScoreAt = Date.now();
+}
+
 /** 写入某组团队记分实体成绩（最好成绩 / 最佳球位统一引擎） */
 function setGroupTeamScores(gameId, groupIndex, engineGroups) {
   const list = _readAll();
@@ -374,9 +399,15 @@ function setGroupTeamScores(gameId, groupIndex, engineGroups) {
     putts: (g.putts || []).slice()
   }));
   if (!Array.isArray(game.groups) || !game.groups.length) {
+    if ((gi || 0) !== 0) return null;
     game.teamScoresByEntity = entities;
+    _ensureGroupFirstScoreAt(game, entities);
+    // 团队记分写盘后反推实际出发洞（四人两球等）
+    teeSheetManage.inferStartHoleIfNeededForGameGroup(game);
   } else if (game.groups[gi]) {
     game.groups[gi].teamScoresByEntity = entities;
+    _ensureGroupFirstScoreAt(game.groups[gi], entities);
+    teeSheetManage.inferStartHoleIfNeededForGameGroup(game.groups[gi]);
   } else {
     return null;
   }

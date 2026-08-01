@@ -643,11 +643,26 @@ Page({
       const teeTime = teeSheetManage.resolveGroupTeeTime(card) || matchTeeTime;
       const startHole = teeSheetManage.resolveGroupStartHole(card);
       const statusKey = card.statusKey;
-      // LIVE：右上角显示已完成洞数（如 9H），不展示 LIVE 文案
+      // LIVE：右上角 nH + 用时（对齐队内赛 G2：holeCount + minutes + "'"）
       let statusBadge = card.statusBadge;
       if (statusKey === 'live') {
         const completedHoles = gameProgress.countCompletedHoles(game, card.groupIndex) || 0;
         statusBadge = String(completedHoles) + 'H';
+        const grp =
+          (Array.isArray(game.groups) && game.groups[card.groupIndex]) ||
+          gameStore.getGroup(game.gameId, card.groupIndex) ||
+          null;
+        const firstScoreAt = grp ? Number(grp.firstScoreAt) : NaN;
+        if (Number.isFinite(firstScoreAt) && firstScoreAt > 0) {
+          const finishedScoreAt = grp ? Number(grp.finishedScoreAt) : NaN;
+          const endMs =
+            Number.isFinite(finishedScoreAt) && finishedScoreAt > 0
+              ? finishedScoreAt
+              : Date.now();
+          const minutes = Math.floor((endMs - firstScoreAt) / 60000);
+          statusBadge =
+            statusBadge + ' ' + String(minutes < 0 ? 0 : minutes) + "'";
+        }
       }
       return Object.assign({}, card, {
         statusBadge: statusBadge,

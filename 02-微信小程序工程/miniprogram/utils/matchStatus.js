@@ -39,14 +39,72 @@ function hasAnyScoreInGroupsStoreGroup(group) {
   );
 }
 
-/** gameStore 组：是否存在至少一洞成绩 */
+/** gameStore 组：是否存在至少一洞成绩（个人分 / 团队 entity，对齐队内赛 G2 entity 语义） */
 function hasAnyScoreInGameGroup(group) {
   if (!group) return false;
   const scoresByPlayer = group.scoresByPlayer || {};
-  return (group.playersSlots || []).filter(Boolean).some((p) => {
+  const hasPlayer = (group.playersSlots || []).filter(Boolean).some((p) => {
     const rec = scoresByPlayer[p.playerId] || {};
     return (rec.scores || []).some(isFilledScore);
   });
+  if (hasPlayer) {
+    // TEMP DIAG
+    console.log('[HUB_TEE_STATUS_DIAG] hasAnyScoreInGameGroup', {
+      path: 'scoresByPlayer',
+      result: true,
+      groupId: group.groupId || ''
+    });
+    return true;
+  }
+  // 四人两球等：成绩在 teamScoresByEntity（与 match.scoreData.teamScoresByEntity 同规则）
+  const entities = group.teamScoresByEntity;
+  const entityHit =
+    Array.isArray(entities) &&
+    entities.some((e) => hasAnyFilledScoreInArray(e && e.scores));
+  // TEMP DIAG：返回前打印 entity 结构与判定
+  console.log('[HUB_TEE_STATUS_DIAG] hasAnyScoreInGameGroup', {
+    path: 'teamScoresByEntity',
+    result: !!entityHit,
+    groupId: group.groupId || '',
+    hasTeamScoresByEntity: Array.isArray(entities),
+    entityCount: Array.isArray(entities) ? entities.length : -1,
+    // G2 期望：[{ teamId, scores:[18], putts:[18] }, ...]
+    entities: Array.isArray(entities)
+      ? entities.map((e, ei) => {
+          const scores = e && e.scores;
+          const filledIdx = [];
+          if (Array.isArray(scores)) {
+            for (let i = 0; i < scores.length; i++) {
+              if (isFilledScore(scores[i])) filledIdx.push(i);
+            }
+          }
+          return {
+            index: ei,
+            teamId: e && e.teamId,
+            entityId: e && e.entityId,
+            rawType: e == null ? 'nullish' : typeof e,
+            keys: e && typeof e === 'object' ? Object.keys(e) : [],
+            scoresType: scores == null ? 'nullish' : Array.isArray(scores) ? 'array' : typeof scores,
+            scoresLen: Array.isArray(scores) ? scores.length : -1,
+            filledHoleIndexes: filledIdx,
+            filledCount: filledIdx.length,
+            // 若 scores 不是数组，把原值打出来（结构偏差定位）
+            scoresPreview: Array.isArray(scores)
+              ? scores.slice(0, 8)
+              : scores
+          };
+        })
+      : entities,
+    failReason: !Array.isArray(entities)
+      ? 'teamScoresByEntity_not_array'
+      : !entities.length
+        ? 'teamScoresByEntity_empty'
+        : !entityHit
+          ? 'no_filled_score_in_entity_scores'
+          : ''
+  });
+  if (entityHit) return true;
+  return false;
 }
 
 /** 成绩数组是否含任意有效洞 */
@@ -78,6 +136,25 @@ function hasAnyScoreInMatchScoreData(group, scoreData) {
 
   const entities = bucket.teamScoresByEntity;
   if (Array.isArray(entities) && entities.some((e) => hasAnyFilledScoreInArray(e && e.scores))) {
+    // TEMP DIAG：队内赛 G2 命中 entity 时的结构对照
+    console.log('[HUB_TEE_STATUS_DIAG] hasAnyScoreInMatchScoreData(G2)', {
+      path: 'match.scoreData.teamScoresByEntity',
+      result: true,
+      groupId: groupId,
+      entityCount: entities.length,
+      entities: entities.map((e, ei) => ({
+        index: ei,
+        teamId: e && e.teamId,
+        entityId: e && e.entityId,
+        keys: e && typeof e === 'object' ? Object.keys(e) : [],
+        scoresIsArray: !!(e && Array.isArray(e.scores)),
+        scoresLen: e && Array.isArray(e.scores) ? e.scores.length : -1,
+        filledCount: e && Array.isArray(e.scores)
+          ? e.scores.filter((s) => isFilledScore(s)).length
+          : 0,
+        sampleScores: e && Array.isArray(e.scores) ? e.scores.slice(0, 6) : null
+      }))
+    });
     return true;
   }
 
@@ -105,7 +182,7 @@ function hasAnyScoreInGroup(group, source, options) {
  * 统一状态计算（唯一入口）
  * @param {object} groupData - 单组数据（groupsStore 组 / gameStore 组 / 球队赛正式组）
  * @param {{ source?: 'groups'|'game'|'match', scoreData?: object }} [options]
- *   - game：读 group.playersSlots + group.scoresByPlayer（普通球局，不变）
+ *   - game：读 scoresByPlayer + teamScoresByEntity（普通球局；entity 对齐队内赛 G2）
  *   - groups：读 groupsStore players.holes
  *   - match：读 options.scoreData[groupId]（球队比赛）
  * @returns {{

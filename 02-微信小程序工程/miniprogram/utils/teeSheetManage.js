@@ -250,19 +250,55 @@ function _findFirstCompletedHole(playerIds, getScoreAtHole) {
   return null;
 }
 
-function _setAutoStartHole(group, holeNo) {
+/**
+ * 团队记分（四人两球等）：第一洞「全部 entity 均有有效成绩」。
+ * 与 gameProgress.countCompletedHoles 的 entity 规则一致。
+ */
+function _findFirstCompletedEntityHole(entities) {
+  const list = (Array.isArray(entities) ? entities : []).filter(
+    (e) => e && Array.isArray(e.scores)
+  );
+  if (!list.length) return null;
+  for (let hi = 0; hi < TOTAL_HOLES; hi++) {
+    const allDone = list.every((e) => isFilledScoreValue((e.scores || [])[hi]));
+    if (allDone) return hi + 1;
+  }
+  return null;
+}
+
+function _setAutoStartHole(group, holeNo, options) {
   const hole = normalizeStartHole(holeNo);
-  if (!group || hole == null || resolveGroupStartHole(group) != null) {
+  if (!group || hole == null) {
     return { updated: false, holeNo: null };
+  }
+  const allowOverwrite = !!(options && options.allowOverwrite);
+  const current = resolveGroupStartHole(group);
+  if (current != null && !allowOverwrite) {
+    return { updated: false, holeNo: null };
+  }
+  if (current === hole && String(group.startHoleSource || '').trim() === 'score_auto') {
+    return { updated: false, holeNo: hole };
   }
   group.startHole = hole;
   group.startHoleSource = 'score_auto';
   return { updated: true, holeNo: hole };
 }
 
-/** 普通 Game：从 playersSlots + scoresByPlayer 自动反推 startHole */
+/**
+ * 普通 Game：自动反推 startHole。
+ * - 优先 teamScoresByEntity（四人两球等团队记分）：第一完整组合洞 → 可覆盖创建/计划 startHole
+ * - 否则 scoresByPlayer（个人比杆）：仅在尚无 startHole 时写入
+ */
 function inferStartHoleIfNeededForGameGroup(group) {
-  if (!group || resolveGroupStartHole(group) != null) {
+  if (!group) return { updated: false, holeNo: null };
+
+  const entities = Array.isArray(group.teamScoresByEntity) ? group.teamScoresByEntity : [];
+  if (entities.length) {
+    const holeNo = _findFirstCompletedEntityHole(entities);
+    return _setAutoStartHole(group, holeNo, { allowOverwrite: true });
+  }
+
+  if (resolveGroupStartHole(group) != null) {
     return { updated: false, holeNo: null };
   }
   const playerIds = _validGamePlayerIds(group);

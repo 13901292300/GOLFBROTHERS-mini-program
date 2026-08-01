@@ -337,7 +337,40 @@ function buildGameTeeSheetView(game) {
   const tPositionUtil = require('./tPosition');
   if (!game) return [];
   return gameStore.listGroups(game).map((grp, gi) => {
+    // TEMP DIAG：Hub 出发表状态 — 进入时确认 group 上是否有 teamScoresByEntity
+    const entities = grp && grp.teamScoresByEntity;
+    console.log('[HUB_TEE_STATUS_DIAG] buildGameTeeSheetView', {
+      gameId: (game && game.gameId) || '',
+      gameMode: (game && game.gameMode) || '',
+      groupIndex: gi,
+      groupId: (grp && grp.groupId) || '',
+      groupStatus: (grp && grp.status) || '',
+      startHole: grp && grp.startHole != null ? grp.startHole : null,
+      startHoleSource: (grp && grp.startHoleSource) || '',
+      hasTeamScoresByEntity: Array.isArray(entities),
+      teamScoresByEntityType: entities == null ? 'nullish' : typeof entities,
+      entityCount: Array.isArray(entities) ? entities.length : -1,
+      entitySummary: Array.isArray(entities)
+        ? entities.map((e, ei) => ({
+            index: ei,
+            teamId: e && e.teamId,
+            keys: e && typeof e === 'object' ? Object.keys(e) : [],
+            scoresIsArray: !!(e && Array.isArray(e.scores)),
+            scoresLen: e && Array.isArray(e.scores) ? e.scores.length : -1,
+            filledCount: e && Array.isArray(e.scores)
+              ? e.scores.filter((s) => s !== null && s !== undefined && s !== '').length
+              : 0,
+            sampleScores: e && Array.isArray(e.scores) ? e.scores.slice(0, 6) : null
+          }))
+        : null,
+      scoresByPlayerKeys: Object.keys((grp && grp.scoresByPlayer) || {})
+    });
     const ms = matchStatus.getMatchStatus(grp, { source: 'game' });
+    console.log('[HUB_TEE_STATUS_DIAG] after getMatchStatus', {
+      groupId: (grp && grp.groupId) || '',
+      statusKey: ms && ms.statusKey,
+      statusBadge: ms && ms.statusBadge
+    });
     const players = (grp.playersSlots || []).filter(Boolean).map((p) => {
       const enriched = tPositionUtil.enrichPlayer(p);
       return {

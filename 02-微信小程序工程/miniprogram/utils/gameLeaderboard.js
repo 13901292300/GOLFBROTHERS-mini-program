@@ -69,7 +69,8 @@ function normalizeMembers(team) {
 function gameHasComposition(game) {
   if (!game) return false;
   const mode = game.gameMode || '';
-  if (mode !== '最好成绩赛' && mode !== '最佳球位赛') return false;
+  // 四人两球与最好/最佳球位同走组合榜（buildTeamRows + teamScoresByEntity）
+  if (mode !== '最好成绩赛' && mode !== '最佳球位赛' && mode !== '四人两球赛') return false;
   const map = game.groupCompositionMap || {};
   const mapTeams = Object.keys(map).some((gid) => {
     const c = map[gid];

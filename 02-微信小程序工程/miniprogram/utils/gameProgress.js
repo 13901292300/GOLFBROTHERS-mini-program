@@ -31,7 +31,8 @@ function isFilledScore(s) {
 
 function isTeamScoringGame(game) {
   const m = game && game.gameMode;
-  return m === '最好成绩赛' || m === '最佳球位赛';
+  // 四人两球与最好/最佳球位同属 teamScoresByEntity 团队记分
+  return m === '最好成绩赛' || m === '最佳球位赛' || m === '四人两球赛';
 }
 
 function isGameEnded(game) {
