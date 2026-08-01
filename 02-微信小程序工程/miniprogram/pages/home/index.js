@@ -306,6 +306,12 @@ Page({
       this.showProfileSection();
     } else if (options && options.section === 'tournament') {
       this.showTournamentSection();
+    } else if (options && options.section === 'plaza') {
+      // 开始比赛成功等入口：广场；tab=tournament → 「球队比赛」TAB
+      this.showPlazaSection();
+      if (String(options.tab || '') === 'tournament') {
+        this.switchTopTab({ currentTarget: { dataset: { which: 'secondary' } } });
+      }
     } else if (options && options.tab === 'my') {
       // 记分页返回：自动定位到首页「我的 TAB」
       this.showHomeSection();

@@ -3155,16 +3155,18 @@ Page({
     this.applyMoreAccess();
     wx.showModal({
       title: '提示',
-      content: '比赛已经进入开始阶段，请到‘赛事’菜单查看',
+      content: '比赛已进入LIVE状态，请到“广场-球队比赛”页面查看',
       showCancel: false,
       confirmText: '确认',
       success: (res) => {
         if (!res.confirm) return;
         console.log('[start-match-navigate]');
+        // 广场 → 球队比赛 TAB（勿回赛事/详情）
+        const plazaTeamUrl = '/pages/home/index?section=plaza&tab=tournament';
         wx.redirectTo({
-          url: '/pages/home/index?section=tournament',
+          url: plazaTeamUrl,
           fail: () => {
-            wx.reLaunch({ url: '/pages/home/index?section=tournament' });
+            wx.reLaunch({ url: plazaTeamUrl });
           }
         });
       }
