@@ -5787,26 +5787,74 @@ Page({
     }
 
     // 四人最佳球位 / 最好成绩：记分实体 = scoreEngine.groups，球员列表/快捷控件按组数呈现（一组一项）
+    // 清除草稿 UI 对齐个人比杆：clearDraft / clearPending / quickClearDraft
     if (this.data.mode === 'fourball_best') {
-      const { sheetPar, sheetHoleIndex, panelScore, scoreDisplayMode, activePlayerIdx, quickPanelScores, scorePanelMode } = this.data;
+      const {
+        sheetPar,
+        sheetHoleIndex,
+        panelScore,
+        scoreDisplayMode,
+        activePlayerIdx,
+        quickPanelScores,
+        scorePanelMode,
+        scoreClearDraft,
+        scoreHoleClearPending,
+        quickScoreClearDraft,
+        quickScoreFreshDraft
+      } = this.data;
       const groups = this._engineGroups || [];
       const single = groups.length <= 1;
+      const clearDraft = !!scoreClearDraft && scorePanelMode === 'tech';
+      const clearPending = !!scoreHoleClearPending && scorePanelMode === 'tech';
+      const quickClearDraft = !!quickScoreClearDraft && scorePanelMode === 'quick';
+      const quickFreshDraft = !!quickScoreFreshDraft && scorePanelMode === 'quick';
       const sheetPlayers = groups.map((g, gi) => {
-        let holeScore;
+        const formal = (g.scores || [])[sheetHoleIndex];
+        const hasFormal = isFilledScore(formal);
+        let holeScore = '';
+        let isDraftScore = false;
         if (scorePanelMode === 'quick') {
-          const q = quickPanelScores[gi] != null ? quickPanelScores[gi] : sheetPar;
-          holeScore = formatMainScore(q, sheetPar, scoreDisplayMode);
-        } else {
-          const s = (g.scores || [])[sheetHoleIndex];
-          holeScore = isFilledScore(s) ? formatMainScore(s, sheetPar, scoreDisplayMode) : '';
+          if (quickClearDraft) {
+            holeScore = '';
+            isDraftScore = false;
+          } else {
+            const q = quickPanelScores[gi] != null ? quickPanelScores[gi] : sheetPar;
+            holeScore = formatMainScore(q, sheetPar, scoreDisplayMode);
+            isDraftScore = quickFreshDraft ? true : !hasFormal;
+          }
+        } else if (clearDraft) {
+          holeScore = '';
+          isDraftScore = false;
+        } else if (clearPending) {
+          if (gi === activePlayerIdx) {
+            const draft = panelScore != null && panelScore !== '' ? panelScore : sheetPar;
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          }
+        } else if (gi === activePlayerIdx) {
+          const draft = panelScore != null && panelScore !== '' ? panelScore : sheetPar;
+          if (!hasFormal) {
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          } else if (Number(draft) === Number(formal)) {
+            holeScore = formatMainScore(formal, sheetPar, scoreDisplayMode);
+            isDraftScore = false;
+          } else {
+            holeScore = formatMainScore(draft, sheetPar, scoreDisplayMode);
+            isDraftScore = true;
+          }
+        } else if (hasFormal) {
+          holeScore = formatMainScore(formal, sheetPar, scoreDisplayMode);
+          isDraftScore = false;
         }
         return {
           id: g.id,
           // 单组时沿用赛制标题（最佳球位/最好成绩）；多组时显示队伍名
           name: single ? (this.data.bestLabel || g.name) : g.name,
           avatar: g.avatar || '',
-          active: gi === activePlayerIdx,
-          holeScore
+          active: clearDraft ? false : gi === activePlayerIdx,
+          holeScore,
+          isDraftScore
         };
       });
       this.setData({
@@ -11746,10 +11794,34 @@ Page({
     });
   },
 
+  /** fourball_best：本洞全部组合清空写入 _engineGroups（不碰 _playersSource） */
+  _clearHoleScoresInEngineGroups(holeIndex) {
+    const hi = Number(holeIndex);
+    if (!Number.isFinite(hi) || hi < 0 || hi > 17) return;
+    (this._engineGroups || []).forEach((g) => {
+      if (!g) return;
+      g.scores = Array.isArray(g.scores) ? g.scores : [];
+      g.putts = Array.isArray(g.putts) ? g.putts : [];
+      g.fairways = Array.isArray(g.fairways) ? g.fairways : [];
+      g.penalties = Array.isArray(g.penalties) ? g.penalties : [];
+      g.sands = Array.isArray(g.sands) ? g.sands : [];
+      while (g.scores.length < 18) g.scores.push(null);
+      while (g.putts.length < 18) g.putts.push(null);
+      while (g.fairways.length < 18) g.fairways.push(null);
+      while (g.penalties.length < 18) g.penalties.push(0);
+      while (g.sands.length < 18) g.sands.push(0);
+      g.scores[hi] = null;
+      g.putts[hi] = null;
+      g.fairways[hi] = null;
+      g.penalties[hi] = 0;
+      g.sands[hi] = 0;
+    });
+  },
+
   /**
    * 普通单组技术面板：清除当前洞草稿 UI（不写 _playersSource / 不 persist）
    * 快捷面板：独立清除显示状态（头像旁成绩格全空，不关弹窗、不改正式成绩）
-   * fourball_best：保持原「清除=关闭」行为
+   * fourball_best：对齐个人比杆 — 清除草稿 UI，确认后才落盘（清除 ≠ 关闭）
    * stroke_entity：清洞正式成绩 + 落盘 + 关面板（不改 activePlayerIdx）
    */
   clearScoreInput() {
@@ -11795,8 +11867,24 @@ Page({
       }, () => this.syncSheetPlayers());
       return;
     }
+    // fourball_best：对齐个人比杆清除草稿（不关面板、不立刻 persist）
     if (this.data.mode === 'fourball_best') {
-      this.closeScoreInput();
+      if (this.data.scorePanelMode === 'quick') {
+        this.setData({ quickScoreClearDraft: true }, () => this.syncSheetPlayers());
+        return;
+      }
+      const par = this.data.sheetPar;
+      this.setData({
+        scoreClearDraft: true,
+        scoreHoleClearPending: true,
+        activePlayerIdx: -1,
+        panelScore: par,
+        panelPutt: 2,
+        panelPuttTouched: false,
+        panelFairway: FAIRWAY_FAIRWAY,
+        panelPenalty: 0,
+        panelBunker: 0
+      }, () => this.syncSheetPlayers());
       return;
     }
     if (this.data.scorePanelMode === 'quick') {
@@ -11873,15 +11961,20 @@ Page({
       this._focusSheetSide(idx);
       return;
     }
+    // fourball_best：组侧栏（快捷清除恢复走 groups，禁止落入个人 _playersSource）
+    if (this.data.mode === 'fourball_best') {
+      if (this.data.scorePanelMode === 'quick') {
+        if (!this.data.quickScoreClearDraft) return;
+        this._resumeQuickEditAfterClearGroup(idx);
+        return;
+      }
+      this._focusSheetGroup(idx);
+      return;
+    }
     // 快捷清除草稿中：点头像退出清除 → 本洞默认 PAR 草稿（不恢复清除前正式分）
     if (this.data.scorePanelMode === 'quick') {
       if (!this.data.quickScoreClearDraft) return;
       this._resumeQuickEditAfterClear(idx);
-      return;
-    }
-    // 四人最佳球位：切换记分实体=切换「组」，载入该组本洞成绩
-    if (this.data.mode === 'fourball_best') {
-      this._focusSheetGroup(idx);
       return;
     }
     this._focusSheetPlayer(idx);
@@ -11927,6 +12020,26 @@ Page({
     }, () => this.syncSheetPlayers());
   },
 
+  /** 快捷清除显示中点组合：退出清除 UI，仅恢复面板草稿（不写 _engineGroups） */
+  _resumeQuickEditAfterClearGroup(groupIdx) {
+    if (this.data.mode !== 'fourball_best') return;
+    const par = this.data.sheetPar;
+    const groups = this._engineGroups || [];
+    const quick = groups.map(() => par);
+    this.setData({
+      quickScoreClearDraft: false,
+      quickScoreFreshDraft: true,
+      activePlayerIdx: groupIdx,
+      panelScore: par,
+      panelPutt: 2,
+      panelPuttTouched: false,
+      panelFairway: FAIRWAY_FAIRWAY,
+      panelPenalty: 0,
+      panelBunker: 0,
+      quickPanelScores: quick
+    }, () => this.syncSheetPlayers());
+  },
+
   /** 快捷清除显示中点球员：退出清除 UI，仅恢复面板草稿（不写 _playersSource） */
   _resumeQuickEditAfterClear(playerIdx) {
     const par = this.data.sheetPar;
@@ -11950,14 +12063,30 @@ Page({
     const holeIndex = this.data.sheetHoleIndex;
     const par = this.data.sheetPar;
     const g = (this._engineGroups || [])[gi];
-    const raw = g && (g.scores || [])[holeIndex];
+    if (!g) return;
+    // 清除待确认：不回填旧正式成绩，控件用默认值（对齐 _focusSheetPlayer）
+    if (this.data.scoreHoleClearPending) {
+      this.setData({
+        scoreClearDraft: false,
+        activePlayerIdx: gi,
+        panelScore: par,
+        panelPutt: 2,
+        panelPuttTouched: false,
+        panelFairway: FAIRWAY_FAIRWAY,
+        panelPenalty: 0,
+        panelBunker: 0
+      }, () => this.syncSheetPlayers());
+      return;
+    }
+    const raw = (g.scores || [])[holeIndex];
     const hasScore = isFilledScore(raw);
     const score = hasScore ? raw : par;
-    const putt = (g && (g.putts || [])[holeIndex]) || 2;
-    const fairway = resolveHoleFairway(g && g.fairways, holeIndex);
-    const penalty = resolveHolePenalty(g && g.penalties, holeIndex);
-    const sand = resolveHoleSand(g && g.sands, holeIndex);
+    const putt = (g.putts || [])[holeIndex] || 2;
+    const fairway = resolveHoleFairway(g.fairways, holeIndex);
+    const penalty = resolveHolePenalty(g.penalties, holeIndex);
+    const sand = resolveHoleSand(g.sands, holeIndex);
     this.setData({
+      scoreClearDraft: false,
       activePlayerIdx: gi,
       panelScore: score,
       panelPutt: putt,
@@ -12245,11 +12374,29 @@ Page({
   },
 
   // 四人最佳球位 / 最好成绩：每个记分实体（组）写入一个成绩；不拆分球员、不生成多值数组。
+  // 清除确认：对齐个人比杆 — clear draft / quick clear → 清空本洞组合成绩后 persist。
   confirmTeamScore() {
-    const { sheetHoleIndex, sheetPar, scorePanelMode } = this.data;
+    const {
+      sheetHoleIndex,
+      sheetPar,
+      scorePanelMode,
+      scoreClearDraft,
+      scoreHoleClearPending,
+      activePlayerIdx,
+      quickScoreClearDraft
+    } = this.data;
     const groups = this._engineGroups || [];
 
     if (scorePanelMode === 'quick') {
+      if (quickScoreClearDraft) {
+        this._clearHoleScoresInEngineGroups(sheetHoleIndex);
+        this.setData({ quickScoreClearDraft: false, quickScoreFreshDraft: false });
+        this.refreshTeamColumns();
+        this._persistTeamScores();
+        this.closeScoreInput();
+        this._afterScoresPersisted();
+        return;
+      }
       // 快捷面板：按组数一次写入各组本洞成绩
       const quick = this.data.quickPanelScores || [];
       groups.forEach((g, gi) => {
@@ -12265,24 +12412,42 @@ Page({
       return;
     }
 
-    // 技术面板：写入当前组，未填组自动切换，全部填完才关闭
-    const gi = this.data.activePlayerIdx;
-    const g = groups[gi];
-    if (g) {
-      let newScore = this.data.panelScore;
-      if (!isFilledScore(newScore)) newScore = sheetPar;
-      g.scores[sheetHoleIndex] = newScore;
-      if (isFilledScore(this.data.panelPutt)) {
-        g.putts = g.putts || [];
-        g.putts[sheetHoleIndex] = this.data.panelPutt;
-      }
-      g.fairways = g.fairways || [];
-      g.fairways[sheetHoleIndex] = normalizeFairwayValue(this.data.panelFairway);
-      g.penalties = g.penalties || [];
-      g.penalties[sheetHoleIndex] = normalizePenaltyValue(this.data.panelPenalty);
-      g.sands = g.sands || [];
-      g.sands[sheetHoleIndex] = normalizeSandValue(this.data.panelBunker);
+    // 清除草稿确认（未选组）：本洞全部组合成绩清空 → persist
+    if (scoreClearDraft) {
+      this._clearHoleScoresInEngineGroups(sheetHoleIndex);
+      this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
+      this.refreshTeamColumns();
+      this._persistTeamScores();
+      this.closeScoreInput();
+      this._afterScoresPersisted();
+      return;
     }
+
+    const gi = activePlayerIdx;
+    const g = groups[gi];
+    if (!g) return;
+
+    // 清除待确认 + 已选组：先整组清空，再写入当前组面板值
+    if (scoreHoleClearPending) {
+      this._clearHoleScoresInEngineGroups(sheetHoleIndex);
+    }
+
+    // 技术面板：写入当前组，未填组自动切换，全部填完才关闭
+    let newScore = this.data.panelScore;
+    if (!isFilledScore(newScore)) newScore = sheetPar;
+    g.scores[sheetHoleIndex] = newScore;
+    if (isFilledScore(this.data.panelPutt)) {
+      g.putts = g.putts || [];
+      g.putts[sheetHoleIndex] = this.data.panelPutt;
+    }
+    g.fairways = g.fairways || [];
+    g.fairways[sheetHoleIndex] = normalizeFairwayValue(this.data.panelFairway);
+    g.penalties = g.penalties || [];
+    g.penalties[sheetHoleIndex] = normalizePenaltyValue(this.data.panelPenalty);
+    g.sands = g.sands || [];
+    g.sands[sheetHoleIndex] = normalizeSandValue(this.data.panelBunker);
+
+    this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
     this.refreshTeamColumns();
     this._persistTeamScores();
 
