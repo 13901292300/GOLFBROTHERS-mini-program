@@ -9864,9 +9864,16 @@ Page({
       return plan;
     }
 
-    // 普通四人两球：按 slot 同步 team-1/team-2.members（不新建 teamId、不删成绩）
+    // 普通 fourball_best：换人后同步 composition.teams.members → _engineGroups（保留 teamId / 成绩）
+    // 四人两球：slot→team 全量重建 members；最好成绩/最佳球位 2+2：按 replace 补丁更新 members
     if (commitPath.path === 'gameStore' && this._isOrdinaryFourball2BallContext()) {
       const synced = this._syncOrdinaryFourball2BallCompositionFromSlots();
+      if (!synced) {
+        wx.showToast({ title: '组合同步失败', icon: 'none' });
+        return plan;
+      }
+    } else if (commitPath.path === 'gameStore' && this._isOrdinaryFourballBestCompositionContext()) {
+      const synced = this._patchOrdinaryFourballCompositionMembersFromSlots(diff);
       if (!synced) {
         wx.showToast({ title: '组合同步失败', icon: 'none' });
         return plan;
@@ -9903,10 +9910,193 @@ Page({
     return !!(game && game.gameMode === '四人两球赛');
   },
 
+  /**
+   * 普通局最好成绩 / 最佳球位（含 2+2）：有 composition.teams 时需换人后同步 members。
+   * 不含四人两球（走 _syncOrdinaryFourball2BallCompositionFromSlots）。
+   */
+  _isOrdinaryFourballBestCompositionContext() {
+    if (this.data.mode !== 'fourball_best' || !this.data.gameId) return false;
+    if (this._isOrdinaryFourball2BallContext()) return false;
+    const ms = this._matchState || matchState.getMatchState() || {};
+    const ft = String(ms.formatType || '').trim();
+    const game = gameStore.getGame(this.data.gameId);
+    const gm = game ? String(game.gameMode || '').trim() : '';
+    const formatOk =
+      ft === 'best_score' ||
+      ft === 'best_ball' ||
+      ft === 'best_ball_4_0' ||
+      gm === '最好成绩赛' ||
+      gm === '最佳球位赛';
+    if (!formatOk || !game) return false;
+    const gi = this._gameGroupIndex || 0;
+    const storeGroups = gameStore.listGroups(game);
+    const group = storeGroups[gi] || {};
+    const groupId = group.groupId || this.data.gameId + '-g' + (gi + 1);
+    const prevMap =
+      game.groupCompositionMap && typeof game.groupCompositionMap === 'object'
+        ? game.groupCompositionMap
+        : {};
+    const prevComp = prevMap[groupId] || group.composition || game.composition || null;
+    return !!(prevComp && Array.isArray(prevComp.teams) && prevComp.teams.length);
+  },
+
   _validateOrdinaryFourball2BallDraft(slots) {
     const n = countFilledFourballSlots(slots);
     if (n === 2 || n === 4) return '';
     return '四人两球赛需保留 2 人或 4 人';
+  },
+
+  /**
+   * 最好成绩/最佳球位：换人后只补丁 composition.teams.members（及展示字段）。
+   * 保留 teamId / compositionType / teamScoresByEntity / _engineGroups 成绩数组。
+   */
+  _patchOrdinaryFourballCompositionMembersFromSlots(diff) {
+    if (!this._isOrdinaryFourballBestCompositionContext()) return false;
+    const gameId = this.data.gameId;
+    const gi = this._gameGroupIndex || 0;
+    const game = gameStore.getGame(gameId);
+    if (!game) return false;
+
+    const storeGroups = gameStore.listGroups(game);
+    const group = storeGroups[gi] || {};
+    const groupId = group.groupId || gameId + '-g' + (gi + 1);
+    const prevMap =
+      game.groupCompositionMap && typeof game.groupCompositionMap === 'object'
+        ? game.groupCompositionMap
+        : {};
+    const prevComp = prevMap[groupId] || group.composition || null;
+    if (!prevComp || !Array.isArray(prevComp.teams) || !prevComp.teams.length) return false;
+
+    const slotById = {};
+    (this._demoSlots || []).forEach((slot) => {
+      const m = slotPlayerToFourballMember(slot);
+      if (m && m.playerId) slotById[String(m.playerId)] = m;
+    });
+
+    const replaceMap = {};
+    (diff && diff.replaced ? diff.replaced : []).forEach((ch) => {
+      const fromId = ch && ch.fromPlayerId != null ? String(ch.fromPlayerId).trim() : '';
+      const toId = ch && ch.toPlayerId != null ? String(ch.toPlayerId).trim() : '';
+      if (!fromId || !toId) return;
+      const idx = ch.slotIndex;
+      const fromSlot =
+        idx != null && idx >= 0 ? slotPlayerToFourballMember((this._demoSlots || [])[idx]) : null;
+      const member = fromSlot && String(fromSlot.playerId) === toId ? fromSlot : slotById[toId];
+      if (member) replaceMap[fromId] = member;
+    });
+
+    const patchMember = (m) => {
+      if (!m) return null;
+      const pid = String(m.playerId || m.userId || m.id || '').trim();
+      if (!pid) return null;
+      if (replaceMap[pid]) {
+        const next = replaceMap[pid];
+        return {
+          playerId: next.playerId,
+          userId: next.playerId,
+          name: next.name,
+          avatar: next.avatar || '',
+          gender: next.gender || '',
+          tPosition: next.tPosition || '',
+          tee: next.tee || next.tPosition || ''
+        };
+      }
+      const live = slotById[pid];
+      if (!live) return null;
+      return {
+        playerId: live.playerId,
+        userId: live.playerId,
+        name: live.name,
+        avatar: live.avatar || '',
+        gender: live.gender || m.gender || '',
+        tPosition: live.tPosition || m.tPosition || '',
+        tee: live.tee || live.tPosition || m.tee || ''
+      };
+    };
+
+    const nextTeams = prevComp.teams.map((t) => {
+      if (!t) return t;
+      const raw = Array.isArray(t.members)
+        ? t.members
+        : Array.isArray(t.players)
+          ? t.players
+          : [];
+      const members = raw.map(patchMember).filter(Boolean);
+      return Object.assign({}, t, {
+        teamId: t.teamId,
+        teamIndex: t.teamIndex,
+        name: t.name,
+        type:
+          members.length === 1 ? 'single' : members.length === 2 ? 'pair' : t.type || 'pair',
+        members: members,
+        players: members.slice()
+      });
+    });
+
+    const nextComp = Object.assign({}, prevComp, {
+      teams: nextTeams,
+      playerCount: nextTeams.reduce((n, t) => n + ((t && t.members) || []).length, 0)
+    });
+    game.groupCompositionMap = Object.assign({}, prevMap, { [groupId]: nextComp });
+    game.composition = {
+      type: nextComp.compositionType || (game.composition && game.composition.type) || '',
+      single: nextComp.teamMode === 'single_team',
+      teams: nextTeams,
+      scoringTemplate:
+        nextComp.scoringTemplate ||
+        (game.composition && game.composition.scoringTemplate) ||
+        'team_best'
+    };
+    if (Array.isArray(game.groups) && game.groups[gi]) {
+      game.groups[gi] = Object.assign({}, game.groups[gi], { composition: nextComp });
+    }
+    // 不触碰 teamScoresByEntity / scores 内容
+    gameStore.saveGame(game);
+
+    const teamById = {};
+    nextTeams.forEach((t) => {
+      if (t && t.teamId) teamById[String(t.teamId)] = t;
+    });
+    this._engineGroups = (this._engineGroups || []).map((g) => {
+      if (!g) return g;
+      const tid = String(g.id || g.teamId || '').trim();
+      const team = teamById[tid];
+      if (!team) return g;
+      const members = (team.members || []).slice();
+      return Object.assign({}, g, {
+        id: g.id || g.teamId || tid,
+        teamId: g.teamId || g.id || tid,
+        members: members,
+        avatar: (members[0] && members[0].avatar) || g.avatar || ''
+        // scores / putts 原样保留
+      });
+    });
+
+    const ms = this._matchState || matchState.getMatchState();
+    if (ms && ms.gameId === gameId) {
+      const nextGroups = (this._engineGroups || []).map((g) => ({
+        teamId: g.id || g.teamId,
+        name: g.name,
+        type: g.type,
+        members: (g.members || []).slice(),
+        scores: (g.scores || []).slice(),
+        putts: (g.putts || []).slice()
+      }));
+      const next = Object.assign({}, ms, { groups: nextGroups });
+      matchState.setMatchState(next);
+      this._matchState = next;
+    }
+
+    console.log('[fourball-best-composition-member-sync]', {
+      gameId: gameId,
+      groupId: groupId,
+      replaced: Object.keys(replaceMap),
+      teams: nextTeams.map((t) => ({
+        teamId: t.teamId,
+        memberIds: (t.members || []).map((m) => m.playerId)
+      }))
+    });
+    return true;
   },
 
   /**
@@ -10430,8 +10620,18 @@ Page({
     if (this._isGameStoreContext()) {
       const game = gameStore.getGame(this.data.gameId);
       const groups = gameStore.listGroups(game);
-      groups.forEach((g) => {
+      const curGi =
+        this._gameGroupIndex != null ? Number(this._gameGroupIndex) || 0 : 0;
+      // 当前组占用由 _currentGroupUsedIds（编辑期 draft）负责；勿扫本组已落盘 playersSlots
+      groups.forEach((g, gi) => {
         if (!g) return;
+        if (gi === curGi) return;
+        if (cur) {
+          const gid = String(g.groupId || g.id || '').trim();
+          if (gid && gid === String(cur)) return;
+          // matchState.groupId 形如 gameId:index
+          if (String(cur) === String(this.data.gameId) + ':' + gi) return;
+        }
         const collect = (player) => {
           const playerId = player && (player.playerId || player.userId || player.id);
           if (playerId) ids.push(playerId);
@@ -10442,28 +10642,7 @@ Page({
       console.log('[score-player-occupancy]', {
         source: 'gameStore',
         gameId: this.data.gameId || '',
-        groupIndex: this._gameGroupIndex || 0,
-        usedIds: ids
-      });
-      return ids;
-    }
-
-    if (this._isGameStoreContext()) {
-      const game = gameStore.getGame(this.data.gameId);
-      const groups = gameStore.listGroups(game);
-      groups.forEach((g) => {
-        if (!g) return;
-        const collect = (player) => {
-          const playerId = player && (player.playerId || player.userId || player.id);
-          if (playerId) ids.push(playerId);
-        };
-        (Array.isArray(g.playersSlots) ? g.playersSlots : []).forEach(collect);
-        (Array.isArray(g.players) ? g.players : []).forEach(collect);
-      });
-      console.log('[score-player-occupancy]', {
-        source: 'gameStore',
-        gameId: this.data.gameId || '',
-        groupIndex: this._gameGroupIndex || 0,
+        groupIndex: curGi,
         usedIds: ids
       });
       return ids;
