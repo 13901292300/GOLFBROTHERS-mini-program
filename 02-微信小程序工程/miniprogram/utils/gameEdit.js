@@ -8,6 +8,16 @@ const { resolveFirstTwoCourses } = require('./courseDatabase.js');
 
 const COMPOSITION_MODES = { '最好成绩赛': true, '最佳球位赛': true };
 
+/** 普通局面四人两球赛：自动 composition（不进组合弹窗，但需落盘 groupCompositionMap） */
+function isFourball2BallGameMode(mode) {
+  return mode === '四人两球赛';
+}
+
+/** 需要把 composition 写入 GAME 的赛制（含自动生成的四人两球） */
+function isCompositionPersistMode(mode) {
+  return isCompositionGameMode(mode) || isFourball2BallGameMode(mode);
+}
+
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 
 function parseTeeTimeText(text) {
@@ -270,6 +280,25 @@ function validateSubmitForm(form, helpers) {
     }
   }
 
+  // 四人两球赛：每组仅 2 或 4 人；composition 由创建页自动生成后校验
+  if (isFourball2BallGameMode(gameMode)) {
+    const map = form.groupCompositionMap || {};
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      const count = filledInGroup(g);
+      if (count === 0) continue;
+      if (count !== 2 && count !== 4) {
+        return '第' + (i + 1) + '组：四人两球赛每组须为2人或4人';
+      }
+      if (!(h.skipComposition)) {
+        const rec = map[g.id];
+        if (!compositionRecordValid(rec, count)) {
+          return '第' + (i + 1) + '组：四人两球组合未生成';
+        }
+      }
+    }
+  }
+
   return null;
 }
 
@@ -303,7 +332,7 @@ function mergeScoresForSlots(oldScores, newSlots) {
  */
 function buildUpdatedGame(existing, form, helpers) {
   const h = helpers || {};
-  const compMode = isCompositionGameMode(form.gameMode);
+  const compMode = isCompositionPersistMode(form.gameMode);
   const compositionMap = compMode ? (form.groupCompositionMap || {}) : {};
   const existingGroups = gameStore.listGroups(existing);
   const buildSlots = h.buildSlots || buildSlotsFromPlayers;
@@ -370,6 +399,8 @@ function buildUpdatedGame(existing, form, helpers) {
 module.exports = {
   COMPOSITION_MODES,
   isCompositionGameMode,
+  isFourball2BallGameMode,
+  isCompositionPersistMode,
   compositionRecordValid,
   parseHalfFromComboText,
   resolveHalfCourses,

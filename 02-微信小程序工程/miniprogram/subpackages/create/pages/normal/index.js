@@ -540,6 +540,91 @@ Page({
     }));
   },
 
+  /** 普通局面四人两球赛：是否当前赛制（不进组合弹窗，提交时自动写 composition） */
+  _isFourball2BallMode() {
+    return this.data.gameMode === '四人两球赛';
+  },
+
+  /**
+   * 四人两球 teams：形状对齐 _buildSplitTeams（type:'pair' + players/members）。
+   * 2 人 → 1 队；4 人 → 报名序 slot1+2 / slot3+4。
+   */
+  _buildFourball2BallTeams(filledPlayers) {
+    const filled = (filledPlayers || []).filter((p) => p && p.filled);
+    const makeTeam = (teamIndex, list) => {
+      const members = this._playersToMembers(list);
+      return {
+        teamIndex: teamIndex,
+        teamId: 'team-' + teamIndex,
+        name: '队伍 ' + teamIndex,
+        type: 'pair',
+        players: members,
+        members: members
+      };
+    };
+    if (filled.length === 2) {
+      return [makeTeam(1, filled)];
+    }
+    if (filled.length === 4) {
+      return [makeTeam(1, filled.slice(0, 2)), makeTeam(2, filled.slice(2, 4))];
+    }
+    return [];
+  },
+
+  /**
+   * 四人两球 composition 记录（与 G2/G3 2+2 confirmGrouping 同构字段）。
+   * 2 人：single_team + compositionType 2+0；4 人：split_team + 2+2。
+   */
+  _buildFourball2BallCompositionRecord(groupIndex) {
+    const g = this.data.groups[groupIndex];
+    if (!g) return null;
+    const filled = ((g.players || []).filter((p) => p && p.filled));
+    const count = filled.length;
+    if (count !== 2 && count !== 4) return null;
+    const teams = this._buildFourball2BallTeams(filled);
+    if (!teams.length) return null;
+    if (count === 2) {
+      return {
+        groupId: g.id,
+        groupIndex: groupIndex,
+        playerCount: 2,
+        compositionType: '2+0',
+        teamMode: 'single_team',
+        teams: teams,
+        scoringTemplate: 'team_best'
+      };
+    }
+    return {
+      groupId: g.id,
+      groupIndex: groupIndex,
+      playerCount: 4,
+      compositionType: '2+2',
+      teamMode: 'split_team',
+      teams: teams,
+      scoringTemplate: 'team_best'
+    };
+  },
+
+  /** 为所有有效组生成四人两球 groupCompositionMap */
+  _buildFourball2BallCompositionMap() {
+    const map = {};
+    (this.data.groups || []).forEach((g, i) => {
+      const rec = this._buildFourball2BallCompositionRecord(i);
+      if (rec) map[g.id] = rec;
+    });
+    return map;
+  },
+
+  /**
+   * 表单用 composition：四人两球始终自动生成；其它赛制读 data.groupCompositionMap。
+   */
+  _getEffectiveCompositionMap() {
+    if (this._isFourball2BallMode()) {
+      return this._buildFourball2BallCompositionMap();
+    }
+    return this.data.groupCompositionMap || {};
+  },
+
   _buildCompositionRecord(groupIndex, opt) {
     const g = this.data.groups[groupIndex];
     const filled = ((g && g.players) || []).filter((p) => p && p.filled);
@@ -908,7 +993,8 @@ Page({
   _getGroupComposition(gIdx) {
     const g = this.data.groups[gIdx];
     if (!g) return null;
-    return (this.data.groupCompositionMap || {})[g.id] || null;
+    // 四人两球：读自动生成 map，避免 setData 未落盘时 _resolveGroups 拿到空 composition
+    return (this._getEffectiveCompositionMap() || {})[g.id] || null;
   },
 
   _resolveGroups(gIdx) {
@@ -1084,6 +1170,7 @@ Page({
   },
 
   _buildFormSnapshot() {
+    const compositionMap = this._getEffectiveCompositionMap();
     return {
       courseId: this.data.courseId,
       courseName: (this.data.courseName || '').trim(),
@@ -1097,7 +1184,7 @@ Page({
       visibility: this.data.visibility,
       accessCode: this.data.accessCode,
       groups: this.data.groups || [],
-      groupCompositionMap: this.data.groupCompositionMap || {}
+      groupCompositionMap: compositionMap
     };
   },
 
@@ -1239,7 +1326,14 @@ Page({
     }
     const courseId = this.data.courseId;
     const courseName = (this.data.courseName || '').trim();
-    const compositionMap = this.data.groupCompositionMap || {};
+    // 四人两球：提交时自动写入与 G2/G3 2+2 同构的 composition（本阶段不改记分路由）
+    const compositionMap = this._getEffectiveCompositionMap();
+    if (this._isFourball2BallMode()) {
+      this.setData({
+        groupCompositionMap: compositionMap,
+        compositionSummaryText: this._buildCompositionSummary(compositionMap)
+      });
+    }
     const buildSlots = (players) =>
       (players || []).map((p, i) => {
         if (!p || !p.filled) return null;
@@ -1319,10 +1413,11 @@ Page({
     // 单组：始终 group 0；多组且创建者在赛中：定位到创建者所在组
     const startGroupIndex = isMulti && creatorInGame ? creatorGroupIndex : 0;
 
-    // 模板映射：团队类赛制（最好成绩赛 / 最佳球位赛）统一走「统一记分引擎」（fourball_best），
-    // 由 scoreEngine.groups 驱动分组高亮与记分控件数量（4+0 / 3+1 / 2+2 / 2+1+1 一致）；
-    // 个人比杆 / 四人两球 → 分组记分（game 模式）。
-    const unified = !!COMPOSITION_MODES[this.data.gameMode];
+    // 模板映射：最好成绩 / 最佳球位 / 四人两球 → 统一记分引擎 fourball_best；
+    // formatType 四人两球仍为 fourball_2ball；groups 来自 groupCompositionMap（2+2 / 单 pair）。
+    // 个人比杆 → game 模式。
+    const unified =
+      !!COMPOSITION_MODES[this.data.gameMode] || this._isFourball2BallMode();
 
     // 统一比赛状态对象（页面间唯一数据通道）：球员/球场/赛制/成绩/组数全部由创建页一次性写入。
     // mode/gameId/groupIndex 一并写入 matchState，记分页只认 matchState，不再依赖 URL 参数。
@@ -1348,9 +1443,9 @@ Page({
         front9Course: this.data.front9Course || null,
         back9Course: this.data.back9Course || null
       },
-      // 赛制：驱动记分表第一列标题
+      // 赛制：驱动记分表第一列标题（四人两球 = fourball_2ball）
       formatType: this._resolveFormatType(startGroupIndex),
-      // 统一记分引擎分组结构（scoreEngine.groups）：驱动「分组高亮」与「记分控件数量」
+      // 统一记分引擎分组：composition.teams → pair shell
       groups: unified ? this._resolveGroups(startGroupIndex) : undefined,
       // 成绩：18 洞默认空（null），UI 不显示 0 / 假数据
       scores: matchStateUtil.emptyScores(),
