@@ -74,10 +74,11 @@ function resolveFormatTypeFromGame(game, groupIndex) {
   return 'individual_stroke';
 }
 
-// 团队类赛制（最好成绩赛 / 最佳球位赛）→ 统一记分引擎；其余 → 分组记分
+// 团队类赛制 → 统一记分引擎 fourball_best；其余 → 分组记分 game
+// 四人两球赛：formatType 仍为 fourball_2ball，mode 走 fourball_best（复用 pair shell）
 function isTeamMode(game) {
   const m = game && game.gameMode;
-  return m === '最好成绩赛' || m === '最佳球位赛';
+  return m === '最好成绩赛' || m === '最佳球位赛' || m === '四人两球赛';
 }
 
 // 统一记分引擎分组结构（scoreEngine.groups）：优先本组 composition.teams
@@ -92,7 +93,10 @@ function resolveGroupsFromGame(game, group, groupIndex) {
       members: (t.members || t.players || []).map((m) => ({
         playerId: m.playerId,
         name: m.name,
-        avatar: m.avatar || ''
+        avatar: m.avatar || '',
+        gender: m.gender || '',
+        tPosition: m.tPosition || '',
+        tee: m.tee || m.tPosition || ''
       }))
     }));
   }
@@ -103,7 +107,14 @@ function resolveGroupsFromGame(game, group, groupIndex) {
   return slots.filter(Boolean).map((p, i) => ({
     teamId: 'team-' + (i + 1),
     name: '队伍 ' + (i + 1),
-    members: [{ playerId: p.playerId, name: p.name, avatar: p.avatar || '' }]
+    members: [{
+      playerId: p.playerId,
+      name: p.name,
+      avatar: p.avatar || '',
+      gender: p.gender || '',
+      tPosition: p.tPosition || '',
+      tee: p.tee || p.tPosition || ''
+    }]
   }));
 }
 

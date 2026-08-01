@@ -115,6 +115,110 @@ const FB22_PAIR_GEOM = {
 };
 
 /**
+ * 普通四人两球（formatType=fourball_2ball）：从固定 4 slot 生成 team-1 / team-2 成员。
+ * - 4 人：slot1+2 → team-1，slot3+4 → team-2
+ * - 2 人：剩余两人 → team-1，team-2.members=[]（成绩保留、展示隐藏）
+ * 不新建 teamId，不改 scores。
+ */
+function slotPlayerToFourballMember(slot) {
+  if (!slot) return null;
+  const nested = slot.player || null;
+  const playerId =
+    (slot.playerId != null && String(slot.playerId).trim()) ||
+    (slot.id != null && String(slot.id).trim()) ||
+    (nested && nested.playerId != null && String(nested.playerId).trim()) ||
+    '';
+  if (!playerId) return null;
+  const tPosition =
+    (slot.tPosition != null && String(slot.tPosition).trim()) ||
+    (nested && nested.tPosition != null && String(nested.tPosition).trim()) ||
+    '';
+  const tee =
+    (slot.tee != null && String(slot.tee).trim()) ||
+    (nested && nested.tee != null && String(nested.tee).trim()) ||
+    tPosition ||
+    '';
+  const gender =
+    (slot.gender != null && String(slot.gender).trim()) ||
+    (nested && nested.gender != null && String(nested.gender).trim()) ||
+    '';
+  return {
+    playerId: playerId,
+    name: (slot.name || (nested && nested.name) || '球员').trim() || '球员',
+    avatar: (slot.avatar || (nested && nested.avatar) || '') || '',
+    gender: gender,
+    tPosition: tPosition,
+    tee: tee
+  };
+}
+
+function countFilledFourballSlots(slots) {
+  const arr = Array.isArray(slots) ? slots : [];
+  let n = 0;
+  for (let i = 0; i < 4; i++) {
+    if (slotPlayerToFourballMember(arr[i])) n += 1;
+  }
+  return n;
+}
+
+function buildOrdinaryFourball2BallTeamsFromSlots(slots) {
+  const arr = Array.isArray(slots) ? slots : [];
+  const s0 = slotPlayerToFourballMember(arr[0]);
+  const s1 = slotPlayerToFourballMember(arr[1]);
+  const s2 = slotPlayerToFourballMember(arr[2]);
+  const s3 = slotPlayerToFourballMember(arr[3]);
+  const filled = [s0, s1, s2, s3].filter(Boolean);
+  const makeTeam = (teamIndex, members) => {
+    const list = (members || []).filter(Boolean);
+    return {
+      teamIndex: teamIndex,
+      teamId: 'team-' + teamIndex,
+      name: '队伍 ' + teamIndex,
+      type: 'pair',
+      players: list.slice(),
+      members: list.slice()
+    };
+  };
+  if (filled.length === 4) {
+    return {
+      filledCount: 4,
+      teams: [makeTeam(1, [s0, s1]), makeTeam(2, [s2, s3])]
+    };
+  }
+  if (filled.length === 2) {
+    return {
+      filledCount: 2,
+      teams: [makeTeam(1, filled), makeTeam(2, [])]
+    };
+  }
+  return { filledCount: filled.length, teams: null };
+}
+
+function pickFourballTeamScoreRecord(teamId, engineGroups, savedEntities) {
+  const tid = String(teamId || '').trim();
+  if (!tid) return { scores: [], putts: [] };
+  const fromEngine = (engineGroups || []).find(
+    (g) => g && String(g.id || g.teamId || '').trim() === tid
+  );
+  if (fromEngine) {
+    return {
+      scores: (fromEngine.scores || []).slice(),
+      putts: (fromEngine.putts || []).slice()
+    };
+  }
+  const fromSaved = (savedEntities || []).find(
+    (r) => r && String(r.teamId || '').trim() === tid
+  );
+  if (fromSaved) {
+    return {
+      scores: (fromSaved.scores || []).slice(),
+      putts: (fromSaved.putts || []).slice()
+    };
+  }
+  return { scores: [], putts: [] };
+}
+
+/**
  * fourball_best 视觉门控（不改成绩模型）
  * - isFourballPair22：纯 2+2（业务字段，含义不变）
  * - isFourballPairLayout：2+2 或 2+1（有 pair 且无 ≥3 人组）→ 复用 pair22 布局/横滑
@@ -2390,10 +2494,14 @@ Page({
     }
   },
 
-  // 赛制 → 第一列标题（变量驱动，唯一映射）
-  // 记分表第一列文案：严格按赛制。仅 best_ball_4_0 → 最佳球位；其余（best_ball / best_score）→ 最好成绩
+  // 赛制 → 展示文案（Context 面板 / 第一列标题）；mode 仍可为 fourball_best
+  // formatType 优先：fourball_2ball → 四人两球赛（勿落入最好成绩）
   _labelForFormat(formatType) {
-    return formatType === 'best_ball_4_0' ? '最佳球位' : '最好成绩';
+    const ft = String(formatType || '').trim();
+    if (ft === 'fourball_2ball') return '四人两球赛';
+    if (ft === 'fourball_best') return '最好成绩比杆赛';
+    if (ft === 'best_ball_4_0') return '最佳球位';
+    return '最好成绩';
   },
 
   // 四人最佳球位模式初始化：
@@ -2416,29 +2524,35 @@ Page({
     // 每个 group = 一个记分实体（含 scores/putts）；不拆分球员、不生成多值数组。
     this._engineGroups = this._buildEngineGroups(ms, hasMatch);
 
-    // 从 gameStore 回灌团队记分实体成绩（返回首页进度条依赖此数据）
+    // 从 gameStore 回灌团队记分实体成绩（按 teamId；空成员组也保留成绩供隐藏后恢复）
     if (hasMatch && this.data.gameId) {
       const savedGroup = gameStore.getGroup(this.data.gameId, this._gameGroupIndex || 0) || {};
       const savedTeams = savedGroup.teamScoresByEntity || [];
       if (savedTeams.length && this._engineGroups.length) {
-        savedTeams.forEach((rec, gi) => {
-          if (!this._engineGroups[gi]) return;
-          this._engineGroups[gi].scores = (rec.scores || []).slice();
-          this._engineGroups[gi].putts = (rec.putts || []).slice();
+        savedTeams.forEach((rec) => {
+          const tid = String((rec && rec.teamId) || '').trim();
+          if (!tid) return;
+          const eg = this._engineGroups.find(
+            (g) => g && String(g.id || g.teamId || '').trim() === tid
+          );
+          if (!eg) return;
+          eg.scores = (rec.scores || []).slice();
+          eg.putts = (rec.putts || []).slice();
         });
       }
     }
 
     // 第一列标题：真实比赛由 matchState.formatType 驱动；演示态固定「最佳球位」原型
     const label = hasMatch ? this._labelForFormat(ms && ms.formatType) : '最佳球位';
-    // 4+0 身份文案：创建时保存的赛制名称；演示态用首页示例赛制名
+    // Context 面板赛制：优先 formatType（fourball_2ball → 四人两球赛）
     const formatLabel =
+      label ||
       (hasMatch &&
         ms &&
         ms.course &&
         String(ms.course.gameMode || ms.course.format || '').trim()) ||
       String((this.data.match && this.data.match.format) || '').trim() ||
-      label;
+      '';
     // 真实比赛：球队记分行 = 各组逐洞最佳（best across groups）派生；演示态保留原型数据
     const team = hasMatch ? this._teamBestColumns(this.data.scoreDisplayMode) : null;
     const colStartW = this._computeBestballColStartWidth();
@@ -2615,8 +2729,11 @@ Page({
   },
 
   // 逐洞「各组最佳」（best across groups）：球队记分行的唯一来源（单一成绩，不生成多值数组）
+  // 空成员组（四人两球 2 人态隐藏的 team-2）不参与聚合，但其 scores 仍留在 _engineGroups
   _teamBestScores() {
-    const groups = this._engineGroups || [];
+    const groups = (this._engineGroups || []).filter(
+      (g) => ((g && g.members) || []).length > 0
+    );
     const scores = [];
     const putts = [];
     for (let h = 0; h < 18; h++) {
@@ -2853,7 +2970,8 @@ Page({
     }
     const groups = this._engineGroups || [];
     let gpos = 0; // 全局成员序号（双色 T 台调色板按此循环）
-    return groups.map((g, gi) => {
+    // 空成员组（如四人两球 2 人态的 team-2）保留成绩但不展示
+    return groups.filter((g) => ((g && g.members) || []).length > 0).map((g, gi) => {
       const t = buildTeamBestColumns(g.scores, g.putts, displayMode);
       const members = g.members || [];
       const size = members.length;
@@ -2943,7 +3061,13 @@ Page({
     const halfText = c.halfText || '';
     const courseFull = courseName ? (courseName + (halfText || '')) : '';
     const title = c.roundName || c.eventName || c.tournamentName || c.name || courseName || '高尔夫球局';
-    const format = c.gameMode || c.format || this._labelForFormat(ms && ms.formatType);
+    // 赛制展示优先 formatType（四人两球 = fourball_2ball，勿被 fourball_best 文案覆盖）
+    const formatType = String((ms && ms.formatType) || '').trim();
+    const format =
+      (formatType ? this._labelForFormat(formatType) : '') ||
+      c.gameMode ||
+      c.format ||
+      '';
     const teeTime = c.teeTimeText || c.teeTime || c.date || '';
     const isPrivate = c.visibility === 'private';
     this.setData({
@@ -6983,7 +7107,100 @@ Page({
 
     this._syncLocalPlayersTeeFromMap(teeMap);
     this.persistSession();
+    // 普通四人两球：T 台展示读 _engineGroups.members，需同步 composition / matchState
+    if (this._isOrdinaryFourball2BallContext()) {
+      this._syncOrdinaryFourball2BallTeeFromMap(teeMap);
+    }
     return { ok: true, path: 'game' };
+  },
+
+  /**
+   * 普通四人两球：按 playerId 把 T 台写回 composition / matchState.groups / _engineGroups.members。
+   * 不改 teamId / teamScoresByEntity / 成绩数组。
+   */
+  _syncOrdinaryFourball2BallTeeFromMap(teeMap) {
+    if (!this._isOrdinaryFourball2BallContext() || !teeMap) return false;
+    const gameId = this.data.gameId;
+    const gi = this._gameGroupIndex || 0;
+    const game = gameStore.getGame(gameId);
+    if (!game) return false;
+
+    const patchMember = (m) => {
+      if (!m) return m;
+      const id = String(m.playerId || m.userId || m.id || '').trim();
+      const tee = this._resolveEditTeeForPlayerId(teeMap, id);
+      if (!tee) return m;
+      const slot =
+        (this._demoSlots || []).find(
+          (p) => p && String(p.playerId || p.id || '').trim() === id
+        ) || null;
+      const gender = (slot && slot.gender) || m.gender || '';
+      return Object.assign({}, m, {
+        tPosition: tee,
+        tee: tee,
+        gender: gender
+      });
+    };
+    const patchTeam = (t) => {
+      if (!t) return t;
+      const members = (Array.isArray(t.members) ? t.members : []).map(patchMember);
+      const players = Array.isArray(t.players) ? t.players.map(patchMember) : members.slice();
+      return Object.assign({}, t, { members: members, players: players });
+    };
+
+    const storeGroups = gameStore.listGroups(game);
+    const group = storeGroups[gi] || {};
+    const groupId = group.groupId || gameId + '-g' + (gi + 1);
+    const prevMap =
+      game.groupCompositionMap && typeof game.groupCompositionMap === 'object'
+        ? game.groupCompositionMap
+        : {};
+    const prevComp = prevMap[groupId] || group.composition || null;
+    if (prevComp && Array.isArray(prevComp.teams)) {
+      const nextComp = Object.assign({}, prevComp, {
+        teams: prevComp.teams.map(patchTeam)
+      });
+      game.groupCompositionMap = Object.assign({}, prevMap, { [groupId]: nextComp });
+      game.composition = {
+        type: nextComp.compositionType || (game.composition && game.composition.type) || '',
+        single: nextComp.teamMode === 'single_team',
+        teams: nextComp.teams,
+        scoringTemplate:
+          nextComp.scoringTemplate ||
+          (game.composition && game.composition.scoringTemplate) ||
+          'team_best'
+      };
+      if (Array.isArray(game.groups) && game.groups[gi]) {
+        game.groups[gi] = Object.assign({}, game.groups[gi], { composition: nextComp });
+      }
+      gameStore.saveGame(game);
+    } else {
+      // 无 composition 时走 slot→组合全量同步（已含 tPosition）
+      this._syncOrdinaryFourball2BallCompositionFromSlots();
+    }
+
+    if (Array.isArray(this._engineGroups)) {
+      this._engineGroups = this._engineGroups.map((g) => {
+        if (!g) return g;
+        return Object.assign({}, g, {
+          members: (Array.isArray(g.members) ? g.members : []).map(patchMember)
+        });
+      });
+    }
+
+    const ms = this._matchState || matchState.getMatchState();
+    if (ms && ms.gameId === gameId && Array.isArray(ms.groups)) {
+      const nextGroups = ms.groups.map((g) => {
+        if (!g) return g;
+        return Object.assign({}, g, {
+          members: (Array.isArray(g.members) ? g.members : []).map(patchMember)
+        });
+      });
+      const next = Object.assign({}, ms, { groups: nextGroups });
+      matchState.setMatchState(next);
+      this._matchState = next;
+    }
+    return true;
   },
 
   confirmEditTeeSheet() {
@@ -7758,6 +7975,7 @@ Page({
             source: s.player.source,
             gender: s.player.gender || '',
             tPosition: s.player.tPosition || '',
+            tee: s.player.tee || s.player.tPosition || '',
             teamLabel: s.player.teamLabel || s.player.teamGroupName || '',
             teamGroupName: s.player.teamGroupName || s.player.teamLabel || ''
           }
@@ -8547,6 +8765,7 @@ Page({
       source: source || p.source || 'manual',
       gender: p.gender || '',
       tPosition: p.tPosition || '',
+      tee: p.tee || p.tPosition || '',
       teamLabel: '',
       teamGroupName: ''
     };
@@ -9487,10 +9706,28 @@ Page({
       return plan;
     }
 
+    // 普通四人两球：保存前校验 2/4 人（禁止 1/3）；不改球队赛路径
+    if (commitPath.path === 'gameStore' && this._isOrdinaryFourball2BallContext()) {
+      const compositionErr = this._validateOrdinaryFourball2BallDraft(this._draftSlots);
+      if (compositionErr) {
+        wx.showToast({ title: compositionErr, icon: 'none' });
+        return plan;
+      }
+    }
+
     const ok = this._applyGameOrDemoCommitDiff(diff);
     if (!ok) {
       wx.showToast({ title: '提交失败', icon: 'none' });
       return plan;
+    }
+
+    // 普通四人两球：按 slot 同步 team-1/team-2.members（不新建 teamId、不删成绩）
+    if (commitPath.path === 'gameStore' && this._isOrdinaryFourball2BallContext()) {
+      const synced = this._syncOrdinaryFourball2BallCompositionFromSlots();
+      if (!synced) {
+        wx.showToast({ title: '组合同步失败', icon: 'none' });
+        return plan;
+      }
     }
 
     plan.deferredWrites = {
@@ -9512,6 +9749,117 @@ Page({
     this._finalizeCloseGroupManage();
     wx.showToast({ title: '已保存', icon: 'success' });
     return plan;
+  },
+
+  /** 普通局四人两球：formatType=fourball_2ball + fourball_best + gameStore */
+  _isOrdinaryFourball2BallContext() {
+    if (this.data.mode !== 'fourball_best' || !this.data.gameId) return false;
+    const ms = this._matchState || matchState.getMatchState() || {};
+    if (String(ms.formatType || '').trim() === 'fourball_2ball') return true;
+    const game = gameStore.getGame(this.data.gameId);
+    return !!(game && game.gameMode === '四人两球赛');
+  },
+
+  _validateOrdinaryFourball2BallDraft(slots) {
+    const n = countFilledFourballSlots(slots);
+    if (n === 2 || n === 4) return '';
+    return '四人两球赛需保留 2 人或 4 人';
+  },
+
+  /**
+   * 人员调整后：只改 composition / engine 的 members，保留 team-1/team-2 与 teamScoresByEntity。
+   */
+  _syncOrdinaryFourball2BallCompositionFromSlots() {
+    if (!this._isOrdinaryFourball2BallContext()) return false;
+    const gameId = this.data.gameId;
+    const gi = this._gameGroupIndex || 0;
+    const game = gameStore.getGame(gameId);
+    if (!game) return false;
+
+    const built = buildOrdinaryFourball2BallTeamsFromSlots(this._demoSlots);
+    if (!built || !built.teams) return false;
+
+    const storeGroups = gameStore.listGroups(game);
+    const group = storeGroups[gi] || {};
+    const groupId = group.groupId || gameId + '-g' + (gi + 1);
+    const prevMap = (game.groupCompositionMap && typeof game.groupCompositionMap === 'object')
+      ? game.groupCompositionMap
+      : {};
+    const prevComp = prevMap[groupId] || group.composition || null;
+    const compositionRec = {
+      groupId: groupId,
+      groupIndex: gi,
+      playerCount: built.filledCount,
+      compositionType: built.filledCount === 2 ? '2+0' : '2+2',
+      teamMode: built.filledCount === 2 ? 'single_team' : 'split_team',
+      teams: built.teams,
+      scoringTemplate: (prevComp && prevComp.scoringTemplate) || 'team_best'
+    };
+
+    const nextMap = Object.assign({}, prevMap, { [groupId]: compositionRec });
+    game.groupCompositionMap = nextMap;
+    game.composition = {
+      type: compositionRec.compositionType,
+      single: compositionRec.teamMode === 'single_team',
+      teams: built.teams,
+      scoringTemplate: compositionRec.scoringTemplate
+    };
+
+    if (Array.isArray(game.groups) && game.groups[gi]) {
+      game.groups[gi] = Object.assign({}, game.groups[gi], {
+        composition: compositionRec
+      });
+    }
+
+    // 不触碰 teamScoresByEntity / scores 内容
+    gameStore.saveGame(game);
+
+    const savedGroup = gameStore.getGroup(gameId, gi) || {};
+    const savedEntities = savedGroup.teamScoresByEntity || [];
+    const prevEngine = this._engineGroups || [];
+
+    this._engineGroups = built.teams.map((t) => {
+      const picked = pickFourballTeamScoreRecord(t.teamId, prevEngine, savedEntities);
+      return {
+        id: t.teamId,
+        teamId: t.teamId,
+        name: t.name || t.teamId,
+        type: t.type || 'pair',
+        members: (t.members || []).slice(),
+        avatar: (t.members && t.members[0] && t.members[0].avatar) || '',
+        scores: picked.scores,
+        putts: picked.putts
+      };
+    });
+
+    const ms = this._matchState || matchState.getMatchState();
+    if (ms && ms.gameId === gameId) {
+      const nextGroups = this._engineGroups.map((g) => ({
+        teamId: g.id || g.teamId,
+        name: g.name,
+        type: g.type,
+        members: (g.members || []).slice(),
+        scores: (g.scores || []).slice(),
+        putts: (g.putts || []).slice()
+      }));
+      const next = Object.assign({}, ms, {
+        groups: nextGroups,
+        formatType: 'fourball_2ball'
+      });
+      matchState.setMatchState(next);
+      this._matchState = next;
+    }
+
+    console.log('[fourball-2ball-composition-sync]', {
+      gameId: gameId,
+      groupId: groupId,
+      filledCount: built.filledCount,
+      teams: built.teams.map((t) => ({
+        teamId: t.teamId,
+        memberIds: (t.members || []).map((m) => m.playerId)
+      }))
+    });
+    return true;
   },
 
   // 是否绑定真实记分数据源（个人比杆赛走 groupsStore，以 playerId 为成绩主键）
@@ -9564,7 +9912,14 @@ Page({
       }
       return {
         slotId,
-        player: { playerId: p.playerId || p.id, name: p.name, avatar: p.avatar },
+        player: {
+          playerId: p.playerId || p.id,
+          name: p.name,
+          avatar: p.avatar,
+          gender: p.gender || '',
+          tPosition: p.tPosition || '',
+          tee: p.tee || p.tPosition || ''
+        },
         playerId: p.playerId || p.id,
         status: 'occupied',
         source: p.source || 'manual',
