@@ -1,7 +1,8 @@
 /**
  * G5–G8 比洞结果展示（仅展示层）。
  * 业余赛可继续记满 18 洞：不中止记分、不改 scoreData、不改比赛状态。
- * 提前结束文案：首次「领先洞数 > 剩余洞数」→ n & m（如 7&5）。
+ * 提前结束文案：首次「领先洞数 > 剩余洞数」且剩余 > 0 → n&m（如 5&4）。
+ * 打满 18 洞（剩余 0）：→ nUP / nDN，禁止 n&0。
  */
 
 function isFilledScore(raw) {
@@ -76,6 +77,20 @@ function buildMatchPlayResultSummary(scoresA, scoresB, startHole) {
   }
 
   if (clinch) {
+    // 展示层：剩余 0 洞时禁止 n&0，改用 nUP / nDN（不改 clinch 判定本身）
+    if (clinch.remaining <= 0) {
+      const suffix = clinch.leader === 'B' ? 'DN' : 'UP';
+      return {
+        leader: clinch.leader,
+        up: clinch.up,
+        remaining: clinch.remaining,
+        thru: thru,
+        clinched: true,
+        statusMain: String(clinch.up),
+        statusSub: suffix,
+        label: clinch.up + suffix
+      };
+    }
     return {
       leader: clinch.leader,
       up: clinch.up,
