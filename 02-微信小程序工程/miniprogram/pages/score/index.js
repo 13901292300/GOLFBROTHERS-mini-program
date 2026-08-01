@@ -12391,8 +12391,7 @@ Page({
       if (quickScoreClearDraft) {
         this._clearHoleScoresInEngineGroups(sheetHoleIndex);
         this.setData({ quickScoreClearDraft: false, quickScoreFreshDraft: false });
-        this.refreshTeamColumns();
-        this._persistTeamScores();
+        this._persistAndRefreshTeamBoard();
         this.closeScoreInput();
         this._afterScoresPersisted();
         return;
@@ -12416,8 +12415,7 @@ Page({
     if (scoreClearDraft) {
       this._clearHoleScoresInEngineGroups(sheetHoleIndex);
       this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
-      this.refreshTeamColumns();
-      this._persistTeamScores();
+      this._persistAndRefreshTeamBoard();
       this.closeScoreInput();
       this._afterScoresPersisted();
       return;
@@ -12448,8 +12446,7 @@ Page({
     g.sands[sheetHoleIndex] = normalizeSandValue(this.data.panelBunker);
 
     this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
-    this.refreshTeamColumns();
-    this._persistTeamScores();
+    this._persistAndRefreshTeamBoard();
 
     const next = groups.findIndex((gr) => !isFilledScore((gr.scores || [])[sheetHoleIndex]));
     if (next !== -1) {
@@ -12462,10 +12459,24 @@ Page({
 
   // 各组本洞成绩写完后：派生球队记分行 + 持久化
   _finalizeTeamHole() {
-    this.refreshTeamColumns();
-    this._persistTeamScores();
+    this._persistAndRefreshTeamBoard();
     this.closeScoreInput();
     this._afterScoresPersisted();
+  },
+
+  /**
+   * fourball_best 确认后落盘 + 看板刷新。
+   * 4+0 / 3+0 / 3+1（isFourball40StrokeShell，含 3+1）：persist → refreshPlayers → playersView
+   * 2+2 等：保持原 refreshTeamColumns → persist
+   */
+  _persistAndRefreshTeamBoard() {
+    if (this.data.isFourball40StrokeShell) {
+      this._persistTeamScores();
+      this.refreshPlayers();
+      return;
+    }
+    this.refreshTeamColumns();
+    this._persistTeamScores();
   },
 
   // 重建按组记分行（每组一行）+ 兼容字段（best across groups）
