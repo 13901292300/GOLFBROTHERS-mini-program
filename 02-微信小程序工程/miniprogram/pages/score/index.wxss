@@ -1809,6 +1809,23 @@ page {
   position: relative;
 }
 
+/* G6/G7 pair：复用 fourball 身份列宽 / 折叠几何（G5 single 不进此分支） */
+.scoreboard-shell--match-play.is-match-play-pair {
+  --fourball-identity-width-start: 220rpx;
+  --fourball-identity-width-delta: 72rpx;
+  --fourball-identity-width: calc(
+    var(--fourball-identity-width-start) - var(--fourball-identity-width-delta) *
+      var(--fourball-identity-collapse, 0)
+  );
+  --fourball-diff-lead-width: 96rpx;
+  --fourball-tee-lead-width: 6rpx;
+  --fourball-hole-par-anchor-width: calc(
+    var(--fourball-identity-width) + var(--fourball-diff-lead-width) +
+      var(--fourball-tee-lead-width)
+  );
+  --fourball-avatar-collapse-shift: -48rpx;
+}
+
 .scoreboard-shell--match-play .player-column {
   width: 128rpx;
   min-width: 128rpx;
@@ -1820,6 +1837,13 @@ page {
   box-sizing: border-box;
 }
 
+.scoreboard-shell--match-play.is-match-play-pair .player-column {
+  width: var(--fourball-identity-width);
+  min-width: var(--fourball-identity-width);
+  max-width: var(--fourball-identity-width);
+  transition: none;
+}
+
 .scoreboard-shell--match-play .score-track {
   flex: 1;
   min-width: 0;
@@ -1829,7 +1853,7 @@ page {
   background: transparent;
 }
 
-/* HOLE/PAR normal：宽 230rpx，仅文字+横移（无铺底，同 game-single，避免 translate 时蓝底伸入洞列） */
+/* HOLE/PAR normal：G5=230rpx；G6/G7 pair=identity+diff+T（随折叠变宽） */
 .scoreboard-shell--match-play .match-play-hole-par-normal {
   position: absolute;
   left: 0;
@@ -1984,6 +2008,171 @@ page {
   height: 80rpx;
 }
 
+/* G6/G7：pair 身份布局（同构 fourball-pair-identity；挂 paired-avatars/paired-names 类名） */
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  width: 100%;
+  min-width: 0;
+  padding: 8rpx 12rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .avatar-group,
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .paired-avatars {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 80rpx;
+  margin: 0 auto;
+  box-sizing: border-box;
+  gap: calc(16rpx * (1 - var(--fourball-identity-collapse, 0)));
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .avatar-group__item {
+  position: relative;
+  flex-shrink: 0;
+  width: 80rpx;
+  height: 80rpx;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .avatar-group__item--first {
+  z-index: 2;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .avatar-group__item--second {
+  z-index: 1;
+  margin-left: calc(
+    var(--fourball-avatar-collapse-shift, -48rpx) * var(--fourball-identity-collapse, 0)
+  );
+  transform: translateX(0);
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .avatar-group__avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  display: block;
+  background: var(--bg-secondary);
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .name-stack {
+  position: relative;
+  width: 100%;
+  min-height: 28rpx;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .name-group,
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .paired-names {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  width: 100%;
+  min-height: 28rpx;
+  opacity: calc(1 - var(--fourball-identity-collapse, 0));
+  /* 覆盖 legacy .paired-names absolute 叠名样式 */
+  position: relative;
+  height: auto;
+  transform: none;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .name-group__name {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 50%;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .pair-name-compact {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 28rpx;
+  box-sizing: border-box;
+  opacity: var(--fourball-identity-collapse, 0);
+  pointer-events: none;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .pair-name-compact--combined .pair-name-compact__text {
+  max-width: 100%;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .pair-name-compact--dual {
+  justify-content: center;
+  gap: 0;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .pair-name-compact__part {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .fourball-pair-identity .pair-name-compact__sep {
+  flex: 0 0 auto;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .match-play-hole-par-normal,
+.scoreboard-shell--match-play.is-match-play-pair .match-play-status-title-normal {
+  width: var(--fourball-hole-par-anchor-width);
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .match-play-tee-sticky-overlay {
+  left: var(--fourball-identity-width);
+}
+
+.scoreboard-shell--match-play.is-match-play-pair .match-play-status-title-compact {
+  width: calc(var(--fourball-identity-width) + 6rpx);
+}
+
+/* G6/G7 pair：阶段1 track 补偿（对齐 fourball-score-track__inner）；不影响 G5 */
+.scoreboard-shell--match-play.is-match-play-pair .score-track__inner {
+  position: relative;
+  z-index: 1;
+  will-change: transform;
+  transition: none;
+}
+
 /* HEADER V2：身份蓝 / HOLE×lead 交叉蓝 */
 .scoreboard-shell--match-play .player-column__spacer.shell-row--par,
 .scoreboard-shell--match-play .player-column__row {
@@ -2118,6 +2307,7 @@ page {
   padding: 0;
   margin: 0;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
   justify-content: stretch;
   border-right: none;
@@ -2140,6 +2330,14 @@ page {
   margin: 0;
   flex-shrink: 0;
   box-sizing: border-box;
+}
+
+/* G6/G7 pair：双色 T 半条（对齐 fourball lead.tee） */
+.scoreboard-shell--match-play .track-lead-tee .track-lead-tee__half,
+.scoreboard-shell--match-play .match-play-tee-sticky-overlay__row .track-lead-tee__half {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
 }
 
 /* HEADER V2：lead 身份蓝；HOLE 行 lead 交叉蓝 */
@@ -2288,6 +2486,7 @@ page {
 
 .scoreboard-shell--match-play .match-play-tee-sticky-overlay__row {
   display: flex;
+  flex-direction: column;
   align-items: stretch;
   justify-content: stretch;
   width: 100%;

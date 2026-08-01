@@ -279,11 +279,11 @@
         </scroll-view>
       </view>
 
-      <!-- ===== 比洞 Shell：G5；布局对齐 stroke shell（track lead + T sticky overlay）===== -->
+      <!-- ===== 比洞 Shell：G5–G8；G6/G7 pair 复用 fourball 2+2 身份（avatar-group + A/B 折叠）===== -->
       <view
         wx:elif="{{useMatchPlayScoreShell}}"
-        class="scoreboard-shell scoreboard-shell--match-play {{isMatchPlayTeeStickyVisible ? 'is-match-play-tee-sticky' : ''}}"
-        style="{{scoreboardStyle}}"
+        class="scoreboard-shell scoreboard-shell--match-play {{isMatchPlayPairLayout ? 'is-match-play-pair' : ''}} {{isMatchPlayTeeStickyVisible ? 'is-match-play-tee-sticky' : ''}}"
+        style="--fourball-identity-collapse:{{matchPlayIdentityCollapseProgress}};{{scoreboardStyle}}"
       >
         <scroll-view
           class="player-column"
@@ -308,14 +308,39 @@
                   </view>
                 </block>
                 <block wx:else>
-                  <view class="player-column__card match-play-pair-card">
-                    <view class="pair-avatar-group">
-                      <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
-                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                  <!-- G2/G3 pair identity 同构：横向双头像 + name-group / 折叠 A/B -->
+                  <view class="fourball-pair-identity">
+                    <view class="avatar-group paired-avatars">
+                      <view
+                        wx:for="{{item.pairMembers}}"
+                        wx:for-item="pm"
+                        wx:for-index="mIdx"
+                        wx:key="name"
+                        class="avatar-group__item {{mIdx === 1 ? 'avatar-group__item--second' : 'avatar-group__item--first'}}"
+                      >
+                        <image class="avatar-group__avatar" src="{{pm.avatar}}" mode="aspectFill"></image>
                       </view>
                     </view>
-                    <view class="paired-names">
-                      <text wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="player-name-line" style="left:{{pm.left}};transform:{{pm.tf}};">{{pm.name}}</text>
+                    <view class="name-stack">
+                      <view class="name-group paired-names">
+                        <text
+                          wx:for="{{item.pairMembers}}"
+                          wx:for-item="pm"
+                          wx:key="name"
+                          class="name-group__name"
+                        >{{pm.name}}</text>
+                      </view>
+                      <view
+                        wx:if="{{item.collapsedNameView}}"
+                        class="pair-name-compact pair-name-compact--{{item.collapsedNameView.mode}}"
+                      >
+                        <text wx:if="{{item.collapsedNameView.mode === 'combined'}}" class="pair-name-compact__text">{{item.collapsedNameView.text}}</text>
+                        <block wx:else>
+                          <text class="pair-name-compact__part" style="{{item.collapsedNameView.leftStyle}}">{{item.collapsedNameView.left}}</text>
+                          <text class="pair-name-compact__sep">/</text>
+                          <text class="pair-name-compact__part" style="{{item.collapsedNameView.rightStyle}}">{{item.collapsedNameView.right}}</text>
+                        </block>
+                      </view>
                     </view>
                   </view>
                 </block>
@@ -382,7 +407,16 @@
               wx:for-index="sIdx"
             >
               <view class="shell-row shell-row--player match-play-tee-sticky-overlay__row">
-                <view class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
+                <block wx:if="{{item.kind === 'pair'}}">
+                  <view
+                    wx:for="{{item.pairMembers}}"
+                    wx:for-item="pm"
+                    wx:key="name"
+                    class="track-lead-tee__half"
+                    style="background:{{pm.teeColor}};"
+                  ></view>
+                </block>
+                <view wx:else class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
               </view>
               <view
                 wx:if="{{sIdx === 0}}"
@@ -400,7 +434,11 @@
           bindscroll="onScoreTrackScroll"
           show-scrollbar="{{false}}"
         >
-          <view class="score-track__inner">
+          <!-- G6/G7 pair：阶段1 compensate；G5 single 不绑 transform -->
+          <view
+            class="score-track__inner"
+            style="{{isMatchPlayPairLayout ? matchPlayTrackInnerStyle : ''}}"
+          >
             <view class="scoreboard-row scoreboard-row--head shell-row shell-row--head">
               <view class="scoreboard-cell track-lead-diff track-lead-diff--head"></view>
               <view class="scoreboard-cell track-lead-tee track-lead-tee--head"></view>
@@ -439,7 +477,16 @@
                   </view>
                 </view>
                 <view class="scoreboard-cell track-lead-tee">
-                  <view class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
+                  <block wx:if="{{item.kind === 'pair'}}">
+                    <view
+                      wx:for="{{item.pairMembers}}"
+                      wx:for-item="pm"
+                      wx:key="name"
+                      class="track-lead-tee__half"
+                      style="background:{{pm.teeColor}};"
+                    ></view>
+                  </block>
+                  <view wx:else class="player-tee-marker track-lead-tee__mark {{item.colorClass}}"></view>
                 </view>
                 <view
                   wx:for="{{item.cells}}"

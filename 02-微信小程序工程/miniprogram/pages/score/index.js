@@ -1956,8 +1956,14 @@ Page({
     useGameStrokeShell: false,
     /** 个人比杆 UI Shell：普通创建个人比杆 + 球队赛 G1；不含 G5–G8 / 其它 individual_stroke */
     useStrokeScoreShell: false,
-    /** 比洞 UI Shell：本阶段仅球队赛 G5；G6–G8 仍走 legacy（与 useStrokeScoreShell 独立） */
+    /** 比洞 UI Shell：G5–G8（与 useStrokeScoreShell 独立） */
     useMatchPlayScoreShell: false,
+    /** G6/G7/G8：matchSidesView 含 pair 时，身份列复用 fourball 2+2 折叠布局 */
+    isMatchPlayPairLayout: false,
+    /** G6/G7 pair：identity 折叠进度 0~1（对齐 fourballIdentityCollapseProgress） */
+    matchPlayIdentityCollapseProgress: 0,
+    /** G6/G7 pair：阶段1 track 补偿（对齐 fourballTrackInnerStyle / Phase6.1） */
+    matchPlayTrackInnerStyle: 'transform: translateX(0px);',
     /** fourball UI Shell v2：fourball_best + pair 布局（全组≤2 且含双人）；单人行展示居中退化 */
     useFourballScoreShell: false,
     /** fourball shell v2 行数据适配层（由 bestTeams 派生） */
@@ -3266,7 +3272,7 @@ Page({
       : isMatchPlayBoard && gameMode
         ? gameMode
         : '个人比杆赛';
-    // UI Shell：仅球队赛 G1（个人比杆）；G5–G8 / 无 match 演示不进新壳
+    // UI Shell：球队赛 G1 → stroke shell；G5–G8 比洞 → match-play shell（不进 stroke_entity）
     const isTeamG1Stroke =
       !!matchId &&
       !isMatchPlayBoard &&
@@ -3278,7 +3284,7 @@ Page({
       isSingleGroupGame: false,
       useGameStrokeShell: false,
       useStrokeScoreShell: isTeamG1Stroke,
-      useMatchPlayScoreShell: isG5Only,
+      useMatchPlayScoreShell: isMatchPlayBoard,
       useFourballScoreShell: this._resolveFourballScoreShell(),
       isFourballPair22: false,
       isFourballPairLayout: false,
@@ -3303,6 +3309,9 @@ Page({
       isTeeStickyVisible: false,
       isMatchPlayTeeStickyVisible: false,
       matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
+      isMatchPlayPairLayout: false,
+      matchPlayIdentityCollapseProgress: 0,
+      matchPlayTrackInnerStyle: 'transform: translateX(0px);',
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
       // G5 显示个人比洞赛；G6/G7/G8 显示赛制名；G1 及其他个人行保持个人比杆赛
@@ -3314,9 +3323,11 @@ Page({
       this.setData({
         isG5MatchPlay: true,
         isMatchPlayScoreMode: true,
-        useMatchPlayScoreShell: isG5Only,
+        useMatchPlayScoreShell: true,
         isMatchPlayTeeStickyVisible: false,
         matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
+        matchPlayIdentityCollapseProgress: 0,
+        matchPlayTrackInnerStyle: 'transform: translateX(0px);',
         columns: buildG5Columns(),
         'match.format': formatLabel,
         'gameContext.format': formatLabel
@@ -4773,8 +4784,8 @@ Page({
     if (this.data.mode === 'individual_stroke') {
       patch.isG5MatchPlay = isMatchPlayBoard;
       patch.isMatchPlayScoreMode = matchPlayScoreMode;
-      // UI Shell：本阶段仅 G5；与 useStrokeScoreShell 独立，不改成绩逻辑
-      patch.useMatchPlayScoreShell = isG5Only;
+      // UI Shell：G5–G8 比洞均开 match-play shell；与 useStrokeScoreShell 独立，不改成绩逻辑
+      patch.useMatchPlayScoreShell = isMatchPlayBoard;
       if (isMatchPlayBoard) {
         patch['match.format'] = boardFormatLabel;
         if (this.data.gameContext && this.data.gameContext.ready) {
@@ -4799,23 +4810,36 @@ Page({
           boardGroupId
         );
         Object.assign(patch, this._syncG5MatchStatusView(g5Match, true, boardGameMode));
-        // G6/G7/G8 pair：sticky 列宽 / diff 布局变量对齐 stroke_entity pair（不影响 G5 single）
-        if (!isG5Only) {
-          const g678HasPair = (patch.matchSidesView || []).some(
-            (row) => row && row.kind === 'pair'
-          );
-          if (g678HasPair) {
-            patch.scoreboardStyle = this._buildScoreboardStyleVars({
-              colWidth: 344,
-              bestDiffGrow: 1
+        // G6/G7/G8 pair：复用 G2/G3 fourball 身份折叠（collapsedNameView）；不影响 G5 single
+        const g678HasPair =
+          !isG5Only &&
+          (patch.matchSidesView || []).some((row) => row && row.kind === 'pair');
+        patch.isMatchPlayPairLayout = !!g678HasPair;
+        if (g678HasPair) {
+          patch.matchSidesView = (patch.matchSidesView || []).map((row) => {
+            if (!row || row.kind !== 'pair') return row;
+            const members = Array.isArray(row.pairMembers) ? row.pairMembers : [];
+            const name0 = (members[0] && members[0].name) || '';
+            const name1 = (members[1] && members[1].name) || '';
+            return Object.assign({}, row, {
+              collapsedNameView: this._buildFourballCollapsedNameView(name0, name1)
             });
-          }
+          });
+        } else {
+          patch.matchPlayIdentityCollapseProgress = 0;
+          patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
         }
       } else {
         patch.columns = buildColumns();
+        patch.isMatchPlayPairLayout = false;
+        patch.matchPlayIdentityCollapseProgress = 0;
+        patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
       }
       if (!isMatchPlayBoard && patch.isG5MatchPlay === false) {
         patch.matchSidesView = [];
+        patch.isMatchPlayPairLayout = false;
+        patch.matchPlayIdentityCollapseProgress = 0;
+        patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
         patch.matchStatusView = {
           cells: [],
           rowCells: [],
@@ -6442,10 +6466,10 @@ Page({
     this.setData({ isTeeStickyVisible: visible });
   },
 
-  /** match-play T sticky：独立 UI 状态，不改 G1 _syncGameSingleTeeSticky */
+  /** match-play T sticky（仅 G5 single；G6/G7 pair 走 _syncMatchPlayPairShellScrollState） */
   _syncMatchPlayTeeSticky(scrollLeft) {
-    if (!this.data.useMatchPlayScoreShell) {
-      if (this.data.isMatchPlayTeeStickyVisible) {
+    if (!this.data.useMatchPlayScoreShell || this.data.isMatchPlayPairLayout) {
+      if (!this.data.useMatchPlayScoreShell && this.data.isMatchPlayTeeStickyVisible) {
         this.setData({ isMatchPlayTeeStickyVisible: false });
       }
       return;
@@ -6456,10 +6480,13 @@ Page({
     this.setData({ isMatchPlayTeeStickyVisible: visible });
   },
 
-  /** match-play HOLE/PAR overlay 横移：独立于 _syncGameSingleHoleParMove */
+  /** match-play HOLE/PAR overlay 横移（仅 G5 single；pair 走原子同步） */
   _syncMatchPlayHoleParMove(scrollLeft) {
-    if (!this.data.useMatchPlayScoreShell) {
-      if (this.data.matchPlayHoleParNormalStyle !== 'transform: translateX(0px);') {
+    if (!this.data.useMatchPlayScoreShell || this.data.isMatchPlayPairLayout) {
+      if (
+        !this.data.useMatchPlayScoreShell &&
+        this.data.matchPlayHoleParNormalStyle !== 'transform: translateX(0px);'
+      ) {
         this.setData({ matchPlayHoleParNormalStyle: 'transform: translateX(0px);' });
       }
       return;
@@ -6472,6 +6499,68 @@ Page({
     const style = 'transform: translateX(' + tx + 'px);';
     if (style === this.data.matchPlayHoleParNormalStyle) return;
     this.setData({ matchPlayHoleParNormalStyle: style });
+  },
+
+  /**
+   * G6/G7 pair：对齐 fourball `_syncFourballShellScrollState`
+   * 一次 setData：collapse + track compensate + tee sticky + hole/par
+   */
+  _syncMatchPlayPairShellScrollState(scrollLeft, seq) {
+    if (!this.data.useMatchPlayScoreShell || !this.data.isMatchPlayPairLayout) {
+      const resetStyle = 'transform: translateX(0px);';
+      if (
+        this.data.matchPlayIdentityCollapseProgress ||
+        this.data.matchPlayTrackInnerStyle !== resetStyle
+      ) {
+        this.setData({
+          matchPlayIdentityCollapseProgress: 0,
+          matchPlayTrackInnerStyle: resetStyle
+        });
+      }
+      return;
+    }
+    if (typeof seq === 'number' && seq !== this._matchPlayScrollSeq) return;
+
+    const left = Math.max(0, Number(scrollLeft) || 0);
+    const resetStyle = 'transform: translateX(0px);';
+    let next;
+    if (left < 1) {
+      next = {
+        matchPlayIdentityCollapseProgress: 0,
+        isMatchPlayTeeStickyVisible: false,
+        matchPlayTrackInnerStyle: resetStyle,
+        matchPlayHoleParNormalStyle: resetStyle
+      };
+    } else {
+      const progress = this._calculateFourballIdentityCollapseProgress(left);
+      const compensatePx = this._calculateFourballTrackPhaseCompensatePx(left);
+      const holeParTx = this._calculateFourballHoleParOffsetX(left);
+      next = {
+        matchPlayIdentityCollapseProgress: progress,
+        isMatchPlayTeeStickyVisible: this._shouldFourballTeeStickyVisible(left),
+        matchPlayTrackInnerStyle: 'transform: translateX(' + compensatePx + 'px);',
+        matchPlayHoleParNormalStyle: 'transform: translateX(' + holeParTx + 'px);'
+      };
+    }
+    const cur = this.data;
+    if (
+      next.matchPlayIdentityCollapseProgress === cur.matchPlayIdentityCollapseProgress &&
+      next.isMatchPlayTeeStickyVisible === !!cur.isMatchPlayTeeStickyVisible &&
+      next.matchPlayTrackInnerStyle === cur.matchPlayTrackInnerStyle &&
+      next.matchPlayHoleParNormalStyle === cur.matchPlayHoleParNormalStyle
+    ) {
+      return;
+    }
+    if (typeof seq === 'number' && seq !== this._matchPlayScrollSeq) return;
+
+    this.setData(next, () => {
+      if (typeof seq === 'number' && seq !== this._matchPlayScrollSeq) {
+        this._syncMatchPlayPairShellScrollState(
+          this._matchPlayLatestScrollLeft,
+          this._matchPlayScrollSeq
+        );
+      }
+    });
   },
 
   /**
@@ -6499,8 +6588,15 @@ Page({
     const scrollLeft = (e.detail && e.detail.scrollLeft) || 0;
     this._syncGameSingleTeeSticky(scrollLeft);
     this._syncGameSingleHoleParMove(scrollLeft);
-    this._syncMatchPlayTeeSticky(scrollLeft);
-    this._syncMatchPlayHoleParMove(scrollLeft);
+    if (this.data.useMatchPlayScoreShell && this.data.isMatchPlayPairLayout) {
+      // G6/G7：collapse + compensate + tee sticky + hole/par 原子同步（对齐 fourball）
+      this._matchPlayLatestScrollLeft = scrollLeft;
+      this._matchPlayScrollSeq = (this._matchPlayScrollSeq || 0) + 1;
+      this._syncMatchPlayPairShellScrollState(scrollLeft, this._matchPlayScrollSeq);
+    } else {
+      this._syncMatchPlayTeeSticky(scrollLeft);
+      this._syncMatchPlayHoleParMove(scrollLeft);
+    }
 
     if (this._shellScrollLock === 'identity') return;
     const top = e.detail.scrollTop || 0;
