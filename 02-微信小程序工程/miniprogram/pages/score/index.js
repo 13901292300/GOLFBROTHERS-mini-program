@@ -2676,14 +2676,23 @@ Page({
       if (members.length < 3) return;
       members.forEach((m) => {
         const i = roster.length;
-        const tp = TEE_PALETTE[i % TEE_PALETTE.length];
+        // 与 _buildEntityRosterFromEntitiesView / teeSegments 一致：显式 tPosition/tee → style；否则 palette
+        const style = resolveScoreTeeStyle(m, i);
+        const palette = TEE_PALETTE[i % TEE_PALETTE.length];
+        const hasExplicitTee = !!(m && (isEditTeeKey(m.tPosition) || isEditTeeKey(m.tee)));
+        const tee = hasExplicitTee
+          ? style.tee || (palette && palette.tee) || ''
+          : (palette && palette.tee) || style.tee || '';
+        const teeColor = hasExplicitTee
+          ? style.teeColor || (palette && palette.teeColor) || ''
+          : (palette && palette.teeColor) || style.teeColor || '';
         const shortName = m.name && m.name.indexOf('.') >= 0 ? m.name.split('.').pop().trim() : m.name;
         roster.push({
           playerId: m.playerId || ('seat-' + i),
           name: shortName || m.name || '球员',
           avatar: m.avatar || '',
-          tee: tp.tee,
-          teeColor: tp.teeColor,
+          tee: tee,
+          teeColor: teeColor,
           groupIndex: gi,
           groupClass: 'bestball-group-' + (gi % 4)
         });
@@ -7250,19 +7259,32 @@ Page({
 
     this._syncLocalPlayersTeeFromMap(teeMap);
     this.persistSession();
-    // 普通四人两球：T 台展示读 _engineGroups.members，需同步 composition / matchState
-    if (this._isOrdinaryFourball2BallContext()) {
+    // 普通 fourball composition：T 台展示读 _engineGroups.members，需同步 composition
+    // 覆盖：四人两球 / 最好成绩·最佳球位 4+0·2+2 等
+    if (this._needsOrdinaryFourballCompositionTeeSync()) {
       this._syncOrdinaryFourball2BallTeeFromMap(teeMap);
     }
     return { ok: true, path: 'game' };
   },
 
   /**
-   * 普通四人两球：按 playerId 把 T 台写回 composition / matchState.groups / _engineGroups.members。
+   * 普通创建 fourball_best：记分页 T 台读 composition / _engineGroups.members 时需同步。
+   * 四人两球 + 最好成绩/最佳球位（4+0 / 2+2 / 3+1 等有 composition.teams）。
+   */
+  _needsOrdinaryFourballCompositionTeeSync() {
+    return (
+      this._isOrdinaryFourball2BallContext() || this._isOrdinaryFourballBestCompositionContext()
+    );
+  },
+
+  /**
+   * 普通创建 fourball composition：按 playerId 把 T 台写回
+   * composition.teams.members / matchState.groups / _engineGroups.members。
+   * 覆盖四人两球、最好成绩/最佳球位 4+0·2+2 等。
    * 不改 teamId / teamScoresByEntity / 成绩数组。
    */
   _syncOrdinaryFourball2BallTeeFromMap(teeMap) {
-    if (!this._isOrdinaryFourball2BallContext() || !teeMap) return false;
+    if (!this._needsOrdinaryFourballCompositionTeeSync() || !teeMap) return false;
     const gameId = this.data.gameId;
     const gi = this._gameGroupIndex || 0;
     const game = gameStore.getGame(gameId);
@@ -7276,7 +7298,11 @@ Page({
       const slot =
         (this._demoSlots || []).find(
           (p) => p && String(p.playerId || p.id || '').trim() === id
-        ) || null;
+        ) ||
+        (this._playersSource || []).find(
+          (p) => p && String(p.playerId || p.id || '').trim() === id
+        ) ||
+        null;
       const gender = (slot && slot.gender) || m.gender || '';
       return Object.assign({}, m, {
         tPosition: tee,
@@ -7298,7 +7324,7 @@ Page({
       game.groupCompositionMap && typeof game.groupCompositionMap === 'object'
         ? game.groupCompositionMap
         : {};
-    const prevComp = prevMap[groupId] || group.composition || null;
+    const prevComp = prevMap[groupId] || group.composition || game.composition || null;
     if (prevComp && Array.isArray(prevComp.teams)) {
       const nextComp = Object.assign({}, prevComp, {
         teams: prevComp.teams.map(patchTeam)
@@ -7317,8 +7343,8 @@ Page({
         game.groups[gi] = Object.assign({}, game.groups[gi], { composition: nextComp });
       }
       gameStore.saveGame(game);
-    } else {
-      // 无 composition 时走 slot→组合全量同步（已含 tPosition）
+    } else if (this._isOrdinaryFourball2BallContext()) {
+      // 四人两球无 composition 时走 slot→组合全量同步（已含 tPosition）
       this._syncOrdinaryFourball2BallCompositionFromSlots();
     }
 
