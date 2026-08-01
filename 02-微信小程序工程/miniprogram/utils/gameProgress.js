@@ -13,6 +13,36 @@ const TOTAL_HOLES = 18;
 const MARKER_SIZE_PX = 16;
 // 五角星约 18px 宽，track 右端内缩半宽与星标中心对齐
 const TRACK_END_INSET_PX = 9;
+/** 出发表 LIVE 角标用时展示封顶（分钟）；不改 firstScoreAt / LIVE 判定 */
+const LIVE_DURATION_DISPLAY_CAP_MINUTES = 360;
+
+/**
+ * 已算好的用时分钟 → 展示值（仅封顶，不改计时源）。
+ * @param {number} minutes
+ * @returns {number}
+ */
+function capLiveDurationDisplayMinutes(minutes) {
+  const n = Math.floor(Number(minutes));
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n > LIVE_DURATION_DISPLAY_CAP_MINUTES ? LIVE_DURATION_DISPLAY_CAP_MINUTES : n;
+}
+
+/**
+ * 出发表 LIVE 角标用时后缀（如 ` 45'`）。
+ * 计算仍为 floor((end-start)/60000)；仅展示封顶 360。
+ * @param {number} firstScoreAt
+ * @param {number} [endMs]
+ * @returns {string} 无效 firstScoreAt 时返回 ''
+ */
+function formatLiveDurationBadgeSuffix(firstScoreAt, endMs) {
+  const start = Number(firstScoreAt);
+  if (!Number.isFinite(start) || start <= 0) return '';
+  const endRaw = Number(endMs);
+  const end = Number.isFinite(endRaw) && endRaw > 0 ? endRaw : Date.now();
+  const rawMinutes = Math.floor((end - start) / 60000);
+  const minutes = capLiveDurationDisplayMinutes(rawMinutes < 0 ? 0 : rawMinutes);
+  return ' ' + String(minutes) + "'";
+}
 
 function buildMarkerLeft(indicatorHole) {
   const ratio = TOTAL_HOLES > 1 ? (indicatorHole - 1) / (TOTAL_HOLES - 1) : 0;
@@ -208,6 +238,7 @@ module.exports = {
   TOTAL_HOLES,
   MARKER_SIZE_PX,
   TRACK_END_INSET_PX,
+  LIVE_DURATION_DISPLAY_CAP_MINUTES,
   isFilledScore,
   isTeamScoringGame,
   isGameEnded,
@@ -219,5 +250,7 @@ module.exports = {
   computeNormalizedIndicatorHole,
   buildMarkerLeft,
   buildProgressUi,
-  confirmFinishGame
+  confirmFinishGame,
+  capLiveDurationDisplayMinutes,
+  formatLiveDurationBadgeSuffix
 };

@@ -41,6 +41,7 @@ const {
   isMatchPlayBoardMode
 } = require('../../../utils/strokeEntityValidator.js');
 const matchStatus = require('../../../utils/matchStatus.js');
+const gameProgress = require('../../../utils/gameProgress.js');
 const contactStore = require('../../../utils/contactStore.js');
 const scheduleStore = require('../../../utils/scheduleStore.js');
 const scheduleAdapter = require('../../../utils/scheduleAdapter.js');
@@ -6274,8 +6275,8 @@ Page({
           Number.isFinite(finishedScoreAt) && finishedScoreAt > 0
             ? finishedScoreAt
             : Date.now();
-        const minutes = Math.floor((endMs - firstScoreAt) / 60000);
-        statusBadge = statusBadge + ' ' + String(minutes < 0 ? 0 : minutes) + "'";
+        statusBadge =
+          statusBadge + gameProgress.formatLiveDurationBadgeSuffix(firstScoreAt, endMs);
       }
       return Object.assign({}, card, { statusBadge: statusBadge });
     });

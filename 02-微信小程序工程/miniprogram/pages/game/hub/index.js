@@ -659,9 +659,8 @@ Page({
             Number.isFinite(finishedScoreAt) && finishedScoreAt > 0
               ? finishedScoreAt
               : Date.now();
-          const minutes = Math.floor((endMs - firstScoreAt) / 60000);
           statusBadge =
-            statusBadge + ' ' + String(minutes < 0 ? 0 : minutes) + "'";
+            statusBadge + gameProgress.formatLiveDurationBadgeSuffix(firstScoreAt, endMs);
         }
       }
       return Object.assign({}, card, {
