@@ -2587,7 +2587,16 @@ Page({
       if (!members.length) return;
       members.forEach((m) => {
         const i = roster.length;
-        const tp = TEE_PALETTE[i % TEE_PALETTE.length];
+        const style = resolveScoreTeeStyle(m, i);
+        const palette = TEE_PALETTE[i % TEE_PALETTE.length];
+        const hasExplicitTee = !!(m && (isEditTeeKey(m.tPosition) || isEditTeeKey(m.tee)));
+        // 与四段 teeSegments 同优先级：显式 tPosition/tee → style；否则 palette → style
+        const tee = hasExplicitTee
+          ? style.tee || (palette && palette.tee) || ''
+          : (palette && palette.tee) || style.tee || '';
+        const teeColor = hasExplicitTee
+          ? style.teeColor || (palette && palette.teeColor) || ''
+          : (palette && palette.teeColor) || style.teeColor || '';
         const rawName = (m && m.name) || '';
         const shortName =
           rawName && rawName.indexOf('.') >= 0 ? rawName.split('.').pop().trim() : rawName;
@@ -2595,8 +2604,8 @@ Page({
           playerId: (m && m.userId) || ('seat-' + i),
           name: shortName || rawName || '球员',
           avatar: (m && m.avatar) || '',
-          tee: tp.tee,
-          teeColor: tp.teeColor,
+          tee: tee,
+          teeColor: teeColor,
           groupIndex: gi,
           groupClass: 'bestball-group-' + (gi % 4)
         });
@@ -3595,7 +3604,13 @@ Page({
       bestDiffGrow: 1
     });
     const bestRoster = this._buildEntityRosterFromEntitiesView(entitiesView);
-    const useEntityFourballShell = this._resolveStrokeEntityFourballShell(entitiesView);
+    // 4+0 → game-single fourball40；2+2/2+1 → pair shell；互斥
+    const useEntityFourball40Shell = this._resolveStrokeEntityFourball40Shell(
+      match,
+      entitiesView
+    );
+    const useEntityFourballShell =
+      !useEntityFourball40Shell && this._resolveStrokeEntityFourballShell(entitiesView);
     const patch = {
       entitiesView: entitiesView,
       bestRoster: bestRoster,
@@ -3604,13 +3619,31 @@ Page({
       isG5MatchPlay: false,
       matchSidesView: [],
       mode: 'stroke_entity',
-      useStrokeScoreShell: false,
+      useStrokeScoreShell: useEntityFourball40Shell,
       useMatchPlayScoreShell: false,
       useFourballScoreShell: useEntityFourballShell,
-      isFourball40StrokeShell: false,
-      strokeShellFormatLabel: ''
+      isFourball40StrokeShell: useEntityFourball40Shell,
+      strokeShellFormatLabel: useEntityFourball40Shell ? teamLabel : ''
     };
-    if (useEntityFourballShell) {
+    if (useEntityFourball40Shell) {
+      patch.playersView = this._buildFourball40PlayersViewFromEntities(
+        entitiesView,
+        teamLabel,
+        displayMode
+      );
+      patch.bestRoster = padBestRosterFourSlots(bestRoster);
+      patch.scoreboardStyle = this._buildScoreboardStyleVars({
+        colWidth: G1_IDENTITY_COL_WIDTH,
+        paddingX: 12,
+        diffOpacity: 1,
+        nameWidth: 96
+      });
+      patch.isFourballPair22 = false;
+      patch.isFourballPairLayout = false;
+      patch.isTeeStickyVisible = false;
+      patch.isHoleParCompact = false;
+      patch.holeParNormalStyle = 'transform: translateX(0px);';
+    } else if (useEntityFourballShell) {
       const entityPairFlags = resolveFourballPairFlags(
         entitiesView.map((row) => ({ members: (row && row.members) || [] }))
       );
@@ -5880,6 +5913,82 @@ Page({
     if (this.data.mode !== 'fourball_best') return false;
     const pairFlags = resolveFourballPairFlags(this._engineGroups || []);
     return !!pairFlags.isFourballPairLayout;
+  },
+
+  /**
+   * 队内赛 G2/G3 4+0：接入普通局面 fourball40 stroke shell（useStrokeScoreShell）。
+   * 不进 pair shell；不改 scoreEntities / teamScoresByEntity。
+   * @param {object|null} match
+   * @param {Array} [entitiesViewArg]
+   */
+  _resolveStrokeEntityFourball40Shell(match, entitiesViewArg) {
+    const modeOk =
+      this.data.mode === 'stroke_entity' || Array.isArray(entitiesViewArg);
+    if (!modeOk) return false;
+    const ms = this._matchState || this._readMatchState() || {};
+    const gameMode = this._resolveTeamMatchGameMode(match, ms);
+    if (resolveStrokeKind(gameMode) !== 'g2g3') return false;
+    if (isMatchPlayBoardMode(gameMode)) return false;
+    if (resolveCompositionMode(match) !== '4+0') return false;
+    const rows = Array.isArray(entitiesViewArg)
+      ? entitiesViewArg
+      : this.data.entitiesView || [];
+    if (!rows.length) return false;
+    return rows.some((row) => row && row.kind === 'team');
+  },
+
+  /**
+   * entitiesView → playersView（对齐 _buildFourball40PlayersView team 行）。
+   * 仅展示适配；成绩仍用 entity.scores / putts。
+   */
+  _buildFourball40PlayersViewFromEntities(entitiesView, formatLabel, displayMode) {
+    const label = String(formatLabel || '').trim() || '最佳球位';
+    const rows = Array.isArray(entitiesView) ? entitiesView : [];
+    return rows.map((entity, gi) => {
+      const members = (
+        Array.isArray(entity && entity.memberDisplay) ? entity.memberDisplay : []
+      ).slice(0, 4);
+      const scores = Array.isArray(entity && entity.scores) ? entity.scores.slice() : [];
+      const putts = Array.isArray(entity && entity.putts) ? entity.putts.slice() : [];
+      const entityId =
+        (entity && entity.entityId != null && String(entity.entityId)) ||
+        'entity-40-' + gi;
+
+      const teeSegments = members.map((m, mi) => {
+        const style = resolveScoreTeeStyle(m, gi * 4 + mi);
+        const palette = TEE_PALETTE[mi % TEE_PALETTE.length];
+        const hasExplicitTee = !!(m && (isEditTeeKey(m.tPosition) || isEditTeeKey(m.tee)));
+        return {
+          key: 'tee-' + gi + '-' + mi,
+          teeColor: hasExplicitTee
+            ? style.teeColor || (palette && palette.teeColor) || ''
+            : (palette && palette.teeColor) || style.teeColor || ''
+        };
+      });
+
+      const m0 = members[0] || {};
+      const style = resolveScoreTeeStyle(m0, gi);
+      const enriched = enrichPlayer(
+        {
+          id: entityId,
+          playerId: entityId,
+          name: label,
+          avatar: '',
+          colorClass: style.colorClass || 'border-light',
+          scores: scores,
+          putts: putts
+        },
+        gi,
+        displayMode,
+        { cellEvenDiffAsZero: true }
+      );
+      return Object.assign({}, enriched, {
+        rowKind: 'team',
+        label: label,
+        teeSegments: teeSegments,
+        sourceGroupIndex: gi
+      });
+    });
   },
 
   /**
@@ -10880,8 +10989,11 @@ Page({
       return;
     }
 
-    // 队内 G2/G3 2+2 fourball shell：点格走 Entity 记分，禁止 openTeamScoreInput
-    if (this.data.mode === 'stroke_entity' && this.data.useFourballScoreShell) {
+    // 队内 G2/G3：pair shell / fourball40 stroke shell 点格均走 Entity 记分
+    if (
+      this.data.mode === 'stroke_entity' &&
+      (this.data.useFourballScoreShell || this.data.isFourball40StrokeShell)
+    ) {
       const entityIndex = Number(playerIdx);
       const holeIndex = resolveHoleIndexFromColIdx(cIdx, false);
       if (!Number.isFinite(entityIndex) || entityIndex < 0) return;
