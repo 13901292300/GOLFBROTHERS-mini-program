@@ -1062,6 +1062,19 @@ page {
   height: 50%;
 }
 
+/* 单色 sticky T（2+1 / 1+1）：满行高；双 T 仍走上方 50%/50% */
+.scoreboard-shell--fourball .fourball-tee-sticky-overlay__strip.tee-single .tee-left {
+  flex: 0 0 100%;
+  height: 100%;
+}
+
+.scoreboard-shell--fourball .fourball-tee-sticky-overlay__strip.tee-single .tee-right {
+  flex: 0 0 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* sticky 显示瞬间隐藏 track 内 T（同帧交接，无淡出，避免回跳观感） */
 .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee .fourball-track-lead__tee-half {
   opacity: 0;
