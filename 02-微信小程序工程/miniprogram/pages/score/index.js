@@ -8392,11 +8392,13 @@ Page({
     });
   },
 
-  /** 解析绑定用 seatIndex：显式值 → _targetSeatIndex；3+0→seat1–3；2+0→seat1–2 */
+  /** 解析绑定用 seatIndex：显式值 → _targetSeatIndex；3+0 / 2+0 / 2+1 缺员折位 */
   _resolveBindSeatIndex(explicit) {
     const n = Number(explicit);
     const raw = n > 0 ? n : Number(this._targetSeatIndex) > 0 ? Number(this._targetSeatIndex) : null;
-    return this._clampSeatIndexForTwoZeroBind(this._clampSeatIndexForThreeZeroBind(raw));
+    return this._clampSeatIndexForTwoOneBind(
+      this._clampSeatIndexForTwoZeroBind(this._clampSeatIndexForThreeZeroBind(raw))
+    );
   },
 
   /** diff 用 seatIndex：draft → original → 无则 null（不按人数猜） */
@@ -8446,12 +8448,15 @@ Page({
     apply(this._originalSlots);
   },
 
-  /** draft 中尚未占用的最小 seatIndex（多选好友续填用）；3+0→seat1–3；2+0→seat1–2 */
+  /** draft 中尚未占用的最小 seatIndex；3+0 / 2+0 / 2+1 缺员优先队内空座 */
   _nextAvailableSeatIndexForDraft() {
     const prevComp = this._getOrdinaryFourballBestComposition();
     const compType = prevComp ? resolveCompositionType(prevComp) : '';
     if (compType === '3+0') return this._nextEmptySeatIndexInThreeZeroCapacity();
     if (compType === '2+0') return this._nextEmptySeatIndexInTwoZeroCapacity();
+    if (compType === '2+1' && this._countOccupiedDraftSlots() < 3) {
+      return this._nextEmptySeatIndexForTwoOneRestore();
+    }
 
     const template = this._groupManageSeatTemplate;
     if (!Array.isArray(template) || !template.length) return null;
@@ -10983,6 +10988,63 @@ Page({
     return this._nextEmptySeatIndexInTwoZeroCapacity();
   },
 
+  /** 2+1：team-1=seat1/2，team-2=seat3/4；人数<3 时为缺员恢复 */
+  _isOrdinaryFourball21RestorationActive() {
+    const prevComp = this._getOrdinaryFourballBestComposition();
+    if (!prevComp || resolveCompositionType(prevComp) !== '2+1') return false;
+    return this._countOccupiedDraftSlots() < 3;
+  },
+
+  _isDraftSeatOccupied(seatIndex) {
+    const si = Number(seatIndex);
+    if (!(si > 0)) return false;
+    return (this._draftSlots || []).some(
+      (s) => s && s.status === 'occupied' && Number(s.seatIndex) === si
+    );
+  },
+
+  /** 2+1 team-1 空座：seat1 → seat2 */
+  _nextEmptySeatIndexInTwoOneTeam1() {
+    if (!this._isDraftSeatOccupied(1)) return 1;
+    if (!this._isDraftSeatOccupied(2)) return 2;
+    return null;
+  },
+
+  /** 2+1 team-2 空座：seat3 → seat4 */
+  _nextEmptySeatIndexInTwoOneTeam2() {
+    if (!this._isDraftSeatOccupied(3)) return 3;
+    if (!this._isDraftSeatOccupied(4)) return 4;
+    return null;
+  },
+
+  /** 2+1 缺员：优先 team-1 空座，再 team-2 */
+  _nextEmptySeatIndexForTwoOneRestore() {
+    const t1 = this._nextEmptySeatIndexInTwoOneTeam1();
+    if (t1 != null) return t1;
+    return this._nextEmptySeatIndexInTwoOneTeam2();
+  },
+
+  /**
+   * 2+1 缺员恢复：team-1 有空位时，点击 seat3/4 也折到 team-1 空座。
+   * 人数≥3 时不折位（留给加第 4 人 transition）。
+   */
+  _clampSeatIndexForTwoOneBind(seatIndex) {
+    if (!this._isOrdinaryFourball21RestorationActive()) {
+      const n = Number(seatIndex);
+      return n > 0 ? n : null;
+    }
+    const t1Empty = this._nextEmptySeatIndexInTwoOneTeam1();
+    if (t1Empty != null) {
+      const si = Number(seatIndex);
+      if ((si === 1 || si === 2) && !this._isDraftSeatOccupied(si)) return si;
+      return t1Empty;
+    }
+    const t2Empty = this._nextEmptySeatIndexInTwoOneTeam2();
+    const si = Number(seatIndex);
+    if ((si === 3 || si === 4) && !this._isDraftSeatOccupied(si)) return si;
+    return t2Empty;
+  },
+
   _promptOrdinaryFourball30To4Transition(diff, plan) {
     const itemList = ['4+0', '3+1'];
     wx.showActionSheet({
@@ -12351,9 +12413,12 @@ Page({
       fillSeatFromMember(seat, member);
     });
 
-    // 3) add：优先 diff.seatIndex；3+0→seat1–3；2+0→seat1–2（缺员恢复禁止写 seat3/4）
+    // 3) add：优先 diff.seatIndex；3+0 / 2+0 / 2+1 缺员按队内容量折位
     const isThreeZero = compositionType === '3+0';
     const isTwoZero = compositionType === '2+0';
+    const isTwoOne = compositionType === '2+1';
+    const seatIsEmpty = (s) =>
+      !!(s && !(s.playerId != null && String(s.playerId).trim()));
     const findEmptySeatInThreeZeroCapacity = () => {
       let best = null;
       for (let i = 0; i < seats.length; i++) {
@@ -12361,8 +12426,7 @@ Page({
         if (!s) continue;
         const si = Number(s.seatIndex) || 0;
         if (si < 1 || si > 3) continue;
-        const occ = s.playerId != null ? String(s.playerId).trim() : '';
-        if (occ) continue;
+        if (!seatIsEmpty(s)) continue;
         if (!best || si < Number(best.seatIndex)) best = s;
       }
       return best;
@@ -12374,11 +12438,41 @@ Page({
         if (!s) continue;
         const si = Number(s.seatIndex) || 0;
         if (si !== 1 && si !== 2) continue;
-        const occ = s.playerId != null ? String(s.playerId).trim() : '';
-        if (occ) continue;
+        if (!seatIsEmpty(s)) continue;
         if (!best || si < Number(best.seatIndex)) best = s;
       }
       return best;
+    };
+    const findEmptySeatInTwoOneTeam1 = () => {
+      let best = null;
+      for (let i = 0; i < seats.length; i++) {
+        const s = seats[i];
+        if (!s) continue;
+        const si = Number(s.seatIndex) || 0;
+        if (si !== 1 && si !== 2) continue;
+        if (!seatIsEmpty(s)) continue;
+        if (!best || si < Number(best.seatIndex)) best = s;
+      }
+      return best;
+    };
+    const findEmptySeatInTwoOneTeam2 = () => {
+      let best = null;
+      for (let i = 0; i < seats.length; i++) {
+        const s = seats[i];
+        if (!s) continue;
+        const si = Number(s.seatIndex) || 0;
+        if (si !== 3 && si !== 4) continue;
+        if (!seatIsEmpty(s)) continue;
+        if (!best || si < Number(best.seatIndex)) best = s;
+      }
+      return best;
+    };
+    const countOccupiedSeats = () => {
+      let n = 0;
+      seats.forEach((s) => {
+        if (s && s.playerId != null && String(s.playerId).trim()) n += 1;
+      });
+      return n;
     };
     (diff && diff.added ? diff.added : []).forEach((ch) => {
       const member = memberFromChange(ch);
@@ -12391,32 +12485,49 @@ Page({
         // 缺员恢复：优先点击的合法空座；seat4 / 越界 → 容量内最小空座
         if (si >= 1 && si <= 3) {
           const cand = findSeatByIndex(si);
-          if (cand && !(cand.playerId && String(cand.playerId).trim())) {
-            target = cand;
-          }
+          if (seatIsEmpty(cand)) target = cand;
         }
         if (!target) target = findEmptySeatInThreeZeroCapacity();
       } else if (isTwoZero) {
         // 2+0 缺员恢复：只填 seat1/2；点击 seat3/4 → 折到 pair 空座
         if (si === 1 || si === 2) {
           const cand = findSeatByIndex(si);
-          if (cand && !(cand.playerId && String(cand.playerId).trim())) {
-            target = cand;
-          }
+          if (seatIsEmpty(cand)) target = cand;
         }
         if (!target) target = findEmptySeatInTwoZeroCapacity();
+      } else if (isTwoOne && countOccupiedSeats() < 3) {
+        // 2+1 缺员恢复：team-1(seat1/2) 有空则优先，忽略点击 seat4
+        const t1 = findEmptySeatInTwoOneTeam1();
+        if (t1) {
+          if (si === 1 || si === 2) {
+            const cand = findSeatByIndex(si);
+            if (seatIsEmpty(cand)) target = cand;
+          }
+          if (!target) target = t1;
+        } else {
+          if (si === 3 || si === 4) {
+            const cand = findSeatByIndex(si);
+            if (seatIsEmpty(cand)) target = cand;
+          }
+          if (!target) target = findEmptySeatInTwoOneTeam2();
+        }
       } else if (si > 0) {
         target = findSeatByIndex(si);
       } else {
         target = findEmptySeat();
       }
       if (!target) return;
-      // 3+0 / 2+0 恢复时强制 team-1
+      // 3+0 / 2+0 恢复时强制 team-1；2+1 恢复按座保留原 teamId（不清）
       if (isThreeZero && Number(target.seatIndex) <= 3) {
         target.teamId = 'team-1';
       }
       if (isTwoZero && (Number(target.seatIndex) === 1 || Number(target.seatIndex) === 2)) {
         target.teamId = 'team-1';
+      }
+      if (isTwoOne && countOccupiedSeats() < 3) {
+        const tsi = Number(target.seatIndex);
+        if (tsi === 1 || tsi === 2) target.teamId = 'team-1';
+        else if (tsi === 3 || tsi === 4) target.teamId = 'team-2';
       }
       fillSeatFromMember(target, member);
     });
@@ -13220,11 +13331,11 @@ Page({
   // Team Match：报名 / 好友 / 球队 / 手工；Normal Game：好友 / 老牌组合 / 手工
   onEmptySlotTap(e) {
     const seatIndex = Number(e.currentTarget.dataset.seatIndex);
-    // 3+0：点击 seat4 等非法座 → 折到容量内空座（seat1–3）
+    // 3+0 / 2+0 / 2+1 缺员：点击非法座折到恢复目标座
     if (!isNaN(seatIndex) && seatIndex > 0) {
-      this._targetSeatIndex = this._clampSeatIndexForThreeZeroBind(seatIndex);
+      this._targetSeatIndex = this._resolveBindSeatIndex(seatIndex);
     } else {
-      this._targetSeatIndex = this._clampSeatIndexForThreeZeroBind(null);
+      this._targetSeatIndex = this._resolveBindSeatIndex(null);
     }
 
     let idx = Number(e.currentTarget.dataset.index);
