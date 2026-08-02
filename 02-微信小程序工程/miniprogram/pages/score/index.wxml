@@ -121,8 +121,8 @@
               wx:key="id"
               class="shell-row shell-row--player player-column__row"
             >
-              <!-- 4+0/3+0/3+1 组合行：TEAM SCORE + 赛制名；3+1 单人行走下方个人比杆身份 -->
-              <view wx:if="{{isFourball40StrokeShell && item.rowKind !== 'single'}}" class="player-column__card player-column__card--team-score">
+              <!-- 4+0/3+0/3+1 组合行：TEAM SCORE + 赛制名（仅有效 members 的组进 playersView） -->
+              <view wx:if="{{isFourball40StrokeShell && item.rowKind === 'team'}}" class="player-column__card player-column__card--team-score">
                 <view class="bestball-mode-wrap">
                   <text class="bestball-mode-kicker">TEAM SCORE</text>
                   <text class="bestball-mode-main">{{strokeShellFormatLabel}}</text>
@@ -169,7 +169,7 @@
               wx:key="id"
               class="shell-row shell-row--player tee-sticky-overlay__row"
             >
-              <!-- 4+0：合成 T 线（满行高，四色上下拼接）；其它模式保持单色 T -->
+              <!-- 4+0/3+1：合成 T；单人单色 T（空组不进 playersView） -->
               <view wx:if="{{isFourball40StrokeShell && item.teeSegments.length}}" class="track-lead-tee__composite">
                 <view
                   wx:for="{{item.teeSegments}}"
@@ -898,7 +898,7 @@
             wx:for-index="gIdx"
             class="scoreboard-row scoreboard-row--player"
           >
-            <!-- pair / layout-single / 4+0 team layout：split；其它 team：mode 文案 -->
+            <!-- pair / layout-single / 4+0 team layout：split；其它 team：mode 文案（空组不进 bestTeams） -->
             <view class="scoreboard-cell sticky-col player-cell {{item.kind === 'pair' || (item.kind === 'single' && isFourballPairLayout) || (item.kind === 'team' && isFourballTeamLayout) ? 'bestball-pair-cell bestball-pair-cell--split' : (item.kind === 'single' ? 'bestball-single-cell' : 'bestball-mode-cell')}}">
               <block wx:if="{{item.kind === 'single' && isFourballPairLayout}}">
                 <!-- 2+1 单人：头像必须在 pair-avatar-group 内，与双头像共用 container-shift / second-shift -->
@@ -1496,18 +1496,38 @@
           <text class="section-count">{{playerCount}}/4</text>
         </view>
         <view class="players-strip fixed-slots">
-          <view wx:for="{{groupSlots}}" wx:key="slotId" wx:for-index="slotIdx" class="player-item fixed-slot {{item.status !== 'occupied' ? 'empty-slot' : ''}}">
-            <text class="slot-index">{{item.slotId}}</text>
+          <view
+            wx:for="{{groupSlots}}"
+            wx:key="slotId"
+            wx:for-index="slotIdx"
+            class="player-item fixed-slot {{item.status !== 'occupied' ? 'empty-slot' : ''}}"
+          >
+            <text class="slot-index">{{item.seatIndex || item.slotId}}</text>
             <view class="avatar-wrap">
               <block wx:if="{{item.status === 'occupied'}}">
                 <image src="{{item.player.avatar}}" mode="aspectFill"></image>
-                <view catchtap="removeGroupSlot" data-index="{{slotIdx}}" class="delete-dot">×</view>
+                <view
+                  catchtap="removeGroupSlot"
+                  data-seat-index="{{item.seatIndex}}"
+                  data-index="{{item.draftSlotIndex != null ? item.draftSlotIndex : slotIdx}}"
+                  class="delete-dot"
+                >×</view>
               </block>
               <block wx:elif="{{item.status === 'pending'}}">
-                <view bindtap="onEmptySlotTap" data-index="{{slotIdx}}" class="empty-avatar empty-avatar--pending">…</view>
+                <view
+                  bindtap="onEmptySlotTap"
+                  data-seat-index="{{item.seatIndex}}"
+                  data-index="{{item.draftSlotIndex != null ? item.draftSlotIndex : slotIdx}}"
+                  class="empty-avatar empty-avatar--pending"
+                >…</view>
               </block>
               <block wx:else>
-                <view bindtap="onEmptySlotTap" data-index="{{slotIdx}}" class="empty-avatar {{item.hasCache ? 'empty-avatar--cache' : ''}}">＋</view>
+                <view
+                  bindtap="onEmptySlotTap"
+                  data-seat-index="{{item.seatIndex}}"
+                  data-index="{{item.draftSlotIndex != null ? item.draftSlotIndex : slotIdx}}"
+                  class="empty-avatar {{item.hasCache ? 'empty-avatar--cache' : ''}}"
+                >＋</view>
                 <view wx:if="{{item.hasCache}}" class="slot-cache-badge">↻</view>
               </block>
             </view>

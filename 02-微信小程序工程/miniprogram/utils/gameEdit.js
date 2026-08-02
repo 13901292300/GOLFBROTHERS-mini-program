@@ -379,12 +379,17 @@ function buildUpdatedGame(existing, form, helpers) {
     gameMode: form.gameMode || '',
     groupCompositionMap: compMode ? compositionMap : {},
     composition: firstComp
-      ? {
-          type: firstComp.compositionType,
-          single: firstComp.teamMode === 'single_team',
-          teams: firstComp.teams || [],
-          scoringTemplate: firstComp.scoringTemplate || ''
-        }
+      ? (function () {
+          const top = {
+            type: firstComp.compositionType,
+            single: firstComp.teamMode === 'single_team',
+            teams: firstComp.teams || [],
+            scoringTemplate: firstComp.scoringTemplate || ''
+          };
+          // Seat Model 双写透传；无 seats 的旧 composition 不回填
+          if (Array.isArray(firstComp.seats)) top.seats = firstComp.seats;
+          return top;
+        })()
       : null,
     scoringTemplate: compMode && firstComp ? (firstComp.scoringTemplate || '') : '',
     visibility: form.visibility,

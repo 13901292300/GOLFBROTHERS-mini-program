@@ -60,6 +60,52 @@ function partType(size) {
   return size >= 4 ? 'quad' : size === 3 ? 'triple' : size === 2 ? 'pair' : 'single';
 }
 
+/** fourball_best Seat Model：固定 4 座；按 teams 顺序展开 members，不足补空座 */
+const FOURBALL_SEAT_COUNT = 4;
+
+/**
+ * 由已生成的 teams 派生 composition.seats（双写，不改 teams.members）。
+ * seatIndex 1..4；队内顺序 = members 顺序；空座 teamId/playerId 为 null。
+ *
+ * 映射：2+2 / 3+1 / 2+1+1 / 2+1 / 4+0 / 3+0 均适用。
+ */
+function buildFourballSeatsFromTeams(teams) {
+  const seats = [];
+  (Array.isArray(teams) ? teams : []).forEach((t) => {
+    if (!t || seats.length >= FOURBALL_SEAT_COUNT) return;
+    const teamId = t.teamId != null && String(t.teamId).trim() ? String(t.teamId).trim() : null;
+    const raw = Array.isArray(t.members)
+      ? t.members
+      : Array.isArray(t.players)
+        ? t.players
+        : [];
+    raw.forEach((m) => {
+      if (seats.length >= FOURBALL_SEAT_COUNT) return;
+      const playerId =
+        m && (m.playerId != null || m.userId != null || m.id != null)
+          ? String(m.playerId || m.userId || m.id).trim()
+          : '';
+      seats.push({
+        seatIndex: seats.length + 1,
+        teamId: teamId,
+        playerId: playerId || null,
+        name: (m && m.name) || '',
+        avatar: (m && m.avatar) || ''
+      });
+    });
+  });
+  while (seats.length < FOURBALL_SEAT_COUNT) {
+    seats.push({
+      seatIndex: seats.length + 1,
+      teamId: null,
+      playerId: null,
+      name: '',
+      avatar: ''
+    });
+  }
+  return seats;
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -646,6 +692,8 @@ Page({
         members: members
       }];
       record.scoringTemplate = UNIFIED_TEMPLATE;
+      // Seat Model 双写：保留 teams.members，额外落盘固定 seats
+      record.seats = buildFourballSeatsFromTeams(record.teams);
     }
     return record;
   },
@@ -964,6 +1012,8 @@ Page({
       compositionType: opt.id,
       teamMode: 'split_team',
       teams: teams,
+      // Seat Model 双写：保留 teams.members，额外落盘固定 seats
+      seats: buildFourballSeatsFromTeams(teams),
       scoringTemplate: 'team_best'
     };
 
@@ -1384,6 +1434,9 @@ Page({
             type: firstComp.compositionType,
             single: firstComp.teamMode === 'single_team',
             teams: firstComp.teams || [],
+            seats: Array.isArray(firstComp.seats)
+              ? firstComp.seats
+              : buildFourballSeatsFromTeams(firstComp.teams || []),
             scoringTemplate: firstComp.scoringTemplate || ''
           }
         : null,
