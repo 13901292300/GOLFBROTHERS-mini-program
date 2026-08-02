@@ -46,11 +46,19 @@ function buildCompositionOptions(count) {
       { id: '2+1+1', label: '2+1+1', desc: '一队 2 人 + 两个单人', parts: [2, 1, 1], single: false, icon: '👥' }
     ];
   }
-  // count === 3
-  return [
-    { id: '3+0', label: '3+0', desc: '全员一队 · 不拆分 · 统一计分', parts: [3], single: true, icon: '🏌' },
-    { id: '2+1', label: '2+1', desc: '一队 2 人 + 1 人', parts: [2, 1], single: false, icon: '👥' }
-  ];
+  if (count === 3) {
+    return [
+      { id: '3+0', label: '3+0', desc: '全员一队 · 不拆分 · 统一计分', parts: [3], single: true, icon: '🏌' },
+      { id: '2+1', label: '2+1', desc: '一队 2 人 + 1 人', parts: [2, 1], single: false, icon: '👥' }
+    ];
+  }
+  // count === 2：2+0（创建流自动生成，不弹选择）
+  if (count === 2) {
+    return [
+      { id: '2+0', label: '2+0', desc: '全员一队 · 不拆分 · 统一计分', parts: [2], single: true, icon: '🏌' }
+    ];
+  }
+  return [];
 }
 
 const mockAvatars = require('../../../../utils/mockAvatars.js');
@@ -554,12 +562,12 @@ Page({
     return ((g && g.players) || []).filter((p) => p && p.filled).length;
   },
 
-  // 需要确认组合类型的组（团队赛制 + 该组已填 >= 3 人）
+  // 需要确认组合类型的组（团队赛制 + 该组已填 >= 2 人；2 人自动 2+0）
   _groupsNeedingComposition() {
     if (!COMPOSITION_MODES[this.data.gameMode]) return [];
     return (this.data.groups || [])
       .map((g, i) => ({ group: g, index: i, count: this._groupFilledCount(i) }))
-      .filter((x) => x.count >= 3);
+      .filter((x) => x.count >= 2);
   },
 
   _compositionRecordValid(rec, count) {
@@ -637,6 +645,7 @@ Page({
         compositionType: '2+0',
         teamMode: 'single_team',
         teams: teams,
+        seats: buildFourballSeatsFromTeams(teams),
         scoringTemplate: 'team_best'
       };
     }
@@ -647,6 +656,7 @@ Page({
       compositionType: '2+2',
       teamMode: 'split_team',
       teams: teams,
+      seats: buildFourballSeatsFromTeams(teams),
       scoringTemplate: 'team_best'
     };
   },
@@ -834,6 +844,22 @@ Page({
     }
     const item = queue[0];
     const g = item.group;
+
+    // 2 人：自动生成 2+0（single_team + seats），不弹组合选择
+    if (item.count === 2) {
+      const opt = { id: '2+0', label: '2+0', parts: [2], single: true };
+      const record = this._buildCompositionRecord(item.index, opt);
+      const map = Object.assign({}, this.data.groupCompositionMap || {});
+      map[g.id] = record;
+      this._compositionQueue = queue.slice(1);
+      this.setData({
+        groupCompositionMap: map,
+        compositionSummaryText: this._buildCompositionSummary(map),
+        showComposition: false
+      }, () => this._openNextCompositionSheet());
+      return;
+    }
+
     const existing = (this.data.groupCompositionMap || {})[g.id];
     this.setData({
       compositionGroupIndex: item.index,

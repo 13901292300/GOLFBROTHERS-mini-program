@@ -262,16 +262,17 @@ function validateSubmitForm(form, helpers) {
     return '请至少选择一名球员';
   }
 
+  // 最好成绩 / 最佳球位：每组至少 2 人；须完成 composition（含自动 2+0）
   const compMode = isCompositionGameMode(gameMode);
   if (compMode && !(h.skipComposition)) {
     const map = form.groupCompositionMap || {};
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
       const count = filledInGroup(g);
-      if (count > 0 && count < 3) {
-        return '第' + (i + 1) + '组：组合赛制每组至少需要3名球员';
+      if (count > 0 && count < 2) {
+        return '第' + (i + 1) + '组：组合赛制每组至少需要2名球员';
       }
-      if (count >= 3) {
+      if (count >= 2) {
         const rec = map[g.id];
         if (!compositionRecordValid(rec, count)) {
           return '第' + (i + 1) + '组：请完成组合分配';
@@ -280,13 +281,16 @@ function validateSubmitForm(form, helpers) {
     }
   }
 
-  // 四人两球赛：每组仅 2 或 4 人；composition 由创建页自动生成后校验
+  // 四人两球赛：每组仅 2 或 4 人（禁止 3）；composition 由创建页自动生成后校验
   if (isFourball2BallGameMode(gameMode)) {
     const map = form.groupCompositionMap || {};
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
       const count = filledInGroup(g);
       if (count === 0) continue;
+      if (count === 3) {
+        return '第' + (i + 1) + '组：四人两球赛不支持3人，请保留2人或4人';
+      }
       if (count !== 2 && count !== 4) {
         return '第' + (i + 1) + '组：四人两球赛每组须为2人或4人';
       }
