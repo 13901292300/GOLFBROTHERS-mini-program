@@ -3233,13 +3233,22 @@ Page({
     const halfText = c.halfText || '';
     const courseFull = courseName ? (courseName + (halfText || '')) : '';
     const title = c.roundName || c.eventName || c.tournamentName || c.name || courseName || '高尔夫球局';
-    // 赛制展示优先 formatType（四人两球 = fourball_2ball，勿被 fourball_best 文案覆盖）
-    const formatType = String((ms && ms.formatType) || '').trim();
-    const format =
-      (formatType ? this._labelForFormat(formatType) : '') ||
-      c.gameMode ||
-      c.format ||
-      '';
+    // 队内赛：赛制用 match.gameMode（最后确认）；禁止 formatType=individual_stroke →「最好成绩」
+    // 普通局：仍优先 formatType → _labelForFormat（fourball_2ball 等）
+    let format = '';
+    const matchId = ms && ms.matchId ? String(ms.matchId).trim() : '';
+    const teamMatch = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    if (teamMatch || (matchId && isTeamInternalScoreMatchContext(ms))) {
+      format = String(this._resolveTeamMatchGameMode(teamMatch, ms) || '').trim();
+    }
+    if (!format) {
+      const formatType = String((ms && ms.formatType) || '').trim();
+      format =
+        (formatType ? this._labelForFormat(formatType) : '') ||
+        c.gameMode ||
+        c.format ||
+        '';
+    }
     const teeTime = c.teeTimeText || c.teeTime || c.date || '';
     const isPrivate = c.visibility === 'private';
     this.setData({
