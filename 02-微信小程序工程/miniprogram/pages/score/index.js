@@ -10425,6 +10425,16 @@ Page({
       return plan;
     }
 
+    // 普通 fourball_best：2+0 → 加第 3 人：只选 3+0 / 2+1（不走普通 seat sync）
+    if (
+      commitPath.path === 'gameStore' &&
+      this._isOrdinaryFourballBestCompositionContext() &&
+      this._needsOrdinaryFourball20To3Transition(diff)
+    ) {
+      this._promptOrdinaryFourball20To3Transition(diff, plan);
+      return plan;
+    }
+
     const ok = this._applyGameOrDemoCommitDiff(diff);
     if (!ok) {
       wx.showToast({ title: '提交失败', icon: 'none' });
@@ -11156,6 +11166,327 @@ Page({
 
     gameStore.saveGame(game);
     console.log('[fourball-best-30-to-4-transition-seats]', {
+      gameId: this.data.gameId,
+      mapKey: mapKey,
+      targetType: type,
+      seats: seats.map((s) => ({
+        seatIndex: s.seatIndex,
+        teamId: s.teamId,
+        playerId: s.playerId
+      })),
+      teams: nextTeams.map((t) => ({
+        teamId: t.teamId,
+        memberIds: (t.members || []).map((m) => m.playerId)
+      }))
+    });
+    return true;
+  },
+
+  /**
+   * 2+0 → 加第 3 人：进入 3+0 / 2+1 选择。
+   * draft 有效人数 === 3 且存在 add 时触发；不走普通 seat sync。
+   */
+  _needsOrdinaryFourball20To3Transition(diff) {
+    if (!this._isOrdinaryFourballBestCompositionContext()) return false;
+    if (!(diff && Array.isArray(diff.added) && diff.added.length)) return false;
+    if (this._countOccupiedDraftSlots() !== 3) return false;
+    const prevComp = this._getOrdinaryFourballBestComposition();
+    if (!prevComp) return false;
+    return resolveCompositionType(prevComp) === '2+0';
+  },
+
+  _promptOrdinaryFourball20To3Transition(diff, plan) {
+    const itemList = ['3+0', '2+1'];
+    wx.showActionSheet({
+      alertText: '请选择组合方式',
+      itemList: itemList,
+      success: (res) => {
+        const targetType = itemList[res.tapIndex];
+        if (!targetType) return;
+        const ok = this._applyGameOrDemoCommitDiff(diff);
+        if (!ok) {
+          wx.showToast({ title: '提交失败', icon: 'none' });
+          return;
+        }
+        this.persistSession();
+        const synced = this._applyOrdinaryFourball20To3Transition(diff, targetType);
+        if (!synced) {
+          wx.showToast({ title: '组合同步失败', icon: 'none' });
+          return;
+        }
+        if (plan) {
+          plan.deferredWrites = {
+            gameStore: true,
+            groupsStore: false,
+            persistSession: true,
+            rebindScoreContext: true
+          };
+        }
+        console.log('[GROUP_MANAGE_COMMIT_APPLIED]', {
+          path: 'gameStore',
+          fourball20To3: targetType,
+          changeCount: diff && diff.changeCount
+        });
+        this._finalizeCloseGroupManage();
+        this._refreshScorePageFromGame();
+        wx.showToast({ title: '已保存', icon: 'success' });
+      },
+      fail: () => {
+        wx.showToast({ title: '已取消，请选择组合后保存', icon: 'none' });
+      }
+    });
+  },
+
+  /**
+   * Seat Model：2+0 → 3 人。seat3 绑定新人；按选项写 teamId / compositionType。
+   * 保留 team-1 成绩槽；2+1 时仅新 team-2 补空槽。不清 teamScoresByEntity。
+   */
+  _applyOrdinaryFourball20To3Transition(diff, targetType) {
+    const type = String(targetType || '').trim();
+    if (type !== '3+0' && type !== '2+1') return false;
+
+    const resolved = this._resolveOrdinaryFourballCompositionRecord();
+    if (!resolved) return false;
+    const game = resolved.game;
+    const group = resolved.group;
+    const gi = resolved.gi;
+    const mapKey = resolved.mapKey;
+    const prevMap = resolved.prevMap;
+    const prevComp = resolved.comp;
+
+    const addedPlayers = [];
+    const pushMember = (m) => {
+      if (!m || !m.playerId) return;
+      const pid = String(m.playerId).trim();
+      if (!pid) return;
+      if (addedPlayers.some((x) => String(x.playerId) === pid)) return;
+      addedPlayers.push(m);
+    };
+    (diff && diff.added ? diff.added : []).forEach((ch) => {
+      const idx = ch && ch.slotIndex;
+      if (idx != null && idx >= 0) {
+        pushMember(slotPlayerToFourballMember((this._demoSlots || [])[idx]));
+        const draftSlot = (this._draftSlots || [])[idx];
+        if (draftSlot && draftSlot.status === 'occupied') {
+          const p = draftSlot.player || {};
+          const pid = p.playerId || draftSlot.playerId;
+          if (pid) {
+            pushMember({
+              playerId: String(pid).trim(),
+              name: p.name || '球员',
+              avatar: p.avatar || '',
+              gender: p.gender || '',
+              tPosition: p.tPosition || '',
+              tee: p.tee || p.tPosition || ''
+            });
+          }
+        }
+      }
+      const toId = ch && ch.toPlayerId != null ? String(ch.toPlayerId).trim() : '';
+      if (!toId) return;
+      const hit = (this._demoSlots || [])
+        .map(slotPlayerToFourballMember)
+        .find((m) => m && String(m.playerId) === toId);
+      pushMember(hit);
+    });
+    if (!addedPlayers.length) return false;
+    const added = addedPlayers[0];
+
+    const seats = getCompositionSeats(prevComp);
+    const seatAt = (n) => {
+      const idx = Number(n);
+      for (let i = 0; i < seats.length; i++) {
+        if (seats[i] && Number(seats[i].seatIndex) === idx) return seats[i];
+      }
+      return null;
+    };
+    const fillSeat = (seat, member, teamId) => {
+      if (!seat || !member) return;
+      seat.playerId = String(member.playerId).trim();
+      seat.name = member.name || '';
+      seat.avatar = member.avatar || '';
+      seat.gender = member.gender || '';
+      seat.tPosition = member.tPosition || '';
+      seat.tee = member.tee || member.tPosition || '';
+      if (teamId != null) {
+        seat.teamId = teamId ? String(teamId).trim() : null;
+      }
+    };
+
+    // 原 2+0：seat1–2 @ team-1；seat3/4 空 → seat3 写入新人
+    [1, 2].forEach((si) => {
+      const s = seatAt(si);
+      if (s) s.teamId = 'team-1';
+    });
+    if (type === '3+0') {
+      fillSeat(seatAt(3), added, 'team-1');
+    } else {
+      // 2+1：seat3 = 新人 @ team-2；seat4 空
+      fillSeat(seatAt(3), added, 'team-2');
+    }
+    const s4 = seatAt(4);
+    if (s4 && (s4.playerId == null || !String(s4.playerId).trim())) {
+      s4.teamId = null;
+    }
+
+    let teamsShell = (Array.isArray(prevComp.teams) ? prevComp.teams : [])
+      .filter(Boolean)
+      .map((t) => Object.assign({}, t));
+    if (!teamsShell.length) {
+      teamsShell = [
+        {
+          teamIndex: 1,
+          teamId: 'team-1',
+          name: '队伍 1',
+          type: 'pair',
+          members: [],
+          players: []
+        }
+      ];
+    }
+    const teamMode = type === '3+0' ? 'single_team' : 'split_team';
+    if (type === '2+1') {
+      const hasT2 = teamsShell.some(
+        (t) => t && String(t.teamId || '').trim() === 'team-2'
+      );
+      if (!hasT2) {
+        teamsShell.push({
+          teamIndex: 2,
+          teamId: 'team-2',
+          name: '队伍 2',
+          type: 'single',
+          members: [],
+          players: []
+        });
+      }
+    } else {
+      // 3+0：仅保留 team-1
+      teamsShell = teamsShell
+        .filter((t) => t && String(t.teamId || '').trim() === 'team-1')
+        .slice(0, 1);
+      if (!teamsShell.length) {
+        teamsShell = [
+          {
+            teamIndex: 1,
+            teamId: 'team-1',
+            name: '队伍 1',
+            type: 'triple',
+            members: [],
+            players: []
+          }
+        ];
+      }
+    }
+
+    const shellComp = Object.assign({}, prevComp, {
+      compositionType: type,
+      teamMode: teamMode,
+      teams: teamsShell
+    });
+
+    let nextTeams = deriveTeamsFromSeats(shellComp, seats);
+    if (!nextTeams || !nextTeams.length) return false;
+
+    const capacityParts = parseCompositionParts(type);
+    nextTeams = nextTeams.map((t, ti) => {
+      const n = ((t && t.members) || []).length;
+      const cap =
+        capacityParts && capacityParts[ti] != null ? capacityParts[ti] : null;
+      return Object.assign({}, t, {
+        type: cap != null ? teamTypeForCapacity(cap, n) : t.type,
+        players: ((t && t.members) || []).slice()
+      });
+    });
+
+    const slotById = {};
+    (this._demoSlots || []).forEach((slot) => {
+      const m = slotPlayerToFourballMember(slot);
+      if (m && m.playerId) slotById[String(m.playerId)] = m;
+    });
+    const seatByPid = {};
+    seats.forEach((s) => {
+      if (!s || s.playerId == null || !String(s.playerId).trim()) return;
+      seatByPid[String(s.playerId).trim()] = s;
+    });
+    nextTeams = nextTeams.map((t) => {
+      const members = ((t && t.members) || []).map((m) => {
+        if (!m || !m.playerId) return m;
+        const pid = String(m.playerId).trim();
+        const live = slotById[pid];
+        const seat = seatByPid[pid];
+        return {
+          playerId: pid,
+          userId: pid,
+          name: (m.name || (live && live.name) || (seat && seat.name) || '球员').trim() || '球员',
+          avatar: m.avatar || (live && live.avatar) || (seat && seat.avatar) || '',
+          gender: (live && live.gender) || (seat && seat.gender) || '',
+          tPosition:
+            (live && live.tPosition) || (seat && seat.tPosition) || '',
+          tee:
+            (live && (live.tee || live.tPosition)) ||
+            (seat && (seat.tee || seat.tPosition)) ||
+            ''
+        };
+      });
+      return Object.assign({}, t, { members: members, players: members.slice() });
+    });
+
+    const nextComp = Object.assign({}, prevComp, {
+      groupId: prevComp.groupId || mapKey,
+      compositionType: type,
+      teamMode: teamMode,
+      seats: seats,
+      teams: nextTeams,
+      playerCount: 3,
+      scoringTemplate:
+        prevComp.scoringTemplate ||
+        (type === '3+0' ? 'fourball_best' : 'team_best')
+    });
+
+    game.groupCompositionMap = Object.assign({}, prevMap, { [mapKey]: nextComp });
+    game.composition = {
+      type: nextComp.compositionType,
+      single: teamMode === 'single_team',
+      teams: nextTeams,
+      seats: seats,
+      scoringTemplate: nextComp.scoringTemplate || ''
+    };
+
+    // 已有 teamId 成绩原样保留；仅新 teamId（2+1 的 team-2）补空槽
+    const savedEntities = Array.isArray(group.teamScoresByEntity)
+      ? group.teamScoresByEntity
+      : [];
+    const engineGroups = this._engineGroups || [];
+    const scoreById = {};
+    savedEntities.forEach((rec) => {
+      const tid = rec && rec.teamId != null ? String(rec.teamId).trim() : '';
+      if (!tid) return;
+      scoreById[tid] = {
+        teamId: tid,
+        scores: (rec.scores || []).slice(),
+        putts: (rec.putts || []).slice()
+      };
+    });
+    nextTeams.forEach((t) => {
+      const tid = String((t && t.teamId) || '').trim();
+      if (!tid || scoreById[tid]) return;
+      const picked = pickFourballTeamScoreRecord(tid, engineGroups, savedEntities);
+      scoreById[tid] = {
+        teamId: tid,
+        scores: picked.scores,
+        putts: picked.putts
+      };
+    });
+    const nextScoreEntities = Object.keys(scoreById).map((id) => scoreById[id]);
+    if (Array.isArray(game.groups) && game.groups[gi]) {
+      game.groups[gi] = Object.assign({}, game.groups[gi], {
+        composition: nextComp,
+        teamScoresByEntity: nextScoreEntities
+      });
+    }
+
+    gameStore.saveGame(game);
+    console.log('[fourball-best-20-to-3-transition-seats]', {
       gameId: this.data.gameId,
       mapKey: mapKey,
       targetType: type,
