@@ -10059,6 +10059,49 @@ Page({
       });
     });
 
+    // 2+2 缺员恢复：slots 有人但 teams 未收录时，补入 members.length < 2 的队（不重建 composition）
+    const filledOrphanIds = [];
+    const compositionType = String(prevComp.compositionType || '').trim();
+    if (compositionType === '2+2') {
+      const usedIds = {};
+      nextTeams.forEach((t) => {
+        ((t && t.members) || []).forEach((m) => {
+          const pid = m && m.playerId != null ? String(m.playerId).trim() : '';
+          if (pid) usedIds[pid] = true;
+        });
+      });
+      const orphanPlayers = [];
+      (this._demoSlots || []).forEach((slot) => {
+        const m = slotPlayerToFourballMember(slot);
+        if (!m || !m.playerId) return;
+        const pid = String(m.playerId).trim();
+        if (!pid || usedIds[pid]) return;
+        orphanPlayers.push({
+          playerId: m.playerId,
+          userId: m.playerId,
+          name: m.name,
+          avatar: m.avatar || '',
+          gender: m.gender || '',
+          tPosition: m.tPosition || '',
+          tee: m.tee || m.tPosition || ''
+        });
+        usedIds[pid] = true;
+      });
+      let orphanIdx = 0;
+      for (let ti = 0; ti < nextTeams.length && orphanIdx < orphanPlayers.length; ti++) {
+        const t = nextTeams[ti];
+        if (!t || !Array.isArray(t.members)) continue;
+        while (t.members.length < 2 && orphanIdx < orphanPlayers.length) {
+          const orphan = orphanPlayers[orphanIdx++];
+          t.members.push(orphan);
+          filledOrphanIds.push(orphan.playerId);
+        }
+        t.players = t.members.slice();
+        t.type =
+          t.members.length === 1 ? 'single' : t.members.length === 2 ? 'pair' : t.type || 'pair';
+      }
+    }
+
     const nextComp = Object.assign({}, prevComp, {
       teams: nextTeams,
       playerCount: nextTeams.reduce((n, t) => n + ((t && t.members) || []).length, 0)
@@ -10117,6 +10160,7 @@ Page({
       gameId: gameId,
       groupId: groupId,
       replaced: Object.keys(replaceMap),
+      filledOrphans: filledOrphanIds,
       teams: nextTeams.map((t) => ({
         teamId: t.teamId,
         memberIds: (t.members || []).map((m) => m.playerId)
