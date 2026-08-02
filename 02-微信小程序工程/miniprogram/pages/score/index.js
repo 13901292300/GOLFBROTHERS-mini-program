@@ -31,7 +31,10 @@ const {
   listFilledPlayers,
   isG5MatchPlayMode,
   isG6G7MatchPlayMode,
-  isG8MatchPlayMode
+  isG8MatchPlayMode,
+  validateG5MatchPlayPlayers,
+  validateG6G7MatchPlayPlayers,
+  validateG8MatchPlayPlayers
 } = require('../../utils/strokeEntityValidator.js');
 const { resolveCompositionMode } = require('../../utils/strokeCompositionResolver.js');
 const { normalizeFormalGroupSeats } = require('../../utils/strokeGroupSeatNormalizer.js');
@@ -10142,20 +10145,36 @@ Page({
   },
 
   /**
-   * LIVE 添加/删除确认前分组合法性（G2/G3 / G4）。
+   * LIVE 添加/删除确认前：校验 draft 最终组状态是否符合赛制。
+   * - G5/G6/G7/G8：走比洞专用最终态规则（允许调整组合，不做 slot 分队锁定）
+   * - G2/G3/G4：走比杆组合规则
    * 失败返回中文错误文案；非相关赛制或空组返回 ''。
    */
   _validateTeamMatchDraftComposition() {
     const match = this._readScoreTeamMatch();
     if (!match) return '';
-    const kind = resolveStrokeKind(resolveGameMode(match));
-    if (kind !== 'g2g3' && kind !== 'g4') return '';
-
+    const gameMode = resolveGameMode(match);
     const nextPlayers = teamMatchStore.slotsToPlayers(this._draftSlots || []);
     const filled = listFilledPlayers({ players: nextPlayers });
     if (!filled.length) return '';
 
     const teamMap = buildRegisterTeamMap(match);
+    const playersProbe = filled.map((p) => ({ userId: p.userId }));
+
+    // G5–G8：最终态合法性（禁止误用 g2g3/g4 比杆规则）
+    if (isG5MatchPlayMode(gameMode)) {
+      return validateG5MatchPlayPlayers(playersProbe, teamMap) || '';
+    }
+    if (isG6G7MatchPlayMode(gameMode)) {
+      return validateG6G7MatchPlayPlayers(playersProbe, teamMap) || '';
+    }
+    if (isG8MatchPlayMode(gameMode)) {
+      return validateG8MatchPlayPlayers(playersProbe, teamMap) || '';
+    }
+
+    const kind = resolveStrokeKind(gameMode);
+    if (kind !== 'g2g3' && kind !== 'g4') return '';
+
     for (let i = 0; i < filled.length; i++) {
       const uid = filled[i].userId;
       const teamId = teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
