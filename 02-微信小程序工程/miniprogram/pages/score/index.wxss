@@ -719,6 +719,16 @@ page {
   box-shadow: none;
 }
 
+/*
+ * match-play pair fixed-collapse（G6/G7/G8）
+ * - 默认折叠宽 collapse=1 → 148rpx；expanded collapse=0 → 220rpx
+ * - 禁止 width transition；不改 fourball fixed-collapse / G5 single
+ */
+.scoreboard-shell--match-play.is-match-play-identity-fixed-collapse .player-column,
+.scoreboard-shell--match-play.is-match-play-identity-fixed-collapse .score-track__inner {
+  transition: none !important;
+}
+
 /* Phase5.5：列宽 220→148 随 progress；禁止 width transition（跟手） */
 /* Phase5.4：最高层遮挡。列底用页面底，避免末行以下被 identity 蓝铺满 */
 .scoreboard-shell--fourball .fourball-player-column {

@@ -282,8 +282,8 @@
       <!-- ===== 比洞 Shell：G5–G8；G6/G7 pair 复用 fourball 2+2 身份（avatar-group + A/B 折叠）===== -->
       <view
         wx:elif="{{useMatchPlayScoreShell}}"
-        class="scoreboard-shell scoreboard-shell--match-play {{isMatchPlayPairLayout ? 'is-match-play-pair' : ''}} {{isMatchPlayTeeStickyVisible ? 'is-match-play-tee-sticky' : ''}}"
-        style="--fourball-identity-collapse:{{matchPlayIdentityCollapseProgress}};{{scoreboardStyle}}"
+        class="scoreboard-shell scoreboard-shell--match-play {{isMatchPlayPairLayout ? 'is-match-play-pair' : ''}} {{isMatchPlayTeeStickyVisible ? 'is-match-play-tee-sticky' : ''}} {{matchPlayIdentityMode === 'fixed-collapse' ? 'is-match-play-identity-fixed-collapse' : ''}} {{matchPlayIdentityMode === 'fixed-collapse' && matchPlayIdentityExpanded ? 'is-match-play-identity-expanded' : ''}}"
+        style="--fourball-identity-collapse:{{matchPlayIdentityMode === 'fixed-collapse' ? (matchPlayIdentityExpanded ? 0 : 1) : matchPlayIdentityCollapseProgress}};{{scoreboardStyle}}"
       >
         <scroll-view
           class="player-column"
@@ -308,8 +308,8 @@
                   </view>
                 </block>
                 <block wx:else>
-                  <!-- G2/G3 pair identity 同构：横向双头像 + name-group / 折叠 A/B -->
-                  <view class="fourball-pair-identity">
+                  <!-- G6/G7/G8 pair identity：fixed-collapse（点击展开 / 横滑收起） -->
+                  <view class="fourball-pair-identity" bindtap="onMatchPlayIdentityTap">
                     <view class="avatar-group paired-avatars">
                       <view
                         wx:for="{{item.pairMembers}}"
@@ -317,6 +317,8 @@
                         wx:for-index="mIdx"
                         wx:key="name"
                         class="avatar-group__item {{mIdx === 1 ? 'avatar-group__item--second' : 'avatar-group__item--first'}}"
+                        data-player-id="{{pm.playerId || ''}}"
+                        catchtap="onMatchPlayPlayerAvatarTap"
                       >
                         <image class="avatar-group__avatar" src="{{pm.avatar}}" mode="aspectFill"></image>
                       </view>

@@ -1584,6 +1584,7 @@ function buildMatchPlayPairMembers(members) {
     const playerId = m && m.playerId ? String(m.playerId) : '';
     const name = (m && m.name) || '球员';
     return {
+      playerId: playerId,
       name: name,
       avatar: mockAvatars.resolveAvatar(m && m.avatar, playerId || name),
       teeColor: style.teeColor,
@@ -2003,6 +2004,13 @@ Page({
     useMatchPlayScoreShell: false,
     /** G6/G7/G8：matchSidesView 含 pair 时，身份列复用 fourball 2+2 折叠布局 */
     isMatchPlayPairLayout: false,
+    /**
+     * match-play pair 身份交互：'fixed-collapse' = 固定折叠 + 点击展开。
+     * 仅 G6/G7/G8 isMatchPlayPairLayout；不影响 G5 single / fourball shell。
+     */
+    matchPlayIdentityMode: false,
+    /** fixed-collapse：身份列是否展开（默认折叠） */
+    matchPlayIdentityExpanded: false,
     /** G6/G7 pair：identity 折叠进度 0~1（对齐 fourballIdentityCollapseProgress） */
     matchPlayIdentityCollapseProgress: 0,
     /** G6/G7 pair：阶段1 track 补偿（对齐 fourballTrackInnerStyle / Phase6.1） */
@@ -3505,6 +3513,8 @@ Page({
       isMatchPlayTeeStickyVisible: false,
       matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
       isMatchPlayPairLayout: false,
+      matchPlayIdentityMode: false,
+      matchPlayIdentityExpanded: false,
       matchPlayIdentityCollapseProgress: 0,
       matchPlayTrackInnerStyle: 'transform: translateX(0px);',
       isHoleParCompact: false,
@@ -3521,6 +3531,8 @@ Page({
         useMatchPlayScoreShell: true,
         isMatchPlayTeeStickyVisible: false,
         matchPlayHoleParNormalStyle: 'transform: translateX(0px);',
+        matchPlayIdentityMode: false,
+        matchPlayIdentityExpanded: false,
         matchPlayIdentityCollapseProgress: 0,
         matchPlayTrackInnerStyle: 'transform: translateX(0px);',
         columns: buildG5Columns(),
@@ -5092,6 +5104,17 @@ Page({
           (patch.matchSidesView || []).some((row) => row && row.kind === 'pair');
         patch.isMatchPlayPairLayout = !!g678HasPair;
         if (g678HasPair) {
+          patch.matchPlayIdentityMode = FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE;
+          // 已在 fixed-collapse 时保留展开态，避免 refreshPlayers 打分刷新把展开收回
+          if (this.data.matchPlayIdentityMode !== FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE) {
+            patch.matchPlayIdentityExpanded = false;
+            patch.matchPlayIdentityCollapseProgress = 1;
+          } else {
+            patch.matchPlayIdentityCollapseProgress = this.data.matchPlayIdentityExpanded
+              ? 0
+              : 1;
+          }
+          patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
           patch.matchSidesView = (patch.matchSidesView || []).map((row) => {
             if (!row || row.kind !== 'pair') return row;
             const members = Array.isArray(row.pairMembers) ? row.pairMembers : [];
@@ -5102,18 +5125,24 @@ Page({
             });
           });
         } else {
+          patch.matchPlayIdentityMode = false;
+          patch.matchPlayIdentityExpanded = false;
           patch.matchPlayIdentityCollapseProgress = 0;
           patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
         }
       } else {
         patch.columns = buildColumns();
         patch.isMatchPlayPairLayout = false;
+        patch.matchPlayIdentityMode = false;
+        patch.matchPlayIdentityExpanded = false;
         patch.matchPlayIdentityCollapseProgress = 0;
         patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
       }
       if (!isMatchPlayBoard && patch.isG5MatchPlay === false) {
         patch.matchSidesView = [];
         patch.isMatchPlayPairLayout = false;
+        patch.matchPlayIdentityMode = false;
+        patch.matchPlayIdentityExpanded = false;
         patch.matchPlayIdentityCollapseProgress = 0;
         patch.matchPlayTrackInnerStyle = 'transform: translateX(0px);';
         patch.matchStatusView = {
@@ -6451,6 +6480,47 @@ Page({
     console.log(playerId);
   },
 
+  _isMatchPlayIdentityFixedCollapseMode() {
+    return (
+      !!this.data.useMatchPlayScoreShell &&
+      !!this.data.isMatchPlayPairLayout &&
+      this.data.matchPlayIdentityMode === FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE
+    );
+  },
+
+  /**
+   * match-play pair fixed-collapse：组合身份区点击。
+   * - 折叠 → 仅展开（无 toggle）
+   * - 展开 → 无响应（空白区不折叠；头像走 catchtap）
+   */
+  onMatchPlayIdentityTap() {
+    if (!this._isMatchPlayIdentityFixedCollapseMode()) return;
+    if (this.data.matchPlayIdentityExpanded) return;
+    this.setData({
+      matchPlayIdentityExpanded: true,
+      matchPlayIdentityCollapseProgress: 0
+    });
+  },
+
+  /**
+   * match-play pair fixed-collapse：具体球员头像（catchtap，阻止冒泡到身份区）。
+   * - 折叠：视为点组合区 → 仅展开
+   * - 展开：预留球员入口（当前只 console.log playerId，不跳转）
+   */
+  onMatchPlayPlayerAvatarTap(e) {
+    if (!this._isMatchPlayIdentityFixedCollapseMode()) return;
+    if (!this.data.matchPlayIdentityExpanded) {
+      this.setData({
+        matchPlayIdentityExpanded: true,
+        matchPlayIdentityCollapseProgress: 0
+      });
+      return;
+    }
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const playerId = ds.playerId != null ? String(ds.playerId).trim() : '';
+    console.log(playerId);
+  },
+
   /**
    * fixed-collapse：tee sticky 阈值 = 仅 diff 宽（无 phase1）。
    */
@@ -6914,8 +6984,9 @@ Page({
   },
 
   /**
-   * G6/G7 pair：对齐 fourball `_syncFourballShellScrollState`
+   * G6/G7/G8 pair：对齐 fourball `_syncFourballShellScrollState`
    * 一次 setData：collapse + track compensate + tee sticky + hole/par
+   * fixed-collapse：不连续折叠 / 不 compensate；展开后横滑立刻收回
    */
   _syncMatchPlayPairShellScrollState(scrollLeft, seq) {
     if (!this.data.useMatchPlayScoreShell || !this.data.isMatchPlayPairLayout) {
@@ -6935,6 +7006,48 @@ Page({
 
     const left = Math.max(0, Number(scrollLeft) || 0);
     const resetStyle = 'transform: translateX(0px);';
+    const cur = this.data;
+    this._matchPlayLatestScrollLeft = left;
+
+    // fixed-collapse：不驱动连续 collapse / compensate；展开时横滑立刻收回
+    if (this._isMatchPlayIdentityFixedCollapseMode()) {
+      const next = {};
+      let expanded = !!cur.matchPlayIdentityExpanded;
+      if (expanded && left > 0.5) {
+        expanded = false;
+        next.matchPlayIdentityExpanded = false;
+      }
+      const progress = expanded ? 0 : 1;
+      if (progress !== cur.matchPlayIdentityCollapseProgress) {
+        next.matchPlayIdentityCollapseProgress = progress;
+      }
+      if (cur.matchPlayTrackInnerStyle !== resetStyle) {
+        next.matchPlayTrackInnerStyle = resetStyle;
+      }
+      const teeSticky =
+        left < 1 ? false : this._shouldFourballTeeStickyVisibleFixedCollapse(left);
+      const holeParTx =
+        left < 1 ? 0 : this._calculateFourballHoleParOffsetXFixedCollapse(left);
+      const holeParStyle = 'transform: translateX(' + holeParTx + 'px);';
+      if (teeSticky !== !!cur.isMatchPlayTeeStickyVisible) {
+        next.isMatchPlayTeeStickyVisible = teeSticky;
+      }
+      if (holeParStyle !== cur.matchPlayHoleParNormalStyle) {
+        next.matchPlayHoleParNormalStyle = holeParStyle;
+      }
+      if (!Object.keys(next).length) return;
+      if (typeof seq === 'number' && seq !== this._matchPlayScrollSeq) return;
+      this.setData(next, () => {
+        if (typeof seq === 'number' && seq !== this._matchPlayScrollSeq) {
+          this._syncMatchPlayPairShellScrollState(
+            this._matchPlayLatestScrollLeft,
+            this._matchPlayScrollSeq
+          );
+        }
+      });
+      return;
+    }
+
     let next;
     if (left < 1) {
       next = {
@@ -6954,7 +7067,6 @@ Page({
         matchPlayHoleParNormalStyle: 'transform: translateX(' + holeParTx + 'px);'
       };
     }
-    const cur = this.data;
     if (
       next.matchPlayIdentityCollapseProgress === cur.matchPlayIdentityCollapseProgress &&
       next.isMatchPlayTeeStickyVisible === !!cur.isMatchPlayTeeStickyVisible &&
