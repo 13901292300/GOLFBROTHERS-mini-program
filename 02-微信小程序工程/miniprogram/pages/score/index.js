@@ -6548,8 +6548,10 @@ Page({
   },
 
   /**
-   * 队内赛 G2/G3 pair 布局（2+2 / 2+1）：接入 useFourballScoreShell（不改 fourball_best 门控）。
-   * 对齐 resolveFourballPairFlags：有 pair 且全组 ≤2；3+/4+0 / G4 返回 false。
+   * 队内赛 pair shell：接入 useFourballScoreShell（不改 fourball_best 门控）。
+   * - G2/G3：2+2 / 2+1（有 pair 且全组 ≤2）
+   * - G4：四人两球比杆赛（pair entities；G8 比洞由 isMatchPlayBoardMode 排除）
+   * - G2/G3 4+0：不进（走 fourball40）；非 pair 布局 → false
    * @param {Array} [entitiesViewArg] refreshEntities 刚生成的视图；缺省读 data.entitiesView
    */
   _resolveStrokeEntityFourballShell(entitiesViewArg) {
@@ -6561,7 +6563,9 @@ Page({
     const matchId = (ms && ms.matchId) || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     const gameMode = this._resolveTeamMatchGameMode(match, ms);
-    if (resolveStrokeKind(gameMode) !== 'g2g3') return false;
+    const kind = resolveStrokeKind(gameMode);
+    // G2/G3 pair + G4 比杆；G5–G8 / 其它 kind 不进
+    if (kind !== 'g2g3' && kind !== 'g4') return false;
     if (isMatchPlayBoardMode(gameMode)) return false;
     const rows = Array.isArray(entitiesViewArg)
       ? entitiesViewArg
