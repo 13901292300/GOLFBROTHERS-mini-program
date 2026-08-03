@@ -3941,6 +3941,11 @@ Page({
     );
     const useEntityFourballShell =
       !useEntityFourball40Shell && this._resolveStrokeEntityFourballShell(entitiesView);
+    // G2/G3 pair shell → fixed-collapse；4+0 / 非 pair entity → false（旧 fallback 保留）
+    const entityIdentityMode = this._resolveFourballIdentityMode({
+      pageMode: 'stroke_entity',
+      useFourballScoreShell: useEntityFourballShell
+    });
     const patch = {
       entitiesView: entitiesView,
       bestRoster: bestRoster,
@@ -3954,10 +3959,11 @@ Page({
       useFourballScoreShell: useEntityFourballShell,
       isFourball40StrokeShell: useEntityFourball40Shell,
       strokeShellFormatLabel: useEntityFourball40Shell ? teamLabel : '',
-      // 队内 entity 不走 fixed-collapse 实验
-      fourballIdentityMode: false,
-      fourballIdentityExpanded: false
+      fourballIdentityMode: entityIdentityMode
     };
+    if (entityIdentityMode !== FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE) {
+      patch.fourballIdentityExpanded = false;
+    }
     if (useEntityFourball40Shell) {
       patch.playersView = this._buildFourball40PlayersViewFromEntities(
         entitiesView,
@@ -6392,16 +6398,17 @@ Page({
   },
 
   /**
-   * 普通 fourball score shell 身份列模式（tag: fourball-fixed-collapse-stable-v1）。
-   * - fourball_best + useFourballScoreShell → 'fixed-collapse'（默认）
-   * - 否则 false：保留动态 collapse / compensate 旧路径（fallback，不删除）
-   * 排除：stroke_entity / match-play / G5–G8（非 fourball_best 或非本 shell）
+   * fourball score shell 身份列模式（基线：fourball-fixed-collapse-normal-game-v1）。
+   * - fourball_best + useFourballScoreShell → 'fixed-collapse'
+   * - stroke_entity + useFourballScoreShell（G2/G3 pair）→ 'fixed-collapse'
+   * - 否则 false：保留动态 collapse / compensate 旧路径（不删除）
+   * 排除：G2/G3 4+0、G4 非 pair shell、match-play / G5–G8
    */
   _resolveFourballIdentityMode(opts) {
     const o = opts || {};
     const pageMode = o.pageMode != null ? o.pageMode : this.data.mode;
-    // 仅普通 fourball_best；队内 entity、match-play、G5–G8 不进
-    if (pageMode !== 'fourball_best') return false;
+    const modeOk = pageMode === 'fourball_best' || pageMode === 'stroke_entity';
+    if (!modeOk) return false;
     const useShell =
       o.useFourballScoreShell != null
         ? !!o.useFourballScoreShell
