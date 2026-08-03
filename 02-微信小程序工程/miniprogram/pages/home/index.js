@@ -9,6 +9,7 @@ const userProfileStore = require('../../utils/userProfileStore.js');
 const bannerConfig = require('../../utils/bannerConfig.js');
 const scheduleStore = require('../../utils/scheduleStore.js');
 const { sortSchedules } = require('../../utils/scheduleSort.js');
+const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 
 function decorateTournamentCard(match, card) {
   if (!card) return null;
@@ -177,7 +178,7 @@ Page({
           'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=100',
           'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100'
         ],
-        title: '周末业余邀请赛',
+        title: '周末业余挑战赛',
         progressWidth: '25%',
         progressMarkerLeft: gameProgress.buildMarkerLeft(4),
         progressMarkerText: '04',
@@ -186,7 +187,7 @@ Page({
         date: '2025/07/20',
         views: '64',
         type: 'tour',
-        navUrl: '/pages/score/index'
+        navUrl: '/pages/score/index?gameId=demo-weekend-amateur&groupIndex=0'
       },
       {
         id: 'my-2',
@@ -326,6 +327,8 @@ Page({
     this.applyTheme(getApp().getTheme());
     this._syncFontScale();
     this.refreshUserProfile();
+    // 首页演示 GAME：仅首次写入，不覆盖用户测试数据
+    demoWeekendAmateurGame.ensureDemoWeekendAmateurGame();
     // 每次显示刷新进行中 GAME（持久化数据源 → 返回首页不丢失、刷新可恢复）
     this.refreshGames();
     this.refreshTeamMatchCards();
@@ -777,7 +780,15 @@ Page({
       .map((g) => this._gameToCard(g, true))
       .concat(finishedGames.map((g) => this._gameToCard(g, false)));
     const plazaCards = activeGames.map((g) => this._gameToCard(g, false));
-    const base = this._baseMyCards || [];
+    const demoId = demoWeekendAmateurGame.DEMO_WEEKEND_AMATEUR_GAME_ID;
+    const hasDemoDynamic = myGameCards.some(
+      (c) => c && (c.gameId === demoId || c.id === demoId)
+    );
+    // 动态卡已有 demo-weekend-amateur 时隐藏静态演示卡，避免双卡
+    const base = (this._baseMyCards || []).filter((c) => {
+      if (!hasDemoDynamic) return true;
+      return !(c && c.id === 'my-1');
+    });
     this.setData({
       myCards: myGameCards.concat(base),
       plazaCards: plazaCards

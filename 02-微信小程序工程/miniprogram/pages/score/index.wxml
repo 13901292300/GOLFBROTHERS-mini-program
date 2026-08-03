@@ -547,10 +547,11 @@
       </view>
 
       <!-- ===== fourball shell v2：仅 pair22；Phase4 分层 + Phase6 tee sticky ===== -->
+      <!-- fixed-collapse：collapse 由 expanded 离散驱动；动态模式仍用 fourballIdentityCollapseProgress -->
       <view
         wx:elif="{{useFourballScoreShell}}"
-        class="scoreboard-shell scoreboard-shell--fourball {{fourballTeeStickyVisible ? 'is-fourball-tee-sticky' : ''}}"
-        style="--fourball-identity-collapse:{{fourballIdentityCollapseProgress}};"
+        class="scoreboard-shell scoreboard-shell--fourball {{fourballTeeStickyVisible ? 'is-fourball-tee-sticky' : ''}} {{fourballIdentityMode === 'fixed-collapse' ? 'is-fourball-identity-fixed-collapse' : ''}} {{fourballIdentityMode === 'fixed-collapse' && fourballIdentityExpanded ? 'is-fourball-identity-expanded' : ''}}"
+        style="--fourball-identity-collapse:{{fourballIdentityMode === 'fixed-collapse' ? (fourballIdentityExpanded ? 0 : 1) : fourballIdentityCollapseProgress}};"
       >
         <!-- 固定身份层：不响应 scrollLeft / 不折叠 -->
         <scroll-view
@@ -572,6 +573,7 @@
               <view
                 class="fourball-pair-identity {{item.type === 'single' ? 'fourball-pair-identity--single' : ''}}"
                 data-fourball-geometry="identity"
+                bindtap="onFourballIdentityTap"
               >
                 <view class="avatar-group" data-fourball-geometry="avatar-group">
                   <view
@@ -580,6 +582,8 @@
                     wx:for-index="mIdx"
                     wx:key="name"
                     class="avatar-group__item {{mIdx === 1 ? 'avatar-group__item--second' : 'avatar-group__item--first'}}"
+                    data-player-id="{{m.playerId || m.id || ''}}"
+                    catchtap="onFourballPlayerAvatarTap"
                   >
                     <image class="avatar-group__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
                   </view>

@@ -703,6 +703,22 @@ page {
   );
 }
 
+/*
+ * 实验：fixed-collapse
+ * - 默认折叠宽（collapse=1 → 148rpx）；expanded 时 collapse=0 → 220rpx
+ * - 禁止 width transition；不改动态折叠路径
+ * - 关闭全高接缝 box-shadow（避免头像|diff 灰竖条拉到成绩区底部）
+ */
+.scoreboard-shell--fourball.is-fourball-identity-fixed-collapse .fourball-player-column,
+.scoreboard-shell--fourball.is-fourball-identity-fixed-collapse .fourball-score-track__inner,
+.scoreboard-shell--fourball.is-fourball-identity-fixed-collapse .fourball-hole-par-overlay {
+  transition: none !important;
+}
+
+.scoreboard-shell--fourball.is-fourball-identity-fixed-collapse .fourball-player-column {
+  box-shadow: none;
+}
+
 /* Phase5.5：列宽 220→148 随 progress；禁止 width transition（跟手） */
 /* Phase5.4：最高层遮挡。列底用页面底，避免末行以下被 identity 蓝铺满 */
 .scoreboard-shell--fourball .fourball-player-column {
@@ -717,6 +733,12 @@ page {
   background-color: var(--bg-primary);
   box-sizing: border-box;
   transition: none;
+  /*
+   * 视觉兜底验证（不改宽度/translateX/scroll/setData）：
+   * 向右延伸与接缝同色的遮罩，盖住透明 track 露出的壳层白底。
+   * box-shadow 不占布局宽，不影响 --fourball-identity-width 计算。
+   */
+  box-shadow: 12rpx 0 0 0 var(--score-header-identity);
 }
 
 /* identity|diff 竖线：挂在内容 inner（表头+球员行高度），不随全高 column 伸入空白区 */

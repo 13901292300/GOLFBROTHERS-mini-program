@@ -47,8 +47,12 @@ const {
   getCompositionSeats,
   deriveTeamsFromSeats
 } = require('../../utils/fourballComposition.js');
+const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 
 const MATCH_JOIN_PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
+
+/** 实验：fixed-collapse 身份列模式（仅普通 fourball shell；默认关闭） */
+const FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE = 'fixed-collapse';
 
 /** M2 A1：样例 console 只打一次，避免 refresh 刷屏 */
 let _m2AdapterSampleLogged = false;
@@ -2012,12 +2016,20 @@ Page({
     fourballScrollLeft: 0,
     /** fourball shell identity 折叠进度 0~1（Phase5.1：仅状态，不驱动 UI） */
     fourballIdentityCollapseProgress: 0,
-    /** fourball shell T sticky：Phase6.2 阈值 = phase1(72) + diff(96rpx→px) */
+    /** fourball shell T sticky：Phase6.2 阈值 = phase1(72rpx→px) + diff(96rpx→px) */
     fourballTeeStickyVisible: false,
     /** Phase6.1：阶段1 反向补偿，阻止 lead/score 侵入 identity（transform 字符串） */
     fourballTrackInnerStyle: 'transform: translateX(0px);',
     /** Phase7.4：HOLE/PAR 阶段2 横滑 offset（px，负值左移；阶段1 为 0） */
     fourballHoleParOffsetX: 0,
+    /**
+     * 实验：身份列交互模式。
+     * false = 现有 scroll 驱动动态折叠；'fixed-collapse' = 固定折叠 + 点击展开。
+     * 仅普通 fourball score shell；不影响 G6/G7/G8 / composition / score。
+     */
+    fourballIdentityMode: false,
+    /** fixed-collapse：身份列是否展开（默认折叠） */
+    fourballIdentityExpanded: false,
     /** 普通创建 fourball_best 纯 2+2：业务判定（每组恰好 2 人） */
     isFourballPair22: false,
     /** fourball pair 视觉布局：2+2 或 2+1（有 pair 且无 ≥3）；驱动 CSS class / 横滑 */
@@ -2614,6 +2626,9 @@ Page({
       this._engineGroups || []
     );
     const useStrokeScoreShell = isFourball40StrokeShell || isFourballIndividualFallback;
+    const useFourballScoreShell = useStrokeScoreShell
+      ? false
+      : this._resolveFourballScoreShell();
     // Legacy 仍用 bestTeams；4+0/3+0/3+1 与 individual-fallback 走 stroke shell（playersView）
     const bestTeams = this._buildBestTeams(this.data.scoreDisplayMode, hasMatch, label);
     this.setData({
@@ -2622,12 +2637,18 @@ Page({
       useGameStrokeShell: false,
       useStrokeScoreShell: useStrokeScoreShell,
       useMatchPlayScoreShell: false,
-      useFourballScoreShell: useStrokeScoreShell ? false : this._resolveFourballScoreShell(),
+      useFourballScoreShell: useFourballScoreShell,
       fourballTeeStickyVisible: false,
       fourballScrollLeft: 0,
       fourballIdentityCollapseProgress: 0,
       fourballTrackInnerStyle: 'transform: translateX(0px);',
       fourballHoleParOffsetX: 0,
+      fourballIdentityMode: this._resolveFourballIdentityMode({
+        pageMode: 'fourball_best',
+        gameId: this.data.gameId,
+        useFourballScoreShell: useFourballScoreShell
+      }),
+      fourballIdentityExpanded: false,
       isTeeStickyVisible: false,
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
@@ -3933,7 +3954,10 @@ Page({
       useMatchPlayScoreShell: false,
       useFourballScoreShell: useEntityFourballShell,
       isFourball40StrokeShell: useEntityFourball40Shell,
-      strokeShellFormatLabel: useEntityFourball40Shell ? teamLabel : ''
+      strokeShellFormatLabel: useEntityFourball40Shell ? teamLabel : '',
+      // 队内 entity 不走 fixed-collapse 实验
+      fourballIdentityMode: false,
+      fourballIdentityExpanded: false
     };
     if (useEntityFourball40Shell) {
       patch.playersView = this._buildFourball40PlayersViewFromEntities(
@@ -4991,6 +5015,14 @@ Page({
       patch.useFourballScoreShell = useStrokeScoreShell
         ? false
         : this._resolveFourballScoreShell();
+      patch.fourballIdentityMode = this._resolveFourballIdentityMode({
+        pageMode: 'fourball_best',
+        gameId: this.data.gameId,
+        useFourballScoreShell: patch.useFourballScoreShell
+      });
+      if (patch.fourballIdentityMode !== FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE) {
+        patch.fourballIdentityExpanded = false;
+      }
       patch.isFourball40StrokeShell = isFourball40StrokeShell;
       const identityLabel = String(this.data.bestLabel || formatLabel || '').trim() || '最佳球位';
       patch.strokeShellFormatLabel = isFourball40StrokeShell ? identityLabel : '';
@@ -6361,6 +6393,87 @@ Page({
   },
 
   /**
+   * 实验：普通 fourball shell 身份列模式。
+   * - 默认 false：保留 scroll 动态折叠
+   * - 'fixed-collapse'：固定折叠 + 点击展开（仅 fourball_best + useFourballScoreShell）
+   * 队内 entity / G6–G8 一律 false。
+   */
+  _resolveFourballIdentityMode(opts) {
+    const o = opts || {};
+    const pageMode = o.pageMode != null ? o.pageMode : this.data.mode;
+    if (pageMode !== 'fourball_best') return false;
+    const useShell =
+      o.useFourballScoreShell != null
+        ? !!o.useFourballScoreShell
+        : !!this.data.useFourballScoreShell;
+    if (!useShell) return false;
+    const gameId = o.gameId != null ? o.gameId : this.data.gameId;
+    // 周末业余挑战赛（demo-weekend-amateur）默认开启实验路径
+    if (
+      String(gameId || '') ===
+      String(demoWeekendAmateurGame.DEMO_WEEKEND_AMATEUR_GAME_ID || 'demo-weekend-amateur')
+    ) {
+      return FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE;
+    }
+    return false;
+  },
+
+  _isFourballIdentityFixedCollapseMode() {
+    return (
+      !!this.data.useFourballScoreShell &&
+      this.data.fourballIdentityMode === FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE
+    );
+  },
+
+  /**
+   * fixed-collapse：组合身份区点击。
+   * - 折叠 → 仅展开（无 toggle）
+   * - 展开 → 无响应（空白区不折叠；头像走 catchtap）
+   */
+  onFourballIdentityTap() {
+    if (!this._isFourballIdentityFixedCollapseMode()) return;
+    if (this.data.fourballIdentityExpanded) return;
+    this.setData({ fourballIdentityExpanded: true });
+  },
+
+  /**
+   * fixed-collapse：具体球员头像（catchtap，阻止冒泡到身份区）。
+   * - 折叠：视为点组合区 → 仅展开
+   * - 展开：预留球员入口（当前只 console.log playerId，不跳转）
+   */
+  onFourballPlayerAvatarTap(e) {
+    if (!this._isFourballIdentityFixedCollapseMode()) return;
+    if (!this.data.fourballIdentityExpanded) {
+      this.setData({ fourballIdentityExpanded: true });
+      return;
+    }
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const playerId = ds.playerId != null ? String(ds.playerId).trim() : '';
+    console.log(playerId);
+  },
+
+  /**
+   * fixed-collapse：tee sticky 阈值 = 仅 diff 宽（无 phase1）。
+   */
+  _shouldFourballTeeStickyVisibleFixedCollapse(scrollLeft) {
+    const left = Math.max(0, Number(scrollLeft) || 0);
+    const diffWPx = this._getFourballDiffLeadWidthPx();
+    return left + 0.5 >= diffWPx;
+  },
+
+  /**
+   * fixed-collapse：HOLE/PAR offset（无 phase1；随 lead 被成绩覆盖进度移动）。
+   */
+  _calculateFourballHoleParOffsetXFixedCollapse(scrollLeft) {
+    const left = Math.max(0, Number(scrollLeft) || 0);
+    if (left < 1) return 0;
+    const diffWPx = this._getFourballDiffLeadWidthPx();
+    const progress = diffWPx > 0 ? Math.min(1, left / diffWPx) : 1;
+    const travelPx = (51 * this._getGameSingleWindowWidth()) / 750;
+    return Math.round(-travelPx * progress * 100) / 100;
+  },
+
+  /**
    * 队内赛 G2/G3 4+0：接入普通局面 fourball40 stroke shell（useStrokeScoreShell）。
    * 不进 pair shell；不改 scoreEntities / teamScoresByEntity。
    * @param {object|null} match
@@ -6906,32 +7019,46 @@ Page({
   },
 
   /**
-   * fourball identity 折叠进度：scrollLeft / 72 → 0~1（无 easing / 无 UI 副作用）。
+   * 阶段1 折叠行程（px）= CSS --fourball-identity-width-delta(72rpx) 的物理像素。
+   * scrollLeft / compensate / identity 收缩共用此尺度，避免 72px vs 72rpx 混用。
+   */
+  _getFourballPhase1CollapseDistancePx() {
+    if (this._fourballPhase1CollapseDistancePxCache != null) {
+      return this._fourballPhase1CollapseDistancePxCache;
+    }
+    const px = (72 * this._getGameSingleWindowWidth()) / 750;
+    this._fourballPhase1CollapseDistancePxCache = px;
+    return px;
+  },
+
+  /**
+   * fourball identity 折叠进度：scrollLeft / phase1Px → 0~1（与 72rpx 列宽 delta 同尺度）。
    */
   _calculateFourballIdentityCollapseProgress(scrollLeft) {
-    const threshold = 72;
+    const phase1Px = this._getFourballPhase1CollapseDistancePx();
     const left = Math.max(0, Number(scrollLeft) || 0);
-    return Math.min(1, Math.max(0, left / threshold));
+    if (!(phase1Px > 0)) return 0;
+    return Math.min(1, Math.max(0, left / phase1Px));
   },
 
   /**
    * Phase6.1：阶段1 保护区补偿量（px）。
-   * scrollLeft∈[0,72] → 全额补偿（track 视觉不动）；>72 → 封顶 72（阶段2 相对滑动）。
+   * scrollLeft∈[0,phase1Px] → 全额补偿；>phase1Px → 封顶 phase1Px（阶段2 相对滑动）。
    */
   _calculateFourballTrackPhaseCompensatePx(scrollLeft) {
-    const phase1 = 72;
+    const phase1Px = this._getFourballPhase1CollapseDistancePx();
     const left = Math.max(0, Number(scrollLeft) || 0);
-    return Math.min(phase1, left);
+    return Math.min(phase1Px, left);
   },
 
   /**
    * Phase7.4：HOLE/PAR 横滑 offset（px）。
-   * 阶段1（≤72）：0，中心由 anchor width（identity 压缩）承担；
+   * 阶段1（≤phase1Px）：0，中心由 anchor width（identity 压缩）承担；
    * 阶段2：随 lead 左移，进度对齐 tee sticky（extra/diff宽），行程 51rpx（125→74），封顶不跟无限滚。
    */
   _calculateFourballHoleParOffsetX(scrollLeft) {
     const left = Math.max(0, Number(scrollLeft) || 0);
-    const phase1Px = 72;
+    const phase1Px = this._getFourballPhase1CollapseDistancePx();
     if (left <= phase1Px) return 0;
     const extra = left - phase1Px;
     const diffWPx = this._getFourballDiffLeadWidthPx();
@@ -6943,15 +7070,16 @@ Page({
   /**
    * Phase5.3 开发期几何检查（只读 console；不改布局 / 不改业务）。
    * 用法：getCurrentPages()[0]._measureFourballIdentityGeometry()
-   * 分别在 scrollLeft≈0 / ≈72 各测一次，对比 playerColumnWidth / identityWidth / leadLeft。
+   * 分别在 scrollLeft≈0 / ≈phase1Px 各测一次，对比 playerColumnWidth / identityWidth / leadLeft。
    */
   _measureFourballIdentityGeometry() {
     const page = this;
+    const latestLeft = Number(page._fourballLatestScrollLeft) || 0;
     const label =
       'geometry_' +
       (Number(page.data.fourballIdentityCollapseProgress) >= 0.99
         ? 'collapsed'
-        : Number(page.data.fourballScrollLeft) < 1
+        : latestLeft < 1
           ? 'initial'
           : 'mid');
     wx.createSelectorQuery()
@@ -6971,7 +7099,8 @@ Page({
         const lead = res && res[3];
         const out = {
           label: label,
-          scrollLeft: page.data.fourballScrollLeft,
+          scrollLeft: latestLeft,
+          phase1Px: page._getFourballPhase1CollapseDistancePx(),
           collapseProgress: page.data.fourballIdentityCollapseProgress,
           playerColumnWidth: col ? col.width : null,
           identityWidth: identity ? identity.width : null,
@@ -6996,7 +7125,7 @@ Page({
    */
   _shouldFourballTeeStickyVisible(scrollLeft) {
     const left = Math.max(0, Number(scrollLeft) || 0);
-    const phase1Px = 72;
+    const phase1Px = this._getFourballPhase1CollapseDistancePx();
     const diffWPx = this._getFourballDiffLeadWidthPx();
     return left + 0.5 >= phase1Px + diffWPx;
   },
@@ -7011,43 +7140,82 @@ Page({
   /**
    * Phase6.5 / 7.4：由 scrollLeft 原子推导 shell 横滑派生态
    * （collapse / compensate / tee sticky / hole-par offset）。
-   * scrollLeft<1 时强制归零；seq 过期则丢弃，setData 完成后若已有更新则补齐最新 scrollLeft。
+   * 实时跟手：只 setData 视觉字段；scrollLeft 仅存内存，避免无关字段刷屏。
+   * seq 过期则丢弃，setData 完成后若已有更新则补齐最新 scrollLeft。
    */
   _syncFourballShellScrollState(scrollLeft, seq) {
     if (typeof seq === 'number' && seq !== this._fourballScrollSeq) return;
 
     const left = Math.max(0, Number(scrollLeft) || 0);
+    this._fourballLatestScrollLeft = left;
+
     const resetStyle = 'transform: translateX(0px);';
-    let next;
-    if (left < 1) {
-      next = {
-        fourballScrollLeft: 0,
-        fourballIdentityCollapseProgress: 0,
-        fourballTeeStickyVisible: false,
-        fourballTrackInnerStyle: resetStyle,
-        fourballHoleParOffsetX: 0
-      };
-    } else {
-      const progress = this._calculateFourballIdentityCollapseProgress(left);
-      const compensatePx = this._calculateFourballTrackPhaseCompensatePx(left);
-      next = {
-        fourballScrollLeft: left,
-        fourballIdentityCollapseProgress: progress,
-        fourballTeeStickyVisible: this._shouldFourballTeeStickyVisible(left),
-        fourballTrackInnerStyle: 'transform: translateX(' + compensatePx + 'px);',
-        fourballHoleParOffsetX: this._calculateFourballHoleParOffsetX(left)
-      };
-    }
     const cur = this.data;
-    if (
-      next.fourballScrollLeft === cur.fourballScrollLeft &&
-      next.fourballIdentityCollapseProgress === cur.fourballIdentityCollapseProgress &&
-      next.fourballTeeStickyVisible === !!cur.fourballTeeStickyVisible &&
-      next.fourballTrackInnerStyle === cur.fourballTrackInnerStyle &&
-      next.fourballHoleParOffsetX === cur.fourballHoleParOffsetX
-    ) {
+    const next = {};
+
+    // 实验路径：fixed-collapse — 不驱动 collapse/compensate；展开时横滑立刻收回
+    if (this._isFourballIdentityFixedCollapseMode()) {
+      if (cur.fourballIdentityExpanded && left > 0.5) {
+        next.fourballIdentityExpanded = false;
+      }
+      if (cur.fourballTrackInnerStyle !== resetStyle) {
+        next.fourballTrackInnerStyle = resetStyle;
+      }
+      const teeSticky =
+        left < 1 ? false : this._shouldFourballTeeStickyVisibleFixedCollapse(left);
+      const holeParOffsetX =
+        left < 1 ? 0 : this._calculateFourballHoleParOffsetXFixedCollapse(left);
+      if (teeSticky !== !!cur.fourballTeeStickyVisible) {
+        next.fourballTeeStickyVisible = teeSticky;
+      }
+      if (holeParOffsetX !== cur.fourballHoleParOffsetX) {
+        next.fourballHoleParOffsetX = holeParOffsetX;
+      }
+      if (!Object.keys(next).length) return;
+      if (typeof seq === 'number' && seq !== this._fourballScrollSeq) return;
+      this.setData(next, () => {
+        if (typeof seq === 'number' && seq !== this._fourballScrollSeq) {
+          this._syncFourballShellScrollState(
+            this._fourballLatestScrollLeft,
+            this._fourballScrollSeq
+          );
+        }
+      });
       return;
     }
+
+    let progress;
+    let trackInnerStyle;
+    let teeSticky;
+    let holeParOffsetX;
+    if (left < 1) {
+      progress = 0;
+      trackInnerStyle = resetStyle;
+      teeSticky = false;
+      holeParOffsetX = 0;
+    } else {
+      progress = this._calculateFourballIdentityCollapseProgress(left);
+      const compensatePx = this._calculateFourballTrackPhaseCompensatePx(left);
+      // 稳定字符串，减少浮点抖动导致的无效 setData
+      const compensateRounded = Math.round(compensatePx * 100) / 100;
+      trackInnerStyle = 'transform: translateX(' + compensateRounded + 'px);';
+      teeSticky = this._shouldFourballTeeStickyVisible(left);
+      holeParOffsetX = this._calculateFourballHoleParOffsetX(left);
+    }
+
+    if (progress !== cur.fourballIdentityCollapseProgress) {
+      next.fourballIdentityCollapseProgress = progress;
+    }
+    if (trackInnerStyle !== cur.fourballTrackInnerStyle) {
+      next.fourballTrackInnerStyle = trackInnerStyle;
+    }
+    if (teeSticky !== !!cur.fourballTeeStickyVisible) {
+      next.fourballTeeStickyVisible = teeSticky;
+    }
+    if (holeParOffsetX !== cur.fourballHoleParOffsetX) {
+      next.fourballHoleParOffsetX = holeParOffsetX;
+    }
+    if (!Object.keys(next).length) return;
     if (typeof seq === 'number' && seq !== this._fourballScrollSeq) return;
 
     this.setData(next, () => {
@@ -7062,11 +7230,16 @@ Page({
 
   /**
    * fourball shell track 横滑（独立于 Legacy onScoreboardScroll / G1 onScoreTrackScroll）。
-   * Phase6.5：单一写入口 + 滚动 seq，始终只应用最新 scrollLeft。
+   * Phase6.5：实时跟随 + seq，始终只应用最新 scrollLeft。
    */
   onFourballScoreTrackScroll(e) {
     const scrollLeft = Math.max(0, Number((e.detail && e.detail.scrollLeft) || 0));
     if (this.data.useFourballScoreShell) {
+      // 取消旧 debounce Patch（若仍有残留 timer）
+      if (this._fourballScrollSyncTimer) {
+        clearTimeout(this._fourballScrollSyncTimer);
+        this._fourballScrollSyncTimer = null;
+      }
       this._fourballLatestScrollLeft = scrollLeft;
       this._fourballScrollSeq = (this._fourballScrollSeq || 0) + 1;
       this._syncFourballShellScrollState(scrollLeft, this._fourballScrollSeq);
