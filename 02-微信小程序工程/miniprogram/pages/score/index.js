@@ -47,7 +47,6 @@ const {
   getCompositionSeats,
   deriveTeamsFromSeats
 } = require('../../utils/fourballComposition.js');
-const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 
 const MATCH_JOIN_PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
 
@@ -6393,29 +6392,22 @@ Page({
   },
 
   /**
-   * 实验：普通 fourball shell 身份列模式。
-   * - 默认 false：保留 scroll 动态折叠
-   * - 'fixed-collapse'：固定折叠 + 点击展开（仅 fourball_best + useFourballScoreShell）
-   * 队内 entity / G6–G8 一律 false。
+   * 普通 fourball score shell 身份列模式（tag: fourball-fixed-collapse-stable-v1）。
+   * - fourball_best + useFourballScoreShell → 'fixed-collapse'（默认）
+   * - 否则 false：保留动态 collapse / compensate 旧路径（fallback，不删除）
+   * 排除：stroke_entity / match-play / G5–G8（非 fourball_best 或非本 shell）
    */
   _resolveFourballIdentityMode(opts) {
     const o = opts || {};
     const pageMode = o.pageMode != null ? o.pageMode : this.data.mode;
+    // 仅普通 fourball_best；队内 entity、match-play、G5–G8 不进
     if (pageMode !== 'fourball_best') return false;
     const useShell =
       o.useFourballScoreShell != null
         ? !!o.useFourballScoreShell
         : !!this.data.useFourballScoreShell;
     if (!useShell) return false;
-    const gameId = o.gameId != null ? o.gameId : this.data.gameId;
-    // 周末业余挑战赛（demo-weekend-amateur）默认开启实验路径
-    if (
-      String(gameId || '') ===
-      String(demoWeekendAmateurGame.DEMO_WEEKEND_AMATEUR_GAME_ID || 'demo-weekend-amateur')
-    ) {
-      return FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE;
-    }
-    return false;
+    return FOURBALL_IDENTITY_MODE_FIXED_COLLAPSE;
   },
 
   _isFourballIdentityFixedCollapseMode() {
