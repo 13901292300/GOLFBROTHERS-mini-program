@@ -236,7 +236,14 @@
     <view class="feature-section">
       <view class="feature-section-title"><text class="fst-main">常用功能</text><text class="fst-sub">普通用户可用</text></view>
       <view class="feature-grid">
-        <view wx:for="{{featuresCommon}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+        <view
+          wx:for="{{featuresCommon}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
           <view class="feature-icon"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
         </view>
@@ -245,7 +252,14 @@
     <view class="feature-section">
       <view class="feature-section-title"><text class="fst-main">管理功能</text><text class="fst-sub">需权限</text></view>
       <view class="feature-grid">
-        <view wx:for="{{featuresPermission}}" wx:key="permission" bindtap="onFeatureTap" data-permission="{{item.permission}}" class="feature-item">
+        <view
+          wx:for="{{featuresPermission}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>
         </view>
@@ -259,7 +273,8 @@
           wx:key="permission"
           bindtap="onFeatureTap"
           data-permission="{{item.permission}}"
-          class="feature-item"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
         >
           <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
           <text class="feature-label">{{item.label}}</text>

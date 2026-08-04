@@ -410,18 +410,28 @@ function cornerRank(colArr, pIdx) {
 
 /** 多组普通球局 / 球队赛事记分页：更多功能面板（仅此 10 项） */
 const MORE_MENU_ITEMS_COMPACT = [
-  { icon: '⚑', label: '修改T台', bg: 'bg-pga-blue' },
-  { icon: '⌖', label: '修改半场', bg: 'bg-pga-blue' },
-  { icon: '▦', label: '成绩卡', bg: 'bg-pga-blue' },
-  { icon: '↗', label: '统计数据', bg: 'bg-pga-blue' },
-  { icon: '👥', label: '球友圈', bg: 'bg-pga-blue' },
-  { icon: '✐', label: '球童记分', bg: 'bg-pga-blue' },
-  { icon: '📖', label: '记账本', bg: 'bg-pga-blue' },
-  { icon: '🪪', label: '海报', bg: 'bg-pga-blue' },
-  { icon: '🎨', label: '显示设置', bg: 'bg-pga-blue' },
-  { icon: '💬', label: '反馈', bg: 'bg-pga-blue' },
-  { icon: '⏻', label: '结束比赛', bg: 'bg-gold', action: 'finish_match' }
+  { icon: '⚑', label: '修改T台', bg: 'bg-pga-blue', action: 'edit_tee' },
+  { icon: '⌖', label: '修改半场', bg: 'bg-pga-blue', action: 'edit_half' },
+  { icon: '▦', label: '成绩卡', bg: 'bg-pga-blue', action: 'scorecard' },
+  { icon: '↗', label: '统计数据', bg: 'bg-pga-blue', action: 'stats' },
+  { icon: '👥', label: '球友圈', bg: 'bg-pga-blue', action: 'circle' },
+  { icon: '✐', label: '球童记分', bg: 'bg-pga-blue', action: 'caddie_score' },
+  { icon: '📖', label: '记账本', bg: 'bg-pga-blue', action: 'ledger' },
+  { icon: '🪪', label: '海报', bg: 'bg-pga-blue', action: 'poster' },
+  { icon: '🎨', label: '显示设置', bg: 'bg-pga-blue', action: 'theme' },
+  { icon: '💬', label: '反馈', bg: 'bg-pga-blue', action: 'feedback' },
+  { icon: '⏻', label: '结束本组比赛', bg: 'bg-gold', action: 'finish_match' }
 ];
+
+/**
+ * 普通多组：本组 finished 后更多菜单禁用（按 action，不按位置）
+ * finish_match 另在 apply 中改为「已结束」
+ */
+const SCORE_GROUP_FINISHED_DISABLED_ACTIONS = {
+  edit_tee: true,
+  caddie_score: true,
+  finish_match: true
+};
 
 /** 演示/标准模式等其它记分场景：主功能区（原「虚拟」位留空） */
 const MORE_MENU_ITEMS_LEGACY_MAIN = [
@@ -561,28 +571,52 @@ function isFinishMatchMenuItem(item) {
   if (!item || item.empty) return false;
   if (item.action === 'finish_match') return true;
   const label = item.label != null ? String(item.label) : '';
-  return label === '结束比赛' || label === '已结束';
+  return label === '结束比赛' || label === '结束本组比赛' || label === '已结束';
 }
 
 /**
- * finished：第一行 4 个可点项 disabled；结束比赛 → 已结束 + disabled
- * 非 finished：结束比赛保持可点
+ * finished 菜单禁用：
+ * - useGroupFinishMenuRules（普通多组本组结束）：按 action 禁用，不再按前 4 项位置
+ * - 其它（单组 / 队内赛整场结束）：保留原「前 4 项 + 结束项」逻辑，避免影响既有场景
+ * 非 finished：保留菜单源文案（多组/队内赛「结束本组比赛」，单组「结束比赛」）
  */
-function applyFinishedScoreMoreMenuState(items, matchFinished) {
+function applyFinishedScoreMoreMenuState(items, matchFinished, options) {
+  const opts = options || {};
   const list = Array.isArray(items) ? items : [];
   if (!matchFinished) {
     return list.map((item) => {
       if (!item || item.empty) return item;
       if (isFinishMatchMenuItem(item)) {
+        const srcLabel = item.label != null ? String(item.label) : '';
         return Object.assign({}, item, {
-          action: 'finish_match',
-          label: '结束比赛',
+          action: item.action || 'finish_match',
+          label: srcLabel && srcLabel !== '已结束' ? srcLabel : '结束比赛',
           disabled: false
         });
       }
       return Object.assign({}, item, { disabled: false });
     });
   }
+
+  // 普通多组：本组 status=finished → 按 action 禁用
+  if (opts.useGroupFinishMenuRules) {
+    return list.map((item) => {
+      if (!item || item.empty) return item;
+      if (isFinishMatchMenuItem(item)) {
+        return Object.assign({}, item, {
+          action: 'finish_match',
+          label: '已结束',
+          disabled: true
+        });
+      }
+      const action = item.action != null ? String(item.action) : '';
+      return Object.assign({}, item, {
+        disabled: !!SCORE_GROUP_FINISHED_DISABLED_ACTIONS[action]
+      });
+    });
+  }
+
+  // 单组 / 队内赛：原前 4 项位置禁用（行为不变）
   let firstRowUsed = 0;
   return list.map((item) => {
     if (!item || item.empty) return item;
@@ -2403,9 +2437,20 @@ Page({
     }
 
     const matchFinished = isMatchStatusFinished(match) || !!this.data.gameFinished;
+    // 仅普通多组 + 本组已结束：走 action 禁用表；单组 / 队内赛仍用原位置逻辑
+    const game = gameId ? gameStore.getGame(gameId) : null;
+    const useGroupFinishMenuRules =
+      !isTeamInternalScoreMatchContext(ms) &&
+      !!gameId &&
+      !!game &&
+      typeof gameStore.isMultiGroup === 'function' &&
+      gameStore.isMultiGroup(game) &&
+      !!this.data.gameFinished;
     if (panels && panels.moreMenuItems) {
       panels = {
-        moreMenuItems: applyFinishedScoreMoreMenuState(panels.moreMenuItems, matchFinished)
+        moreMenuItems: applyFinishedScoreMoreMenuState(panels.moreMenuItems, matchFinished, {
+          useGroupFinishMenuRules: useGroupFinishMenuRules
+        })
       };
     }
     return panels;
@@ -8068,7 +8113,12 @@ Page({
       return;
     }
 
-    if (action === 'finish_match' || label === '结束比赛' || label === '已结束') {
+    if (
+      action === 'finish_match' ||
+      label === '结束比赛' ||
+      label === '结束本组比赛' ||
+      label === '已结束'
+    ) {
       if (label === '已结束' || this._resolveAddDeleteDisabled()) return;
       if (this._boundToStore() && this.data.groupId) {
         wx.showModal({

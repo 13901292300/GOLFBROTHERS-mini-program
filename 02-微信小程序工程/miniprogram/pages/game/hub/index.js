@@ -62,6 +62,28 @@ const FEATURES_PERMISSION = [
   { permission: 'finish_match', glyph: '⏻', label: '结束比赛', tone: 'warning' }
 ];
 
+/** 已结束 GAME：仍可点的查看/设置类 */
+const FEATURES_VIEW_PERMISSION_SET = {
+  leaderboard: true,
+  stats: true,
+  feedback: true,
+  theme: true
+};
+
+/** 已结束 GAME：禁用的修改/管理类（仍展示，置灰） */
+const FEATURES_FINISHED_DISABLED_PERMISSION_SET = {
+  edit_match: true,
+  edit_half: true,
+  manage_players: true,
+  manage_tee_sheet: true,
+  edit_groups: true,
+  permission_management: true,
+  fees: true,
+  net_score: true,
+  cancel_match: true,
+  finish_match: true
+};
+
 /** M 面板管理区底部独立行：取消 / 结束（不混入上方网格） */
 const FEATURES_PERMISSION_FOOTER_KEYS = {
   cancel_match: true,
@@ -804,6 +826,33 @@ Page({
   },
 
   /* ===== 更多功能面板（与球队比赛 100% 一致；所有操作绑定当前 gameId） ===== */
+  /**
+   * 已结束 GAME（game.status finished/ended）时 M 项是否禁用。
+   * 查看类永不因此禁用；修改/管理类禁用。
+   */
+  _getMoreFeatureDisabledState(game, feature) {
+    if (!feature || feature.empty) return false;
+    const permission = feature.permission != null ? String(feature.permission) : '';
+    if (!permission || FEATURES_VIEW_PERMISSION_SET[permission]) return false;
+    if (!gameProgress.isGameEnded(game)) return false;
+    return !!FEATURES_FINISHED_DISABLED_PERMISSION_SET[permission];
+  },
+
+  _withMoreFeatureDisabledState(list, game) {
+    const ended = gameProgress.isGameEnded(game);
+    return (Array.isArray(list) ? list : []).map((f) => {
+      if (!f || f.empty) return f;
+      const next = Object.assign({}, f, {
+        disabled: this._getMoreFeatureDisabledState(game, f)
+      });
+      // finish_match：进行中「结束比赛」；结束后「已结束」+ disabled
+      if (String(f.permission || '') === 'finish_match') {
+        next.label = ended ? '已结束' : '结束比赛';
+      }
+      return next;
+    });
+  },
+
   applyMoreAccess() {
     const access = MORE_ACCESS;
     const permSet = access.permissions || [];
@@ -818,11 +867,19 @@ Page({
       .filter((f) => f && f.permission !== 'manage_players' && f.permission !== 'edit_groups' && f.permission !== 'fees' && f.permission !== 'net_score')
       .filter((f) => visible('permission', f.permission));
     const split = splitPermissionFeatures(permissionFeatures);
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameId ? gameStore.getGameById(gameId) || gameStore.getGame(gameId) : null;
     this.setData({
-      featuresCommon: FEATURES_COMMON.filter((f) => visible('common', f.permission)),
-      featuresPermission: split.featuresPermission,
+      featuresCommon: this._withMoreFeatureDisabledState(
+        FEATURES_COMMON.filter((f) => visible('common', f.permission)),
+        game
+      ),
+      featuresPermission: this._withMoreFeatureDisabledState(split.featuresPermission, game),
       featuresPermissionFooterPad: split.featuresPermissionFooterPad,
-      featuresPermissionFooter: split.featuresPermissionFooter
+      featuresPermissionFooter: this._withMoreFeatureDisabledState(
+        split.featuresPermissionFooter,
+        game
+      )
     });
   },
   openMoreSheet() {
@@ -838,6 +895,17 @@ Page({
   },
   onFeatureTap(e) {
     const permission = e.currentTarget.dataset.permission;
+    const disabledAttr = e.currentTarget.dataset.disabled;
+    const disabledFromUi =
+      disabledAttr === true || disabledAttr === 'true' || disabledAttr === 1 || disabledAttr === '1';
+    const gameId = this._gameId || this.data.gameId || '';
+    const game = gameId ? gameStore.getGameById(gameId) || gameStore.getGame(gameId) : null;
+    if (
+      disabledFromUi ||
+      this._getMoreFeatureDisabledState(game, { permission: permission })
+    ) {
+      return;
+    }
     if (permission === 'export_groups') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       wx.showToast({ title: '分组表导出功能开发中', icon: 'none' });
@@ -868,6 +936,11 @@ Page({
     if (permission === 'cancel_match') {
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       this._promptCancelGame();
+      return;
+    }
+    if (permission === 'finish_match') {
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      this._promptFinishGame();
       return;
     }
     if (permission === 'edit_match') {
@@ -2091,6 +2164,56 @@ Page({
         if (res.confirm) this._confirmCancelGame();
       }
     });
+  },
+
+  /**
+   * 结束比赛（M 面板 finish_match）
+   * 整场结束：gameProgress.confirmFinishWholeGame（非记分页「结束本组」）
+   */
+  _promptFinishGame() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) {
+      wx.showToast({ title: '当前为演示模式', icon: 'none' });
+      return;
+    }
+    const game = gameStore.getGameById(gameId) || gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      return;
+    }
+    if (gameProgress.isGameEnded(game)) {
+      wx.showToast({ title: '比赛已经结束。', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '结束比赛',
+      content: '确认结束本场比赛？结束后成绩将不可再修改。',
+      cancelText: '暂不结束',
+      confirmText: '确认结束',
+      confirmColor: '#ce9224',
+      success: (res) => {
+        if (res.confirm) this._confirmFinishGame();
+      }
+    });
+  },
+
+  _confirmFinishGame() {
+    const gameId = this._gameId || this.data.gameId || '';
+    if (!gameId) return;
+    const game = gameStore.getGameById(gameId) || gameStore.getGame(gameId);
+    if (!game) {
+      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+      return;
+    }
+    if (gameProgress.isGameEnded(game)) {
+      wx.showToast({ title: '比赛已经结束。', icon: 'none' });
+      this.applyMoreAccess();
+      return;
+    }
+    gameProgress.confirmFinishWholeGame(gameId);
+    this.refreshGame();
+    this.applyMoreAccess();
+    wx.showToast({ title: '比赛已结束', icon: 'success' });
   },
 
   _confirmCancelGame() {

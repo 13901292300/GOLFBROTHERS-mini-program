@@ -219,7 +219,10 @@ function buildProgressUi(game, groupIndex) {
   };
 }
 
-/** 用户点击「确认结束」后调用：唯一允许将 game 标为 finished 的入口 */
+/**
+ * 记分页「结束本组比赛」：
+ * game.status = finished + 指定 group.status = finished
+ */
 function confirmFinishGame(gameId, groupIndex) {
   if (!gameId) return null;
   const game = gameStore.getGame(gameId);
@@ -231,6 +234,32 @@ function confirmFinishGame(gameId, groupIndex) {
   }
   gameStore.updateGame(gameId, { status: matchStatus.FINISHED_STORAGE_STATUS });
   gameStore.updateGroupStatus(gameId, gi, matchStatus.FINISHED_STORAGE_STATUS);
+  return gameStore.getGame(gameId);
+}
+
+/**
+ * HUB M「结束比赛」：结束整场 GAME
+ * game.status = finished + 全部 groups[].status = finished
+ * 不改成绩数据；不替代 confirmFinishGame（记分页仍用后者）
+ */
+function confirmFinishWholeGame(gameId) {
+  if (!gameId) return null;
+  const game = gameStore.getGame(gameId);
+  if (!game || isGameEnded(game)) return game;
+
+  gameStore.updateGame(gameId, { status: matchStatus.FINISHED_STORAGE_STATUS });
+
+  const latest = gameStore.getGame(gameId) || game;
+  const groups = gameStore.listGroups(latest);
+  const n = Array.isArray(groups) ? groups.length : 0;
+  if (n > 0) {
+    for (let gi = 0; gi < n; gi++) {
+      gameStore.updateGroupStatus(gameId, gi, matchStatus.FINISHED_STORAGE_STATUS);
+    }
+  } else {
+    gameStore.updateGroupStatus(gameId, 0, matchStatus.FINISHED_STORAGE_STATUS);
+  }
+
   return gameStore.getGame(gameId);
 }
 
@@ -251,6 +280,7 @@ module.exports = {
   buildMarkerLeft,
   buildProgressUi,
   confirmFinishGame,
+  confirmFinishWholeGame,
   capLiveDurationDisplayMinutes,
   formatLiveDurationBadgeSuffix
 };
