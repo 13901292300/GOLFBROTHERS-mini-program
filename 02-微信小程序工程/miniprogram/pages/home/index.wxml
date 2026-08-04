@@ -363,7 +363,7 @@
                   </view>
                   <text class="profile-menu-chevron">›</text>
                 </view>
-                <view class="ds-list-item">
+                <view class="ds-list-item" bindtap="navigateToStatistics">
                   <view class="profile-menu-label flex items-center gap-4">
                     <view class="profile-menu-icon"><text class="text-data-blue text-xl">📊</text></view>
                     <text class="ds-body font-normal">数据统计</text>
