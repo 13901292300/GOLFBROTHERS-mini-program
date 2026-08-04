@@ -77,24 +77,141 @@
             >近3年</view>
           </view>
         </view>
-        <view class="fp-chart">
-          <view wx:for="{{yearlyStats}}" wx:key="year" class="fp-chart__col">
-            <view class="fp-chart__bar-wrap">
-              <view
-                class="fp-chart__bar {{item.highlight ? 'is-highlight' : ''}}"
-                style="height: {{item.heightPct}}%;"
-              ></view>
+        <!-- 顶部图例 -->
+        <view class="fp-combo-legend">
+          <view class="fp-combo-legend__item fp-combo-legend__item--score">
+            <view class="fp-combo-legend__swatch fp-combo-legend__swatch--line" aria-hidden="true">
+              <view class="fp-combo-legend__line-seg"></view>
+              <view class="fp-combo-legend__line-dot"></view>
+              <view class="fp-combo-legend__line-seg"></view>
             </view>
-            <text class="fp-chart__avg {{item.highlight ? 'is-highlight' : ''}}">{{item.avg}}</text>
-            <text class="fp-chart__year">{{item.year}}</text>
+            <text class="fp-combo-legend__text">平均杆数（杆）</text>
+          </view>
+          <view class="fp-combo-legend__item fp-combo-legend__item--rounds">
+            <view class="fp-combo-legend__swatch fp-combo-legend__swatch--bar" aria-hidden="true"></view>
+            <text class="fp-combo-legend__text">完整轮次（轮）</text>
           </view>
         </view>
-        <view class="fp-year-grid">
-          <view wx:for="{{yearlyStats}}" wx:key="year" class="fp-year-grid__item">
-            <text class="fp-year-grid__year">{{item.year}}</text>
-            <text class="fp-year-grid__avg {{item.highlight ? 'is-highlight' : ''}}">{{item.avg}}</text>
-            <text class="fp-year-grid__rounds {{item.highlight ? 'is-highlight' : ''}}">{{item.rounds}}轮</text>
+
+        <!-- 三列 grid：max-content | 1fr | max-content，轴宽=标题/最大刻度，chart 最大化 -->
+        <view class="fp-trend {{chartCanScroll ? 'is-scrollable' : ''}}">
+          <view class="fp-combo__axis fp-combo__axis--left" aria-label="平均杆数">
+            <text class="fp-combo__y-title fp-combo__y-title--score">平均杆数</text>
+            <view class="fp-combo__y-ticks">
+              <text wx:for="{{scoreAxisTicks}}" wx:key="*this" class="fp-combo__tick">{{item}}</text>
+            </view>
           </view>
+
+          <scroll-view
+            class="fp-combo__chart"
+            scroll-x="{{true}}"
+            enable-flex="{{true}}"
+            show-scrollbar="{{false}}"
+            scroll-left="{{chartScrollLeft}}"
+            scroll-with-animation="{{false}}"
+            data-source="chart"
+            bindscroll="onTrendScroll"
+          >
+            <view class="fp-combo__track" style="width: {{chartTrackWidthRpx}}rpx;">
+              <view class="fp-combo__y-spacer" aria-hidden="true"></view>
+              <view class="fp-combo__plot">
+                <image
+                  class="fp-combo__line"
+                  src="{{chartLineSvgSrc}}"
+                  mode="scaleToFill"
+                  aria-hidden="true"
+                />
+                <view class="fp-combo__cols">
+                  <view
+                    wx:for="{{yearStats}}"
+                    wx:key="year"
+                    class="fp-combo__col"
+                    style="width: {{chartColWidthRpx}}rpx;"
+                  >
+                    <view
+                      class="fp-combo__bar {{item.highlight ? 'is-highlight' : ''}}"
+                      style="height: {{item.barHeightPct}}%;"
+                    ></view>
+                    <view
+                      class="fp-combo__point {{item.highlight ? 'is-highlight' : ''}}"
+                      style="top: {{item.lineTopPct}}%;"
+                    ></view>
+                  </view>
+                </view>
+              </view>
+              <view class="fp-combo__x">
+                <text
+                  wx:for="{{yearStats}}"
+                  wx:key="year"
+                  class="fp-combo__x-label"
+                  style="width: {{chartColWidthRpx}}rpx;"
+                >{{item.yearLabel}}</text>
+              </view>
+            </view>
+          </scroll-view>
+
+          <view class="fp-combo__axis fp-combo__axis--right" aria-label="完整轮次">
+            <text class="fp-combo__y-title fp-combo__y-title--rounds">完整轮次</text>
+            <view class="fp-combo__y-ticks">
+              <text wx:for="{{roundAxisTicks}}" wx:key="*this" class="fp-combo__tick">{{item}}</text>
+            </view>
+          </view>
+
+          <!-- 底表：左指标固定 / 中数据滚动 / 右占位（与轴列同宽） -->
+          <view class="fp-metric__labels {{chartCanScroll ? 'is-scroll-entry' : ''}}">
+            <view class="fp-metric__label">
+              <text class="fp-metric__label-line">年份</text>
+            </view>
+            <view class="fp-metric__label fp-metric__label--score">
+              <text class="fp-metric__label-line">平均</text>
+              <text class="fp-metric__label-line">杆数</text>
+            </view>
+            <view class="fp-metric__label fp-metric__label--rounds">
+              <text class="fp-metric__label-line">完整</text>
+              <text class="fp-metric__label-line">轮次</text>
+            </view>
+          </view>
+          <scroll-view
+            class="fp-metric__scroll {{chartCanScroll ? 'is-scroll-entry' : ''}}"
+            scroll-x="{{true}}"
+            enable-flex="{{true}}"
+            show-scrollbar="{{false}}"
+            scroll-left="{{chartScrollLeft}}"
+            scroll-with-animation="{{false}}"
+            data-source="metric"
+            bindscroll="onTrendScroll"
+          >
+            <view class="fp-metric__track" style="width: {{chartTrackWidthRpx}}rpx;">
+              <view class="fp-metric__row fp-metric__row--year">
+                <text
+                  wx:for="{{yearStats}}"
+                  wx:key="year"
+                  class="fp-metric__cell fp-metric__cell--year"
+                  style="width: {{chartColWidthRpx}}rpx;"
+                >{{item.yearLabel}}</text>
+              </view>
+              <view class="fp-metric__row fp-metric__row--score">
+                <text
+                  wx:for="{{yearStats}}"
+                  wx:key="year"
+                  class="fp-metric__cell fp-metric__cell--score {{item.highlight ? 'is-highlight' : ''}}"
+                  style="width: {{chartColWidthRpx}}rpx;"
+                >{{item.avgScoreText}}</text>
+              </view>
+              <view class="fp-metric__row fp-metric__row--rounds">
+                <text
+                  wx:for="{{yearStats}}"
+                  wx:key="year"
+                  class="fp-metric__cell fp-metric__cell--rounds {{item.highlight ? 'is-highlight' : ''}}"
+                  style="width: {{chartColWidthRpx}}rpx;"
+                >{{item.roundsText}}</text>
+              </view>
+            </view>
+          </scroll-view>
+          <view class="fp-metric__rail-spacer {{chartCanScroll ? 'is-scroll-entry' : ''}}" aria-hidden="true"></view>
+        </view>
+        <view wx:if="{{chartCanScroll}}" class="fp-combo-scroll-hint">
+          <text class="fp-combo-scroll-hint__text">← 左滑查看更多历史</text>
         </view>
       </view>
     </view>

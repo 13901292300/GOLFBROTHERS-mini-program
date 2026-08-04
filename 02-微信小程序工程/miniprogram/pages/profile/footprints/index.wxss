@@ -296,6 +296,7 @@ page {
 /* ===== Panel ===== */
 .fp-panel {
   padding: 16px;
+  overflow: visible;
 }
 .fp-panel__head {
   display: flex;
@@ -353,12 +354,395 @@ page {
   color: #fff;
 }
 
-.fp-chart {
+/* ===== 组合图图例 ===== */
+.fp-combo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: -4px 0 12px;
+}
+.fp-combo-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fp-combo-legend__swatch {
+  flex-shrink: 0;
+}
+/* ━━●━━ 折线图例 */
+.fp-combo-legend__swatch--line {
+  display: flex;
+  align-items: center;
+  width: 28px;
+  height: 12px;
+}
+.fp-combo-legend__line-seg {
+  flex: 1;
+  height: 2px;
+  background: var(--data-blue);
+  border-radius: 1px;
+}
+.fp-combo-legend__line-dot {
+  width: 8px;
+  height: 8px;
+  margin: 0 1px;
+  border-radius: 9999px;
+  background: var(--data-blue);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.fp-combo-legend__swatch--bar {
+  width: 8px;
+  height: 12px;
+  border-radius: 2px 2px 1px 1px;
+  background: rgba(0, 45, 98, 0.55);
+  box-sizing: border-box;
+}
+.fp-page.dark-mode .fp-combo-legend__swatch--bar {
+  background: rgba(160, 190, 170, 0.85);
+}
+.fp-combo-legend__text {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.fp-combo-legend__item--score .fp-combo-legend__text {
+  color: var(--data-blue);
+}
+.fp-combo-legend__item--rounds .fp-combo-legend__text {
+  color: var(--cloud-blue);
+}
+.fp-page.dark-mode .fp-combo-legend__item--rounds .fp-combo-legend__text {
+  color: rgba(160, 190, 170, 0.95);
+}
+
+/* ===== 三列：max-content | 1fr | max-content —— 轴宽随标题/最大刻度，chart 最大化 ===== */
+.fp-trend {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 0;
+  row-gap: 0;
+  width: 100%;
+  align-items: start;
+  box-sizing: border-box;
+}
+.fp-combo__axis {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+}
+.fp-combo__axis--left {
+  align-items: flex-start;
+}
+.fp-combo__axis--right {
+  align-items: flex-end;
+}
+/* 标题进文档流：与刻度同列同宽，无 absolute、无额外 padding */
+.fp-combo__y-title {
+  display: block;
+  margin: 0;
+  padding: 0;
+  height: 12px;
+  line-height: 12px;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+.fp-combo__axis--left .fp-combo__y-title {
+  text-align: left;
+}
+.fp-combo__axis--right .fp-combo__y-title {
+  text-align: right;
+}
+.fp-combo__y-title--score {
+  color: var(--data-blue);
+}
+.fp-combo__y-title--rounds {
+  color: var(--cloud-blue);
+}
+.fp-page.dark-mode .fp-combo__y-title--rounds {
+  color: rgba(160, 190, 170, 0.95);
+}
+.fp-combo__y-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 140px;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.fp-combo__axis--left .fp-combo__y-ticks {
+  align-items: flex-start;
+}
+.fp-combo__axis--right .fp-combo__y-ticks {
+  align-items: flex-end;
+}
+.fp-combo__tick {
+  margin: 0;
+  padding: 0;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+  white-space: nowrap;
+}
+.fp-combo__y-spacer {
+  flex-shrink: 0;
+  height: 12px;
+}
+/* 中间图表区占满剩余宽度 */
+.fp-combo__chart {
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.fp-combo__track {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+.fp-combo__plot {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fp-combo__cols {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.fp-combo__col {
+  position: relative;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: 100%;
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  height: 140px;
+  justify-content: center;
 }
+.fp-combo__bar {
+  width: 55%;
+  max-width: 16px;
+  min-height: 2px;
+  border-radius: 3px 3px 1px 1px;
+  background: rgba(0, 45, 98, 0.55);
+}
+.fp-page.dark-mode .fp-combo__bar {
+  background: rgba(30, 46, 38, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(0, 174, 239, 0.18);
+}
+.fp-combo__bar.is-highlight {
+  background: rgba(0, 174, 239, 0.55);
+}
+.fp-page.dark-mode .fp-combo__bar.is-highlight {
+  background: rgba(0, 174, 239, 0.42);
+}
+.fp-combo__point {
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 9999px;
+  background: var(--data-blue);
+  border: 2px solid var(--bg-card);
+  box-sizing: border-box;
+  z-index: 3;
+  pointer-events: none;
+}
+.fp-combo__point.is-highlight {
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  background: var(--champion-gold);
+}
+.fp-combo__line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  display: block;
+}
+.fp-combo__x {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 6px 0 0;
+  box-sizing: border-box;
+  height: 22px;
+}
+.fp-combo__x-label {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* 底部指标：落在同一 grid 左右列，宽度与 Y 轴内容列对齐 */
+.fp-metric__labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  box-sizing: border-box;
+  min-height: 88px;
+}
+.fp-metric__labels.is-scroll-entry,
+.fp-metric__scroll.is-scroll-entry,
+.fp-metric__rail-spacer.is-scroll-entry {
+  background: var(--bg-subtle);
+}
+.fp-metric__scroll.is-scroll-entry {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.fp-metric__rail-spacer.is-scroll-entry {
+  border-top: 1px solid var(--border);
+}
+.fp-metric__label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 22px;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.fp-metric__label-line {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: left;
+}
+.fp-metric__label--score .fp-metric__label-line {
+  color: var(--data-blue);
+}
+.fp-metric__label--rounds .fp-metric__label-line {
+  color: var(--cloud-blue);
+}
+.fp-page.dark-mode .fp-metric__label--rounds .fp-metric__label-line {
+  color: rgba(160, 190, 170, 0.95);
+}
+.fp-metric__scroll {
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.fp-metric__track {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  min-height: 78px;
+}
+.fp-metric__row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-height: 22px;
+}
+.fp-metric__cell {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 16px;
+  height: 16px;
+  white-space: nowrap;
+  overflow: visible;
+}
+.fp-metric__cell--year {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.fp-metric__cell--score {
+  color: var(--data-blue);
+}
+.fp-metric__cell--rounds {
+  color: var(--cloud-blue);
+}
+.fp-page.dark-mode .fp-metric__cell--rounds {
+  color: rgba(160, 190, 170, 0.95);
+}
+.fp-metric__cell.is-highlight {
+  color: var(--champion-gold);
+}
+.fp-metric__rail-spacer {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  box-sizing: border-box;
+  min-height: 1px;
+}
+.fp-combo-scroll-hint {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+.fp-combo-scroll-hint__text {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--data-blue);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+
+/* legacy chart selectors removed */
 .fp-chart__col {
   flex: 1;
   min-width: 0;
@@ -394,40 +778,6 @@ page {
   color: var(--data-blue);
 }
 .fp-chart__year {
-  margin-top: 2px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.fp-year-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-.fp-year-grid__item {
-  text-align: center;
-}
-.fp-year-grid__year {
-  display: block;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.fp-year-grid__avg {
-  display: block;
-  margin-top: 4px;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-.fp-year-grid__avg.is-highlight,
-.fp-year-grid__rounds.is-highlight {
-  color: var(--data-blue);
-}
-.fp-year-grid__rounds {
-  display: block;
   margin-top: 2px;
   font-size: 10px;
   color: var(--text-muted);

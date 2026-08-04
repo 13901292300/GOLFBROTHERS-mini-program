@@ -31,34 +31,239 @@ function buildHeroProfile() {
   };
 }
 
-const YEARLY_ALL = [
-  { year: '2017', avg: 92.3, rounds: 28 },
-  { year: '2018', avg: 89.1, rounds: 52 },
-  { year: '2019', avg: 87.4, rounds: 64 },
-  { year: '2020', avg: 86.2, rounds: 41 },
-  { year: '2021', avg: 85.0, rounds: 72 },
-  { year: '2022', avg: 83.8, rounds: 78 },
-  { year: '2023', avg: 82.1, rounds: 85 },
-  { year: '2024', avg: 80.5, rounds: 66, highlight: true }
+/**
+ * 成绩走势 mock — 唯一年度数据源 yearStats
+ * 同一对象同时驱动：年份 X / 柱(roundCount) / 折线(avgScore) / 下方明细
+ * 超过 CHART_VIEWPORT_YEARS 年时横向滚动，不压缩列宽
+ */
+const YEAR_STATS_ALL = [
+  { year: 2013, roundCount: 14, avgScore: 102 },
+  { year: 2014, roundCount: 18, avgScore: 100 },
+  { year: 2015, roundCount: 22, avgScore: 98 },
+  { year: 2016, roundCount: 26, avgScore: 97 },
+  { year: 2017, roundCount: 28, avgScore: 96 },
+  { year: 2018, roundCount: 42, avgScore: 94 },
+  { year: 2019, roundCount: 55, avgScore: 92 },
+  { year: 2020, roundCount: 38, avgScore: 91 },
+  { year: 2021, roundCount: 68, avgScore: 90 },
+  { year: 2022, roundCount: 72, avgScore: 89 },
+  { year: 2023, roundCount: 88, avgScore: 88 },
+  { year: 2024, roundCount: 90, avgScore: 86, highlight: true }
 ];
 
-function sliceYearly(range) {
-  if (range === '3y') return YEARLY_ALL.slice(-3);
-  if (range === '5y') return YEARLY_ALL.slice(-5);
-  return YEARLY_ALL.slice();
+/** 视窗最多展示年数；超出部分横向滚动，默认落在最近 N 年 */
+const CHART_VIEWPORT_YEARS = 8;
+/** 每一年固定列宽（rpx），禁止压缩；轨道 = n × 列宽 */
+const CHART_COL_WIDTH_RPX = 80;
+
+/** 折线 SVG 逻辑尺寸；X = (i + 0.5) / n * W，与列中心对齐 */
+const CHART_PLOT_SVG_H = 200;
+const CHART_PLOT_SVG_W = 1000;
+
+function sliceYearStats(range) {
+  if (range === '3y') return YEAR_STATS_ALL.slice(-3);
+  if (range === '5y') return YEAR_STATS_ALL.slice(-5);
+  return YEAR_STATS_ALL.slice();
 }
 
-/** 为柱状图生成高度百分比（杆数越低柱越高） */
-function withChartHeights(list) {
-  const avgs = list.map((x) => x.avg);
-  const min = Math.min.apply(null, avgs);
-  const max = Math.max.apply(null, avgs);
-  const span = max - min || 1;
-  return list.map((item) => {
-    const norm = (max - item.avg) / span;
-    const heightPct = Math.round(28 + norm * 72);
-    return Object.assign({}, item, { heightPct: heightPct });
+function clampPct(pct) {
+  if (pct < 0) return 0;
+  if (pct > 100) return 100;
+  return Math.round(pct * 100) / 100;
+}
+
+/** 选取不小于 raw 的「好看」整数步长 */
+function niceIntStep(raw) {
+  const n = Math.max(1, Math.ceil(Number(raw) || 1));
+  const candidates = [1, 2, 5, 10, 15, 20, 25, 50, 100];
+  for (let i = 0; i < candidates.length; i++) {
+    if (candidates[i] >= n) return candidates[i];
+  }
+  return Math.ceil(n / 50) * 50;
+}
+
+/**
+ * 左轴（平均杆数）：按当前切片 avgScore 动态生成整数刻度
+ * 顶→底：scoreMax → scoreMin（杆数越高越靠上）
+ * 禁止小数
+ */
+function buildScoreAxisFromData(scores) {
+  const list = (scores || []).filter(function (s) {
+    return Number.isFinite(Number(s));
+  }).map(function (s) {
+    return Math.round(Number(s));
   });
+  let minS = 80;
+  let maxS = 100;
+  if (list.length) {
+    minS = Math.min.apply(null, list);
+    maxS = Math.max.apply(null, list);
+  }
+  if (minS === maxS) {
+    minS -= 4;
+    maxS += 4;
+  }
+  // 上下各留约 2 杆余量
+  let axisMin = Math.floor(minS) - 2;
+  let axisMax = Math.ceil(maxS) + 2;
+  const step = niceIntStep((axisMax - axisMin) / 4);
+  axisMax = Math.ceil(axisMax / step) * step;
+  axisMin = Math.floor(axisMin / step) * step;
+  if (axisMax <= axisMin) axisMax = axisMin + step * 4;
+
+  const ticks = [];
+  for (let v = axisMax; v >= axisMin; v -= step) {
+    ticks.push(Math.round(v));
+  }
+  if (ticks[ticks.length - 1] !== axisMin) ticks.push(Math.round(axisMin));
+  return { scoreMax: axisMax, scoreMin: axisMin, ticks: ticks };
+}
+
+/**
+ * 右轴（完整轮次）：按 maxRoundCount 动态生成整数刻度
+ * 顶→底：roundMax → 0
+ */
+function buildRoundAxisFromData(maxRoundCount) {
+  const maxR = Math.max(1, Math.ceil(Number(maxRoundCount) || 1));
+  const step = niceIntStep(maxR / 4);
+  let top = Math.ceil(maxR / step) * step;
+  if (top < step) top = step;
+  const ticks = [];
+  for (let v = top; v >= 0; v -= step) {
+    ticks.push(Math.round(v));
+  }
+  if (ticks[ticks.length - 1] !== 0) ticks.push(0);
+  return { roundMax: top, ticks: ticks };
+}
+
+/**
+ * 柱高（右轴独立比例）：
+ * barHeightPct = roundCount / maxRoundCount * 100
+ * 分母取右轴顶刻度 roundMax（由用户 maxRoundCount 动态上卷），保证柱高与右轴对齐
+ */
+function calcBarHeightPct(roundCount, roundMax) {
+  const maxR = roundMax > 0 ? roundMax : 1;
+  return clampPct((Number(roundCount) || 0) / maxR * 100);
+}
+
+/**
+ * 折线点 top%（左轴独立比例，正向杆数坐标）：
+ * lineTopPct = (scoreMax - avgScore) / (scoreMax - scoreMin) * 100
+ * 杆数越高 → top 越小 → 屏幕越高；杆数降低 → 折线视觉向下
+ */
+function calcLineTopPct(avgScore, scoreMax, scoreMin) {
+  const span = scoreMax - scoreMin || 1;
+  return clampPct((scoreMax - Number(avgScore)) / span * 100);
+}
+
+/**
+ * 折线连线：与 yearStats 同序、同索引
+ * x = (i + 0.5) / n * W
+ * y = lineTopPct / 100 * H
+ */
+function buildYearStatsLineSvg(yearStats, isDark) {
+  const list = Array.isArray(yearStats) ? yearStats : [];
+  const n = list.length;
+  if (!n) return '';
+  const stroke = isDark ? '#00aeef' : '#002d62';
+  const w = CHART_PLOT_SVG_W;
+  const h = CHART_PLOT_SVG_H;
+  const coords = list.map(function (p, i) {
+    const x = ((i + 0.5) / n) * w;
+    const y = (Number(p.lineTopPct) / 100) * h;
+    return { x: x, y: y };
+  });
+  const poly = coords
+    .map(function (c) {
+      return c.x.toFixed(2) + ',' + c.y.toFixed(2);
+    })
+    .join(' ');
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+    w +
+    ' ' +
+    h +
+    '" preserveAspectRatio="none">' +
+    '<polyline fill="none" stroke="' +
+    stroke +
+    '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="' +
+    poly +
+    '"/>' +
+    '</svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/**
+ * 构建组合图：只产出一份 yearStats（禁止拆 years/scores/rounds）
+ */
+function buildYearStatsChart(range, isDark) {
+  const raw = sliceYearStats(range);
+  let maxRoundCount = 0;
+  const scores = [];
+  raw.forEach(function (item) {
+    const n = Number(item.roundCount) || 0;
+    if (n > maxRoundCount) maxRoundCount = n;
+    if (Number.isFinite(Number(item.avgScore))) scores.push(Number(item.avgScore));
+  });
+  if (maxRoundCount <= 0) maxRoundCount = 1;
+
+  const scoreAxis = buildScoreAxisFromData(scores);
+  const roundAxis = buildRoundAxisFromData(maxRoundCount);
+
+  const n = raw.length;
+  const yearStats = raw.map(function (item, index) {
+    const year = item.year;
+    const roundCount = Number(item.roundCount) || 0;
+    const avgScore = Number(item.avgScore);
+    const avgScoreInt = Number.isFinite(avgScore) ? Math.round(avgScore) : null;
+    return {
+      index: index,
+      year: year,
+      yearLabel: String(year),
+      roundCount: roundCount,
+      avgScore: avgScoreInt,
+      avgScoreText: avgScoreInt != null ? String(avgScoreInt) : '-',
+      roundsText: String(roundCount),
+      barHeightPct: calcBarHeightPct(roundCount, roundAxis.roundMax),
+      lineTopPct: calcLineTopPct(
+        avgScoreInt != null ? avgScoreInt : scoreAxis.scoreMin,
+        scoreAxis.scoreMax,
+        scoreAxis.scoreMin
+      ),
+      highlight: !!item.highlight
+    };
+  });
+
+  // 固定列宽：不压缩；超过视窗约 8 列时横向滚动，默认最近 8 年
+  const chartCanScroll = n > CHART_VIEWPORT_YEARS;
+  const chartColWidthRpx = CHART_COL_WIDTH_RPX;
+  const chartTrackWidthRpx = Math.max(1, n) * CHART_COL_WIDTH_RPX;
+  const scrollStartIndex = chartCanScroll ? n - CHART_VIEWPORT_YEARS : 0;
+  let chartScrollLeft = 0;
+  if (chartCanScroll && scrollStartIndex > 0) {
+    try {
+      const sys = wx.getSystemInfoSync();
+      const winW = (sys && sys.windowWidth) || 375;
+      const colPx = (CHART_COL_WIDTH_RPX * winW) / 750;
+      chartScrollLeft = Math.round(scrollStartIndex * colPx);
+    } catch (e) {
+      chartScrollLeft = 0;
+    }
+  }
+
+  return {
+    yearStats: yearStats,
+    scoreAxisTicks: scoreAxis.ticks,
+    roundAxisTicks: roundAxis.ticks,
+    chartLineSvgSrc: buildYearStatsLineSvg(yearStats, isDark),
+    chartMaxRoundCount: maxRoundCount,
+    chartScoreMax: scoreAxis.scoreMax,
+    chartScoreMin: scoreAxis.scoreMin,
+    chartColWidthRpx: chartColWidthRpx,
+    chartTrackWidthRpx: chartTrackWidthRpx,
+    chartCanScroll: chartCanScroll,
+    chartScrollLeft: chartScrollLeft
+  };
 }
 
 /**
@@ -320,7 +525,15 @@ Page({
       { label: '打过球场', value: '38', sub: '5 个国家', accent: false },
       { label: '球友数', value: '156', sub: '同组 89 人', accent: false }
     ],
-    yearlyStats: [],
+    yearStats: [],
+    scoreAxisTicks: [100, 95, 90, 85],
+    roundAxisTicks: [100, 75, 50, 25, 0],
+    chartLineSvgSrc: '',
+    chartMaxRoundCount: 0,
+    chartColWidthRpx: CHART_COL_WIDTH_RPX,
+    chartTrackWidthRpx: CHART_COL_WIDTH_RPX * CHART_VIEWPORT_YEARS,
+    chartCanScroll: false,
+    chartScrollLeft: 0,
     distributions: [
       { range: '70-75', width: 5, label: '2%' },
       { range: '76-80', width: 18, label: '15%' },
@@ -532,27 +745,48 @@ Page({
     const isDark = theme === 'dark';
     const level = this.data.mapLevel || MAP_LEVEL.WORLD;
     const mapState = buildMapLevelState(level, isDark);
+    const chartState = buildYearStatsChart(this.data.chartRange || 'all', isDark);
     this.setData(
       Object.assign(
         {
           themeClass: isDark ? 'dark-mode' : 'bright-mode'
         },
-        mapState
+        mapState,
+        chartState
       )
     );
   },
 
   applyChartRange(range) {
     const next = range === '3y' || range === '5y' ? range : 'all';
-    this.setData({
-      chartRange: next,
-      yearlyStats: withChartHeights(sliceYearly(next))
-    });
+    const isDark = this.data.themeClass === 'dark-mode';
+    const chartState = buildYearStatsChart(next, isDark);
+    this.setData(Object.assign({ chartRange: next }, chartState));
   },
 
   onChartRangeTap(e) {
     const range = (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.range) || 'all';
     this.applyChartRange(range);
+  },
+
+  /**
+   * 图表区与底表数据区共享 scrollLeft（禁止各自独立滚动错位）
+   * 底表为主要滑动入口；任一侧滑动都会同步另一侧
+   */
+  onTrendScroll(e) {
+    const detail = (e && e.detail) || {};
+    const left = Number(detail.scrollLeft);
+    if (!Number.isFinite(left)) return;
+    if (this._trendScrollLock) return;
+    const prev = Number(this.data.chartScrollLeft) || 0;
+    if (Math.abs(left - prev) < 0.5) return;
+    this._trendScrollLock = true;
+    this.setData({ chartScrollLeft: left }, function () {
+      const self = this;
+      setTimeout(function () {
+        self._trendScrollLock = false;
+      }, 16);
+    }.bind(this));
   },
 
   applyMapLevel(level) {
