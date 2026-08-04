@@ -176,32 +176,32 @@
 
     <!-- 6. Map + Courses -->
     <view class="fp-section fp-section--stack">
-      <!-- 足迹地图：world → asia → china -->
+      <!-- 足迹地图：WORLD → CONTINENT → COUNTRY -->
       <view class="fp-card fp-panel">
         <view class="fp-panel__head">
           <view class="fp-panel__titles">
-            <text class="fp-panel__title">足迹地图</text>
+            <text class="fp-panel__title">{{mapTitle}}</text>
             <text class="fp-panel__desc">{{mapDesc}}</text>
           </view>
-          <view wx:if="{{mapLevel !== 'world'}}" class="fp-map-back" bindtap="onMapBackTap">返回上级</view>
+          <view wx:if="{{mapLevel !== 'WORLD'}}" class="fp-map-back" bindtap="onMapBackTap">返回上级</view>
         </view>
 
         <view class="fp-map-crumb">
           <text
-            class="fp-map-crumb__item {{mapLevel === 'world' ? 'is-active' : ''}}"
-            data-level="world"
+            class="fp-map-crumb__item {{mapLevel === 'WORLD' ? 'is-active' : ''}}"
+            data-level="WORLD"
             bindtap="onMapLevelTap"
           >世界</text>
           <text class="fp-map-crumb__sep">›</text>
           <text
-            class="fp-map-crumb__item {{mapLevel === 'asia' ? 'is-active' : ''}} {{mapLevel === 'world' ? 'is-disabled' : ''}}"
-            data-level="asia"
+            class="fp-map-crumb__item {{mapCrumbContinentActive ? 'is-active' : ''}} {{!mapCrumbContinentReached ? 'is-disabled' : ''}}"
+            data-level="CONTINENT"
             bindtap="onMapLevelTap"
           >亚洲</text>
           <text class="fp-map-crumb__sep">›</text>
           <text
-            class="fp-map-crumb__item {{mapLevel === 'china' ? 'is-active' : ''}} {{mapLevel !== 'china' ? 'is-disabled' : ''}}"
-            data-level="china"
+            class="fp-map-crumb__item {{mapCrumbCountryActive ? 'is-active' : ''}} {{!mapCrumbCountryReached ? 'is-disabled' : ''}}"
+            data-level="COUNTRY"
             bindtap="onMapLevelTap"
           >中国</text>
         </view>
@@ -231,40 +231,25 @@
               <view class="fp-map-ambiance__spark fp-map-ambiance__spark--3"></view>
             </view>
 
-            <!-- 下钻热区 -->
+            <!-- 下钻热区（区域名，无开发点击提示） -->
             <view
               wx:if="{{mapHitKind === 'asia'}}"
               class="fp-map-hit fp-map-hit--asia"
               catchtap="onMapAsiaHit"
             >
-              <text class="fp-map-hit__label">亚洲</text>
+              <text class="fp-map-hit__label">{{mapHitLabel}}</text>
             </view>
             <view
               wx:if="{{mapHitKind === 'china'}}"
               class="fp-map-hit fp-map-hit--china"
               catchtap="onMapChinaHit"
             >
-              <text class="fp-map-hit__label">中国</text>
-            </view>
-
-            <view class="fp-map-stage__hint" wx:if="{{mapCanDrill}}">
-              <text>{{mapLevel === 'world' ? '点击亚洲区域' : '点击中国区域'}}</text>
+              <text class="fp-map-hit__label">{{mapHitLabel}}</text>
             </view>
           </view>
         </view>
 
-        <!-- 世界层：国家徽章 -->
-        <view wx:if="{{mapBadges.length}}" class="fp-map-badges">
-          <view
-            wx:for="{{mapBadges}}"
-            wx:key="id"
-            class="fp-map-badge fp-map-badge--{{item.tone}}"
-          >
-            <text>{{item.text}}</text>
-          </view>
-        </view>
-
-        <!-- 亚洲 / 中国：数量排序 -->
+        <!-- 当前层级统计排序 -->
         <view wx:if="{{mapRankList.length}}" class="fp-map-rank">
           <text class="fp-overline">{{mapRankLabel}}</text>
           <view wx:for="{{mapRankList}}" wx:key="rank" class="fp-map-rank__row">

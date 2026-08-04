@@ -62,9 +62,17 @@ function withChartHeights(list) {
 }
 
 /**
- * 足迹地图 — viewBox(1000×500) + 三级：world → asia → china
- * 频度点静态；氛围层独立；下方 badges / 排序列表说明
+ * 足迹地图 — viewBox(1000×500)
+ * 层级：WORLD → CONTINENT → COUNTRY（PROVINCE 预留）
+ * mock 统计：WORLD 按洲 / CONTINENT 按国家 / COUNTRY 按省份
  */
+const MAP_LEVEL = {
+  WORLD: 'WORLD',
+  CONTINENT: 'CONTINENT',
+  COUNTRY: 'COUNTRY',
+  PROVINCE: 'PROVINCE'
+};
+
 const MAP_PATHS_WORLD =
   '<path d="M580 80 Q620 60 680 70 Q740 65 780 80 Q820 70 850 90 Q870 110 860 140 Q850 170 830 190 Q810 210 780 220 Q750 230 720 225 Q700 240 680 250 Q660 240 640 230 Q610 240 590 230 Q570 220 560 200 Q550 180 555 160 Q550 140 560 120 Q565 100 580 80Z" fill="CONT_FILL" opacity="CONT_OP"/>' +
   '<path d="M440 70 Q460 55 480 60 Q500 55 520 65 Q540 60 550 75 Q560 90 555 110 Q550 130 535 145 Q520 155 500 150 Q480 155 465 145 Q450 135 445 115 Q440 95 440 70Z" fill="CONT_FILL" opacity="CONT_OP"/>' +
@@ -140,36 +148,30 @@ const MAP_DOTS_CHINA = [
   { cx: 760, cy: 300, r: 3, tone: 'gold' }
 ];
 
+/** WORLD：按洲统计 */
+const MAP_WORLD_CONTINENTS = [
+  { name: '亚洲', count: 37, key: 'asia' },
+  { name: '大洋洲', count: 1, key: 'oceania' },
+  { name: '欧洲', count: 0, key: 'europe' },
+  { name: '北美', count: 0, key: 'na' }
+];
+
+/** CONTINENT（亚洲）：按国家统计 */
 const MAP_ASIA_COUNTRIES = [
-  { name: '中国', count: 28, flag: '🇨🇳' },
-  { name: '泰国', count: 4, flag: '🇹🇭' },
-  { name: '日本', count: 3, flag: '🇯🇵' },
-  { name: '韩国', count: 2, flag: '🇰🇷' }
+  { name: '中国', count: 28, flag: '🇨🇳', key: 'china' },
+  { name: '泰国', count: 4, flag: '🇹🇭', key: 'thailand' },
+  { name: '日本', count: 3, flag: '🇯🇵', key: 'japan' },
+  { name: '韩国', count: 2, flag: '🇰🇷', key: 'korea' }
 ];
 
+/** COUNTRY（中国）：按省份统计 */
 const MAP_CHINA_PROVINCES = [
-  { name: '广东', count: 12 },
-  { name: '上海', count: 5 },
-  { name: '云南', count: 4 },
-  { name: '海南', count: 3 },
-  { name: '北京', count: 2 },
-  { name: '浙江', count: 2 }
-];
-
-const MAP_BADGES_DARK = [
-  { id: 'b-cn', text: '🇨🇳 中国 28场', tone: 'proto-green' },
-  { id: 'b-th', text: '🇹🇭 泰国 4场', tone: 'proto-gold' },
-  { id: 'b-jp', text: '🇯🇵 日本 3场', tone: 'proto-gold' },
-  { id: 'b-kr', text: '🇰🇷 韩国 2场', tone: 'proto-gold' },
-  { id: 'b-au', text: '🇦🇺 澳大利亚 1场', tone: 'proto-gold' }
-];
-
-const MAP_BADGES_BRIGHT = [
-  { id: 'b-cn', text: '🇨🇳 中国 28场', tone: 'primary' },
-  { id: 'b-th', text: '🇹🇭 泰国 4场', tone: 'gold' },
-  { id: 'b-jp', text: '🇯🇵 日本 3场', tone: 'gold' },
-  { id: 'b-kr', text: '🇰🇷 韩国 2场', tone: 'gold' },
-  { id: 'b-au', text: '🇦🇺 澳大利亚 1场', tone: 'gold' }
+  { name: '广东', count: 12, key: 'guangdong' },
+  { name: '上海', count: 5, key: 'shanghai' },
+  { name: '云南', count: 4, key: 'yunnan' },
+  { name: '海南', count: 3, key: 'hainan' },
+  { name: '北京', count: 2, key: 'beijing' },
+  { name: '浙江', count: 2, key: 'zhejiang' }
 ];
 
 function sizeFromR(r) {
@@ -201,13 +203,26 @@ function toRankList(items, withFlag) {
   });
 }
 
+function normalizeMapLevel(level) {
+  const v = String(level || '').toUpperCase();
+  if (v === MAP_LEVEL.CONTINENT) return MAP_LEVEL.CONTINENT;
+  if (v === MAP_LEVEL.COUNTRY) return MAP_LEVEL.COUNTRY;
+  if (v === MAP_LEVEL.PROVINCE) return MAP_LEVEL.PROVINCE;
+  // 兼容旧 world/asia/china
+  if (v === 'ASIA') return MAP_LEVEL.CONTINENT;
+  if (v === 'CHINA') return MAP_LEVEL.COUNTRY;
+  if (v === 'WORLD') return MAP_LEVEL.WORLD;
+  return MAP_LEVEL.WORLD;
+}
+
 function buildFootprintMapSvgSrc(isDark, level) {
   const bg = isDark ? '#0a0f0d' : '#f3f4f6';
   const contFill = isDark ? '#1e2e26' : '#002d62';
   const contOp = isDark ? '0.5' : '0.18';
+  const lv = normalizeMapLevel(level);
   let paths = MAP_PATHS_WORLD;
-  if (level === 'asia') paths = MAP_PATHS_ASIA;
-  if (level === 'china') paths = MAP_PATHS_CHINA;
+  if (lv === MAP_LEVEL.CONTINENT) paths = MAP_PATHS_ASIA;
+  if (lv === MAP_LEVEL.COUNTRY || lv === MAP_LEVEL.PROVINCE) paths = MAP_PATHS_CHINA;
   const continents = paths.replace(/CONT_FILL/g, contFill).replace(/CONT_OP/g, contOp);
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500">' +
@@ -220,42 +235,63 @@ function buildFootprintMapSvgSrc(isDark, level) {
 }
 
 function buildMapLevelState(level, isDark) {
-  const next = level === 'asia' || level === 'china' ? level : 'world';
-  let mapDesc = '跨越 5 个国家 · 38 座球场';
+  const next = normalizeMapLevel(level);
+  let mapTitle = '我的足迹 · 世界';
+  let mapDesc = '按大洲统计 · 38 座球场';
   let mapDots = toMapDotsView(MAP_DOTS_WORLD);
-  let mapBadges = isDark ? MAP_BADGES_DARK : MAP_BADGES_BRIGHT;
-  let mapRankList = [];
-  let mapRankLabel = '';
+  let mapRankList = toRankList(
+    MAP_WORLD_CONTINENTS.filter((c) => c.count > 0),
+    false
+  );
+  let mapRankLabel = '大洲排序';
   let mapCanDrill = true;
   let mapHitKind = 'asia';
+  let mapHitLabel = '亚洲';
+  let mapCrumbContinentActive = false;
+  let mapCrumbCountryActive = false;
+  let mapCrumbContinentReached = false;
+  let mapCrumbCountryReached = false;
 
-  if (next === 'asia') {
-    mapDesc = '亚洲足迹 · 按球场数排序';
+  if (next === MAP_LEVEL.CONTINENT) {
+    mapTitle = '我的足迹 · 亚洲';
+    mapDesc = '按国家统计 · 亚洲';
     mapDots = toMapDotsView(MAP_DOTS_ASIA);
-    mapBadges = [];
     mapRankList = toRankList(MAP_ASIA_COUNTRIES, true);
     mapRankLabel = '国家排序';
     mapCanDrill = true;
     mapHitKind = 'china';
-  } else if (next === 'china') {
-    mapDesc = '中国足迹 · 省份按球场数排序';
+    mapHitLabel = '中国';
+    mapCrumbContinentActive = true;
+    mapCrumbContinentReached = true;
+  } else if (next === MAP_LEVEL.COUNTRY || next === MAP_LEVEL.PROVINCE) {
+    mapTitle = '我的足迹 · 中国';
+    mapDesc = '按省份统计 · 中国';
     mapDots = toMapDotsView(MAP_DOTS_CHINA);
-    mapBadges = [];
     mapRankList = toRankList(MAP_CHINA_PROVINCES, false);
     mapRankLabel = '省份排序';
     mapCanDrill = false;
     mapHitKind = '';
+    mapHitLabel = '';
+    mapCrumbContinentReached = true;
+    mapCrumbCountryReached = true;
+    mapCrumbCountryActive = true;
+    mapCrumbContinentActive = false;
   }
 
   return {
     mapLevel: next,
+    mapTitle: mapTitle,
     mapDesc: mapDesc,
     mapDots: mapDots,
-    mapBadges: mapBadges,
     mapRankList: mapRankList,
     mapRankLabel: mapRankLabel,
     mapCanDrill: mapCanDrill,
     mapHitKind: mapHitKind,
+    mapHitLabel: mapHitLabel,
+    mapCrumbContinentActive: mapCrumbContinentActive,
+    mapCrumbCountryActive: mapCrumbCountryActive,
+    mapCrumbContinentReached: mapCrumbContinentReached,
+    mapCrumbCountryReached: mapCrumbCountryReached,
     mapSvgSrc: buildFootprintMapSvgSrc(isDark, next)
   };
 }
@@ -380,16 +416,21 @@ Page({
         lossPct: 23.1
       }
     ],
-    /** 足迹地图：world → asia → china */
-    mapLevel: 'world',
-    mapDesc: '跨越 5 个国家 · 38 座球场',
+    /** 足迹地图：WORLD → CONTINENT → COUNTRY */
+    mapLevel: MAP_LEVEL.WORLD,
+    mapTitle: '我的足迹 · 世界',
+    mapDesc: '按大洲统计 · 38 座球场',
     mapSvgSrc: '',
     mapDots: toMapDotsView(MAP_DOTS_WORLD),
-    mapBadges: MAP_BADGES_DARK,
     mapRankList: [],
-    mapRankLabel: '',
+    mapRankLabel: '大洲排序',
     mapCanDrill: true,
     mapHitKind: 'asia',
+    mapHitLabel: '亚洲',
+    mapCrumbContinentActive: false,
+    mapCrumbCountryActive: false,
+    mapCrumbContinentReached: false,
+    mapCrumbCountryReached: false,
     courses: [
       { rank: '01', name: '观澜湖高尔夫球会', meta: '深圳 · 最佳 72', rounds: '52轮', avg: '均杆 83.2', top: true },
       { rank: '02', name: '南山国际高尔夫球会', meta: '深圳 · 最佳 74', rounds: '45轮', avg: '均杆 84.1' },
@@ -466,7 +507,7 @@ Page({
     this.refreshHeroProfile();
     this.applyTheme(getApp().getTheme());
     this.applyChartRange('all');
-    this.applyMapLevel('world');
+    this.applyMapLevel(MAP_LEVEL.WORLD);
   },
 
   onShow() {
@@ -489,7 +530,7 @@ Page({
 
   applyTheme(theme) {
     const isDark = theme === 'dark';
-    const level = this.data.mapLevel || 'world';
+    const level = this.data.mapLevel || MAP_LEVEL.WORLD;
     const mapState = buildMapLevelState(level, isDark);
     this.setData(
       Object.assign(
@@ -519,35 +560,52 @@ Page({
     this.setData(buildMapLevelState(level, isDark));
   },
 
+  /** 世界层 → 亚洲（CONTINENT） */
   onMapAsiaHit() {
-    if (this.data.mapLevel === 'world') this.applyMapLevel('asia');
+    if (normalizeMapLevel(this.data.mapLevel) === MAP_LEVEL.WORLD) {
+      this.applyMapLevel(MAP_LEVEL.CONTINENT);
+    }
   },
 
+  /** 亚洲层 → 中国（COUNTRY） */
   onMapChinaHit() {
-    if (this.data.mapLevel === 'asia') this.applyMapLevel('china');
+    if (normalizeMapLevel(this.data.mapLevel) === MAP_LEVEL.CONTINENT) {
+      this.applyMapLevel(MAP_LEVEL.COUNTRY);
+    }
   },
 
   /** 面包屑：仅允许回到已到达层级 */
   onMapLevelTap(e) {
-    const level = (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.level) || 'world';
-    const cur = this.data.mapLevel;
-    if (level === 'world') {
-      this.applyMapLevel('world');
+    const level = normalizeMapLevel(
+      (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.level) || MAP_LEVEL.WORLD
+    );
+    const cur = normalizeMapLevel(this.data.mapLevel);
+    if (level === MAP_LEVEL.WORLD) {
+      this.applyMapLevel(MAP_LEVEL.WORLD);
       return;
     }
-    if (level === 'asia' && (cur === 'asia' || cur === 'china')) {
-      this.applyMapLevel('asia');
+    if (
+      level === MAP_LEVEL.CONTINENT &&
+      (cur === MAP_LEVEL.CONTINENT || cur === MAP_LEVEL.COUNTRY || cur === MAP_LEVEL.PROVINCE)
+    ) {
+      this.applyMapLevel(MAP_LEVEL.CONTINENT);
       return;
     }
-    if (level === 'china' && cur === 'china') {
-      this.applyMapLevel('china');
+    if (
+      level === MAP_LEVEL.COUNTRY &&
+      (cur === MAP_LEVEL.COUNTRY || cur === MAP_LEVEL.PROVINCE)
+    ) {
+      this.applyMapLevel(MAP_LEVEL.COUNTRY);
     }
   },
 
   onMapBackTap() {
-    const level = this.data.mapLevel;
-    if (level === 'china') this.applyMapLevel('asia');
-    else if (level === 'asia') this.applyMapLevel('world');
+    const level = normalizeMapLevel(this.data.mapLevel);
+    if (level === MAP_LEVEL.COUNTRY || level === MAP_LEVEL.PROVINCE) {
+      this.applyMapLevel(MAP_LEVEL.CONTINENT);
+    } else if (level === MAP_LEVEL.CONTINENT) {
+      this.applyMapLevel(MAP_LEVEL.WORLD);
+    }
   },
 
   onBack() {
