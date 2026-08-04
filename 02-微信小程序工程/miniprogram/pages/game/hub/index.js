@@ -22,6 +22,7 @@ const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../utils/playerManage.js');
 const teeSheetManage = require('../../../utils/teeSheetManage.js');
 const gameProgress = require('../../../utils/gameProgress.js');
+const contactFollowAction = require('../../../utils/contactFollowAction.js');
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -306,7 +307,9 @@ Page({
     // 讨论区聊天数据：传入统一 discussion 组件（聊天/输入/表情逻辑全部由组件承载）
     chat: CHAT,
     currentUserId: '',
-    followMap: {}
+    followMap: {},
+    /** none | following | friend — 与通讯录关系状态一致 */
+    relationMap: {}
   },
 
   _hubDebug(stage, extra) {
@@ -2198,11 +2201,28 @@ Page({
   },
 
   onLeaderboardFollow(e) {
-    const pid = e.detail && e.detail.playerId;
+    const detail = (e && e.detail) || {};
+    const pid = String(detail.playerId || detail.userId || '').trim();
     if (!pid) return;
-    const map = Object.assign({}, this.data.followMap);
-    map[pid] = !map[pid];
-    this.setData({ followMap: map });
+    const player = detail.player || {};
+    const status = contactFollowAction.followUser({
+      id: pid,
+      playerId: pid,
+      name: player.name,
+      nickname: player.name || player.nickname,
+      avatar: player.avatar,
+      gender: player.gender
+    });
+    const followMap = Object.assign({}, this.data.followMap);
+    const relationMap = Object.assign({}, this.data.relationMap);
+    followMap[pid] = true;
+    relationMap[pid] = status || contactFollowAction.getRelationStatus(pid) || 'following';
+    this.setData({ followMap: followMap, relationMap: relationMap });
+    wx.showToast({
+      title: relationMap[pid] === 'friend' ? '已成为好友' : '已关注',
+      icon: 'none',
+      duration: 900
+    });
   },
 
   noop() {},

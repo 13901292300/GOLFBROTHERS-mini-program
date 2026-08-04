@@ -301,7 +301,7 @@
         <!-- 我的菜单内容 -->
         <view wx:if="{{showProfileContent}}" id="profile-content" class="ds-page-profile">
           <view class="pb-32">
-            <view class="relative overflow-hidden" style="background:var(--bg-card)">
+            <view class="relative overflow-hidden profile-identity-shell">
               <view class="relative ds-profile-hero overflow-hidden">
                 <image id="profile-banner-img" src="{{profileBannerImg}}" class="w-full h-full opacity-80" mode="aspectFill"></image>
                 <view class="banner-gradient"></view>
@@ -317,26 +317,24 @@
               <view class="relative -mt-20 flex flex-col items-center px-6 pb-7">
                 <view class="relative mb-5">
                   <view class="ds-profile-avatar-ring relative">
-                    <image src="https://cdn.screenshottocode.com/H0XDATQ7nxMnJo8KZn-wV.jpg" class="w-full h-full" mode="aspectFill"></image>
-                    <view bindtap="toggleEditProfile" data-show="{{true}}" class="absolute inset-0 profile-avatar-overlay flex items-center justify-center">
-                      <text class="text-white text-xl">📷</text>
-                    </view>
+                    <image src="{{userProfile.avatar}}" class="w-full h-full" mode="aspectFill"></image>
+                    <view bindtap="toggleEditProfile" data-show="{{true}}" class="absolute inset-0 profile-avatar-overlay"></view>
                   </view>
                 </view>
                 <view class="text-center w-full">
                   <view class="flex items-center justify-center gap-3 mb-5" bindtap="toggleEditProfile" data-show="{{true}}">
                     <text class="ds-display text-4xl leading-none">{{userProfile.nickname || '未设置昵称'}}</text>
                     <text class="text-data-blue text-lg">♂</text>
-                    <text class="text-10px text-slate-400">✎</text>
+                    <text class="profile-edit-hint">✎</text>
                   </view>
                   <view class="grid grid-cols-2 gap-4 max-w-300 mx-auto">
-                    <view class="ds-card ds-card-stat rounded-lg px-4 py-3 flex flex-col items-center">
+                    <view class="ds-card ds-card-stat profile-stat-card rounded-lg px-4 py-3 flex flex-col items-center">
                       <text class="ds-overline mb-1">江湖差点</text>
-                      <text class="text-3xl font-black italic leading-none ds-text-gold">11.6</text>
+                      <text class="text-3xl font-black italic leading-none ds-text-gold">{{userProfile.handicap}}</text>
                     </view>
-                    <view class="ds-card ds-card-stat rounded-lg px-4 py-3 flex flex-col items-center">
+                    <view class="ds-card ds-card-stat profile-stat-card rounded-lg px-4 py-3 flex flex-col items-center">
                       <text class="ds-overline mb-1">浮动系数</text>
-                      <text class="text-3xl font-black italic leading-none ds-text-data">4.2</text>
+                      <text class="text-3xl font-black italic leading-none ds-text-data">{{userProfile.floatCoef}}</text>
                     </view>
                   </view>
                 </view>
@@ -344,51 +342,77 @@
             </view>
 
             <view class="px-4 pt-4 space-y-4">
-              <view class="ds-card ds-list-section rounded-xl overflow-hidden">
-                <view class="profile-list-header flex justify-between items-center">
+              <view class="ds-card ds-list-section rounded-xl overflow-hidden profile-event-center">
+                <view class="profile-list-header">
                   <text class="ds-overline ds-text-gold">赛事中心</text>
-                  <text class="text-8px text-slate-400 font-bold uppercase tracking-widest">始于 2024</text>
+                </view>
+                <view class="ds-list-item" bindtap="navigateToContacts">
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-green-500 text-xl">👥</text></view>
+                    <text class="ds-body font-normal">通讯录</text>
+                  </view>
+                  <view class="profile-menu-trail">
+                    <view wx:if="{{contactsNotifyBadge}}" class="profile-menu-dot"></view>
+                    <text class="profile-menu-chevron">›</text>
+                  </view>
+                </view>
+                <view class="ds-list-item" bindtap="navigateToHistory">
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-gold text-xl">🏆</text></view>
+                    <text class="ds-body font-normal">历史成绩</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
                 <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-green-500 text-xl">👥</text><text class="ds-body font-normal">通讯录</text></view>
-                  <text class="text-10px text-slate-300">›</text>
-                </view>
-                <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-gold text-xl">🏆</text><text class="ds-body font-normal">历史成绩</text></view>
-                  <view class="flex items-center gap-2"><text class="profile-live-badge">LIVE</text><text class="text-10px text-slate-300">›</text></view>
-                </view>
-                <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-data-blue text-xl">📊</text><text class="ds-body font-normal">数据统计</text></view>
-                  <text class="text-10px text-slate-300">›</text>
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-data-blue text-xl">📊</text></view>
+                    <text class="ds-body font-normal">数据统计</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
                 <view class="ds-list-item" bindtap="navigateToFootprints">
-                  <view class="flex items-center gap-4"><text class="text-red-500 text-xl">🚩</text><text class="ds-body font-normal">江湖足迹</text></view>
-                  <text class="text-10px text-slate-300">›</text>
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-red-500 text-xl">🚩</text></view>
+                    <text class="ds-body font-normal">江湖足迹</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
                 <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-gold text-xl">🛡</text><text class="ds-body font-normal">我的球队</text></view>
-                  <text class="text-10px text-slate-300">›</text>
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-gold text-xl">🛡</text></view>
+                    <text class="ds-body font-normal">我的球队</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
               </view>
 
               <view class="ds-card ds-list-section rounded-xl overflow-hidden">
                 <view class="profile-list-header-alt"><text class="ds-overline">资产与工具</text></view>
                 <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-data-blue text-xl">💳</text><text class="ds-body font-normal">我的钱包</text></view>
-                  <text class="text-10px text-slate-300">›</text>
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-data-blue text-xl">💳</text></view>
+                    <text class="ds-body font-normal">我的钱包</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
                 <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-gold text-xl">📄</text><text class="ds-body font-normal">小账本</text></view>
-                  <text class="text-10px text-slate-300">›</text>
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-gold text-xl">📄</text></view>
+                    <text class="ds-body font-normal">小账本</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
                 <view class="ds-list-item">
-                  <view class="flex items-center gap-4"><text class="text-slate-400 text-xl">⚙</text><text class="font-normal text-slate-500">设置</text></view>
-                  <text class="text-10px text-slate-300">›</text>
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon profile-menu-icon--muted"><text class="text-xl">⚙</text></view>
+                    <text class="ds-body font-normal">设置</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
                 </view>
               </view>
 
               <view class="p-8 text-center opacity-40">
-                <text class="font-black italic text-sm tracking-widest text-slate-500">江湖精英系统</text>
+                <text class="profile-footer-brand">江湖精英系统</text>
               </view>
             </view>
           </view>
@@ -421,7 +445,10 @@
         </view>
         <view bindtap="showProfileSection" class="ds-bottom-nav-item {{bottomNavActive === 'profile' ? 'ds-bottom-nav-item--active' : ''}}">
           <view class="item-inner">
-            <text class="icon">👤</text>
+            <view class="bottom-tab-icon-wrap">
+              <text class="icon">👤</text>
+              <view wx:if="{{profileNotifyBadge}}" class="bottom-tab-dot"></view>
+            </view>
             <text class="bottom-tab-text">我的</text>
           </view>
         </view>
@@ -643,8 +670,8 @@
     </view>
   </view>
 
-  <!-- Profile Edit Modal -->
-  <view wx:if="{{editProfileVisible}}" class="ds-overlay-viewport ds-profile-edit-panel fixed inset-0 z-320 max-w-md flex flex-col transition-all {{editProfileOpen ? 'overlay-open' : 'overlay-closed'}}">
+  <!-- Profile Edit Modal（挂 themeClass，与创建弹层同源） -->
+  <view wx:if="{{editProfileVisible}}" class="ds-overlay-viewport ds-profile-edit-panel {{themeClass}} fixed inset-0 z-320 max-w-md flex flex-col transition-all {{editProfileOpen ? 'overlay-open' : 'overlay-closed'}}">
     <view class="ds-app-header ds-overlay__fixed">
       <view class="more-create-header">
         <button bindtap="onEditProfileCancel" class="text-white text-sm font-bold">取消</button>
@@ -655,44 +682,44 @@
     <scroll-view scroll-y class="ds-overlay__grow p-5 pb-10">
       <view class="flex flex-col items-center mb-8">
         <view class="relative w-24 h-24 mb-3">
-          <image src="https://cdn.screenshottocode.com/H0XDATQ7nxMnJo8KZn-wV.jpg" class="w-full h-full rounded-full border-4 profile-avatar-border" mode="aspectFill"></image>
-          <view class="absolute bg-tour-blue w-8 h-8 rounded-full flex items-center justify-center border-4 border-white" style="bottom:0;right:0">
+          <image src="{{userProfile.avatar}}" class="w-full h-full rounded-full border-4 profile-avatar-border" mode="aspectFill"></image>
+          <view class="absolute bg-tour-blue w-8 h-8 rounded-full flex items-center justify-center border-4 profile-camera-badge" style="bottom:0;right:0">
             <text class="text-white text-10px">📷</text>
           </view>
         </view>
-        <button bindtap="toggleBannerPicker" data-show="{{true}}" class="flex items-center gap-2 text-10px text-slate-500 font-black uppercase tracking-widest">
+        <button bindtap="toggleBannerPicker" data-show="{{true}}" class="flex items-center gap-2 profile-edit-label">
           <text>🖼 更换头像背景</text>
         </button>
       </view>
       <view class="space-y-4">
         <view class="ds-profile-field">
-          <text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">身份类型</text>
+          <text class="profile-edit-label block mb-1">身份类型</text>
           <view class="flex gap-2 mt-2"><text class="ds-chip ds-chip--selected">球友</text><text class="ds-chip">球童</text></view>
         </view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">昵称</text><input type="text" value="{{profileEditDraft.nickname}}" bindinput="onEditProfileNicknameInput" class="edit-field-input" placeholder="微信/社区昵称" /></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">昵称</text><input type="text" value="{{profileEditDraft.nickname}}" bindinput="onEditProfileNicknameInput" class="edit-field-input" placeholder="微信/社区昵称" /></view>
         <view class="ds-profile-field">
-          <text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">比赛名</text>
+          <text class="profile-edit-label block mb-1">比赛名</text>
           <input type="text" value="{{profileEditDraft.competitionName}}" bindinput="onEditProfileCompetitionNameInput" class="edit-field-input" placeholder="赛事报名、出发表、成绩榜显示名称" />
         </view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">性别</text><view class="flex gap-4 mt-2"><text class="ds-chip ds-chip--selected">男</text><text class="ds-chip">女</text></view></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">性别</text><view class="flex gap-4 mt-2"><text class="ds-chip ds-chip--selected">男</text><text class="ds-chip">女</text></view></view>
         <view class="ds-profile-field flex justify-between items-end">
-          <view><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">差点 Handicap</text><text class="text-lg font-black text-gold">11.6</text></view>
-          <text class="text-10px text-slate-400 mb-1">系统自动计算</text>
+          <view><text class="profile-edit-label block mb-1">差点 Handicap</text><text class="text-lg font-black text-gold">11.6</text></view>
+          <text class="profile-edit-hint mb-1">系统自动计算</text>
         </view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">国籍</text><picker mode="selector" range="{{['中国','美国','日本','韩国']}}"><view class="text-lg font-bold">中国</view></picker></view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">所在省份</text><input type="text" value="广东" class="edit-field-input" /></view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">常打球场</text><view class="w-full text-lg font-bold py-1 flex justify-between items-center text-slate-500"><text>选择球场</text><text class="text-xs text-slate-400">🔍</text></view></view>
-        <view class="ds-profile-field"><text class="text-10px text-slate-500 font-black uppercase tracking-widest block mb-1">个人签名</text><textarea class="edit-field-textarea" placeholder="写下你的球场格言..."></textarea></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">国籍</text><picker mode="selector" range="{{['中国','美国','日本','韩国']}}"><view class="text-lg font-bold ds-text-primary">中国</view></picker></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">所在省份</text><input type="text" value="广东" class="edit-field-input" /></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">常打球场</text><view class="w-full text-lg font-bold py-1 flex justify-between items-center ds-text-muted"><text>选择球场</text><text class="text-xs">🔍</text></view></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">个人签名</text><textarea class="edit-field-textarea" placeholder="写下你的球场格言..."></textarea></view>
       </view>
     </scroll-view>
   </view>
 
   <!-- Profile Banner Picker Modal -->
-  <view wx:if="{{bannerPickerVisible}}" class="fixed inset-0 z-330 flex flex-col justify-end bg-black-70 max-w-md">
-    <view class="w-full bg-white rounded-t-3xl p-5 border-t border-slate-100">
+  <view wx:if="{{bannerPickerVisible}}" class="profile-banner-picker {{themeClass}} fixed inset-0 z-330 flex flex-col justify-end bg-black-70 max-w-md">
+    <view class="profile-banner-picker__sheet w-full rounded-t-3xl p-5">
       <view class="flex items-center justify-between mb-4">
-        <text class="text-sm font-black text-tour-blue tracking-widest">更换头像背景</text>
-        <button bindtap="toggleBannerPicker" data-show="{{false}}" class="text-slate-500 text-sm">关闭</button>
+        <text class="profile-banner-picker__title">更换头像背景</text>
+        <button bindtap="toggleBannerPicker" data-show="{{false}}" class="profile-banner-picker__close">关闭</button>
       </view>
       <view class="banner-picker-grid">
         <button bindtap="chooseBanner" data-url="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80" class="banner-picker-item">

@@ -1,0 +1,353 @@
+<view class="fp-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">FOOTPRINTS</text>
+          <text class="gb-header__title">江湖足迹</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="fp-body" enhanced show-scrollbar="{{false}}">
+    <!-- 1. Hero：对齐「我的」资料头区，卡片规范 -->
+    <view class="fp-hero-wrap">
+      <view class="fp-card fp-hero">
+        <view class="fp-hero__banner"></view>
+        <view class="fp-hero__body">
+          <view class="fp-avatar-ring">
+            <view class="fp-avatar">
+              <image class="fp-avatar__img" src="{{profile.avatar}}" mode="aspectFill" />
+            </view>
+          </view>
+          <view class="fp-hero__meta">
+            <view class="fp-hero__name-row">
+              <text class="fp-hero__name">{{profile.nickname}}</text>
+            </view>
+            <view class="fp-hero__badges">
+              <text class="fp-chip fp-chip--gold">江湖差点 {{profile.handicapText}}</text>
+              <text class="fp-chip fp-chip--blue">浮动系数 {{profile.floatCoefText}}</text>
+            </view>
+            <text class="fp-hero__sub">
+              {{profile.sinceLabel}} · <text class="fp-hero__sub-em">{{profile.daysOnTour}}</text>
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 2. Stats -->
+    <view class="fp-section">
+      <view class="fp-stats">
+        <view wx:for="{{stats}}" wx:key="label" class="fp-card fp-stat-card">
+          <text class="fp-overline">{{item.label}}</text>
+          <text class="fp-stat-card__value {{item.accent ? 'is-accent' : ''}}">{{item.value}}</text>
+          <text class="fp-stat-card__sub {{item.goldSub ? 'is-gold' : ''}}">{{item.sub}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 3. Chart -->
+    <view class="fp-section">
+      <view class="fp-card fp-panel">
+        <view class="fp-panel__head">
+          <view class="fp-panel__titles">
+            <text class="fp-panel__title">成绩走势</text>
+            <text class="fp-panel__desc">历年平均杆数 & 轮次统计</text>
+          </view>
+          <view class="fp-range">
+            <view
+              class="fp-range__btn {{chartRange === 'all' ? 'is-active' : ''}}"
+              data-range="all"
+              bindtap="onChartRangeTap"
+            >全部</view>
+            <view
+              class="fp-range__btn {{chartRange === '5y' ? 'is-active' : ''}}"
+              data-range="5y"
+              bindtap="onChartRangeTap"
+            >近5年</view>
+            <view
+              class="fp-range__btn {{chartRange === '3y' ? 'is-active' : ''}}"
+              data-range="3y"
+              bindtap="onChartRangeTap"
+            >近3年</view>
+          </view>
+        </view>
+        <view class="fp-chart">
+          <view wx:for="{{yearlyStats}}" wx:key="year" class="fp-chart__col">
+            <view class="fp-chart__bar-wrap">
+              <view
+                class="fp-chart__bar {{item.highlight ? 'is-highlight' : ''}}"
+                style="height: {{item.heightPct}}%;"
+              ></view>
+            </view>
+            <text class="fp-chart__avg {{item.highlight ? 'is-highlight' : ''}}">{{item.avg}}</text>
+            <text class="fp-chart__year">{{item.year}}</text>
+          </view>
+        </view>
+        <view class="fp-year-grid">
+          <view wx:for="{{yearlyStats}}" wx:key="year" class="fp-year-grid__item">
+            <text class="fp-year-grid__year">{{item.year}}</text>
+            <text class="fp-year-grid__avg {{item.highlight ? 'is-highlight' : ''}}">{{item.avg}}</text>
+            <text class="fp-year-grid__rounds {{item.highlight ? 'is-highlight' : ''}}">{{item.rounds}}轮</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 4. Distribution + Best -->
+    <view class="fp-section fp-section--stack">
+      <view class="fp-card fp-panel">
+        <text class="fp-panel__title">成绩分布</text>
+        <text class="fp-panel__desc fp-panel__desc--mb">各杆数区间占比</text>
+        <view class="fp-dist-list">
+          <view wx:for="{{distributions}}" wx:key="range" class="fp-dist-row">
+            <text class="fp-dist-row__range">{{item.range}}</text>
+            <view class="fp-dist-row__track">
+              <view class="fp-dist-row__fill" style="width: {{item.width}}%;">
+                <text class="fp-dist-row__pct">{{item.label}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="fp-card fp-panel">
+        <text class="fp-panel__title">巅峰时刻</text>
+        <text class="fp-panel__desc fp-panel__desc--mb">个人最佳成绩 TOP 5</text>
+        <view class="fp-best-list">
+          <view
+            wx:for="{{bestRounds}}"
+            wx:key="rank"
+            class="fp-best-row {{item.trophy ? 'is-top' : ''}}"
+          >
+            <view class="fp-best-row__rank {{item.trophy ? 'is-trophy' : ''}}">
+              <text>{{item.trophy ? '冠' : item.rank}}</text>
+            </view>
+            <view class="fp-best-row__body">
+              <text class="fp-best-row__name">{{item.name}}</text>
+              <text class="fp-best-row__date">{{item.date}}</text>
+            </view>
+            <text class="fp-best-row__score {{item.trophy ? 'is-gold' : ''}}">{{item.score}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 5. Rivals -->
+    <view class="fp-section">
+      <view class="fp-card fp-panel">
+        <view class="fp-panel__head">
+          <view class="fp-panel__titles">
+            <text class="fp-panel__title">江湖对决</text>
+            <text class="fp-panel__desc">与常约球友的交锋战绩</text>
+          </view>
+          <text class="fp-link">查看全部 →</text>
+        </view>
+        <view class="fp-rivals">
+          <view wx:for="{{rivals}}" wx:key="name" class="fp-rival">
+            <view class="fp-rival__head">
+              <view class="fp-rival__avatar tone-{{item.tone}}">
+                <text>{{item.initial}}</text>
+              </view>
+              <view class="fp-rival__meta">
+                <text class="fp-rival__name">{{item.name}}</text>
+                <text class="fp-rival__sub">{{item.meta}}</text>
+              </view>
+            </view>
+            <view class="fp-rival__bar-row">
+              <text class="fp-rival__win">{{item.wins}}胜</text>
+              <view class="fp-rival__bar">
+                <view class="fp-rival__seg is-win" style="width: {{item.winPct}}%;"></view>
+                <view class="fp-rival__seg is-draw" style="width: {{item.drawPct}}%;"></view>
+                <view class="fp-rival__seg is-loss" style="width: {{item.lossPct}}%;"></view>
+              </view>
+              <text class="fp-rival__loss">{{item.losses}}负</text>
+            </view>
+            <text class="fp-rival__draw">{{item.draws}} 平</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 6. Map + Courses -->
+    <view class="fp-section fp-section--stack">
+      <!-- 足迹地图：world → asia → china -->
+      <view class="fp-card fp-panel">
+        <view class="fp-panel__head">
+          <view class="fp-panel__titles">
+            <text class="fp-panel__title">足迹地图</text>
+            <text class="fp-panel__desc">{{mapDesc}}</text>
+          </view>
+          <view wx:if="{{mapLevel !== 'world'}}" class="fp-map-back" bindtap="onMapBackTap">返回上级</view>
+        </view>
+
+        <view class="fp-map-crumb">
+          <text
+            class="fp-map-crumb__item {{mapLevel === 'world' ? 'is-active' : ''}}"
+            data-level="world"
+            bindtap="onMapLevelTap"
+          >世界</text>
+          <text class="fp-map-crumb__sep">›</text>
+          <text
+            class="fp-map-crumb__item {{mapLevel === 'asia' ? 'is-active' : ''}} {{mapLevel === 'world' ? 'is-disabled' : ''}}"
+            data-level="asia"
+            bindtap="onMapLevelTap"
+          >亚洲</text>
+          <text class="fp-map-crumb__sep">›</text>
+          <text
+            class="fp-map-crumb__item {{mapLevel === 'china' ? 'is-active' : ''}} {{mapLevel !== 'china' ? 'is-disabled' : ''}}"
+            data-level="china"
+            bindtap="onMapLevelTap"
+          >中国</text>
+        </view>
+
+        <view class="fp-map-stage" aria-label="足迹地图">
+          <view class="fp-map-viewport">
+            <!-- 1. 地图背景层 -->
+            <image class="fp-map-svg" src="{{mapSvgSrc}}" mode="scaleToFill" aria-hidden="true"/>
+
+            <!-- 2. 足迹频度点层（静态） -->
+            <view
+              wx:for="{{mapDots}}"
+              wx:key="id"
+              class="fp-map-dot fp-map-dot--{{item.tone}} fp-map-dot--{{item.size}}"
+              style="left: {{item.left}}; top: {{item.top}};"
+            ></view>
+
+            <!-- 3. 独立动画氛围层 -->
+            <view class="fp-map-ambiance" aria-hidden="true">
+              <view class="fp-map-ambiance__veil"></view>
+              <view class="fp-map-ambiance__glow fp-map-ambiance__glow--a"></view>
+              <view class="fp-map-ambiance__glow fp-map-ambiance__glow--b"></view>
+              <view class="fp-map-ambiance__glow fp-map-ambiance__glow--c"></view>
+              <view class="fp-map-ambiance__sweep"></view>
+              <view class="fp-map-ambiance__spark fp-map-ambiance__spark--1"></view>
+              <view class="fp-map-ambiance__spark fp-map-ambiance__spark--2"></view>
+              <view class="fp-map-ambiance__spark fp-map-ambiance__spark--3"></view>
+            </view>
+
+            <!-- 下钻热区 -->
+            <view
+              wx:if="{{mapHitKind === 'asia'}}"
+              class="fp-map-hit fp-map-hit--asia"
+              catchtap="onMapAsiaHit"
+            >
+              <text class="fp-map-hit__label">亚洲</text>
+            </view>
+            <view
+              wx:if="{{mapHitKind === 'china'}}"
+              class="fp-map-hit fp-map-hit--china"
+              catchtap="onMapChinaHit"
+            >
+              <text class="fp-map-hit__label">中国</text>
+            </view>
+
+            <view class="fp-map-stage__hint" wx:if="{{mapCanDrill}}">
+              <text>{{mapLevel === 'world' ? '点击亚洲区域' : '点击中国区域'}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 世界层：国家徽章 -->
+        <view wx:if="{{mapBadges.length}}" class="fp-map-badges">
+          <view
+            wx:for="{{mapBadges}}"
+            wx:key="id"
+            class="fp-map-badge fp-map-badge--{{item.tone}}"
+          >
+            <text>{{item.text}}</text>
+          </view>
+        </view>
+
+        <!-- 亚洲 / 中国：数量排序 -->
+        <view wx:if="{{mapRankList.length}}" class="fp-map-rank">
+          <text class="fp-overline">{{mapRankLabel}}</text>
+          <view wx:for="{{mapRankList}}" wx:key="rank" class="fp-map-rank__row">
+            <text class="fp-map-rank__no {{item.top ? 'is-gold' : ''}}">{{item.rank}}</text>
+            <text class="fp-map-rank__name">{{item.name}}</text>
+            <text class="fp-map-rank__count">{{item.count}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="fp-card fp-panel">
+        <text class="fp-panel__title">常去球场</text>
+        <text class="fp-panel__desc fp-panel__desc--mb">按打球次数排列</text>
+        <scroll-view scroll-y class="fp-course-scroll" show-scrollbar="{{false}}">
+          <view wx:for="{{courses}}" wx:key="rank" class="fp-course-row">
+            <text class="fp-course-row__rank {{item.top ? 'is-gold' : ''}}">{{item.rank}}</text>
+            <view class="fp-course-row__body">
+              <text class="fp-course-row__name">{{item.name}}</text>
+              <text class="fp-course-row__meta">{{item.meta}}</text>
+            </view>
+            <view class="fp-course-row__right">
+              <text class="fp-course-row__rounds">{{item.rounds}}</text>
+              <text class="fp-course-row__avg">{{item.avg}}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+
+    <!-- 7. Heatmap -->
+    <view class="fp-section">
+      <view class="fp-card fp-panel">
+        <view class="fp-panel__head">
+          <view class="fp-panel__titles">
+            <text class="fp-panel__title">打球热力图</text>
+            <text class="fp-panel__desc">2024年每月打球频次</text>
+          </view>
+          <view class="fp-heat-legend">
+            <text>少</text>
+            <view class="fp-heat-legend__swatch l0"></view>
+            <view class="fp-heat-legend__swatch l1"></view>
+            <view class="fp-heat-legend__swatch l2"></view>
+            <view class="fp-heat-legend__swatch l3"></view>
+            <view class="fp-heat-legend__swatch l4"></view>
+            <text>多</text>
+          </view>
+        </view>
+        <view class="fp-heatmap">
+          <view wx:for="{{heatmap}}" wx:key="month" class="fp-heat-cell">
+            <text class="fp-heat-cell__month">{{item.month}}</text>
+            <view class="fp-heat-cell__box level-{{item.level}}">
+              <text>{{item.count}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 8. Milestones -->
+    <view class="fp-section fp-section--last">
+      <view class="fp-card fp-panel">
+        <text class="fp-panel__title">江湖大事记</text>
+        <text class="fp-panel__desc fp-panel__desc--mb">你的高尔夫之旅重要节点</text>
+        <view class="fp-timeline">
+          <view wx:for="{{milestones}}" wx:key="title" class="fp-milestone">
+            <view class="fp-milestone__node tone-{{item.tone}}">
+              <text>{{item.icon}}</text>
+            </view>
+            <view class="fp-milestone__card {{item.highlight ? 'is-highlight' : ''}}">
+              <view class="fp-milestone__row">
+                <text class="fp-milestone__title {{item.highlight ? 'is-accent' : ''}}">{{item.title}}</text>
+                <text class="fp-milestone__date">{{item.date}}</text>
+              </view>
+              <text class="fp-milestone__desc">{{item.desc}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="fp-footer">
+      <text class="fp-footer__brand">GOLFBROTHERS</text>
+      <text class="fp-footer__note">数据截至 2024年11月15日 · UI mock 展示</text>
+    </view>
+  </scroll-view>
+</view>

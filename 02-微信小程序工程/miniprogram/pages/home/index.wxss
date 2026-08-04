@@ -1611,7 +1611,7 @@ page {
 .mb-5 { margin-bottom: 20px; }
 .mb-6 { margin-bottom: 24px; }
 .mb-8 { margin-bottom: 32px; }
-.mx-auto { margin-left: 0; margin-right: 0; }
+.mx-auto { margin-left: auto; margin-right: auto; }
 .max-w-300 { max-width: 300px; }
 .w-1-5 { width: 6px; } .h-1-5 { height: 6px; }
 .w-2-5 { width: 10px; } .h-2-5 { height: 10px; }
@@ -1789,11 +1789,109 @@ page {
   height: 10px;
   background: var(--error);
   border-radius: 9999px;
-  border: 2px solid var(--text-primary);
+  border: 2px solid var(--text-on-dark);
+}
+.profile-menu-trail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.profile-menu-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--error);
+}
+.profile-menu-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+.profile-edit-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.profile-edit-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.profile-footer-brand {
+  font-weight: 900;
+  font-style: italic;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.profile-identity-shell {
+  background: var(--bg-card);
+}
+.profile-stat-card {
+  background: var(--bg-subtle);
+  box-shadow: none;
+}
+.profile-camera-badge {
+  border-color: var(--bg-card);
+}
+.profile-banner-picker__sheet {
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.profile-banner-picker__title {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+}
+.profile-banner-picker__close {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+/* 编辑资料弹层：挂 themeClass 时同步 dark token */
+.ds-profile-edit-panel.dark-theme {
+  --bg-primary: #050816;
+  --bg-card: #0B1220;
+  --bg-subtle: #121A2B;
+  --bg-hover: #1A2332;
+  --border: var(--border-dark);
+  --text-primary: #E5EEFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.profile-banner-picker.dark-theme {
+  --bg-primary: #050816;
+  --bg-card: #0B1220;
+  --bg-subtle: #121A2B;
+  --border: var(--border-dark);
+  --text-primary: #E5EEFC;
+  --text-muted: #94A3B8;
+}
+.bottom-tab-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bottom-tab-dot {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--error, #ef4444);
+  border: 1.5px solid var(--bg-card, #fff);
 }
 .profile-avatar-border { border-color: var(--champion-gold); }
 .profile-avatar-overlay {
-  background: var(--black-alpha-40);
+  /* 透明点击热区：保留全覆盖点击，不遮挡头像展示 */
+  background: transparent;
   top: 0; right: 0; bottom: 0; left: 0;
 }
 .profile-live-badge {
@@ -1811,11 +1909,46 @@ page {
   border-bottom: 1px solid var(--border);
   box-sizing: border-box;
 }
+/* 赛事中心：文案统一左对齐（不影响右侧 › / LIVE） */
+.profile-event-center {
+  text-align: left;
+}
+.profile-event-center .profile-list-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: left;
+}
+.profile-event-center .ds-list-item {
+  text-align: left;
+}
+/* 「我的」菜单：固定宽度 icon 槽，统一文案起点 */
+.profile-menu-label {
+  justify-content: flex-start;
+  text-align: left;
+  min-width: 0;
+}
+.profile-menu-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  overflow: hidden;
+}
+.profile-menu-icon .text-xl {
+  line-height: 1;
+}
 .profile-list-header-alt {
   padding: var(--input-padding-y) var(--input-padding-x);
-  background: var(--slate-50);
-  border-bottom: 1px solid var(--slate-100);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
   box-sizing: border-box;
+}
+.profile-menu-icon--muted {
+  color: var(--text-muted);
 }
 
 /* 中间“+”创建面板：操作面板顶部（非页面级蓝色 HEADER，无假胶囊/返回） */
@@ -2003,7 +2136,7 @@ page {
   height: 96px;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--slate-100);
+  border: 1px solid var(--border);
   position: relative;
   padding: 0;
   width: 100%;

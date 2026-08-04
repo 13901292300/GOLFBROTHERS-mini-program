@@ -1,0 +1,19 @@
+/**
+ * 加关注 — 唯一标准样式（对齐领先榜展开面板）
+ */
+.sc-follow-btn {
+  flex-shrink: 0;
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  background: var(--champion-gold, #ce9224);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+.sc-follow-btn--hover {
+  opacity: 0.88;
+}

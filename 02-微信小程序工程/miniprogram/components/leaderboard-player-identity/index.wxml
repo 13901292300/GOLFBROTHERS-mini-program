@@ -16,9 +16,18 @@
       </view>
     </view>
   </view>
-  <view
-    wx:if="{{!isSelf}}"
-    catchtap="onFollowTap"
-    class="sc-follow-btn {{followed ? 'sc-follow-btn--followed' : ''}}"
-  >{{followed ? '已关注' : '加关注'}}</view>
+  <!-- 加关注=操作按钮；好友/已关注=状态标签，二者不混用 -->
+  <follow-action-btn
+    wx:if="{{!isSelf && displayStatus === 'none'}}"
+    user-id="{{player.playerId}}"
+    bind:follow="onFollowTap"
+  />
+  <text
+    wx:elif="{{!isSelf && displayStatus === 'friend'}}"
+    class="sc-rel-tag sc-rel-tag--friend"
+  >好友</text>
+  <text
+    wx:elif="{{!isSelf && displayStatus === 'following'}}"
+    class="sc-rel-tag sc-rel-tag--following"
+  >已关注</text>
 </view>

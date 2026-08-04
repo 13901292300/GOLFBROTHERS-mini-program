@@ -5,6 +5,7 @@
     "half-course-sheet": "/components/half-course-sheet/index",
     "player-source-sheet": "/components/player-source-sheet/index",
     "phone-bind-sheet": "/components/phone-bind-sheet/index",
-    "leaderboard-player-identity": "/components/leaderboard-player-identity/index"
+    "leaderboard-player-identity": "/components/leaderboard-player-identity/index",
+    "follow-action-btn": "/components/follow-action-btn/index"
   }
 }

@@ -1,0 +1,415 @@
+/**
+ * 通讯录 — 双向关注球友轻量列表
+ * Token / header 对齐 profile/history、footprints
+ */
+
+.ct-page {
+  --primary-blue: #002d62;
+  --tour-blue: #002d62;
+  --champion-gold: #ce9224;
+  --data-blue: #00aeef;
+  --gender-male: #38bdf8;
+  --gender-female: #f472b6;
+
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.ct-page.bright-mode {
+  --error: #dc2626;
+  --text-on-dark: #ffffff;
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+}
+
+.ct-page.dark-mode {
+  --error: #dc2626;
+  --text-on-dark: #ffffff;
+  --bg-primary: #050816;
+  --bg-card: #0b1220;
+  --bg-subtle: #121a2b;
+  --border: rgba(148, 163, 184, 0.16);
+  --text-primary: #e5eefc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+}
+
+page {
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* ===== gb-header ===== */
+.gb-header {
+  background: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: #fff;
+  flex-shrink: 0;
+}
+.gb-header__inner {
+  display: flex;
+  align-items: center;
+}
+.gb-header__left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.gb-header__back {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gb-header__chevron {
+  color: var(--text-on-dark, #fff);
+  font-size: 52rpx;
+  line-height: 1;
+}
+.gb-header__eyebrow {
+  display: block;
+  font-size: 17rpx;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+.gb-header__title {
+  display: block;
+  color: var(--text-on-dark, #fff);
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+}
+
+/* ===== search（固定于 Header 下） ===== */
+.ct-search-wrap {
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  padding: 16rpx 28rpx;
+  border-bottom: 1px solid var(--border);
+}
+
+.ct-search {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.ct-search__icon {
+  font-size: 26rpx;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.ct-search__input {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: var(--text-primary);
+}
+
+.ct-search__ph {
+  color: var(--text-muted);
+}
+
+.ct-search__clear {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ===== 关系 Tab（轻量横排，金色指示线） ===== */
+.ct-tabs {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 8rpx;
+}
+
+.ct-tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ct-tab-dot {
+  position: absolute;
+  top: 14rpx;
+  right: 10rpx;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 9999rpx;
+  background: var(--error, #ef4444);
+  border: 2rpx solid var(--bg-primary);
+}
+
+.ct-tab.is-active {
+  color: var(--text-primary);
+  font-weight: 900;
+}
+
+.ct-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 48rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: var(--champion-gold);
+}
+
+/* ===== main + index ===== */
+.ct-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+
+.ct-body {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding-right: 36rpx;
+}
+
+.ct-body--search {
+  padding-right: 0;
+}
+
+.ct-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding: 20rpx 28rpx 8rpx;
+}
+
+.ct-meta__label {
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--champion-gold);
+}
+
+.ct-meta__count {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ct-section {
+  padding-bottom: 4rpx;
+}
+
+.ct-letter-head {
+  padding: 12rpx 28rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+.ct-letter-head--new {
+  color: var(--champion-gold);
+}
+
+.ct-row {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 22rpx 28rpx;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.ct-avatar {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 9999rpx;
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+}
+
+.ct-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.ct-line1 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10rpx 16rpx;
+  min-width: 0;
+}
+
+.ct-name {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.25;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ct-gender {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ct-gender.is-male {
+  color: var(--gender-male);
+}
+
+.ct-gender.is-female {
+  color: var(--gender-female);
+}
+
+.ct-metric {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.ct-signature {
+  font-size: 22rpx;
+  font-weight: 500;
+  color: var(--text-muted);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 推荐：弱来源提示（APP 关注迁移） */
+.ct-source {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.72;
+  line-height: 1.3;
+}
+
+/* 关系状态标签（非按钮；加关注见 follow-action-btn 组件） */
+.ct-rel-tag {
+  flex-shrink: 0;
+  margin-left: 8rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.ct-rel-tag--friend {
+  border-color: rgba(206, 146, 36, 0.55);
+  background: rgba(206, 146, 36, 0.12);
+  color: var(--champion-gold);
+}
+
+.ct-rel-tag--following {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.ct-empty {
+  padding: 120rpx 28rpx;
+  text-align: center;
+}
+
+.ct-empty__text {
+  font-size: 26rpx;
+  color: var(--text-muted);
+}
+
+.ct-pad {
+  height: 48rpx;
+}
+
+/* ===== A–Z index ===== */
+.ct-index {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx 6rpx;
+  max-height: 86%;
+  overflow: hidden;
+}
+
+.ct-index__item {
+  width: 28rpx;
+  height: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16rpx;
+  font-weight: 800;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.ct-index__item.is-active {
+  color: var(--champion-gold);
+}

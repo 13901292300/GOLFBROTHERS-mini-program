@@ -10,6 +10,7 @@ const bannerConfig = require('../../utils/bannerConfig.js');
 const scheduleStore = require('../../utils/scheduleStore.js');
 const { sortSchedules } = require('../../utils/scheduleSort.js');
 const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
+const contactNotifyStore = require('../../utils/contactNotifyStore.js');
 
 function decorateTournamentCard(match, card) {
   if (!card) return null;
@@ -128,6 +129,9 @@ Page({
     plazaCards: [],
     plazaTournamentCards: [],
     bottomNavActive: 'home',
+    /** 路径红点：由未读通知事件动态计算（非固定布尔） */
+    profileNotifyBadge: false,
+    contactsNotifyBadge: false,
     createOverlayVisible: false,
     createOverlayOpen: false,
     moreCreateVisible: false,
@@ -137,7 +141,13 @@ Page({
     scheduleRemindPanelOpen: false,
     editProfileVisible: false,
     editProfileOpen: false,
-    userProfile: { nickname: '', competitionName: '' },
+    userProfile: {
+      nickname: '',
+      competitionName: '',
+      avatar: '',
+      handicap: null,
+      floatCoef: null
+    },
     profileEditDraft: { nickname: '', competitionName: '' },
     bannerPickerVisible: false,
     profileBannerImg: 'https://cdn.screenshottocode.com/fjGiYQjgxR_OzO3H9s1OQ.png',
@@ -334,6 +344,14 @@ Page({
     this.refreshTeamMatchCards();
     this._refreshScheduleCards();
     this._buildScheduleEventsByDate();
+    this.setData({
+      profileNotifyBadge: contactNotifyStore.hasUnreadForPath(
+        contactNotifyStore.TARGET.PROFILE
+      ),
+      contactsNotifyBadge: contactNotifyStore.hasUnreadForPath(
+        contactNotifyStore.TARGET.CONTACTS
+      )
+    });
   },
 
   /** 从 scheduleStore 读取并映射为 UI scheduleCards（空库保持 []，无演示种子） */
@@ -765,7 +783,10 @@ Page({
     this.setData({
       userProfile: {
         nickname: profile.nickname || '',
-        competitionName: profile.competitionName || ''
+        competitionName: profile.competitionName || '',
+        avatar: profile.avatar || userProfileStore.DEFAULT_AVATAR,
+        handicap: profile.handicap,
+        floatCoef: profile.floatCoef
       }
     });
   },
@@ -1217,6 +1238,24 @@ Page({
     });
   },
 
+  navigateToHistory() {
+    wx.navigateTo({
+      url: '/pages/profile/history/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
+  navigateToContacts() {
+    wx.navigateTo({
+      url: '/pages/profile/contacts/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
   toggleEditProfile(arg) {
     let show;
     if (typeof arg === 'boolean') {
@@ -1262,7 +1301,10 @@ Page({
     this.setData({
       userProfile: {
         nickname: saved.nickname || '',
-        competitionName: saved.competitionName || ''
+        competitionName: saved.competitionName || '',
+        avatar: saved.avatar || userProfileStore.DEFAULT_AVATAR,
+        handicap: saved.handicap,
+        floatCoef: saved.floatCoef
       }
     });
     this.toggleEditProfile(false);

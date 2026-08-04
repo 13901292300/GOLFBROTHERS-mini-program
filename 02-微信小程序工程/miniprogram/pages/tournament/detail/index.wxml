@@ -687,7 +687,7 @@
                           <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{player.country}}</text>　AGE: <text class="sc-sub-strong">{{player.age}}</text></view>
                         </view>
                       </view>
-                      <view catchtap="noop" class="sc-follow-btn">加关注</view>
+                      <follow-action-btn user-id="{{player.playerId || player.scorecardKey}}" bind:follow="noop" />
                     </view>
 
                     <view class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
@@ -790,7 +790,7 @@
                       <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
                     </view>
                   </view>
-                  <view catchtap="noop" class="sc-follow-btn">加关注</view>
+                  <follow-action-btn user-id="{{item.playerId || item.id}}" bind:follow="noop" />
                 </view>
 
                 <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">

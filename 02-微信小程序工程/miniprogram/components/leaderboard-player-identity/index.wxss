@@ -1,5 +1,24 @@
-.sc-follow-btn--followed {
-  background: var(--bg-subtle) !important;
-  color: var(--text-muted) !important;
-  border: 1px solid var(--border);
+.sc-rel-tag {
+  flex-shrink: 0;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-subtle, #f3f4f6);
+  color: var(--text-muted, #6b7280);
+}
+
+.sc-rel-tag--friend {
+  border-color: rgba(206, 146, 36, 0.55);
+  background: rgba(206, 146, 36, 0.12);
+  color: var(--champion-gold, #ce9224);
+}
+
+.sc-rel-tag--following {
+  border-color: var(--border, #e5e7eb);
+  background: var(--bg-subtle, #f3f4f6);
+  color: var(--text-muted, #6b7280);
 }

@@ -61,6 +61,7 @@
                   wx:key="playerId"
                   player="{{mem}}"
                   followed="{{followMap[mem.playerId]}}"
+                  relation-status="{{relationMap[mem.playerId] || (followMap[mem.playerId] ? 'following' : 'none')}}"
                   is-self="{{mem.playerId === currentUserId}}"
                   bind:follow="onLeaderboardFollow"
                 />
@@ -71,6 +72,7 @@
                 wx:else
                 player="{{item.player}}"
                 followed="{{followMap[item.playerId]}}"
+                relation-status="{{relationMap[item.playerId] || (followMap[item.playerId] ? 'following' : 'none')}}"
                 is-self="{{item.playerId === currentUserId}}"
                 bind:follow="onLeaderboardFollow"
               />
