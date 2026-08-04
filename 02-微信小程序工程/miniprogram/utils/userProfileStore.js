@@ -1,15 +1,18 @@
 /**
  * 用户长期资料（本地持久化）
- * competitionName：竞技场景公开名称（报名/出发表/成绩榜等唯一来源）
- * nickname：社区昵称，不作为赛事显示名称
- * avatar：头像 URL（「我的」/江湖足迹等共用）
- * handicap：江湖差点（统一竞技字段；后台未接入前为本地 mock）
- * floatCoef：浮动系数（统一竞技字段；非负独立指标）
+ * nickname：社区昵称
+ * displayName：比赛/领先榜/记分卡显示名（同步 competitionName 兼容旧读取）
+ * identityType：PLAYER | CADDIE
+ * signature / caddieCourse / phoneBound / phoneMasked
+ * handicap / floatCoef：竞技展示字段（非编辑页写入）
  */
 
 const gameStore = require('./gameStore.js');
 
 const STORAGE_KEY = 'gb_user_profile_v1';
+
+const IDENTITY_PLAYER = 'PLAYER';
+const IDENTITY_CADDIE = 'CADDIE';
 
 /** 与「我的」页当前展示头像一致的默认值（后台未接入前） */
 const DEFAULT_AVATAR =
@@ -36,14 +39,38 @@ function _writeRaw(profile) {
   }
 }
 
+function _normalizeIdentityType(value) {
+  const v = String(value || '').trim().toUpperCase();
+  if (v === IDENTITY_CADDIE || v === '球童') return IDENTITY_CADDIE;
+  return IDENTITY_PLAYER;
+}
+
+function _normalizeGender(value, fallback) {
+  const g = String(value != null ? value : '').trim();
+  if (g === '男' || g === 'female' || g === '女') {
+    if (g === 'female' || g === '女') return '女';
+    return '男';
+  }
+  if (g === 'male') return '男';
+  const fb = String(fallback || '').trim();
+  if (fb === '女' || fb === 'female') return '女';
+  if (fb === '男' || fb === 'male') return '男';
+  return fb || '';
+}
+
 function _baseFromCurrentUser() {
   const user = gameStore.getCurrentUser() || {};
   return {
     userId: user.userId || 'me',
     nickname: user.name || '',
-    gender: user.gender || '',
+    gender: _normalizeGender(user.gender, '男'),
     competitionName: '',
-    // 头像与「我的」展示源一致；不用 gameStore 占位图覆盖
+    displayName: '',
+    signature: '',
+    identityType: IDENTITY_PLAYER,
+    caddieCourse: '',
+    phoneBound: false,
+    phoneMasked: '未绑定',
     avatar: DEFAULT_AVATAR,
     handicap: DEFAULT_HANDICAP,
     floatCoef: DEFAULT_FLOAT_COEF
@@ -63,12 +90,35 @@ function normalizeProfile(raw) {
     data.avatar != null && String(data.avatar).trim() !== ''
       ? String(data.avatar).trim()
       : base.avatar;
+
+  // displayName 优先；兼容旧 competitionName
+  const displayName =
+    data.displayName != null && String(data.displayName).trim() !== ''
+      ? String(data.displayName).trim()
+      : data.competitionName != null
+        ? String(data.competitionName).trim()
+        : base.displayName;
+
   return {
     userId: data.userId || base.userId,
     nickname: data.nickname != null ? String(data.nickname) : base.nickname,
-    // 性别唯一来源：用户个人资料；未设置时回退当前用户默认
-    gender: data.gender != null && data.gender !== '' ? String(data.gender) : base.gender,
-    competitionName: data.competitionName != null ? String(data.competitionName).trim() : '',
+    gender: _normalizeGender(
+      data.gender != null && data.gender !== '' ? data.gender : base.gender,
+      base.gender
+    ),
+    signature: data.signature != null ? String(data.signature) : base.signature,
+    identityType: _normalizeIdentityType(
+      data.identityType != null ? data.identityType : base.identityType
+    ),
+    caddieCourse: data.caddieCourse != null ? String(data.caddieCourse).trim() : base.caddieCourse,
+    displayName: displayName,
+    // 兼容旧报名/出发表读取
+    competitionName: displayName,
+    phoneBound: data.phoneBound === true,
+    phoneMasked:
+      data.phoneMasked != null && String(data.phoneMasked).trim() !== ''
+        ? String(data.phoneMasked).trim()
+        : base.phoneMasked,
     avatar: avatarRaw || DEFAULT_AVATAR,
     handicap: _toNumberOr(data.handicap != null ? data.handicap : base.handicap, DEFAULT_HANDICAP),
     floatCoef: _toNumberOr(
@@ -93,43 +143,50 @@ function saveProfile(profile) {
 /** 局部更新用户资料 */
 function updateProfile(patch) {
   const current = loadProfile();
-  return saveProfile(Object.assign({}, current, patch || {}));
+  const merged = Object.assign({}, current, patch || {});
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'displayName')) {
+    merged.displayName = patch.displayName != null ? String(patch.displayName).trim() : '';
+    merged.competitionName = merged.displayName;
+  }
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'competitionName') && !Object.prototype.hasOwnProperty.call(patch, 'displayName')) {
+    merged.displayName = patch.competitionName != null ? String(patch.competitionName).trim() : '';
+    merged.competitionName = merged.displayName;
+  }
+  return saveProfile(merged);
 }
 
-/** 单独更新比赛名（唯一竞技名称来源） */
-function setCompetitionName(competitionName) {
+/** 单独更新比赛显示名 */
+function setDisplayName(displayName) {
   return updateProfile({
-    competitionName: competitionName != null ? String(competitionName).trim() : ''
+    displayName: displayName != null ? String(displayName).trim() : ''
   });
 }
 
-/**
- * 报名弹窗默认比赛名：优先 competitionName，回退 nickname
- */
-function getRegisterCompetitionNameDefault(profile) {
-  const p = profile || loadProfile();
-  const competitionName = String(p.competitionName || '').trim();
-  if (competitionName) return competitionName;
-  return String(p.nickname || '').trim();
+/** 单独更新比赛名（兼容旧 API → displayName） */
+function setCompetitionName(competitionName) {
+  return setDisplayName(competitionName);
 }
 
 /**
- * 报名流程预留：读取当前弹窗可提交的比赛名（以用户最后一次编辑为准）
- * @param {string} draft 弹窗内可编辑值
+ * 报名弹窗默认比赛名：优先 displayName/competitionName，回退 nickname
  */
+function getRegisterCompetitionNameDefault(profile) {
+  const p = profile || loadProfile();
+  const displayName = String(p.displayName || p.competitionName || '').trim();
+  if (displayName) return displayName;
+  return String(p.nickname || '').trim();
+}
+
 function resolveRegisterCompetitionName(draft) {
   const value = draft != null ? String(draft).trim() : '';
   if (value) return value;
   return getRegisterCompetitionNameDefault();
 }
 
-/**
- * 报名流程预留：将弹窗最终比赛名写回用户资料（非 registerInfo 写入）
- */
 function persistRegisterCompetitionDraft(draft) {
   const value = resolveRegisterCompetitionName(draft);
   if (!value) return loadProfile();
-  return setCompetitionName(value);
+  return setDisplayName(value);
 }
 
 module.exports = {
@@ -137,9 +194,12 @@ module.exports = {
   DEFAULT_AVATAR,
   DEFAULT_HANDICAP,
   DEFAULT_FLOAT_COEF,
+  IDENTITY_PLAYER,
+  IDENTITY_CADDIE,
   loadProfile,
   saveProfile,
   updateProfile,
+  setDisplayName,
   setCompetitionName,
   getRegisterCompetitionNameDefault,
   resolveRegisterCompetitionName,

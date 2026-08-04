@@ -318,7 +318,7 @@
                 <view class="relative mb-5">
                   <view class="ds-profile-avatar-ring relative">
                     <image src="{{userProfile.avatar}}" class="w-full h-full" mode="aspectFill"></image>
-                    <view bindtap="toggleEditProfile" data-show="{{true}}" class="absolute inset-0 profile-avatar-overlay"></view>
+                    <view bindtap="navigateToProfileEdit" class="absolute inset-0 profile-avatar-overlay"></view>
                   </view>
                 </view>
                 <view class="text-center w-full">

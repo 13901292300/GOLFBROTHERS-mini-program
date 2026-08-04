@@ -16,7 +16,8 @@
     "pages/profile/footprints/index",
     "pages/profile/history/index",
     "pages/profile/contacts/index",
-    "pages/profile/statistics/index"
+    "pages/profile/statistics/index",
+    "pages/profile/edit/index"
   ],
   "subPackages": [
     {

@@ -1265,6 +1265,15 @@ Page({
     });
   },
 
+  navigateToProfileEdit() {
+    wx.navigateTo({
+      url: '/pages/profile/edit/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
   toggleEditProfile(arg) {
     let show;
     if (typeof arg === 'boolean') {
