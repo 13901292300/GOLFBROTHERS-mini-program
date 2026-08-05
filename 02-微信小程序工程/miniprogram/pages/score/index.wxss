@@ -2843,6 +2843,372 @@ page {
 .score-double { background: #6b7280; border-radius: 8rpx; }
 .score-double .hole-cell-score { color: #ffffff; }
 
+/*
+ * ===== 临时 Classic Style（仅 .score-page.is-score-classic / demo-weekend-amateur）=====
+ * classicClass 挂在 score-cell：整格传统记分卡色块；禁止 :has。
+ * scoreClass / bestScoreClass / scoreStyle / 成绩逻辑不改。
+ */
+
+/* Classic 下取消 Elite marker 外形（保留 DOM / scoreClass） */
+.score-page.is-score-classic .score-eagle,
+.score-page.is-score-classic .score-birdie,
+.score-page.is-score-classic .score-bogey,
+.score-page.is-score-classic .score-double {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.score-page.is-score-classic .hole-cell-score--hint {
+  color: #9ca3af;
+}
+
+/* Classic：洞格内数字普通字重（覆盖 Elite 900/700） */
+.score-page.is-score-classic .hole-cell-score {
+  font-weight: normal;
+}
+.score-page.is-score-classic .hole-cell-putt {
+  font-weight: normal;
+}
+.score-page.is-score-classic .hole-cell-diff {
+  font-weight: normal;
+}
+
+/* 整格色块：压过 fourball .score-cell 的 bg-primary；传统表格无圆角 */
+.score-page.is-score-classic .score-cell.classic-eagle {
+  border-radius: 0 !important;
+  background: #ffe1cf !important;
+  background-color: #ffe1cf !important;
+}
+.score-page.is-score-classic .score-cell.classic-birdie {
+  border-radius: 0 !important;
+  background: #fff8f2 !important;
+  background-color: #fff8f2 !important;
+}
+.score-page.is-score-classic .score-cell.classic-par {
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+.score-page.is-score-classic .score-cell.classic-bogey {
+  border-radius: 0 !important;
+  background: #e6e6e6 !important;
+  background-color: #e6e6e6 !important;
+}
+.score-page.is-score-classic .score-cell.classic-double {
+  border-radius: 0 !important;
+  background: #cecece !important;
+  background-color: #cecece !important;
+}
+.score-page.is-score-classic .score-cell.classic-triple {
+  border-radius: 0 !important;
+  background: #b5b5b5 !important;
+  background-color: #b5b5b5 !important;
+}
+
+/* 数字色 */
+.score-page.is-score-classic .score-cell.classic-eagle .hole-cell-score,
+.score-page.is-score-classic .score-cell.classic-birdie .hole-cell-score {
+  color: #f5620d;
+}
+.score-page.is-score-classic .score-cell.classic-par .hole-cell-score {
+  color: #1c94de;
+}
+.score-page.is-score-classic .score-cell.classic-bogey .hole-cell-score,
+.score-page.is-score-classic .score-cell.classic-double .hole-cell-score,
+.score-page.is-score-classic .score-cell.classic-triple .hole-cell-score {
+  color: #000000;
+}
+
+/* putt */
+.score-page.is-score-classic .score-cell.classic-eagle .hole-cell-putt,
+.score-page.is-score-classic .score-cell.classic-birdie .hole-cell-putt,
+.score-page.is-score-classic .score-cell.classic-par .hole-cell-putt,
+.score-page.is-score-classic .score-cell.classic-bogey .hole-cell-putt,
+.score-page.is-score-classic .score-cell.classic-double .hole-cell-putt,
+.score-page.is-score-classic .score-cell.classic-triple .hole-cell-putt {
+  color: #000000;
+  opacity: 1;
+}
+
+/* Classic 右下角杆差：统一小鸟/老鹰色（压过 .diff-under/even/over !important） */
+.score-page.is-score-classic .hole-cell-diff,
+.score-page.is-score-classic .hole-cell-diff.diff-under,
+.score-page.is-score-classic .hole-cell-diff.diff-even,
+.score-page.is-score-classic .hole-cell-diff.diff-over {
+  color: #f5620d !important;
+}
+
+/*
+ * Classic fourball identity 后 lead diff：仅 diff<0（.diff-under）改小鸟橙；
+ * diff>=0 保持原色。不改洞格 / OUT·IN·TOT / Elite。
+ */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead__diff.diff-under {
+  color: #f5620d !important;
+}
+
+/* Classic OUT/IN：左下推杆与本格半场汇总总杆同色（.special-cell-val = text-secondary） */
+.score-page.is-score-classic .scoreboard-cell--hole-special-col .special-cell-putt {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+/* Classic TOT：左下推杆黑 */
+.score-page.is-score-classic .score-cell--total .special-cell-putt,
+.score-page.is-score-classic .scoreboard-cell--tot-col .special-cell-putt {
+  color: #000000;
+  opacity: 1;
+}
+
+.score-page.is-score-classic .special-cell-diff,
+.score-page.is-score-classic .special-cell-diff.diff-under,
+.score-page.is-score-classic .special-cell-diff.diff-even,
+.score-page.is-score-classic .special-cell-diff.diff-over {
+  color: #f5620d !important;
+}
+
+/*
+ * Classic DARK：仅六档成绩格色板（不改 LIGHT、HOLE/PAR、T、OUT/IN/TOT、分隔线）
+ * 语义同亮色纸面：暖橙鹰/鸟、冷蓝平杆、灰阶超杆；字色随底对比
+ */
+.score-page.is-score-classic.dark-mode .score-cell.classic-eagle {
+  background: #4a2c1a !important;
+  background-color: #4a2c1a !important;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-birdie {
+  background: #3a281c !important;
+  background-color: #3a281c !important;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-par {
+  background: #1c2430 !important;
+  background-color: #1c2430 !important;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-bogey {
+  background: #2e2e2e !important;
+  background-color: #2e2e2e !important;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-double {
+  background: #252525 !important;
+  background-color: #252525 !important;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-triple {
+  background: #1c1c1c !important;
+  background-color: #1c1c1c !important;
+}
+
+.score-page.is-score-classic.dark-mode .score-cell.classic-eagle .hole-cell-score,
+.score-page.is-score-classic.dark-mode .score-cell.classic-birdie .hole-cell-score {
+  color: #ff8c42;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-par .hole-cell-score {
+  color: #5eb4e8;
+}
+.score-page.is-score-classic.dark-mode .score-cell.classic-bogey .hole-cell-score,
+.score-page.is-score-classic.dark-mode .score-cell.classic-double .hole-cell-score,
+.score-page.is-score-classic.dark-mode .score-cell.classic-triple .hole-cell-score {
+  color: #f3f4f6;
+}
+
+.score-page.is-score-classic.dark-mode .score-cell.classic-eagle .hole-cell-putt,
+.score-page.is-score-classic.dark-mode .score-cell.classic-birdie .hole-cell-putt,
+.score-page.is-score-classic.dark-mode .score-cell.classic-par .hole-cell-putt,
+.score-page.is-score-classic.dark-mode .score-cell.classic-bogey .hole-cell-putt,
+.score-page.is-score-classic.dark-mode .score-cell.classic-double .hole-cell-putt,
+.score-page.is-score-classic.dark-mode .score-cell.classic-triple .hole-cell-putt {
+  color: #d1d5db;
+  opacity: 1;
+}
+
+.score-page.is-score-classic.dark-mode .score-cell.classic-eagle .hole-cell-diff,
+.score-page.is-score-classic.dark-mode .score-cell.classic-birdie .hole-cell-diff,
+.score-page.is-score-classic.dark-mode .score-cell.classic-par .hole-cell-diff,
+.score-page.is-score-classic.dark-mode .score-cell.classic-bogey .hole-cell-diff,
+.score-page.is-score-classic.dark-mode .score-cell.classic-double .hole-cell-diff,
+.score-page.is-score-classic.dark-mode .score-cell.classic-triple .hole-cell-diff {
+  color: #ff8c42 !important;
+}
+
+/* Classic DARK：lead 仅 under→小鸟橙；OUT·IN·TOT 辅助色保持 */
+.score-page.is-score-classic.dark-mode .scoreboard-shell--fourball .fourball-track-lead__diff.diff-under {
+  color: #ff8c42 !important;
+}
+
+.score-page.is-score-classic.dark-mode .special-cell-diff,
+.score-page.is-score-classic.dark-mode .special-cell-diff.diff-under,
+.score-page.is-score-classic.dark-mode .special-cell-diff.diff-even,
+.score-page.is-score-classic.dark-mode .special-cell-diff.diff-over {
+  color: #ff8c42 !important;
+}
+
+.score-page.is-score-classic.dark-mode .scoreboard-cell--hole-special-col .special-cell-putt {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.score-page.is-score-classic.dark-mode .score-cell--total .special-cell-putt,
+.score-page.is-score-classic.dark-mode .scoreboard-cell--tot-col .special-cell-putt {
+  color: #d1d5db;
+  opacity: 1;
+}
+
+/*
+ * Classic 非成绩区：统一 HOLE 行底 var(--score-header-hole)
+ * 仅 .score-page.is-score-classic + fourball shell（周末业余挑战赛路径）
+ * 不改：成绩行 T 线（.fourball-track-lead--tee 无 --head/--par、tee-sticky __row、tee-half）
+ * 不改：score-cell.classic-* 色块
+ */
+/* HOLE 洞号行（含 OUT/IN/TOT 头） */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell--special-head,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* PAR 行全部 cell（含 OUT/IN/TOT） */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* 成绩行 OUT / IN / TOT 汇总列 */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--player .score-cell.score-cell--total,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* 左侧球员信息：HOLE/PAR spacer + 身份行（头像/昵称） */
+/* Classic：取消全高接缝 shadow，避免末行以下出现 HOLE 色带（不改基础 fourball-player-column） */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column {
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__spacer.shell-row--par,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__row {
+  background: var(--score-header-hole) !important;
+}
+
+/* 行首累计 diff（成绩行；不含 T） */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--player .fourball-track-lead--diff {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* HOLE / PAR 行 lead：diff 占位 + T 占位 → HOLE 底；成绩行 T 保持 tee 色 */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* T sticky：仅 HOLE/PAR spacer；不改球员行 __row */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-tee-sticky-overlay__inner > .fourball-tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer.shell-row--par {
+  background: var(--score-header-hole) !important;
+}
+
+/*
+ * Classic 横向分隔线 — 单源责任（不新增线条，去掉重复）
+ * 右：仅 score-cell / scoreboard-cell / fourball-track-lead
+ * 左：仅 fourball-player-column spacer/row
+ * 禁：scoreboard-row 横线、hole-par-overlay 横线、tee-sticky 横线
+ * HOLE|PAR = --fourball-score-row-border；PAR|成绩/成绩行 = 更深 player token
+ * overlay 底透明，避免盖住左列/lead 单源线（文案仍在）
+ */
+/* Classic 分隔线统一色：HOLE/PAR + 成绩横线 + 纵向列缝 */
+.score-page.is-score-classic.bright-mode {
+  --fourball-score-row-border: #94a3b8;
+  --fourball-classic-player-row-border: #94a3b8;
+}
+.score-page.is-score-classic.dark-mode {
+  --fourball-score-row-border: #71717a;
+  --fourball-classic-player-row-border: #71717a;
+}
+
+/* 禁止：row 级横线（压过此前 Classic row border） */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row.scoreboard-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row.scoreboard-row--par,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row.scoreboard-row--player {
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+/* 禁止：overlay 横线 + 实心底遮挡单源线 */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-hole-par-overlay__hole,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-hole-par-overlay__par {
+  border-top: none;
+  border-bottom: none;
+  background: transparent;
+}
+
+/* 禁止：tee sticky 重复横线（不改 tee 色块） */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-tee-sticky-overlay__inner > .fourball-tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-tee-sticky-overlay__row {
+  border-top: none;
+  border-bottom: none;
+  background: transparent;
+}
+
+/* —— 右区唯一源：cell / lead —— */
+/* HOLE 顶 + HOLE|PAR */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+
+/* PAR|第一成绩 */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead--par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/* 成绩行间 + 末行底（含 diff/T lead） */
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row.scoreboard-row--player .score-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--player .fourball-track-lead {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/* —— 左区唯一源：player-column spacer/row —— */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__spacer.shell-row--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__spacer.shell-row--par,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__row,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-player-column__inner > .fourball-player-column__row:last-child {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/*
+ * Classic 纵向分隔线（单源，不叠 border）
+ * - 列间：复用全局 .scoreboard-cell border-right，仅改色
+ * - T|第一洞：补 tee lead 右缘（基线 tee 无 border-right）
+ * 贯穿 HOLE 顶 → 末成绩行底；不改 tee-half / classic-* 底
+ */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead--tee {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--player .score-cell {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+}
+
 .hole-cell-meta,
 .special-cell-meta {
   position: absolute;
@@ -7228,4 +7594,129 @@ page {
 
 .font-large .match-cumulative {
   font-size: 34rpx;
+}
+
+/*
+ * Classic 字体档位（仅 .is-score-classic；不改 .font-large / storage）
+ * 标准 = 当前 Elite 大字体；大字体 = Classic 标准再 +1～2 档
+ */
+/* —— Classic 标准（洞格 = Elite .font-large；OUT/IN/TOT 小一档 + 去粗） —— */
+.score-page.is-score-classic .hole-cell-score {
+  font-size: 58rpx;
+}
+.score-page.is-score-classic .special-cell-val {
+  font-size: 50rpx;
+  font-weight: normal;
+}
+/* Classic 洞格主成绩 ≥10：降一档（不动 diff / putt / 汇总列） */
+.score-page.is-score-classic .hole-cell-score.hole-cell-score--classic-wide {
+  font-size: 50rpx;
+}
+.score-page.is-score-classic .hole-cell-score--diff {
+  font-size: 50rpx;
+}
+.score-page.is-score-classic .hole-cell-putt,
+.score-page.is-score-classic .hole-cell-diff,
+.score-page.is-score-classic .special-cell-putt,
+.score-page.is-score-classic .special-cell-diff {
+  font-size: 22rpx;
+}
+.score-page.is-score-classic .player-diff-score {
+  font-size: 48rpx;
+}
+.score-page.is-score-classic .player-name-line {
+  font-size: 26rpx;
+}
+.score-page.is-score-classic .hole-number,
+.score-page.is-score-classic .hole-label-circle {
+  font-size: 24rpx;
+}
+.score-page.is-score-classic .par-val {
+  font-size: 28rpx;
+}
+.score-page.is-score-classic .entity-diff-score {
+  font-size: 40rpx;
+}
+.score-page.is-score-classic .entity-name {
+  font-size: 32rpx;
+}
+.score-page.is-score-classic .match-label-main {
+  font-size: 26rpx;
+}
+.score-page.is-score-classic .match-cumulative {
+  font-size: 34rpx;
+}
+/* fourball：累计 diff / 昵称 / HOLE·PAR 文案（原不在 .font-large 内，Classic 同步上移） */
+/* diff 列：相对 Classic 整体字号再降 2 档（仅 lead diff，不动 hole-cell-diff） */
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-track-lead__diff {
+  font-size: 32rpx;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-pair-identity .name-group__name,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact--combined .pair-name-compact__text,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact__part,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact__sep {
+  font-size: 22rpx;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-hole-par-overlay__hole text,
+.score-page.is-score-classic .scoreboard-shell--fourball .fourball-hole-par-overlay__par text {
+  font-size: 24rpx;
+}
+
+/* —— Classic 大字体（.font-large + is-score-classic，再 +1～2 档） —— */
+.score-page.is-score-classic.font-large .hole-cell-score {
+  font-size: 66rpx;
+}
+.score-page.is-score-classic.font-large .special-cell-val {
+  font-size: 58rpx;
+  font-weight: normal;
+}
+.score-page.is-score-classic.font-large .hole-cell-score.hole-cell-score--classic-wide {
+  font-size: 58rpx;
+}
+.score-page.is-score-classic.font-large .hole-cell-score--diff {
+  font-size: 58rpx;
+}
+.score-page.is-score-classic.font-large .hole-cell-putt,
+.score-page.is-score-classic.font-large .hole-cell-diff,
+.score-page.is-score-classic.font-large .special-cell-putt,
+.score-page.is-score-classic.font-large .special-cell-diff {
+  font-size: 26rpx;
+}
+.score-page.is-score-classic.font-large .player-diff-score {
+  font-size: 56rpx;
+}
+.score-page.is-score-classic.font-large .player-name-line {
+  font-size: 30rpx;
+}
+.score-page.is-score-classic.font-large .hole-number,
+.score-page.is-score-classic.font-large .hole-label-circle {
+  font-size: 28rpx;
+}
+.score-page.is-score-classic.font-large .par-val {
+  font-size: 32rpx;
+}
+.score-page.is-score-classic.font-large .entity-diff-score {
+  font-size: 48rpx;
+}
+.score-page.is-score-classic.font-large .entity-name {
+  font-size: 36rpx;
+}
+.score-page.is-score-classic.font-large .match-label-main {
+  font-size: 30rpx;
+}
+.score-page.is-score-classic.font-large .match-cumulative {
+  font-size: 40rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-track-lead__diff {
+  font-size: 40rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-pair-identity .name-group__name,
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact--combined .pair-name-compact__text,
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact__part,
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-pair-identity .pair-name-compact__sep {
+  font-size: 26rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-hole-par-overlay__hole text,
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-hole-par-overlay__par text {
+  font-size: 28rpx;
 }

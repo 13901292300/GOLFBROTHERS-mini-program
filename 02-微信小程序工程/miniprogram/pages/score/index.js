@@ -17,6 +17,7 @@ const halfCourseEdit = require('../../utils/halfCourseEdit.js');
 const holeLayout = require('../../utils/holeLayout.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const reactionSounds = require('../../utils/reactionSounds.js');
+const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const teeSheetManage = require('../../utils/teeSheetManage.js');
 const caddieScoringAccess = require('../../utils/caddieScoringAccess.js');
@@ -682,6 +683,13 @@ function formatCellDiff(diff) {
   return n > 0 ? '+' + n : String(n);
 }
 
+/** Classic 洞格右下角文案：-N / 0 / N（正数无 +）；不改 formatCellDiff / Elite */
+function formatClassicCellDiff(diff) {
+  const n = Number(diff);
+  if (!Number.isFinite(n) || n === 0) return '0';
+  return String(n);
+}
+
 // 杆差模式主数字：diff>0 显示 +N，diff=0 显示 0，diff<0 显示 -N
 function formatDiffWithPlus(diff) {
   if (diff > 0) return '+' + diff;
@@ -694,6 +702,30 @@ function formatMainScore(scoreVal, par, displayMode) {
   if (scoreVal === null || scoreVal === undefined || scoreVal === '') return '';
   if (displayMode === 'diff') return formatDiffWithPlus(scoreVal - par);
   return String(scoreVal);
+}
+
+/**
+ * OUT / IN / TOT 展示派生（仅 UI，不改累计计算与存档）
+ * - OUT/IN + gross：主数字=半场总杆，角标=半场累计杆差
+ * - OUT/IN + diff：主数字=半场累计杆差，角标隐藏
+ * - TOT：主数字永远总杆，永不显示杆差
+ */
+function resolveSpecialColumnDisplay(displayMode, isTot, sum, diffTotal, filled) {
+  if (!(filled > 0)) {
+    return { mainStr: '', displayScore: '', diffStr: '' };
+  }
+  if (isTot) {
+    return { mainStr: String(sum), displayScore: sum, diffStr: '' };
+  }
+  if (displayMode === 'diff') {
+    const d = formatDiffWithPlus(diffTotal);
+    return { mainStr: d, displayScore: d, diffStr: '' };
+  }
+  return {
+    mainStr: String(sum),
+    displayScore: sum,
+    diffStr: formatDiff(diffTotal)
+  };
 }
 
 /**
@@ -916,6 +948,31 @@ function bestScoreClass(diff) {
   return '';
 }
 
+/**
+ * 临时 Classic Style（仅视觉验证）：按真实洞差映射 classic-* class。
+ * 不改 scoreClass / bestScoreClass / scoreStyle / getScoreStatus。
+ * 空洞必须由调用方保证不传入（未录入返回 ''）。
+ */
+function resolveClassicHoleClass(diff) {
+  const n = Number(diff);
+  if (!Number.isFinite(n)) return '';
+  if (n <= -2) return 'classic-eagle';
+  if (n === -1) return 'classic-birdie';
+  if (n === 0) return 'classic-par';
+  if (n === 1) return 'classic-bogey';
+  if (n === 2) return 'classic-double';
+  if (n >= 3) return 'classic-triple';
+  return '';
+}
+
+/** Classic 洞格主数字两位数降档（仅显示 class；gross≥10；不动杆差模式 / 计算） */
+function resolveClassicHoleScoreSizeClass(scoreVal, displayMode) {
+  if (displayMode === 'diff') return '';
+  const n = Number(scoreVal);
+  if (!Number.isFinite(n) || n < 10) return '';
+  return 'hole-cell-score--classic-wide';
+}
+
 // displayMode（gross/diff）统一驱动记分格主数字与右下角杆差，逻辑与 enrichPlayer 保持一致
 function buildBestBallColumns(displayMode) {
   return columnLabels().map((label, idx) => {
@@ -934,25 +991,33 @@ function buildBestBallColumns(displayMode) {
       score = par + diff;
       putts = Math.max(1, 2 + (idx % 2 === 0 ? 0 : -1));
     }
+    const isTot = idx === 20;
+    const specialDisp = isSpecial
+      ? resolveSpecialColumnDisplay(displayMode, isTot, score, diff, true)
+      : null;
     return {
       colIdx: idx,
       label,
       par,
       isSpecial,
-      isTot: idx === 20,
-      score,
-      // 记分格主数字：gross→总杆；diff→带符号本洞杆差（汇总列与个人比杆赛一致，始终显示总杆）
-      mainStr: isSpecial ? String(score) : formatMainScore(score, par, displayMode),
+      isTot,
+      score: isSpecial ? specialDisp.displayScore : score,
+      // 洞格：gross/diff；OUT/IN/TOT：见 resolveSpecialColumnDisplay
+      mainStr: isSpecial
+        ? specialDisp.mainStr
+        : formatMainScore(score, par, displayMode),
       putts,
       diff,
-      // 右下角杆差：洞格统一 formatCellDiff；汇总列仍用 formatDiff
       diffStr: isSpecial
-        ? formatDiff(diff)
+        ? specialDisp.diffStr
         : displayMode === 'diff'
           ? ''
           : formatCellDiff(diff),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
-      scoreClass: isSpecial ? '' : bestScoreClass(diff)
+      scoreClass: isSpecial ? '' : bestScoreClass(diff),
+      classicScoreSizeClass: isSpecial
+        ? ''
+        : resolveClassicHoleScoreSizeClass(score, displayMode)
     };
   });
 }
@@ -987,28 +1052,42 @@ function buildTeamBestColumns(scores, putts, displayMode) {
     if (SPECIAL_IDX.includes(idx)) {
       const isOut = idx === 9;
       const isIn = idx === 19;
+      const isTot = idx === 20;
       const sum = isOut ? outSum : isIn ? inSum : outSum + inSum;
       const puttTotal = isOut ? outPutts : isIn ? inPutts : outPutts + inPutts;
       const diffTotal = isOut ? outDiff : isIn ? inDiff : outDiff + inDiff;
       const filled = isOut ? outFilled : isIn ? inFilled : outFilled + inFilled;
+      const specialDisp = resolveSpecialColumnDisplay(
+        displayMode,
+        isTot,
+        sum,
+        diffTotal,
+        filled
+      );
       return {
-        colIdx: idx, label, par, isSpecial: true, isTot: idx === 20,
-        score: filled > 0 ? sum : '',
-        mainStr: filled > 0 ? String(sum) : '',
+        colIdx: idx, label, par, isSpecial: true, isTot,
+        score: specialDisp.displayScore,
+        mainStr: specialDisp.mainStr,
         putts: filled > 0 ? puttTotal : '',
         diff: diffTotal,
-        diffStr: filled > 0 ? formatDiff(diffTotal) : '',
+        diffStr: specialDisp.diffStr,
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
-        scoreClass: ''
+        scoreClass: '',
+        classicClass: ''
       };
     }
     const hi = holeCursor;
     holeCursor += 1;
     const s = scores[hi];
+    // 空洞：以 score 是否存在为准，classicClass 必须为空（勿用 diff===0）
     if (!isFilledScore(s)) {
       return {
         colIdx: idx, label, par, isSpecial: false, isTot: false,
-        score: '', mainStr: '', putts: '', diff: 0, diffStr: '', diffClass: 'diff-even', scoreClass: ''
+        score: '', mainStr: '', putts: '', diff: 0, diffStr: '', classicDiffStr: '',
+        diffClass: 'diff-even',
+        scoreClass: '',
+        classicClass: '',
+        classicScoreSizeClass: ''
       };
     }
     const p = putts[hi] || 1;
@@ -1022,8 +1101,12 @@ function buildTeamBestColumns(scores, putts, displayMode) {
       putts: p,
       diff,
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
+      // Classic 专用展示；杆差模式下仍隐藏右下角（与 Elite 一致）
+      classicDiffStr: displayMode === 'diff' ? '' : formatClassicCellDiff(diff),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
-      scoreClass: bestScoreClass(diff)
+      scoreClass: bestScoreClass(diff),
+      classicClass: resolveClassicHoleClass(diff),
+      classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode)
     };
   });
   const relScore = outDiff + inDiff;
@@ -1779,20 +1862,28 @@ function enrichPlayer(player, pIdx, displayMode, options) {
     if (SPECIAL_IDX.includes(colIdx)) {
       const isOut = colIdx === 9;
       const isIn = colIdx === 19;
+      const isTot = colIdx === 20;
       const sum = isOut ? outSum : isIn ? inSum : outSum + inSum;
       const puttTotal = isOut ? outPutts : isIn ? inPutts : outPutts + inPutts;
       const diffTotal = isOut ? outDiff : isIn ? inDiff : outDiff + inDiff;
       const filled = isOut ? outFilled : isIn ? inFilled : outFilled + inFilled;
+      const specialDisp = resolveSpecialColumnDisplay(
+        displayMode,
+        isTot,
+        sum,
+        diffTotal,
+        filled
+      );
       return {
         type: 'special',
         colIdx,
         label,
         par,
-        val: filled > 0 ? sum : '',
+        val: specialDisp.displayScore,
         puttTotal: filled > 0 ? puttTotal : '',
         diffTotal,
-        diffStr: filled > 0 ? formatDiff(diffTotal) : '',
-        isTot: colIdx === 20,
+        diffStr: specialDisp.diffStr,
+        isTot,
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even'
       };
     }
@@ -1816,6 +1907,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         diff: 0,
         diffStr: '',
         scoreClass: '',
+        classicScoreSizeClass: '',
         triangleClass:
           hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
         gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
@@ -1852,6 +1944,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       // 右下角杆差：杆差模式下隐藏（主数字已是杆差，避免重复）；平杆统一 0
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
       scoreClass: scoreStyle(diff),
+      classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
       triangleClass:
         hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
       gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
@@ -2001,6 +2094,10 @@ Page({
     columns: buildColumns(),
     playersView: [],
     entitiesView: [],
+    /**
+     * 临时视觉验证：仅 demo-weekend-amateur 洞格 Classic Style（不改成绩逻辑 / 无设置入口）
+     */
+    scoreHoleStyleClassic: false,
     /**
      * M2 Render Model（A1：仅 Adapter 产出，WXML 未接入）
      * { headerRows, scoreRows }
@@ -2212,7 +2309,7 @@ Page({
     // 无比赛数据：不初始化任何默认比赛，提示后保持空白（入口已统一拦截，此处为兜底）
     if (!ms || !ms.formatType) {
       this._playersSource = [];
-      this.setData({ noMatch: true });
+      this.setData({ noMatch: true, scoreHoleStyleClassic: false });
       wx.showToast({ title: '暂无比赛数据', icon: 'none' });
       return;
     }
@@ -2242,7 +2339,9 @@ Page({
       formatType: ms.formatType,
       groupId: groupId,
       gameId: gameId,
-      gameGroupIndex: groupIndex
+      gameGroupIndex: groupIndex,
+      // 临时 Classic：仅 gameId === demo-weekend-amateur（isDemoWeekendAmateurGameId）
+      scoreHoleStyleClassic: demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gameId)
     });
 
     this._syncHoleLayoutFromCourse({ refresh: false });
@@ -4413,7 +4512,8 @@ Page({
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
       'match.format': game && game.gameMode ? game.gameMode : '个人比杆赛',
-      'match.course': game ? game.courseName || '' : ''
+      'match.course': game ? game.courseName || '' : '',
+      scoreHoleStyleClassic: demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gameId)
     });
     // 轻量 Context Panel：单组 / 多组均展示（仅 createGame metadata + 天气）
     this.buildGameContext(game);
@@ -7924,6 +8024,7 @@ Page({
           diffStr: c.diffStr || '',
           diffClass: c.diffClass || 'diff-even',
           scoreClass: c.scoreClass || '',
+          classicScoreSizeClass: c.classicScoreSizeClass || '',
           holeIndex: c.holeIndex
         };
       });
