@@ -22,7 +22,7 @@
  */
 
 const MATCH_STATE_KEY = 'matchState';
-const SCORE_PAGE_URL = '/pages/score/index';
+const SCORE_PAGE_URL = '/subpackages/scoring/pages/score/index';
 const gameStore = require('./gameStore.js');
 
 function getMatchState() {
