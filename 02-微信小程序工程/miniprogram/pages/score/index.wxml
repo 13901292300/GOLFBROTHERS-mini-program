@@ -587,7 +587,17 @@
                     data-player-id="{{m.playerId || m.id || ''}}"
                     catchtap="onFourballPlayerAvatarTap"
                   >
-                    <image class="avatar-group__avatar" src="{{m.avatar}}" mode="aspectFill"></image>
+                    <!-- hit-wrap：震动/汁水仅视觉，不改 avatar src，不参与布局位移 -->
+                    <view
+                      class="avatar-group__hit-wrap {{playerActionHitPlayerId == m.playerId ? 'is-tomato-shake' : ''}} {{playerActionFlowerScalePlayerId == m.playerId ? 'is-flower-pulse' : ''}}"
+                    >
+                      <image
+                        id="fb-player-avatar-{{m.playerId || m.id}}"
+                        class="avatar-group__avatar"
+                        src="{{m.avatar}}"
+                        mode="aspectFill"
+                      ></image>
+                    </view>
                   </view>
                 </view>
                 <view class="name-stack">
@@ -1850,6 +1860,239 @@
     </view>
     <view class="style-done-wrap">
       <view bindtap="closeStyleSheet" class="style-done-btn">完成</view>
+    </view>
+  </view>
+
+  <!-- Demo：球员头像互动面板（fourball shell 展开后点击头像） -->
+  <view
+    wx:if="{{playerActionSheetVisible}}"
+    bindtap="closePlayerActionSheet"
+    class="sheet-overlay sheet-overlay--player-action"
+  ></view>
+  <view
+    wx:if="{{playerActionSheetVisible && playerActionTarget}}"
+    class="bottom-sheet bottom-sheet--player-action"
+    catchtap="noop"
+  >
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="player-action-sheet">
+      <view class="player-action-sheet__profile">
+        <image
+          class="player-action-sheet__avatar"
+          src="{{playerActionTarget.avatar}}"
+          mode="aspectFill"
+        ></image>
+        <view class="player-action-sheet__meta">
+          <text class="player-action-sheet__name">{{playerActionTarget.name}}</text>
+          <text class="player-action-sheet__gender">{{playerActionTarget.genderLabel}}</text>
+        </view>
+      </view>
+      <view class="player-action-sheet__actions">
+        <view
+          class="player-action-sheet__tomato"
+          catchtap="onPlayerActionTomatoTap"
+        >🍅</view>
+        <view
+          class="player-action-sheet__bucket"
+          catchtap="onPlayerActionBucketTap"
+        >🪣</view>
+        <view
+          class="player-action-sheet__egg"
+          catchtap="onPlayerActionEggTap"
+        >🥚</view>
+        <view
+          class="player-action-sheet__flower"
+          catchtap="onPlayerActionFlowerTap"
+        >🌹</view>
+      </view>
+    </view>
+    <view class="sheet-cancel-wrap">
+      <view bindtap="closePlayerActionSheet" class="sheet-cancel-btn">取 消</view>
+    </view>
+  </view>
+
+  <!-- Demo：🍅 飞行动画层（高于 sheet，纯视觉） -->
+  <view
+    wx:if="{{playerActionTomatoVisible}}"
+    class="player-action-tomato-fly {{playerActionTomatoAnimating ? 'is-flying' : ''}}"
+    style="{{playerActionTomatoStyle}}"
+  >🍅</view>
+
+  <!-- Demo：🍅 命中爆裂（头像中心局部碎裂，非全屏） -->
+  <view
+    wx:if="{{playerActionBurstVisible}}"
+    class="player-action-tomato-burst"
+    style="{{playerActionBurstStyle}}"
+  >
+    <view class="player-action-tomato-burst__core"></view>
+    <view class="player-action-tomato-burst__shard s0"></view>
+    <view class="player-action-tomato-burst__shard s1"></view>
+    <view class="player-action-tomato-burst__shard s2"></view>
+    <view class="player-action-tomato-burst__shard s3"></view>
+    <view class="player-action-tomato-burst__shard s4"></view>
+    <view class="player-action-tomato-burst__shard s5"></view>
+  </view>
+  <!-- Demo：🍅 汁液 — fixed 锚定目标头像 -->
+  <view
+    wx:if="{{playerActionJuiceVisible}}"
+    class="player-action-tomato-juice"
+    style="{{playerActionJuiceStyle}}"
+  >
+    <view class="player-action-tomato-juice__impact"></view>
+    <view class="player-action-tomato-juice__crown"></view>
+    <view class="player-action-tomato-juice__stream st0"></view>
+    <view class="player-action-tomato-juice__stream st1"></view>
+    <view class="player-action-tomato-juice__stream st2"></view>
+    <view class="player-action-tomato-juice__stream st3"></view>
+    <view class="player-action-tomato-juice__stream st4"></view>
+    <view class="player-action-tomato-juice__drop dp0"></view>
+    <view class="player-action-tomato-juice__drop dp1"></view>
+    <view class="player-action-tomato-juice__drop dp2"></view>
+    <view class="player-action-tomato-juice__drop dp3"></view>
+    <view class="player-action-tomato-juice__drop dp4"></view>
+    <view class="player-action-tomato-juice__bottom-drip bd0"></view>
+    <view class="player-action-tomato-juice__bottom-drip bd1"></view>
+    <view class="player-action-tomato-juice__bottom-drip bd2"></view>
+    <view class="player-action-tomato-juice__speck sk0"></view>
+    <view class="player-action-tomato-juice__speck sk1"></view>
+    <view class="player-action-tomato-juice__speck sk2"></view>
+  </view>
+  <!-- Demo：🪣 湿水 — fixed 锚定目标头像 -->
+  <view
+    wx:if="{{playerActionWaterVisible}}"
+    class="player-action-bucket-water"
+    style="{{playerActionWaterStyle}}"
+  >
+    <view class="player-action-bucket-water__fill"></view>
+    <view class="player-action-bucket-water__sheet s0"></view>
+    <view class="player-action-bucket-water__sheet s1"></view>
+    <view class="player-action-bucket-water__sheet s2"></view>
+    <view class="player-action-bucket-water__sheet s3"></view>
+  </view>
+
+  <!-- Demo：🥚 连击飞入层（可多枚并存；独立于记分 wx:for，避免整表重绘闪白） -->
+  <view
+    wx:for="{{playerActionEggs}}"
+    wx:key="id"
+    class="player-action-egg-fly {{item.finale ? 'is-finale' : ''}}"
+    style="{{item.style}}"
+  >🥚</view>
+  <!-- Demo：🥚 糊脸层 — fixed 锚定目标头像矩形，不写入成绩列表 -->
+  <view
+    wx:if="{{playerActionEggSplatVisible}}"
+    class="player-action-egg-splat {{playerActionEggFinale ? 'is-finale' : ''}} {{playerActionEggSplatHiding ? 'is-hiding' : ''}}"
+    style="{{playerActionEggSplatStyle}}"
+  >
+    <view wx:if="{{playerActionEggLevel >= 1}}" class="player-action-egg-splat__white w0"></view>
+    <view wx:if="{{playerActionEggLevel >= 1}}" class="player-action-egg-splat__stream s0"></view>
+    <view wx:if="{{playerActionEggLevel >= 2}}" class="player-action-egg-splat__white w1"></view>
+    <view wx:if="{{playerActionEggLevel >= 2}}" class="player-action-egg-splat__stream s1"></view>
+    <view wx:if="{{playerActionEggLevel >= 2}}" class="player-action-egg-splat__drop d0"></view>
+    <view wx:if="{{playerActionEggLevel >= 3}}" class="player-action-egg-splat__white w2"></view>
+    <view wx:if="{{playerActionEggLevel >= 3}}" class="player-action-egg-splat__yolk y0"></view>
+    <view wx:if="{{playerActionEggLevel >= 3}}" class="player-action-egg-splat__stream s2"></view>
+    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__white w3"></view>
+    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__yolk y1"></view>
+    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__stream s3"></view>
+    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__drop d1"></view>
+    <view wx:if="{{playerActionEggLevel >= 5}}" class="player-action-egg-splat__yolk y2"></view>
+    <view wx:if="{{playerActionEggLevel >= 5}}" class="player-action-egg-splat__stream s4"></view>
+    <view wx:if="{{playerActionEggLevel >= 5}}" class="player-action-egg-splat__drop d2"></view>
+    <view wx:if="{{playerActionEggLevel >= 6}}" class="player-action-egg-splat__drop d3"></view>
+    <!-- 最后一击：仅加大覆盖/流淌/滴落（无 flash / glow / 白闪） -->
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-white fw0"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-white fw1"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-white fw2"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-yolk fy0"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-yolk fy1"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-yolk fy2"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f0"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f1"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f2"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f3"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f4"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f5"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f6"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd0"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd1"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd2"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd3"></view>
+    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd4"></view>
+  </view>
+
+  <!-- Demo：🪣 水桶（正上方下降 → 翻转倒水，独立于🍅） -->
+  <view
+    wx:if="{{playerActionBucketVisible}}"
+    class="player-action-bucket {{playerActionBucketDropping ? 'is-dropping' : ''}} {{playerActionBucketPouring ? 'is-pouring' : ''}}"
+    style="{{playerActionBucketStyle}}"
+  >
+    <text class="player-action-bucket__icon">🪣</text>
+    <view wx:if="{{playerActionBucketPouring}}" class="player-action-bucket__streams">
+      <view class="player-action-bucket__stream st0"></view>
+      <view class="player-action-bucket__stream st1"></view>
+      <view class="player-action-bucket__stream st2"></view>
+      <view class="player-action-bucket__stream st3"></view>
+      <view class="player-action-bucket__stream st4"></view>
+    </view>
+  </view>
+  <!-- 夸张倒水层：仅锚定目标头像，略宽于头像边缘 -->
+  <view
+    wx:if="{{playerActionWaterFloodVisible}}"
+    class="player-action-bucket-flood"
+    style="{{playerActionWaterFloodStyle}}"
+  >
+    <view class="player-action-bucket-flood__blast"></view>
+    <view class="player-action-bucket-flood__cascade c0"></view>
+    <view class="player-action-bucket-flood__cascade c1"></view>
+    <view class="player-action-bucket-flood__cascade c2"></view>
+    <view class="player-action-bucket-flood__cascade c3"></view>
+    <view class="player-action-bucket-flood__cascade c4"></view>
+  </view>
+  <view
+    wx:if="{{playerActionWaterDripVisible}}"
+    class="player-action-bucket-drip"
+    style="{{playerActionWaterDripStyle}}"
+  >
+    <view class="player-action-bucket-drip__drop d0"></view>
+    <view class="player-action-bucket-drip__drop d1"></view>
+    <view class="player-action-bucket-drip__drop d2"></view>
+    <view class="player-action-bucket-drip__drop d3"></view>
+    <view class="player-action-bucket-drip__drop d4"></view>
+    <view class="player-action-bucket-drip__drop d5"></view>
+    <view class="player-action-bucket-drip__drop d6"></view>
+    <view class="player-action-bucket-drip__drop d7"></view>
+  </view>
+
+  <!-- Demo：🌹 送花（柔和飘入 → 开放 + 花环） -->
+  <view
+    wx:if="{{playerActionFlowerVisible}}"
+    class="player-action-flower {{playerActionFlowerBloom ? 'is-bloom' : ''}}"
+    style="{{playerActionFlowerStyle}}"
+  >🌹</view>
+  <view
+    wx:if="{{playerActionPetalVisible}}"
+    class="player-action-flower-petals"
+    style="{{playerActionPetalStyle}}"
+  >
+    <view class="player-action-flower-petals__p p0"></view>
+    <view class="player-action-flower-petals__p p1"></view>
+    <view class="player-action-flower-petals__p p2"></view>
+    <view class="player-action-flower-petals__p p3"></view>
+  </view>
+  <!-- Demo：🌹 花环（围绕头像中心；外层定位，内层缩放） -->
+  <view
+    wx:if="{{playerActionWreathVisible}}"
+    class="player-action-flower-wreath {{playerActionWreathAppear ? 'is-appear' : ''}} {{playerActionWreathFading ? 'is-fading' : ''}}"
+    style="{{playerActionWreathStyle}}"
+  >
+    <view
+      wx:for="{{playerActionWreathItems}}"
+      wx:key="id"
+      class="player-action-flower-wreath__item"
+      style="{{item.style}}"
+    >
+      <view class="player-action-flower-wreath__bloom" style="animation-delay:{{item.delay}};">{{item.emoji}}</view>
     </view>
   </view>
 

@@ -16,6 +16,7 @@ const gameLifecycle = require('../../utils/gameLifecycle.js');
 const halfCourseEdit = require('../../utils/halfCourseEdit.js');
 const holeLayout = require('../../utils/holeLayout.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
+const reactionSounds = require('../../utils/reactionSounds.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const teeSheetManage = require('../../utils/teeSheetManage.js');
 const caddieScoringAccess = require('../../utils/caddieScoringAccess.js');
@@ -2052,6 +2053,54 @@ Page({
     fourballIdentityMode: false,
     /** fixed-collapse：身份列是否展开（默认折叠） */
     fourballIdentityExpanded: false,
+    /** Demo：球员头像互动面板（仅 fourball shell 展开后入口；无动画/无写盘） */
+    playerActionSheetVisible: false,
+    playerActionTarget: null,
+    /** Demo：🍅 飞行动画层 */
+    playerActionTomatoVisible: false,
+    playerActionTomatoAnimating: false,
+    playerActionTomatoStyle: '',
+    /** Demo：命中反馈（爆裂 / 汁水 / 震动；不写头像数据） */
+    playerActionBurstVisible: false,
+    playerActionBurstStyle: '',
+    /** Demo：🍅 汁液 — fixed 锚定目标头像（不进成绩列表，避免邻头像闪白） */
+    playerActionJuiceVisible: false,
+    playerActionJuiceStyle: '',
+    playerActionHitPlayerId: '',
+    /** Demo：🪣 水桶动画（独立于🍅轨迹） */
+    playerActionBucketVisible: false,
+    playerActionBucketDropping: false,
+    playerActionBucketPouring: false,
+    playerActionBucketStyle: '',
+    /** Demo：🪣 湿水 — fixed 锚定目标头像 */
+    playerActionWaterVisible: false,
+    playerActionWaterStyle: '',
+    playerActionWaterDripVisible: false,
+    playerActionWaterDripStyle: '',
+    playerActionWaterFloodVisible: false,
+    playerActionWaterFloodStyle: '',
+    /** Demo：🌹 送花动画（独立于🍅/🪣） */
+    playerActionFlowerVisible: false,
+    playerActionFlowerBloom: false,
+    playerActionFlowerStyle: '',
+    playerActionPetalVisible: false,
+    playerActionPetalStyle: '',
+    /** Demo：🌹 仅目标头像轻缩放（局部，无全局 glow/flash） */
+    playerActionFlowerScalePlayerId: '',
+    /** Demo：🌹 命中后花环（围绕头像） */
+    playerActionWreathVisible: false,
+    playerActionWreathAppear: false,
+    playerActionWreathFading: false,
+    playerActionWreathStyle: '',
+    playerActionWreathItems: [],
+    /** Demo：🥚 连击（独立于🍅/🪣/🌹；糊脸层 fixed 锚定头像，不写盘） */
+    playerActionEggs: [],
+    playerActionEggSplatVisible: false,
+    /** 结束清理：先隐藏卸合成层，再 wx:if 销毁（防乳白残留） */
+    playerActionEggSplatHiding: false,
+    playerActionEggSplatStyle: '',
+    playerActionEggLevel: 0,
+    playerActionEggFinale: false,
     /** 普通创建 fourball_best 纯 2+2：业务判定（每组恰好 2 人） */
     isFourballPair22: false,
     /** fourball pair 视觉布局：2+2 或 2+1（有 pair 且无 ≥3）；驱动 CSS class / 横滑 */
@@ -3212,10 +3261,14 @@ Page({
           const name = this._shortName(m.name) || m.name || '球员';
           // 仅 fourball pair 展示用；原 name 保留完整短名
           const dn = name.length > 2 ? name.charAt(0) + '…' : name;
+          const rawPid = m && (m.playerId || m.id || m.userId);
+          const playerId = rawPid != null && String(rawPid).trim() ? String(rawPid).trim() : '';
           return {
+            playerId: playerId,
             name: name,
             displayName: dn,
             avatar: m.avatar || '',
+            gender: (m && m.gender) || '',
             teeColor: style.teeColor,
             left: PAIR_LEFT[mi] || (24 + mi * 104) + 'rpx',
             tf: mi === 1 ? 'translateX(var(--pair-second-shift, 0rpx))' : 'none'
@@ -4422,6 +4475,12 @@ Page({
 
   onReady() {
     this.initHeaderNav();
+    // 预热互动音效实例，避免命中动画 setData 同帧首次 createInnerAudioContext 造成全屏闪白
+    try {
+      reactionSounds.warmReactionSounds();
+    } catch (e) {
+      /* ignore */
+    }
   },
 
   // 只读取全局主题并渲染，本页不允许修改主题
@@ -6482,7 +6541,7 @@ Page({
   /**
    * fixed-collapse：具体球员头像（catchtap，阻止冒泡到身份区）。
    * - 折叠：视为点组合区 → 仅展开
-   * - 展开：预留球员入口（当前只 console.log playerId，不跳转）
+   * - 展开：打开临时球员互动面板（Demo，无动画 / 无写盘）
    */
   onFourballPlayerAvatarTap(e) {
     if (!this._isFourballIdentityFixedCollapseMode()) return;
@@ -6492,7 +6551,1170 @@ Page({
     }
     const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
     const playerId = ds.playerId != null ? String(ds.playerId).trim() : '';
-    console.log(playerId);
+    const target = this._resolvePlayerActionTarget(playerId);
+    if (!target) return;
+    this.setData({
+      playerActionSheetVisible: true,
+      playerActionTarget: target
+    });
+  },
+
+  /**
+   * Demo：从 fourballRowsView / _playersSource 组装互动面板展示数据。
+   * 不读成绩、不写盘。
+   */
+  _resolvePlayerActionTarget(playerId) {
+    const key = playerId != null ? String(playerId).trim() : '';
+    if (!key) return null;
+
+    let member = null;
+    const rows = this.data.fourballRowsView || [];
+    for (let i = 0; i < rows.length; i++) {
+      const members = (rows[i] && rows[i].identity && rows[i].identity.members) || [];
+      for (let j = 0; j < members.length; j++) {
+        const m = members[j];
+        if (!m) continue;
+        const mid = String(m.playerId || m.id || m.userId || '').trim();
+        if (mid && isSameUserIdentity(mid, key)) {
+          member = m;
+          break;
+        }
+      }
+      if (member) break;
+    }
+
+    const source = this._findPlayersSourceById(key);
+    const name =
+      (source && (source.name || source.nickname || source.displayName)) ||
+      (member && (member.name || member.displayName)) ||
+      '球员';
+    const avatar =
+      (member && member.avatar) ||
+      (source && source.avatar) ||
+      '';
+    const genderRaw =
+      (member && member.gender) ||
+      (source && source.gender) ||
+      '';
+    const gender =
+      genderRaw === 'female' || genderRaw === 'male'
+        ? genderRaw
+        : resolveScoreDisplayGender(
+            { gender: genderRaw },
+            key
+          );
+    const genderLabel = gender === 'female' ? '女' : gender === 'male' ? '男' : '未设置';
+
+    return {
+      playerId: key,
+      name: name,
+      avatar: avatar,
+      gender: gender,
+      genderLabel: genderLabel
+    };
+  },
+
+  closePlayerActionSheet() {
+    if (!this.data.playerActionSheetVisible) return;
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null
+    });
+  },
+
+  /**
+   * Demo：🍅 → 定位目标头像中心，飞入并旋转 720°，到达后播命中反馈。
+   * 纯视觉：无写盘。
+   */
+  onPlayerActionTomatoTap() {
+    if (this._playerActionTomatoBusy) return;
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && target.playerId != null ? String(target.playerId).trim() : '';
+    if (!playerId) {
+      console.log('[player-action-tomato] missing playerId');
+      return;
+    }
+    const selector = '#fb-player-avatar-' + playerId;
+    const self = this;
+    this._playerActionTomatoBusy = true;
+
+    wx.createSelectorQuery()
+      .in(this)
+      .select(selector)
+      .boundingClientRect((rect) => {
+        if (!rect) {
+          console.log('[player-action-tomato] avatar not found', {
+            playerId: playerId,
+            selector: selector
+          });
+          self._playerActionTomatoBusy = false;
+          return;
+        }
+        self._playPlayerActionTomatoFly(rect, playerId);
+      })
+      .exec();
+  },
+
+  /**
+   * Demo：单个番茄动画实例（随机起点 → 头像中心，轻微弧线，旋转 720°，约 0.8s）。
+   * 到达后由命中反馈接管（爆裂 / 汁水 / 震动保持不动）。
+   */
+  _playPlayerActionTomatoFly(rect, playerId) {
+    const left = Number(rect && rect.left);
+    const top = Number(rect && rect.top);
+    const width = Number(rect && rect.width);
+    const height = Number(rect && rect.height);
+    const endX = left + width / 2;
+    const endY = top + height / 2;
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    if (
+      !Number.isFinite(endX) ||
+      !Number.isFinite(endY) ||
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionTomatoBusy = false;
+      return;
+    }
+    const juiceStyle =
+      'left:' +
+      Math.round(left) +
+      'px;top:' +
+      Math.round(top) +
+      'px;width:' +
+      Math.round(width) +
+      'px;height:' +
+      Math.round(height) +
+      'px;';
+
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+
+    // 每次随机起点：右侧 / 右上 / 右下 / 下方
+    const origins = [
+      { key: 'right', x: winW + 96, y: endY },
+      { key: 'right-top', x: winW + 72, y: -64 },
+      { key: 'right-bottom', x: winW + 72, y: winH + 64 },
+      { key: 'bottom', x: endX + 24, y: winH + 96 }
+    ];
+    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    const startX = origin.x;
+    const startY = origin.y;
+    // 控制点随起点微调，保持轻微弧线（非直线）
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const ctrlX = midX + (origin.key === 'bottom' ? 48 : -12);
+    const ctrlY =
+      origin.key === 'right-top'
+        ? midY - 28
+        : origin.key === 'right-bottom' || origin.key === 'bottom'
+          ? midY + 36
+          : midY - 56;
+    const flyMs = 800;
+
+    const buildFlyStyle = function (x, y, rot, scale) {
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg) scale(' +
+        scale +
+        ');transition:none;'
+      );
+    };
+
+    // 关闭面板，露出目标头像
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionTomatoVisible: true,
+      playerActionTomatoAnimating: true,
+      playerActionTomatoStyle: buildFlyStyle(startX, startY, 0, 1),
+      playerActionBurstVisible: false,
+      playerActionBurstStyle: '',
+      playerActionJuiceVisible: false,
+      playerActionJuiceStyle: juiceStyle,
+      playerActionHitPlayerId: ''
+    });
+
+    const self = this;
+    this._clearPlayerActionTomatoTimers();
+
+    this._playerActionTomatoFlyTimer = setTimeout(function () {
+      self._playerActionTomatoFlyTimer = null;
+      const t0 = Date.now();
+
+      const tick = function () {
+        const elapsed = Date.now() - t0;
+        let t = elapsed / flyMs;
+        if (t >= 1) t = 1;
+        // 二次贝塞尔：随机起点 → 弧线 → 头像中心
+        const u = 1 - t;
+        const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+        const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
+        const rot = 720 * t;
+        const scale = 1 + 0.15 * t;
+        self.setData({
+          playerActionTomatoStyle: buildFlyStyle(x, y, rot, scale)
+        });
+        if (t < 1) {
+          self._playerActionTomatoArcTimer = setTimeout(tick, 16);
+          return;
+        }
+        self._playerActionTomatoArcTimer = null;
+        self._playPlayerActionTomatoHit(hitPlayerId, endX, endY);
+      };
+
+      tick();
+    }, 40);
+  },
+
+  /** Demo：清理🍅相关延时器 */
+  _clearPlayerActionTomatoTimers() {
+    const keys = [
+      '_playerActionTomatoFlyTimer',
+      '_playerActionTomatoArcTimer',
+      '_playerActionTomatoClearTimer',
+      '_playerActionTomatoHitTimer',
+      '_playerActionTomatoBurstTimer',
+      '_playerActionTomatoShakeTimer',
+      '_playerActionTomatoJuiceTimer'
+    ];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (this[k]) {
+        clearTimeout(this[k]);
+        this[k] = null;
+      }
+    }
+  },
+
+  /**
+   * Demo：命中反馈 —— 番茄停留后爆裂消失，头像汁水从头流到脚约 4.5s + 轻微震动。
+   * 纯视觉，不改头像 src / 成绩 / LIVE。
+   */
+  _playPlayerActionTomatoHit(playerId, centerX, centerY) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const cx = Number(centerX);
+    const cy = Number(centerY);
+    const burstStyle =
+      Number.isFinite(cx) && Number.isFinite(cy)
+        ? 'left:' + cx + 'px;top:' + cy + 'px;'
+        : '';
+
+    // 到达态短暂停留：番茄仍可见；随后爆裂并隐藏番茄本体
+    const self = this;
+    this._playerActionTomatoHitTimer = setTimeout(function () {
+      self._playerActionTomatoHitTimer = null;
+      self.setData({
+        playerActionTomatoVisible: false,
+        playerActionTomatoAnimating: false,
+        playerActionTomatoStyle: '',
+        playerActionBurstVisible: !!burstStyle,
+        playerActionBurstStyle: burstStyle,
+        playerActionJuiceVisible: true,
+        playerActionHitPlayerId: hitPlayerId
+      });
+
+      self._playerActionTomatoBurstTimer = setTimeout(function () {
+        self._playerActionTomatoBurstTimer = null;
+        self.setData({
+          playerActionBurstVisible: false,
+          playerActionBurstStyle: ''
+        });
+      }, 420);
+
+      self._playerActionTomatoShakeTimer = setTimeout(function () {
+        self._playerActionTomatoShakeTimer = null;
+        self.setData({ playerActionHitPlayerId: '' });
+      }, 420);
+
+      self._playerActionTomatoJuiceTimer = setTimeout(function () {
+        self._playerActionTomatoJuiceTimer = null;
+        self.setData({
+          playerActionJuiceVisible: false,
+          playerActionJuiceStyle: ''
+        });
+        self._playerActionTomatoBusy = false;
+      }, 4500);
+    }, 160);
+  },
+
+  /**
+   * Demo：🪣 → 复用 playerId + #fb-player-avatar 定位；独立下降/倒水动画（不复用🍅轨迹）。
+   */
+  onPlayerActionBucketTap() {
+    if (this._playerActionBucketBusy) return;
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && target.playerId != null ? String(target.playerId).trim() : '';
+    if (!playerId) {
+      console.log('[player-action-bucket] missing playerId');
+      return;
+    }
+    const selector = '#fb-player-avatar-' + playerId;
+    const self = this;
+    this._playerActionBucketBusy = true;
+
+    wx.createSelectorQuery()
+      .in(this)
+      .select(selector)
+      .boundingClientRect((rect) => {
+        if (!rect) {
+          console.log('[player-action-bucket] avatar not found', {
+            playerId: playerId,
+            selector: selector
+          });
+          self._playerActionBucketBusy = false;
+          return;
+        }
+        self._playPlayerActionBucket(rect, playerId);
+      })
+      .exec();
+  },
+
+  /** Demo：清理🪣相关延时器 */
+  _clearPlayerActionBucketTimers() {
+    const keys = [
+      '_playerActionBucketDropTimer',
+      '_playerActionBucketPauseTimer',
+      '_playerActionBucketPourTimer',
+      '_playerActionBucketHideTimer',
+      '_playerActionBucketWaterTimer',
+      '_playerActionBucketDripTimer',
+      '_playerActionBucketFloodTimer'
+    ];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (this[k]) {
+        clearTimeout(this[k]);
+        this[k] = null;
+      }
+    }
+  },
+
+  /**
+   * Demo：互动反应音效（独立模块；不改动画 / 记分）。
+   * @param {string} key 如 'bucket_water'
+   */
+  _playReactionSound(key) {
+    reactionSounds.playReactionSound(key);
+  },
+
+  /**
+   * Demo：彻底移除🪣相关视觉层（避免 opacity:0 / transform 合成层残留白线）。
+   * 一次 setData 清掉水桶 / 水流 / 水滴 / 头像湿水 overlay。
+   */
+  _resetPlayerActionBucketVisuals(extra) {
+    const patch = {
+      playerActionBucketVisible: false,
+      playerActionBucketDropping: false,
+      playerActionBucketPouring: false,
+      playerActionBucketStyle: '',
+      playerActionWaterVisible: false,
+      playerActionWaterStyle: '',
+      playerActionWaterDripVisible: false,
+      playerActionWaterDripStyle: '',
+      playerActionWaterFloodVisible: false,
+      playerActionWaterFloodStyle: ''
+    };
+    if (extra && typeof extra === 'object') {
+      const keys = Object.keys(extra);
+      for (let i = 0; i < keys.length; i++) {
+        patch[keys[i]] = extra[keys[i]];
+      }
+    }
+    this.setData(patch);
+  },
+
+  /**
+   * Demo：水桶右上屏外正立入场 → 移到头像正上方 → 停顿 → 翻转倒水 → 水流/水滴/湿水 → 消失。
+   * 飞行阶段不旋转；到目标后才翻桶。
+   */
+  _playPlayerActionBucket(rect, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const left = Number(rect && rect.left);
+    const top = Number(rect && rect.top);
+    const width = Number(rect && rect.width);
+    const height = Number(rect && rect.height);
+    if (
+      !hitPlayerId ||
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionBucketBusy = false;
+      return;
+    }
+
+    let winW = 375;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+    } catch (err) {
+      winW = 375;
+    }
+
+    const centerX = left + width / 2;
+    const avatarTop = top;
+    // 右上方屏外起点（x > windowWidth，y 为负）；目标：头像正上方
+    const startX = winW + 80;
+    const startY = -72;
+    const hoverX = centerX;
+    const hoverY = avatarTop - 18;
+    const approachMs = 650;
+    const pauseMs = 200;
+    const pourMs = 620;
+    const buildBucketStyle = function (x, y, rot) {
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg);'
+      );
+    };
+
+    this._clearPlayerActionBucketTimers();
+    // 开场先清干净，避免上次 opacity:0 节点残留
+    this._resetPlayerActionBucketVisuals({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionBucketVisible: true,
+      playerActionBucketStyle: buildBucketStyle(startX, startY, 0)
+    });
+
+    const self = this;
+    // 倒水/湿水严格限制在目标头像矩形内（不放大到邻头像）
+    const waterStyle =
+      'left:' +
+      Math.round(left) +
+      'px;top:' +
+      Math.round(top) +
+      'px;width:' +
+      Math.round(width) +
+      'px;height:' +
+      Math.round(height) +
+      'px;';
+    const floodStyle = waterStyle;
+    const dripStyle =
+      'left:' + centerX + 'px;top:' + (top + height * 0.92) + 'px;';
+
+    // 正立从右上屏外移到头像正上方（不旋转）
+    this._playerActionBucketDropTimer = setTimeout(function () {
+      self._playerActionBucketDropTimer = null;
+      self.setData({
+        playerActionBucketDropping: true,
+        playerActionBucketStyle: buildBucketStyle(hoverX, hoverY, 0)
+      });
+    }, 40);
+
+    // 到达后停顿，再翻桶倒水（夸张水流）；入场阶段不播声音
+    this._playerActionBucketPauseTimer = setTimeout(function () {
+      self._playerActionBucketPauseTimer = null;
+      self.setData({
+        playerActionBucketDropping: false,
+        playerActionBucketPouring: true,
+        playerActionBucketStyle: buildBucketStyle(hoverX, hoverY, 128),
+        playerActionWaterVisible: true,
+        playerActionWaterStyle: waterStyle,
+        playerActionWaterFloodVisible: true,
+        playerActionWaterFloodStyle: floodStyle,
+        playerActionWaterDripVisible: true,
+        playerActionWaterDripStyle: dripStyle
+      });
+      // 翻转倒水 / 水流出现的同时播流水声（测试）
+      self._playReactionSound('bucket_water');
+    }, 40 + approachMs + pauseMs);
+
+    const pourStart = 40 + approachMs + pauseMs;
+
+    // 倒水结束：先拆水桶层（含桶口水流）
+    this._playerActionBucketHideTimer = setTimeout(function () {
+      self._playerActionBucketHideTimer = null;
+      self.setData({
+        playerActionBucketVisible: false,
+        playerActionBucketDropping: false,
+        playerActionBucketPouring: false,
+        playerActionBucketStyle: ''
+      });
+    }, pourStart + pourMs);
+
+    // 瀑布层动画约 1.35s：结束后立刻 wx:if 移除，勿留 opacity:0 合成层
+    this._playerActionBucketFloodTimer = setTimeout(function () {
+      self._playerActionBucketFloodTimer = null;
+      self.setData({
+        playerActionWaterFloodVisible: false,
+        playerActionWaterFloodStyle: ''
+      });
+    }, pourStart + 1500);
+
+    // 水滴最晚 delay 0.95 + 2.2s ≈ 3.15s：结束后立刻移除
+    this._playerActionBucketDripTimer = setTimeout(function () {
+      self._playerActionBucketDripTimer = null;
+      self.setData({
+        playerActionWaterDripVisible: false,
+        playerActionWaterDripStyle: ''
+      });
+    }, pourStart + 3200);
+
+    // 湿水 overlay 3.2s：到期后一次性清光所有 bucket/water 层
+    this._playerActionBucketWaterTimer = setTimeout(function () {
+      self._playerActionBucketWaterTimer = null;
+      self._resetPlayerActionBucketVisuals();
+      self._playerActionBucketBusy = false;
+    }, pourStart + 3400);
+  },
+
+  /**
+   * Demo：🥚 → 复用 playerId + #fb-player-avatar 定位；连击 6 + 最后一击（独立于🍅/🪣/🌹）。
+   */
+  onPlayerActionEggTap() {
+    if (this._playerActionEggBusy) return;
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && target.playerId != null ? String(target.playerId).trim() : '';
+    if (!playerId) {
+      console.log('[player-action-egg] missing playerId');
+      return;
+    }
+    const selector = '#fb-player-avatar-' + playerId;
+    const self = this;
+    this._playerActionEggBusy = true;
+
+    wx.createSelectorQuery()
+      .in(this)
+      .select(selector)
+      .boundingClientRect((rect) => {
+        if (!rect) {
+          console.log('[player-action-egg] avatar not found', {
+            playerId: playerId,
+            selector: selector
+          });
+          self._playerActionEggBusy = false;
+          return;
+        }
+        self._playPlayerActionEggCombo(rect, playerId);
+      })
+      .exec();
+  },
+
+  /** Demo：清理🥚相关延时器 */
+  _clearPlayerActionEggTimers() {
+    const list = this._playerActionEggTimers;
+    if (list && list.length) {
+      for (let i = 0; i < list.length; i++) {
+        clearTimeout(list[i]);
+      }
+    }
+    this._playerActionEggTimers = [];
+  },
+
+  _eggTimeout(fn, ms) {
+    const self = this;
+    if (!this._playerActionEggTimers) this._playerActionEggTimers = [];
+    const tid = setTimeout(function () {
+      const arr = self._playerActionEggTimers || [];
+      const idx = arr.indexOf(tid);
+      if (idx >= 0) arr.splice(idx, 1);
+      fn();
+    }, ms);
+    this._playerActionEggTimers.push(tid);
+    return tid;
+  },
+
+  /** Demo：彻底移除🥚飞行层 / 糊脸层（wx:if 销毁，非仅 opacity:0） */
+  _resetPlayerActionEggVisuals(extra) {
+    if (this._playerActionEggTeardownTimer) {
+      clearTimeout(this._playerActionEggTeardownTimer);
+      this._playerActionEggTeardownTimer = null;
+    }
+    const patch = {
+      playerActionEggs: [],
+      playerActionEggSplatVisible: false,
+      playerActionEggSplatHiding: false,
+      playerActionEggSplatStyle: '',
+      playerActionEggLevel: 0,
+      playerActionEggFinale: false
+    };
+    if (extra && typeof extra === 'object') {
+      const keys = Object.keys(extra);
+      for (let i = 0; i < keys.length; i++) {
+        patch[keys[i]] = extra[keys[i]];
+      }
+    }
+    this.setData(patch);
+  },
+
+  /**
+   * Demo：🥚 fixed reaction layer 两阶段清理
+   * 1) is-hiding：opacity/visibility/transform 卸掉 GPU 合成（DOM 仍在）
+   * 2) ~160ms 后 wx:if 销毁 shell/white/yolk/finale 全部子层
+   */
+  _teardownPlayerActionEggSplat() {
+    if (this._playerActionEggTeardownTimer) {
+      clearTimeout(this._playerActionEggTeardownTimer);
+      this._playerActionEggTeardownTimer = null;
+    }
+    const hasSplat = !!this.data.playerActionEggSplatVisible;
+    const hasFlies = (this.data.playerActionEggs || []).length > 0;
+    if (!hasSplat && !hasFlies) {
+      this._resetPlayerActionEggVisuals();
+      return;
+    }
+    // 阶段 1：先藏层 + 清飞行壳，避免带 transform 的乳白层被瞬间拆掉残留白块
+    this.setData({
+      playerActionEggSplatHiding: true,
+      playerActionEggs: []
+    });
+    const self = this;
+    this._playerActionEggTeardownTimer = setTimeout(function () {
+      self._playerActionEggTeardownTimer = null;
+      // 阶段 2：彻底移除（Visible=false → 整棵 splat DOM 销毁）
+      self._resetPlayerActionEggVisuals();
+    }, 160);
+  },
+
+  _buildEggFlyStyle(x, y, rot, scale, flyMs) {
+    const transition =
+      flyMs > 0
+        ? 'left ' +
+          flyMs +
+          'ms cubic-bezier(0.22, 0.61, 0.36, 1),top ' +
+          flyMs +
+          'ms cubic-bezier(0.22, 0.61, 0.36, 1),transform ' +
+          flyMs +
+          'ms cubic-bezier(0.22, 0.61, 0.36, 1)'
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg) scale(' +
+      scale +
+      ');transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  _setEggItemStyle(eggId, style) {
+    const eggs = this.data.playerActionEggs || [];
+    for (let i = 0; i < eggs.length; i++) {
+      if (eggs[i] && eggs[i].id === eggId) {
+        // 路径更新：只改单枚 style，降低整页 diff 闪白
+        const patch = {};
+        patch['playerActionEggs[' + i + '].style'] = style;
+        this.setData(patch);
+        return;
+      }
+    }
+  },
+
+  _removeEggItem(eggId) {
+    const eggs = (this.data.playerActionEggs || []).filter(function (e) {
+      return e && e.id !== eggId;
+    });
+    this.setData({ playerActionEggs: eggs });
+  },
+
+  /**
+   * Demo：单枚鸡蛋沿固定轨迹屏外 → 头像中心（origin/旋转由连击层统一传入）。
+   */
+  _spawnPlayerActionEggFly(opts, onArrive) {
+    const self = this;
+    const endX = Number(opts && opts.endX);
+    const endY = Number(opts && opts.endY);
+    const flyMs = Number(opts && opts.flyMs) || 360;
+    const finale = !!(opts && opts.finale);
+    const originX = Number(opts && opts.originX);
+    const originY = Number(opts && opts.originY);
+    const startRot = Number(opts && opts.startRot);
+    const endRot = Number(opts && opts.endRot);
+    if (
+      !Number.isFinite(endX) ||
+      !Number.isFinite(endY) ||
+      !Number.isFinite(originX) ||
+      !Number.isFinite(originY)
+    ) {
+      if (typeof onArrive === 'function') onArrive();
+      return;
+    }
+    const eggId =
+      'egg-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+    const rot0 = Number.isFinite(startRot) ? startRot : -18;
+    const rot1 = Number.isFinite(endRot) ? endRot : rot0 + 480;
+    // 最后一击也不做 scale 放大，避免命中瞬间合成闪白
+    const eggs = (this.data.playerActionEggs || []).slice();
+    eggs.push({
+      id: eggId,
+      finale: finale,
+      style: this._buildEggFlyStyle(originX, originY, rot0, 1, 0)
+    });
+    this.setData({ playerActionEggs: eggs });
+
+    this._eggTimeout(function () {
+      self._setEggItemStyle(
+        eggId,
+        self._buildEggFlyStyle(endX, endY, rot1, 1, flyMs)
+      );
+    }, 24);
+
+    this._eggTimeout(function () {
+      self._removeEggItem(eggId);
+      if (typeof onArrive === 'function') onArrive();
+    }, 24 + flyMs);
+  },
+
+  /** Demo：命中只叠加 level / 最后一击流淌层（糊脸层已 fixed，无 flash） */
+  _applyPlayerActionEggHit(playerId, level, isFinale) {
+    const nextLevel = Math.max(0, Number(level) || 0);
+    if (isFinale) {
+      // 先 setData 再播声音：音效模块内部 nextTick，错开同帧原生音频初始化
+      this.setData({
+        playerActionEggLevel: nextLevel,
+        playerActionEggFinale: true
+      });
+      this._playReactionSound('egg_hit_finale');
+      return;
+    }
+    // 前 6 次：撞击头像瞬间播命中音（setData 之后调用，避免与建层同栈）
+    this.setData({
+      playerActionEggSplatVisible: true,
+      playerActionEggLevel: nextLevel
+    });
+    this._playReactionSound('egg_hit');
+  },
+
+  /**
+   * Demo：🥚 连击节奏
+   * - 6 枚同一屏外起点、同一轨迹连续命中，蛋清/蛋黄持续叠加不清理
+   * - 完成后停顿 1–1.5s，再同轨迹最后一击最大流淌
+   * - 残留拉长，整体约 8s；无震动/glow/闪光；纯视觉不写盘。
+   */
+  _playPlayerActionEggCombo(rect, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const left = Number(rect && rect.left);
+    const top = Number(rect && rect.top);
+    const width = Number(rect && rect.width);
+    const height = Number(rect && rect.height);
+    if (
+      !hitPlayerId ||
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionEggBusy = false;
+      return;
+    }
+
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+
+    const endX = left + width / 2;
+    const endY = top + height / 2;
+    // 整轮共用同一屏外起点 + 同一旋转轨迹（连续投掷感）
+    const originX = winW + 72;
+    const originY = Math.max(32, Math.min(winH - 32, endY));
+    const startRot = -18;
+    const endRot = 462;
+    const comboCount = 6;
+    const gapMs = 260;
+    const flyMs = 360;
+    const pauseMs = 1400;
+    const holdMs = 6200;
+    const finaleFlyMs = 300;
+    const self = this;
+
+    // 糊脸层尺寸=目标头像矩形（仅头像附近，不进成绩 wx:for）
+    const splatStyle =
+      'left:' +
+      Math.round(left) +
+      'px;top:' +
+      Math.round(top) +
+      'px;width:' +
+      Math.round(width) +
+      'px;height:' +
+      Math.round(height) +
+      'px;';
+
+    this._clearPlayerActionEggTimers();
+    this._resetPlayerActionEggVisuals({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionEggSplatStyle: splatStyle
+    });
+
+    const lastComboHitAt = (comboCount - 1) * gapMs + 24 + flyMs;
+    for (let i = 0; i < comboCount; i++) {
+      (function (index) {
+        self._eggTimeout(function () {
+          self._spawnPlayerActionEggFly(
+            {
+              endX: endX,
+              endY: endY,
+              flyMs: flyMs,
+              originX: originX,
+              originY: originY,
+              startRot: startRot,
+              endRot: endRot,
+              finale: false
+            },
+            function () {
+              self._applyPlayerActionEggHit(hitPlayerId, index + 1, false);
+            }
+          );
+        }, index * gapMs);
+      })(i);
+    }
+
+    // 前 6 个完成后停顿 1–1.5s → 同位置最后一击
+    const finaleStartAt = lastComboHitAt + pauseMs;
+    this._eggTimeout(function () {
+      self._spawnPlayerActionEggFly(
+        {
+          endX: endX,
+          endY: endY,
+          flyMs: finaleFlyMs,
+          originX: originX,
+          originY: originY,
+          startRot: startRot,
+          endRot: endRot + 180,
+          finale: true
+        },
+        function () {
+          self._applyPlayerActionEggHit(hitPlayerId, 7, true);
+          self._eggTimeout(function () {
+            // 残留结束后两阶段拆 fixed 层（先卸合成，再 wx:if 销毁）
+            self._teardownPlayerActionEggSplat();
+            self._playerActionEggBusy = false;
+          }, holdMs);
+        }
+      );
+    }, finaleStartAt);
+  },
+
+  /**
+   * Demo：🌹 → 复用 playerId + #fb-player-avatar 定位；柔和飘入（慢于🍅，独立轨迹）。
+   */
+  onPlayerActionFlowerTap() {
+    if (this._playerActionFlowerBusy) return;
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && target.playerId != null ? String(target.playerId).trim() : '';
+    if (!playerId) {
+      console.log('[player-action-flower] missing playerId');
+      return;
+    }
+    const selector = '#fb-player-avatar-' + playerId;
+    const self = this;
+    this._playerActionFlowerBusy = true;
+
+    wx.createSelectorQuery()
+      .in(this)
+      .select(selector)
+      .boundingClientRect((rect) => {
+        if (!rect) {
+          console.log('[player-action-flower] avatar not found', {
+            playerId: playerId,
+            selector: selector
+          });
+          self._playerActionFlowerBusy = false;
+          return;
+        }
+        self._playPlayerActionFlower(rect, playerId);
+      })
+      .exec();
+  },
+
+  /** Demo：清理🌹相关延时器 */
+  _clearPlayerActionFlowerTimers() {
+    const keys = [
+      '_playerActionFlowerFlyTimer',
+      '_playerActionFlowerArcTimer',
+      '_playerActionFlowerBloomTimer',
+      '_playerActionFlowerWreathTimer',
+      '_playerActionFlowerFadeTimer',
+      '_playerActionFlowerClearTimer'
+    ];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (this[k]) {
+        clearTimeout(this[k]);
+        this[k] = null;
+      }
+    }
+  },
+
+  /**
+   * Demo：花朵从中线右侧随机起点柔和飘入 → 轻漂浮旋转 → 到达开放 + 花瓣 + 花环 → 自动清理。
+   * 无全屏 glow / flash。
+   */
+  _playPlayerActionFlower(rect, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const left = Number(rect && rect.left);
+    const top = Number(rect && rect.top);
+    const width = Number(rect && rect.width);
+    const height = Number(rect && rect.height);
+    if (
+      !hitPlayerId ||
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionFlowerBusy = false;
+      return;
+    }
+
+    const endX = left + width / 2 + 6;
+    const endY = top + height / 2 - 4;
+
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+
+    // 随机起点：必须在横向中线右侧（不从左侧进入）
+    const midX = winW * 0.5;
+    const origins = [
+      { key: 'right-top', x: winW + 56, y: -48 },
+      { key: 'right', x: winW + 72, y: endY },
+      { key: 'right-bottom', x: winW + 56, y: winH + 48 },
+      { key: 'mid-right-up', x: midX + winW * 0.28, y: Math.max(24, endY - 90) }
+    ];
+    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    // 兜底：强制 startX 落在中线右侧
+    const startX = Math.max(midX + 8, Number(origin.x));
+    const startY = Number(origin.y);
+    const ctrlX = (startX + endX) / 2 + (origin.key === 'mid-right-up' ? 18 : -10);
+    const ctrlY =
+      origin.key === 'right-top' || origin.key === 'mid-right-up'
+        ? Math.min(startY, endY) - 28
+        : origin.key === 'right-bottom'
+          ? Math.max(startY, endY) + 24
+          : (startY + endY) / 2 - 32;
+    const flyMs = 1400;
+
+    const easeInOut = function (t) {
+      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    };
+    const buildFlowerStyle = function (x, y, rot, scale) {
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg) scale(' +
+        scale +
+        ');transition:none;'
+      );
+    };
+
+    this._clearPlayerActionFlowerTimers();
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionFlowerVisible: true,
+      playerActionFlowerBloom: false,
+      playerActionFlowerStyle: buildFlowerStyle(startX, startY, -10, 0.92),
+      playerActionPetalVisible: false,
+      playerActionPetalStyle: '',
+      playerActionFlowerScalePlayerId: '',
+      playerActionWreathVisible: false,
+      playerActionWreathAppear: false,
+      playerActionWreathFading: false,
+      playerActionWreathStyle: '',
+      playerActionWreathItems: []
+    });
+
+    const self = this;
+    this._playerActionFlowerFlyTimer = setTimeout(function () {
+      self._playerActionFlowerFlyTimer = null;
+      const t0 = Date.now();
+
+      const tick = function () {
+        const elapsed = Date.now() - t0;
+        let raw = elapsed / flyMs;
+        if (raw >= 1) raw = 1;
+        const t = easeInOut(raw);
+        const u = 1 - t;
+        const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+        // 轻微上下漂浮
+        const bob = Math.sin(raw * Math.PI * 2.2) * 10 * (1 - raw * 0.35);
+        const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
+        const rot = -14 + 28 * Math.sin(raw * Math.PI * 1.6);
+        const scale = 0.92 + 0.1 * t;
+        self.setData({
+          playerActionFlowerStyle: buildFlowerStyle(x, y, rot, scale)
+        });
+        if (raw < 1) {
+          self._playerActionFlowerArcTimer = setTimeout(tick, 16);
+          return;
+        }
+        self._playerActionFlowerArcTimer = null;
+        // 到达后进入花环状态（不立即结束）
+        self._playPlayerActionFlowerWreath({
+          playerId: hitPlayerId,
+          avatarCx: left + width / 2,
+          avatarCy: top + height / 2,
+          avatarSize: Math.max(width, height),
+          arriveX: endX,
+          arriveY: endY,
+          buildFlowerStyle: buildFlowerStyle
+        });
+      };
+
+      tick();
+    }, 40);
+  },
+
+  /**
+   * Demo：🌹 命中花环 —— 围绕头像中心生成多朵花，缩放出现，停留约 1.5s 后淡出清理。
+   * 不改飞行轨迹 / 起点规则。
+   */
+  _playPlayerActionFlowerWreath(opts) {
+    const o = opts || {};
+    const hitPlayerId = o.playerId != null ? String(o.playerId).trim() : '';
+    const avatarCx = Number(o.avatarCx);
+    const avatarCy = Number(o.avatarCy);
+    const avatarSize = Number(o.avatarSize);
+    const arriveX = Number(o.arriveX);
+    const arriveY = Number(o.arriveY);
+    const buildFlowerStyle =
+      typeof o.buildFlowerStyle === 'function'
+        ? o.buildFlowerStyle
+        : function (x, y, rot, scale) {
+            return (
+              'left:' +
+              x +
+              'px;top:' +
+              y +
+              'px;transform:translate(-50%,-50%) rotate(' +
+              rot +
+              'deg) scale(' +
+              scale +
+              ');transition:none;'
+            );
+          };
+
+    if (!Number.isFinite(avatarCx) || !Number.isFinite(avatarCy)) {
+      this.setData({
+        playerActionFlowerVisible: false,
+        playerActionFlowerBloom: false,
+        playerActionFlowerStyle: ''
+      });
+      this._playerActionFlowerBusy = false;
+      return;
+    }
+
+    const wreathR = Math.max(30, (Number.isFinite(avatarSize) ? avatarSize : 40) / 2 + 16);
+    const emojis = ['🌸', '🌺', '🌸', '💮', '🌸', '🌺', '🌸', '💮'];
+    const items = [];
+    for (let i = 0; i < 8; i++) {
+      const deg = i * 45;
+      items.push({
+        id: 'wreath-' + i,
+        emoji: emojis[i],
+        delay: (i * 0.035).toFixed(3) + 's',
+        style:
+          'transform:rotate(' +
+          deg +
+          'deg) translateY(-' +
+          wreathR +
+          'px) rotate(-' +
+          deg +
+          'deg);'
+      });
+    }
+
+    // 先短暂绽放到达花，再切到花环；无全局 glow，仅目标头像轻缩放
+    this.setData({
+      playerActionFlowerBloom: true,
+      playerActionFlowerStyle: buildFlowerStyle(arriveX, arriveY, 0, 1.18),
+      playerActionPetalVisible: true,
+      playerActionPetalStyle: 'left:' + avatarCx + 'px;top:' + avatarCy + 'px;',
+      playerActionFlowerScalePlayerId: hitPlayerId
+    });
+
+    const self = this;
+    this._playerActionFlowerBloomTimer = setTimeout(function () {
+      self._playerActionFlowerBloomTimer = null;
+      self.setData({
+        playerActionFlowerVisible: false,
+        playerActionFlowerBloom: false,
+        playerActionFlowerStyle: '',
+        playerActionWreathVisible: true,
+        playerActionWreathAppear: false,
+        playerActionWreathFading: false,
+        playerActionWreathStyle: 'left:' + avatarCx + 'px;top:' + avatarCy + 'px;',
+        playerActionWreathItems: items
+      });
+      // 下一帧触发花环缩放出现
+      self._playerActionFlowerWreathTimer = setTimeout(function () {
+        self._playerActionFlowerWreathTimer = null;
+        self.setData({ playerActionWreathAppear: true });
+      }, 30);
+    }, 260);
+
+    // 花环保持约 1.5s 后淡出清理
+    this._playerActionFlowerFadeTimer = setTimeout(function () {
+      self._playerActionFlowerFadeTimer = null;
+      self.setData({
+        playerActionWreathFading: true,
+        playerActionPetalVisible: false,
+        playerActionPetalStyle: ''
+      });
+      self._playerActionFlowerClearTimer = setTimeout(function () {
+        self._playerActionFlowerClearTimer = null;
+        self.setData({
+          playerActionWreathVisible: false,
+          playerActionWreathAppear: false,
+          playerActionWreathFading: false,
+          playerActionWreathStyle: '',
+          playerActionWreathItems: [],
+          playerActionFlowerScalePlayerId: ''
+        });
+        self._playerActionFlowerBusy = false;
+      }, 420);
+    }, 260 + 30 + 1500);
   },
 
   _isMatchPlayIdentityFixedCollapseMode() {

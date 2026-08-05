@@ -3463,6 +3463,1589 @@ page {
 .score-page.dark-mode .bottom-sheet--more-menu .feature-item:active { opacity: 0.72; }
 
 .sheet-overlay--half { z-index: 210; }
+
+/* Demo：球员头像互动面板 */
+.sheet-overlay--player-action { z-index: 220; }
+.bottom-sheet--player-action { z-index: 230; }
+.player-action-sheet {
+  padding: 8rpx 48rpx 32rpx;
+}
+.player-action-sheet__profile {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 28rpx;
+}
+.player-action-sheet__avatar {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #e5e7eb;
+  border: 4rpx solid rgba(0, 45, 98, 0.12);
+  box-sizing: border-box;
+}
+.player-action-sheet__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10rpx;
+  min-width: 0;
+}
+.player-action-sheet__name {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--golf-blue, #002d62);
+  line-height: 1.25;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-action-sheet__gender {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-secondary, #9ca3af);
+  letter-spacing: 0.06em;
+}
+.player-action-sheet__actions {
+  margin-top: 40rpx;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 28rpx;
+}
+.player-action-sheet__tomato,
+.player-action-sheet__bucket,
+.player-action-sheet__egg,
+.player-action-sheet__flower {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 28rpx;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  line-height: 1;
+  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.08);
+}
+.player-action-sheet__tomato:active,
+.player-action-sheet__bucket:active,
+.player-action-sheet__egg:active,
+.player-action-sheet__flower:active {
+  opacity: 0.72;
+  transform: scale(0.96);
+}
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__name {
+  color: var(--text-primary);
+}
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__gender {
+  color: var(--text-secondary);
+}
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__avatar {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+}
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__tomato,
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__bucket,
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__egg,
+.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__flower {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Demo：🍅 飞行动画层 */
+.player-action-tomato-fly {
+  position: fixed;
+  z-index: 400;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  font-size: 26px;
+  line-height: 28px;
+  text-align: center;
+  pointer-events: none;
+  /* 不用 will-change：微信端易整页合成闪白 */
+}
+/* 飞行轨迹由 JS 弧线驱动（约 0.8s），不再用直线 transition */
+.player-action-tomato-fly.is-flying {
+  transition: none;
+}
+
+/* Demo：🥚 连击飞入（transition 时长由 inline style 控制） */
+.player-action-egg-fly {
+  position: fixed;
+  z-index: 405;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  font-size: 28px;
+  line-height: 30px;
+  text-align: center;
+  pointer-events: none;
+}
+.player-action-egg-fly.is-finale {
+  z-index: 406;
+}
+
+/* Demo：🥚 累积蛋清/蛋黄 — fixed 锚定头像矩形（left/top/w/h 由 JS） */
+.player-action-egg-splat {
+  position: fixed;
+  z-index: 398;
+  border-radius: 50%;
+  pointer-events: none;
+  overflow: hidden;
+  background: transparent;
+  box-sizing: border-box;
+  /* 禁止 filter / drop-shadow / blur / will-change：微信端易留合成白块 */
+}
+.player-action-egg-splat__white,
+.player-action-egg-splat__stream,
+.player-action-egg-splat__yolk,
+.player-action-egg-splat__drop,
+.player-action-egg-splat__finale-white,
+.player-action-egg-splat__finale-stream,
+.player-action-egg-splat__finale-yolk,
+.player-action-egg-splat__finale-drip {
+  position: absolute;
+  pointer-events: none;
+}
+
+/*
+ * 结束清理阶段：动画 forwards 常停在高 opacity + translateY。
+ * 先卸合成层，再由 JS 延迟 ~160ms wx:if 销毁，避免乳白色块残留。
+ */
+.player-action-egg-splat.is-hiding {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+.player-action-egg-splat.is-hiding .player-action-egg-splat__white,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__stream,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__yolk,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__drop,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__finale-white,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__finale-stream,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__finale-yolk,
+.player-action-egg-splat.is-hiding .player-action-egg-splat__finale-drip {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  animation: none !important;
+  transform: none !important;
+  background: transparent !important;
+}
+
+/* 蛋清斑块（半透明乳白，挂载后淡入并残留） */
+.player-action-egg-splat__white {
+  border-radius: 48% 52% 45% 55%;
+  background: radial-gradient(
+    ellipse at 45% 40%,
+    rgba(255, 252, 240, 0.72) 0%,
+    rgba(245, 240, 220, 0.35) 55%,
+    transparent 78%
+  );
+  opacity: 0.85;
+  animation: player-action-egg-fade-in 0.28s ease forwards;
+}
+.player-action-egg-splat__white.w0 {
+  left: 18%;
+  top: 6%;
+  width: 42%;
+  height: 28%;
+}
+.player-action-egg-splat__white.w1 {
+  left: 48%;
+  top: 10%;
+  width: 36%;
+  height: 24%;
+  border-radius: 55% 45% 50% 48%;
+}
+.player-action-egg-splat__white.w2 {
+  left: 10%;
+  top: 28%;
+  width: 34%;
+  height: 30%;
+}
+.player-action-egg-splat__white.w3 {
+  left: 52%;
+  top: 36%;
+  width: 38%;
+  height: 32%;
+}
+
+/* 不规则蛋清流线：顶→底，结束后保持可见 */
+.player-action-egg-splat__stream {
+  top: 4%;
+  width: 14%;
+  height: 0;
+  border-radius: 40% 50% 45% 55% / 8% 10% 85% 80%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 252, 245, 0.72) 0%,
+    rgba(240, 235, 215, 0.42) 55%,
+    rgba(230, 225, 200, 0.18) 90%,
+    transparent 100%
+  );
+  transform-origin: top center;
+  animation: player-action-egg-stream-flow 1.4s ease-out forwards;
+}
+.player-action-egg-splat__stream.s0 { left: 8%; width: 16%; }
+.player-action-egg-splat__stream.s1 { left: 28%; width: 11%; animation-duration: 1.5s; }
+.player-action-egg-splat__stream.s2 { left: 42%; width: 18%; animation-duration: 1.55s; }
+.player-action-egg-splat__stream.s3 { left: 62%; width: 12%; animation-duration: 1.6s; }
+.player-action-egg-splat__stream.s4 { left: 74%; width: 15%; animation-duration: 1.65s; }
+
+/* 蛋黄块状（无 scale 弹跳，避免闪） */
+.player-action-egg-splat__yolk {
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    rgba(255, 205, 70, 0.92) 0%,
+    rgba(245, 170, 35, 0.75) 45%,
+    rgba(230, 140, 20, 0.2) 72%,
+    transparent 85%
+  );
+  opacity: 0.9;
+  animation: player-action-egg-fade-in 0.32s ease forwards;
+}
+.player-action-egg-splat__yolk.y0 {
+  left: 30%;
+  top: 22%;
+  width: 28%;
+  height: 26%;
+}
+.player-action-egg-splat__yolk.y1 {
+  left: 48%;
+  top: 40%;
+  width: 22%;
+  height: 20%;
+  background: radial-gradient(
+    circle at 45% 40%,
+    rgba(255, 190, 50, 0.88) 0%,
+    rgba(235, 150, 25, 0.55) 55%,
+    transparent 80%
+  );
+}
+.player-action-egg-splat__yolk.y2 {
+  left: 22%;
+  top: 48%;
+  width: 20%;
+  height: 18%;
+}
+
+/* 小滴落 */
+.player-action-egg-splat__drop {
+  width: 8%;
+  height: 8%;
+  border-radius: 50% 45% 55% 48%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    rgba(255, 252, 240, 0.8) 0%,
+    rgba(245, 235, 200, 0.35) 60%,
+    transparent 80%
+  );
+  animation: player-action-egg-drop-fall 1.6s ease-in forwards;
+}
+.player-action-egg-splat__drop.d0 { left: 16%; top: 55%; }
+.player-action-egg-splat__drop.d1 { left: 40%; top: 62%; width: 7%; height: 9%; }
+.player-action-egg-splat__drop.d2 { left: 58%; top: 70%; }
+.player-action-egg-splat__drop.d3 { left: 72%; top: 58%; width: 6%; height: 7%; }
+
+/*
+ * 最后一击强化：更大覆盖 + 更多流线/滴落 + 更长残留
+ * 禁止：opacity 0→高 白闪、brightness/filter、全屏 burst、大块白色 overlay 淡入
+ */
+.player-action-egg-splat__finale-white {
+  border-radius: 50% 45% 55% 48%;
+  background: radial-gradient(
+    ellipse at 45% 40%,
+    rgba(250, 245, 225, 0.55) 0%,
+    rgba(235, 225, 195, 0.28) 55%,
+    transparent 78%
+  );
+  opacity: 0.7;
+}
+.player-action-egg-splat__finale-white.fw0 {
+  left: 6%;
+  top: 2%;
+  width: 52%;
+  height: 38%;
+}
+.player-action-egg-splat__finale-white.fw1 {
+  left: 42%;
+  top: 8%;
+  width: 48%;
+  height: 34%;
+  border-radius: 45% 55% 48% 52%;
+}
+.player-action-egg-splat__finale-white.fw2 {
+  left: 14%;
+  top: 36%;
+  width: 70%;
+  height: 40%;
+  border-radius: 50% 48% 52% 46%;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    rgba(248, 242, 220, 0.48) 0%,
+    rgba(230, 220, 190, 0.22) 58%,
+    transparent 80%
+  );
+}
+.player-action-egg-splat__finale-yolk {
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 38%,
+    rgba(255, 200, 60, 0.88) 0%,
+    rgba(240, 155, 28, 0.62) 48%,
+    transparent 78%
+  );
+  opacity: 0.88;
+}
+.player-action-egg-splat__finale-yolk.fy0 {
+  left: 18%;
+  top: 14%;
+  width: 42%;
+  height: 38%;
+}
+.player-action-egg-splat__finale-yolk.fy1 {
+  left: 48%;
+  top: 32%;
+  width: 34%;
+  height: 30%;
+  background: radial-gradient(
+    circle at 48% 40%,
+    rgba(255, 190, 50, 0.82) 0%,
+    rgba(230, 145, 22, 0.5) 55%,
+    transparent 80%
+  );
+}
+.player-action-egg-splat__finale-yolk.fy2 {
+  left: 28%;
+  top: 52%;
+  width: 30%;
+  height: 26%;
+  background: radial-gradient(
+    circle at 45% 42%,
+    rgba(245, 175, 40, 0.78) 0%,
+    rgba(220, 130, 18, 0.42) 58%,
+    transparent 82%
+  );
+}
+/* 多股流淌：只做 height/translateY，不闪 opacity */
+.player-action-egg-splat__finale-stream {
+  top: 0;
+  height: 0;
+  border-radius: 42% 55% 48% 50% / 6% 8% 88% 85%;
+  background: linear-gradient(
+    180deg,
+    rgba(250, 245, 225, 0.7) 0%,
+    rgba(245, 220, 160, 0.42) 38%,
+    rgba(255, 195, 70, 0.28) 68%,
+    transparent 100%
+  );
+  opacity: 0.78;
+  transform-origin: top center;
+  animation: player-action-egg-finale-stream 3.2s ease-out forwards;
+}
+.player-action-egg-splat__finale-stream.f0 { left: 2%; width: 18%; }
+.player-action-egg-splat__finale-stream.f1 { left: 16%; width: 12%; animation-delay: 0.05s; }
+.player-action-egg-splat__finale-stream.f2 { left: 28%; width: 20%; animation-delay: 0.02s; }
+.player-action-egg-splat__finale-stream.f3 { left: 46%; width: 14%; animation-delay: 0.08s; }
+.player-action-egg-splat__finale-stream.f4 { left: 58%; width: 18%; animation-delay: 0.04s; }
+.player-action-egg-splat__finale-stream.f5 { left: 72%; width: 13%; animation-delay: 0.1s; }
+.player-action-egg-splat__finale-stream.f6 { left: 82%; width: 16%; animation-delay: 0.06s; }
+/* 底部滴落加强 */
+.player-action-egg-splat__finale-drip {
+  bottom: -4%;
+  width: 11%;
+  height: 0;
+  border-radius: 40% 40% 55% 55%;
+  background: linear-gradient(
+    180deg,
+    rgba(250, 240, 210, 0.7) 0%,
+    rgba(255, 190, 55, 0.45) 50%,
+    transparent 100%
+  );
+  opacity: 0.8;
+  animation: player-action-egg-finale-drip 2.8s ease-in 0.35s forwards;
+}
+.player-action-egg-splat__finale-drip.fd0 { left: 12%; }
+.player-action-egg-splat__finale-drip.fd1 { left: 30%; width: 14%; animation-delay: 0.28s; }
+.player-action-egg-splat__finale-drip.fd2 { left: 48%; width: 16%; animation-delay: 0.4s; }
+.player-action-egg-splat__finale-drip.fd3 { left: 66%; width: 13%; animation-delay: 0.5s; }
+.player-action-egg-splat__finale-drip.fd4 { left: 80%; animation-delay: 0.62s; }
+
+@keyframes player-action-egg-fade-in {
+  0% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
+@keyframes player-action-egg-stream-flow {
+  0% {
+    height: 0;
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+  35% {
+    height: 72%;
+    opacity: 0.8;
+    transform: translateY(2%);
+  }
+  100% {
+    height: 118%;
+    opacity: 0.7;
+    transform: translateY(8%);
+  }
+}
+@keyframes player-action-egg-drop-fall {
+  0% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+  18% {
+    opacity: 0.8;
+    transform: translateY(8%);
+  }
+  100% {
+    opacity: 0.45;
+    transform: translateY(100%);
+  }
+}
+@keyframes player-action-egg-finale-stream {
+  0% {
+    height: 0;
+    transform: translateY(0);
+  }
+  30% {
+    height: 62%;
+    transform: translateY(0);
+  }
+  65% {
+    height: 105%;
+    transform: translateY(16%);
+  }
+  100% {
+    height: 130%;
+    transform: translateY(42%);
+  }
+}
+@keyframes player-action-egg-finale-drip {
+  0% {
+    height: 0;
+    transform: translateY(0);
+  }
+  35% {
+    height: 28%;
+    transform: translateY(6%);
+  }
+  100% {
+    height: 48%;
+    transform: translateY(42%);
+  }
+}
+
+/* Demo：🪣 水桶（右上屏外正立入场 → 头像上方停顿 → 翻桶） */
+.player-action-bucket {
+  position: fixed;
+  z-index: 402;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  /* 不用常驻 will-change，避免移除后 GPU 合成残留 */
+}
+.player-action-bucket.is-dropping {
+  transition:
+    left 0.65s cubic-bezier(0.22, 0.61, 0.36, 1),
+    top 0.65s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.player-action-bucket.is-pouring {
+  transition: transform 0.28s ease-out;
+}
+.player-action-bucket__icon {
+  display: block;
+  width: 40px;
+  height: 40px;
+  font-size: 34px;
+  line-height: 40px;
+  text-align: center;
+}
+/* Demo：桶口多股水流（倒水瞬间） */
+.player-action-bucket__streams {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.player-action-bucket__stream {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 0;
+  margin-left: -6px;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.8) 0%, rgba(37, 99, 235, 0.35) 100%);
+  transform-origin: top center;
+  animation: player-action-bucket-stream 0.7s ease-out forwards;
+}
+.player-action-bucket__stream.st0 { margin-left: -22px; width: 14px; animation-delay: 0s; }
+.player-action-bucket__stream.st1 { margin-left: -10px; width: 16px; animation-delay: 0.04s; }
+.player-action-bucket__stream.st2 { margin-left: -4px; width: 18px; animation-delay: 0.02s; }
+.player-action-bucket__stream.st3 { margin-left: 6px; width: 15px; animation-delay: 0.06s; }
+.player-action-bucket__stream.st4 { margin-left: 16px; width: 13px; animation-delay: 0.08s; }
+@keyframes player-action-bucket-stream {
+  0% {
+    height: 0;
+    opacity: 0.2;
+  }
+  30% {
+    height: 48px;
+    opacity: 0.85;
+  }
+  70% {
+    height: 70px;
+    opacity: 0.55;
+  }
+  100% {
+    height: 84px;
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Demo：倒水层 — 严格裁切在目标头像圆内（不放大覆盖邻头像） */
+.player-action-bucket-flood {
+  position: fixed;
+  z-index: 401;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.player-action-bucket-flood__blast {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 78%;
+  height: 28%;
+  margin-left: -39%;
+  border-radius: 50%;
+  background: rgba(96, 165, 250, 0.32);
+  animation: player-action-bucket-blast 0.55s ease-out forwards;
+}
+.player-action-bucket-flood__cascade {
+  position: absolute;
+  top: 8%;
+  width: 18%;
+  height: 0;
+  border-radius: 0 0 40% 40%;
+  background: linear-gradient(180deg, rgba(125, 180, 235, 0.75) 0%, rgba(59, 130, 246, 0.45) 55%, rgba(37, 99, 235, 0.2) 100%);
+  animation: player-action-bucket-cascade 1.35s ease-out forwards;
+}
+.player-action-bucket-flood__cascade.c0 { left: 8%; animation-delay: 0s; width: 20%; }
+.player-action-bucket-flood__cascade.c1 { left: 26%; animation-delay: 0.05s; width: 22%; }
+.player-action-bucket-flood__cascade.c2 { left: 42%; animation-delay: 0.02s; width: 24%; }
+.player-action-bucket-flood__cascade.c3 { left: 58%; animation-delay: 0.08s; width: 20%; }
+.player-action-bucket-flood__cascade.c4 { left: 74%; animation-delay: 0.11s; width: 18%; }
+@keyframes player-action-bucket-blast {
+  0% {
+    opacity: 0.25;
+    transform: scaleX(0.5) scaleY(0.4);
+  }
+  35% {
+    opacity: 0.55;
+    transform: scaleX(1.05) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    transform: scaleX(1.1) scaleY(0.7);
+  }
+}
+@keyframes player-action-bucket-cascade {
+  0% {
+    height: 0;
+    opacity: 0.3;
+  }
+  25% {
+    height: 70%;
+    opacity: 0.9;
+  }
+  70% {
+    height: 100%;
+    opacity: 0.55;
+  }
+  100% {
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Demo：湿水覆盖 — fixed 锚定目标头像；多股下淌，无白光闪光 */
+.player-action-bucket-water {
+  position: fixed;
+  z-index: 397;
+  border-radius: 50%;
+  pointer-events: none;
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: player-action-bucket-water-fade 3.2s ease forwards;
+}
+.player-action-bucket-water__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(125, 180, 235, 0.55) 0%,
+    rgba(59, 130, 246, 0.42) 45%,
+    rgba(37, 99, 235, 0.32) 100%
+  );
+}
+.player-action-bucket-water__sheet {
+  position: absolute;
+  top: -10%;
+  width: 28%;
+  height: 0;
+  border-radius: 0 0 45% 45%;
+  background: linear-gradient(180deg, rgba(147, 197, 253, 0.75) 0%, rgba(59, 130, 246, 0.35) 100%);
+  animation: player-action-bucket-water-sheet 1.5s ease-out forwards;
+}
+.player-action-bucket-water__sheet.s0 { left: 4%; animation-delay: 0s; width: 30%; }
+.player-action-bucket-water__sheet.s1 { left: 28%; animation-delay: 0.06s; width: 34%; }
+.player-action-bucket-water__sheet.s2 { left: 50%; animation-delay: 0.03s; width: 32%; }
+.player-action-bucket-water__sheet.s3 { left: 70%; animation-delay: 0.1s; width: 28%; }
+@keyframes player-action-bucket-water-sheet {
+  0% {
+    height: 0;
+    opacity: 0.4;
+  }
+  35% {
+    height: 85%;
+    opacity: 0.85;
+  }
+  100% {
+    height: 120%;
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@keyframes player-action-bucket-water-fade {
+  0% {
+    opacity: 0.35;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  62% {
+    opacity: 0.85;
+  }
+  85% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Demo：底部大量滴水 */
+.player-action-bucket-drip {
+  position: fixed;
+  z-index: 403;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.player-action-bucket-drip__drop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 7px;
+  height: 10px;
+  margin: -4px 0 0 -3px;
+  border-radius: 50% 50% 45% 45%;
+  background: rgba(59, 130, 246, 0.88);
+  animation: player-action-bucket-drip-fall 2.2s ease-in forwards;
+}
+.player-action-bucket-drip__drop.d0 { animation-delay: 0s; }
+.player-action-bucket-drip__drop.d1 {
+  width: 6px;
+  height: 9px;
+  background: rgba(96, 165, 250, 0.9);
+  animation-delay: 0.1s;
+  animation-name: player-action-bucket-drip-fall-1;
+}
+.player-action-bucket-drip__drop.d2 {
+  animation-delay: 0.2s;
+  animation-name: player-action-bucket-drip-fall-2;
+}
+.player-action-bucket-drip__drop.d3 {
+  width: 5px;
+  height: 8px;
+  background: rgba(147, 197, 253, 0.9);
+  animation-delay: 0.32s;
+  animation-name: player-action-bucket-drip-fall-3;
+}
+.player-action-bucket-drip__drop.d4 {
+  width: 8px;
+  height: 11px;
+  animation-delay: 0.45s;
+  animation-name: player-action-bucket-drip-fall-4;
+}
+.player-action-bucket-drip__drop.d5 {
+  width: 5px;
+  height: 8px;
+  background: rgba(96, 165, 250, 0.85);
+  animation-delay: 0.6s;
+  animation-name: player-action-bucket-drip-fall-5;
+}
+.player-action-bucket-drip__drop.d6 {
+  width: 6px;
+  height: 9px;
+  animation-delay: 0.78s;
+  animation-name: player-action-bucket-drip-fall-6;
+}
+.player-action-bucket-drip__drop.d7 {
+  width: 4px;
+  height: 7px;
+  background: rgba(125, 180, 235, 0.9);
+  animation-delay: 0.95s;
+  animation-name: player-action-bucket-drip-fall-7;
+}
+@keyframes player-action-bucket-drip-fall {
+  0% { transform: translate(-14px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-16px, 42px) scale(0.35); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-1 {
+  0% { transform: translate(-6px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-4px, 48px) scale(0.3); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-2 {
+  0% { transform: translate(2px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(4px, 44px) scale(0.32); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-3 {
+  0% { transform: translate(10px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(14px, 50px) scale(0.28); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-4 {
+  0% { transform: translate(-18px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-22px, 46px) scale(0.3); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-5 {
+  0% { transform: translate(16px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(20px, 52px) scale(0.28); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-6 {
+  0% { transform: translate(-2px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(0, 56px) scale(0.25); opacity: 0; visibility: hidden; }
+}
+@keyframes player-action-bucket-drip-fall-7 {
+  0% { transform: translate(8px, 0) scale(1); opacity: 1; }
+  100% { transform: translate(10px, 40px) scale(0.3); opacity: 0; visibility: hidden; }
+}
+
+/* Demo：🌹 送花（柔和飘入 / 开放 / 花瓣；无全屏 glow） */
+.player-action-flower {
+  position: fixed;
+  z-index: 404;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  font-size: 32px;
+  line-height: 36px;
+  text-align: center;
+  pointer-events: none;
+}
+.player-action-flower.is-bloom {
+  /* 仅本地轻缩放，避免大范围发光闪屏 */
+  animation: player-action-flower-bloom 0.4s ease-out;
+}
+@keyframes player-action-flower-bloom {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+.player-action-flower-petals {
+  position: fixed;
+  z-index: 405;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.player-action-flower-petals__p {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 10px;
+  margin: -5px 0 0 -4px;
+  border-radius: 60% 40% 60% 40%;
+  background: #fb7185;
+  opacity: 0.9;
+  animation: player-action-flower-petal 0.85s ease-out forwards;
+}
+.player-action-flower-petals__p.p0 {
+  background: #f472b6;
+  animation-name: player-action-flower-petal-0;
+}
+.player-action-flower-petals__p.p1 {
+  background: #fb7185;
+  width: 7px;
+  height: 9px;
+  animation-name: player-action-flower-petal-1;
+  animation-delay: 0.04s;
+}
+.player-action-flower-petals__p.p2 {
+  background: #fda4af;
+  animation-name: player-action-flower-petal-2;
+  animation-delay: 0.08s;
+}
+.player-action-flower-petals__p.p3 {
+  background: #f9a8d4;
+  width: 6px;
+  height: 8px;
+  animation-name: player-action-flower-petal-3;
+  animation-delay: 0.12s;
+}
+@keyframes player-action-flower-petal-0 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.6);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-18px, -16px) rotate(-40deg) scale(0.35);
+    opacity: 0;
+  }
+}
+@keyframes player-action-flower-petal-1 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.6);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(16px, -14px) rotate(35deg) scale(0.3);
+    opacity: 0;
+  }
+}
+@keyframes player-action-flower-petal-2 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-12px, 14px) rotate(-25deg) scale(0.3);
+    opacity: 0;
+  }
+}
+@keyframes player-action-flower-petal-3 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(14px, 12px) rotate(30deg) scale(0.28);
+    opacity: 0;
+  }
+}
+
+/* Demo：🌹 花环（围绕头像；外层圆周定位，内层缩放出现） */
+.player-action-flower-wreath {
+  position: fixed;
+  z-index: 406;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.player-action-flower-wreath__item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+}
+.player-action-flower-wreath__bloom {
+  width: 22px;
+  height: 22px;
+  font-size: 18px;
+  line-height: 22px;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.2);
+  /* 去掉 filter/drop-shadow：微信端易引起大面积合成闪白 */
+}
+.player-action-flower-wreath.is-appear .player-action-flower-wreath__bloom {
+  animation: player-action-flower-wreath-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) forwards;
+}
+.player-action-flower-wreath.is-fading {
+  animation: player-action-flower-wreath-fade 0.42s ease forwards;
+}
+@keyframes player-action-flower-wreath-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes player-action-flower-wreath-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Demo：头像命中层（局部合成隔离，避免震动/缩放波及邻头像） */
+.scoreboard-shell--fourball .fourball-pair-identity .avatar-group__hit-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.scoreboard-shell--fourball .fourball-pair-identity .avatar-group__hit-wrap.is-tomato-shake {
+  animation: player-action-tomato-shake 0.38s ease;
+}
+/* 🌹 仅目标头像轻微缩放，无发光、不影响其它头像 */
+.scoreboard-shell--fourball .fourball-pair-identity .avatar-group__hit-wrap.is-flower-pulse {
+  animation: player-action-flower-avatar-pulse 0.55s ease;
+}
+@keyframes player-action-flower-avatar-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.06);
+  }
+}
+@keyframes player-action-tomato-shake {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate(-2px, 1px) rotate(-3deg);
+  }
+  40% {
+    transform: translate(2px, -1px) rotate(3deg);
+  }
+  60% {
+    transform: translate(-1px, 1px) rotate(-2deg);
+  }
+  80% {
+    transform: translate(1px, 0) rotate(2deg);
+  }
+}
+
+/* Demo：番茄汁糊脸 — fixed 锚定目标头像（约 4.5s；无全屏/邻头像影响） */
+.player-action-tomato-juice {
+  position: fixed;
+  z-index: 397;
+  border-radius: 50%;
+  pointer-events: none;
+  overflow: hidden;
+  background: transparent;
+  box-sizing: border-box;
+  animation: player-action-tomato-juice-fade 4.5s ease forwards;
+}
+
+/* 层1：顶部爆裂原点 */
+.player-action-tomato-juice__impact {
+  position: absolute;
+  left: 18%;
+  top: -4%;
+  width: 58%;
+  height: 34%;
+  border-radius: 48% 55% 60% 42%;
+  background:
+    radial-gradient(ellipse 80% 70% at 42% 48%, rgba(255, 75, 48, 0.92) 0%, rgba(210, 30, 22, 0.55) 38%, transparent 72%),
+    radial-gradient(circle at 68% 40%, rgba(190, 22, 18, 0.7) 0 18%, transparent 46%),
+    radial-gradient(circle at 28% 62%, rgba(160, 14, 12, 0.55) 0 14%, transparent 40%);
+  opacity: 0;
+  animation: player-action-tomato-juice-impact 4.5s ease forwards;
+}
+
+/* 头顶残留：砸烂后黏在顶部，慢慢变薄淡出 */
+.player-action-tomato-juice__crown {
+  position: absolute;
+  left: 12%;
+  top: -2%;
+  width: 72%;
+  height: 26%;
+  border-radius: 50% 50% 45% 55% / 70% 65% 40% 45%;
+  background:
+    radial-gradient(ellipse 90% 80% at 40% 55%, rgba(230, 45, 32, 0.88) 0%, rgba(180, 20, 16, 0.45) 45%, transparent 75%),
+    radial-gradient(circle at 70% 40%, rgba(200, 30, 22, 0.55) 0 16%, transparent 42%);
+  opacity: 0;
+  animation: player-action-tomato-juice-crown 4.5s ease forwards;
+}
+
+/* 层2：多股不对称汁流 —— 先拉长再整体下移（不是只拉高后停住） */
+.player-action-tomato-juice__stream {
+  position: absolute;
+  top: 4%;
+  height: 0;
+  border-radius: 45% 55% 50% 50% / 8% 10% 85% 80%;
+  transform-origin: top center;
+  animation: player-action-tomato-juice-stream 3.2s cubic-bezier(0.33, 0.12, 0.25, 1) forwards;
+}
+.player-action-tomato-juice__stream.st0 {
+  left: 6%;
+  width: 17%;
+  background: linear-gradient(
+    180deg,
+    rgba(240, 55, 40, 0.9) 0%,
+    rgba(200, 28, 22, 0.62) 42%,
+    rgba(160, 16, 14, 0.28) 82%,
+    transparent 100%
+  );
+  animation-delay: 0.04s;
+  animation-duration: 3.05s;
+}
+.player-action-tomato-juice__stream.st1 {
+  left: 22%;
+  width: 11%;
+  top: 8%;
+  background: linear-gradient(
+    180deg,
+    rgba(220, 40, 30, 0.72) 0%,
+    rgba(175, 20, 16, 0.42) 50%,
+    rgba(140, 12, 10, 0.18) 88%,
+    transparent 100%
+  );
+  animation-delay: 0.18s;
+  animation-duration: 3.45s;
+  animation-name: player-action-tomato-juice-stream-slow;
+}
+.player-action-tomato-juice__stream.st2 {
+  left: 34%;
+  width: 23%;
+  top: 2%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 70, 45, 0.95) 0%,
+    rgba(210, 32, 24, 0.7) 35%,
+    rgba(170, 18, 15, 0.38) 75%,
+    rgba(130, 10, 10, 0.12) 92%,
+    transparent 100%
+  );
+  animation-delay: 0s;
+  animation-duration: 2.9s;
+}
+.player-action-tomato-juice__stream.st3 {
+  left: 58%;
+  width: 9%;
+  top: 10%;
+  background: linear-gradient(
+    180deg,
+    rgba(200, 30, 22, 0.65) 0%,
+    rgba(160, 16, 14, 0.35) 55%,
+    transparent 100%
+  );
+  animation-delay: 0.24s;
+  animation-duration: 3.55s;
+  animation-name: player-action-tomato-juice-stream-slow;
+}
+.player-action-tomato-juice__stream.st4 {
+  left: 68%;
+  width: 19%;
+  top: 6%;
+  background: linear-gradient(
+    180deg,
+    rgba(235, 50, 38, 0.85) 0%,
+    rgba(185, 24, 18, 0.55) 40%,
+    rgba(145, 12, 12, 0.22) 80%,
+    transparent 100%
+  );
+  animation-delay: 0.1s;
+  animation-duration: 3.15s;
+}
+
+/* 层3：途中小滴（全程下移） */
+.player-action-tomato-juice__drop {
+  position: absolute;
+  width: 7%;
+  height: 7%;
+  border-radius: 50% 45% 55% 48%;
+  background: radial-gradient(circle at 40% 35%, rgba(255, 90, 55, 0.9) 0%, rgba(180, 22, 18, 0.55) 55%, transparent 78%);
+  opacity: 0;
+  animation: player-action-tomato-juice-drop 3.4s ease-in forwards;
+}
+.player-action-tomato-juice__drop.dp0 {
+  left: 14%;
+  top: 18%;
+  width: 6%;
+  height: 8%;
+  animation-delay: 0.35s;
+}
+.player-action-tomato-juice__drop.dp1 {
+  left: 40%;
+  top: 14%;
+  width: 9%;
+  height: 9%;
+  animation-delay: 0.22s;
+}
+.player-action-tomato-juice__drop.dp2 {
+  left: 52%;
+  top: 24%;
+  width: 5%;
+  height: 6%;
+  animation-delay: 0.55s;
+  background: radial-gradient(circle at 45% 40%, rgba(200, 30, 22, 0.75) 0%, rgba(140, 12, 10, 0.35) 60%, transparent 80%);
+}
+.player-action-tomato-juice__drop.dp3 {
+  left: 72%;
+  top: 20%;
+  width: 7%;
+  height: 7%;
+  animation-delay: 0.42s;
+}
+.player-action-tomato-juice__drop.dp4 {
+  left: 30%;
+  top: 32%;
+  width: 5%;
+  height: 5%;
+  animation-delay: 0.7s;
+  background: radial-gradient(circle at 40% 35%, rgba(220, 45, 35, 0.7) 0%, transparent 72%);
+}
+
+/* 层4：底部滴落 —— 汁流到脚后往下滴出 */
+.player-action-tomato-juice__bottom-drip {
+  position: absolute;
+  bottom: -4%;
+  width: 10%;
+  height: 0;
+  border-radius: 40% 40% 55% 55%;
+  background: linear-gradient(
+    180deg,
+    rgba(220, 40, 30, 0.75) 0%,
+    rgba(170, 18, 15, 0.45) 55%,
+    transparent 100%
+  );
+  opacity: 0;
+  animation: player-action-tomato-juice-bottom-drip 2.2s ease-in forwards;
+}
+.player-action-tomato-juice__bottom-drip.bd0 {
+  left: 22%;
+  width: 12%;
+  animation-delay: 1.35s;
+}
+.player-action-tomato-juice__bottom-drip.bd1 {
+  left: 44%;
+  width: 16%;
+  animation-delay: 1.15s;
+  background: linear-gradient(
+    180deg,
+    rgba(240, 55, 40, 0.85) 0%,
+    rgba(185, 22, 18, 0.5) 50%,
+    transparent 100%
+  );
+}
+.player-action-tomato-juice__bottom-drip.bd2 {
+  left: 68%;
+  width: 11%;
+  animation-delay: 1.5s;
+}
+
+/* 层5：局部溅点 */
+.player-action-tomato-juice__speck {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  animation: player-action-tomato-juice-speck 4.5s ease forwards;
+}
+.player-action-tomato-juice__speck.sk0 {
+  left: 8%;
+  top: 42%;
+  width: 12%;
+  height: 10%;
+  background: radial-gradient(ellipse at 50% 45%, rgba(190, 25, 20, 0.7) 0%, transparent 70%);
+  animation-delay: 0.2s;
+}
+.player-action-tomato-juice__speck.sk1 {
+  left: 78%;
+  top: 55%;
+  width: 10%;
+  height: 9%;
+  background: radial-gradient(ellipse at 40% 50%, rgba(170, 18, 15, 0.6) 0%, transparent 68%);
+  animation-delay: 0.35s;
+}
+.player-action-tomato-juice__speck.sk2 {
+  left: 44%;
+  top: 72%;
+  width: 14%;
+  height: 11%;
+  background: radial-gradient(ellipse at 50% 40%, rgba(200, 30, 22, 0.55) 0%, transparent 72%);
+  animation-delay: 0.85s;
+}
+
+/* 爆裂瞬间 → 头顶糊住 → 慢淡 */
+@keyframes player-action-tomato-juice-impact {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  5% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  12% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 0.55;
+  }
+  70% {
+    opacity: 0.28;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+@keyframes player-action-tomato-juice-crown {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.7) scaleY(0.5);
+  }
+  6% {
+    opacity: 0.95;
+    transform: scaleX(1.05) scaleY(1.1);
+  }
+  14% {
+    opacity: 0.9;
+    transform: scaleX(1) scaleY(1);
+  }
+  55% {
+    opacity: 0.72;
+  }
+  78% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1) scaleY(0.85);
+  }
+}
+/* 主流：拉长 → 整段下移到脚 → 淡出 */
+@keyframes player-action-tomato-juice-stream {
+  0% {
+    height: 0;
+    opacity: 0.45;
+    transform: translateY(0);
+  }
+  18% {
+    height: 48%;
+    opacity: 0.95;
+    transform: translateY(0);
+  }
+  38% {
+    height: 78%;
+    opacity: 0.88;
+    transform: translateY(8%);
+  }
+  58% {
+    height: 62%;
+    opacity: 0.7;
+    transform: translateY(38%);
+  }
+  78% {
+    height: 42%;
+    opacity: 0.42;
+    transform: translateY(72%);
+  }
+  100% {
+    height: 28%;
+    opacity: 0;
+    transform: translateY(105%);
+  }
+}
+/* 细流更慢、更拖沓 */
+@keyframes player-action-tomato-juice-stream-slow {
+  0% {
+    height: 0;
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  22% {
+    height: 40%;
+    opacity: 0.85;
+    transform: translateY(0);
+  }
+  45% {
+    height: 70%;
+    opacity: 0.75;
+    transform: translateY(12%);
+  }
+  68% {
+    height: 50%;
+    opacity: 0.55;
+    transform: translateY(48%);
+  }
+  88% {
+    height: 32%;
+    opacity: 0.28;
+    transform: translateY(88%);
+  }
+  100% {
+    height: 20%;
+    opacity: 0;
+    transform: translateY(115%);
+  }
+}
+@keyframes player-action-tomato-juice-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.55);
+  }
+  8% {
+    opacity: 0.95;
+    transform: translateY(4%) scale(1);
+  }
+  55% {
+    opacity: 0.7;
+    transform: translateY(85%) scale(0.9);
+  }
+  85% {
+    opacity: 0.35;
+    transform: translateY(130%) scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(160%) scale(0.4);
+  }
+}
+@keyframes player-action-tomato-juice-bottom-drip {
+  0% {
+    height: 0;
+    opacity: 0;
+    transform: translateY(0);
+  }
+  15% {
+    height: 18%;
+    opacity: 0.9;
+    transform: translateY(0);
+  }
+  45% {
+    height: 32%;
+    opacity: 0.75;
+    transform: translateY(10%);
+  }
+  75% {
+    height: 28%;
+    opacity: 0.4;
+    transform: translateY(35%);
+  }
+  100% {
+    height: 16%;
+    opacity: 0;
+    transform: translateY(70%);
+  }
+}
+@keyframes player-action-tomato-juice-speck {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  10% {
+    opacity: 0.9;
+    transform: scale(1.1);
+  }
+  40% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  75% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+/* 前大半段保持可见，最后慢慢淡出（避免 0→1 白闪） */
+@keyframes player-action-tomato-juice-fade {
+  0% {
+    opacity: 0.4;
+  }
+  6% {
+    opacity: 1;
+  }
+  68% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Demo：撞击爆裂碎裂（头像中心局部，非页面闪光） */
+.player-action-tomato-burst {
+  position: fixed;
+  z-index: 401;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.player-action-tomato-burst__core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff6b4a 0%, #c62828 45%, transparent 72%);
+  animation: player-action-tomato-burst-core 0.38s ease-out forwards;
+}
+.player-action-tomato-burst__shard {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 8px;
+  margin: -4px 0 0 -5px;
+  border-radius: 40% 60% 50% 40%;
+  background: #e53935;
+  opacity: 0.95;
+  animation: player-action-tomato-burst-shard 0.4s ease-out forwards;
+}
+.player-action-tomato-burst__shard.s0 {
+  background: #ef5350;
+  animation-name: player-action-tomato-burst-s0;
+}
+.player-action-tomato-burst__shard.s1 {
+  background: #c62828;
+  width: 8px;
+  height: 7px;
+  animation-name: player-action-tomato-burst-s1;
+}
+.player-action-tomato-burst__shard.s2 {
+  background: #ff7043;
+  animation-name: player-action-tomato-burst-s2;
+}
+.player-action-tomato-burst__shard.s3 {
+  background: #d32f2f;
+  width: 7px;
+  height: 9px;
+  animation-name: player-action-tomato-burst-s3;
+}
+.player-action-tomato-burst__shard.s4 {
+  background: #ff8a65;
+  animation-name: player-action-tomato-burst-s4;
+}
+.player-action-tomato-burst__shard.s5 {
+  background: #b71c1c;
+  width: 9px;
+  height: 6px;
+  animation-name: player-action-tomato-burst-s5;
+}
+@keyframes player-action-tomato-burst-core {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+@keyframes player-action-tomato-burst-s0 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(18px, -14px) rotate(50deg) scale(0.4);
+    opacity: 0;
+  }
+}
+@keyframes player-action-tomato-burst-s1 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-16px, -12px) rotate(-40deg) scale(0.35);
+    opacity: 0;
+  }
+}
+@keyframes player-action-tomato-burst-s2 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(20px, 10px) rotate(70deg) scale(0.3);
+    opacity: 0;
+  }
+}
+@keyframes player-action-tomato-burst-s3 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-18px, 14px) rotate(-55deg) scale(0.35);
+    opacity: 0;
+  }
+}
+@keyframes player-action-tomato-burst-s4 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(6px, 20px) rotate(25deg) scale(0.3);
+    opacity: 0;
+  }
+}
+@keyframes player-action-tomato-burst-s5 {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-8px, -20px) rotate(-30deg) scale(0.3);
+    opacity: 0;
+  }
+}
+
 /* 修改半场：panel 必须高于 mask，否则遮罩拦截全部点击 */
 .bottom-sheet.half-course-sheet {
   z-index: 230;
