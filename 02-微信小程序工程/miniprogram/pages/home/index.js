@@ -197,7 +197,7 @@ Page({
         date: '2025/07/20',
         views: '64',
         type: 'tour',
-        navUrl: '/pages/score/index?gameId=demo-weekend-amateur&groupIndex=0'
+        navUrl: '/subpackages/scoring/pages/score/index?gameId=demo-weekend-amateur&groupIndex=0'
       },
       {
         id: 'my-2',
@@ -226,7 +226,7 @@ Page({
         date: '2025/04/15',
         views: '72',
         type: 'tour',
-        navUrl: '/pages/score/index?mode=fourball_best'
+        navUrl: '/subpackages/scoring/pages/score/index?mode=fourball_best'
       },
       {
         id: 'my-3',
@@ -834,7 +834,7 @@ Page({
     const multi = Array.isArray(g.groups) && g.groups.length > 1;
     const navUrl = multi
       ? '/pages/game/hub/index?gameId=' + g.gameId
-      : '/pages/score/index?gameId=' + g.gameId + '&groupIndex=0';
+      : '/subpackages/scoring/pages/score/index?gameId=' + g.gameId + '&groupIndex=0';
     const progress = gameProgress.buildProgressUi(g, 0);
     const ended = g.status === 'finished' || g.status === 'ended';
     return {
@@ -1217,7 +1217,7 @@ Page({
     const url = e.currentTarget.dataset.url;
     if (!url) return;
     // 所有进入记分页的入口统一走 enterScorePage（matchState 唯一数据源）
-    if (url.indexOf('/pages/score/index') === 0) {
+    if (url.indexOf('/subpackages/scoring/pages/score/index') === 0) {
       this._enterScore(url);
       return;
     }
