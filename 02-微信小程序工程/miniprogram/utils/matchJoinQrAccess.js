@@ -46,7 +46,7 @@ function buildMatchJoinPagePath(params) {
   const token = normalizeId(input.token);
   if (!matchId || !groupId || !token) return '';
   return (
-    'pages/score/index?matchId=' +
+    'subpackages/scoring/pages/score/index?matchId=' +
     encodeURIComponent(matchId) +
     '&groupId=' +
     encodeURIComponent(groupId) +
