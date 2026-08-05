@@ -2404,7 +2404,10 @@ Page({
         scoreDisplayMode: savedDisplayMode === 'diff' || savedDisplayMode === 'gross' ? savedDisplayMode : 'gross',
         scorePanelMode: inputMode
       },
-      () => this.refreshPlayers()
+      () => {
+        const playersView = this.data.playersView;
+        if (!playersView || !playersView.length) this.refreshPlayers();
+      }
     );
 
     // 会话内本地状态回灌：同一会话再次进入该球局不丢失成绩
