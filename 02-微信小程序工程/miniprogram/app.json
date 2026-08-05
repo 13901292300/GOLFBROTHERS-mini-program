@@ -2,7 +2,6 @@
   "pages": [
     "pages/home/index",
     "pages/index/index",
-    "pages/score/index",
     "pages/match/join/index",
     "pages/tournament/detail/index",
     "pages/tournament/stats/index",
@@ -37,6 +36,13 @@
         "pages/friends/index",
         "pages/combos/index",
         "pages/manual/index"
+      ]
+    },
+    {
+      "root": "subpackages/scoring",
+      "name": "scoring",
+      "pages": [
+        "pages/score/index"
       ]
     }
   ],
