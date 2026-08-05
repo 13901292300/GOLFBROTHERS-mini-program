@@ -375,10 +375,10 @@ Page({
     });
     matchStateUtil.setMatchState(this.buildScoreMatchState(match, groupId));
     wx.redirectTo({
-      url: '/pages/score/index?joinToken=' + encodeURIComponent(access.token || ''),
+      url: '/subpackages/scoring/pages/score/index?joinToken=' + encodeURIComponent(access.token || ''),
       fail: () => {
         wx.navigateTo({
-          url: '/pages/score/index?joinToken=' + encodeURIComponent(access.token || '')
+          url: '/subpackages/scoring/pages/score/index?joinToken=' + encodeURIComponent(access.token || '')
         });
       }
     });
