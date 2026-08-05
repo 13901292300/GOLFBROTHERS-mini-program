@@ -973,6 +973,17 @@ function resolveClassicHoleScoreSizeClass(scoreVal, displayMode) {
   return 'hole-cell-score--classic-wide';
 }
 
+/**
+ * 主成绩两位数降档显示 class（仅 UI 字段；不改数值/计算）。
+ * 按主数字展示值 |n|≥10；CSS 仅 .is-score-elite-demo 生效，不影响 Classic。
+ */
+function resolveScoreMainWideClass(mainDisplay) {
+  if (mainDisplay === '' || mainDisplay == null) return '';
+  const n = Number(String(mainDisplay).replace(/^\+/, ''));
+  if (!Number.isFinite(n) || Math.abs(n) < 10) return '';
+  return 'score-main--wide';
+}
+
 // displayMode（gross/diff）统一驱动记分格主数字与右下角杆差，逻辑与 enrichPlayer 保持一致
 function buildBestBallColumns(displayMode) {
   return columnLabels().map((label, idx) => {
@@ -995,6 +1006,9 @@ function buildBestBallColumns(displayMode) {
     const specialDisp = isSpecial
       ? resolveSpecialColumnDisplay(displayMode, isTot, score, diff, true)
       : null;
+    const mainStr = isSpecial
+      ? specialDisp.mainStr
+      : formatMainScore(score, par, displayMode);
     return {
       colIdx: idx,
       label,
@@ -1003,9 +1017,7 @@ function buildBestBallColumns(displayMode) {
       isTot,
       score: isSpecial ? specialDisp.displayScore : score,
       // 洞格：gross/diff；OUT/IN/TOT：见 resolveSpecialColumnDisplay
-      mainStr: isSpecial
-        ? specialDisp.mainStr
-        : formatMainScore(score, par, displayMode),
+      mainStr: mainStr,
       putts,
       diff,
       diffStr: isSpecial
@@ -1017,7 +1029,8 @@ function buildBestBallColumns(displayMode) {
       scoreClass: isSpecial ? '' : bestScoreClass(diff),
       classicScoreSizeClass: isSpecial
         ? ''
-        : resolveClassicHoleScoreSizeClass(score, displayMode)
+        : resolveClassicHoleScoreSizeClass(score, displayMode),
+      scoreMainWideClass: resolveScoreMainWideClass(mainStr)
     };
   });
 }
@@ -1073,7 +1086,8 @@ function buildTeamBestColumns(scores, putts, displayMode) {
         diffStr: specialDisp.diffStr,
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
         scoreClass: '',
-        classicClass: ''
+        classicClass: '',
+        scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr)
       };
     }
     const hi = holeCursor;
@@ -1087,17 +1101,19 @@ function buildTeamBestColumns(scores, putts, displayMode) {
         diffClass: 'diff-even',
         scoreClass: '',
         classicClass: '',
-        classicScoreSizeClass: ''
+        classicScoreSizeClass: '',
+        scoreMainWideClass: ''
       };
     }
     const p = putts[hi] || 1;
     const diff = s - par;
     if (hi < 9) { outSum += s; outPutts += p; outDiff += diff; outFilled += 1; }
     else { inSum += s; inPutts += p; inDiff += diff; inFilled += 1; }
+    const mainStr = formatMainScore(s, par, displayMode);
     return {
       colIdx: idx, label, par, isSpecial: false, isTot: false,
       score: s,
-      mainStr: formatMainScore(s, par, displayMode),
+      mainStr: mainStr,
       putts: p,
       diff,
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
@@ -1106,7 +1122,8 @@ function buildTeamBestColumns(scores, putts, displayMode) {
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
       scoreClass: bestScoreClass(diff),
       classicClass: resolveClassicHoleClass(diff),
-      classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode)
+      classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
+      scoreMainWideClass: resolveScoreMainWideClass(mainStr)
     };
   });
   const relScore = outDiff + inDiff;
@@ -1880,11 +1897,13 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         label,
         par,
         val: specialDisp.displayScore,
+        mainStr: specialDisp.mainStr,
         puttTotal: filled > 0 ? puttTotal : '',
         diffTotal,
         diffStr: specialDisp.diffStr,
         isTot,
-        diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even'
+        diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
+        scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr)
       };
     }
 
@@ -1908,6 +1927,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         diffStr: '',
         scoreClass: '',
         classicScoreSizeClass: '',
+        scoreMainWideClass: '',
         triangleClass:
           hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
         gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
@@ -1929,6 +1949,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       inFilled += 1;
     }
 
+    const mainStr = formatMainScore(s, par, displayMode);
     return {
       type: 'hole',
       colIdx,
@@ -1937,7 +1958,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       holeIndex: hi,
       score: s,
       // 主数字显示：gross→实际杆数；diff→带符号本洞杆差（仅 UI 展示，不改底层数据）
-      mainStr: formatMainScore(s, par, displayMode),
+      mainStr: mainStr,
       displayHint: '',
       putts: p,
       diff,
@@ -1945,6 +1966,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
       scoreClass: scoreStyle(diff),
       classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
+      scoreMainWideClass: resolveScoreMainWideClass(mainStr),
       triangleClass:
         hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
       gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
@@ -2095,9 +2117,16 @@ Page({
     playersView: [],
     entitiesView: [],
     /**
-     * 临时视觉验证：仅 demo-weekend-amateur 洞格 Classic Style（不改成绩逻辑 / 无设置入口）
+     * 演示赛显示风格：仅 demo-weekend-amateur；elite | classic
+     * 驱动 scoreHoleStyleClassic → 根 class is-score-classic（不改成绩 / fontScale）
      */
+    pageScoreStyle: 'classic',
+    /** 显示设置中「显示风格」区块：仅演示赛可见 */
+    showScoreStyleSetting: false,
+    /** 由 pageScoreStyle === 'classic' 派生；勿再按 gameId 永久强制 */
     scoreHoleStyleClassic: false,
+    /** 演示赛 + elite：根 class is-score-elite-demo（仅分隔线复刻 Classic，不改成绩色） */
+    isScoreEliteDemo: false,
     /**
      * M2 Render Model（A1：仅 Adapter 产出，WXML 未接入）
      * { headerRows, scoreRows }
@@ -2309,7 +2338,13 @@ Page({
     // 无比赛数据：不初始化任何默认比赛，提示后保持空白（入口已统一拦截，此处为兜底）
     if (!ms || !ms.formatType) {
       this._playersSource = [];
-      this.setData({ noMatch: true, scoreHoleStyleClassic: false });
+      this.setData({
+        noMatch: true,
+        scoreHoleStyleClassic: false,
+        isScoreEliteDemo: false,
+        showScoreStyleSetting: false,
+        pageScoreStyle: 'elite'
+      });
       wx.showToast({ title: '暂无比赛数据', icon: 'none' });
       return;
     }
@@ -2339,10 +2374,9 @@ Page({
       formatType: ms.formatType,
       groupId: groupId,
       gameId: gameId,
-      gameGroupIndex: groupIndex,
-      // 临时 Classic：仅 gameId === demo-weekend-amateur（isDemoWeekendAmateurGameId）
-      scoreHoleStyleClassic: demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gameId)
+      gameGroupIndex: groupIndex
     });
+    this._syncPageScoreStyle(gameId);
 
     this._syncHoleLayoutFromCourse({ refresh: false });
 
@@ -2377,6 +2411,7 @@ Page({
     this.hydrateFromSession();
     this._syncMoreMenuItems();
     this._syncFontScale();
+    this._syncPageScoreStyle(gameId);
     wx.nextTick(() => this._tryApplyPendingMatchJoinBind());
   },
 
@@ -2703,6 +2738,61 @@ Page({
     this.setData({
       fontScale: fontScale,
       fontScaleClass: fontScale === 'large' ? 'font-large' : 'font-normal'
+    });
+  },
+
+  /** 演示赛显示风格 storage key（仅 demo-weekend-amateur） */
+  _pageScoreStyleKey() {
+    return 'scoreStyle_demo_weekend_amateur';
+  },
+
+  /** 读取演示赛 pageScoreStyle；缺省 classic（保持当前体验） */
+  _getPageScoreStyle() {
+    try {
+      const value = wx.getStorageSync(this._pageScoreStyleKey());
+      return value === 'elite' ? 'elite' : 'classic';
+    } catch (e) {
+      return 'classic';
+    }
+  },
+
+  /**
+   * 同步 pageScoreStyle → scoreHoleStyleClassic / isScoreEliteDemo / 设置项可见性。
+   * 非 demo-weekend-amateur：强制关、隐藏设置项。
+   */
+  _syncPageScoreStyle(gameId) {
+    const gid = gameId != null ? gameId : this.data.gameId;
+    const isDemo = demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gid);
+    if (!isDemo) {
+      this.setData({
+        pageScoreStyle: 'elite',
+        scoreHoleStyleClassic: false,
+        isScoreEliteDemo: false,
+        showScoreStyleSetting: false
+      });
+      return;
+    }
+    const pageScoreStyle = this._getPageScoreStyle();
+    this.setData({
+      pageScoreStyle: pageScoreStyle,
+      scoreHoleStyleClassic: pageScoreStyle === 'classic',
+      isScoreEliteDemo: pageScoreStyle === 'elite',
+      showScoreStyleSetting: true
+    });
+  },
+
+  /** 写入演示赛显示风格（仅 demo-weekend-amateur；不改 fontScale / 成绩） */
+  _setPageScoreStyle(value) {
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) return;
+    const next = value === 'elite' ? 'elite' : 'classic';
+    try {
+      wx.setStorageSync(this._pageScoreStyleKey(), next);
+    } catch (e) {}
+    this.setData({
+      pageScoreStyle: next,
+      scoreHoleStyleClassic: next === 'classic',
+      isScoreEliteDemo: next === 'elite',
+      showScoreStyleSetting: true
     });
   },
 
@@ -4512,9 +4602,9 @@ Page({
       isHoleParCompact: false,
       holeParNormalStyle: 'transform: translateX(0px);',
       'match.format': game && game.gameMode ? game.gameMode : '个人比杆赛',
-      'match.course': game ? game.courseName || '' : '',
-      scoreHoleStyleClassic: demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gameId)
+      'match.course': game ? game.courseName || '' : ''
     });
+    this._syncPageScoreStyle(gameId);
     // 轻量 Context Panel：单组 / 多组均展示（仅 createGame metadata + 天气）
     this.buildGameContext(game);
     this.refreshPlayers();
@@ -8007,8 +8097,9 @@ Page({
             putts: c.puttTotal,
             diffStr: c.diffStr || '',
             diffClass: c.diffClass || 'diff-even',
-            mainStr: '',
+            mainStr: c.mainStr != null ? c.mainStr : '',
             scoreClass: '',
+            scoreMainWideClass: c.scoreMainWideClass || '',
             holeIndex: c.holeIndex
           };
         }
@@ -8025,6 +8116,7 @@ Page({
           diffClass: c.diffClass || 'diff-even',
           scoreClass: c.scoreClass || '',
           classicScoreSizeClass: c.classicScoreSizeClass || '',
+          scoreMainWideClass: c.scoreMainWideClass || '',
           holeIndex: c.holeIndex
         };
       });
@@ -9520,9 +9612,12 @@ Page({
   },
 
   openStyleSheet() {
+    const isDemo = demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId);
     this.setData({
       showStyleSheet: true,
-      fontScale: this._getFontScale()
+      fontScale: this._getFontScale(),
+      pageScoreStyle: isDemo ? this._getPageScoreStyle() : this.data.pageScoreStyle,
+      showScoreStyleSetting: isDemo
     });
   },
 
@@ -9536,6 +9631,15 @@ Page({
         ? e.currentTarget.dataset.value
         : '';
     this._setFontScale(value);
+  },
+
+  /** 演示赛显示风格切换（精英 / 经典）；仅 demo-weekend-amateur */
+  onPageScoreStyleChange(e) {
+    const value =
+      e && e.currentTarget && e.currentTarget.dataset
+        ? e.currentTarget.dataset.value
+        : '';
+    this._setPageScoreStyle(value);
   },
 
   /**

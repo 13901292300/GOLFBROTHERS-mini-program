@@ -1,4 +1,4 @@
-<view class="score-page {{themeClass}} {{fontScaleClass}} {{scoreHoleStyleClassic ? 'is-score-classic' : ''}}">
+<view class="score-page {{themeClass}} {{fontScaleClass}} {{scoreHoleStyleClassic ? 'is-score-classic' : ''}} {{isScoreEliteDemo ? 'is-score-elite-demo' : ''}}">
   <!-- Header -->
   <view id="main-header" class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
@@ -255,7 +255,7 @@
               >
                 <block wx:if="{{cell.type === 'special'}}">
                   <view class="special-cell-inner">
-                    <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                    <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{cell.scoreMainWideClass}}">{{cell.val}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{cell.puttTotal}}</text>
                       <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
@@ -265,7 +265,7 @@
                 <block wx:else>
                   <view class="hole-cell-inner">
                     <view class="{{cell.scoreClass}}">
-                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{cell.classicScoreSizeClass}}">{{cell.mainStr || cell.displayHint}}</text>
+                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{cell.classicScoreSizeClass}} {{cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{cell.putts}}</text>
@@ -734,7 +734,7 @@
               >
                 <block wx:if="{{col.isSpecial}}">
                   <view class="special-cell-inner">
-                    <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{col.score}}</text>
+                    <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{col.scoreMainWideClass}}">{{col.score}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{col.putts}}</text>
                       <text class="special-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
@@ -744,7 +744,7 @@
                 <block wx:else>
                   <view class="hole-cell-inner">
                     <view class="{{col.scoreClass}}">
-                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}}">{{col.mainStr}}</text>
+                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}} {{col.scoreMainWideClass}}">{{col.mainStr}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{col.putts}}</text>
@@ -1016,7 +1016,7 @@
             >
               <block wx:if="{{col.isSpecial}}">
                 <view class="special-cell-inner">
-                  <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{col.score}}</text>
+                  <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{col.scoreMainWideClass}}">{{col.score}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{col.putts}}</text>
                     <text class="special-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
@@ -1027,7 +1027,7 @@
               <block wx:else>
                 <view class="hole-cell-inner">
                   <view class="{{col.scoreClass}}">
-                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}}">{{col.mainStr}}</text>
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}} {{col.scoreMainWideClass}}">{{col.mainStr}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{col.putts}}</text>
@@ -1856,6 +1856,21 @@
           data-value="large"
           class="style-option {{fontScale === 'large' ? 'active' : ''}}"
         >大字体</view>
+      </view>
+    </view>
+    <view wx:if="{{showScoreStyleSetting}}" class="style-section">
+      <text class="style-section-title">显示风格</text>
+      <view class="style-option-row">
+        <view
+          bindtap="onPageScoreStyleChange"
+          data-value="elite"
+          class="style-option {{pageScoreStyle === 'elite' ? 'active' : ''}}"
+        >精英风格</view>
+        <view
+          bindtap="onPageScoreStyleChange"
+          data-value="classic"
+          class="style-option {{pageScoreStyle === 'classic' ? 'active' : ''}}"
+        >经典风格</view>
       </view>
     </view>
     <view class="style-done-wrap">
