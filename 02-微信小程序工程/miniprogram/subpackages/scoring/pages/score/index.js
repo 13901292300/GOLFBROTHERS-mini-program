@@ -2,30 +2,30 @@
  * 记分页面 — 1:1 复刻 记分及添加删除页面汇总.html
  */
 
-const { createHeaderStyle } = require('../../utils/headerEngine.js');
-const groupsStore = require('../../utils/groupsStore.js');
-const playerSlots = require('../../utils/playerSlots.js');
-const { getGenderById } = require('../../utils/playerDirectory.js');
-const teamDirectory = require('../../utils/teamDirectory.js');
-const gameStore = require('../../utils/gameStore.js');
-const weatherService = require('../../utils/weatherService.js');
-const matchState = require('../../utils/matchState.js');
-const gameProgress = require('../../utils/gameProgress.js');
-const matchStatus = require('../../utils/matchStatus.js');
-const gameLifecycle = require('../../utils/gameLifecycle.js');
-const halfCourseEdit = require('../../utils/halfCourseEdit.js');
-const holeLayout = require('../../utils/holeLayout.js');
-const mockAvatars = require('../../utils/mockAvatars.js');
-const reactionSounds = require('../../utils/reactionSounds.js');
-const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
-const teamMatchStore = require('../../utils/teamMatchStore.js');
-const teeSheetManage = require('../../utils/teeSheetManage.js');
-const caddieScoringAccess = require('../../utils/caddieScoringAccess.js');
-const userDirectory = require('../../utils/userDirectory.js');
-const userStore = require('../../utils/userStore.js');
-const contactStore = require('../../utils/contactStore.js');
-const userIdentityAlias = require('../../utils/userIdentityAlias.js');
-const { syncStrokeEntities } = require('../../utils/strokeEntityBuilder.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const groupsStore = require('../../../../utils/groupsStore.js');
+const playerSlots = require('../../../../utils/playerSlots.js');
+const { getGenderById } = require('../../../../utils/playerDirectory.js');
+const teamDirectory = require('../../../../utils/teamDirectory.js');
+const gameStore = require('../../../../utils/gameStore.js');
+const weatherService = require('../../../../utils/weatherService.js');
+const matchState = require('../../../../utils/matchState.js');
+const gameProgress = require('../../../../utils/gameProgress.js');
+const matchStatus = require('../../../../utils/matchStatus.js');
+const gameLifecycle = require('../../../../utils/gameLifecycle.js');
+const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
+const holeLayout = require('../../../../utils/holeLayout.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
+const reactionSounds = require('../../../../utils/reactionSounds.js');
+const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const teeSheetManage = require('../../../../utils/teeSheetManage.js');
+const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
+const userDirectory = require('../../../../utils/userDirectory.js');
+const userStore = require('../../../../utils/userStore.js');
+const contactStore = require('../../../../utils/contactStore.js');
+const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
+const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
 const {
   resolveStrokeKind,
   resolveGameMode,
@@ -37,10 +37,10 @@ const {
   validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
-} = require('../../utils/strokeEntityValidator.js');
-const { resolveCompositionMode } = require('../../utils/strokeCompositionResolver.js');
-const { normalizeFormalGroupSeats } = require('../../utils/strokeGroupSeatNormalizer.js');
-const { buildMatchPlayResultSummary } = require('../../utils/matchPlayResult.js');
+} = require('../../../../utils/strokeEntityValidator.js');
+const { resolveCompositionMode } = require('../../../../utils/strokeCompositionResolver.js');
+const { normalizeFormalGroupSeats } = require('../../../../utils/strokeGroupSeatNormalizer.js');
+const { buildMatchPlayResultSummary } = require('../../../../utils/matchPlayResult.js');
 const {
   resolveCompositionType,
   parseCompositionParts,
@@ -48,7 +48,7 @@ const {
   isFourball21Shape,
   getCompositionSeats,
   deriveTeamsFromSeats
-} = require('../../utils/fourballComposition.js');
+} = require('../../../../utils/fourballComposition.js');
 
 const MATCH_JOIN_PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
 
