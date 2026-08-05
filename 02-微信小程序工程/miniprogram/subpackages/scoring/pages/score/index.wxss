@@ -1,7 +1,7 @@
 /**
  * 记分页面样式 — 对齐 记分及添加删除页面汇总.html
  */
-@import '../../styles/half-course-panel.wxss';
+@import '../../../../styles/half-course-panel.wxss';
 
 /* =========================================================
    THEME TOKEN SYSTEM (single source of truth)
