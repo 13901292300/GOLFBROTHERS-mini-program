@@ -705,6 +705,9 @@ Page({
 
   onTeamCompetitionToggle(e) {
     const enabled = !!(e && e.detail && e.detail.value);
+    if (enabled === !!(this.data.draftTeamCompetition && this.data.draftTeamCompetition.enabled)) {
+      return;
+    }
     const competition = this._competitionForGroupCount(
       Object.assign({}, this.data.draftTeamCompetition, { enabled: enabled }),
       (this.data.draftTeamGroups || []).length
