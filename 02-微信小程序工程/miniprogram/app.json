@@ -3,7 +3,6 @@
     "pages/home/index",
     "pages/index/index",
     "pages/match/join/index",
-    "pages/tournament/detail/index",
     "pages/team/select/index",
     "pages/course/select/index",
     "pages/game/hub/index",
@@ -48,7 +47,8 @@
         "pages/stats/index",
         "pages/peoria/index",
         "pages/group-editor/index",
-        "pages/group-pick/index"
+        "pages/group-pick/index",
+        "pages/detail/index"
       ]
     }
   ],

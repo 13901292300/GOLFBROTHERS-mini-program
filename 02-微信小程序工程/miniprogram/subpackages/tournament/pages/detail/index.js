@@ -1,37 +1,37 @@
-const mockAvatars = require('../../../utils/mockAvatars.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
 /**
  * 赛事详情页（球队赛 / 队内赛正在进行中）
  * 1:1 复刻 01-HTML原型/记分页面/队内赛正在进行中.html
  * 含 5 个 tab：赛事详情 / 领先榜 / 出发表 / 讨论区 / 游戏
  */
 
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const groupsStore = require('../../../utils/groupsStore.js');
-const matchStateUtil = require('../../../utils/matchState.js');
-const holeLayout = require('../../../utils/holeLayout.js');
-const halfCourse = require('../../../utils/halfCourse.js');
-const partnerConfigUtil = require('../../../utils/partnerConfig.js');
-const eventSponsorConfig = require('../../../utils/eventSponsorConfig.js');
-const bannerConfig = require('../../../utils/bannerConfig.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
-const demoJiaobeiMatch = require('../../../utils/demoJiaobeiMatch.js');
-const gameLifecycle = require('../../../utils/gameLifecycle.js');
-const gameStore = require('../../../utils/gameStore.js');
-const userProfileStore = require('../../../utils/userProfileStore.js');
-const teamDirectory = require('../../../utils/teamDirectory.js');
-const playerDirectory = require('../../../utils/playerDirectory.js');
-const tPosition = require('../../../utils/tPosition.js');
-const tempAdminPermission = require('../../../utils/tempAdminPermission.js');
-const caddieScoringAccess = require('../../../utils/caddieScoringAccess.js');
-const tempAdminAccess = require('../../../utils/tempAdminAccess.js');
-const qrAccessAuth = require('../../../utils/qrAccessAuth.js');
-const playerManage = require('../../../utils/playerManage.js');
-const teeSheetManage = require('../../../utils/teeSheetManage.js');
-const paymentManage = require('../../../utils/paymentManage.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const groupsStore = require('../../../../utils/groupsStore.js');
+const matchStateUtil = require('../../../../utils/matchState.js');
+const holeLayout = require('../../../../utils/holeLayout.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
+const partnerConfigUtil = require('../../../../utils/partnerConfig.js');
+const eventSponsorConfig = require('../../../../utils/eventSponsorConfig.js');
+const bannerConfig = require('../../../../utils/bannerConfig.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const demoJiaobeiMatch = require('../../../../utils/demoJiaobeiMatch.js');
+const gameLifecycle = require('../../../../utils/gameLifecycle.js');
+const gameStore = require('../../../../utils/gameStore.js');
+const userProfileStore = require('../../../../utils/userProfileStore.js');
+const teamDirectory = require('../../../../utils/teamDirectory.js');
+const playerDirectory = require('../../../../utils/playerDirectory.js');
+const tPosition = require('../../../../utils/tPosition.js');
+const tempAdminPermission = require('../../../../utils/tempAdminPermission.js');
+const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
+const tempAdminAccess = require('../../../../utils/tempAdminAccess.js');
+const qrAccessAuth = require('../../../../utils/qrAccessAuth.js');
+const playerManage = require('../../../../utils/playerManage.js');
+const teeSheetManage = require('../../../../utils/teeSheetManage.js');
+const paymentManage = require('../../../../utils/paymentManage.js');
 const {
   resolveStrokeCompositions,
   resolveCompositionMode
-} = require('../../../utils/strokeCompositionResolver.js');
+} = require('../../../../utils/strokeCompositionResolver.js');
 const {
   resolveStrokeKind,
   resolveGameMode,
@@ -39,13 +39,13 @@ const {
   isG6G7MatchPlayMode,
   isG8MatchPlayMode,
   isMatchPlayBoardMode
-} = require('../../../utils/strokeEntityValidator.js');
-const matchStatus = require('../../../utils/matchStatus.js');
-const gameProgress = require('../../../utils/gameProgress.js');
-const contactStore = require('../../../utils/contactStore.js');
-const scheduleStore = require('../../../utils/scheduleStore.js');
-const scheduleAdapter = require('../../../utils/scheduleAdapter.js');
-const { buildMatchPlayResultSummary } = require('../../../utils/matchPlayResult.js');
+} = require('../../../../utils/strokeEntityValidator.js');
+const matchStatus = require('../../../../utils/matchStatus.js');
+const gameProgress = require('../../../../utils/gameProgress.js');
+const contactStore = require('../../../../utils/contactStore.js');
+const scheduleStore = require('../../../../utils/scheduleStore.js');
+const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
+const { buildMatchPlayResultSummary } = require('../../../../utils/matchPlayResult.js');
 
 /** 其它赛事领先榜逐洞广告默认图（交杯鲜啤演示单独走广告图片1） */
 const DEFAULT_SCORECARD_AD_IMAGE =
