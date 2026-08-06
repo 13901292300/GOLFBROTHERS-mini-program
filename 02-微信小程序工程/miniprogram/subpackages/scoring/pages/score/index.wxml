@@ -645,8 +645,13 @@
           show-scrollbar="{{false}}"
         >
           <view class="fourball-tee-sticky-overlay__inner">
-            <view class="shell-row shell-row--head fourball-tee-sticky-overlay__spacer"></view>
-            <view class="shell-row shell-row--par fourball-tee-sticky-overlay__spacer"></view>
+            <!-- HOLE/PAR 真实 6rpx T 区（与成绩行同列；Elite 吸边：5rpx 底 + 1rpx 分隔） -->
+            <view class="shell-row shell-row--head fourball-tee-sticky-overlay__spacer">
+              <view class="fourball-tee-sticky-overlay__tee"></view>
+            </view>
+            <view class="shell-row shell-row--par fourball-tee-sticky-overlay__spacer">
+              <view class="fourball-tee-sticky-overlay__tee"></view>
+            </view>
             <view
               wx:for="{{fourballRowsView}}"
               wx:key="id"
@@ -737,7 +742,7 @@
                     <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{col.scoreMainWideClass}}">{{col.score}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{col.putts}}</text>
-                      <text class="special-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
+                      <text class="special-cell-diff {{col.diffClass}}">{{isScoreEliteDemo ? col.eliteDiffStr : col.diffStr}}</text>
                     </view>
                   </view>
                 </block>
@@ -748,7 +753,7 @@
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{col.putts}}</text>
-                      <text class="hole-cell-diff {{col.diffClass}}">{{scoreHoleStyleClassic ? col.classicDiffStr : col.diffStr}}</text>
+                      <text class="hole-cell-diff {{col.diffClass}}">{{scoreHoleStyleClassic || isScoreEliteDemo ? col.classicDiffStr : col.diffStr}}</text>
                     </view>
                   </view>
                 </block>
@@ -1304,6 +1309,7 @@
     <!-- 讨论区：复用全局唯一 Discussion Chat System 组件（围观行 + 聊天流 + emoji + 输入栏，禁止本页单独实现） -->
     <view wx:if="{{activeTab === 'discussion'}}" id="discussion-tab-panel" class="score-discussion-panel">
       <discussion
+        id="score-discussion"
         watchers="{{watchers}}"
         messages="{{chatMessages}}"
         theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"

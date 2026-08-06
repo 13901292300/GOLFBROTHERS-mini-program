@@ -26,7 +26,7 @@ Component({
   properties: {
     // 围观头像列表：[{ name, avatar }]
     watchers: { type: Array, value: [] },
-    // 初始聊天消息：[{ self, name, avatar, text, mention }]
+    // 初始聊天消息：普通 [{ self, name, avatar, text, mention }]；系统 [{ type:'system', action, text, timestamp }]
     messages: { type: Array, value: [] },
     // 主题：'dark' | 'bright'（驱动聊天气泡等硬编码色，token 色走 CSS 变量自动继承）
     theme: { type: String, value: 'bright' },
@@ -84,6 +84,26 @@ Component({
       const cursor = typeof e.detail.cursor === 'number' ? e.detail.cursor : (this.data.draft || '').length;
       // 失焦时记录光标位置并复位 focus 标志，确保后续 @插入能重新触发聚焦
       this.setData({ cursor, inputFocus: false });
+    },
+
+    /**
+     * 追加系统提示（type=system），不走气泡、不受 _userTouched 阻断。
+     * @param {{ text:string, action?:string, timestamp?:number }} payload
+     */
+    appendSystemMessage(payload) {
+      const p = payload || {};
+      const text = String(p.text || '').trim();
+      if (!text) return;
+      const chat = (this.data.chat || []).concat({
+        type: 'system',
+        action: p.action != null ? String(p.action) : '',
+        text: text,
+        timestamp: p.timestamp != null ? p.timestamp : Date.now()
+      });
+      this.setData({
+        chat: chat,
+        toView: 'ds-msg-' + (chat.length - 1)
+      });
     },
 
     // 发送：空内容禁止；追加到聊天流，清空草稿/复位发送态/光标并关闭表情面板，滚动到底

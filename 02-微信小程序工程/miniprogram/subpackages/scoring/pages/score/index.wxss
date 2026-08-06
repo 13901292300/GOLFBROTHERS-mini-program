@@ -1009,6 +1009,14 @@ page {
   line-height: 1;
 }
 
+/* HOLE/PAR sticky 内真实 6rpx T 区节点（与成绩行同列；默认透传，Elite 再上色） */
+.scoreboard-shell--fourball .fourball-tee-sticky-overlay__tee {
+  width: 6rpx;
+  height: 100%;
+  box-sizing: border-box;
+  background: transparent;
+}
+
 /* Phase6 / 5.5 / 6.2：T sticky — left=压缩后 identity 右缘；显隐无过渡，防交接回跳 */
 .scoreboard-shell--fourball .fourball-tee-sticky-overlay {
   position: absolute;
@@ -3127,6 +3135,75 @@ page {
 }
 
 /*
+ * 演示 Elite：-2（Eagle）红底白字；外径对齐 -1（Birdie）红圈外框
+ * 共用 --score-marker-size:72rpx + border-box；不改公共 .score-eagle / .score-birdie
+ */
+.score-page.is-score-elite-demo .score-eagle {
+  --score-marker-size: 72rpx;
+  width: var(--score-marker-size);
+  height: var(--score-marker-size);
+  box-sizing: border-box;
+  background: #ef4444;
+  border: none;
+  border-radius: 9999rpx;
+}
+.score-page.is-score-elite-demo .score-eagle .hole-cell-score {
+  color: #ffffff;
+}
+
+/*
+ * 演示 Elite 成绩表达（仅 is-score-elite-demo / demo-weekend-amateur）
+ * - PAR 主成绩：与 Classic #1c94de 一致（依赖已有 classicClass=classic-par）
+ * - 左下 putt：黑
+ * - 右下 diff：>0 黑；=0 蓝；<0 红（文案正数无 + 见 classicDiffStr / eliteDiffStr）
+ */
+.score-page.is-score-elite-demo .score-cell.classic-par .hole-cell-score {
+  color: #1c94de;
+}
+.score-page.is-score-elite-demo .hole-cell-putt,
+.score-page.is-score-elite-demo .special-cell-putt {
+  color: #000000;
+  opacity: 1;
+  font-weight: 400;
+}
+.score-page.is-score-elite-demo .hole-cell-diff,
+.score-page.is-score-elite-demo .special-cell-diff {
+  font-weight: 400;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-track-lead__diff {
+  font-weight: 400;
+}
+.score-page.is-score-elite-demo .hole-cell-diff.diff-over,
+.score-page.is-score-elite-demo .special-cell-diff.diff-over {
+  color: #000000 !important;
+}
+.score-page.is-score-elite-demo .hole-cell-diff.diff-even,
+.score-page.is-score-elite-demo .special-cell-diff.diff-even {
+  color: #1c94de !important;
+}
+.score-page.is-score-elite-demo .hole-cell-diff.diff-under,
+.score-page.is-score-elite-demo .special-cell-diff.diff-under {
+  color: #ef4444 !important;
+}
+/* DARK：保持可读；PAR/even 对齐 Classic DARK 平杆蓝 */
+.score-page.is-score-elite-demo.dark-mode .score-cell.classic-par .hole-cell-score {
+  color: #5eb4e8;
+}
+.score-page.is-score-elite-demo.dark-mode .hole-cell-putt,
+.score-page.is-score-elite-demo.dark-mode .special-cell-putt {
+  color: #d1d5db;
+  opacity: 1;
+}
+.score-page.is-score-elite-demo.dark-mode .hole-cell-diff.diff-over,
+.score-page.is-score-elite-demo.dark-mode .special-cell-diff.diff-over {
+  color: #f3f4f6 !important;
+}
+.score-page.is-score-elite-demo.dark-mode .hole-cell-diff.diff-even,
+.score-page.is-score-elite-demo.dark-mode .special-cell-diff.diff-even {
+  color: #5eb4e8 !important;
+}
+
+/*
  * 演示 Elite：主成绩 |n|≥10 降一档（字段 scoreMainWideClass → score-main--wide）
  * 基线 Elite：标准 48rpx / 大字 58rpx → 宽数字 40rpx / 50rpx；不影响 Classic / diff / putt
  */
@@ -3137,6 +3214,31 @@ page {
 .score-page.is-score-elite-demo.font-large .hole-cell-score.score-main--wide,
 .score-page.is-score-elite-demo.font-large .special-cell-val.score-main--wide {
   font-size: 50rpx;
+}
+
+/*
+ * 演示 Elite + 大字体：成绩标记外框同步放大（~19%）
+ * class 来源：scoreClass = score-eagle(-2) / score-birdie(-1) / score-bogey(+1) / score-double(+2)
+ * classic-* 仅 Classic 整格色块，此处不改；不改公共 .score-* / Elite 标准档
+ */
+.score-page.is-score-elite-demo.font-large .score-birdie,
+.score-page.is-score-elite-demo.font-large .score-eagle,
+.score-page.is-score-elite-demo.font-large .score-bogey,
+.score-page.is-score-elite-demo.font-large .score-double {
+  --score-marker-size: 86rpx;
+  width: var(--score-marker-size);
+  height: var(--score-marker-size);
+  box-sizing: border-box;
+}
+/* 边框随外框同比略增，保持描边相对比例 */
+.score-page.is-score-elite-demo.font-large .score-birdie {
+  border-width: 5rpx;
+}
+.score-page.is-score-elite-demo.font-large .score-bogey {
+  border-width: 2rpx;
+}
+.score-page.is-score-elite-demo.font-large .score-double {
+  border-radius: 10rpx;
 }
 
 /*
@@ -3236,8 +3338,9 @@ page {
 }
 
 /*
- * 演示 Elite：tee sticky 去重复横线；HOLE/PAR spacer → HOLE 底
- * 成绩行 __row：仅底用 HOLE（与其它非记分区一致）；T 色块仍由 __strip / tee-half 绘制
+ * 演示 Elite：tee sticky 去重复横线
+ * HOLE/PAR：真实 6rpx T 区 = 5rpx HOLE 底 + 1rpx 分隔（不用 border-right 主体）
+ * 成绩行 __row：底用 HOLE；T 色块仍由 __strip 满 6rpx 绘制
  */
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer,
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__inner > .fourball-tee-sticky-overlay__spacer.shell-row--head,
@@ -3245,10 +3348,21 @@ page {
   border-top: none;
   border-bottom: none;
 }
-.score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__inner > .fourball-tee-sticky-overlay__spacer.shell-row--head,
+/* HOLE/PAR spacer 透传，T 区由 __tee 渐变绘制 */
+.score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer.shell-row--head,
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer.shell-row--par {
-  background: var(--score-header-hole) !important;
-  background-color: var(--score-header-hole) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__tee {
+  width: 6rpx;
+  background: linear-gradient(
+    to right,
+    var(--score-header-hole) 0,
+    var(--score-header-hole) 5rpx,
+    var(--fourball-classic-player-row-border) 5rpx,
+    var(--fourball-classic-player-row-border) 6rpx
+  );
 }
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__row {
   background: var(--score-header-hole) !important;
@@ -3311,6 +3425,15 @@ page {
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .fourball-track-lead--tee {
   border-right: 1px solid var(--fourball-classic-player-row-border);
   box-sizing: border-box;
+}
+/*
+ * 演示 Elite 吸边：HOLE/PAR 的 T 区改由 tee-sticky __tee（6rpx 渐变）绘制
+ * 关掉 head/par lead 的 border-right，避免与 __tee 末 1rpx 双线
+ * 成绩行 lead 仍保留 border-right（未吸边/交接）；吸边后成绩行 T 色由 __strip 满铺
+ */
+.score-page.is-score-elite-demo .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee.fourball-track-lead--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee.fourball-track-lead--par {
+  border-right: none;
 }
 .score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell,
 .score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell,

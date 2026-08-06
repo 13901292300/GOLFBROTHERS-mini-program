@@ -26,25 +26,31 @@
   <scroll-view class="ds-chat-scroll" scroll-y scroll-into-view="{{toView}}" scroll-with-animation>
     <view class="discussion-chat">
       <view class="discussion-time">今天</view>
-      <view wx:for="{{chat}}" wx:key="index" id="ds-msg-{{index}}" class="chat-row {{item.self ? 'self' : ''}}">
-        <image
-          wx:if="{{!item.self}}"
-          class="chat-avatar"
-          src="{{item.avatar}}"
-          mode="aspectFill"
-          data-userid="{{item.userId}}"
-          data-name="{{item.name}}"
-          bindtouchstart="onAvatarTouchStart"
-          bindtouchmove="onAvatarTouchMove"
-          bindtouchend="onAvatarTouchEnd"
-          bindtouchcancel="onAvatarTouchEnd"
-        ></image>
-        <view class="chat-col">
-          <text class="chat-meta">{{item.name}}</text>
-          <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
+      <block wx:for="{{chat}}" wx:key="index">
+        <!-- 系统提示：居中灰字，无气泡（type=system；与普通评论分离） -->
+        <view wx:if="{{item.type === 'system'}}" id="ds-msg-{{index}}" class="chat-system">
+          <text class="chat-system__text">{{item.text}}</text>
         </view>
-        <image wx:if="{{item.self}}" class="chat-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
-      </view>
+        <view wx:else id="ds-msg-{{index}}" class="chat-row {{item.self ? 'self' : ''}}">
+          <image
+            wx:if="{{!item.self}}"
+            class="chat-avatar"
+            src="{{item.avatar}}"
+            mode="aspectFill"
+            data-userid="{{item.userId}}"
+            data-name="{{item.name}}"
+            bindtouchstart="onAvatarTouchStart"
+            bindtouchmove="onAvatarTouchMove"
+            bindtouchend="onAvatarTouchEnd"
+            bindtouchcancel="onAvatarTouchEnd"
+          ></image>
+          <view class="chat-col">
+            <text class="chat-meta">{{item.name}}</text>
+            <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
+          </view>
+          <image wx:if="{{item.self}}" class="chat-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+        </view>
+      </block>
       <view
         wx:if="{{bottomSpacerHeight > 0}}"
         class="discussion-content-spacer"

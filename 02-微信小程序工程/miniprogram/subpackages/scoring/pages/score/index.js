@@ -949,6 +949,17 @@ function bestScoreClass(diff) {
 }
 
 /**
+ * 演示 Elite 洞格 marker（仅 demo-weekend-amateur + pageScoreStyle=elite）：
+ * -2 → score-eagle（红底白字）；-1 / ≤-3 仍走 bestScoreClass（当前为 score-birdie）。
+ * 不改 bestScoreClass / Classic / 非演示路径。
+ */
+function resolveEliteDemoHoleScoreClass(diff) {
+  const n = Number(diff);
+  if (n === -2) return 'score-eagle';
+  return bestScoreClass(diff);
+}
+
+/**
  * 临时 Classic Style（仅视觉验证）：按真实洞差映射 classic-* class。
  * 不改 scoreClass / bestScoreClass / scoreStyle / getScoreStatus。
  * 空洞必须由调用方保证不传入（未录入返回 ''）。
@@ -985,7 +996,8 @@ function resolveScoreMainWideClass(mainDisplay) {
 }
 
 // displayMode（gross/diff）统一驱动记分格主数字与右下角杆差，逻辑与 enrichPlayer 保持一致
-function buildBestBallColumns(displayMode) {
+function buildBestBallColumns(displayMode, opts) {
+  const eliteDemoMarkers = !!(opts && opts.eliteDemoMarkers);
   return columnLabels().map((label, idx) => {
     const isSpecial = SPECIAL_IDX.includes(idx);
     const par = columnPars()[idx];
@@ -1025,8 +1037,20 @@ function buildBestBallColumns(displayMode) {
         : displayMode === 'diff'
           ? ''
           : formatCellDiff(diff),
+      eliteDiffStr:
+        isSpecial && !isTot ? formatClassicCellDiff(diff) : '',
+      classicDiffStr: isSpecial
+        ? ''
+        : displayMode === 'diff'
+          ? ''
+          : formatClassicCellDiff(diff),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
-      scoreClass: isSpecial ? '' : bestScoreClass(diff),
+      scoreClass: isSpecial
+        ? ''
+        : eliteDemoMarkers
+          ? resolveEliteDemoHoleScoreClass(diff)
+          : bestScoreClass(diff),
+      classicClass: isSpecial ? '' : resolveClassicHoleClass(diff),
       classicScoreSizeClass: isSpecial
         ? ''
         : resolveClassicHoleScoreSizeClass(score, displayMode),
@@ -1048,16 +1072,20 @@ function buildEmptyBestColumns() {
     putts: '',
     diff: 0,
     diffStr: '',
+    eliteDiffStr: '',
+    classicDiffStr: '',
     diffClass: 'diff-even',
-    scoreClass: ''
+    scoreClass: '',
+    classicClass: ''
   }));
 }
 
 // 由「团队单一成绩」数组派生四人最佳球位/最好成绩球队记分行 + OUT/IN/TOT 汇总。
 // 唯一数据源为 team scores（每洞一个成绩，不区分球员）；仅 UI 派生，不改记分结构。
-function buildTeamBestColumns(scores, putts, displayMode) {
+function buildTeamBestColumns(scores, putts, displayMode, opts) {
   scores = scores || [];
   putts = putts || [];
+  const eliteDemoMarkers = !!(opts && opts.eliteDemoMarkers);
   let outSum = 0, inSum = 0, outPutts = 0, inPutts = 0, outDiff = 0, inDiff = 0, outFilled = 0, inFilled = 0;
   let holeCursor = 0;
   const columns = columnLabels().map((label, idx) => {
@@ -1084,6 +1112,9 @@ function buildTeamBestColumns(scores, putts, displayMode) {
         putts: filled > 0 ? puttTotal : '',
         diff: diffTotal,
         diffStr: specialDisp.diffStr,
+        // Elite demo OUT/IN 角标：0/N/-N（无 +、不用 E）；TOT 无角标；不改 Classic/diffStr
+        eliteDiffStr:
+          !isTot && filled > 0 ? formatClassicCellDiff(diffTotal) : '',
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
         scoreClass: '',
         classicClass: '',
@@ -1097,7 +1128,7 @@ function buildTeamBestColumns(scores, putts, displayMode) {
     if (!isFilledScore(s)) {
       return {
         colIdx: idx, label, par, isSpecial: false, isTot: false,
-        score: '', mainStr: '', putts: '', diff: 0, diffStr: '', classicDiffStr: '',
+        score: '', mainStr: '', putts: '', diff: 0, diffStr: '', eliteDiffStr: '', classicDiffStr: '',
         diffClass: 'diff-even',
         scoreClass: '',
         classicClass: '',
@@ -1117,10 +1148,13 @@ function buildTeamBestColumns(scores, putts, displayMode) {
       putts: p,
       diff,
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
-      // Classic 专用展示；杆差模式下仍隐藏右下角（与 Elite 一致）
+      eliteDiffStr: '',
+      // Classic / Elite demo 洞格右下角：-N / 0 / N（正数无 +）
       classicDiffStr: displayMode === 'diff' ? '' : formatClassicCellDiff(diff),
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even',
-      scoreClass: bestScoreClass(diff),
+      scoreClass: eliteDemoMarkers
+        ? resolveEliteDemoHoleScoreClass(diff)
+        : bestScoreClass(diff),
       classicClass: resolveClassicHoleClass(diff),
       classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
       scoreMainWideClass: resolveScoreMainWideClass(mainStr)
@@ -2791,12 +2825,25 @@ Page({
     try {
       wx.setStorageSync(this._pageScoreStyleKey(), next);
     } catch (e) {}
-    this.setData({
-      pageScoreStyle: next,
-      scoreHoleStyleClassic: next === 'classic',
-      isScoreEliteDemo: next === 'elite',
-      showScoreStyleSetting: true
-    });
+    this.setData(
+      {
+        pageScoreStyle: next,
+        scoreHoleStyleClassic: next === 'classic',
+        isScoreEliteDemo: next === 'elite',
+        showScoreStyleSetting: true
+      },
+      () => {
+        // Elite -2 eagle marker 依赖 columns.scoreClass，切换风格后重建记分行
+        if (this.data.mode === 'fourball_best' && typeof this.refreshPlayers === 'function') {
+          this.refreshPlayers();
+        }
+      }
+    );
+  },
+
+  /** 演示 Elite 洞格 marker 选项（供 buildTeamBestColumns / buildBestBallColumns） */
+  _eliteDemoScoreMarkerOpts() {
+    return { eliteDemoMarkers: !!this.data.isScoreEliteDemo };
   },
 
   // 记分方式(技术/快捷)偏好缓存 key：稳定全局键，绝不绑定 hole/player/group
@@ -2935,7 +2982,9 @@ Page({
       bestTeams: bestTeams,
       fourballRowsView: this._buildFourballRowsView(bestTeams),
       // 兼容字段（best across groups，供需要时读取，不再用于行渲染）
-      bestColumns: hasMatch ? team.columns : buildBestBallColumns(this.data.scoreDisplayMode),
+      bestColumns: hasMatch
+        ? team.columns
+        : buildBestBallColumns(this.data.scoreDisplayMode, this._eliteDemoScoreMarkerOpts()),
       bestTeamDiffStr: hasMatch ? team.teamDiffStr : formatDiff(BEST_SPECIAL[20].diff),
       bestTeamDiffClass: hasMatch
         ? team.teamDiffClass
@@ -3205,7 +3254,12 @@ Page({
 
   _teamBestColumns(displayMode) {
     const tb = this._teamBestScores();
-    return buildTeamBestColumns(tb.scores, tb.putts, displayMode);
+    return buildTeamBestColumns(
+      tb.scores,
+      tb.putts,
+      displayMode,
+      this._eliteDemoScoreMarkerOpts()
+    );
   },
 
   // 组合记分行第一列起始宽度：pair(2人)/team(4人)需容纳 identity + diff + tee
@@ -3392,7 +3446,7 @@ Page({
     const hasMatch = hasMatchArg != null ? hasMatchArg : this.data.bestHasMatch;
     const bestLabel = labelArg || this.data.bestLabel || '最佳球位';
     if (!hasMatch) {
-      const proto = buildBestBallColumns(displayMode);
+      const proto = buildBestBallColumns(displayMode, this._eliteDemoScoreMarkerOpts());
       const d = BEST_SPECIAL[20].diff;
       const demoMembers = (this._playersSource || []).slice(0, 4).map((m, mi) => {
         const name = this._shortName(m && m.name) || (m && m.name) || '球员';
@@ -3428,7 +3482,12 @@ Page({
       .map((x) => {
       const g = x.g;
       const gi = x.engineIdx;
-      const t = buildTeamBestColumns(g.scores, g.putts, displayMode);
+      const t = buildTeamBestColumns(
+        g.scores,
+        g.putts,
+        displayMode,
+        this._eliteDemoScoreMarkerOpts()
+      );
       const members = g.members || [];
       const size = members.length;
       const kind = size === 1 ? 'single' : size === 2 ? 'pair' : 'team';
@@ -5290,7 +5349,10 @@ Page({
           ? padBestRosterFourSlots(this._buildRosterFromGroups())
           : this._buildRosterFromGroups();
       } else {
-        patch.bestColumns = buildBestBallColumns(displayMode);
+        patch.bestColumns = buildBestBallColumns(
+          displayMode,
+          this._eliteDemoScoreMarkerOpts()
+        );
         patch.bestRoster = isFourball40StrokeShell
           ? padBestRosterFourSlots(buildBestRoster(this._playersSource))
           : buildBestRoster(this._playersSource);
@@ -7618,6 +7680,7 @@ Page({
 
   /**
    * Demo：🌹 → 复用 playerId + #fb-player-avatar 定位；柔和飘入（慢于🍅，独立轨迹）。
+   * demo-weekend-amateur：送花成功后追加讨论区系统消息（不写盘）。
    */
   onPlayerActionFlowerTap() {
     if (this._playerActionFlowerBusy) return;
@@ -7645,8 +7708,49 @@ Page({
           return;
         }
         self._playPlayerActionFlower(rect, playerId);
+        self._appendDemoFlowerSystemMessage(target);
       })
       .exec();
+  },
+
+  /**
+   * 演示赛送花：讨论区系统消息「A 给 B 送了一朵花」。
+   * 仅 demo-weekend-amateur；仅页面实时 chatMessages，不写 game/match/score。
+   */
+  _appendDemoFlowerSystemMessage(target) {
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const toName =
+      (target && (target.name || target.displayName || target.nickname)) ||
+      '球员';
+    const fromName = this._resolveDemoInteractionActorName();
+    const text = fromName + ' 给 ' + String(toName).trim() + ' 送了一朵🌹';
+    const msg = {
+      type: 'system',
+      action: 'flower',
+      text: text,
+      timestamp: Date.now()
+    };
+    const chatMessages = (this.data.chatMessages || []).concat(msg);
+    this.setData({ chatMessages: chatMessages });
+    try {
+      const disc = this.selectComponent('#score-discussion');
+      if (disc && typeof disc.appendSystemMessage === 'function') {
+        disc.appendSystemMessage(msg);
+      }
+    } catch (e) {
+      /* 讨论区未挂载（非讨论 Tab）时仅靠 chatMessages，切回 Tab 时由 messages 同步 */
+    }
+  },
+
+  /** 互动系统消息：当前操作用户展示名（优先昵称，缺省「我」） */
+  _resolveDemoInteractionActorName() {
+    const user = gameStore.getCurrentUser() || {};
+    const name = String(
+      user.nickname || user.name || user.displayName || ''
+    ).trim();
+    return name || '我';
   },
 
   /** Demo：清理🌹相关延时器 */
