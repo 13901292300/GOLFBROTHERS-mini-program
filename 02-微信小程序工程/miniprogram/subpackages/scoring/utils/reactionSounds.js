@@ -1,6 +1,6 @@
 /**
  * 互动反应音效（独立于动画 / 记分逻辑）
- * 资源目录：miniprogram/assets/sounds/
+ * 资源目录：miniprogram/subpackages/scoring/assets/sounds/
  *
  * 注意：微信端在「动画 setData 同帧」同步 createInnerAudioContext / seek / play
  * 容易触发原生层与页面合成抢占，表现为全屏闪白。因此：
@@ -10,9 +10,9 @@
  */
 
 const SOUND_SRC = {
-  bucket_water: '/assets/sounds/bucket_water.wav',
-  egg_hit: '/assets/sounds/egg_hit.wav',
-  egg_hit_finale: '/assets/sounds/egg_hit_finale.wav'
+  bucket_water: '/subpackages/scoring/assets/sounds/bucket_water.wav',
+  egg_hit: '/subpackages/scoring/assets/sounds/egg_hit.wav',
+  egg_hit_finale: '/subpackages/scoring/assets/sounds/egg_hit_finale.wav'
 };
 
 /** @type {Object.<string, any>} */
