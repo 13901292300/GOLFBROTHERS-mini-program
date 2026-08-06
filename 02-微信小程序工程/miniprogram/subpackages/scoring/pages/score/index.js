@@ -48,7 +48,7 @@ const {
   isFourball21Shape,
   getCompositionSeats,
   deriveTeamsFromSeats
-} = require('../../../../utils/fourballComposition.js');
+} = require('../../utils/fourballComposition.js');
 
 const MATCH_JOIN_PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
 
