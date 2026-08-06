@@ -1,5 +1,5 @@
-/* 复用赛事详情页统一样式（Header / TAB 吸顶 / 领先榜 / 分组卡 / 讨论区 / ds-card 等） */
-@import "../../tournament/detail/index.wxss";
+/* 复用 tournament-common（Header / TAB / 领先榜 / 出发表 / 讨论区壳 / sheets 等） */
+@import "/styles/tournament-common.wxss";
 
 /* ===== Hub Bottom Sheet · Dark 顶蓝线（仅 .bottom-sheet，不影响 .style-sheet） ===== */
 .detail-page .bottom-sheet {
