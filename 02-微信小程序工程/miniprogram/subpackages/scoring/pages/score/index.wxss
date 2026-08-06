@@ -3369,6 +3369,26 @@ page {
   background-color: var(--score-header-hole) !important;
 }
 
+/*
+ * 演示 Classic：HOLE/PAR T 区复刻 Elite 6rpx（5rpx HOLE 底 + 1rpx 分隔）
+ * 仅 .is-score-classic-demo；不改公共 .is-score-classic / Elite / 成绩行 __strip
+ */
+.score-page.is-score-classic-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__spacer.shell-row--par {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+.score-page.is-score-classic-demo .scoreboard-shell--fourball .fourball-tee-sticky-overlay__tee {
+  width: 6rpx;
+  background: linear-gradient(
+    to right,
+    var(--score-header-hole) 0,
+    var(--score-header-hole) 5rpx,
+    var(--fourball-classic-player-row-border) 5rpx,
+    var(--fourball-classic-player-row-border) 6rpx
+  );
+}
+
 /* —— 右区唯一源：cell / lead —— */
 /* HOLE 顶 + HOLE|PAR */
 .score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell--head,
@@ -3433,6 +3453,11 @@ page {
  */
 .score-page.is-score-elite-demo .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee.fourball-track-lead--head,
 .score-page.is-score-elite-demo .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee.fourball-track-lead--par {
+  border-right: none;
+}
+/* 演示 Classic 吸边：同上，仅 .is-score-classic-demo */
+.score-page.is-score-classic-demo .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee.fourball-track-lead--head,
+.score-page.is-score-classic-demo .scoreboard-shell--fourball.is-fourball-tee-sticky .fourball-track-lead--tee.fourball-track-lead--par {
   border-right: none;
 }
 .score-page.is-score-classic .scoreboard-shell--fourball .scoreboard-row--head .scoreboard-cell,

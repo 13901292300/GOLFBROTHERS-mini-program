@@ -2159,6 +2159,8 @@ Page({
     showScoreStyleSetting: false,
     /** 由 pageScoreStyle === 'classic' 派生；勿再按 gameId 永久强制 */
     scoreHoleStyleClassic: false,
+    /** 演示赛 + classic：根 class is-score-classic-demo（HOLE/PAR T 区 6rpx 模型等专用覆盖） */
+    isScoreClassicDemo: false,
     /** 演示赛 + elite：根 class is-score-elite-demo（仅分隔线复刻 Classic，不改成绩色） */
     isScoreEliteDemo: false,
     /**
@@ -2375,6 +2377,7 @@ Page({
       this.setData({
         noMatch: true,
         scoreHoleStyleClassic: false,
+        isScoreClassicDemo: false,
         isScoreEliteDemo: false,
         showScoreStyleSetting: false,
         pageScoreStyle: 'elite'
@@ -2794,7 +2797,7 @@ Page({
   },
 
   /**
-   * 同步 pageScoreStyle → scoreHoleStyleClassic / isScoreEliteDemo / 设置项可见性。
+   * 同步 pageScoreStyle → scoreHoleStyleClassic / isScoreClassicDemo / isScoreEliteDemo / 设置项可见性。
    * 非 demo-weekend-amateur：强制关、隐藏设置项。
    */
   _syncPageScoreStyle(gameId) {
@@ -2804,6 +2807,7 @@ Page({
       this.setData({
         pageScoreStyle: 'elite',
         scoreHoleStyleClassic: false,
+        isScoreClassicDemo: false,
         isScoreEliteDemo: false,
         showScoreStyleSetting: false
       });
@@ -2813,6 +2817,7 @@ Page({
     this.setData({
       pageScoreStyle: pageScoreStyle,
       scoreHoleStyleClassic: pageScoreStyle === 'classic',
+      isScoreClassicDemo: pageScoreStyle === 'classic',
       isScoreEliteDemo: pageScoreStyle === 'elite',
       showScoreStyleSetting: true
     });
@@ -2829,6 +2834,7 @@ Page({
       {
         pageScoreStyle: next,
         scoreHoleStyleClassic: next === 'classic',
+        isScoreClassicDemo: next === 'classic',
         isScoreEliteDemo: next === 'elite',
         showScoreStyleSetting: true
       },
