@@ -13,13 +13,13 @@
  * 标准杆：holeLayout.resolveLayoutFromContext
  */
 
-const groupsStore = require('./groupsStore.js');
-const holeLayout = require('./holeLayout.js');
-const halfCourse = require('./halfCourse.js');
-const playerManage = require('./playerManage.js');
-const tPosition = require('./tPosition.js');
-const mockAvatars = require('./mockAvatars.js');
-const matchStatus = require('./matchStatus.js');
+const groupsStore = require('../../../utils/groupsStore.js');
+const holeLayout = require('../../../utils/holeLayout.js');
+const halfCourse = require('../../../utils/halfCourse.js');
+const playerManage = require('../../../utils/playerManage.js');
+const tPosition = require('../../../utils/tPosition.js');
+const mockAvatars = require('../../../utils/mockAvatars.js');
+const matchStatus = require('../../../utils/matchStatus.js');
 const {
   resolveStrokeKind,
   resolveGameMode,
@@ -29,7 +29,7 @@ const {
   isMatchPlayBoardMode,
   buildRegisterTeamMap,
   listFilledPlayers
-} = require('./strokeEntityValidator.js');
+} = require('../../../utils/strokeEntityValidator.js');
 
 const SCORE_CELL_COUNT = holeLayout.SCORE_CELL_COUNT || 18;
 

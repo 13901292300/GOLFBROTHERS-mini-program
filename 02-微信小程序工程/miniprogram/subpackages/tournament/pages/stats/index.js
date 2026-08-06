@@ -11,7 +11,7 @@
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const gameStore = require('../../../../utils/gameStore.js');
-const statisticsAdapter = require('../../../../utils/statisticsAdapter.js');
+const statisticsAdapter = require('../../utils/statisticsAdapter.js');
 const {
   resolveGameMode,
   isMatchPlayBoardMode
