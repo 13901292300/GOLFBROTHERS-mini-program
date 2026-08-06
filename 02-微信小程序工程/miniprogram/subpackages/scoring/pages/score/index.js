@@ -2233,7 +2233,7 @@ Page({
     /** Demo：第一视角 reaction-screen-layer（tomato | flower） */
     reactionScreenVisible: false,
     reactionScreenFading: false,
-    reactionScreenMode: '', // tomato | flower | egg
+    reactionScreenMode: '', // tomato | flower | egg | boxing
     reactionTomatoFlyVisible: false,
     reactionTomatoFlyStyle: '',
     reactionTomatoSplashVisible: false,
@@ -2252,6 +2252,23 @@ Page({
     reactionEggBurstStyle: '',
     reactionEggFinaleActive: false,
     reactionEggShake: false,
+    /** Demo：👊 第三人称卡通拳击（boxing-reaction-layer；克隆头像变形，不改原头像/成绩） */
+    reactionBoxingAvatarUrl: '',
+    reactionBoxingShellStyle: '',
+    reactionBoxingBodyStyle: '',
+    reactionBoxingMaskStyle: '',
+    reactionBoxingGloveLeftPhase: '', // punch | ''
+    reactionBoxingGloveRightPhase: '', // punch | charge | strike | ''
+    reactionBoxingImpactVisible: false,
+    reactionBoxingImpactWord: '',
+    reactionBoxingImpactSide: '', // left | right | finale
+    reactionBoxingShake: false,
+    /** Demo：👊 击晕阶段（boxing-dizzy-layer） */
+    reactionBoxingDizzy: false,
+    reactionBoxingDizzyStarCount: 3,
+    /** Demo：👊 boxing 离位 — 记分行原头像暂隐（占位尺寸保留） */
+    reactionAvatarDetached: false,
+    reactionAvatarDetachedPlayerId: '',
     /** Demo：🪣 水桶动画（独立于🍅轨迹） */
     playerActionBucketVisible: false,
     playerActionBucketDropping: false,
@@ -7152,8 +7169,615 @@ Page({
     wx.showToast({ title: '他人主页暂未开放', icon: 'none' });
   },
 
-  /** Demo：占位互动元素（🍺🚀👊🚗）仅展示，不播动画 */
+  /** Demo：占位互动元素（🍺🚀🚗）仅展示，不播动画 */
   onPlayerActionPlaceholderTap() {},
+
+  /**
+   * Demo：👊 → 第三人称拳击 reaction（目标头像克隆至屏中，左右连击 + 终结击飞回座位）。
+   * 仅 demo-weekend-amateur；复用 player-action-modal；不改原头像 / 成绩。
+   */
+  onPlayerActionBoxingTap() {
+    if (this._playerActionBoxingBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
+    if (!playerId) {
+      console.log('[player-action-boxing] missing playerId');
+      return;
+    }
+    const avatarUrl =
+      (target && (target.avatar || target.avatarUrl || target.headimgurl)) || '';
+    const self = this;
+    this._playerActionBoxingBusy = true;
+    this._queryPlayerActionAvatarRect(playerId, function (rect) {
+      if (!rect) {
+        self._playerActionBoxingBusy = false;
+        return;
+      }
+      // 定位完成后再离位隐藏原头像，避免 query 量到空位
+      self._playScreenBoxingReaction(rect, avatarUrl, playerId);
+    });
+  },
+
+  _clearPlayerActionBoxingTimers() {
+    const list = this._playerActionBoxingTimers;
+    if (list && list.length) {
+      for (let i = 0; i < list.length; i++) {
+        clearTimeout(list[i]);
+      }
+    }
+    this._playerActionBoxingTimers = [];
+  },
+
+  _boxingTimeout(fn, ms) {
+    const self = this;
+    if (!this._playerActionBoxingTimers) this._playerActionBoxingTimers = [];
+    const tid = setTimeout(function () {
+      const arr = self._playerActionBoxingTimers || [];
+      const idx = arr.indexOf(tid);
+      if (idx >= 0) arr.splice(idx, 1);
+      fn();
+    }, ms);
+    this._playerActionBoxingTimers.push(tid);
+    return tid;
+  },
+
+  /** Demo：拳击壳层只负责位移（不承载变形，避免 transform 冲突） */
+  _buildBoxingShellStyle(cx, cy, w, h, flyMs) {
+    const transition =
+      flyMs > 0
+        ? 'left ' +
+          flyMs +
+          'ms cubic-bezier(0.22, 0.61, 0.36, 1),top ' +
+          flyMs +
+          'ms cubic-bezier(0.22, 0.61, 0.36, 1)'
+        : 'none';
+    return (
+      'left:' +
+      cx +
+      'px;top:' +
+      cy +
+      'px;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px;transform:translate(-50%,-50%);transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  /**
+   * Demo：头像本体变形（scale/scaleX/Y/rotate/skew）— 罩在 mask+image 外，二者一起变
+   * deform: { base, sx, sy, rot, skew, r1..r4, ry1..ry4 }
+   */
+  _buildBoxingBodyStyle(deform, transitionMs) {
+    const d = deform || {};
+    const base = d.base != null ? d.base : 1;
+    const sx = d.sx != null ? d.sx : 1;
+    const sy = d.sy != null ? d.sy : 1;
+    const rot = d.rot != null ? d.rot : 0;
+    const skew = d.skew != null ? d.skew : 0;
+    const ms = transitionMs != null ? transitionMs : 0;
+    const transition =
+      ms > 0 ? 'transform ' + ms + 'ms cubic-bezier(0.2, 0.75, 0.3, 1)' : 'none';
+    return (
+      'transform:scale(' +
+      base +
+      ') scaleX(' +
+      sx +
+      ') scaleY(' +
+      sy +
+      ') rotate(' +
+      rot +
+      'deg) skewX(' +
+      skew +
+      'deg);transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  /** Demo：橡皮泥遮罩圆角（与 image 同层裁切，随累积态继承） */
+  _buildBoxingMaskStyle(deform, transitionMs) {
+    const d = deform || {};
+    const r1 = d.r1 != null ? d.r1 : 50;
+    const r2 = d.r2 != null ? d.r2 : 50;
+    const r3 = d.r3 != null ? d.r3 : 50;
+    const r4 = d.r4 != null ? d.r4 : 50;
+    const ry1 = d.ry1 != null ? d.ry1 : 50;
+    const ry2 = d.ry2 != null ? d.ry2 : 50;
+    const ry3 = d.ry3 != null ? d.ry3 : 50;
+    const ry4 = d.ry4 != null ? d.ry4 : 50;
+    const ms = transitionMs != null ? transitionMs : 0;
+    const transition = ms > 0 ? 'border-radius ' + ms + 'ms ease' : 'none';
+    return (
+      'border-radius:' +
+      r1 +
+      '% ' +
+      r2 +
+      '% ' +
+      r3 +
+      '% ' +
+      r4 +
+      '% / ' +
+      ry1 +
+      '% ' +
+      ry2 +
+      '% ' +
+      ry3 +
+      '% ' +
+      ry4 +
+      '%;transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  _applyBoxingDeformStyles(deform, transitionMs, extra) {
+    const patch = {
+      reactionBoxingBodyStyle: this._buildBoxingBodyStyle(deform, transitionMs),
+      reactionBoxingMaskStyle: this._buildBoxingMaskStyle(deform, transitionMs)
+    };
+    if (extra && typeof extra === 'object') {
+      const keys = Object.keys(extra);
+      for (let i = 0; i < keys.length; i++) {
+        patch[keys[i]] = extra[keys[i]];
+      }
+    }
+    this.setData(patch);
+  },
+
+  _cloneBoxingDeform(src) {
+    const d = src || {};
+    return {
+      base: d.base != null ? d.base : 1,
+      sx: d.sx != null ? d.sx : 1,
+      sy: d.sy != null ? d.sy : 1,
+      rot: d.rot != null ? d.rot : 0,
+      skew: d.skew != null ? d.skew : 0,
+      r1: d.r1 != null ? d.r1 : 50,
+      r2: d.r2 != null ? d.r2 : 50,
+      r3: d.r3 != null ? d.r3 : 50,
+      r4: d.r4 != null ? d.r4 : 50,
+      ry1: d.ry1 != null ? d.ry1 : 50,
+      ry2: d.ry2 != null ? d.ry2 : 50,
+      ry3: d.ry3 != null ? d.ry3 : 50,
+      ry4: d.ry4 != null ? d.ry4 : 50
+    };
+  },
+
+  /**
+   * Demo：每拳累积橡皮泥偏移（状态继承，不回正圆）
+   * punchIndex 0-based：越往后挤扁/歪斜越强 → 约第6拳呈土豆形
+   */
+  _accumulateBoxingDeform(prev, side, finale, punchIndex) {
+    const d = this._cloneBoxingDeform(prev);
+    const fromLeft = side === 'left';
+    const idx = punchIndex != null ? punchIndex : 0;
+    const intensity = 0.7 + Math.min(1.4, idx * 0.18);
+    if (finale) {
+      d.sx = Math.max(0.52, d.sx * 0.8);
+      d.sy = Math.min(1.58, d.sy * 1.2);
+      d.rot += fromLeft ? -16 : 18;
+      d.skew += fromLeft ? 9 : -11;
+      d.r1 = Math.min(80, d.r1 + 12);
+      d.r2 = Math.max(24, d.r2 - 10);
+      d.r3 = Math.min(76, d.r3 + 10);
+      d.r4 = Math.max(26, d.r4 - 8);
+      d.ry1 = Math.max(28, d.ry1 - 8);
+      d.ry2 = Math.min(78, d.ry2 + 12);
+      d.ry3 = Math.max(30, d.ry3 - 10);
+      d.ry4 = Math.min(74, d.ry4 + 10);
+      return d;
+    }
+    if (fromLeft) {
+      d.sx = Math.max(0.58, d.sx * (1 - 0.07 * intensity));
+      d.sy = Math.min(1.48, d.sy * (1 + 0.06 * intensity));
+      d.rot += (-5 - Math.random() * 4) * intensity;
+      d.skew += (2.5 + Math.random() * 2.5) * intensity;
+      d.r1 = Math.min(74, d.r1 + (3 + Math.random() * 3) * intensity);
+      d.r2 = Math.max(28, d.r2 - (2.5 + Math.random() * 2.5) * intensity);
+      d.r3 = Math.min(70, d.r3 + (2.5 + Math.random() * 2.5) * intensity);
+      d.r4 = Math.max(30, d.r4 - (2 + Math.random() * 2) * intensity);
+      d.ry1 = Math.max(32, d.ry1 - (2 + Math.random() * 2) * intensity);
+      d.ry2 = Math.min(72, d.ry2 + (3 + Math.random() * 3) * intensity);
+      d.ry3 = Math.max(34, d.ry3 - (2 + Math.random() * 2) * intensity);
+      d.ry4 = Math.min(70, d.ry4 + (2 + Math.random() * 2.5) * intensity);
+    } else {
+      d.sx = Math.min(1.42, d.sx * (1 + 0.055 * intensity));
+      d.sy = Math.max(0.58, d.sy * (1 - 0.07 * intensity));
+      d.rot += (5 + Math.random() * 4) * intensity;
+      d.skew += (-2.5 - Math.random() * 2.5) * intensity;
+      d.r1 = Math.max(28, d.r1 - (2.5 + Math.random() * 2.5) * intensity);
+      d.r2 = Math.min(74, d.r2 + (3 + Math.random() * 3) * intensity);
+      d.r3 = Math.max(30, d.r3 - (2 + Math.random() * 2) * intensity);
+      d.r4 = Math.min(72, d.r4 + (2.5 + Math.random() * 2.5) * intensity);
+      d.ry1 = Math.min(72, d.ry1 + (2.5 + Math.random() * 2.5) * intensity);
+      d.ry2 = Math.max(32, d.ry2 - (2 + Math.random() * 2) * intensity);
+      d.ry3 = Math.min(70, d.ry3 + (2 + Math.random() * 2.5) * intensity);
+      d.ry4 = Math.max(34, d.ry4 - (2 + Math.random() * 2) * intensity);
+    }
+    return d;
+  },
+
+  /** Demo：命中瞬间更夸张的冲击形（随后落到累积态，不恢复正圆） */
+  _buildBoxingImpactDeform(settled, side, finale) {
+    const d = this._cloneBoxingDeform(settled);
+    const fromLeft = side === 'left';
+    if (finale) {
+      d.sx = Math.max(0.42, d.sx * 0.72);
+      d.sy = Math.min(1.7, d.sy * 1.22);
+      d.rot += fromLeft ? -10 : 12;
+      d.skew += fromLeft ? 6 : -8;
+      return d;
+    }
+    if (fromLeft) {
+      d.sx = Math.max(0.48, d.sx * 0.78);
+      d.sy = Math.min(1.55, d.sy * 1.16);
+      d.rot -= 8;
+      d.skew += 5;
+    } else {
+      d.sx = Math.min(1.5, d.sx * 1.14);
+      d.sy = Math.max(0.5, d.sy * 0.78);
+      d.rot += 8;
+      d.skew -= 5;
+    }
+    return d;
+  },
+
+  _resetBoxingReactionVisuals(extra) {
+    const patch = {
+      reactionBoxingAvatarUrl: '',
+      reactionBoxingShellStyle: '',
+      reactionBoxingBodyStyle: '',
+      reactionBoxingMaskStyle: '',
+      reactionBoxingGloveLeftPhase: '',
+      reactionBoxingGloveRightPhase: '',
+      reactionBoxingImpactVisible: false,
+      reactionBoxingImpactWord: '',
+      reactionBoxingImpactSide: '',
+      reactionBoxingShake: false,
+      reactionBoxingDizzy: false,
+      reactionBoxingDizzyStarCount: 3,
+      reactionAvatarDetached: false,
+      reactionAvatarDetachedPlayerId: ''
+    };
+    if (extra && typeof extra === 'object') {
+      const keys = Object.keys(extra);
+      for (let i = 0; i < keys.length; i++) {
+        patch[keys[i]] = extra[keys[i]];
+      }
+    }
+    this.setData(patch);
+  },
+
+  /** Demo：恢复正圆（飞回落座后） */
+  _buildBoxingCircleDeform(base) {
+    return {
+      base: base != null ? base : 1,
+      sx: 1,
+      sy: 1,
+      rot: 0,
+      skew: 0,
+      r1: 50,
+      r2: 50,
+      r3: 50,
+      r4: 50,
+      ry1: 50,
+      ry2: 50,
+      ry3: 50,
+      ry4: 50
+    };
+  },
+
+  /**
+   * Demo：👊 boxing-reaction-layer（卡通格斗）
+   * 连击累积变形 → 击晕（星星+摇晃）→ 巨型拳蓄力 → 高速终结 → 土豆形飞回后复圆。
+   */
+  _playScreenBoxingReaction(rect, avatarUrl, playerId) {
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+
+    const seat = this._normalizePlayerActionAvatarRect(rect) || this._fallbackPlayerActionAvatarRect();
+    const seatCx = seat.left + seat.width / 2;
+    const seatCy = seat.top + seat.height / 2;
+    const seatW = seat.width;
+    const seatH = seat.height;
+    const centerCx = winW / 2;
+    const centerCy = winH * 0.42;
+    const centerScale = 4;
+    const flyInMs = 420;
+    const flyBackMs = 620;
+    const punchCount = 6 + Math.floor(Math.random() * 2); // 6~7
+    const punchGap = 300;
+    const dizzyMs = 1000;
+    const chargeMs = 500;
+    const url = avatarUrl != null ? String(avatarUrl) : '';
+    const dizzyStars = 3 + Math.floor(Math.random() * 3); // 3~5（dizzy-layer）
+    const detachedId = playerId != null ? String(playerId).trim() : '';
+
+    this._boxingDeform = this._buildBoxingCircleDeform(1);
+
+    this._clearPlayerActionBoxingTimers();
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      reactionTomatoFlyVisible: false,
+      reactionTomatoSplashVisible: false,
+      reactionTomatoJuiceActive: false,
+      reactionTomatoDripActive: false,
+      reactionFlowerFlyVisible: false,
+      reactionFlowerItems: [],
+      reactionEggFlies: [],
+      reactionEggHitLevel: 0,
+      reactionEggBurstVisible: false,
+      reactionEggFinaleActive: false,
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'boxing',
+      // 中央动画前：记分行原头像离位隐藏（占位保留）
+      reactionAvatarDetached: !!detachedId,
+      reactionAvatarDetachedPlayerId: detachedId,
+      reactionBoxingAvatarUrl: url,
+      reactionBoxingShellStyle: this._buildBoxingShellStyle(
+        seatCx,
+        seatCy,
+        seatW,
+        seatH,
+        0
+      ),
+      reactionBoxingBodyStyle: this._buildBoxingBodyStyle(this._boxingDeform, 0),
+      reactionBoxingMaskStyle: this._buildBoxingMaskStyle(this._boxingDeform, 0),
+      reactionBoxingGloveLeftPhase: '',
+      reactionBoxingGloveRightPhase: '',
+      reactionBoxingImpactVisible: false,
+      reactionBoxingImpactWord: '',
+      reactionBoxingImpactSide: '',
+      reactionBoxingShake: false,
+      reactionBoxingDizzy: false,
+      reactionBoxingDizzyStarCount: dizzyStars
+    });
+
+    const self = this;
+
+    // 1) 飞到屏中 + 放大 4 倍
+    this._boxingTimeout(function () {
+      const next = self._cloneBoxingDeform(self._boxingDeform);
+      next.base = centerScale;
+      self._boxingDeform = next;
+      self.setData({
+        reactionBoxingShellStyle: self._buildBoxingShellStyle(
+          centerCx,
+          centerCy,
+          seatW,
+          seatH,
+          flyInMs
+        )
+      });
+      self._applyBoxingDeformStyles(next, flyInMs);
+    }, 30);
+
+    // 2) 左下↗ / 右下↖ 交替连击（变形状态继承）
+    let punchAt = 30 + flyInMs + 140;
+    for (let i = 0; i < punchCount; i++) {
+      (function (idx, at) {
+        const fromLeft = idx % 2 === 0;
+        self._boxingTimeout(function () {
+          self._triggerBoxingPunch({
+            side: fromLeft ? 'left' : 'right',
+            punchIndex: idx
+          });
+        }, at);
+      })(i, punchAt);
+      punchAt += punchGap;
+    }
+
+    // 3) 击晕阶段：约 1s，保持土豆形 + 旋转星星 + 左右摇晃
+    const lastPunchAt = punchAt - punchGap;
+    const dizzyAt = lastPunchAt + 320;
+    this._boxingTimeout(function () {
+      self.setData({
+        reactionBoxingDizzy: true,
+        reactionBoxingGloveLeftPhase: '',
+        reactionBoxingGloveRightPhase: '',
+        reactionBoxingImpactVisible: false,
+        reactionBoxingShake: false
+      });
+      // 击晕期间锁定当前累积变形（不回圆）
+      self._applyBoxingDeformStyles(self._boxingDeform, 120);
+    }, dizzyAt);
+
+    // 4) 击晕结束后：右侧巨型拳套出现 → 蓄力 500ms → 高速击中
+    const chargeAt = dizzyAt + dizzyMs;
+    this._boxingTimeout(function () {
+      self.setData({
+        reactionBoxingDizzy: false,
+        reactionBoxingGloveRightPhase: 'charge',
+        reactionBoxingGloveLeftPhase: ''
+      });
+      // 蓄力时仍保持土豆形
+      self._applyBoxingDeformStyles(self._boxingDeform, 80);
+    }, chargeAt);
+
+    const strikeAt = chargeAt + chargeMs;
+    this._boxingTimeout(function () {
+      self._triggerBoxingFinaleStrike();
+    }, strikeAt);
+
+    // 5) 土豆形向左飞出缩小旋转 → 落座复圆
+    const flyBackAt = strikeAt + 180;
+    this._boxingTimeout(function () {
+      const potato = self._cloneBoxingDeform(self._boxingDeform);
+      potato.base = Math.max(1.35, potato.base * 0.55);
+      potato.rot += 140;
+      self._boxingDeform = potato;
+      self.setData({
+        reactionBoxingDizzy: false,
+        reactionBoxingGloveLeftPhase: '',
+        reactionBoxingGloveRightPhase: '',
+        reactionBoxingImpactVisible: false,
+        reactionBoxingImpactWord: '',
+        reactionBoxingImpactSide: '',
+        reactionBoxingShake: false,
+        // 先向左弹出
+        reactionBoxingShellStyle: self._buildBoxingShellStyle(
+          Math.max(24, centerCx - winW * 0.22),
+          centerCy - 12,
+          seatW,
+          seatH,
+          140
+        )
+      });
+      self._applyBoxingDeformStyles(potato, 160);
+    }, flyBackAt);
+
+    this._boxingTimeout(function () {
+      const mid = self._cloneBoxingDeform(self._boxingDeform);
+      mid.base = 1.05;
+      mid.rot += 80;
+      self._boxingDeform = mid;
+      self.setData({
+        reactionBoxingShellStyle: self._buildBoxingShellStyle(
+          seatCx,
+          seatCy,
+          seatW,
+          seatH,
+          flyBackMs - 140
+        )
+      });
+      self._applyBoxingDeformStyles(mid, flyBackMs - 140);
+    }, flyBackAt + 140);
+
+    // 落座后恢复正圆，并恢复记分行原头像
+    const restoreAt = flyBackAt + flyBackMs;
+    this._boxingTimeout(function () {
+      const circle = self._buildBoxingCircleDeform(1);
+      self._boxingDeform = circle;
+      self._applyBoxingDeformStyles(circle, 220, {
+        reactionAvatarDetached: false,
+        reactionAvatarDetachedPlayerId: ''
+      });
+    }, restoreAt);
+
+    // 6) 淡出清理
+    const fadeAt = restoreAt + 280;
+    this._boxingTimeout(function () {
+      self.setData({ reactionScreenFading: true });
+      self._boxingTimeout(function () {
+        self._resetBoxingReactionVisuals({
+          reactionScreenVisible: false,
+          reactionScreenFading: false,
+          reactionScreenMode: ''
+        });
+        self._boxingDeform = null;
+        self._playerActionBoxingBusy = false;
+      }, 520);
+    }, fadeAt);
+  },
+
+  /** Demo：普通拳 — 左下/右下冲入 + 累积变形（不回圆） */
+  _triggerBoxingPunch(opts) {
+    const o = opts || {};
+    const side = o.side === 'left' ? 'left' : 'right';
+    const punchIndex = o.punchIndex != null ? o.punchIndex : 0;
+    const words = ['砰!', '嘭!', 'BAM!', '啪!', '咚!'];
+    const word = words[Math.floor(Math.random() * words.length)];
+
+    const settled = this._accumulateBoxingDeform(
+      this._boxingDeform,
+      side,
+      false,
+      punchIndex
+    );
+    const impact = this._buildBoxingImpactDeform(settled, side, false);
+    this._boxingDeform = settled;
+
+    this.setData({
+      reactionBoxingGloveLeftPhase: '',
+      reactionBoxingGloveRightPhase: '',
+      reactionBoxingImpactVisible: false
+    });
+
+    const self = this;
+    this._boxingTimeout(function () {
+      const patch = {
+        reactionBoxingImpactVisible: true,
+        reactionBoxingImpactWord: word,
+        reactionBoxingImpactSide: side,
+        reactionBoxingShake: true
+      };
+      if (side === 'left') {
+        patch.reactionBoxingGloveLeftPhase = 'punch';
+      } else {
+        patch.reactionBoxingGloveRightPhase = 'punch';
+      }
+      self.setData(patch);
+      self._applyBoxingDeformStyles(impact, 70);
+
+      self._boxingTimeout(function () {
+        self._applyBoxingDeformStyles(settled, 160, {
+          reactionBoxingShake: false
+        });
+      }, 110);
+
+      self._boxingTimeout(function () {
+        self.setData({
+          reactionBoxingImpactVisible: false,
+          reactionBoxingGloveLeftPhase: '',
+          reactionBoxingGloveRightPhase: ''
+        });
+      }, 260);
+    }, 16);
+  },
+
+  /** Demo：终结拳高速击中（蓄力阶段已由 phase=charge 展示） */
+  _triggerBoxingFinaleStrike() {
+    const side = 'right';
+    const words = ['BOOM!', '嘭！！', 'KO!'];
+    const word = words[Math.floor(Math.random() * words.length)];
+    const settled = this._accumulateBoxingDeform(this._boxingDeform, side, true, 99);
+    const impact = this._buildBoxingImpactDeform(settled, side, true);
+    this._boxingDeform = settled;
+
+    this.setData({
+      reactionBoxingGloveRightPhase: 'strike',
+      reactionBoxingGloveLeftPhase: '',
+      reactionBoxingImpactVisible: true,
+      reactionBoxingImpactWord: word,
+      reactionBoxingImpactSide: 'finale',
+      reactionBoxingShake: true,
+      reactionBoxingDizzy: false
+    });
+    this._applyBoxingDeformStyles(impact, 60);
+
+    const self = this;
+    this._boxingTimeout(function () {
+      self._applyBoxingDeformStyles(settled, 140, {
+        reactionBoxingShake: false
+      });
+    }, 120);
+
+    this._boxingTimeout(function () {
+      self.setData({
+        reactionBoxingImpactVisible: false,
+        reactionBoxingGloveRightPhase: ''
+      });
+    }, 280);
+  },
 
   /** Demo：互动动画目标头像定位（记分 #fb-player-avatar → 讨论区缓存/节点 → 屏中回退） */
   _fallbackPlayerActionAvatarRect() {

@@ -593,7 +593,7 @@
                     >
                       <image
                         id="fb-player-avatar-{{m.playerId || m.id}}"
-                        class="avatar-group__avatar"
+                        class="avatar-group__avatar {{reactionAvatarDetached && (reactionAvatarDetachedPlayerId == m.playerId || reactionAvatarDetachedPlayerId == m.id) ? 'is-reaction-detached' : ''}}"
                         src="{{m.avatar}}"
                         mode="aspectFill"
                       ></image>
@@ -1926,13 +1926,13 @@
         <view class="player-action-modal__item" catchtap="onPlayerActionEggTap">🥚</view>
         <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🍺</view>
         <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚀</view>
-        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">👊</view>
+        <view class="player-action-modal__item" catchtap="onPlayerActionBoxingTap">👊</view>
         <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚗</view>
       </view>
     </view>
   </view>
 
-  <!-- Demo：第一视角 reaction-screen-layer（tomato / flower / egg） -->
+  <!-- Demo：reaction-screen-layer（tomato / flower / egg / boxing） -->
   <view
     wx:if="{{reactionScreenVisible}}"
     class="reaction-screen-layer {{reactionScreenFading ? 'is-fading' : ''}}"
@@ -2048,6 +2048,89 @@
         <view class="egg-screen-reaction__finale-drip d1"></view>
         <view class="egg-screen-reaction__finale-drip d2"></view>
         <view class="egg-screen-reaction__finale-drip d3"></view>
+      </view>
+    </view>
+
+    <!-- 👊 卡通格斗：连击累积变形 → 击晕 → 巨型拳蓄力终结 → 飞回复圆 -->
+    <view
+      wx:if="{{reactionScreenMode === 'boxing'}}"
+      class="boxing-reaction-layer {{reactionBoxingShake ? 'is-shake' : ''}} {{reactionBoxingDizzy ? 'is-dizzy' : ''}}"
+    >
+      <view class="boxing-reaction-layer__shell" style="{{reactionBoxingShellStyle}}">
+        <!-- 击晕摇晃包裹层（不改变形 transform） -->
+        <view class="boxing-reaction-layer__sway {{reactionBoxingDizzy ? 'is-sway' : ''}}">
+          <view class="boxing-reaction-layer__body" style="{{reactionBoxingBodyStyle}}">
+            <view class="boxing-reaction-layer__mask" style="{{reactionBoxingMaskStyle}}">
+              <image
+                wx:if="{{reactionBoxingAvatarUrl}}"
+                class="boxing-reaction-layer__img"
+                src="{{reactionBoxingAvatarUrl}}"
+                mode="aspectFill"
+              />
+              <view wx:else class="boxing-reaction-layer__fallback">拳</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 击晕：头顶立体透视环绕黄星（3~5，仅 boxing-dizzy-layer） -->
+        <view
+          wx:if="{{reactionBoxingDizzy}}"
+          class="boxing-dizzy-layer stars-{{reactionBoxingDizzyStarCount}}"
+        >
+          <view class="boxing-dizzy-layer__stage">
+            <view class="boxing-dizzy-layer__carousel">
+              <view class="boxing-dizzy-layer__star s0"><text class="boxing-dizzy-layer__glyph">✦</text></view>
+              <view class="boxing-dizzy-layer__star s1"><text class="boxing-dizzy-layer__glyph">✦</text></view>
+              <view class="boxing-dizzy-layer__star s2"><text class="boxing-dizzy-layer__glyph">✦</text></view>
+              <view class="boxing-dizzy-layer__star s3"><text class="boxing-dizzy-layer__glyph">✦</text></view>
+              <view class="boxing-dizzy-layer__star s4"><text class="boxing-dizzy-layer__glyph">✦</text></view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 左下↗ 漫画红拳套 -->
+      <view
+        wx:if="{{reactionBoxingGloveLeftPhase}}"
+        class="boxing-comic-glove is-bl phase-{{reactionBoxingGloveLeftPhase}}"
+      >
+        <view class="boxing-comic-glove__wrist"></view>
+        <view class="boxing-comic-glove__fist">
+          <view class="boxing-comic-glove__shine"></view>
+          <view class="boxing-comic-glove__crease c0"></view>
+          <view class="boxing-comic-glove__crease c1"></view>
+        </view>
+        <view class="boxing-comic-glove__thumb"></view>
+      </view>
+      <!-- 右下↖ / 右侧蓄力·终结 漫画红拳套 -->
+      <view
+        wx:if="{{reactionBoxingGloveRightPhase}}"
+        class="boxing-comic-glove is-br phase-{{reactionBoxingGloveRightPhase}}"
+      >
+        <view class="boxing-comic-glove__wrist"></view>
+        <view class="boxing-comic-glove__fist">
+          <view class="boxing-comic-glove__shine"></view>
+          <view class="boxing-comic-glove__crease c0"></view>
+          <view class="boxing-comic-glove__crease c1"></view>
+        </view>
+        <view class="boxing-comic-glove__thumb"></view>
+      </view>
+
+      <!-- 漫画冲击：爆炸环 + 速度线 + 拟声词 + 黄星 -->
+      <view
+        wx:if="{{reactionBoxingImpactVisible}}"
+        class="boxing-comic-impact side-{{reactionBoxingImpactSide}}"
+      >
+        <view class="boxing-comic-impact__burst"></view>
+        <view class="boxing-comic-impact__ring r0"></view>
+        <view class="boxing-comic-impact__ring r1"></view>
+        <view class="boxing-comic-impact__line l0"></view>
+        <view class="boxing-comic-impact__line l1"></view>
+        <view class="boxing-comic-impact__line l2"></view>
+        <text class="boxing-comic-impact__word">{{reactionBoxingImpactWord}}</text>
+        <text class="boxing-comic-impact__star s0">✦</text>
+        <text class="boxing-comic-impact__star s1">✦</text>
+        <text class="boxing-comic-impact__star s2">✦</text>
       </view>
     </view>
   </view>

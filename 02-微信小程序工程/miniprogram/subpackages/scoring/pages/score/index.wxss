@@ -4263,7 +4263,7 @@ page {
 }
 
 /*
- * Demo：第一视角 reaction-screen-layer（tomato / flower / egg）
+ * Demo：reaction-screen-layer（tomato / flower / egg / boxing）
  * 禁止：全屏 flash / 大面积 filter blur / 纯红蒙版
  */
 .reaction-screen-layer {
@@ -4701,6 +4701,621 @@ page {
   0% { opacity: 0; height: 0; }
   20% { opacity: 0.75; height: 40px; }
   100% { opacity: 0.35; height: 160px; }
+}
+
+/* 👊 boxing-reaction-layer：卡通格斗（壳层位移 / 本体变形带图 / 漫画红拳套） */
+.reaction-screen-layer .boxing-reaction-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 523;
+  pointer-events: none;
+}
+.reaction-screen-layer .boxing-reaction-layer.is-shake {
+  animation: boxing-layer-shake 0.14s ease-out;
+}
+
+/* 壳：只位移；不写 scale，避免盖住变形 */
+.reaction-screen-layer .boxing-reaction-layer__shell {
+  position: fixed;
+  z-index: 526;
+  pointer-events: none;
+  will-change: left, top;
+}
+/* 击晕左右摇晃（与 body 变形 transform 分离） */
+.reaction-screen-layer .boxing-reaction-layer__sway {
+  width: 100%;
+  height: 100%;
+}
+.reaction-screen-layer .boxing-reaction-layer__sway.is-sway {
+  animation: boxing-dizzy-sway 0.42s ease-in-out infinite;
+}
+/* 本体：scale + scaleX/Y + rotate + skew；内部 mask+image 一起变形 */
+.reaction-screen-layer .boxing-reaction-layer__body {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+.reaction-screen-layer .boxing-reaction-layer__mask {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #d8d2c6;
+  box-shadow: 0 12px 28px rgba(20, 16, 10, 0.3);
+  will-change: border-radius;
+}
+.reaction-screen-layer .boxing-reaction-layer__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+}
+.reaction-screen-layer .boxing-reaction-layer__fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #6b6358;
+  background: #ebe4d8;
+  border-radius: inherit;
+}
+
+/*
+ * 击晕层 boxing-dizzy-layer：头像顶部倾斜轨道的 3D 环绕星
+ * perspective + rotateX 倾角 + carousel rotateY；远处小/淡，近处大/亮
+ */
+.reaction-screen-layer .boxing-dizzy-layer {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 527;
+  width: 180rpx;
+  height: 110rpx;
+  margin-left: -90rpx;
+  margin-top: -78rpx;
+  pointer-events: none;
+  perspective: 360rpx;
+  transform-style: preserve-3d;
+  animation: boxing-dizzy-appear 0.32s ease-out both;
+}
+.reaction-screen-layer .boxing-dizzy-layer__stage {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 140rpx;
+  height: 140rpx;
+  margin-left: -70rpx;
+  margin-top: -70rpx;
+  transform-style: preserve-3d;
+  /* 俯视倾斜：椭圆轨道感，不挡头像主体 */
+  transform: rotateX(66deg) rotateZ(-8deg);
+}
+.reaction-screen-layer .boxing-dizzy-layer__carousel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: boxing-dizzy-spinY 1.35s linear infinite;
+}
+.reaction-screen-layer .boxing-dizzy-layer__star {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36rpx;
+  height: 36rpx;
+  margin-left: -18rpx;
+  margin-top: -18rpx;
+  transform-style: preserve-3d;
+  /* 各星初始角位 + 半径；随 carousel 公转产生远近 */
+}
+.reaction-screen-layer .boxing-dizzy-layer__glyph {
+  display: block;
+  width: 36rpx;
+  height: 36rpx;
+  font-size: 30rpx;
+  line-height: 36rpx;
+  text-align: center;
+  color: #efc22a;
+  text-shadow: 0 1rpx 0 rgba(255, 245, 180, 0.7);
+  /* 抵消倾角，星星正向朝向观众 */
+  transform: rotateX(-66deg);
+  animation: boxing-dizzy-star-depth 1.35s linear infinite;
+}
+/* 均匀分布在 Y 轴轨道上（角度偏移） */
+.reaction-screen-layer .boxing-dizzy-layer__star.s0 {
+  transform: rotateY(0deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s1 {
+  transform: rotateY(72deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s1 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.27s;
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s2 {
+  transform: rotateY(144deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s2 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.54s;
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s3 {
+  transform: rotateY(216deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s3 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.81s;
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s4 {
+  transform: rotateY(288deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer__star.s4 .boxing-dizzy-layer__glyph {
+  animation-delay: -1.08s;
+}
+/* 按数量隐藏多余星 */
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s3,
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s4 {
+  display: none;
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s4 {
+  display: none;
+}
+/* 3 星时改 120° 均分 */
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s0 {
+  transform: rotateY(0deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s1 {
+  transform: rotateY(120deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s2 {
+  transform: rotateY(240deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s1 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.45s;
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-3 .s2 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.9s;
+}
+/* 4 星 90° 均分 */
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s0 {
+  transform: rotateY(0deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s1 {
+  transform: rotateY(90deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s2 {
+  transform: rotateY(180deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s3 {
+  transform: rotateY(270deg) translateZ(58rpx);
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s1 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.3375s;
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s2 .boxing-dizzy-layer__glyph {
+  animation-delay: -0.675s;
+}
+.reaction-screen-layer .boxing-dizzy-layer.stars-4 .s3 .boxing-dizzy-layer__glyph {
+  animation-delay: -1.0125s;
+}
+
+/* 漫画红拳套（纯 CSS；普通约 135rpx，终结约 240rpx） */
+.reaction-screen-layer .boxing-comic-glove {
+  position: fixed;
+  z-index: 528;
+  width: 135rpx;
+  height: 135rpx;
+  pointer-events: none;
+}
+.reaction-screen-layer .boxing-comic-glove.is-bl {
+  left: -10%;
+  bottom: -8%;
+  transform: rotate(-28deg) scaleX(-1);
+}
+.reaction-screen-layer .boxing-comic-glove.is-br {
+  right: -10%;
+  bottom: -8%;
+  left: auto;
+  transform: rotate(28deg);
+}
+.reaction-screen-layer .boxing-comic-glove.is-bl.phase-punch {
+  animation: boxing-glove-punch-bl 0.28s cubic-bezier(0.15, 0.8, 0.25, 1) forwards;
+}
+.reaction-screen-layer .boxing-comic-glove.is-br.phase-punch {
+  animation: boxing-glove-punch-br 0.28s cubic-bezier(0.15, 0.8, 0.25, 1) forwards;
+}
+/* 蓄力：右侧巨大拳套停住抖动 */
+.reaction-screen-layer .boxing-comic-glove.is-br.phase-charge {
+  width: 240rpx;
+  height: 240rpx;
+  right: -4%;
+  bottom: 28%;
+  filter: drop-shadow(0 12px 18px rgba(40, 10, 0, 0.38));
+  transform: rotate(8deg);
+  animation: boxing-glove-charge-pulse 0.5s ease-in-out infinite;
+}
+/* 高速终结击打 */
+.reaction-screen-layer .boxing-comic-glove.is-br.phase-strike {
+  width: 240rpx;
+  height: 240rpx;
+  filter: drop-shadow(0 12px 18px rgba(40, 10, 0, 0.38));
+  animation: boxing-glove-punch-finale-br 0.22s cubic-bezier(0.05, 0.85, 0.2, 1) forwards;
+}
+.reaction-screen-layer .boxing-comic-glove__fist {
+  position: absolute;
+  left: 14rpx;
+  top: 10rpx;
+  width: 100rpx;
+  height: 86rpx;
+  border-radius: 48% 52% 46% 54% / 52% 48% 55% 45%;
+  background: radial-gradient(circle at 32% 28%, #ff7a6a 0%, #e2261c 42%, #b01010 78%, #7a0808 100%);
+  border: 4rpx solid #5c0606;
+  box-shadow:
+    inset -8rpx -10rpx 0 rgba(0, 0, 0, 0.16),
+    inset 4rpx 4rpx 0 rgba(255, 180, 160, 0.25),
+    4rpx 6rpx 0 #3d0202;
+}
+.reaction-screen-layer .boxing-comic-glove.phase-charge .boxing-comic-glove__fist,
+.reaction-screen-layer .boxing-comic-glove.phase-strike .boxing-comic-glove__fist {
+  left: 24rpx;
+  top: 18rpx;
+  width: 176rpx;
+  height: 152rpx;
+  border-width: 6rpx;
+}
+.reaction-screen-layer .boxing-comic-glove__shine {
+  position: absolute;
+  left: 16rpx;
+  top: 14rpx;
+  width: 28rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: rgba(255, 230, 210, 0.55);
+  transform: rotate(-18deg);
+}
+.reaction-screen-layer .boxing-comic-glove__crease {
+  position: absolute;
+  height: 3rpx;
+  background: rgba(80, 8, 8, 0.35);
+  border-radius: 2rpx;
+}
+.reaction-screen-layer .boxing-comic-glove__crease.c0 {
+  left: 28rpx;
+  top: 38rpx;
+  width: 38rpx;
+  transform: rotate(-8deg);
+}
+.reaction-screen-layer .boxing-comic-glove__crease.c1 {
+  left: 30rpx;
+  top: 52rpx;
+  width: 30rpx;
+  transform: rotate(6deg);
+}
+.reaction-screen-layer .boxing-comic-glove__thumb {
+  position: absolute;
+  left: 4rpx;
+  top: 48rpx;
+  width: 38rpx;
+  height: 44rpx;
+  border-radius: 55% 45% 50% 50%;
+  background: radial-gradient(circle at 40% 30%, #f25548 0%, #c41812 70%, #8a0a0a 100%);
+  border: 4rpx solid #5c0606;
+  box-shadow: inset -3rpx -4rpx 0 rgba(0, 0, 0, 0.15);
+  transform: rotate(-25deg);
+}
+.reaction-screen-layer .boxing-comic-glove.phase-charge .boxing-comic-glove__thumb,
+.reaction-screen-layer .boxing-comic-glove.phase-strike .boxing-comic-glove__thumb {
+  left: 8rpx;
+  top: 86rpx;
+  width: 64rpx;
+  height: 76rpx;
+  border-width: 6rpx;
+}
+.reaction-screen-layer .boxing-comic-glove__wrist {
+  position: absolute;
+  left: 38rpx;
+  top: 84rpx;
+  width: 58rpx;
+  height: 38rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(180deg, #c8c0b4 0%, #9a9286 100%);
+  border: 3rpx solid #5a5248;
+  box-shadow: inset 0 -3rpx 0 rgba(0, 0, 0, 0.12);
+}
+.reaction-screen-layer .boxing-comic-glove.phase-charge .boxing-comic-glove__wrist,
+.reaction-screen-layer .boxing-comic-glove.phase-strike .boxing-comic-glove__wrist {
+  left: 70rpx;
+  top: 150rpx;
+  width: 100rpx;
+  height: 56rpx;
+}
+
+/* 漫画冲击反馈 */
+.reaction-screen-layer .boxing-comic-impact {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  z-index: 529;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.reaction-screen-layer .boxing-comic-impact__burst {
+  position: absolute;
+  left: -36px;
+  top: -36px;
+  width: 72px;
+  height: 72px;
+  border-radius: 40% 60% 45% 55% / 55% 40% 60% 45%;
+  background: radial-gradient(circle, rgba(255, 220, 80, 0.85) 0%, rgba(255, 160, 40, 0.35) 45%, transparent 70%);
+  opacity: 0;
+  animation: boxing-impact-burst 0.32s ease-out forwards;
+}
+.reaction-screen-layer .boxing-comic-impact.side-finale .boxing-comic-impact__burst {
+  left: -56px;
+  top: -56px;
+  width: 112px;
+  height: 112px;
+}
+.reaction-screen-layer .boxing-comic-impact__ring {
+  position: absolute;
+  left: -28px;
+  top: -28px;
+  width: 56px;
+  height: 56px;
+  border: 3px solid rgba(40, 28, 12, 0.55);
+  border-radius: 42% 58% 48% 52%;
+  opacity: 0;
+  transform: scale(0.4);
+}
+.reaction-screen-layer .boxing-comic-impact__ring.r0 {
+  animation: boxing-impact-ring 0.34s ease-out forwards;
+}
+.reaction-screen-layer .boxing-comic-impact__ring.r1 {
+  left: -40px;
+  top: -40px;
+  width: 80px;
+  height: 80px;
+  border-width: 2px;
+  animation: boxing-impact-ring 0.38s ease-out 0.04s forwards;
+}
+.reaction-screen-layer .boxing-comic-impact__line {
+  position: absolute;
+  height: 3px;
+  background: #2a2218;
+  border-radius: 2px;
+  opacity: 0;
+  transform-origin: right center;
+}
+.reaction-screen-layer .boxing-comic-impact.side-left .boxing-comic-impact__line,
+.reaction-screen-layer .boxing-comic-impact.side-finale .boxing-comic-impact__line {
+  transform-origin: left center;
+}
+.reaction-screen-layer .boxing-comic-impact__line.l0 {
+  left: -70px;
+  top: -8px;
+  width: 36px;
+  transform: rotate(-18deg);
+  animation: boxing-impact-line 0.28s ease-out forwards;
+}
+.reaction-screen-layer .boxing-comic-impact__line.l1 {
+  left: -78px;
+  top: 6px;
+  width: 44px;
+  transform: rotate(8deg);
+  animation: boxing-impact-line 0.28s ease-out 0.02s forwards;
+}
+.reaction-screen-layer .boxing-comic-impact__line.l2 {
+  left: -64px;
+  top: 18px;
+  width: 30px;
+  transform: rotate(22deg);
+  animation: boxing-impact-line 0.28s ease-out 0.04s forwards;
+}
+.reaction-screen-layer .boxing-comic-impact.side-right .boxing-comic-impact__line.l0,
+.reaction-screen-layer .boxing-comic-impact.side-finale .boxing-comic-impact__line.l0 {
+  left: 34px;
+  transform: rotate(18deg);
+}
+.reaction-screen-layer .boxing-comic-impact.side-right .boxing-comic-impact__line.l1,
+.reaction-screen-layer .boxing-comic-impact.side-finale .boxing-comic-impact__line.l1 {
+  left: 34px;
+  transform: rotate(-8deg);
+}
+.reaction-screen-layer .boxing-comic-impact.side-right .boxing-comic-impact__line.l2,
+.reaction-screen-layer .boxing-comic-impact.side-finale .boxing-comic-impact__line.l2 {
+  left: 34px;
+  transform: rotate(-22deg);
+}
+.reaction-screen-layer .boxing-comic-impact__word {
+  position: absolute;
+  left: -28px;
+  top: -58px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1f1810;
+  letter-spacing: 1px;
+  text-shadow:
+    2px 2px 0 #ffd84a,
+    -1px -1px 0 #fff6c8;
+  opacity: 0;
+  transform: scale(0.4) rotate(-8deg);
+  animation: boxing-impact-word 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+.reaction-screen-layer .boxing-comic-impact.side-finale .boxing-comic-impact__word {
+  left: -40px;
+  top: -72px;
+  font-size: 36px;
+}
+.reaction-screen-layer .boxing-comic-impact__star {
+  position: absolute;
+  font-size: 20px;
+  color: #f0b820;
+  opacity: 0;
+  line-height: 1;
+}
+.reaction-screen-layer .boxing-comic-impact__star.s0 {
+  animation: boxing-star0 0.4s ease-out forwards;
+}
+.reaction-screen-layer .boxing-comic-impact__star.s1 {
+  animation: boxing-star1 0.4s ease-out 0.02s forwards;
+}
+.reaction-screen-layer .boxing-comic-impact__star.s2 {
+  animation: boxing-star2 0.4s ease-out 0.04s forwards;
+}
+
+@keyframes boxing-layer-shake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, 1px); }
+  80% { transform: translate(2px, -1px); }
+  100% { transform: translate(0, 0); }
+}
+/* 左下 → 屏中头像 */
+@keyframes boxing-glove-punch-bl {
+  0% {
+    left: -18%;
+    bottom: -16%;
+    opacity: 0.95;
+    transform: rotate(-34deg) scaleX(-1) scale(0.85);
+  }
+  48% {
+    left: 38%;
+    bottom: 46%;
+    opacity: 1;
+    transform: rotate(-10deg) scaleX(-1) scale(1.12);
+  }
+  100% {
+    left: 28%;
+    bottom: 40%;
+    opacity: 0;
+    transform: rotate(-16deg) scaleX(-1) scale(1);
+  }
+}
+/* 右下 → 屏中头像 */
+@keyframes boxing-glove-punch-br {
+  0% {
+    right: -18%;
+    bottom: -16%;
+    opacity: 0.95;
+    transform: rotate(34deg) scale(0.85);
+  }
+  48% {
+    right: 38%;
+    bottom: 46%;
+    opacity: 1;
+    transform: rotate(10deg) scale(1.12);
+  }
+  100% {
+    right: 28%;
+    bottom: 40%;
+    opacity: 0;
+    transform: rotate(16deg) scale(1);
+  }
+}
+@keyframes boxing-dizzy-sway {
+  0%, 100% { transform: translateX(-8rpx); }
+  50% { transform: translateX(8rpx); }
+}
+@keyframes boxing-dizzy-appear {
+  0% { opacity: 0; transform: translateY(10rpx) scale(0.85); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 轨道公转（Y 轴），非平面 rotateZ */
+@keyframes boxing-dizzy-spinY {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+/* 与公转同步：前方大/亮，后方小/淡（相位跟 angle 偏移对齐） */
+@keyframes boxing-dizzy-star-depth {
+  0% {
+    opacity: 0.95;
+    transform: rotateX(-66deg) scale(1.18);
+    color: #f2cc34;
+  }
+  25% {
+    opacity: 0.55;
+    transform: rotateX(-66deg) scale(0.82);
+    color: #e0b820;
+  }
+  50% {
+    opacity: 0.32;
+    transform: rotateX(-66deg) scale(0.62);
+    color: #d4a818;
+  }
+  75% {
+    opacity: 0.55;
+    transform: rotateX(-66deg) scale(0.82);
+    color: #e0b820;
+  }
+  100% {
+    opacity: 0.95;
+    transform: rotateX(-66deg) scale(1.18);
+    color: #f2cc34;
+  }
+}
+@keyframes boxing-glove-charge-pulse {
+  0%, 100% { transform: rotate(8deg) scale(1); }
+  50% { transform: rotate(6deg) scale(1.04); }
+}
+@keyframes boxing-glove-punch-finale-br {
+  0% {
+    right: -8%;
+    bottom: 28%;
+    opacity: 1;
+    transform: rotate(8deg) scale(1.05);
+  }
+  55% {
+    right: 36%;
+    bottom: 38%;
+    opacity: 1;
+    transform: rotate(2deg) scale(1.2);
+  }
+  100% {
+    right: 24%;
+    bottom: 36%;
+    opacity: 0.15;
+    transform: rotate(6deg) scale(1.1);
+  }
+}
+@keyframes boxing-impact-burst {
+  0% { opacity: 0; transform: scale(0.3); }
+  40% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+@keyframes boxing-impact-ring {
+  0% { opacity: 0.85; transform: scale(0.35); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes boxing-impact-line {
+  0% { opacity: 0; transform: scaleX(0.2); }
+  40% { opacity: 0.9; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1.1); }
+}
+@keyframes boxing-impact-word {
+  0% { opacity: 0; transform: scale(0.35) rotate(-12deg); }
+  35% { opacity: 1; transform: scale(1.15) rotate(-6deg); }
+  100% { opacity: 0; transform: scale(1.05) rotate(-4deg) translateY(-10px); }
+}
+@keyframes boxing-star0 {
+  0% { opacity: 0; transform: translate(-8px, -6px) scale(0.4) rotate(0deg); }
+  35% { opacity: 1; transform: translate(-34px, -38px) scale(1.15) rotate(-18deg); }
+  100% { opacity: 0; transform: translate(-42px, -52px) scale(0.7) rotate(-28deg); }
+}
+@keyframes boxing-star1 {
+  0% { opacity: 0; transform: translate(0, -8px) scale(0.4) rotate(0deg); }
+  35% { opacity: 1; transform: translate(8px, -46px) scale(1.2) rotate(10deg); }
+  100% { opacity: 0; transform: translate(12px, -62px) scale(0.7) rotate(18deg); }
+}
+@keyframes boxing-star2 {
+  0% { opacity: 0; transform: translate(8px, -4px) scale(0.4) rotate(0deg); }
+  35% { opacity: 1; transform: translate(36px, -34px) scale(1.1) rotate(22deg); }
+  100% { opacity: 0; transform: translate(46px, -48px) scale(0.65) rotate(30deg); }
 }
 
 /* 飞行番茄：基准约 80px，JS scale 0.3→1→2 → 视觉约 24→80→160px */
@@ -5956,6 +6571,11 @@ page {
   100% {
     opacity: 0;
   }
+}
+
+/* Demo：boxing 离位 — 仅隐头像图，占位尺寸/行高/成绩列不变 */
+.scoreboard-shell--fourball .fourball-pair-identity .avatar-group__avatar.is-reaction-detached {
+  opacity: 0;
 }
 
 /* Demo：头像命中层（局部合成隔离，避免震动/缩放波及邻头像） */
