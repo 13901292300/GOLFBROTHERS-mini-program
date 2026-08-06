@@ -2,11 +2,11 @@
  * 队内赛分组编辑页
  * 编辑 groupDraft / pairingDraft；确定后才写入正式 groups / pairings
  */
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
-const mockAvatars = require('../../../utils/mockAvatars.js');
-const playerDirectory = require('../../../utils/playerDirectory.js');
-const tPosition = require('../../../utils/tPosition.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
+const playerDirectory = require('../../../../utils/playerDirectory.js');
+const tPosition = require('../../../../utils/tPosition.js');
 const {
   validateStrokeEntities,
   buildRegisterTeamMap,
@@ -18,9 +18,9 @@ const {
   validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
-} = require('../../../utils/strokeEntityValidator.js');
-const { syncStrokeEntities } = require('../../../utils/strokeEntityBuilder.js');
-const { normalizeFormalGroupSeats } = require('../../../utils/strokeGroupSeatNormalizer.js');
+} = require('../../../../utils/strokeEntityValidator.js');
+const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
+const { normalizeFormalGroupSeats } = require('../../../../utils/strokeGroupSeatNormalizer.js');
 
 const STROKE_ENTITY_INVALID_TIP = '当前分组不符合该比赛赛制要求，请重新分组。';
 
@@ -1382,7 +1382,7 @@ Page({
       registerSubTabs: this._registerSubTabs || []
     };
     wx.navigateTo({
-      url: '/pages/tournament/group-pick/index?matchId=' + encodeURIComponent(this.data.matchId || '') +
+      url: '/subpackages/tournament/pages/group-pick/index?matchId=' + encodeURIComponent(this.data.matchId || '') +
         '&groupId=' + encodeURIComponent(groupId) +
         '&groupName=' + encodeURIComponent(groupName)
     });
@@ -2103,7 +2103,7 @@ Page({
     const isClear = sanitized.length === 0;
     // 正式 groups 只持久化 position + userId；展示字段由详情页 hydrate
     // 按 groupId 合并保留已有出发信息（teeTime / startHole）
-    const teeSheetManage = require('../../../utils/teeSheetManage.js');
+    const teeSheetManage = require('../../../../utils/teeSheetManage.js');
     let formal = isClear ? [] : toFormalGroups(sanitized);
     if (!isClear) {
       formal = teeSheetManage.mergeTeeFieldsByGroupId(match.groups, formal);

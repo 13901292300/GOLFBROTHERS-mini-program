@@ -8,14 +8,14 @@
  * - 无 matchId / 无 gameId / 无可用数据 → dataSource='empty'
  * - sortField/sortOrder 默认 total/asc
  */
-const mockAvatars = require('../../../utils/mockAvatars.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
-const gameStore = require('../../../utils/gameStore.js');
-const statisticsAdapter = require('../../../utils/statisticsAdapter.js');
+const mockAvatars = require('../../../../utils/mockAvatars.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const gameStore = require('../../../../utils/gameStore.js');
+const statisticsAdapter = require('../../../../utils/statisticsAdapter.js');
 const {
   resolveGameMode,
   isMatchPlayBoardMode
-} = require('../../../utils/strokeEntityValidator.js');
+} = require('../../../../utils/strokeEntityValidator.js');
 
 const TEE_COLOR_TO_MARKER = {
   '#dc2626': 'border-red',

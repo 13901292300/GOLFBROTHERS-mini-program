@@ -928,7 +928,7 @@ Page({
         return;
       }
       wx.navigateTo({
-        url: '/pages/tournament/stats/index?gameId=' + encodeURIComponent(gameId),
+        url: '/subpackages/tournament/pages/stats/index?gameId=' + encodeURIComponent(gameId),
         fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
       });
       return;

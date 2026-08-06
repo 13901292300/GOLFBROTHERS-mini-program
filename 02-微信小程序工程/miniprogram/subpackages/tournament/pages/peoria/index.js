@@ -3,12 +3,12 @@
  * 18 洞标签按比赛半场布局；selectedHoles 为开球顺序 1–18。
  * 已生成 peoriaResult 后冻结，禁止重算覆盖。
  */
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const peoriaStore = require('../../../utils/peoriaStore.js');
-const peoriaCalculator = require('../../../utils/peoriaCalculator.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
-const holeLayout = require('../../../utils/holeLayout.js');
-const halfCourse = require('../../../utils/halfCourse.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const peoriaStore = require('../../../../utils/peoriaStore.js');
+const peoriaCalculator = require('../../../../utils/peoriaCalculator.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const holeLayout = require('../../../../utils/holeLayout.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
 
 const DRAW_INTERVAL_MS = 120;
 const SPECIAL_COL = { 9: true, 19: true, 20: true };

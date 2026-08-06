@@ -4,10 +4,6 @@
     "pages/index/index",
     "pages/match/join/index",
     "pages/tournament/detail/index",
-    "pages/tournament/stats/index",
-    "pages/tournament/peoria/index",
-    "pages/tournament/group-editor/index",
-    "pages/tournament/group-pick/index",
     "pages/team/select/index",
     "pages/course/select/index",
     "pages/game/hub/index",
@@ -43,6 +39,16 @@
       "name": "scoring",
       "pages": [
         "pages/score/index"
+      ]
+    },
+    {
+      "root": "subpackages/tournament",
+      "name": "tournament",
+      "pages": [
+        "pages/stats/index",
+        "pages/peoria/index",
+        "pages/group-editor/index",
+        "pages/group-pick/index"
       ]
     }
   ],

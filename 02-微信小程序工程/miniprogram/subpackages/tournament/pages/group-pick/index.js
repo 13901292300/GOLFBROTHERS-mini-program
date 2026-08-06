@@ -1,6 +1,6 @@
-const { createHeaderStyle } = require('../../../utils/headerEngine.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
-const playerManage = require('../../../utils/playerManage.js');
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const playerManage = require('../../../../utils/playerManage.js');
 const {
   buildRegisterTeamMap,
   isG5MatchPlayMode,
@@ -10,7 +10,7 @@ const {
   validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
-} = require('../../../utils/strokeEntityValidator.js');
+} = require('../../../../utils/strokeEntityValidator.js');
 
 const TEE_BLUE = 'BLUE_T';
 const TEE_RED = 'RED_T';

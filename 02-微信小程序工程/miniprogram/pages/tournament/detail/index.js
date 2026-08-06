@@ -2526,7 +2526,7 @@ Page({
       ? 'live'
       : (this.data.hasFormalGroups ? 'edit' : 'create');
     wx.navigateTo({
-      url: '/pages/tournament/group-editor/index?matchId=' + encodeURIComponent(matchId) +
+      url: '/subpackages/tournament/pages/group-editor/index?matchId=' + encodeURIComponent(matchId) +
         '&mode=' + encodeURIComponent(mode)
     });
   },
@@ -6988,7 +6988,7 @@ Page({
       const matchId = this.data.matchId || '';
       wx.navigateTo({
         url:
-          '/pages/tournament/stats/index' +
+          '/subpackages/tournament/pages/stats/index' +
           (matchId ? '?matchId=' + encodeURIComponent(matchId) : ''),
         fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
       });
@@ -7022,7 +7022,7 @@ Page({
         return;
       }
       wx.navigateTo({
-        url: '/pages/tournament/peoria/index?matchId=' + encodeURIComponent(matchId),
+        url: '/subpackages/tournament/pages/peoria/index?matchId=' + encodeURIComponent(matchId),
         fail: () => wx.showToast({ title: '净杆配置页尚未注册', icon: 'none' })
       });
       return;
