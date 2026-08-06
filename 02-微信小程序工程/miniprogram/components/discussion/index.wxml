@@ -9,8 +9,10 @@
         wx:for="{{watchers}}"
         wx:key="name"
         class="discussion-avatar-btn"
+        data-role="watcher"
         data-userid="{{item.userId}}"
         data-name="{{item.name}}"
+        data-avatar="{{item.avatar}}"
         bindtouchstart="onAvatarTouchStart"
         bindtouchmove="onAvatarTouchMove"
         bindtouchend="onAvatarTouchEnd"
@@ -34,11 +36,15 @@
         <view wx:else id="ds-msg-{{index}}" class="chat-row {{item.self ? 'self' : ''}}">
           <image
             wx:if="{{!item.self}}"
-            class="chat-avatar"
+            id="ds-msg-avatar-{{index}}"
+            class="chat-avatar ds-player-avatar"
             src="{{item.avatar}}"
             mode="aspectFill"
+            data-role="chat"
             data-userid="{{item.userId}}"
             data-name="{{item.name}}"
+            data-avatar="{{item.avatar}}"
+            data-index="{{index}}"
             bindtouchstart="onAvatarTouchStart"
             bindtouchmove="onAvatarTouchMove"
             bindtouchend="onAvatarTouchEnd"
@@ -48,7 +54,22 @@
             <text class="chat-meta">{{item.name}}</text>
             <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
           </view>
-          <image wx:if="{{item.self}}" class="chat-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <image
+            wx:if="{{item.self}}"
+            id="ds-msg-avatar-{{index}}"
+            class="chat-avatar ds-player-avatar"
+            src="{{item.avatar}}"
+            mode="aspectFill"
+            data-role="chat"
+            data-userid="{{item.userId || 'me'}}"
+            data-name="{{item.name}}"
+            data-avatar="{{item.avatar}}"
+            data-index="{{index}}"
+            bindtouchstart="onAvatarTouchStart"
+            bindtouchmove="onAvatarTouchMove"
+            bindtouchend="onAvatarTouchEnd"
+            bindtouchcancel="onAvatarTouchEnd"
+          ></image>
         </view>
       </block>
       <view

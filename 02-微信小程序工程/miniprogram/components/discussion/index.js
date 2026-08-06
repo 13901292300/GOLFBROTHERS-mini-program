@@ -114,6 +114,7 @@ Component({
       const mentions = (this.data.mentions || []).slice();
       const chat = this.data.chat.concat({
         self: true,
+        userId: 'me',
         name: '我',
         avatar: this.properties.selfAvatar,
         text,
@@ -151,11 +152,50 @@ Component({
         this._lpTimer = null;
       }
     },
-    onAvatarTouchEnd() {
+    onAvatarTouchEnd(e) {
       if (this._lpTimer) {
         clearTimeout(this._lpTimer);
         this._lpTimer = null;
       }
+      // 短按：仅聊天发言头像上抛给宿主；组件内不打开弹窗（长按仍只做 @）
+      if (this._longPressed) return;
+      const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+      if (ds.role !== 'chat') return;
+      const userId = ds.userid != null ? String(ds.userid).trim() : '';
+      const name = ds.name != null ? String(ds.name).trim() : '';
+      const avatar = ds.avatar != null ? String(ds.avatar) : '';
+      const index = ds.index;
+      const payload = {
+        userId: userId,
+        avatar: avatar,
+        name: name,
+        index: index,
+        avatarRect: null
+      };
+      const sel =
+        index != null && index !== ''
+          ? '#ds-msg-avatar-' + index
+          : '';
+      if (!sel) {
+        this.triggerEvent('playerAvatarTap', payload);
+        return;
+      }
+      const self = this;
+      this.createSelectorQuery()
+        .in(this)
+        .select(sel)
+        .boundingClientRect((rect) => {
+          if (rect) {
+            payload.avatarRect = {
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height
+            };
+          }
+          self.triggerEvent('playerAvatarTap', payload);
+        })
+        .exec();
     },
 
     // 在光标位置插入「@用户名 」，生成 mention 数据结构，保持输入框聚焦（支持多次 @）

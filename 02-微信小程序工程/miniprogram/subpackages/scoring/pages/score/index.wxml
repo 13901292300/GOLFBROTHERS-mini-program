@@ -1314,6 +1314,7 @@
         messages="{{chatMessages}}"
         theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
         fontScale="{{fontScale}}"
+        bind:playerAvatarTap="onDiscussionAvatarTap"
       ></discussion>
     </view>
   </view>
@@ -1884,100 +1885,171 @@
     </view>
   </view>
 
-  <!-- Demo：球员头像互动面板（fourball shell 展开后点击头像） -->
+  <!-- Demo：球员头像互动中央弹窗（仅 demo-weekend-amateur） -->
   <view
     wx:if="{{playerActionSheetVisible}}"
     bindtap="closePlayerActionSheet"
-    class="sheet-overlay sheet-overlay--player-action"
+    class="player-action-modal-mask"
   ></view>
   <view
     wx:if="{{playerActionSheetVisible && playerActionTarget}}"
-    class="bottom-sheet bottom-sheet--player-action"
+    class="player-action-modal"
     catchtap="noop"
   >
-    <view class="sheet-top-accent"></view>
-    <view class="sheet-handle"></view>
-    <view class="player-action-sheet">
-      <view class="player-action-sheet__profile">
+    <view class="player-action-modal__card">
+      <view class="player-action-modal__profile">
         <image
-          class="player-action-sheet__avatar"
+          class="player-action-modal__avatar"
           src="{{playerActionTarget.avatar}}"
           mode="aspectFill"
         ></image>
-        <view class="player-action-sheet__meta">
-          <text class="player-action-sheet__name">{{playerActionTarget.name}}</text>
-          <text class="player-action-sheet__gender">{{playerActionTarget.genderLabel}}</text>
+        <view class="player-action-modal__meta">
+          <view class="player-action-modal__name-row">
+            <text class="player-action-modal__name">{{playerActionTarget.name}}</text>
+            <text wx:if="{{playerActionTarget.genderSymbol}}" class="player-action-modal__gender">{{playerActionTarget.genderSymbol}}</text>
+          </view>
+          <view class="player-action-modal__stats">
+            <text class="player-action-modal__stat">江湖差点 {{playerActionTarget.handicapText}}</text>
+            <text class="player-action-modal__stat-sep">·</text>
+            <text class="player-action-modal__stat">浮动系数 {{playerActionTarget.floatCoefText}}</text>
+          </view>
         </view>
+        <view
+          class="player-action-modal__home"
+          catchtap="onPlayerActionProfileTap"
+        >进入主页</view>
       </view>
-      <view class="player-action-sheet__actions">
-        <view
-          class="player-action-sheet__tomato"
-          catchtap="onPlayerActionTomatoTap"
-        >🍅</view>
-        <view
-          class="player-action-sheet__bucket"
-          catchtap="onPlayerActionBucketTap"
-        >🪣</view>
-        <view
-          class="player-action-sheet__egg"
-          catchtap="onPlayerActionEggTap"
-        >🥚</view>
-        <view
-          class="player-action-sheet__flower"
-          catchtap="onPlayerActionFlowerTap"
-        >🌹</view>
+      <view class="player-action-modal__actions">
+        <view class="player-action-modal__item" catchtap="onPlayerActionFlowerTap">🌹</view>
+        <view class="player-action-modal__item" catchtap="onPlayerActionBucketTap">🪣</view>
+        <view class="player-action-modal__item" catchtap="onPlayerActionTomatoTap">🍅</view>
+        <view class="player-action-modal__item" catchtap="onPlayerActionEggTap">🥚</view>
+        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🍺</view>
+        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚀</view>
+        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">👊</view>
+        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚗</view>
       </view>
-    </view>
-    <view class="sheet-cancel-wrap">
-      <view bindtap="closePlayerActionSheet" class="sheet-cancel-btn">取 消</view>
     </view>
   </view>
 
-  <!-- Demo：🍅 飞行动画层（高于 sheet，纯视觉） -->
+  <!-- Demo：第一视角 reaction-screen-layer（tomato / flower / egg） -->
   <view
-    wx:if="{{playerActionTomatoVisible}}"
-    class="player-action-tomato-fly {{playerActionTomatoAnimating ? 'is-flying' : ''}}"
-    style="{{playerActionTomatoStyle}}"
-  >🍅</view>
+    wx:if="{{reactionScreenVisible}}"
+    class="reaction-screen-layer {{reactionScreenFading ? 'is-fading' : ''}}"
+  >
+    <block wx:if="{{reactionScreenMode === 'tomato'}}">
+      <view
+        wx:if="{{reactionTomatoFlyVisible}}"
+        class="tomato-fly"
+        style="{{reactionTomatoFlyStyle}}"
+      >🍅</view>
 
-  <!-- Demo：🍅 命中爆裂（头像中心局部碎裂，非全屏） -->
-  <view
-    wx:if="{{playerActionBurstVisible}}"
-    class="player-action-tomato-burst"
-    style="{{playerActionBurstStyle}}"
-  >
-    <view class="player-action-tomato-burst__core"></view>
-    <view class="player-action-tomato-burst__shard s0"></view>
-    <view class="player-action-tomato-burst__shard s1"></view>
-    <view class="player-action-tomato-burst__shard s2"></view>
-    <view class="player-action-tomato-burst__shard s3"></view>
-    <view class="player-action-tomato-burst__shard s4"></view>
-    <view class="player-action-tomato-burst__shard s5"></view>
-  </view>
-  <!-- Demo：🍅 汁液 — fixed 锚定目标头像 -->
-  <view
-    wx:if="{{playerActionJuiceVisible}}"
-    class="player-action-tomato-juice"
-    style="{{playerActionJuiceStyle}}"
-  >
-    <view class="player-action-tomato-juice__impact"></view>
-    <view class="player-action-tomato-juice__crown"></view>
-    <view class="player-action-tomato-juice__stream st0"></view>
-    <view class="player-action-tomato-juice__stream st1"></view>
-    <view class="player-action-tomato-juice__stream st2"></view>
-    <view class="player-action-tomato-juice__stream st3"></view>
-    <view class="player-action-tomato-juice__stream st4"></view>
-    <view class="player-action-tomato-juice__drop dp0"></view>
-    <view class="player-action-tomato-juice__drop dp1"></view>
-    <view class="player-action-tomato-juice__drop dp2"></view>
-    <view class="player-action-tomato-juice__drop dp3"></view>
-    <view class="player-action-tomato-juice__drop dp4"></view>
-    <view class="player-action-tomato-juice__bottom-drip bd0"></view>
-    <view class="player-action-tomato-juice__bottom-drip bd1"></view>
-    <view class="player-action-tomato-juice__bottom-drip bd2"></view>
-    <view class="player-action-tomato-juice__speck sk0"></view>
-    <view class="player-action-tomato-juice__speck sk1"></view>
-    <view class="player-action-tomato-juice__speck sk2"></view>
+      <view
+        wx:if="{{reactionTomatoSplashVisible}}"
+        class="tomato-hit tomato-hit--{{reactionTomatoImpactPhase}}"
+      >
+        <view class="tomato-hit__shockwave"></view>
+        <view class="tomato-hit__crack c0"></view>
+        <view class="tomato-hit__crack c1"></view>
+        <view class="tomato-hit__crack c2"></view>
+        <view class="tomato-hit__crack c3"></view>
+        <view class="tomato-hit__crack c4"></view>
+        <view class="tomato-hit__blotch"></view>
+        <view class="tomato-hit__pulp p0"></view>
+        <view class="tomato-hit__pulp p1"></view>
+        <view class="tomato-hit__pulp p2"></view>
+        <view class="tomato-hit__pulp p3"></view>
+        <view class="tomato-hit__pulp p4"></view>
+        <view class="tomato-hit__pulp p5"></view>
+      </view>
+
+      <view class="tomato-smear {{reactionTomatoJuiceActive ? 'is-active' : ''}}">
+        <view class="tomato-smear__impact"></view>
+        <view class="tomato-smear__hang"></view>
+        <view class="tomato-smear__run run-left"></view>
+        <view class="tomato-smear__run run-mid"></view>
+        <view class="tomato-smear__run run-right"></view>
+        <view class="tomato-smear__streak s0"></view>
+        <view class="tomato-smear__streak s1"></view>
+        <view class="tomato-smear__streak s2"></view>
+      </view>
+
+      <view class="tomato-drip {{reactionTomatoDripActive ? 'is-active' : ''}}">
+        <view class="tomato-drip__drop d0"></view>
+        <view class="tomato-drip__drop d1"></view>
+        <view class="tomato-drip__drop d2"></view>
+        <view class="tomato-drip__drop d3"></view>
+      </view>
+    </block>
+
+    <!-- 🌹 第一视角花雨：远处飞入 → 中心开放 → 持续生成 → 飘落 -->
+    <view
+      wx:if="{{reactionScreenMode === 'flower'}}"
+      class="flower-screen-reaction"
+    >
+      <view
+        wx:if="{{reactionFlowerFlyVisible}}"
+        class="flower-screen-reaction__fly"
+        style="{{reactionFlowerFlyStyle}}"
+      >🌹</view>
+      <view
+        wx:for="{{reactionFlowerItems}}"
+        wx:key="id"
+        class="flower-screen-reaction__bloom"
+        style="{{item.style}}"
+      >{{item.emoji}}</view>
+    </view>
+
+    <!-- 🥚 第一视角连击砸屏：5 普攻 + 1 终结（不改头像鸡蛋层） -->
+    <view
+      wx:if="{{reactionScreenMode === 'egg'}}"
+      class="egg-screen-reaction {{reactionEggShake ? 'is-shake' : ''}} {{reactionEggFinaleActive ? 'is-finale' : ''}}"
+    >
+      <view
+        wx:for="{{reactionEggFlies}}"
+        wx:key="id"
+        class="egg-screen-reaction__fly {{item.finale ? 'is-finale' : ''}}"
+        style="{{item.style}}"
+      >🥚</view>
+
+      <!-- 普通连击：渐进小面积蛋液残留（level 1–5，不全屏覆盖） -->
+      <view class="egg-screen-reaction__smear level-{{reactionEggHitLevel}}">
+        <view class="egg-screen-reaction__blot b0"></view>
+        <view class="egg-screen-reaction__blot b1"></view>
+        <view class="egg-screen-reaction__blot b2"></view>
+        <view class="egg-screen-reaction__blot b3"></view>
+        <view class="egg-screen-reaction__blot b4"></view>
+      </view>
+
+      <!-- 命中瞬间：小/大蛋壳碎片 -->
+      <view
+        wx:if="{{reactionEggBurstVisible}}"
+        class="egg-screen-reaction__burst {{reactionEggBurstFinale ? 'is-finale' : ''}}"
+        style="{{reactionEggBurstStyle}}"
+      >
+        <view class="egg-screen-reaction__shard s0"></view>
+        <view class="egg-screen-reaction__shard s1"></view>
+        <view class="egg-screen-reaction__shard s2"></view>
+        <view class="egg-screen-reaction__shard s3"></view>
+        <view class="egg-screen-reaction__shard s4"></view>
+        <view class="egg-screen-reaction__yolk-pop"></view>
+      </view>
+
+      <!-- 终结：大范围蛋黄爆裂 + 蛋清流淌 -->
+      <view
+        wx:if="{{reactionEggFinaleActive}}"
+        class="egg-screen-reaction__finale"
+      >
+        <view class="egg-screen-reaction__finale-yolk"></view>
+        <view class="egg-screen-reaction__finale-white w0"></view>
+        <view class="egg-screen-reaction__finale-white w1"></view>
+        <view class="egg-screen-reaction__finale-white w2"></view>
+        <view class="egg-screen-reaction__finale-drip d0"></view>
+        <view class="egg-screen-reaction__finale-drip d1"></view>
+        <view class="egg-screen-reaction__finale-drip d2"></view>
+        <view class="egg-screen-reaction__finale-drip d3"></view>
+      </view>
+    </view>
   </view>
   <!-- Demo：🪣 湿水 — fixed 锚定目标头像 -->
   <view

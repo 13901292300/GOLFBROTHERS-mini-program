@@ -4090,36 +4090,64 @@ page {
 
 .sheet-overlay--half { z-index: 210; }
 
-/* Demo：球员头像互动面板 */
-.sheet-overlay--player-action { z-index: 220; }
-.bottom-sheet--player-action { z-index: 230; }
-.player-action-sheet {
-  padding: 8rpx 48rpx 32rpx;
+/* Demo：球员头像互动中央弹窗（仅 demo-weekend-amateur） */
+.player-action-modal-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 220;
+  background: rgba(15, 23, 42, 0.45);
 }
-.player-action-sheet__profile {
+.player-action-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 230;
+  width: 640rpx;
+  max-width: 86vw;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+}
+.player-action-modal__card {
+  background: var(--bg-card, #ffffff);
+  border-radius: 24rpx;
+  padding: 36rpx 32rpx 40rpx;
+  box-shadow: 0 24rpx 64rpx rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+.player-action-modal__profile {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 28rpx;
+  gap: 20rpx;
 }
-.player-action-sheet__avatar {
-  width: 112rpx;
-  height: 112rpx;
+.player-action-modal__avatar {
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 50%;
   flex-shrink: 0;
   background: #e5e7eb;
-  border: 4rpx solid rgba(0, 45, 98, 0.12);
+  border: 3rpx solid rgba(0, 45, 98, 0.12);
   box-sizing: border-box;
 }
-.player-action-sheet__meta {
+.player-action-modal__meta {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  gap: 10rpx;
+}
+.player-action-modal__name-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   gap: 10rpx;
   min-width: 0;
 }
-.player-action-sheet__name {
-  font-size: 34rpx;
+.player-action-modal__name {
+  font-size: 32rpx;
   font-weight: 800;
   color: var(--golf-blue, #002d62);
   line-height: 1.25;
@@ -4128,59 +4156,96 @@ page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.player-action-sheet__gender {
-  font-size: 24rpx;
+.player-action-modal__gender {
+  flex-shrink: 0;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--data-blue, #1c94de);
+  line-height: 1;
+}
+.player-action-modal__stats {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  min-width: 0;
+}
+.player-action-modal__stat {
+  font-size: 22rpx;
   font-weight: 600;
   color: var(--text-secondary, #9ca3af);
-  letter-spacing: 0.06em;
+  line-height: 1.3;
 }
-.player-action-sheet__actions {
-  margin-top: 40rpx;
+.player-action-modal__stat-sep {
+  font-size: 22rpx;
+  color: var(--text-secondary, #9ca3af);
+  opacity: 0.6;
+}
+.player-action-modal__home {
+  flex-shrink: 0;
+  padding: 14rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 45, 98, 0.08);
+  color: var(--golf-blue, #002d62);
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+.player-action-modal__home:active {
+  opacity: 0.72;
+}
+.player-action-modal__actions {
+  margin-top: 36rpx;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 28rpx;
+  justify-content: space-between;
+  gap: 20rpx 16rpx;
 }
-.player-action-sheet__tomato,
-.player-action-sheet__bucket,
-.player-action-sheet__egg,
-.player-action-sheet__flower {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 28rpx;
+.player-action-modal__item {
+  width: 132rpx;
+  height: 112rpx;
+  border-radius: 20rpx;
   background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 56rpx;
+  font-size: 52rpx;
   line-height: 1;
-  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.08);
 }
-.player-action-sheet__tomato:active,
-.player-action-sheet__bucket:active,
-.player-action-sheet__egg:active,
-.player-action-sheet__flower:active {
+.player-action-modal__item:active {
   opacity: 0.72;
   transform: scale(0.96);
 }
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__name {
+.player-action-modal__item--placeholder {
+  opacity: 0.55;
+}
+.score-page.dark-mode .player-action-modal__card {
+  background: var(--bg-card, #1f2937);
+}
+.score-page.dark-mode .player-action-modal__name {
   color: var(--text-primary);
 }
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__gender {
+.score-page.dark-mode .player-action-modal__gender {
+  color: #60a5fa;
+}
+.score-page.dark-mode .player-action-modal__stat,
+.score-page.dark-mode .player-action-modal__stat-sep {
   color: var(--text-secondary);
 }
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__avatar {
+.score-page.dark-mode .player-action-modal__avatar {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
 }
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__tomato,
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__bucket,
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__egg,
-.score-page.dark-mode .bottom-sheet--player-action .player-action-sheet__flower {
+.score-page.dark-mode .player-action-modal__home {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+.score-page.dark-mode .player-action-modal__item {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Demo：🍅 飞行动画层 */
+/* Demo：🍅 飞行动画层（旧头像命中；demo 已改撞屏） */
 .player-action-tomato-fly {
   position: fixed;
   z-index: 400;
@@ -4192,12 +4257,857 @@ page {
   line-height: 28px;
   text-align: center;
   pointer-events: none;
-  /* 不用 will-change：微信端易整页合成闪白 */
 }
-/* 飞行轨迹由 JS 弧线驱动（约 0.8s），不再用直线 transition */
 .player-action-tomato-fly.is-flying {
   transition: none;
 }
+
+/*
+ * Demo：第一视角 reaction-screen-layer（tomato / flower / egg）
+ * 禁止：全屏 flash / 大面积 filter blur / 纯红蒙版
+ */
+.reaction-screen-layer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 520;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.7s ease;
+}
+.reaction-screen-layer.is-fading {
+  opacity: 0;
+}
+
+/* 🌹 flower-screen-reaction：柔和庆祝花雨（非爆炸） */
+.reaction-screen-layer .flower-screen-reaction {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 523;
+  pointer-events: none;
+}
+.reaction-screen-layer .flower-screen-reaction__fly {
+  position: fixed;
+  z-index: 526;
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  padding: 0;
+  font-size: 64px;
+  line-height: 72px;
+  text-align: center;
+  pointer-events: none;
+  transition: none;
+}
+.reaction-screen-layer .flower-screen-reaction__bloom {
+  position: fixed;
+  z-index: 524;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  font-size: 40px;
+  line-height: 44px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* 🥚 egg-screen-reaction：连续普攻砸屏 + 终结一击（非头像糊脸） */
+.reaction-screen-layer .egg-screen-reaction {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 523;
+  pointer-events: none;
+}
+.reaction-screen-layer .egg-screen-reaction.is-shake {
+  animation: egg-screen-shake 0.12s ease-out;
+}
+.reaction-screen-layer .egg-screen-reaction.is-finale.is-shake {
+  animation: egg-screen-shake-finale 0.22s ease-out;
+}
+.reaction-screen-layer .egg-screen-reaction__fly {
+  position: fixed;
+  z-index: 528;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  padding: 0;
+  font-size: 48px;
+  line-height: 56px;
+  text-align: center;
+  pointer-events: none;
+  will-change: left, top, transform;
+}
+.reaction-screen-layer .egg-screen-reaction__fly.is-finale {
+  width: 88px;
+  height: 88px;
+  font-size: 80px;
+  line-height: 88px;
+  z-index: 529;
+  filter: drop-shadow(0 6px 10px rgba(40, 28, 8, 0.28));
+}
+
+/* 渐进小面积残留：默认隐藏，按 level 逐个显现，不全屏 */
+.reaction-screen-layer .egg-screen-reaction__smear {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 524;
+  pointer-events: none;
+}
+.reaction-screen-layer .egg-screen-reaction__blot {
+  position: absolute;
+  opacity: 0;
+  transform: scale(0.4);
+  border-radius: 55% 45% 60% 40% / 50% 55% 45% 50%;
+  background: radial-gradient(
+    ellipse at 40% 35%,
+    rgba(255, 252, 235, 0.72) 0%,
+    rgba(245, 232, 180, 0.45) 42%,
+    rgba(250, 236, 160, 0.18) 70%,
+    transparent 100%
+  );
+  box-shadow: inset 0 -2px 6px rgba(210, 180, 80, 0.12);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.reaction-screen-layer .egg-screen-reaction__blot.b0 {
+  left: 42%;
+  top: 38%;
+  width: 72px;
+  height: 58px;
+  margin-left: -36px;
+  margin-top: -29px;
+}
+.reaction-screen-layer .egg-screen-reaction__blot.b1 {
+  left: 58%;
+  top: 46%;
+  width: 54px;
+  height: 44px;
+  margin-left: -27px;
+  margin-top: -22px;
+}
+.reaction-screen-layer .egg-screen-reaction__blot.b2 {
+  left: 36%;
+  top: 52%;
+  width: 48px;
+  height: 40px;
+  margin-left: -24px;
+  margin-top: -20px;
+}
+.reaction-screen-layer .egg-screen-reaction__blot.b3 {
+  left: 50%;
+  top: 30%;
+  width: 40px;
+  height: 34px;
+  margin-left: -20px;
+  margin-top: -17px;
+}
+.reaction-screen-layer .egg-screen-reaction__blot.b4 {
+  left: 46%;
+  top: 58%;
+  width: 62px;
+  height: 48px;
+  margin-left: -31px;
+  margin-top: -24px;
+}
+.reaction-screen-layer .egg-screen-reaction__smear.level-1 .b0,
+.reaction-screen-layer .egg-screen-reaction__smear.level-2 .b0,
+.reaction-screen-layer .egg-screen-reaction__smear.level-2 .b1,
+.reaction-screen-layer .egg-screen-reaction__smear.level-3 .b0,
+.reaction-screen-layer .egg-screen-reaction__smear.level-3 .b1,
+.reaction-screen-layer .egg-screen-reaction__smear.level-3 .b2,
+.reaction-screen-layer .egg-screen-reaction__smear.level-4 .b0,
+.reaction-screen-layer .egg-screen-reaction__smear.level-4 .b1,
+.reaction-screen-layer .egg-screen-reaction__smear.level-4 .b2,
+.reaction-screen-layer .egg-screen-reaction__smear.level-4 .b3,
+.reaction-screen-layer .egg-screen-reaction__smear.level-5 .b0,
+.reaction-screen-layer .egg-screen-reaction__smear.level-5 .b1,
+.reaction-screen-layer .egg-screen-reaction__smear.level-5 .b2,
+.reaction-screen-layer .egg-screen-reaction__smear.level-5 .b3,
+.reaction-screen-layer .egg-screen-reaction__smear.level-5 .b4 {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 命中碎片：小范围 / 终结放大 */
+.reaction-screen-layer .egg-screen-reaction__burst {
+  position: fixed;
+  z-index: 527;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.reaction-screen-layer .egg-screen-reaction__shard {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 7px;
+  margin-left: -5px;
+  margin-top: -3px;
+  border-radius: 40% 60% 45% 55%;
+  background: linear-gradient(135deg, #fff8e8 0%, #f0e0b8 55%, #e2c98a 100%);
+  opacity: 0;
+  transform: translate(0, 0) rotate(0deg) scale(0.6);
+}
+.reaction-screen-layer .egg-screen-reaction__burst .s0 {
+  animation: egg-screen-shard0 0.28s ease-out forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst .s1 {
+  animation: egg-screen-shard1 0.28s ease-out 0.01s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst .s2 {
+  animation: egg-screen-shard2 0.28s ease-out 0.02s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst .s3 {
+  animation: egg-screen-shard3 0.28s ease-out 0.015s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst .s4 {
+  animation: egg-screen-shard4 0.28s ease-out 0.025s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__yolk-pop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 24px;
+  margin-left: -14px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ffe27a 0%, #f5c842 55%, #e0a820 100%);
+  opacity: 0;
+  transform: scale(0.3);
+  animation: egg-screen-yolk-pop 0.26s ease-out forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .egg-screen-reaction__shard {
+  width: 16px;
+  height: 11px;
+  margin-left: -8px;
+  margin-top: -5px;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .s0 {
+  animation: egg-screen-shard0-f 0.42s ease-out forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .s1 {
+  animation: egg-screen-shard1-f 0.42s ease-out 0.02s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .s2 {
+  animation: egg-screen-shard2-f 0.42s ease-out 0.03s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .s3 {
+  animation: egg-screen-shard3-f 0.42s ease-out 0.025s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .s4 {
+  animation: egg-screen-shard4-f 0.42s ease-out 0.035s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__burst.is-finale .egg-screen-reaction__yolk-pop {
+  width: 120px;
+  height: 100px;
+  margin-left: -60px;
+  margin-top: -50px;
+  animation: egg-screen-yolk-pop-finale 0.45s ease-out forwards;
+}
+
+/* 终结层：大范围蛋黄 + 蛋清流淌（DOM 固定少量节点） */
+.reaction-screen-layer .egg-screen-reaction__finale {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 525;
+  pointer-events: none;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-yolk {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 220px;
+  height: 190px;
+  margin-left: -110px;
+  margin-top: -95px;
+  border-radius: 58% 42% 55% 45% / 48% 52% 48% 52%;
+  background: radial-gradient(
+    ellipse at 42% 38%,
+    rgba(255, 230, 120, 0.95) 0%,
+    rgba(245, 196, 56, 0.88) 38%,
+    rgba(230, 170, 40, 0.55) 68%,
+    rgba(230, 170, 40, 0) 100%
+  );
+  opacity: 0;
+  transform: scale(0.35);
+  animation: egg-screen-finale-yolk 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-white {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  border-radius: 60% 40% 55% 45% / 50% 55% 45% 50%;
+  background: radial-gradient(
+    ellipse at 45% 40%,
+    rgba(255, 252, 240, 0.78) 0%,
+    rgba(250, 240, 210, 0.42) 55%,
+    rgba(250, 240, 210, 0) 100%
+  );
+  opacity: 0;
+  transform: scale(0.4);
+  animation: egg-screen-finale-white 0.7s ease-out forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-white.w0 {
+  width: 280px;
+  height: 220px;
+  margin-left: -140px;
+  margin-top: -110px;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-white.w1 {
+  width: 200px;
+  height: 160px;
+  margin-left: -40px;
+  margin-top: -40px;
+  animation-delay: 0.06s;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-white.w2 {
+  width: 170px;
+  height: 140px;
+  margin-left: -160px;
+  margin-top: -20px;
+  animation-delay: 0.1s;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-drip {
+  position: absolute;
+  top: 52%;
+  width: 18px;
+  height: 0;
+  border-radius: 0 0 12px 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 250, 230, 0.7) 0%,
+    rgba(245, 230, 180, 0.45) 55%,
+    rgba(245, 230, 180, 0) 100%
+  );
+  opacity: 0;
+  animation: egg-screen-finale-drip 1.6s ease-out 0.2s forwards;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-drip.d0 {
+  left: 42%;
+  width: 16px;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-drip.d1 {
+  left: 50%;
+  width: 22px;
+  animation-duration: 1.8s;
+  animation-delay: 0.28s;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-drip.d2 {
+  left: 58%;
+  width: 14px;
+  animation-duration: 1.5s;
+  animation-delay: 0.34s;
+}
+.reaction-screen-layer .egg-screen-reaction__finale-drip.d3 {
+  left: 47%;
+  width: 12px;
+  animation-duration: 1.7s;
+  animation-delay: 0.4s;
+}
+
+@keyframes egg-screen-shake {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1px); }
+  50% { transform: translate(2px, -1px); }
+  75% { transform: translate(-1px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes egg-screen-shake-finale {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-5px, 3px); }
+  40% { transform: translate(6px, -3px); }
+  60% { transform: translate(-4px, 2px); }
+  80% { transform: translate(3px, -2px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes egg-screen-shard0 {
+  0% { opacity: 0.95; transform: translate(0, 0) rotate(0deg) scale(0.7); }
+  100% { opacity: 0; transform: translate(14px, -12px) rotate(40deg) scale(0.4); }
+}
+@keyframes egg-screen-shard1 {
+  0% { opacity: 0.95; transform: translate(0, 0) rotate(0deg) scale(0.7); }
+  100% { opacity: 0; transform: translate(18px, -14px) rotate(48deg) scale(0.4); }
+}
+@keyframes egg-screen-shard2 {
+  0% { opacity: 0.95; transform: translate(0, 0) rotate(0deg) scale(0.7); }
+  100% { opacity: 0; transform: translate(-16px, -10px) rotate(-52deg) scale(0.4); }
+}
+@keyframes egg-screen-shard3 {
+  0% { opacity: 0.95; transform: translate(0, 0) rotate(0deg) scale(0.7); }
+  100% { opacity: 0; transform: translate(12px, 16px) rotate(72deg) scale(0.4); }
+}
+@keyframes egg-screen-shard4 {
+  0% { opacity: 0.95; transform: translate(0, 0) rotate(0deg) scale(0.7); }
+  100% { opacity: 0; transform: translate(-14px, 12px) rotate(-68deg) scale(0.4); }
+}
+@keyframes egg-screen-shard0-f {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: translate(42px, -32px) rotate(88deg) scale(0.5); }
+}
+@keyframes egg-screen-shard1-f {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: translate(46px, -36px) rotate(90deg) scale(0.5); }
+}
+@keyframes egg-screen-shard2-f {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: translate(-44px, -28px) rotate(-100deg) scale(0.5); }
+}
+@keyframes egg-screen-shard3-f {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: translate(38px, 40px) rotate(120deg) scale(0.5); }
+}
+@keyframes egg-screen-shard4-f {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: translate(-40px, 34px) rotate(-110deg) scale(0.5); }
+}
+@keyframes egg-screen-yolk-pop {
+  0% { opacity: 0.9; transform: scale(0.3); }
+  55% { opacity: 0.85; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+@keyframes egg-screen-yolk-pop-finale {
+  0% { opacity: 0.95; transform: scale(0.25); }
+  45% { opacity: 0.9; transform: scale(1.05); }
+  100% { opacity: 0.35; transform: scale(1.15); }
+}
+@keyframes egg-screen-finale-yolk {
+  0% { opacity: 0; transform: scale(0.35); }
+  55% { opacity: 0.95; transform: scale(1.08); }
+  100% { opacity: 0.88; transform: scale(1); }
+}
+@keyframes egg-screen-finale-white {
+  0% { opacity: 0; transform: scale(0.4); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+  100% { opacity: 0.72; transform: scale(1); }
+}
+@keyframes egg-screen-finale-drip {
+  0% { opacity: 0; height: 0; }
+  20% { opacity: 0.75; height: 40px; }
+  100% { opacity: 0.35; height: 160px; }
+}
+
+/* 飞行番茄：基准约 80px，JS scale 0.3→1→2 → 视觉约 24→80→160px */
+.reaction-screen-layer .tomato-fly {
+  position: fixed;
+  z-index: 525;
+  width: 80px;
+  height: 80px;
+  margin: 0;
+  padding: 0;
+  font-size: 72px;
+  line-height: 80px;
+  text-align: center;
+  pointer-events: none;
+  transition: none;
+}
+
+/*
+ * Impact render (phone screen dirtied by tomato):
+ * impact 0-200ms shock+cracks -> burst 200-500ms blotch+pulp -> flow smear runs
+ * No full-screen white flash / uniform red mask / large blur
+ */
+.reaction-screen-layer .tomato-hit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 524;
+  pointer-events: none;
+}
+.reaction-screen-layer .tomato-hit__shockwave {
+  position: absolute;
+  left: -18px;
+  top: -18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid rgba(120, 90, 85, 0.45);
+  box-sizing: border-box;
+  opacity: 0;
+  background: transparent;
+}
+.reaction-screen-layer .tomato-hit--impact .tomato-hit__shockwave {
+  animation: tomato-hit-shock 0.2s ease-out forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__shockwave {
+  opacity: 0;
+  animation: none;
+}
+.reaction-screen-layer .tomato-hit__crack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 0;
+  margin-left: -1px;
+  transform-origin: top center;
+  background: linear-gradient(
+    180deg,
+    rgba(90, 70, 68, 0.55) 0%,
+    rgba(140, 110, 105, 0.28) 55%,
+    transparent 100%
+  );
+  opacity: 0;
+}
+.reaction-screen-layer .tomato-hit__crack.c0 { transform: rotate(-28deg); }
+.reaction-screen-layer .tomato-hit__crack.c1 { transform: rotate(18deg); }
+.reaction-screen-layer .tomato-hit__crack.c2 { transform: rotate(62deg); }
+.reaction-screen-layer .tomato-hit__crack.c3 { transform: rotate(-72deg); }
+.reaction-screen-layer .tomato-hit__crack.c4 { transform: rotate(118deg); }
+.reaction-screen-layer .tomato-hit--impact .tomato-hit__crack.c0 {
+  animation: tomato-hit-crack 0.2s ease-out forwards;
+}
+.reaction-screen-layer .tomato-hit--impact .tomato-hit__crack.c1 {
+  animation: tomato-hit-crack 0.2s ease-out 0.02s forwards;
+}
+.reaction-screen-layer .tomato-hit--impact .tomato-hit__crack.c2 {
+  animation: tomato-hit-crack 0.18s ease-out 0.04s forwards;
+}
+.reaction-screen-layer .tomato-hit--impact .tomato-hit__crack.c3 {
+  animation: tomato-hit-crack 0.2s ease-out 0.03s forwards;
+}
+.reaction-screen-layer .tomato-hit--impact .tomato-hit__crack.c4 {
+  animation: tomato-hit-crack 0.18s ease-out 0.05s forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__crack,
+.reaction-screen-layer .tomato-hit--flow .tomato-hit__shockwave,
+.reaction-screen-layer .tomato-hit--flow .tomato-hit__crack {
+  opacity: 0 !important;
+  animation: none;
+}
+
+.reaction-screen-layer .tomato-hit__blotch {
+  position: absolute;
+  left: -54px;
+  top: -46px;
+  width: 108px;
+  height: 92px;
+  border-radius: 48% 55% 52% 46% / 50% 48% 55% 50%;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse 72% 68% at 44% 42%, rgba(210, 36, 26, 0.92) 0%, rgba(160, 18, 14, 0.72) 38%, rgba(120, 12, 10, 0.28) 68%, transparent 82%),
+    radial-gradient(circle at 62% 58%, rgba(140, 40, 28, 0.55) 0 16%, transparent 42%);
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__blotch {
+  animation: tomato-hit-blotch 0.3s ease-out forwards;
+}
+.reaction-screen-layer .tomato-hit--flow .tomato-hit__blotch {
+  opacity: 0.9;
+  animation: none;
+}
+
+.reaction-screen-layer .tomato-hit__pulp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 12px;
+  border-radius: 42% 58% 50% 48%;
+  background: rgba(180, 28, 20, 0.9);
+  opacity: 0;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__pulp.p0 {
+  width: 20px;
+  height: 14px;
+  animation: tomato-hit-pulp0 0.3s ease-out forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__pulp.p1 {
+  width: 12px;
+  height: 18px;
+  background: rgba(150, 22, 16, 0.88);
+  animation: tomato-hit-pulp1 0.3s ease-out 0.02s forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__pulp.p2 {
+  width: 18px;
+  height: 11px;
+  background: rgba(200, 48, 32, 0.86);
+  animation: tomato-hit-pulp2 0.28s ease-out 0.03s forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__pulp.p3 {
+  width: 14px;
+  height: 15px;
+  animation: tomato-hit-pulp3 0.3s ease-out 0.04s forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__pulp.p4 {
+  width: 11px;
+  height: 13px;
+  background: rgba(130, 16, 12, 0.9);
+  animation: tomato-hit-pulp4 0.28s ease-out 0.05s forwards;
+}
+.reaction-screen-layer .tomato-hit--burst .tomato-hit__pulp.p5 {
+  width: 17px;
+  height: 10px;
+  background: rgba(190, 34, 24, 0.84);
+  animation: tomato-hit-pulp5 0.3s ease-out 0.02s forwards;
+}
+
+@keyframes tomato-hit-shock {
+  0% { opacity: 0.7; transform: scale(0.4); border-width: 3px; }
+  70% { opacity: 0.35; transform: scale(4.2); border-width: 1px; }
+  100% { opacity: 0; transform: scale(5.6); border-width: 1px; }
+}
+@keyframes tomato-hit-crack {
+  0% { opacity: 0; height: 0; }
+  40% { opacity: 0.75; height: 78px; }
+  100% { opacity: 0.35; height: 118px; }
+}
+@keyframes tomato-hit-blotch {
+  0% { opacity: 0; transform: scale(0.35); }
+  55% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 0.95; transform: scale(1); }
+}
+@keyframes tomato-hit-pulp0 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-118px, -86px) scale(0.55) rotate(-38deg); }
+}
+@keyframes tomato-hit-pulp1 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(96px, -102px) scale(0.5) rotate(42deg); }
+}
+@keyframes tomato-hit-pulp2 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-132px, 28px) scale(0.45) rotate(-16deg); }
+}
+@keyframes tomato-hit-pulp3 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(110px, 46px) scale(0.5) rotate(58deg); }
+}
+@keyframes tomato-hit-pulp4 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-48px, 112px) scale(0.4) rotate(-54deg); }
+}
+@keyframes tomato-hit-pulp5 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(36px, 120px) scale(0.45) rotate(24deg); }
+}
+
+/* Glass smear: local sticky blotches + top hang + uneven runs (not full red wash) */
+.reaction-screen-layer .tomato-smear {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 521;
+  opacity: 0;
+  pointer-events: none;
+}
+.reaction-screen-layer .tomato-smear.is-active {
+  opacity: 1;
+}
+.reaction-screen-layer .tomato-smear__impact {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 132px;
+  height: 110px;
+  margin-left: -66px;
+  margin-top: -55px;
+  border-radius: 46% 54% 50% 48% / 52% 48% 55% 50%;
+  background:
+    radial-gradient(ellipse 70% 65% at 42% 40%, rgba(190, 30, 22, 0.78) 0%, rgba(140, 16, 12, 0.42) 45%, transparent 74%),
+    radial-gradient(circle at 68% 62%, rgba(120, 28, 20, 0.4) 0 14%, transparent 40%);
+  opacity: 0;
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__impact {
+  animation: tomato-smear-impact 0.45s ease-out forwards;
+}
+.reaction-screen-layer .tomato-smear__hang {
+  position: absolute;
+  left: 18%;
+  top: -2%;
+  width: 64%;
+  height: 14%;
+  border-radius: 0 0 55% 50% / 0 0 100% 100%;
+  background:
+    radial-gradient(ellipse 90% 120% at 40% 0%, rgba(200, 36, 26, 0.7) 0%, rgba(150, 18, 14, 0.35) 50%, transparent 78%),
+    radial-gradient(ellipse 40% 80% at 72% 10%, rgba(170, 24, 18, 0.45) 0%, transparent 70%);
+  opacity: 0;
+  transform-origin: top center;
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__hang {
+  animation: tomato-smear-hang 0.55s ease-out forwards;
+}
+.reaction-screen-layer .tomato-smear__run {
+  position: absolute;
+  top: 8%;
+  height: 0;
+  border-radius: 40% 60% 48% 52% / 6% 8% 90% 88%;
+  transform-origin: top center;
+  opacity: 0.9;
+}
+.reaction-screen-layer .tomato-smear__run.run-left {
+  left: 14%;
+  width: 18%;
+  background: linear-gradient(
+    180deg,
+    rgba(200, 34, 24, 0.78) 0%,
+    rgba(160, 20, 14, 0.48) 36%,
+    rgba(120, 12, 10, 0.18) 78%,
+    transparent 100%
+  );
+}
+.reaction-screen-layer .tomato-smear__run.run-mid {
+  left: 46%;
+  width: 8%;
+  top: 10%;
+  background: linear-gradient(
+    180deg,
+    rgba(180, 28, 20, 0.62) 0%,
+    rgba(140, 16, 12, 0.3) 48%,
+    transparent 100%
+  );
+}
+.reaction-screen-layer .tomato-smear__run.run-right {
+  left: 70%;
+  width: 13%;
+  top: 6%;
+  background: linear-gradient(
+    180deg,
+    rgba(210, 42, 30, 0.58) 0%,
+    rgba(150, 18, 14, 0.28) 40%,
+    transparent 100%
+  );
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__run.run-left {
+  animation: tomato-smear-run-left 2.8s cubic-bezier(0.28, 0.08, 0.22, 1) forwards;
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__run.run-mid {
+  animation: tomato-smear-run-mid 3.4s cubic-bezier(0.33, 0.12, 0.25, 1) 0.1s forwards;
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__run.run-right {
+  animation: tomato-smear-run-right 2.5s cubic-bezier(0.3, 0.1, 0.22, 1) 0.18s forwards;
+}
+.reaction-screen-layer .tomato-smear__streak {
+  position: absolute;
+  top: 12%;
+  width: 4px;
+  height: 0;
+  border-radius: 40% 60% 50% 50% / 8% 10% 90% 85%;
+  background: linear-gradient(180deg, rgba(190, 30, 22, 0.65) 0%, rgba(130, 14, 10, 0.22) 70%, transparent 100%);
+  transform-origin: top center;
+}
+.reaction-screen-layer .tomato-smear__streak.s0 { left: 28%; }
+.reaction-screen-layer .tomato-smear__streak.s1 { left: 55%; width: 3px; }
+.reaction-screen-layer .tomato-smear__streak.s2 {
+  left: 82%;
+  width: 5px;
+  background: linear-gradient(180deg, rgba(160, 22, 16, 0.55) 0%, transparent 100%);
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__streak.s0 {
+  animation: tomato-smear-streak 2.6s ease-out 0.12s forwards;
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__streak.s1 {
+  animation: tomato-smear-streak 3.2s ease-out 0.22s forwards;
+}
+.reaction-screen-layer .tomato-smear.is-active .tomato-smear__streak.s2 {
+  animation: tomato-smear-streak 2.4s ease-out 0.08s forwards;
+}
+
+@keyframes tomato-smear-impact {
+  0% { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tomato-smear-hang {
+  0% { opacity: 0; transform: scaleY(0.2); }
+  100% { opacity: 0.92; transform: scaleY(1); }
+}
+@keyframes tomato-smear-run-left {
+  0% { height: 0; opacity: 0.85; }
+  55% { height: 72%; opacity: 0.8; }
+  100% { height: 88%; opacity: 0.52; }
+}
+@keyframes tomato-smear-run-mid {
+  0% { height: 0; opacity: 0.7; }
+  60% { height: 58%; opacity: 0.62; }
+  100% { height: 78%; opacity: 0.38; }
+}
+@keyframes tomato-smear-run-right {
+  0% { height: 0; opacity: 0.65; }
+  50% { height: 46%; opacity: 0.58; }
+  100% { height: 64%; opacity: 0.34; }
+}
+@keyframes tomato-smear-streak {
+  0% { height: 0; opacity: 0.75; }
+  70% { height: 68%; opacity: 0.6; }
+  100% { height: 90%; opacity: 0.3; }
+}
+
+.reaction-screen-layer .tomato-drip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 522;
+  opacity: 0;
+  pointer-events: none;
+}
+.reaction-screen-layer .tomato-drip.is-active {
+  opacity: 1;
+}
+.reaction-screen-layer .tomato-drip__drop {
+  position: absolute;
+  top: 62%;
+  width: 7px;
+  height: 9px;
+  border-radius: 45% 55% 60% 40%;
+  background: rgba(170, 22, 16, 0.7);
+  opacity: 0;
+}
+.reaction-screen-layer .tomato-drip.is-active .tomato-drip__drop.d0 {
+  left: 22%;
+  animation: tomato-drip-fall 1.8s ease-in 0.45s forwards;
+}
+.reaction-screen-layer .tomato-drip.is-active .tomato-drip__drop.d1 {
+  left: 48%;
+  width: 5px;
+  height: 7px;
+  animation: tomato-drip-fall 2.1s ease-in 0.7s forwards;
+}
+.reaction-screen-layer .tomato-drip.is-active .tomato-drip__drop.d2 {
+  left: 68%;
+  width: 8px;
+  height: 10px;
+  background: rgba(140, 16, 12, 0.65);
+  animation: tomato-drip-fall 1.7s ease-in 0.55s forwards;
+}
+.reaction-screen-layer .tomato-drip.is-active .tomato-drip__drop.d3 {
+  left: 84%;
+  width: 6px;
+  height: 8px;
+  animation: tomato-drip-fall 2s ease-in 0.9s forwards;
+}
+@keyframes tomato-drip-fall {
+  0% { opacity: 0; transform: translateY(0) scale(0.7); }
+  15% { opacity: 0.85; }
+  100% { opacity: 0; transform: translateY(28vh) scale(0.85); }
+}
+
 
 /* Demo：🥚 连击飞入（transition 时长由 inline style 控制） */
 .player-action-egg-fly {

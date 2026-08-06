@@ -18,6 +18,7 @@ const holeLayout = require('../../../../utils/holeLayout.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const reactionSounds = require('../../utils/reactionSounds.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
+const userProfileStore = require('../../../../utils/userProfileStore.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
@@ -2215,10 +2216,10 @@ Page({
     fourballIdentityMode: false,
     /** fixed-collapse：身份列是否展开（默认折叠） */
     fourballIdentityExpanded: false,
-    /** Demo：球员头像互动面板（仅 fourball shell 展开后入口；无动画/无写盘） */
+    /** Demo：球员头像互动中央弹窗（仅 demo-weekend-amateur；无写盘） */
     playerActionSheetVisible: false,
     playerActionTarget: null,
-    /** Demo：🍅 飞行动画层 */
+    /** Demo：🍅 飞行动画层（旧：命中头像；现 demo 改撞屏，保留字段以免残留） */
     playerActionTomatoVisible: false,
     playerActionTomatoAnimating: false,
     playerActionTomatoStyle: '',
@@ -2229,6 +2230,28 @@ Page({
     playerActionJuiceVisible: false,
     playerActionJuiceStyle: '',
     playerActionHitPlayerId: '',
+    /** Demo：第一视角 reaction-screen-layer（tomato | flower） */
+    reactionScreenVisible: false,
+    reactionScreenFading: false,
+    reactionScreenMode: '', // tomato | flower | egg
+    reactionTomatoFlyVisible: false,
+    reactionTomatoFlyStyle: '',
+    reactionTomatoSplashVisible: false,
+    reactionTomatoImpactPhase: '', // impact | burst | flow
+    reactionTomatoJuiceActive: false,
+    reactionTomatoDripActive: false,
+    /** Demo：🌹 第一视角花雨（flower-screen-reaction） */
+    reactionFlowerFlyVisible: false,
+    reactionFlowerFlyStyle: '',
+    reactionFlowerItems: [],
+    /** Demo：🥚 第一视角连击砸屏（egg-screen-reaction；不改头像连击） */
+    reactionEggFlies: [],
+    reactionEggHitLevel: 0,
+    reactionEggBurstVisible: false,
+    reactionEggBurstFinale: false,
+    reactionEggBurstStyle: '',
+    reactionEggFinaleActive: false,
+    reactionEggShake: false,
     /** Demo：🪣 水桶动画（独立于🍅轨迹） */
     playerActionBucketVisible: false,
     playerActionBucketDropping: false,
@@ -2357,9 +2380,27 @@ Page({
       { name: 'Yan', avatar: mockAvatars.pickMockAvatar('Yan') }
     ],
     chatMessages: [
-      { self: false, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex'), text: '今天果岭速度挺快，短推要保守一点。' },
-      { self: true, name: '我', avatar: mockAvatars.pickMockAvatar('我'), text: '收到，A4 洞开始注意落点。' },
-      { self: false, name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷'), text: '前组节奏不错，我们保持就行。' }
+      {
+        self: false,
+        userId: 'chat-alex',
+        name: 'Alex',
+        avatar: mockAvatars.pickMockAvatar('Alex'),
+        text: '今天果岭速度挺快，短推要保守一点。'
+      },
+      {
+        self: true,
+        userId: 'me',
+        name: '我',
+        avatar: mockAvatars.pickMockAvatar('我'),
+        text: '收到，A4 洞开始注意落点。'
+      },
+      {
+        self: false,
+        userId: 'chat-dalei',
+        name: '大雷',
+        avatar: mockAvatars.pickMockAvatar('大雷'),
+        text: '前组节奏不错，我们保持就行。'
+      }
     ]
   },
 
@@ -6802,7 +6843,7 @@ Page({
   /**
    * fixed-collapse：具体球员头像（catchtap，阻止冒泡到身份区）。
    * - 折叠：视为点组合区 → 仅展开
-   * - 展开：打开临时球员互动面板（Demo，无动画 / 无写盘）
+   * - 展开：仅 demo-weekend-amateur → openPlayerActionModal（与讨论区共用）
    */
   onFourballPlayerAvatarTap(e) {
     if (!this._isFourballIdentityFixedCollapseMode()) return;
@@ -6812,8 +6853,69 @@ Page({
     }
     const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
     const playerId = ds.playerId != null ? String(ds.playerId).trim() : '';
-    const target = this._resolvePlayerActionTarget(playerId);
+    if (!playerId) return;
+    this.openPlayerActionModal({ userId: playerId });
+  },
+
+  /**
+   * 讨论区发言头像短按：discussion 上抛 playerAvatarTap → 同一中央弹窗。
+   * 仅 demo-weekend-amateur。
+   */
+  onDiscussionAvatarTap(e) {
+    const detail = (e && e.detail) || {};
+    this.openPlayerActionModal({
+      userId: detail.userId,
+      avatar: detail.avatar,
+      name: detail.name,
+      index: detail.index,
+      avatarRect: detail.avatarRect
+    });
+  },
+
+  /**
+   * Demo：统一头像互动入口（记分头像 / 讨论区头像共用同一 player-action-modal）。
+   * targetUser: { avatar, name, gender, handicap, index, userId, floatCoef?, avatarRect? }
+   */
+  openPlayerActionModal(targetUser) {
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const raw = targetUser && typeof targetUser === 'object' ? targetUser : {};
+    const userId = String(raw.userId || raw.playerId || '').trim();
+    const nameHint = String(raw.name || '').trim();
+    let target = null;
+    if (userId) {
+      target = this._resolvePlayerActionTarget(userId);
+    }
+    if (!target && nameHint) {
+      target = this._resolvePlayerActionTargetByName(nameHint);
+    }
+    if (!target) {
+      target = this._buildPlayerActionTargetFromPartial(raw);
+    } else {
+      if (nameHint) target.name = nameHint;
+      if (raw.avatar) target.avatar = raw.avatar;
+      if (raw.gender === 'female' || raw.gender === 'male') {
+        target.gender = raw.gender;
+        target.genderLabel = raw.gender === 'female' ? '女' : '男';
+        target.genderSymbol = raw.gender === 'female' ? '♀' : '♂';
+      }
+      if (raw.handicap != null && raw.handicap !== '') {
+        target.handicap = raw.handicap;
+        target.handicapText = this._formatPlayerActionMetric(raw.handicap);
+      }
+      if (raw.floatCoef != null && raw.floatCoef !== '') {
+        target.floatCoef = raw.floatCoef;
+        target.floatCoefText = this._formatPlayerActionMetric(raw.floatCoef);
+      }
+    }
     if (!target) return;
+    target.userId = target.userId || target.playerId;
+    target.playerId = target.playerId || target.userId;
+    if (raw.index != null) target.index = raw.index;
+    target.avatarRect = this._normalizePlayerActionAvatarRect(
+      raw.avatarRect || target.avatarRect
+    );
     this.setData({
       playerActionSheetVisible: true,
       playerActionTarget: target
@@ -6821,7 +6923,101 @@ Page({
   },
 
   /**
-   * Demo：从 fourballRowsView / _playersSource 组装互动面板展示数据。
+   * Demo：互动弹窗展示用差点/浮动系数格式（缺省 --；不读成绩、不写盘）。
+   */
+  _formatPlayerActionMetric(value) {
+    if (value == null || value === '') return '--';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    return String(n);
+  },
+
+  _normalizePlayerActionAvatarRect(rect) {
+    if (!rect || typeof rect !== 'object') return null;
+    const left = Number(rect.left);
+    const top = Number(rect.top);
+    const width = Number(rect.width);
+    const height = Number(rect.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      return null;
+    }
+    return { left: left, top: top, width: width, height: height };
+  },
+
+  /** Demo：按昵称在记分名单中反查，命中则走完整 target */
+  _resolvePlayerActionTargetByName(name) {
+    const key = String(name || '').trim();
+    if (!key) return null;
+    const sourceList = this._playersSource || [];
+    for (let i = 0; i < sourceList.length; i++) {
+      const p = sourceList[i];
+      if (!p) continue;
+      const n = String(p.name || p.nickname || p.displayName || '').trim();
+      if (n && n === key) {
+        const id = String(p.playerId || p.id || p.userId || '').trim();
+        if (id) return this._resolvePlayerActionTarget(id);
+      }
+    }
+    const rows = this.data.fourballRowsView || [];
+    for (let r = 0; r < rows.length; r++) {
+      const members = (rows[r] && rows[r].identity && rows[r].identity.members) || [];
+      for (let j = 0; j < members.length; j++) {
+        const m = members[j];
+        if (!m) continue;
+        const n = String(m.name || m.displayName || '').trim();
+        if (n && n === key) {
+          const id = String(m.playerId || m.id || m.userId || '').trim();
+          if (id) return this._resolvePlayerActionTarget(id);
+        }
+      }
+    }
+    return null;
+  },
+
+  /**
+   * Demo：讨论区等非记分名单用户 — 缺差点/浮动显示 --。
+   */
+  _buildPlayerActionTargetFromPartial(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const name = String(src.name || '').trim() || '球员';
+    const userId =
+      String(src.userId || src.playerId || '').trim() ||
+      'chat:' + name;
+    const genderRaw = src.gender;
+    const gender =
+      genderRaw === 'female' || genderRaw === 'male'
+        ? genderRaw
+        : resolveScoreDisplayGender({ gender: genderRaw }, userId);
+    const handicap =
+      src.handicap != null && src.handicap !== '' ? src.handicap : null;
+    const floatCoef =
+      src.floatCoef != null && src.floatCoef !== '' ? src.floatCoef : null;
+    return {
+      playerId: userId,
+      userId: userId,
+      name: name,
+      avatar: src.avatar || '',
+      gender: gender,
+      genderLabel: gender === 'female' ? '女' : gender === 'male' ? '男' : '未设置',
+      genderSymbol: gender === 'female' ? '♀' : gender === 'male' ? '♂' : '',
+      handicap: handicap,
+      floatCoef: floatCoef,
+      handicapText: this._formatPlayerActionMetric(handicap),
+      floatCoefText: this._formatPlayerActionMetric(floatCoef),
+      index: src.index,
+      avatarRect: this._normalizePlayerActionAvatarRect(src.avatarRect)
+    };
+  },
+
+  /**
+   * Demo：从 fourballRowsView / _playersSource / 本地资料组装中央弹窗展示数据。
    * 不读成绩、不写盘。
    */
   _resolvePlayerActionTarget(playerId) {
@@ -6845,11 +7041,16 @@ Page({
     }
 
     const source = this._findPlayersSourceById(key);
-    const name =
+    if (!member && !source && !isSameUserIdentity(key, 'me')) {
+      return null;
+    }
+
+    let name =
       (source && (source.name || source.nickname || source.displayName)) ||
       (member && (member.name || member.displayName)) ||
+      (isSameUserIdentity(key, 'me') ? '我' : '') ||
       '球员';
-    const avatar =
+    let avatar =
       (member && member.avatar) ||
       (source && source.avatar) ||
       '';
@@ -6865,13 +7066,62 @@ Page({
             key
           );
     const genderLabel = gender === 'female' ? '女' : gender === 'male' ? '男' : '未设置';
+    const genderSymbol = gender === 'female' ? '♀' : gender === 'male' ? '♂' : '';
+
+    let handicap =
+      source && source.handicap != null && source.handicap !== ''
+        ? source.handicap
+        : member && member.handicap != null && member.handicap !== ''
+          ? member.handicap
+          : null;
+    let floatCoef =
+      source && source.floatCoef != null && source.floatCoef !== ''
+        ? source.floatCoef
+        : member && member.floatCoef != null && member.floatCoef !== ''
+          ? member.floatCoef
+          : null;
+
+    if (isSameUserIdentity(key, 'me')) {
+      try {
+        const profile = userProfileStore.loadProfile() || {};
+        if (profile.handicap != null && profile.handicap !== '') {
+          handicap = profile.handicap;
+        }
+        if (profile.floatCoef != null && profile.floatCoef !== '') {
+          floatCoef = profile.floatCoef;
+        }
+        const profileName = String(
+          profile.nickname || profile.displayName || ''
+        ).trim();
+        if (profileName) name = profileName;
+        if (!avatar && profile.avatar) avatar = profile.avatar;
+      } catch (e) {}
+    } else if (handicap == null || floatCoef == null) {
+      // 仅已知演示球员补稳定展示值；其它用户缺省走 --
+      const demoMetrics = {
+        'fr-1003': { handicap: 8.0, floatCoef: 0.6 },
+        'fr-1005': { handicap: 15.6, floatCoef: 2.0 },
+        'fr-1008': { handicap: 12.4, floatCoef: 1.3 }
+      };
+      const fallback = demoMetrics[key];
+      if (fallback) {
+        if (handicap == null) handicap = fallback.handicap;
+        if (floatCoef == null) floatCoef = fallback.floatCoef;
+      }
+    }
 
     return {
       playerId: key,
+      userId: key,
       name: name,
       avatar: avatar,
       gender: gender,
-      genderLabel: genderLabel
+      genderLabel: genderLabel,
+      genderSymbol: genderSymbol,
+      handicap: handicap,
+      floatCoef: floatCoef,
+      handicapText: this._formatPlayerActionMetric(handicap),
+      floatCoefText: this._formatPlayerActionMetric(floatCoef)
     };
   },
 
@@ -6883,74 +7133,148 @@ Page({
     });
   },
 
+  /** Demo：中央弹窗「进入主页」；仅 demo-weekend-amateur */
+  onPlayerActionProfileTap() {
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
+    this.closePlayerActionSheet();
+    if (!playerId) return;
+    if (isSameUserIdentity(playerId, 'me')) {
+      wx.navigateTo({ url: '/pages/profile/footprints/index' });
+      return;
+    }
+    wx.showToast({ title: '他人主页暂未开放', icon: 'none' });
+  },
+
+  /** Demo：占位互动元素（🍺🚀👊🚗）仅展示，不播动画 */
+  onPlayerActionPlaceholderTap() {},
+
+  /** Demo：互动动画目标头像定位（记分 #fb-player-avatar → 讨论区缓存/节点 → 屏中回退） */
+  _fallbackPlayerActionAvatarRect() {
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+    const size = 40;
+    return {
+      left: (winW - size) / 2,
+      top: winH * 0.36,
+      width: size,
+      height: size
+    };
+  },
+
+  _queryPlayerActionAvatarRect(playerId, done) {
+    const cb = typeof done === 'function' ? done : function () {};
+    const id = playerId != null ? String(playerId).trim() : '';
+    const cached = this._normalizePlayerActionAvatarRect(
+      this.data.playerActionTarget && this.data.playerActionTarget.avatarRect
+    );
+    const self = this;
+
+    const finish = function (rect) {
+      const norm = self._normalizePlayerActionAvatarRect(rect);
+      cb(norm || self._fallbackPlayerActionAvatarRect());
+    };
+
+    if (!id) {
+      finish(cached);
+      return;
+    }
+
+    wx.createSelectorQuery()
+      .in(this)
+      .select('#fb-player-avatar-' + id)
+      .boundingClientRect((rect) => {
+        if (self._normalizePlayerActionAvatarRect(rect)) {
+          finish(rect);
+          return;
+        }
+        if (cached) {
+          finish(cached);
+          return;
+        }
+        let disc = null;
+        try {
+          disc = self.selectComponent('#score-discussion');
+        } catch (e) {
+          disc = null;
+        }
+        if (!disc) {
+          finish(null);
+          return;
+        }
+        wx.createSelectorQuery()
+          .in(disc)
+          .selectAll('.ds-player-avatar')
+          .fields(
+            {
+              dataset: true,
+              rect: true,
+              size: true
+            },
+            function (list) {
+              const arr = list || [];
+              let hit = null;
+              for (let i = 0; i < arr.length; i++) {
+                const item = arr[i];
+                if (!item) continue;
+                const ds = item.dataset || {};
+                const uid = ds.userid != null ? String(ds.userid).trim() : '';
+                if (uid && (uid === id || isSameUserIdentity(uid, id))) {
+                  hit = item;
+                  break;
+                }
+              }
+              finish(hit || null);
+            }
+          )
+          .exec();
+      })
+      .exec();
+  },
+
   /**
    * Demo：🍅 → 定位目标头像中心，飞入并旋转 720°，到达后播命中反馈。
    * 纯视觉：无写盘。
    */
   onPlayerActionTomatoTap() {
     if (this._playerActionTomatoBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
     const target = this.data.playerActionTarget;
     const playerId =
-      target && target.playerId != null ? String(target.playerId).trim() : '';
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
     if (!playerId) {
       console.log('[player-action-tomato] missing playerId');
       return;
     }
-    const selector = '#fb-player-avatar-' + playerId;
-    const self = this;
+    // Demo：第一视角撞屏（不再飞向头像）
     this._playerActionTomatoBusy = true;
-
-    wx.createSelectorQuery()
-      .in(this)
-      .select(selector)
-      .boundingClientRect((rect) => {
-        if (!rect) {
-          console.log('[player-action-tomato] avatar not found', {
-            playerId: playerId,
-            selector: selector
-          });
-          self._playerActionTomatoBusy = false;
-          return;
-        }
-        self._playPlayerActionTomatoFly(rect, playerId);
-      })
-      .exec();
+    this._playScreenTomatoReaction();
   },
 
   /**
-   * Demo：单个番茄动画实例（随机起点 → 头像中心，轻微弧线，旋转 720°，约 0.8s）。
-   * 到达后由命中反馈接管（爆裂 / 汁水 / 震动保持不动）。
+   * Demo：🍅 第一视角撞屏 reaction。
+   * 远处飞入 → 贝塞尔撞向屏幕中心 → 爆裂碎片 → 全屏汁水/流淌 → 停留渐隐 → 清理 DOM。
+   * 无全屏 flash / 大面积 blur；不改头像 / 成绩 / modal 结构。
    */
-  _playPlayerActionTomatoFly(rect, playerId) {
-    const left = Number(rect && rect.left);
-    const top = Number(rect && rect.top);
-    const width = Number(rect && rect.width);
-    const height = Number(rect && rect.height);
-    const endX = left + width / 2;
-    const endY = top + height / 2;
-    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
-    if (
-      !Number.isFinite(endX) ||
-      !Number.isFinite(endY) ||
-      !Number.isFinite(left) ||
-      !Number.isFinite(top) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height)
-    ) {
-      this._playerActionTomatoBusy = false;
-      return;
-    }
-    const juiceStyle =
-      'left:' +
-      Math.round(left) +
-      'px;top:' +
-      Math.round(top) +
-      'px;width:' +
-      Math.round(width) +
-      'px;height:' +
-      Math.round(height) +
-      'px;';
-
+  _playScreenTomatoReaction() {
     let winW = 375;
     let winH = 667;
     try {
@@ -6962,35 +7286,47 @@ Page({
       winH = 667;
     }
 
-    // 每次随机起点：右侧 / 右上 / 右下 / 下方
+    const endX = winW / 2;
+    const endY = winH / 2;
+    const edgePad = Math.max(96, Math.round(Math.min(winW, winH) * 0.22));
     const origins = [
-      { key: 'right', x: winW + 96, y: endY },
-      { key: 'right-top', x: winW + 72, y: -64 },
-      { key: 'right-bottom', x: winW + 72, y: winH + 64 },
-      { key: 'bottom', x: endX + 24, y: winH + 96 }
+      { key: 'left-top', x: -edgePad, y: -edgePad * 0.55 },
+      { key: 'left', x: -edgePad, y: endY + (Math.random() - 0.5) * winH * 0.25 },
+      { key: 'left-bottom', x: -edgePad, y: winH + edgePad * 0.55 },
+      { key: 'right-top', x: winW + edgePad, y: -edgePad * 0.55 },
+      { key: 'right', x: winW + edgePad, y: endY + (Math.random() - 0.5) * winH * 0.25 },
+      { key: 'right-bottom', x: winW + edgePad, y: winH + edgePad * 0.55 }
     ];
     const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
     const startX = origin.x;
     const startY = origin.y;
-    // 控制点随起点微调，保持轻微弧线（非直线）
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
-    const ctrlX = midX + (origin.key === 'bottom' ? 48 : -12);
+    // 弧线控制点：远离直线，强化“从远处砸来”
+    const sideSign = origin.key.indexOf('left') === 0 ? 1 : -1;
+    const ctrlX = midX + sideSign * (40 + Math.random() * 56);
     const ctrlY =
-      origin.key === 'right-top'
-        ? midY - 28
-        : origin.key === 'right-bottom' || origin.key === 'bottom'
-          ? midY + 36
-          : midY - 56;
-    const flyMs = 800;
+      origin.key.indexOf('top') >= 0
+        ? midY - (36 + Math.random() * 48)
+        : origin.key.indexOf('bottom') >= 0
+          ? midY + (36 + Math.random() * 48)
+          : midY - sideSign * (28 + Math.random() * 40);
 
-    const buildFlyStyle = function (x, y, rot, scale) {
+    const startOpacity = 0.6 + Math.random() * 0.2;
+    const flyMs = 980;
+    const holdMs = 3200 + Math.floor(Math.random() * 1600); // 3~4.8s 停留（含流淌）
+    const dripMs = 2200 + Math.floor(Math.random() * 1400); // 2~3.6s 流淌
+    const fadeMs = 700;
+
+    const buildFlyStyle = function (x, y, rot, scale, opacity) {
       return (
         'left:' +
         x +
         'px;top:' +
         y +
-        'px;transform:translate(-50%,-50%) rotate(' +
+        'px;opacity:' +
+        opacity +
+        ';transform:translate(-50%,-50%) rotate(' +
         rot +
         'deg) scale(' +
         scale +
@@ -6998,53 +7334,136 @@ Page({
       );
     };
 
-    // 关闭面板，露出目标头像
+    // ease-in：前慢后快
+    const easeIn = function (t) {
+      return t * t * t;
+    };
+    // scale：0.3 → 1 → 2
+    const scaleAt = function (t) {
+      if (t <= 0.5) return 0.3 + 0.7 * (t / 0.5);
+      return 1 + 1 * ((t - 0.5) / 0.5);
+    };
+
+    this._clearPlayerActionTomatoTimers();
     this.setData({
       playerActionSheetVisible: false,
       playerActionTarget: null,
-      playerActionTomatoVisible: true,
-      playerActionTomatoAnimating: true,
-      playerActionTomatoStyle: buildFlyStyle(startX, startY, 0, 1),
+      // 关闭旧头像命中层，避免双轨
+      playerActionTomatoVisible: false,
+      playerActionTomatoAnimating: false,
+      playerActionTomatoStyle: '',
       playerActionBurstVisible: false,
       playerActionBurstStyle: '',
       playerActionJuiceVisible: false,
-      playerActionJuiceStyle: juiceStyle,
-      playerActionHitPlayerId: ''
+      playerActionJuiceStyle: '',
+      playerActionHitPlayerId: '',
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'tomato',
+      reactionTomatoFlyVisible: true,
+      reactionTomatoFlyStyle: buildFlyStyle(
+        startX,
+        startY,
+        -20,
+        0.3,
+        startOpacity
+      ),
+      reactionTomatoSplashVisible: false,
+      reactionTomatoImpactPhase: '',
+      reactionTomatoJuiceActive: false,
+      reactionTomatoDripActive: false,
+      reactionFlowerFlyVisible: false,
+      reactionFlowerFlyStyle: '',
+      reactionFlowerItems: []
     });
 
     const self = this;
-    this._clearPlayerActionTomatoTimers();
-
     this._playerActionTomatoFlyTimer = setTimeout(function () {
       self._playerActionTomatoFlyTimer = null;
       const t0 = Date.now();
 
       const tick = function () {
         const elapsed = Date.now() - t0;
-        let t = elapsed / flyMs;
-        if (t >= 1) t = 1;
-        // 二次贝塞尔：随机起点 → 弧线 → 头像中心
+        let raw = elapsed / flyMs;
+        if (raw >= 1) raw = 1;
+        const t = easeIn(raw);
         const u = 1 - t;
         const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
         const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
-        const rot = 720 * t;
-        const scale = 1 + 0.15 * t;
+        const rot = -20 + 740 * t;
+        const scale = scaleAt(t);
+        const opacity = startOpacity + (1 - startOpacity) * t;
         self.setData({
-          playerActionTomatoStyle: buildFlyStyle(x, y, rot, scale)
+          reactionTomatoFlyStyle: buildFlyStyle(x, y, rot, scale, opacity)
         });
-        if (t < 1) {
+        if (raw < 1) {
           self._playerActionTomatoArcTimer = setTimeout(tick, 16);
           return;
         }
         self._playerActionTomatoArcTimer = null;
-        self._playPlayerActionTomatoHit(hitPlayerId, endX, endY);
+
+        // —— 撞击后三阶段（仅改渲染时序；飞行触发不变）——
+        // 0–200ms：冲击波 + 玻璃裂纹
+        self.setData({
+          reactionTomatoFlyVisible: false,
+          reactionTomatoFlyStyle: '',
+          reactionTomatoSplashVisible: true,
+          reactionTomatoImpactPhase: 'impact',
+          reactionTomatoJuiceActive: false,
+          reactionTomatoDripActive: false
+        });
+
+        // 200–500ms：厚重汁斑 + 碎肉放射
+        self._playerActionTomatoHitTimer = setTimeout(function () {
+          self._playerActionTomatoHitTimer = null;
+          self.setData({ reactionTomatoImpactPhase: 'burst' });
+        }, 200);
+
+        // 500ms+：玻璃挂液流淌（非红蒙版）；冲击瞬态层稍后卸掉
+        self._playerActionTomatoBurstTimer = setTimeout(function () {
+          self._playerActionTomatoBurstTimer = null;
+          self.setData({
+            reactionTomatoImpactPhase: 'flow',
+            reactionTomatoJuiceActive: true,
+            reactionTomatoDripActive: true
+          });
+        }, 500);
+
+        self._playerActionTomatoShakeTimer = setTimeout(function () {
+          self._playerActionTomatoShakeTimer = null;
+          self.setData({
+            reactionTomatoSplashVisible: false,
+            reactionTomatoImpactPhase: 'flow'
+          });
+        }, 780);
+
+        const lingerAfterDrip = Math.max(800, holdMs - dripMs);
+        self._playerActionTomatoJuiceTimer = setTimeout(function () {
+          self._playerActionTomatoJuiceTimer = null;
+          self.setData({ reactionScreenFading: true });
+          self._playerActionTomatoClearTimer = setTimeout(function () {
+            self._playerActionTomatoClearTimer = null;
+            self.setData({
+              reactionScreenVisible: false,
+              reactionScreenFading: false,
+              reactionScreenMode: '',
+              reactionTomatoFlyVisible: false,
+              reactionTomatoFlyStyle: '',
+              reactionTomatoSplashVisible: false,
+              reactionTomatoImpactPhase: '',
+              reactionTomatoJuiceActive: false,
+              reactionTomatoDripActive: false
+            });
+            self._playerActionTomatoBusy = false;
+          }, fadeMs);
+        }, dripMs + lingerAfterDrip);
       };
 
       tick();
-    }, 40);
+    }, 30);
   },
 
-  /** Demo：清理🍅相关延时器 */
+  /** Demo：清理🍅 / 撞屏 reaction 延时器 */
   _clearPlayerActionTomatoTimers() {
     const keys = [
       '_playerActionTomatoFlyTimer',
@@ -7064,55 +7483,12 @@ Page({
     }
   },
 
-  /**
-   * Demo：命中反馈 —— 番茄停留后爆裂消失，头像汁水从头流到脚约 4.5s + 轻微震动。
-   * 纯视觉，不改头像 src / 成绩 / LIVE。
-   */
-  _playPlayerActionTomatoHit(playerId, centerX, centerY) {
-    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
-    const cx = Number(centerX);
-    const cy = Number(centerY);
-    const burstStyle =
-      Number.isFinite(cx) && Number.isFinite(cy)
-        ? 'left:' + cx + 'px;top:' + cy + 'px;'
-        : '';
-
-    // 到达态短暂停留：番茄仍可见；随后爆裂并隐藏番茄本体
-    const self = this;
-    this._playerActionTomatoHitTimer = setTimeout(function () {
-      self._playerActionTomatoHitTimer = null;
-      self.setData({
-        playerActionTomatoVisible: false,
-        playerActionTomatoAnimating: false,
-        playerActionTomatoStyle: '',
-        playerActionBurstVisible: !!burstStyle,
-        playerActionBurstStyle: burstStyle,
-        playerActionJuiceVisible: true,
-        playerActionHitPlayerId: hitPlayerId
-      });
-
-      self._playerActionTomatoBurstTimer = setTimeout(function () {
-        self._playerActionTomatoBurstTimer = null;
-        self.setData({
-          playerActionBurstVisible: false,
-          playerActionBurstStyle: ''
-        });
-      }, 420);
-
-      self._playerActionTomatoShakeTimer = setTimeout(function () {
-        self._playerActionTomatoShakeTimer = null;
-        self.setData({ playerActionHitPlayerId: '' });
-      }, 420);
-
-      self._playerActionTomatoJuiceTimer = setTimeout(function () {
-        self._playerActionTomatoJuiceTimer = null;
-        self.setData({
-          playerActionJuiceVisible: false,
-          playerActionJuiceStyle: ''
-        });
-        self._playerActionTomatoBusy = false;
-      }, 4500);
-    }, 160);
+  /** 旧：头像命中番茄（demo 已改撞屏；保留空壳以免外部误调崩溃） */
+  _playPlayerActionTomatoFly() {
+    this._playScreenTomatoReaction();
+  },
+  _playPlayerActionTomatoHit() {
+    /* deprecated: screen reaction */
   },
 
   /**
@@ -7122,30 +7498,22 @@ Page({
     if (this._playerActionBucketBusy) return;
     const target = this.data.playerActionTarget;
     const playerId =
-      target && target.playerId != null ? String(target.playerId).trim() : '';
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
     if (!playerId) {
       console.log('[player-action-bucket] missing playerId');
       return;
     }
-    const selector = '#fb-player-avatar-' + playerId;
     const self = this;
     this._playerActionBucketBusy = true;
-
-    wx.createSelectorQuery()
-      .in(this)
-      .select(selector)
-      .boundingClientRect((rect) => {
-        if (!rect) {
-          console.log('[player-action-bucket] avatar not found', {
-            playerId: playerId,
-            selector: selector
-          });
-          self._playerActionBucketBusy = false;
-          return;
-        }
-        self._playPlayerActionBucket(rect, playerId);
-      })
-      .exec();
+    this._queryPlayerActionAvatarRect(playerId, function (rect) {
+      if (!rect) {
+        self._playerActionBucketBusy = false;
+        return;
+      }
+      self._playPlayerActionBucket(rect, playerId);
+    });
   },
 
   /** Demo：清理🪣相关延时器 */
@@ -7345,36 +7713,246 @@ Page({
   },
 
   /**
-   * Demo：🥚 → 复用 playerId + #fb-player-avatar 定位；连击 6 + 最后一击（独立于🍅/🪣/🌹）。
+   * Demo：🥚 → 第一视角连续砸屏连击（5 普攻 + 1 终结）。
+   * 仅 demo-weekend-amateur；不改原头像连击 _playPlayerActionEggCombo。
    */
   onPlayerActionEggTap() {
     if (this._playerActionEggBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
     const target = this.data.playerActionTarget;
     const playerId =
-      target && target.playerId != null ? String(target.playerId).trim() : '';
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
     if (!playerId) {
       console.log('[player-action-egg] missing playerId');
       return;
     }
-    const selector = '#fb-player-avatar-' + playerId;
-    const self = this;
     this._playerActionEggBusy = true;
+    this._playScreenEggComboReaction();
+  },
 
-    wx.createSelectorQuery()
-      .in(this)
-      .select(selector)
-      .boundingClientRect((rect) => {
-        if (!rect) {
-          console.log('[player-action-egg] avatar not found', {
-            playerId: playerId,
-            selector: selector
+  /**
+   * Demo：🥚 screen reaction — 5 枚普通砸屏（间隔 250–400ms）→ 停顿 500ms → 大蛋终结。
+   * 复用 reaction-screen-layer；不改番茄/花/头像鸡蛋逻辑。
+   */
+  _playScreenEggComboReaction() {
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+
+    this._clearPlayerActionEggTimers();
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      // 关闭头像鸡蛋层，避免双轨
+      playerActionEggs: [],
+      playerActionEggSplatVisible: false,
+      playerActionEggSplatHiding: false,
+      playerActionEggSplatStyle: '',
+      playerActionEggLevel: 0,
+      playerActionEggFinale: false,
+      // 关闭其它 screen mode 内容
+      reactionTomatoFlyVisible: false,
+      reactionTomatoSplashVisible: false,
+      reactionTomatoJuiceActive: false,
+      reactionTomatoDripActive: false,
+      reactionFlowerFlyVisible: false,
+      reactionFlowerItems: [],
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'egg',
+      reactionEggFlies: [],
+      reactionEggHitLevel: 0,
+      reactionEggBurstVisible: false,
+      reactionEggBurstFinale: false,
+      reactionEggBurstStyle: '',
+      reactionEggFinaleActive: false,
+      reactionEggShake: false
+    });
+
+    const self = this;
+    const NORMAL_COUNT = 5;
+    let delay = 40;
+    for (let i = 0; i < NORMAL_COUNT; i++) {
+      (function (idx, at) {
+        self._eggTimeout(function () {
+          self._launchScreenEggHit({
+            winW: winW,
+            winH: winH,
+            finale: false,
+            index: idx
           });
-          self._playerActionEggBusy = false;
-          return;
+        }, at);
+      })(i, delay);
+      delay += 250 + Math.floor(Math.random() * 151);
+    }
+
+    // 第 5 枚起飞后再 + 飞行时间约 420ms + 停顿 500ms
+    const finaleAt = delay + 420 + 500;
+    this._eggTimeout(function () {
+      self._launchScreenEggHit({
+        winW: winW,
+        winH: winH,
+        finale: true,
+        index: NORMAL_COUNT
+      });
+    }, finaleAt);
+  },
+
+  /** Demo：单枚砸屏鸡蛋（普通 / 终结） */
+  _launchScreenEggHit(opts) {
+    const o = opts || {};
+    const winW = Number(o.winW) || 375;
+    const winH = Number(o.winH) || 667;
+    const finale = !!o.finale;
+    const edgePad = finale
+      ? Math.max(140, Math.round(Math.min(winW, winH) * 0.38))
+      : Math.max(88, Math.round(Math.min(winW, winH) * 0.22));
+    const origins = [
+      { x: -edgePad, y: Math.random() * winH },
+      { x: winW + edgePad, y: Math.random() * winH },
+      { x: Math.random() * winW, y: -edgePad },
+      { x: Math.random() * winW, y: winH + edgePad },
+      { x: -edgePad, y: -edgePad * 0.5 },
+      { x: winW + edgePad, y: -edgePad * 0.5 },
+      { x: -edgePad, y: winH + edgePad * 0.5 },
+      { x: winW + edgePad, y: winH + edgePad * 0.5 }
+    ];
+    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    const startX = origin.x;
+    const startY = origin.y;
+    // 普通击中点略偏中心；终结直砸中心
+    const endX = finale
+      ? winW / 2
+      : winW / 2 + (Math.random() - 0.5) * Math.min(120, winW * 0.28);
+    const endY = finale
+      ? winH / 2
+      : winH / 2 + (Math.random() - 0.5) * Math.min(140, winH * 0.28);
+    const flyMs = finale ? 560 : 360 + Math.floor(Math.random() * 80);
+    const startScale = finale ? 1.15 : 0.85;
+    const endScale = finale ? 2.5 : 1.15 + Math.random() * 0.2;
+    const startRot = -40 + Math.random() * 80;
+    const endRot = startRot + (finale ? 540 : 320 + Math.random() * 160);
+    const eggId =
+      'seg-' + Date.now() + '-' + (o.index != null ? o.index : 0);
+
+    const buildStyle = function (x, y, rot, scale, ms) {
+      const transition =
+        ms > 0
+          ? 'left ' +
+            ms +
+            'ms cubic-bezier(0.22, 0.55, 0.3, 1),top ' +
+            ms +
+            'ms cubic-bezier(0.22, 0.55, 0.3, 1),transform ' +
+            ms +
+            'ms cubic-bezier(0.2, 0.6, 0.28, 1)'
+          : 'none';
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg) scale(' +
+        scale +
+        ');transition:' +
+        transition +
+        ';'
+      );
+    };
+
+    const flies = (this.data.reactionEggFlies || []).slice();
+    // 控制飞行 DOM：最多保留 2 枚
+    while (flies.length >= 2) flies.shift();
+    flies.push({
+      id: eggId,
+      finale: finale,
+      style: buildStyle(startX, startY, startRot, startScale, 0)
+    });
+    this.setData({ reactionEggFlies: flies });
+
+    const self = this;
+    this._eggTimeout(function () {
+      const list = (self.data.reactionEggFlies || []).slice();
+      for (let i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === eggId) {
+          list[i] = {
+            id: eggId,
+            finale: finale,
+            style: buildStyle(endX, endY, endRot, endScale, flyMs)
+          };
+          break;
         }
-        self._playPlayerActionEggCombo(rect, playerId);
-      })
-      .exec();
+      }
+      self.setData({ reactionEggFlies: list });
+    }, 24);
+
+    this._eggTimeout(function () {
+      // 命中：移除飞行蛋，播碎片 / 残留 / 震动
+      const nextFlies = (self.data.reactionEggFlies || []).filter(function (e) {
+        return e && e.id !== eggId;
+      });
+      const level = finale
+        ? self.data.reactionEggHitLevel
+        : Math.min(5, (self.data.reactionEggHitLevel || 0) + 1);
+      self.setData({
+        reactionEggFlies: nextFlies,
+        reactionEggHitLevel: level,
+        reactionEggBurstVisible: true,
+        reactionEggBurstFinale: finale,
+        reactionEggBurstStyle: 'left:' + endX + 'px;top:' + endY + 'px;',
+        reactionEggShake: true,
+        reactionEggFinaleActive: finale ? true : !!self.data.reactionEggFinaleActive
+      });
+      try {
+        self._playReactionSound(finale ? 'egg_hit_finale' : 'egg_hit');
+      } catch (e) {}
+
+      self._eggTimeout(function () {
+        self.setData({ reactionEggShake: false });
+      }, finale ? 220 : 120);
+
+      self._eggTimeout(function () {
+        self.setData({
+          reactionEggBurstVisible: false,
+          reactionEggBurstFinale: false,
+          reactionEggBurstStyle: ''
+        });
+      }, finale ? 520 : 280);
+
+      if (finale) {
+        // 终结残留后渐隐清理
+        self._eggTimeout(function () {
+          self.setData({ reactionScreenFading: true });
+          self._eggTimeout(function () {
+            self.setData({
+              reactionScreenVisible: false,
+              reactionScreenFading: false,
+              reactionScreenMode: '',
+              reactionEggFlies: [],
+              reactionEggHitLevel: 0,
+              reactionEggBurstVisible: false,
+              reactionEggBurstFinale: false,
+              reactionEggBurstStyle: '',
+              reactionEggFinaleActive: false,
+              reactionEggShake: false
+            });
+            self._playerActionEggBusy = false;
+          }, 700);
+        }, 3200);
+      }
+    }, 24 + flyMs);
   },
 
   /** Demo：清理🥚相关延时器 */
@@ -7685,38 +8263,26 @@ Page({
   },
 
   /**
-   * Demo：🌹 → 复用 playerId + #fb-player-avatar 定位；柔和飘入（慢于🍅，独立轨迹）。
-   * demo-weekend-amateur：送花成功后追加讨论区系统消息（不写盘）。
+   * Demo：🌹 → 第一视角花雨（reaction-screen-layer / flower-screen-reaction）。
+   * 仅 demo-weekend-amateur；仍追加讨论区系统消息；不改 modal / 其它 reaction。
    */
   onPlayerActionFlowerTap() {
     if (this._playerActionFlowerBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
     const target = this.data.playerActionTarget;
     const playerId =
-      target && target.playerId != null ? String(target.playerId).trim() : '';
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
     if (!playerId) {
       console.log('[player-action-flower] missing playerId');
       return;
     }
-    const selector = '#fb-player-avatar-' + playerId;
-    const self = this;
     this._playerActionFlowerBusy = true;
-
-    wx.createSelectorQuery()
-      .in(this)
-      .select(selector)
-      .boundingClientRect((rect) => {
-        if (!rect) {
-          console.log('[player-action-flower] avatar not found', {
-            playerId: playerId,
-            selector: selector
-          });
-          self._playerActionFlowerBusy = false;
-          return;
-        }
-        self._playPlayerActionFlower(rect, playerId);
-        self._appendDemoFlowerSystemMessage(target);
-      })
-      .exec();
+    this._playScreenFlowerReaction();
+    this._appendDemoFlowerSystemMessage(target);
   },
 
   /**
@@ -7759,7 +8325,7 @@ Page({
     return name || '我';
   },
 
-  /** Demo：清理🌹相关延时器 */
+  /** Demo：清理🌹 / 花雨 reaction 延时器 */
   _clearPlayerActionFlowerTimers() {
     const keys = [
       '_playerActionFlowerFlyTimer',
@@ -7767,7 +8333,9 @@ Page({
       '_playerActionFlowerBloomTimer',
       '_playerActionFlowerWreathTimer',
       '_playerActionFlowerFadeTimer',
-      '_playerActionFlowerClearTimer'
+      '_playerActionFlowerClearTimer',
+      '_playerActionFlowerSpawnTimer',
+      '_playerActionFlowerDriftTimer'
     ];
     for (let i = 0; i < keys.length; i++) {
       const k = keys[i];
@@ -7779,8 +8347,328 @@ Page({
   },
 
   /**
-   * Demo：花朵从中线右侧随机起点柔和飘入 → 轻漂浮旋转 → 到达开放 + 花瓣 + 花环 → 自动清理。
-   * 无全屏 glow / flash。
+   * Demo：🌹 第一视角花雨。
+   * 远处飞入中心 → 360° 柔和散开 → 中心持续生成 → 缓慢飘落 → 渐隐清理。
+   * 复用 reaction-screen-layer；DOM 上限约 28；无 canvas / 无爆炸感。
+   */
+  _playScreenFlowerReaction() {
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+
+    const endX = winW / 2;
+    const endY = winH * 0.46;
+    const edgePad = Math.max(72, Math.round(Math.min(winW, winH) * 0.2));
+    const origins = [
+      { x: -edgePad, y: -edgePad * 0.4 },
+      { x: -edgePad, y: endY },
+      { x: -edgePad, y: winH + edgePad * 0.4 },
+      { x: winW + edgePad, y: -edgePad * 0.4 },
+      { x: winW + edgePad, y: endY },
+      { x: winW + edgePad, y: winH + edgePad * 0.4 }
+    ];
+    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    const startX = origin.x;
+    const startY = origin.y;
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const ctrlX = midX + (startX < endX ? 36 : -36);
+    const ctrlY = midY - 40;
+    const flyMs = 1200;
+    const MAX_FLOWERS = 28;
+    const SPAWN_MS = 2400;
+    const HOLD_MS = 2800;
+    const FADE_MS = 700;
+    const emojis = ['🌹', '🌸', '🌺', '🌹', '🌸', '💮'];
+
+    const easeOut = function (t) {
+      return 1 - Math.pow(1 - t, 2.4);
+    };
+    const buildFlyStyle = function (x, y, rot, scale, opacity) {
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;opacity:' +
+        opacity +
+        ';transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg) scale(' +
+        scale +
+        ');transition:none;'
+      );
+    };
+
+    this._clearPlayerActionFlowerTimers();
+    this._flowerScreenSpawnMeta = [];
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionFlowerVisible: false,
+      playerActionFlowerBloom: false,
+      playerActionFlowerStyle: '',
+      playerActionPetalVisible: false,
+      playerActionPetalStyle: '',
+      playerActionFlowerScalePlayerId: '',
+      playerActionWreathVisible: false,
+      playerActionWreathAppear: false,
+      playerActionWreathFading: false,
+      playerActionWreathStyle: '',
+      playerActionWreathItems: [],
+      reactionTomatoFlyVisible: false,
+      reactionTomatoSplashVisible: false,
+      reactionTomatoJuiceActive: false,
+      reactionTomatoDripActive: false,
+      reactionTomatoImpactPhase: '',
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'flower',
+      reactionFlowerFlyVisible: true,
+      reactionFlowerFlyStyle: buildFlyStyle(startX, startY, -12, 0.2, 0.5),
+      reactionFlowerItems: []
+    });
+
+    const self = this;
+    this._playerActionFlowerFlyTimer = setTimeout(function () {
+      self._playerActionFlowerFlyTimer = null;
+      const t0 = Date.now();
+      const tick = function () {
+        const elapsed = Date.now() - t0;
+        let raw = elapsed / flyMs;
+        if (raw >= 1) raw = 1;
+        const t = easeOut(raw);
+        const u = 1 - t;
+        const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+        const bob = Math.sin(raw * Math.PI * 1.8) * 8 * (1 - raw);
+        const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
+        const rot = -12 + 20 * Math.sin(raw * Math.PI);
+        const scale = 0.2 + 0.95 * t;
+        const opacity = 0.5 + 0.5 * t;
+        self.setData({
+          reactionFlowerFlyStyle: buildFlyStyle(x, y, rot, scale, opacity)
+        });
+        if (raw < 1) {
+          self._playerActionFlowerArcTimer = setTimeout(tick, 16);
+          return;
+        }
+        self._playerActionFlowerArcTimer = null;
+        // 中心开放：隐藏飞入主花，开始持续生成花雨
+        self.setData({
+          reactionFlowerFlyVisible: false,
+          reactionFlowerFlyStyle: ''
+        });
+        self._startScreenFlowerBloomSpawn({
+          cx: endX,
+          cy: endY,
+          winW: winW,
+          winH: winH,
+          maxFlowers: MAX_FLOWERS,
+          spawnMs: SPAWN_MS,
+          holdMs: HOLD_MS,
+          fadeMs: FADE_MS,
+          emojis: emojis
+        });
+      };
+      tick();
+    }, 30);
+  },
+
+  /**
+   * Demo：中心持续生成花朵（80–120ms），向 360° 柔和散开，再缓慢飘落渐隐。
+   */
+  _startScreenFlowerBloomSpawn(opts) {
+    const o = opts || {};
+    const cx = Number(o.cx);
+    const cy = Number(o.cy);
+    const winW = Number(o.winW) || 375;
+    const winH = Number(o.winH) || 667;
+    const maxFlowers = o.maxFlowers || 28;
+    const spawnMs = o.spawnMs || 2400;
+    const holdMs = o.holdMs || 2800;
+    const fadeMs = o.fadeMs || 700;
+    const emojis = o.emojis || ['🌹', '🌸'];
+    const maxDist = Math.min(winW, winH) * 0.42;
+    const self = this;
+    const spawnStart = Date.now();
+    let seq = 0;
+    this._flowerScreenSpawnMeta = [];
+
+    const scheduleNext = function () {
+      const elapsed = Date.now() - spawnStart;
+      if (elapsed >= spawnMs) {
+        self._playerActionFlowerSpawnTimer = null;
+        self._finishScreenFlowerRain({ holdMs: holdMs, fadeMs: fadeMs });
+        return;
+      }
+      self._spawnScreenFlowerBloom({
+        cx: cx,
+        cy: cy,
+        maxDist: maxDist,
+        maxFlowers: maxFlowers,
+        emojis: emojis,
+        seq: seq++
+      });
+      const gap = 80 + Math.floor(Math.random() * 41);
+      self._playerActionFlowerSpawnTimer = setTimeout(scheduleNext, gap);
+    };
+
+    // 首朵立刻从中心散开，形成开放感
+    scheduleNext();
+  },
+
+  _spawnScreenFlowerBloom(opts) {
+    const o = opts || {};
+    const cx = Number(o.cx);
+    const cy = Number(o.cy);
+    const maxDist = Number(o.maxDist) || 120;
+    const maxFlowers = o.maxFlowers || 28;
+    const emojis = o.emojis || ['🌹'];
+    const seq = o.seq != null ? o.seq : 0;
+    const rad = Math.random() * Math.PI * 2;
+    const dist = 48 + Math.random() * Math.max(40, maxDist - 48);
+    const dx = Math.cos(rad) * dist;
+    const dy = Math.sin(rad) * dist * 0.92;
+    const fall = 36 + Math.random() * 90;
+    const rot = -28 + Math.random() * 56;
+    const scale = 0.68 + Math.random() * 0.5;
+    const burstMs = 1.7 + Math.random() * 0.9;
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)] || '🌹';
+    const id = 'ff-' + Date.now() + '-' + seq;
+    const base =
+      'left:' +
+      cx +
+      'px;top:' +
+      cy +
+      'px;';
+    const item = {
+      id: id,
+      emoji: emoji,
+      style:
+        base +
+        'opacity:0.8;transform:translate(-50%,-50%) translate(0px,0px) rotate(0deg) scale(0.22);transition:none;'
+    };
+
+    let items = (this.data.reactionFlowerItems || []).slice();
+    items.push(item);
+    if (items.length > maxFlowers) {
+      items = items.slice(items.length - maxFlowers);
+      this._flowerScreenSpawnMeta = (this._flowerScreenSpawnMeta || []).slice(
+        -(maxFlowers - 1)
+      );
+    }
+    this._flowerScreenSpawnMeta = (this._flowerScreenSpawnMeta || []).concat({
+      id: id,
+      dx: dx,
+      dy: dy,
+      fall: fall,
+      rot: rot,
+      scale: scale,
+      base: base
+    });
+    this.setData({ reactionFlowerItems: items });
+
+    const self = this;
+    setTimeout(function () {
+      if (!self.data.reactionScreenVisible || self.data.reactionScreenMode !== 'flower') {
+        return;
+      }
+      const list = (self.data.reactionFlowerItems || []).slice();
+      for (let i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === id) {
+          list[i] = {
+            id: id,
+            emoji: emoji,
+            style:
+              base +
+              'opacity:1;transform:translate(-50%,-50%) translate(' +
+              dx.toFixed(1) +
+              'px,' +
+              dy.toFixed(1) +
+              'px) rotate(' +
+              rot.toFixed(1) +
+              'deg) scale(' +
+              scale.toFixed(2) +
+              ');transition:transform ' +
+              burstMs.toFixed(2) +
+              's cubic-bezier(0.16, 0.72, 0.28, 1), opacity ' +
+              burstMs.toFixed(2) +
+              's ease;'
+          };
+          break;
+        }
+      }
+      self.setData({ reactionFlowerItems: list });
+    }, 24);
+  },
+
+  _finishScreenFlowerRain(opts) {
+    const holdMs = (opts && opts.holdMs) || 2800;
+    const fadeMs = (opts && opts.fadeMs) || 700;
+    const meta = this._flowerScreenSpawnMeta || [];
+    const list = (this.data.reactionFlowerItems || []).slice();
+    const map = {};
+    for (let i = 0; i < meta.length; i++) {
+      if (meta[i] && meta[i].id) map[meta[i].id] = meta[i];
+    }
+    for (let j = 0; j < list.length; j++) {
+      const it = list[j];
+      if (!it) continue;
+      const m = map[it.id];
+      if (!m) continue;
+      const fallMs = 2.4 + Math.random() * 1.1;
+      list[j] = {
+        id: it.id,
+        emoji: it.emoji,
+        style:
+          m.base +
+          'opacity:0.92;transform:translate(-50%,-50%) translate(' +
+          m.dx.toFixed(1) +
+          'px,' +
+          (m.dy + m.fall).toFixed(1) +
+          'px) rotate(' +
+          (m.rot + 8).toFixed(1) +
+          'deg) scale(' +
+          (m.scale * 0.92).toFixed(2) +
+          ');transition:transform ' +
+          fallMs.toFixed(2) +
+          's cubic-bezier(0.2, 0.55, 0.3, 1), opacity ' +
+          fallMs.toFixed(2) +
+          's ease;'
+      };
+    }
+    this.setData({ reactionFlowerItems: list });
+
+    const self = this;
+    this._playerActionFlowerDriftTimer = setTimeout(function () {
+      self._playerActionFlowerDriftTimer = null;
+      self.setData({ reactionScreenFading: true });
+      self._playerActionFlowerClearTimer = setTimeout(function () {
+        self._playerActionFlowerClearTimer = null;
+        self._flowerScreenSpawnMeta = [];
+        self.setData({
+          reactionScreenVisible: false,
+          reactionScreenFading: false,
+          reactionScreenMode: '',
+          reactionFlowerFlyVisible: false,
+          reactionFlowerFlyStyle: '',
+          reactionFlowerItems: []
+        });
+        self._playerActionFlowerBusy = false;
+      }, fadeMs);
+    }, holdMs);
+  },
+
+  /**
+   * Demo：旧头像花环路径（demo 已改第一视角花雨；保留以免外部误调）。
+   * 花朵从中线右侧随机起点柔和飘入 → 轻漂浮旋转 → 到达开放 + 花瓣 + 花环 → 自动清理。
    */
   _playPlayerActionFlower(rect, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
