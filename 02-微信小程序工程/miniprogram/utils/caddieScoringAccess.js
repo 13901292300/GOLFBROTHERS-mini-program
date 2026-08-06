@@ -30,7 +30,7 @@ function buildCaddiePagePath(opts) {
   }
   const matchId = String(o.matchId || '').trim();
   return (
-    'pages/tournament/detail/index?matchId=' +
+    'subpackages/tournament/pages/detail/index?matchId=' +
     encodeURIComponent(matchId) +
     '&caddieToken=' +
     encodeURIComponent(token)

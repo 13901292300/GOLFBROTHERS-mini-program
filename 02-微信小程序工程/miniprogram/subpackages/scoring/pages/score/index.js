@@ -6574,7 +6574,7 @@ Page({
         wx.navigateBack();
       } else {
         wx.redirectTo({
-          url: '/pages/tournament/detail/index?matchId=' +
+          url: '/subpackages/tournament/pages/detail/index?matchId=' +
             encodeURIComponent(matchStateForBack.matchId)
         });
       }

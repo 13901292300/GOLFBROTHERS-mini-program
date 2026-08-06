@@ -307,7 +307,7 @@ Page({
         const matchId = this.data.matchId || '';
         wx.redirectTo({
           url:
-            '/pages/tournament/detail/index' +
+            '/subpackages/tournament/pages/detail/index' +
             (matchId ? '?matchId=' + encodeURIComponent(matchId) : '')
         });
       }

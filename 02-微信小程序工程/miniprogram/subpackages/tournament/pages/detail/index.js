@@ -9638,7 +9638,7 @@ Page({
     }
     return {
       title: '邀请你报名：' + title,
-      path: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+      path: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
     };
   },
 

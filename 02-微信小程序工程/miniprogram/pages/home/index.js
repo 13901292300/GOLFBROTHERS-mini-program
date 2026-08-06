@@ -240,7 +240,7 @@ Page({
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
         views: '256',
         type: 'club',
-        navUrl: '/pages/tournament/detail/index?matchId=demo-jiaobei-beer'
+        navUrl: '/subpackages/tournament/pages/detail/index?matchId=demo-jiaobei-beer'
       }
     ],
     tournamentCards: [
@@ -253,7 +253,7 @@ Page({
         teamName: '江湖业余球员巡回赛',
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
         views: '168',
-        navUrl: '/pages/tournament/detail/index?matchId=demo-jiaobei-beer'
+        navUrl: '/subpackages/tournament/pages/detail/index?matchId=demo-jiaobei-beer'
       },
       {
         id: 'tour-2',
@@ -264,7 +264,7 @@ Page({
         teamName: '高球兄弟精英队',
         venue: '北京通盈雁栖湖高尔夫俱乐部',
         views: '32',
-        navUrl: '/pages/tournament/detail/index'
+        navUrl: '/subpackages/tournament/pages/detail/index'
       },
       {
         id: 'tour-3',
@@ -275,7 +275,7 @@ Page({
         teamName: '北京球友联合会',
         venue: '鸿华国际高尔夫俱乐部',
         views: '80',
-        navUrl: '/pages/tournament/detail/index'
+        navUrl: '/subpackages/tournament/pages/detail/index'
       }
     ],
     currentPickerYear: 0,
@@ -583,7 +583,7 @@ Page({
       e && e.detail && e.detail.matchId != null ? String(e.detail.matchId) : '';
     if (!matchId) return;
     wx.navigateTo({
-      url: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+      url: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
     });
   },
 

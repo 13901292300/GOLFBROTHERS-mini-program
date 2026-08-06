@@ -1698,7 +1698,7 @@ Page({
         wx.navigateBack({ delta: 1 });
       } else {
         wx.redirectTo({
-          url: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(matchId)
+          url: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
         });
       }
     }, 400);

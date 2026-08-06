@@ -1521,7 +1521,7 @@ function toTournamentCard(match) {
     venue: venue,
     views: '0',
     statusLabel: resolveTournamentCardStatusLabel(match),
-    navUrl: '/pages/tournament/detail/index?matchId=' + encodeURIComponent(match.matchId)
+    navUrl: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(match.matchId)
   };
 }
 
