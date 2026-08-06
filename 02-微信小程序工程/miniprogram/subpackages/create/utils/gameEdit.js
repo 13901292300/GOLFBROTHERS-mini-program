@@ -2,9 +2,9 @@
  * 普通创建页 — 编辑已有 GAME 的数据转换（不影响创建流程）
  */
 
-const gameStore = require('./gameStore.js');
-const halfCourse = require('./halfCourse.js');
-const { resolveFirstTwoCourses } = require('./courseDatabase.js');
+const gameStore = require('../../../utils/gameStore.js');
+const halfCourse = require('../../../utils/halfCourse.js');
+const { resolveFirstTwoCourses } = require('../../../utils/courseDatabase.js');
 
 const COMPOSITION_MODES = { '最好成绩赛': true, '最佳球位赛': true };
 

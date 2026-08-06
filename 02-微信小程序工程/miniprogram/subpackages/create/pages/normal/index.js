@@ -2,7 +2,7 @@ const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const { FRIEND_ID_SET } = require('../../../../utils/playerDirectory.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const matchStateUtil = require('../../../../utils/matchState.js');
-const gameEdit = require('../../../../utils/gameEdit.js');
+const gameEdit = require('../../utils/gameEdit.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
