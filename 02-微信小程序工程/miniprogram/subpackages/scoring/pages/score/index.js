@@ -26,6 +26,7 @@ const tomatoReactionTimeline = require('../../utils/tomatoReactionTimeline.js');
 const eggReactionTimeline = require('../../utils/eggReactionTimeline.js');
 const rocketReactionTimeline = require('../../utils/rocketReactionTimeline.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
+const scoreReactionController = require('../../utils/scoreReactionController.js');
 const reactionPanelConfig = require('../../utils/reactionPanelConfig.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
@@ -2402,6 +2403,8 @@ Page({
     /** Demo：👊 boxing 离位 — 记分行原头像暂隐（占位尺寸保留） */
     reactionAvatarDetached: false,
     reactionAvatarDetachedPlayerId: '',
+    /** 当前播放 Reaction Mode：self | observer | ''（与 reactionPanelConfig.mode 对齐） */
+    reactionActiveMode: '',
     /** Demo：🪣 水桶动画（独立于🍅轨迹） */
     playerActionBucketVisible: false,
     playerActionBucketDropping: false,
@@ -3745,6 +3748,14 @@ Page({
         });
       }
       const shortName = this._shortName(m0.name) || m0.name || g.name;
+      const singlePidRaw =
+        kind === 'single' && m0
+          ? m0.playerId || m0.userId || m0.id
+          : '';
+      const singlePlayerId =
+        singlePidRaw != null && String(singlePidRaw).trim()
+          ? String(singlePidRaw).trim()
+          : '';
       return {
         id: g.id,
         groupIndex: gi,
@@ -3755,6 +3766,8 @@ Page({
         name: shortName,
         displayName: kind === 'single' ? displayName : '',
         avatar: m0.avatar || '',
+        // reaction 契约：single 行真实球员 id（id 仍为 group id）
+        playerId: kind === 'single' ? singlePlayerId : '',
         colorClass: kind === 'single' ? colorClass : '',
         teeColor: kind === 'single' ? teeColor : '',
         pairMembers: pairMembers,
@@ -4569,6 +4582,7 @@ Page({
         const enriched = enrichPlayer(
           {
             id: (g && g.id) || 'team-' + gi,
+            playerId: pid,
             name: (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
             avatar: (sourcePlayer && sourcePlayer.avatar) || (m0 && m0.avatar) || '',
             colorClass: style.colorClass || 'border-light',
@@ -4582,6 +4596,7 @@ Page({
         );
         return Object.assign({}, enriched, {
           rowKind: 'single',
+          playerId: pid,
           teeSegments: [],
           sourceGroupIndex: gi
         });
@@ -4655,6 +4670,7 @@ Page({
         const enriched = enrichPlayer(
           {
             id: (g && g.id) || 'team-' + gi,
+            playerId: pid,
             name: (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
             avatar: (sourcePlayer && sourcePlayer.avatar) || (m0 && m0.avatar) || '',
             colorClass: style.colorClass || 'border-light',
@@ -4668,6 +4684,7 @@ Page({
         );
         return Object.assign({}, enriched, {
           rowKind: 'single',
+          playerId: pid,
           teeSegments: [],
           sourceGroupIndex: gi
         });
@@ -6996,7 +7013,7 @@ Page({
   /**
    * fixed-collapse：具体球员头像（catchtap，阻止冒泡到身份区）。
    * - 折叠：视为点组合区 → 仅展开
-   * - 展开：仅 demo-weekend-amateur → openPlayerActionModal（与讨论区共用）
+   * - 展开：openPlayerActionModal（与讨论区共用）
    */
   onFourballPlayerAvatarTap(e) {
     if (!this._isFourballIdentityFixedCollapseMode()) return;
@@ -7011,8 +7028,24 @@ Page({
   },
 
   /**
+   * Stroke / 个人比杆 / G5 单人头像：统一打开 player-action-modal。
+   * playerId 为身份唯一来源；avatar/name 仅作展示缓存（如 4+0 bestRoster 座位头像）。
+   */
+  onScorePlayerAvatarTap(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const playerId = ds.playerId != null ? String(ds.playerId).trim() : '';
+    if (!playerId) return;
+    const avatar = ds.avatar != null ? String(ds.avatar).trim() : '';
+    const name = ds.name != null ? String(ds.name).trim() : '';
+    this.openPlayerActionModal({
+      userId: playerId,
+      avatar: avatar,
+      name: name
+    });
+  },
+
+  /**
    * 讨论区发言头像短按：discussion 上抛 playerAvatarTap → 同一中央弹窗。
-   * 仅 demo-weekend-amateur。
    */
   onDiscussionAvatarTap(e) {
     const detail = (e && e.detail) || {};
@@ -7026,11 +7059,11 @@ Page({
   },
 
   /**
-   * Demo：统一头像互动入口（记分头像 / 讨论区头像共用同一 player-action-modal）。
+   * 统一头像互动入口（记分头像 / 讨论区头像共用同一 player-action-modal）。
    * targetUser: { avatar, name, gender, handicap, index, userId, floatCoef?, avatarRect? }
    */
   openPlayerActionModal(targetUser) {
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!this._isScoreReactionEnabled()) {
       return;
     }
     const raw = targetUser && typeof targetUser === 'object' ? targetUser : {};
@@ -7331,9 +7364,9 @@ Page({
     }
   },
 
-  /** Demo：中央弹窗「进入主页」；仅 demo-weekend-amateur */
+  /** 中央弹窗「进入主页」；与 reaction 同门控 */
   onPlayerActionProfileTap() {
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!this._isScoreReactionEnabled()) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -7358,7 +7391,7 @@ Page({
    */
   onPlayerActionRocketTap() {
     if (this._playerActionRocketBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'rocket', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -7532,7 +7565,8 @@ Page({
       rocketEyesOnlyFaceSrc:
         '/subpackages/scoring/assets/reaction/rocket_eyes_only_face.png',
       reactionAvatarDetached: false,
-      reactionAvatarDetachedPlayerId: ''
+      reactionAvatarDetachedPlayerId: '',
+      reactionActiveMode: ''
     });
 
     const timeline = rocketReactionTimeline.buildRocketSelfTimeline({
@@ -7660,6 +7694,7 @@ Page({
       this.setData({
         reactionAvatarDetached: true,
         reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionActiveMode: 'self',
         reactionRocketAvatarVisible: true,
         reactionRocketAvatarPhase: 'center',
         reactionRocketBlastFace: false,
@@ -8279,7 +8314,8 @@ Page({
       reactionRocketLandSmokeFading: false,
       rocketFaceMode: 'normal',
       reactionAvatarDetached: false,
-      reactionAvatarDetachedPlayerId: ''
+      reactionAvatarDetachedPlayerId: '',
+      reactionActiveMode: ''
     });
     this._rocketTimelineCtx = null;
     this._playerActionRocketBusy = false;
@@ -8318,6 +8354,45 @@ Page({
     if (!tid) return false;
     if (isSameUserIdentity(tid, 'me')) return true;
     return isSameUserIdentity(tid, this._getCurrentReactionUserId());
+  },
+
+  /**
+   * 正式记分页头像互动门控（普通/队内/队际/系列/demo 共用同一 score 页）。
+   * 不复用 isDemoWeekendAmateurGameId。
+   */
+  _getScoreReactionCtx() {
+    const ms = this._matchState || this._readMatchState() || {};
+    return { matchId: ms.matchId || this.data.matchId || '' };
+  },
+
+  _isScoreReactionEnabled() {
+    return scoreReactionController.canOpenReaction(
+      this.data.gameId,
+      this._getScoreReactionCtx()
+    );
+  },
+
+  /**
+   * Self Reaction 原位头像 detach 状态（observer 不隐藏原头像）。
+   * Reaction Mode 取自 reactionPanelConfig，勿用「第一/第三视角」命名判断。
+   */
+  _buildReactionAvatarDetachedPatch(playerId, reactionKey) {
+    const pid = playerId != null ? String(playerId).trim() : '';
+    const mode = reactionPanelConfig.getReactionMode(reactionKey);
+    const detach = mode === 'self' && !!pid;
+    return {
+      reactionAvatarDetached: detach,
+      reactionAvatarDetachedPlayerId: detach ? pid : '',
+      reactionActiveMode: detach ? 'self' : mode === 'observer' ? 'observer' : ''
+    };
+  },
+
+  _buildReactionAvatarDetachedClearPatch() {
+    return {
+      reactionAvatarDetached: false,
+      reactionAvatarDetachedPlayerId: '',
+      reactionActiveMode: ''
+    };
   },
 
   /**
@@ -8405,7 +8480,7 @@ Page({
    * - 不根据头像位置计算；不适用远距离入场原则
    */
   _playSelfReaction(type, ctx) {
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!this._isScoreReactionEnabled()) {
       return;
     }
     const t = type != null ? String(type).trim() : '';
@@ -8533,7 +8608,7 @@ Page({
    * 仅 flower / beer 保留双视角；其余类型回退目标头像中央舞台 Self。
    */
   _playObserverReaction(type, targetPlayer) {
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!this._isScoreReactionEnabled()) {
       return;
     }
     const target = targetPlayer && typeof targetPlayer === 'object' ? targetPlayer : {};
@@ -8594,7 +8669,7 @@ Page({
    */
   onPlayerActionBoxingTap() {
     if (this._playerActionBoxingBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'boxing', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -8622,7 +8697,7 @@ Page({
    */
   onPlayerActionKissTap() {
     if (this._playerActionKissBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'kiss', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -8795,7 +8870,8 @@ Page({
         ms: 0
       }),
       reactionAvatarDetached: !!hitPlayerId,
-      reactionAvatarDetachedPlayerId: hitPlayerId
+      reactionAvatarDetachedPlayerId: hitPlayerId,
+      reactionActiveMode: hitPlayerId ? 'self' : ''
     });
 
     const timeline =
@@ -9115,6 +9191,7 @@ Page({
       this.setData({
         reactionAvatarDetached: true,
         reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionActiveMode: 'self',
         reactionKissSelfAvatarVisible: true,
         reactionKissSelfAvatarPhase: 'seat',
         reactionKissSelfShyVisible: false,
@@ -9358,7 +9435,8 @@ Page({
           showKissShyFace: false,
           reactionKissSelfShyVisible: false,
           reactionAvatarDetached: false,
-          reactionAvatarDetachedPlayerId: ''
+          reactionAvatarDetachedPlayerId: '',
+          reactionActiveMode: ''
         });
       }, clearMs);
       return;
@@ -9398,7 +9476,8 @@ Page({
         showKissShyFace: false,
         reactionKissSelfHeartsFading: false,
         reactionAvatarDetached: false,
-        reactionAvatarDetachedPlayerId: ''
+        reactionAvatarDetachedPlayerId: '',
+        reactionActiveMode: ''
       });
       this._kissTimelineCtx = null;
       this._playerActionKissBusy = false;
@@ -9474,7 +9553,8 @@ Page({
         showKissShyFace: false,
         reactionKissSelfHeartsFading: false,
         reactionAvatarDetached: false,
-        reactionAvatarDetachedPlayerId: ''
+        reactionAvatarDetachedPlayerId: '',
+        reactionActiveMode: ''
       });
       this._kissTimelineCtx = null;
       this._playerActionKissBusy = false;
@@ -9567,7 +9647,7 @@ Page({
    */
   onPlayerActionBeerTap() {
     if (this._playerActionBeerBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'beer', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -10720,7 +10800,8 @@ Page({
       reactionBoxingDizzy: false,
       reactionBoxingDizzyStarCount: 3,
       reactionAvatarDetached: false,
-      reactionAvatarDetachedPlayerId: ''
+      reactionAvatarDetachedPlayerId: '',
+      reactionActiveMode: ''
     };
     if (extra && typeof extra === 'object') {
       const keys = Object.keys(extra);
@@ -10815,6 +10896,7 @@ Page({
       reactionScreenMode: 'boxing',
       reactionAvatarDetached: !!detachedId,
       reactionAvatarDetachedPlayerId: detachedId,
+      reactionActiveMode: detachedId ? 'self' : '',
       reactionBoxingAvatarUrl: url,
       reactionBoxingShellStyle: this._buildBoxingShellStyle(
         seatCx,
@@ -11069,7 +11151,8 @@ Page({
         reactionBoxingDizzy: false,
         reactionBoxingShake: false,
         reactionAvatarDetached: false,
-        reactionAvatarDetachedPlayerId: ''
+        reactionAvatarDetachedPlayerId: '',
+        reactionActiveMode: ''
       });
       this.setData({
         boxingFaceMode: 'boxing_dizzy',
@@ -11307,7 +11390,7 @@ Page({
    */
   onPlayerActionTomatoTap() {
     if (this._playerActionTomatoBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'tomato', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -11461,6 +11544,7 @@ Page({
       }),
       reactionAvatarDetached: !!hitPlayerId,
       reactionAvatarDetachedPlayerId: hitPlayerId,
+      reactionActiveMode: hitPlayerId ? 'self' : '',
       reactionFlowerFlyVisible: false,
       reactionFlowerFlyStyle: '',
       reactionFlowerItems: [],
@@ -11702,6 +11786,7 @@ Page({
       this.setData({
         reactionAvatarDetached: true,
         reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionActiveMode: 'self',
         reactionTomatoSelfAvatarVisible: true,
         reactionTomatoSelfAvatarPhase: 'seat',
         reactionTomatoSelfFaceVisible: false,
@@ -11865,7 +11950,8 @@ Page({
         reactionScreenFading: false,
         reactionScreenMode: '',
         reactionAvatarDetached: false,
-        reactionAvatarDetachedPlayerId: ''
+        reactionAvatarDetachedPlayerId: '',
+        reactionActiveMode: ''
       });
       this._tomatoTimelineCtx = null;
       this._playerActionTomatoBusy = false;
@@ -11920,7 +12006,7 @@ Page({
    */
   onPlayerActionBucketTap() {
     if (this._playerActionBucketBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'bucket', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -12067,6 +12153,7 @@ Page({
       reactionBucketScreenPouring: false,
       reactionAvatarDetached: !!hitPlayerId,
       reactionAvatarDetachedPlayerId: hitPlayerId,
+      reactionActiveMode: hitPlayerId ? 'self' : '',
       reactionBucketSelfAvatarVisible: true,
       reactionBucketSelfAvatarUrl: url,
       reactionBucketSelfAvatarPhase: 'seat',
@@ -12240,6 +12327,7 @@ Page({
       this.setData({
         reactionAvatarDetached: true,
         reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionActiveMode: 'self',
         reactionBucketSelfAvatarVisible: true,
         reactionBucketSelfAvatarPhase: 'seat',
         reactionBucketSelfWetVisible: false,
@@ -12411,7 +12499,8 @@ Page({
         reactionBucketScreenActive: false,
         reactionBucketScreenPouring: false,
         reactionAvatarDetached: false,
-        reactionAvatarDetachedPlayerId: ''
+        reactionAvatarDetachedPlayerId: '',
+        reactionActiveMode: ''
       });
       this._bucketTimelineCtx = null;
       this._playerActionBucketBusy = false;
@@ -12501,7 +12590,7 @@ Page({
    */
   onPlayerActionEggTap() {
     if (this._playerActionEggBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'egg', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -12643,7 +12732,8 @@ Page({
         ms: 0
       }),
       reactionAvatarDetached: !!hitPlayerId,
-      reactionAvatarDetachedPlayerId: hitPlayerId
+      reactionAvatarDetachedPlayerId: hitPlayerId,
+      reactionActiveMode: hitPlayerId ? 'self' : ''
     });
 
     const timeline =
@@ -12772,6 +12862,7 @@ Page({
       this.setData({
         reactionAvatarDetached: true,
         reactionAvatarDetachedPlayerId: c.playerId || '',
+        reactionActiveMode: 'self',
         reactionEggSelfAvatarVisible: true,
         reactionEggSelfAvatarPhase: 'seat',
         reactionEggSelfFaceVisible: false,
@@ -12906,7 +12997,8 @@ Page({
         reactionScreenFading: false,
         reactionScreenMode: '',
         reactionAvatarDetached: false,
-        reactionAvatarDetachedPlayerId: ''
+        reactionAvatarDetachedPlayerId: '',
+        reactionActiveMode: ''
       });
       this._eggTimelineCtx = null;
       this._playerActionEggBusy = false;
@@ -13251,7 +13343,7 @@ Page({
    */
   onPlayerActionFlowerTap() {
     if (this._playerActionFlowerBusy) return;
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (!scoreReactionController.canPlayReaction(this.data.gameId, 'flower', this._getScoreReactionCtx())) {
       return;
     }
     const target = this.data.playerActionTarget;
@@ -13274,10 +13366,15 @@ Page({
 
   /**
    * 演示赛送花：讨论区系统消息「A 给 B 送了一朵花」。
-   * 仅 demo-weekend-amateur；仅页面实时 chatMessages，不写 game/match/score。
+   * 与 reaction 同门控；仅页面实时 chatMessages，不写 game/match/score。
    */
   _appendDemoFlowerSystemMessage(target) {
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+    if (
+      !scoreReactionController.shouldAppendFlowerSystemMessage(
+        this.data.gameId,
+        this._getScoreReactionCtx()
+      )
+    ) {
       return;
     }
     const toName =
@@ -14387,7 +14484,8 @@ Page({
     }
     const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
     const playerId = ds.playerId != null ? String(ds.playerId).trim() : '';
-    console.log(playerId);
+    if (!playerId) return;
+    this.openPlayerActionModal({ userId: playerId });
   },
 
   /**
@@ -14580,7 +14678,14 @@ Page({
           (teeStyle && teeStyle.teeColor) ||
           this._m2TeeColorFromClass(entity && entity.colorClass) ||
           '';
+        const src = m0 || entity || {};
+        const singlePidRaw = src.playerId || src.userId || '';
+        const singlePlayerId =
+          singlePidRaw != null && String(singlePidRaw).trim()
+            ? String(singlePidRaw).trim()
+            : '';
         const singleMember = {
+          playerId: singlePlayerId,
           name: (entity && (entity.name || '')) || (m0 && m0.name) || '球员',
           displayName:
             (entity && (entity.displayName || entity.name || '')) ||
@@ -14605,13 +14710,23 @@ Page({
 
       if (memberCount !== 2) return;
       const pairMembers = Array.isArray(entity && entity.pairMembers) ? entity.pairMembers : [];
-      const identityMembers = pairMembers.slice(0, 2).map((m) => ({
-        name: (m && m.name) || '球员',
-        avatar: (m && m.avatar) || '',
-        teeColor: (m && m.teeColor) || ''
-      }));
+      const memberDisplay = Array.isArray(entity && entity.memberDisplay)
+        ? entity.memberDisplay
+        : [];
+      const identityMembers = pairMembers.slice(0, 2).map((m, mi) => {
+        const src = memberDisplay[mi] || m || {};
+        const rawPid = src.playerId || src.userId || (m && (m.playerId || m.userId)) || '';
+        const playerId =
+          rawPid != null && String(rawPid).trim() ? String(rawPid).trim() : '';
+        return {
+          playerId: playerId,
+          name: (m && m.name) || (src && src.name) || '球员',
+          avatar: (m && m.avatar) || (src && src.avatar) || '',
+          teeColor: (m && m.teeColor) || ''
+        };
+      });
       while (identityMembers.length < 2) {
-        identityMembers.push({ name: '球员', avatar: '', teeColor: '' });
+        identityMembers.push({ playerId: '', name: '球员', avatar: '', teeColor: '' });
       }
       const name0 = identityMembers[0].name || '';
       const name1 = identityMembers[1].name || '';
@@ -14736,7 +14851,15 @@ Page({
       const diffClass = (item && (item.teamDiffClass || item.relClass)) || '';
 
       if (kind === 'pair') {
-        const members = (item && item.pairMembers) || [];
+        const members = ((item && item.pairMembers) || []).map((m) => {
+          const raw =
+            m && (m.playerId != null || m.userId != null)
+              ? m.playerId || m.userId
+              : '';
+          const playerId =
+            raw != null && String(raw).trim() ? String(raw).trim() : '';
+          return Object.assign({}, m, { playerId: playerId });
+        });
         const tee = members.map((m) => (m && m.teeColor) || '');
         const name0 = (members[0] && (members[0].name || members[0].displayName)) || '';
         const name1 = (members[1] && (members[1].name || members[1].displayName)) || '';
@@ -14767,8 +14890,15 @@ Page({
         };
       }
 
-      // single（含 2+1）：从行级字段组装单成员，避免丢行
+      // single（含 2+1 / 2+1+1）：从行级字段组装单成员；playerId 供 reaction
+      const singlePidRaw =
+        (item && (item.playerId || item.userId || item.id)) || '';
+      const singlePlayerId =
+        singlePidRaw != null && String(singlePidRaw).trim()
+          ? String(singlePidRaw).trim()
+          : '';
       const singleMember = {
+        playerId: singlePlayerId,
         name: (item && (item.name || '')) || '',
         displayName: (item && (item.displayName || item.name || '')) || '',
         avatar: (item && (item.avatar || '')) || '',

@@ -88,7 +88,17 @@
           >
             <block wx:if="{{!item.isEmpty}}">
               <view class="bestball-player-id">
-                <image class="bestball-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+                <!-- 4+0/3+0 球员头像仅在名册条；身份列为 TEAM SCORE，须在此接入 reaction -->
+                <image
+                  id="fb-player-avatar-{{item.playerId}}"
+                  class="bestball-player-avatar {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == item.playerId ? 'is-reaction-detached' : ''}}"
+                  src="{{item.avatar}}"
+                  mode="aspectFill"
+                  data-player-id="{{item.playerId || ''}}"
+                  data-avatar="{{item.avatar}}"
+                  data-name="{{item.name || item.displayName}}"
+                  catchtap="onScorePlayerAvatarTap"
+                ></image>
                 <text class="bestball-player-name">{{item.name}}</text>
               </view>
               <view class="bestball-tee-line">
@@ -129,7 +139,14 @@
                 </view>
               </view>
               <view wx:else class="player-column__card">
-                <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                <image
+                  id="fb-player-avatar-{{item.playerId || item.id}}"
+                  class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
+                  src="{{item.avatar}}"
+                  mode="aspectFill"
+                  data-player-id="{{item.playerId || item.id || ''}}"
+                  catchtap="onScorePlayerAvatarTap"
+                ></image>
                 <text class="player-name-line player-column__name">{{item.name}}</text>
               </view>
             </view>
@@ -303,7 +320,14 @@
               <view class="shell-row shell-row--player player-column__row match-play-side-row">
                 <block wx:if="{{item.kind === 'single'}}">
                   <view class="player-column__card">
-                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <image
+                      id="fb-player-avatar-{{item.memberPlayerId || item.playerId || item.id}}"
+                      class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.memberPlayerId || reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
+                      src="{{item.avatar}}"
+                      mode="aspectFill"
+                      data-player-id="{{item.memberPlayerId || item.playerId || item.id || ''}}"
+                      catchtap="onScorePlayerAvatarTap"
+                    ></image>
                     <text class="player-name-line player-column__name">{{item.name}}</text>
                   </view>
                 </block>
@@ -320,7 +344,12 @@
                         data-player-id="{{pm.playerId || ''}}"
                         catchtap="onMatchPlayPlayerAvatarTap"
                       >
-                        <image class="avatar-group__avatar" src="{{pm.avatar}}" mode="aspectFill"></image>
+                        <image
+                          id="fb-player-avatar-{{pm.playerId}}"
+                          class="avatar-group__avatar {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
+                          src="{{pm.avatar}}"
+                          mode="aspectFill"
+                        ></image>
                       </view>
                     </view>
                     <view class="name-stack">
@@ -593,7 +622,7 @@
                     >
                       <image
                         id="fb-player-avatar-{{m.playerId || m.id}}"
-                        class="avatar-group__avatar {{reactionAvatarDetached && (reactionAvatarDetachedPlayerId == m.playerId || reactionAvatarDetachedPlayerId == m.id) ? 'is-reaction-detached' : ''}}"
+                        class="avatar-group__avatar {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == m.playerId || reactionAvatarDetachedPlayerId == m.id) ? 'is-reaction-detached' : ''}}"
                         src="{{m.avatar}}"
                         mode="aspectFill"
                       ></image>
@@ -785,7 +814,14 @@
               class="shell-row shell-row--player player-column__row"
             >
               <view class="player-column__card">
-                <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                <image
+                  id="fb-player-avatar-{{item.playerId || item.id}}"
+                  class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
+                  src="{{item.avatar}}"
+                  mode="aspectFill"
+                  data-player-id="{{item.playerId || item.id || ''}}"
+                  catchtap="onScorePlayerAvatarTap"
+                ></image>
                 <text class="player-name-line player-column__name">{{item.name}}</text>
               </view>
             </view>
@@ -927,7 +963,14 @@
                   <view class="paired-avatars">
                     <view class="pair-avatar-group">
                       <view class="avatar-with-diff avatar-with-diff--single">
-                        <image class="player-avatar-img" src="{{item.avatar}}" mode="aspectFill"></image>
+                        <image
+                          id="fb-player-avatar-{{item.playerId || item.id || item.memberPlayerId}}"
+                          class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id || reactionAvatarDetachedPlayerId == item.memberPlayerId) ? 'is-reaction-detached' : ''}}"
+                          src="{{item.avatar}}"
+                          mode="aspectFill"
+                          data-player-id="{{item.playerId || item.id || item.memberPlayerId || ''}}"
+                          catchtap="onScorePlayerAvatarTap"
+                        ></image>
                       </view>
                     </view>
                   </view>
@@ -945,7 +988,14 @@
               <block wx:elif="{{item.kind === 'single'}}">
                 <view class="player-card">
                   <view class="player-top-line">
-                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <image
+                      id="fb-player-avatar-{{item.playerId || item.id}}"
+                      class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
+                      src="{{item.avatar}}"
+                      mode="aspectFill"
+                      data-player-id="{{item.playerId || item.id || ''}}"
+                      catchtap="onScorePlayerAvatarTap"
+                    ></image>
                     <view class="player-diff-wrap">
                       <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
                     </view>
@@ -960,7 +1010,15 @@
                   <view class="paired-avatars">
                     <view class="pair-avatar-group">
                       <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
-                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                        <image
+                          id="fb-player-avatar-{{pm.playerId}}"
+                          class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
+                          src="{{pm.avatar}}"
+                          mode="aspectFill"
+                          style="border-color:{{pm.teeColor}};"
+                          data-player-id="{{pm.playerId || ''}}"
+                          catchtap="onScorePlayerAvatarTap"
+                        ></image>
                       </view>
                     </view>
                   </view>
@@ -1056,7 +1114,14 @@
               <block wx:if="{{item.kind === 'single'}}">
                 <view class="player-card">
                   <view class="player-top-line">
-                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <image
+                      id="fb-player-avatar-{{item.playerId || item.id || item.entityId}}"
+                      class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id || reactionAvatarDetachedPlayerId == item.entityId) ? 'is-reaction-detached' : ''}}"
+                      src="{{item.avatar}}"
+                      mode="aspectFill"
+                      data-player-id="{{item.playerId || item.id || item.entityId || ''}}"
+                      catchtap="onScorePlayerAvatarTap"
+                    ></image>
                     <view class="player-diff-wrap">
                       <text class="player-diff-score {{item.teamDiffClass}}">{{item.teamDiffStr}}</text>
                     </view>
@@ -1070,7 +1135,15 @@
                   <view class="paired-avatars">
                     <view class="pair-avatar-group">
                       <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
-                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                        <image
+                          id="fb-player-avatar-{{pm.playerId}}"
+                          class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
+                          src="{{pm.avatar}}"
+                          mode="aspectFill"
+                          style="border-color:{{pm.teeColor}};"
+                          data-player-id="{{pm.playerId || ''}}"
+                          catchtap="onScorePlayerAvatarTap"
+                        ></image>
                       </view>
                     </view>
                     <view class="player-diff-wrap">
@@ -1146,7 +1219,14 @@
               <block wx:if="{{item.kind === 'single'}}">
                 <view class="player-card">
                   <view class="player-top-line">
-                    <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                    <image
+                      id="fb-player-avatar-{{item.memberPlayerId || item.playerId || item.id}}"
+                      class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.memberPlayerId || reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
+                      src="{{item.avatar}}"
+                      mode="aspectFill"
+                      data-player-id="{{item.memberPlayerId || item.playerId || item.id || ''}}"
+                      catchtap="onScorePlayerAvatarTap"
+                    ></image>
                     <view class="player-diff-wrap">
                       <text class="player-diff-score {{item.relClass}}">{{item.relScoreStr}}</text>
                     </view>
@@ -1160,7 +1240,15 @@
                   <view class="paired-avatars">
                     <view class="pair-avatar-group">
                       <view wx:for="{{item.pairMembers}}" wx:for-item="pm" wx:key="name" class="avatar-with-diff" style="left:{{pm.left}};transform:{{pm.tf}};">
-                        <image class="player-avatar-img" src="{{pm.avatar}}" mode="aspectFill" style="border-color:{{pm.teeColor}};"></image>
+                        <image
+                          id="fb-player-avatar-{{pm.playerId}}"
+                          class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
+                          src="{{pm.avatar}}"
+                          mode="aspectFill"
+                          style="border-color:{{pm.teeColor}};"
+                          data-player-id="{{pm.playerId || ''}}"
+                          catchtap="onScorePlayerAvatarTap"
+                        ></image>
                       </view>
                     </view>
                     <view class="player-diff-wrap">
@@ -1251,7 +1339,14 @@
             <view class="scoreboard-cell sticky-col player-cell">
               <view class="player-card">
                 <view class="player-top-line">
-                  <image class="player-avatar-img {{item.colorClass}}" src="{{item.avatar}}" mode="aspectFill"></image>
+                  <image
+                    id="fb-player-avatar-{{item.playerId || item.id}}"
+                    class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
+                    src="{{item.avatar}}"
+                    mode="aspectFill"
+                    data-player-id="{{item.playerId || item.id || ''}}"
+                    catchtap="onScorePlayerAvatarTap"
+                  ></image>
                 </view>
                 <text class="player-name-line">{{item.name}}</text>
               </view>

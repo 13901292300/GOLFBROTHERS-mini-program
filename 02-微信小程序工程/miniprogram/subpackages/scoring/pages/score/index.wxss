@@ -9074,8 +9074,14 @@ page {
   }
 }
 
-/* Demo：boxing 离位 — 仅隐头像图，占位尺寸/行高/成绩列不变 */
-.scoreboard-shell--fourball .fourball-pair-identity .avatar-group__avatar.is-reaction-detached {
+/* Self Reaction 离位：仅隐原位头像图，占位尺寸/行高/成绩列不变（全壳统一） */
+.scoreboard-shell--fourball .fourball-pair-identity .avatar-group__avatar.is-reaction-detached,
+.scoreboard-shell--match-play .fourball-pair-identity .avatar-group__avatar.is-reaction-detached,
+.scoreboard-shell--match-play .player-column__card .player-avatar-img.is-reaction-detached,
+.scoreboard-shell--game-single .player-column__card .player-avatar-img.is-reaction-detached,
+.scoreboard-shell--basic .player-column__card .player-avatar-img.is-reaction-detached,
+.scoreboard-scroll .player-avatar-img.is-reaction-detached,
+.bestball-roster-strip .bestball-player-avatar.is-reaction-detached {
   opacity: 0;
 }
 
