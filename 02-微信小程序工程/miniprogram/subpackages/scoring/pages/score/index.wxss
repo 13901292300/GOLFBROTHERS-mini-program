@@ -2587,9 +2587,19 @@ page {
   flex-direction: column;
   align-items: stretch;
   justify-content: stretch;
-  border-right: none;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+/* Phase1：T|hole 单源竖线（对齐 g1/fourball Classic token）；status 不拉通 */
+.scoreboard-shell--match-play .track-lead-tee,
+.scoreboard-shell--match-play .track-lead-tee--head,
+.scoreboard-shell--match-play .track-lead-tee--par {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.scoreboard-shell--match-play .track-lead-tee--status {
+  border-right: none;
 }
 
 .scoreboard-shell--match-play .track-lead-tee .player-tee-marker,
@@ -2738,6 +2748,8 @@ page {
 .scoreboard-shell--match-play .match-play-tee-sticky-overlay.is-visible {
   opacity: 1;
   visibility: visible;
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
 }
 
 .scoreboard-shell--match-play .match-play-tee-sticky-overlay__inner {
