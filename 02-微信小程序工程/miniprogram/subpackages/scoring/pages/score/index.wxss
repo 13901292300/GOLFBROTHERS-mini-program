@@ -2552,6 +2552,8 @@ page {
   font-weight: 700;
   font-style: normal;
   text-transform: none;
+  margin-top: 0;
+  color: var(--text-primary);
 }
 .score-page.is-score-classic .scoreboard-shell--match-play .player-column__card .player-name-line,
 .score-page.is-score-classic .scoreboard-shell--match-play .player-column__card .player-column__name,
