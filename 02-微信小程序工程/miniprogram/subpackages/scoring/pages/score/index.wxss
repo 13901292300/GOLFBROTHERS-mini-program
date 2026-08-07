@@ -2530,6 +2530,48 @@ page {
   white-space: nowrap;
 }
 
+/* match-play lead diff：对齐 g1-stroke / fourball Classic·Elite 字阶（仅本壳） */
+.score-page.is-score-classic .scoreboard-shell--match-play .track-lead-diff .player-diff-score {
+  font-size: 32rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .track-lead-diff .player-diff-score {
+  font-size: 40rpx;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff .player-diff-score {
+  font-weight: 400;
+}
+
+/*
+ * match-play 身份昵称：对齐 g1-stroke / fourball（仅本壳）
+ * 单人：.player-name-line / .player-column__name
+ * pair：.name-group__name + .pair-name-compact__*
+ */
+.scoreboard-shell--match-play .player-column__card .player-name-line,
+.scoreboard-shell--match-play .player-column__card .player-column__name {
+  font-size: 18rpx;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: none;
+}
+.score-page.is-score-classic .scoreboard-shell--match-play .player-column__card .player-name-line,
+.score-page.is-score-classic .scoreboard-shell--match-play .player-column__card .player-column__name,
+.score-page.is-score-classic .scoreboard-shell--match-play .fourball-pair-identity .name-group__name,
+.score-page.is-score-classic .scoreboard-shell--match-play .fourball-pair-identity .pair-name-compact--combined .pair-name-compact__text,
+.score-page.is-score-classic .scoreboard-shell--match-play .fourball-pair-identity .pair-name-compact__part,
+.score-page.is-score-classic .scoreboard-shell--match-play .fourball-pair-identity .pair-name-compact__sep {
+  font-size: 22rpx;
+  line-height: 1.2;
+  min-height: 28rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .player-column__card .player-name-line,
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .player-column__card .player-column__name,
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .fourball-pair-identity .name-group__name,
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .fourball-pair-identity .pair-name-compact--combined .pair-name-compact__text,
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .fourball-pair-identity .pair-name-compact__part,
+.score-page.is-score-classic.font-large .scoreboard-shell--match-play .fourball-pair-identity .pair-name-compact__sep {
+  font-size: 26rpx;
+}
+
 .scoreboard-shell--match-play .track-lead-tee,
 .scoreboard-shell--match-play .track-lead-tee--head,
 .scoreboard-shell--match-play .track-lead-tee--par,
