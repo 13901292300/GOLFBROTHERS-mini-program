@@ -3838,6 +3838,149 @@ page {
   border-right: none;
 }
 
+/*
+ * G1 stroke Elite chrome：对齐 demo fourball Elite 非记分区 + Classic v2 单源分隔
+ * 选择器：.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke
+ * 不改 scoreClass / marker / fourball / match-play / hole-par width·transform / sticky 阈值
+ */
+
+/* —— 背景：统一 hole 底（identity / lead head·par / OUT·IN·TOT）；成绩行 T 色块不动 —— */
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--special-head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.score-cell--total,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column {
+  background: var(--bg-primary) !important;
+  background-color: var(--bg-primary) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__inner {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__row {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff--par,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-tee--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-tee--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+/* HOLE/PAR overlay 透底（对齐 fourball Elite）；区色由 spacer/lead 承接；不改 width/transform */
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container__par {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer.shell-row--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* —— 分隔：镜像 G1 Classic v2 单源 —— */
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--player {
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .tee-sticky-overlay__inner > .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .tee-sticky-overlay__row {
+  border-top: none;
+  border-bottom: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-tee--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff--par,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-tee--par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--player .score-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container__hole {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__row,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column__inner > .player-column__row:last-child,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container__par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-tee {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke.is-tee-sticky .tee-sticky-overlay,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .tee-sticky-overlay.is-visible {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-compact-container,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-normal-container__par,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-compact-container__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .hole-par-compact-container__par {
+  border-right: none;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+/* 关 diff|T 双线；只留 T 右沿 */
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--head .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .scoreboard-row--par > .track-lead-diff {
+  border-right: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--head .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--par > .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--player .track-lead-tee {
+  border-right: none;
+}
+
 .hole-cell-meta,
 .special-cell-meta {
   position: absolute;
