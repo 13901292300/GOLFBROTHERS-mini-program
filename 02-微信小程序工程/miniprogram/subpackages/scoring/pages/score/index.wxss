@@ -4174,6 +4174,144 @@ page {
 }
 
 /*
+ * Match Play Elite chrome（Phase2-B）：镜像 g1-stroke / fourball Elite
+ * 选择器：.score-page.is-score-elite-demo .scoreboard-shell--match-play
+ * 保持：scoreClass / eagle·birdie / FINAL / match-status / UP·DN / Phase1 T token
+ * 不改：g1 / fourball / fourball40 / JS / WXML / hole-par 位移 / sticky 显隐
+ */
+
+/* —— 1. identity / spacer / player row + header lead：统一 hole；column 页底 —— */
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column {
+  box-shadow: none;
+  background: var(--bg-primary) !important;
+  background-color: var(--bg-primary) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__inner {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__spacer.shell-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__row.match-play-side-row {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--tot-head),
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell--special-head:not(.scoreboard-cell--tot-head) {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--par > .scoreboard-cell:not(.scoreboard-cell--tot-col):not(.track-lead-diff):not(.track-lead-tee) {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff--par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* —— 2. HOLE/PAR overlay：透底；sticky spacer hole 底 —— */
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-normal,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-normal__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-normal__par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-compact,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-compact__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-compact__par {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-right: none;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-tee-sticky-overlay__inner > .match-play-tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-tee-sticky-overlay__spacer.shell-row--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* —— 3. row divider：Elite = Classic v2 单源 token —— */
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row.scoreboard-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row.scoreboard-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row.scoreboard-row--player {
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-tee-sticky-overlay__spacer,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-tee-sticky-overlay__inner > .match-play-tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-tee-sticky-overlay__row {
+  border-top: none;
+  border-bottom: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--tot-head),
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--par > .scoreboard-cell:not(.scoreboard-cell--tot-col),
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff--par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee--par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row.scoreboard-row--player .score-cell:not(.scoreboard-cell--tot-col),
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-normal__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-compact__hole {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__spacer.shell-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .player-column__row.match-play-side-row,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-normal__par,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-hole-par-compact__par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/* —— 4. sticky T / 洞列竖线：T 单源；关 diff 与吸边双线 —— */
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-tee--par {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .match-play-tee-sticky-overlay.is-visible {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--head .scoreboard-cell:not(.track-lead-diff):not(.track-lead-tee):not(.scoreboard-cell--tot-head),
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--par > .scoreboard-cell:not(.track-lead-diff):not(.track-lead-tee):not(.scoreboard-cell--tot-col),
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--player .score-cell:not(.scoreboard-cell--tot-col) {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--head .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play .scoreboard-row--par > .track-lead-diff {
+  border-right: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--match-play.is-match-play-tee-sticky .scoreboard-row--head .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play.is-match-play-tee-sticky .scoreboard-row--par > .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--match-play.is-match-play-tee-sticky .scoreboard-row--player .track-lead-tee {
+  border-right: none;
+}
+
+/*
  * fourball40（4+0/3+1）Classic / Elite chrome
  * 镜像 g1-stroke 稳定基线 + fourball 非记分区策略；独立选择器，不改 g1 / fourball / TEAM SCORE 内容
  * .score-page.is-score-classic .scoreboard-shell--fourball40
