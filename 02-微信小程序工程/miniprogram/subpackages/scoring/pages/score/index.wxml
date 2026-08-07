@@ -528,7 +528,7 @@
                   bindtap="onMatchSideScoreCellTap"
                   data-side-idx="{{sIdx}}"
                   data-col-idx="{{cIdx}}"
-                  class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}}"
+                  class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}} {{cell.classicClass}}"
                 >
                   <block wx:if="{{cell.type === 'special'}}">
                     <view class="special-cell-inner">
@@ -546,7 +546,7 @@
                       </view>
                       <view class="hole-cell-meta">
                         <text class="hole-cell-putt">{{cell.putts}}</text>
-                        <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                        <text class="hole-cell-diff {{cell.diffClass}}">{{scoreHoleStyleClassic || isScoreEliteDemo ? cell.classicDiffStr : cell.diffStr}}</text>
                       </view>
                     </view>
                   </block>
