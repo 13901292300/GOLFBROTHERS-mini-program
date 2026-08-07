@@ -5318,6 +5318,231 @@ page {
   100% { opacity: 0; transform: translate(46px, -48px) scale(0.65) rotate(30deg); }
 }
 
+/* 👄 亲吻：远处飞入 → 接触呼吸 → 红心升起（DOM ≤ 1 lips + 8 hearts） */
+.reaction-screen-layer .kiss-screen-reaction {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 526;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Observer：锚定目标头像 rect，嘴唇中心 = 头像中心 */
+.reaction-screen-layer .kiss-target-layer {
+  position: fixed;
+  z-index: 529;
+  pointer-events: none;
+  overflow: visible;
+}
+.reaction-screen-layer .kiss-target-layer__lips {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--kiss-target-side, 40px);
+  height: var(--kiss-target-side, 40px);
+  margin: 0;
+  padding: 0;
+  font-size: var(--kiss-target-font, 34px);
+  line-height: var(--kiss-target-side, 40px);
+  text-align: center;
+  transform: translate(-50%, -50%) scale(1);
+  will-change: transform, opacity;
+}
+.reaction-screen-layer .kiss-target-layer__lips.phase-hit {
+  animation: kiss-target-peck 0.32s cubic-bezier(0.2, 0.85, 0.25, 1) forwards;
+}
+.reaction-screen-layer .kiss-target-layer__lips.phase-hold {
+  animation: kiss-target-breathe 0.95s ease-in-out infinite;
+}
+.reaction-screen-layer .kiss-target-layer__lips.phase-fade {
+  animation: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.35);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+@keyframes kiss-target-peck {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes kiss-target-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06) translateY(-2px);
+  }
+}
+.reaction-screen-layer .kiss-target-layer__heart {
+  position: absolute;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  font-size: 22px;
+  line-height: 28px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  animation-name: kiss-heart-rise;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+}
+.reaction-screen-layer .kiss-screen-reaction__lips {
+  position: fixed;
+  z-index: 527;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  font-size: 52px;
+  line-height: 64px;
+  text-align: center;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: none;
+}
+/* Self 近镜头：更大基准字号，配合 JS scale 形成贴镜头感 */
+.reaction-screen-layer .kiss-screen-reaction.is-self .kiss-screen-reaction__lips {
+  width: 96px;
+  height: 96px;
+  font-size: 78px;
+  line-height: 96px;
+}
+.reaction-screen-layer .kiss-screen-reaction__lips.phase-hold {
+  animation: kiss-lips-breathe 0.85s ease-in-out infinite;
+}
+/* Self 命中脉冲：1.8 → 2.1 → 1.9（相对 --kiss-arrive-scale） */
+.reaction-screen-layer .kiss-screen-reaction.is-self .kiss-screen-reaction__lips.phase-hit {
+  animation: kiss-lips-hit-self 0.28s cubic-bezier(0.15, 0.85, 0.25, 1) forwards;
+}
+.reaction-screen-layer .kiss-screen-reaction.is-self .kiss-screen-reaction__lips.phase-hold {
+  animation: kiss-lips-breathe-self 0.9s ease-in-out infinite;
+}
+.reaction-screen-layer .kiss-screen-reaction__lips.phase-fade {
+  animation: none;
+  opacity: 0 !important;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  transform: translate(-50%, -50%) scale(0.35) !important;
+}
+.reaction-screen-layer .kiss-screen-reaction.is-self .kiss-screen-reaction__lips.phase-fade {
+  transform: translate(-50%, -50%)
+    scale(calc(var(--kiss-arrive-scale, 1.9) * 0.35)) !important;
+}
+@keyframes kiss-lips-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08) translateY(-3px);
+  }
+}
+@keyframes kiss-lips-hit-self {
+  0% {
+    transform: translate(-50%, -50%)
+      scale(calc(var(--kiss-arrive-scale, 1.9) * 0.95));
+  }
+  42% {
+    transform: translate(-50%, -50%)
+      scale(calc(var(--kiss-arrive-scale, 1.9) * 1.12));
+  }
+  100% {
+    transform: translate(-50%, -50%)
+      scale(calc(var(--kiss-arrive-scale, 1.9) * 1.02));
+  }
+}
+@keyframes kiss-lips-breathe-self {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(var(--kiss-arrive-scale, 1.9))
+      translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%)
+      scale(calc(var(--kiss-arrive-scale, 1.9) * 1.06)) translateY(-5px);
+  }
+}
+.reaction-screen-layer .kiss-screen-reaction__heart {
+  position: fixed;
+  z-index: 528;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  font-size: 28px;
+  line-height: 36px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  animation-name: kiss-heart-rise;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+}
+.reaction-screen-layer .kiss-screen-reaction__heart.is-pop {
+  font-size: 32px;
+  animation-name: kiss-heart-rise-pop;
+  animation-timing-function: cubic-bezier(0.18, 0.9, 0.28, 1.15);
+}
+@keyframes kiss-heart-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateX(0) translateY(8px)
+      scale(calc(var(--kiss-heart-scale, 1) * 0.55));
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%)
+      translateX(var(--kiss-heart-drift, 0px))
+      translateY(var(--kiss-heart-rise, -110px))
+      scale(var(--kiss-heart-scale, 1));
+  }
+}
+@keyframes kiss-heart-rise-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateX(0) translateY(10px)
+      scale(calc(var(--kiss-heart-scale, 1) * 0.35));
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateX(calc(var(--kiss-heart-drift, 0px) * 0.15))
+      translateY(-6px) scale(calc(var(--kiss-heart-scale, 1) * 1.18));
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateX(calc(var(--kiss-heart-drift, 0px) * 0.4))
+      translateY(calc(var(--kiss-heart-rise, -110px) * 0.35))
+      scale(var(--kiss-heart-scale, 1));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%)
+      translateX(var(--kiss-heart-drift, 0px))
+      translateY(var(--kiss-heart-rise, -110px))
+      scale(calc(var(--kiss-heart-scale, 1) * 0.85));
+  }
+}
+
 /* 飞行番茄：基准约 80px，JS scale 0.3→1→2 → 视觉约 24→80→160px */
 .reaction-screen-layer .tomato-fly {
   position: fixed;
@@ -5346,6 +5571,109 @@ page {
   height: 0;
   z-index: 524;
   pointer-events: none;
+}
+/* 第三方：撞击锚在目标头像（由 inline left/top/scale 覆盖屏中默认） */
+.reaction-screen-layer .tomato-hit.is-avatar-anchor {
+  position: fixed;
+  z-index: 525;
+}
+
+/* 🪣 第一视角全屏覆水（效果在屏中，非飞向头像） */
+.reaction-screen-layer .bucket-screen-reaction {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 523;
+  pointer-events: none;
+  opacity: 0;
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring {
+  opacity: 1;
+}
+.reaction-screen-layer .bucket-screen-reaction__sheet {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 0;
+  border-radius: 0 0 40% 40%;
+  background: linear-gradient(
+    180deg,
+    rgba(120, 190, 230, 0.55) 0%,
+    rgba(90, 170, 220, 0.35) 55%,
+    rgba(90, 170, 220, 0.08) 100%
+  );
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__sheet.s0 {
+  animation: bucket-screen-sheet 1.4s ease-out forwards;
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__sheet.s1 {
+  left: 18%;
+  right: 22%;
+  animation: bucket-screen-sheet 1.55s ease-out 0.06s forwards;
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__sheet.s2 {
+  left: 28%;
+  right: 12%;
+  animation: bucket-screen-sheet 1.35s ease-out 0.1s forwards;
+}
+.reaction-screen-layer .bucket-screen-reaction__cascade {
+  position: absolute;
+  top: 12%;
+  width: 18px;
+  height: 0;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(150, 210, 240, 0.7) 0%,
+    rgba(100, 180, 225, 0.35) 70%,
+    transparent 100%
+  );
+}
+.reaction-screen-layer .bucket-screen-reaction__cascade.c0 { left: 32%; }
+.reaction-screen-layer .bucket-screen-reaction__cascade.c1 { left: 48%; width: 24px; }
+.reaction-screen-layer .bucket-screen-reaction__cascade.c2 { left: 62%; }
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__cascade.c0 {
+  animation: bucket-screen-cascade 1.6s ease-out 0.12s forwards;
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__cascade.c1 {
+  animation: bucket-screen-cascade 1.8s ease-out 0.18s forwards;
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__cascade.c2 {
+  animation: bucket-screen-cascade 1.5s ease-out 0.22s forwards;
+}
+.reaction-screen-layer .bucket-screen-reaction__pool {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 0;
+  border-radius: 40% 40% 0 0;
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    rgba(100, 180, 220, 0.45) 0%,
+    rgba(100, 180, 220, 0.18) 55%,
+    transparent 100%
+  );
+}
+.reaction-screen-layer .bucket-screen-reaction.is-pouring .bucket-screen-reaction__pool {
+  animation: bucket-screen-pool 1.8s ease-out 0.3s forwards;
+}
+@keyframes bucket-screen-sheet {
+  0% { height: 0; opacity: 0.2; }
+  55% { height: 62%; opacity: 0.85; }
+  100% { height: 78%; opacity: 0.55; }
+}
+@keyframes bucket-screen-cascade {
+  0% { height: 0; opacity: 0; }
+  40% { height: 45%; opacity: 0.85; }
+  100% { height: 70%; opacity: 0.35; }
+}
+@keyframes bucket-screen-pool {
+  0% { height: 0; opacity: 0; }
+  100% { height: 28%; opacity: 0.7; }
 }
 .reaction-screen-layer .tomato-hit__shockwave {
   position: absolute;

@@ -10,9 +10,24 @@
  */
 
 const SOUND_SRC = {
+  /** Demo bucket：水桶.mov 有效倒水段（1170–1920ms），翻转倒水主音 */
   bucket_water: '/subpackages/scoring/assets/sounds/bucket_water.wav',
+  /** Demo bucket：到达提示（1175–1310ms） */
+  bucket_start: '/subpackages/scoring/assets/sounds/bucket_start.wav',
+  /** Demo bucket：与 bucket_water 同段，timeline 别名 */
+  bucket_pour: '/subpackages/scoring/assets/sounds/bucket_pour.wav',
+  /** Demo bucket：尾部短促（1720–1920ms），资源保留 */
+  bucket_end: '/subpackages/scoring/assets/sounds/bucket_end.wav',
   egg_hit: '/subpackages/scoring/assets/sounds/egg_hit.wav',
-  egg_hit_finale: '/subpackages/scoring/assets/sounds/egg_hit_finale.wav'
+  egg_hit_finale: '/subpackages/scoring/assets/sounds/egg_hit_finale.wav',
+  /** Demo boxing：由 音频文件/拳击.mov 转码；连击整段节奏 */
+  boxing: '/subpackages/scoring/assets/sounds/boxing.wav',
+  /** Demo boxing 终结拳：从 boxing.wav 截取第一拳片段（430–640ms） */
+  boxing_hit_first: '/subpackages/scoring/assets/sounds/boxing_hit_first.wav',
+  /** Demo kiss：亲吻.mov 有效接触段（540–900ms） */
+  kiss: '/subpackages/scoring/assets/sounds/kiss.wav',
+  /** Demo flower：送花.mov 有效段（220–900ms），到达目标瞬间播放 */
+  flower_send: '/subpackages/scoring/assets/sounds/flower_send.wav'
 };
 
 /** @type {Object.<string, any>} */
@@ -46,17 +61,32 @@ function warmReactionSounds(keys) {
   }
 }
 
-function _playNow(soundKey) {
+/**
+ * @param {string} soundKey
+ * @param {{ volume?: number, seekMs?: number }=} opts
+ */
+function _playNow(soundKey, opts) {
   const audio = _getOrCreatePlayer(soundKey);
   if (!audio) return;
+  const o = opts && typeof opts === 'object' ? opts : {};
+  let volume = o.volume != null ? Number(o.volume) : 1;
+  if (!Number.isFinite(volume)) volume = 1;
+  if (volume < 0) volume = 0;
+  if (volume > 1) volume = 1;
   try {
     audio.stop();
   } catch (e) {
     /* ignore */
   }
   try {
-    // 部分机型在未 canplay 时 seek 会卡住原生层；失败则直接 play
-    audio.seek(0);
+    audio.volume = volume;
+  } catch (e) {
+    /* ignore */
+  }
+  const seekMs = o.seekMs != null ? Number(o.seekMs) : 0;
+  const seekSec = Number.isFinite(seekMs) && seekMs > 0 ? seekMs / 1000 : 0;
+  try {
+    audio.seek(seekSec);
   } catch (e) {
     /* ignore */
   }
@@ -66,18 +96,20 @@ function _playNow(soundKey) {
 /**
  * 播放反应音效（可重复触发；同 key 会停掉再播）。
  * 播放动作 defer 到下一拍，避免与页面 setData 同帧抢合成。
- * @param {string} key 音效键，如 'bucket_water'
+ * @param {string} key 音效键，如 'bucket_water' | 'boxing'
+ * @param {{ volume?: number, seekMs?: number }=} opts
  */
-function playReactionSound(key) {
+function playReactionSound(key, opts) {
   const soundKey = key != null ? String(key).trim() : '';
   if (!soundKey || !SOUND_SRC[soundKey]) {
     console.log('[reaction-sound] unknown key', soundKey);
     return;
   }
+  const playOpts = opts && typeof opts === 'object' ? opts : {};
   try {
     const run = function () {
       try {
-        _playNow(soundKey);
+        _playNow(soundKey, playOpts);
       } catch (err) {
         console.log('[reaction-sound] play failed', soundKey, err);
       }
@@ -89,6 +121,18 @@ function playReactionSound(key) {
     }
   } catch (err) {
     console.log('[reaction-sound] play failed', soundKey, err);
+  }
+}
+
+/** 停止指定 key（若正在播放） */
+function stopReactionSound(key) {
+  const soundKey = key != null ? String(key).trim() : '';
+  const audio = _players[soundKey];
+  if (!audio) return;
+  try {
+    audio.stop();
+  } catch (e) {
+    /* ignore */
   }
 }
 
@@ -116,5 +160,6 @@ module.exports = {
   SOUND_SRC: SOUND_SRC,
   warmReactionSounds: warmReactionSounds,
   playReactionSound: playReactionSound,
+  stopReactionSound: stopReactionSound,
   destroyReactionSounds: destroyReactionSounds
 };

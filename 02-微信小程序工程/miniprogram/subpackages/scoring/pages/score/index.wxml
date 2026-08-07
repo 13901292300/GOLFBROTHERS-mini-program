@@ -1927,12 +1927,12 @@
         <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🍺</view>
         <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚀</view>
         <view class="player-action-modal__item" catchtap="onPlayerActionBoxingTap">👊</view>
-        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚗</view>
+        <view class="player-action-modal__item" catchtap="onPlayerActionKissTap">👄</view>
       </view>
     </view>
   </view>
 
-  <!-- Demo：reaction-screen-layer（tomato / flower / egg / boxing） -->
+  <!-- Demo：reaction-screen-layer（tomato / flower / egg / boxing / kiss） -->
   <view
     wx:if="{{reactionScreenVisible}}"
     class="reaction-screen-layer {{reactionScreenFading ? 'is-fading' : ''}}"
@@ -1946,7 +1946,8 @@
 
       <view
         wx:if="{{reactionTomatoSplashVisible}}"
-        class="tomato-hit tomato-hit--{{reactionTomatoImpactPhase}}"
+        class="tomato-hit tomato-hit--{{reactionTomatoImpactPhase}} {{reactionTomatoAnchorMode === 'avatar' ? 'is-avatar-anchor' : ''}}"
+        style="{{reactionTomatoHitStyle}}"
       >
         <view class="tomato-hit__shockwave"></view>
         <view class="tomato-hit__crack c0"></view>
@@ -1963,7 +1964,10 @@
         <view class="tomato-hit__pulp p5"></view>
       </view>
 
-      <view class="tomato-smear {{reactionTomatoJuiceActive ? 'is-active' : ''}}">
+      <view
+        wx:if="{{reactionTomatoAnchorMode !== 'avatar'}}"
+        class="tomato-smear {{reactionTomatoJuiceActive ? 'is-active' : ''}}"
+      >
         <view class="tomato-smear__impact"></view>
         <view class="tomato-smear__hang"></view>
         <view class="tomato-smear__run run-left"></view>
@@ -1974,13 +1978,30 @@
         <view class="tomato-smear__streak s2"></view>
       </view>
 
-      <view class="tomato-drip {{reactionTomatoDripActive ? 'is-active' : ''}}">
+      <view
+        wx:if="{{reactionTomatoAnchorMode !== 'avatar'}}"
+        class="tomato-drip {{reactionTomatoDripActive ? 'is-active' : ''}}"
+      >
         <view class="tomato-drip__drop d0"></view>
         <view class="tomato-drip__drop d1"></view>
         <view class="tomato-drip__drop d2"></view>
         <view class="tomato-drip__drop d3"></view>
       </view>
     </block>
+
+    <!-- 🪣 第一视角全屏覆水 -->
+    <view
+      wx:if="{{reactionScreenMode === 'bucket'}}"
+      class="bucket-screen-reaction {{reactionBucketScreenPouring ? 'is-pouring' : ''}}"
+    >
+      <view class="bucket-screen-reaction__sheet s0"></view>
+      <view class="bucket-screen-reaction__sheet s1"></view>
+      <view class="bucket-screen-reaction__sheet s2"></view>
+      <view class="bucket-screen-reaction__cascade c0"></view>
+      <view class="bucket-screen-reaction__cascade c1"></view>
+      <view class="bucket-screen-reaction__cascade c2"></view>
+      <view class="bucket-screen-reaction__pool"></view>
+    </view>
 
     <!-- 🌹 第一视角花雨：远处飞入 → 中心开放 → 持续生成 → 飘落 -->
     <view
@@ -2131,6 +2152,46 @@
         <text class="boxing-comic-impact__star s0">✦</text>
         <text class="boxing-comic-impact__star s1">✦</text>
         <text class="boxing-comic-impact__star s2">✦</text>
+      </view>
+    </view>
+
+    <!-- 👄 亲吻：self 近镜头 / observer 锚定头像 kiss-target-layer -->
+    <view
+      wx:if="{{reactionScreenMode === 'kiss'}}"
+      class="kiss-screen-reaction {{reactionKissIsSelf ? 'is-self' : 'is-observer'}}"
+    >
+      <!-- 飞行嘴唇（self 全程；observer 仅飞入阶段） -->
+      <view
+        wx:if="{{reactionKissLipsVisible}}"
+        class="kiss-screen-reaction__lips phase-{{reactionKissLipsPhase}}"
+        style="{{reactionKissLipsStyle}}"
+      >👄</view>
+      <!-- Self 红心 -->
+      <block wx:if="{{reactionKissIsSelf}}">
+        <view
+          wx:for="{{reactionKissHearts}}"
+          wx:key="id"
+          class="kiss-screen-reaction__heart {{item.pop ? 'is-pop' : ''}}"
+          style="{{item.style}}"
+        >❤️</view>
+      </block>
+
+      <!-- Observer：锚定目标头像中心（嘴唇中心 = 头像中心） -->
+      <view
+        wx:if="{{reactionKissTargetVisible}}"
+        class="kiss-target-layer"
+        style="{{reactionKissTargetStyle}}"
+      >
+        <view
+          class="kiss-target-layer__lips phase-{{reactionKissLipsPhase}}"
+          style="{{reactionKissTargetLipsStyle}}"
+        >👄</view>
+        <view
+          wx:for="{{reactionKissTargetHearts}}"
+          wx:key="id"
+          class="kiss-target-layer__heart"
+          style="{{item.style}}"
+        >❤️</view>
       </view>
     </view>
   </view>

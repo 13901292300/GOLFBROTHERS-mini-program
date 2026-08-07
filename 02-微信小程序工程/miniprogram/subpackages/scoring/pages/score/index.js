@@ -17,6 +17,10 @@ const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const reactionSounds = require('../../utils/reactionSounds.js');
+const boxingReactionTimeline = require('../../utils/boxingReactionTimeline.js');
+const bucketReactionTimeline = require('../../utils/bucketReactionTimeline.js');
+const kissReactionTimeline = require('../../utils/kissReactionTimeline.js');
+const flowerReactionTimeline = require('../../utils/flowerReactionTimeline.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
@@ -2233,13 +2237,30 @@ Page({
     /** Demo：第一视角 reaction-screen-layer（tomato | flower） */
     reactionScreenVisible: false,
     reactionScreenFading: false,
-    reactionScreenMode: '', // tomato | flower | egg | boxing
+    reactionScreenMode: '', // tomato | flower | egg | boxing | kiss
+    /** Demo：👄 亲吻（kiss-screen-reaction；原 🚗 入口） */
+    reactionKissLipsVisible: false,
+    reactionKissLipsStyle: '',
+    reactionKissLipsPhase: '', // fly | hit | hold | fade
+    reactionKissHearts: [],
+    /** Demo：👄 Self 近镜头增强（不影响 observer） */
+    reactionKissIsSelf: false,
+    /** Demo：👄 Observer — kiss-target-layer（锚定目标头像 rect） */
+    reactionKissTargetVisible: false,
+    reactionKissTargetStyle: '',
+    reactionKissTargetLipsStyle: '',
+    reactionKissTargetHearts: [],
     reactionTomatoFlyVisible: false,
     reactionTomatoFlyStyle: '',
     reactionTomatoSplashVisible: false,
     reactionTomatoImpactPhase: '', // impact | burst | flow
     reactionTomatoJuiceActive: false,
     reactionTomatoDripActive: false,
+    reactionTomatoHitStyle: '',
+    reactionTomatoAnchorMode: '', // screen | avatar
+    /** Demo：🪣 第一视角全屏覆水 */
+    reactionBucketScreenActive: false,
+    reactionBucketScreenPouring: false,
     /** Demo：🌹 第一视角花雨（flower-screen-reaction） */
     reactionFlowerFlyVisible: false,
     reactionFlowerFlyStyle: '',
@@ -7169,12 +7190,231 @@ Page({
     wx.showToast({ title: '他人主页暂未开放', icon: 'none' });
   },
 
-  /** Demo：占位互动元素（🍺🚀🚗）仅展示，不播动画 */
+  /** Demo：占位互动元素（🍺🚀）仅展示，不播动画 */
   onPlayerActionPlaceholderTap() {},
 
+  /** Demo：reaction 窗口尺寸 */
+  _getReactionWindowSize() {
+    let winW = 375;
+    let winH = 667;
+    try {
+      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
+      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
+      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
+    } catch (err) {
+      winW = 375;
+      winH = 667;
+    }
+    return { winW: winW, winH: winH };
+  },
+
+  /** Demo：当前操作用户 id（用于第一视角 / 第三方分流） */
+  _getCurrentReactionUserId() {
+    try {
+      const user = gameStore.getCurrentUser() || {};
+      const id = String(user.userId || user.id || '').trim();
+      if (id) return id;
+    } catch (e) {
+      /* ignore */
+    }
+    return 'me';
+  },
+
+  /** Demo：target === 当前用户 → 第一视角 */
+  _isSelfReactionTarget(targetUserId) {
+    const tid = targetUserId != null ? String(targetUserId).trim() : '';
+    if (!tid) return false;
+    if (isSameUserIdentity(tid, 'me')) return true;
+    return isSameUserIdentity(tid, this._getCurrentReactionUserId());
+  },
+
   /**
-   * Demo：👊 → 第三人称拳击 reaction（目标头像克隆至屏中，左右连击 + 终结击飞回座位）。
-   * 仅 demo-weekend-amateur；复用 player-action-modal；不改原头像 / 成绩。
+   * Demo：SELF 专用 — 随机屏幕边缘入场。
+   * 不读头像 rect；不用远距离入场原则（该原则仅 observer）。
+   */
+  _getRandomSelfReactionEntryPoint(winW, winH) {
+    const w = Number(winW) || 375;
+    const h = Number(winH) || 667;
+    const pad = Math.max(72, Math.round(Math.min(w, h) * 0.2));
+    const candidates = [
+      { key: 'top', x: w * 0.5, y: -pad },
+      { key: 'bottom', x: w * 0.5, y: h + pad },
+      { key: 'left', x: -pad, y: h * 0.5 },
+      { key: 'right', x: w + pad, y: h * 0.5 },
+      { key: 'top-left', x: -pad, y: -pad },
+      { key: 'top-right', x: w + pad, y: -pad },
+      { key: 'bottom-left', x: -pad, y: h + pad },
+      { key: 'bottom-right', x: w + pad, y: h + pad }
+    ];
+    return candidates[Math.floor(Math.random() * candidates.length)] || candidates[0];
+  },
+
+  /**
+   * Demo：OBSERVER 专用 — 远距离入场点（仅第三方）。
+   * 从 8 边缘候选选距目标头像最远点，增加飞行距离/空间感。
+   * 禁止用于 self：self 请用 _getRandomSelfReactionEntryPoint，落点永远在屏中。
+   * 不考虑成绩区/其它 UI（reaction layer 最高层）。
+   */
+  _getReactionEntryPoint(targetRect) {
+    const size = this._getReactionWindowSize();
+    const winW = size.winW;
+    const winH = size.winH;
+    const rect =
+      this._normalizePlayerActionAvatarRect(targetRect) ||
+      this._fallbackPlayerActionAvatarRect();
+    const tx = rect.left + rect.width / 2;
+    const ty = rect.top + rect.height / 2;
+    const pad = Math.max(80, Math.round(Math.min(winW, winH) * 0.2));
+    const candidates = [
+      { key: 'top', x: winW * 0.5, y: -pad },
+      { key: 'bottom', x: winW * 0.5, y: winH + pad },
+      { key: 'left', x: -pad, y: winH * 0.5 },
+      { key: 'right', x: winW + pad, y: winH * 0.5 },
+      { key: 'top-left', x: -pad, y: -pad },
+      { key: 'top-right', x: winW + pad, y: -pad },
+      { key: 'bottom-left', x: -pad, y: winH + pad },
+      { key: 'bottom-right', x: winW + pad, y: winH + pad }
+    ];
+    let best = candidates[0];
+    let bestD = -1;
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const dx = c.x - tx;
+      const dy = c.y - ty;
+      const d = dx * dx + dy * dy;
+      if (d > bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return {
+      x: best.x,
+      y: best.y,
+      key: best.key,
+      winW: winW,
+      winH: winH,
+      targetX: tx,
+      targetY: ty
+    };
+  },
+
+  /**
+   * Demo：SELF / 第一视角统一入口（targetUserId === currentUserId）。
+   * - 最终效果永远在屏幕中央（flower 屏中开放、tomato 屏中撞击等）
+   * - 入场方向可随机（_getRandomSelfReactionEntryPoint）
+   * - 不根据头像位置计算；不适用远距离入场原则
+   */
+  _playSelfReaction(type, ctx) {
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const t = type != null ? String(type).trim() : '';
+    const context = ctx && typeof ctx === 'object' ? ctx : {};
+    if (t === 'tomato') {
+      this._playScreenTomatoReaction({ perspective: 'self' });
+      return;
+    }
+    if (t === 'flower') {
+      this._playScreenFlowerReaction();
+      return;
+    }
+    if (t === 'egg') {
+      this._playScreenEggComboReaction();
+      return;
+    }
+    if (t === 'bucket') {
+      this._playSelfBucketScreenReaction();
+      return;
+    }
+    if (t === 'boxing') {
+      // boxing 仍以克隆头像做中央演出，但不走远距离入场原则
+      const playerId = String(context.playerId || '').trim();
+      const avatarUrl = context.avatarUrl || '';
+      const self = this;
+      this._queryPlayerActionAvatarRect(playerId, function (rect) {
+        if (!rect) {
+          self._playerActionBoxingBusy = false;
+          return;
+        }
+        self._playScreenBoxingReaction(rect, avatarUrl, playerId);
+      });
+      return;
+    }
+    if (t === 'kiss') {
+      this._playSelfKissReaction();
+      return;
+    }
+  },
+
+  /**
+   * Demo：OBSERVER / 第三方统一入口（targetUserId !== currentUserId）。
+   * - 目标头像为视觉中心，动画落点 = 目标头像
+   * - 入场仅此处使用 _getReactionEntryPoint（远距离原则）
+   * - 若误传入 self 目标，回退 _playSelfReaction，避免污染第一视角
+   */
+  _playObserverReaction(type, targetPlayer) {
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const target = targetPlayer && typeof targetPlayer === 'object' ? targetPlayer : {};
+    const playerId = String(target.playerId || target.userId || '').trim();
+    const avatarUrl =
+      target.avatar || target.avatarUrl || target.headimgurl || '';
+    const t = type != null ? String(type).trim() : '';
+    if (!playerId) {
+      console.log('[reaction-observer] missing playerId', t);
+      return;
+    }
+    // 防误调：self 目标不得走远距离入场 / 头像落点路径
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction(t, {
+        playerId: playerId,
+        avatarUrl: avatarUrl,
+        target: target
+      });
+      return;
+    }
+    const self = this;
+    this._queryPlayerActionAvatarRect(playerId, function (rect) {
+      if (!rect) {
+        if (t === 'tomato') self._playerActionTomatoBusy = false;
+        else if (t === 'flower') self._playerActionFlowerBusy = false;
+        else if (t === 'egg') self._playerActionEggBusy = false;
+        else if (t === 'bucket') self._playerActionBucketBusy = false;
+        else if (t === 'boxing') self._playerActionBoxingBusy = false;
+        else if (t === 'kiss') self._playerActionKissBusy = false;
+        return;
+      }
+      if (t === 'tomato') {
+        self._playObserverTomatoReaction(rect, playerId);
+        return;
+      }
+      if (t === 'flower') {
+        self._playPlayerActionFlower(rect, playerId);
+        return;
+      }
+      if (t === 'egg') {
+        self._playPlayerActionEggCombo(rect, playerId);
+        return;
+      }
+      if (t === 'bucket') {
+        self._playPlayerActionBucket(rect, playerId);
+        return;
+      }
+      if (t === 'boxing') {
+        self._playScreenBoxingReaction(rect, avatarUrl, playerId);
+        return;
+      }
+      if (t === 'kiss') {
+        self._playObserverKissReaction(rect, playerId);
+        return;
+      }
+    });
+  },
+
+  /**
+   * Demo：👊 → 拳击 reaction（按目标分流第一视角 / 第三方）。
+   * 仅 demo-weekend-amateur；复用 player-action-modal；不改成绩。
    */
   onPlayerActionBoxingTap() {
     if (this._playerActionBoxingBusy) return;
@@ -7192,16 +7432,621 @@ Page({
     }
     const avatarUrl =
       (target && (target.avatar || target.avatarUrl || target.headimgurl)) || '';
-    const self = this;
     this._playerActionBoxingBusy = true;
-    this._queryPlayerActionAvatarRect(playerId, function (rect) {
-      if (!rect) {
-        self._playerActionBoxingBusy = false;
+    const ctx = { playerId: playerId, avatarUrl: avatarUrl, target: target };
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('boxing', ctx);
+    } else {
+      this._playObserverReaction('boxing', target);
+    }
+  },
+
+  /**
+   * Demo：👄 → 亲吻 reaction（原 🚗 入口位置）。
+   * 仅 demo-weekend-amateur；不改成绩 / modal 结构。
+   */
+  onPlayerActionKissTap() {
+    if (this._playerActionKissBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
+    if (!playerId) {
+      console.log('[player-action-kiss] missing playerId');
+      return;
+    }
+    this._playerActionKissBusy = true;
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('kiss', { playerId: playerId, target: target });
+    } else {
+      this._playObserverReaction('kiss', target);
+    }
+  },
+
+  /** Demo：👄 SELF — 随机边缘入场 → 屏中亲吻 + 红心 */
+  _playSelfKissReaction() {
+    const size = this._getReactionWindowSize();
+    const winW = size.winW;
+    const winH = size.winH;
+    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
+    this._playScreenKissReaction({
+      mode: 'self',
+      startX: origin.x,
+      startY: origin.y,
+      entryKey: origin.key || '',
+      endX: winW / 2,
+      endY: winH / 2
+    });
+  },
+
+  /** Demo：👄 OBSERVER — 远距离入场 → 嘴唇停在目标头像正中心 */
+  _playObserverKissReaction(rect, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    if (this._isSelfReactionTarget(hitPlayerId)) {
+      this._playSelfKissReaction();
+      return;
+    }
+    const norm =
+      this._normalizePlayerActionAvatarRect(rect) ||
+      this._fallbackPlayerActionAvatarRect() ||
+      rect;
+    const left = Number(norm.left);
+    const top = Number(norm.top);
+    const width = Number(norm.width);
+    const height = Number(norm.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionKissBusy = false;
+      return;
+    }
+    const entry = this._getReactionEntryPoint(norm);
+    // 嘴唇最终落点 = 头像几何中心（不用屏中 / 旁侧偏移）
+    const endX = left + width / 2;
+    const endY = top + height / 2;
+    this._playScreenKissReaction({
+      mode: 'observer',
+      startX: entry.x,
+      startY: entry.y,
+      entryKey: entry.key || '',
+      endX: endX,
+      endY: endY,
+      playerId: hitPlayerId,
+      targetRect: {
+        left: left,
+        top: top,
+        width: width,
+        height: height
+      }
+    });
+  },
+
+  _clearKissReactionTimers() {
+    const keys = ['_kissArcTimer', '_kissFlyStartTimer'];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (this[k]) {
+        clearTimeout(this[k]);
+        this[k] = null;
+      }
+    }
+    const tl = this._kissTimelineTimers;
+    if (tl && tl.length) {
+      for (let j = 0; j < tl.length; j++) {
+        clearTimeout(tl[j]);
+      }
+    }
+    this._kissTimelineTimers = [];
+  },
+
+  _kissTimeout(fn, ms) {
+    const self = this;
+    if (!this._kissTimelineTimers) this._kissTimelineTimers = [];
+    const id = setTimeout(function () {
+      const list = self._kissTimelineTimers || [];
+      const idx = list.indexOf(id);
+      if (idx >= 0) list.splice(idx, 1);
+      try {
+        fn();
+      } catch (err) {
+        console.log('[kiss-timeline] handler error', err);
+      }
+    }, ms);
+    this._kissTimelineTimers.push(id);
+    return id;
+  },
+
+  _stopKissReactionSounds() {
+    try {
+      reactionSounds.stopReactionSound('kiss');
+    } catch (err) {
+      /* ignore */
+    }
+  },
+
+  _buildKissLipsStyle(x, y, rot, scale, opacity) {
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;opacity:' +
+      opacity +
+      ';transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg) scale(' +
+      scale +
+      ');'
+    );
+  },
+
+  /**
+   * @param {number} endX
+   * @param {number} endY
+   * @param {{ count?: number, selfPop?: boolean, delayBase?: number }=} opts
+   */
+  _buildKissHearts(endX, endY, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const selfPop = !!o.selfPop;
+    const count =
+      o.count != null
+        ? Math.max(1, o.count | 0)
+        : selfPop
+          ? 3 + Math.floor(Math.random() * 6) // self 3–8
+          : 3 + Math.floor(Math.random() * 4); // observer 3–6
+    const delayBase = o.delayBase != null ? o.delayBase : 0.05;
+    const hearts = [];
+    for (let i = 0; i < count; i++) {
+      const scale = selfPop
+        ? (0.7 + Math.random() * 0.95).toFixed(2)
+        : (0.55 + Math.random() * 0.75).toFixed(2);
+      const delay = selfPop
+        ? (delayBase + Math.random() * 0.04).toFixed(2)
+        : (0.05 + i * (0.12 + Math.random() * 0.1) + Math.random() * 0.08).toFixed(2);
+      const dur = selfPop
+        ? (1.05 + Math.random() * 0.95).toFixed(2)
+        : (1.15 + Math.random() * 0.85).toFixed(2);
+      const drift = Math.round(
+        selfPop ? -42 + Math.random() * 84 : -28 + Math.random() * 56
+      );
+      const rise = Math.round(
+        selfPop ? -(110 + Math.random() * 90) : -(90 + Math.random() * 70)
+      );
+      const ox = Math.round(endX + (selfPop ? -18 + Math.random() * 36 : -10 + Math.random() * 20));
+      const oy = Math.round(endY + (selfPop ? -14 + Math.random() * 18 : -6 + Math.random() * 10));
+      hearts.push({
+        id: 'kh-' + i + '-' + Date.now() + '-' + Math.floor(Math.random() * 999),
+        pop: selfPop,
+        style:
+          'left:' +
+          ox +
+          'px;top:' +
+          oy +
+          'px;--kiss-heart-scale:' +
+          scale +
+          ';--kiss-heart-drift:' +
+          drift +
+          'px;--kiss-heart-rise:' +
+          rise +
+          'px;animation-duration:' +
+          dur +
+          's;animation-delay:' +
+          delay +
+          's;'
+      });
+    }
+    return hearts;
+  },
+
+  /** Demo：👄 Self — 连续弹出 3–8 颗红心（非一次全出） */
+  _startSelfKissHeartSpawn(endX, endY) {
+    const total = 3 + Math.floor(Math.random() * 6);
+    const self = this;
+    let spawned = 0;
+    const spawnOne = function () {
+      if (!self._kissTimelineCtx || self._kissTimelineCtx.mode !== 'self') return;
+      if (spawned >= total) return;
+      const next = (self.data.reactionKissHearts || []).concat(
+        self._buildKissHearts(endX, endY, { count: 1, selfPop: true, delayBase: 0 })
+      );
+      self.setData({ reactionKissHearts: next.slice(-8) });
+      spawned += 1;
+      if (spawned < total) {
+        self._kissTimeout(spawnOne, 70 + Math.floor(Math.random() * 110));
+      }
+    };
+    spawnOne();
+  },
+
+  /**
+   * Demo：👄 Observer — 红心相对 kiss-target-layer 中心（头像中心）生成。
+   * @returns {Array<{id:string, style:string}>}
+   */
+  _buildObserverKissTargetHearts() {
+    const count = 3 + Math.floor(Math.random() * 4); // 3–6
+    const hearts = [];
+    for (let i = 0; i < count; i++) {
+      const scale = (0.55 + Math.random() * 0.7).toFixed(2);
+      const delay = (0.04 + i * (0.1 + Math.random() * 0.08) + Math.random() * 0.06).toFixed(2);
+      const dur = (1.1 + Math.random() * 0.75).toFixed(2);
+      const drift = Math.round(-26 + Math.random() * 52);
+      const rise = Math.round(-(78 + Math.random() * 64));
+      hearts.push({
+        id: 'okh-' + i + '-' + Date.now(),
+        style:
+          'left:50%;top:50%;--kiss-heart-scale:' +
+          scale +
+          ';--kiss-heart-drift:' +
+          drift +
+          'px;--kiss-heart-rise:' +
+          rise +
+          'px;animation-duration:' +
+          dur +
+          's;animation-delay:' +
+          delay +
+          's;'
+      });
+    }
+    return hearts;
+  },
+
+  /** Demo：👄 Observer — kiss-target-layer 锚定头像 rect */
+  _buildKissTargetLayerStyle(targetRect) {
+    const tr = targetRect || {};
+    const left = Number(tr.left);
+    const top = Number(tr.top);
+    const width = Number(tr.width);
+    const height = Number(tr.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      return '';
+    }
+    return (
+      'left:' +
+      left +
+      'px;top:' +
+      top +
+      'px;width:' +
+      width +
+      'px;height:' +
+      height +
+      'px;'
+    );
+  },
+
+  _buildKissTargetLipsStyle(targetRect) {
+    const tr = targetRect || {};
+    const width = Number(tr.width);
+    const height = Number(tr.height);
+    const side = Math.max(
+      28,
+      Math.round(Math.max(Number.isFinite(width) ? width : 40, Number.isFinite(height) ? height : 40) * 0.98)
+    );
+    return (
+      '--kiss-target-side:' +
+      side +
+      'px;--kiss-target-font:' +
+      Math.round(side * 0.86) +
+      'px;'
+    );
+  },
+
+  /**
+   * Demo：👄 共用演出（self 屏中增强 / observer 头像保持原节奏）。
+   * 音效仅 kiss_hit 节点播放。
+   */
+  _playScreenKissReaction(opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const mode = o.mode === 'observer' ? 'observer' : 'self';
+    const isSelf = mode === 'self';
+    const startX = Number(o.startX);
+    const startY = Number(o.startY);
+    const endX = Number(o.endX);
+    const endY = Number(o.endY);
+    if (
+      !Number.isFinite(startX) ||
+      !Number.isFinite(startY) ||
+      !Number.isFinite(endX) ||
+      !Number.isFinite(endY)
+    ) {
+      this._playerActionKissBusy = false;
+      return;
+    }
+
+    const flyMs = isSelf
+      ? kissReactionTimeline.SELF_KISS_TIMING.flyMs
+      : kissReactionTimeline.KISS_TIMING.flyMs;
+    const holdMs = isSelf
+      ? kissReactionTimeline.SELF_KISS_TIMING.holdMs + Math.floor(Math.random() * 200)
+      : 1200 + Math.floor(Math.random() * 600); // observer 停留 1.2–1.8s
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const key = String(o.entryKey || '');
+    const sideSign = key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
+    const ctrlX = midX + sideSign * (36 + Math.random() * 52);
+    const ctrlY =
+      key.indexOf('top') >= 0
+        ? midY - (30 + Math.random() * 44)
+        : key.indexOf('bottom') >= 0
+          ? midY + (30 + Math.random() * 44)
+          : midY - sideSign * (24 + Math.random() * 36);
+    const arriveScale = isSelf ? 1.8 + Math.random() * 0.4 : 1; // self 1.8–2.2
+    const targetRect =
+      !isSelf && o.targetRect && typeof o.targetRect === 'object' ? o.targetRect : null;
+    const targetStyle = !isSelf ? this._buildKissTargetLayerStyle(targetRect) : '';
+    const targetLipsStyle = !isSelf ? this._buildKissTargetLipsStyle(targetRect) : '';
+
+    this._clearKissReactionTimers();
+    this._stopKissReactionSounds();
+    this._kissTimelineCtx = {
+      mode: mode,
+      startX: startX,
+      startY: startY,
+      endX: endX,
+      endY: endY,
+      ctrlX: ctrlX,
+      ctrlY: ctrlY,
+      flyMs: flyMs,
+      holdMs: holdMs,
+      arriveScale: arriveScale,
+      targetRect: targetRect,
+      targetStyle: targetStyle,
+      targetLipsStyle: targetLipsStyle
+    };
+
+    const startScale = isSelf ? 0.32 + Math.random() * 0.08 : 0.32;
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'kiss',
+      reactionKissIsSelf: isSelf,
+      reactionKissLipsVisible: true,
+      reactionKissLipsPhase: 'fly',
+      reactionKissLipsStyle: this._buildKissLipsStyle(
+        startX,
+        startY,
+        -12,
+        startScale,
+        isSelf ? 0.7 : 0.72
+      ),
+      reactionKissHearts: [],
+      reactionKissTargetVisible: false,
+      reactionKissTargetStyle: targetStyle,
+      reactionKissTargetLipsStyle: targetLipsStyle,
+      reactionKissTargetHearts: []
+    });
+
+    const timeline = kissReactionTimeline.buildKissReactionTimeline({
+      mode: mode,
+      flyMs: flyMs,
+      holdMs: holdMs
+    });
+    this._runKissReactionTimeline(timeline);
+  },
+
+  _runKissReactionTimeline(timeline) {
+    const self = this;
+    const list = timeline || [];
+    for (let i = 0; i < list.length; i++) {
+      (function (ev) {
+        self._kissTimeout(function () {
+          self._dispatchKissTimelineEvent(ev);
+        }, ev.time);
+      })(list[i]);
+    }
+  },
+
+  _dispatchKissTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._kissTimelineCtx || {};
+    const isSelf = ctx.mode === 'self';
+
+    if (action === 'fly_start' || action === 'kiss_fly') {
+      this._startKissArcFlight(ctx);
+      return;
+    }
+
+    if (action === 'kiss_hit') {
+      const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.9;
+      if (isSelf) {
+        // Self：接触瞬间放大脉冲 + 强音（飞行途中不播）
+        this.setData({
+          reactionKissLipsPhase: 'hit',
+          reactionKissLipsStyle:
+            'left:' +
+            ctx.endX +
+            'px;top:' +
+            ctx.endY +
+            'px;opacity:1;--kiss-arrive-scale:' +
+            arriveScale.toFixed(2) +
+            ';'
+        });
+        if (e.sound) {
+          this._playReactionSound(e.sound, {
+            volume: e.volume != null ? e.volume : 1,
+            seekMs: e.seekMs != null ? e.seekMs : 0
+          });
+        }
+        const pulseMs =
+          (kissReactionTimeline.SELF_KISS_TIMING &&
+            kissReactionTimeline.SELF_KISS_TIMING.hitPulseMs) ||
+          280;
+        const self = this;
+        this._kissTimeout(function () {
+          if (!self._kissTimelineCtx || self._kissTimelineCtx.mode !== 'self') return;
+          self.setData({
+            reactionKissLipsPhase: 'hold',
+            reactionKissLipsStyle:
+              'left:' +
+              ctx.endX +
+              'px;top:' +
+              ctx.endY +
+              'px;opacity:1;--kiss-arrive-scale:' +
+              arriveScale.toFixed(2) +
+              ';'
+          });
+        }, pulseMs);
         return;
       }
-      // 定位完成后再离位隐藏原头像，避免 query 量到空位
-      self._playScreenBoxingReaction(rect, avatarUrl, playerId);
-    });
+      // Observer：飞入嘴唇卸下 → kiss-target-layer 覆盖头像中心 + 亲吻脉冲
+      this.setData({
+        reactionKissLipsVisible: false,
+        reactionKissLipsStyle: '',
+        reactionKissTargetVisible: true,
+        reactionKissTargetStyle: ctx.targetStyle || this._buildKissTargetLayerStyle(ctx.targetRect),
+        reactionKissTargetLipsStyle:
+          ctx.targetLipsStyle || this._buildKissTargetLipsStyle(ctx.targetRect),
+        reactionKissLipsPhase: 'hit'
+      });
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.95,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      const pulseMs =
+        (kissReactionTimeline.KISS_TIMING && kissReactionTimeline.KISS_TIMING.hitPulseMs) ||
+        320;
+      const page = this;
+      this._kissTimeout(function () {
+        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'observer') return;
+        page.setData({ reactionKissLipsPhase: 'hold' });
+      }, pulseMs);
+      return;
+    }
+
+    if (action === 'hearts_start' || action === 'heart_spawn') {
+      if (isSelf) {
+        this._startSelfKissHeartSpawn(ctx.endX, ctx.endY);
+      } else {
+        // Observer：从头像中心（target layer）冒出，非屏中
+        this.setData({
+          reactionKissTargetHearts: this._buildObserverKissTargetHearts()
+        });
+      }
+      return;
+    }
+
+    if (action === 'lips_fade') {
+      this.setData({
+        reactionKissLipsPhase: 'fade',
+        reactionScreenFading: true
+      });
+      return;
+    }
+
+    if (action === 'cleanup') {
+      this._stopKissReactionSounds();
+      this._clearKissReactionTimers();
+      this.setData({
+        reactionScreenVisible: false,
+        reactionScreenFading: false,
+        reactionScreenMode: '',
+        reactionKissLipsVisible: false,
+        reactionKissLipsStyle: '',
+        reactionKissLipsPhase: '',
+        reactionKissHearts: [],
+        reactionKissIsSelf: false,
+        reactionKissTargetVisible: false,
+        reactionKissTargetStyle: '',
+        reactionKissTargetLipsStyle: '',
+        reactionKissTargetHearts: []
+      });
+      this._kissTimelineCtx = null;
+      this._playerActionKissBusy = false;
+    }
+  },
+
+  /** Demo：👄 贝塞尔飞行；Self 近镜头 / Observer 飞向头像中心 */
+  _startKissArcFlight(ctx) {
+    const self = this;
+    const c = ctx || this._kissTimelineCtx || {};
+    const isSelf = c.mode === 'self';
+    const startX = c.startX;
+    const startY = c.startY;
+    const endX = c.endX;
+    const endY = c.endY;
+    const ctrlX = c.ctrlX;
+    const ctrlY = c.ctrlY;
+    const flyMs = c.flyMs != null ? c.flyMs : isSelf ? 1080 : 980;
+    const arriveScale = c.arriveScale != null ? c.arriveScale : 2;
+    const easeIn = function (t) {
+      return t * t * t;
+    };
+    // Observer：小 → 放大，终点刚好盖住头像中心尺度
+    const scaleAtObserver = function (t) {
+      if (t <= 0.5) return 0.32 + (0.7 - 0.32) * (t / 0.5);
+      return 0.7 + (1.05 - 0.7) * ((t - 0.5) / 0.5);
+    };
+    // Self：0.35 → 0.8 → 1.3 → 1.8~2.2（越近越大）
+    const scaleAtSelf = function (t) {
+      if (t <= 0.42) return 0.35 + (0.8 - 0.35) * (t / 0.42);
+      if (t <= 0.72) return 0.8 + (1.3 - 0.8) * ((t - 0.42) / 0.3);
+      return 1.3 + (arriveScale - 1.3) * ((t - 0.72) / 0.28);
+    };
+    const t0 = Date.now();
+
+    const tick = function () {
+      if (!self._kissTimelineCtx) return;
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeIn(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const bob = isSelf
+        ? Math.sin(raw * Math.PI * 2.4) * (14 * (1 - raw * 0.35))
+        : Math.sin(raw * Math.PI * 1.8) * (8 * (1 - raw * 0.5));
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
+      const rot = isSelf
+        ? -18 + 36 * t + Math.sin(raw * Math.PI * 1.6) * 14
+        : -16 + 30 * t + Math.sin(raw * Math.PI) * 12;
+      const scale = isSelf ? scaleAtSelf(t) : scaleAtObserver(t);
+      const opacity = isSelf ? 0.68 + 0.32 * t : 0.72 + 0.28 * t;
+      self.setData({
+        reactionKissLipsPhase: 'fly',
+        reactionKissLipsStyle: self._buildKissLipsStyle(x, y, rot, scale, opacity)
+      });
+      if (raw < 1) {
+        self._kissArcTimer = setTimeout(tick, 16);
+        return;
+      }
+      self._kissArcTimer = null;
+      // 落点视觉由 kiss_hit 对齐；此处兜底定位到头像/屏中心
+      if (isSelf) {
+        self.setData({
+          reactionKissLipsStyle:
+            'left:' +
+            endX +
+            'px;top:' +
+            endY +
+            'px;opacity:1;--kiss-arrive-scale:' +
+            arriveScale.toFixed(2) +
+            ';'
+        });
+      } else {
+        self.setData({
+          reactionKissLipsStyle:
+            'left:' + endX + 'px;top:' + endY + 'px;opacity:1;'
+        });
+      }
+    };
+
+    tick();
   },
 
   _clearPlayerActionBoxingTimers() {
@@ -7477,8 +8322,8 @@ Page({
   },
 
   /**
-   * Demo：👊 boxing-reaction-layer（卡通格斗）
-   * 连击累积变形 → 击晕（星星+摇晃）→ 巨型拳蓄力 → 高速终结 → 土豆形飞回后复圆。
+   * Demo：👊 boxing-reaction-layer — timeline 驱动动画+拳击音频同步。
+   * 连击节奏对齐 boxing.wav 峰值；终结拳复用第一拳音频（seek）并提高音量。
    */
   _playScreenBoxingReaction(rect, avatarUrl, playerId) {
     let winW = 375;
@@ -7500,17 +8345,25 @@ Page({
     const centerCx = winW / 2;
     const centerCy = winH * 0.42;
     const centerScale = 4;
-    const flyInMs = 420;
+    const flyInMs = boxingReactionTimeline.FLY_IN_MS || 420;
     const flyBackMs = 620;
-    const punchCount = 6 + Math.floor(Math.random() * 2); // 6~7
-    const punchGap = 300;
-    const dizzyMs = 1000;
-    const chargeMs = 500;
     const url = avatarUrl != null ? String(avatarUrl) : '';
-    const dizzyStars = 3 + Math.floor(Math.random() * 3); // 3~5（dizzy-layer）
+    const dizzyStars = 3 + Math.floor(Math.random() * 3);
     const detachedId = playerId != null ? String(playerId).trim() : '';
 
     this._boxingDeform = this._buildBoxingCircleDeform(1);
+    this._boxingTimelineCtx = {
+      seatCx: seatCx,
+      seatCy: seatCy,
+      seatW: seatW,
+      seatH: seatH,
+      centerCx: centerCx,
+      centerCy: centerCy,
+      centerScale: centerScale,
+      winW: winW,
+      flyInMs: flyInMs,
+      flyBackMs: flyBackMs
+    };
 
     this._clearPlayerActionBoxingTimers();
     this.setData({
@@ -7529,7 +8382,6 @@ Page({
       reactionScreenVisible: true,
       reactionScreenFading: false,
       reactionScreenMode: 'boxing',
-      // 中央动画前：记分行原头像离位隐藏（占位保留）
       reactionAvatarDetached: !!detachedId,
       reactionAvatarDetachedPlayerId: detachedId,
       reactionBoxingAvatarUrl: url,
@@ -7552,80 +8404,122 @@ Page({
       reactionBoxingDizzyStarCount: dizzyStars
     });
 
-    const self = this;
+    const timeline = boxingReactionTimeline.buildBoxingReactionTimeline({
+      dizzyMs: 1000,
+      chargeMs: 500,
+      flyBackMs: flyBackMs
+    });
+    this._runBoxingReactionTimeline(timeline);
+  },
 
-    // 1) 飞到屏中 + 放大 4 倍
-    this._boxingTimeout(function () {
-      const next = self._cloneBoxingDeform(self._boxingDeform);
-      next.base = centerScale;
-      self._boxingDeform = next;
-      self.setData({
-        reactionBoxingShellStyle: self._buildBoxingShellStyle(
-          centerCx,
-          centerCy,
-          seatW,
-          seatH,
-          flyInMs
+  /** Demo：按 boxing timeline 统一调度动画与 boxing.wav */
+  _runBoxingReactionTimeline(timeline) {
+    const self = this;
+    const list = timeline || [];
+    for (let i = 0; i < list.length; i++) {
+      (function (ev) {
+        self._boxingTimeout(function () {
+          self._dispatchBoxingTimelineEvent(ev);
+        }, ev.time);
+      })(list[i]);
+    }
+  },
+
+  _dispatchBoxingTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._boxingTimelineCtx || {};
+    if (action === 'fly_in') {
+      const next = this._cloneBoxingDeform(this._boxingDeform);
+      next.base = ctx.centerScale != null ? ctx.centerScale : 4;
+      this._boxingDeform = next;
+      this.setData({
+        reactionBoxingShellStyle: this._buildBoxingShellStyle(
+          ctx.centerCx,
+          ctx.centerCy,
+          ctx.seatW,
+          ctx.seatH,
+          ctx.flyInMs || 420
         )
       });
-      self._applyBoxingDeformStyles(next, flyInMs);
-    }, 30);
-
-    // 2) 左下↗ / 右下↖ 交替连击（变形状态继承）
-    let punchAt = 30 + flyInMs + 140;
-    for (let i = 0; i < punchCount; i++) {
-      (function (idx, at) {
-        const fromLeft = idx % 2 === 0;
-        self._boxingTimeout(function () {
-          self._triggerBoxingPunch({
-            side: fromLeft ? 'left' : 'right',
-            punchIndex: idx
-          });
-        }, at);
-      })(i, punchAt);
-      punchAt += punchGap;
+      this._applyBoxingDeformStyles(next, ctx.flyInMs || 420);
+      return;
     }
-
-    // 3) 击晕阶段：约 1s，保持土豆形 + 旋转星星 + 左右摇晃
-    const lastPunchAt = punchAt - punchGap;
-    const dizzyAt = lastPunchAt + 320;
-    this._boxingTimeout(function () {
-      self.setData({
+    if (action === 'audio_start') {
+      this._playReactionSound(e.sound || 'boxing', {
+        volume: e.volume != null ? e.volume : 0.92,
+        seekMs: e.seekMs != null ? e.seekMs : 0
+      });
+      return;
+    }
+    if (action === 'glove_enter') {
+      this._boxingGloveEnter({
+        side: e.side,
+        finale: false
+      });
+      return;
+    }
+    if (action === 'hit') {
+      this._boxingHitImpact({
+        side: e.side,
+        punchIndex: e.punchIndex,
+        finale: false
+      });
+      return;
+    }
+    if (action === 'dizzy_start') {
+      this.setData({
         reactionBoxingDizzy: true,
         reactionBoxingGloveLeftPhase: '',
         reactionBoxingGloveRightPhase: '',
         reactionBoxingImpactVisible: false,
         reactionBoxingShake: false
       });
-      // 击晕期间锁定当前累积变形（不回圆）
-      self._applyBoxingDeformStyles(self._boxingDeform, 120);
-    }, dizzyAt);
-
-    // 4) 击晕结束后：右侧巨型拳套出现 → 蓄力 500ms → 高速击中
-    const chargeAt = dizzyAt + dizzyMs;
-    this._boxingTimeout(function () {
-      self.setData({
+      this._applyBoxingDeformStyles(this._boxingDeform, 120);
+      return;
+    }
+    if (action === 'finale_charge') {
+      this.setData({
         reactionBoxingDizzy: false,
         reactionBoxingGloveRightPhase: 'charge',
         reactionBoxingGloveLeftPhase: ''
       });
-      // 蓄力时仍保持土豆形
-      self._applyBoxingDeformStyles(self._boxingDeform, 80);
-    }, chargeAt);
-
-    const strikeAt = chargeAt + chargeMs;
-    this._boxingTimeout(function () {
-      self._triggerBoxingFinaleStrike();
-    }, strikeAt);
-
-    // 5) 土豆形向左飞出缩小旋转 → 落座复圆
-    const flyBackAt = strikeAt + 180;
-    this._boxingTimeout(function () {
-      const potato = self._cloneBoxingDeform(self._boxingDeform);
+      this._applyBoxingDeformStyles(this._boxingDeform, 80);
+      return;
+    }
+    if (action === 'finale_glove') {
+      this._boxingGloveEnter({
+        side: 'right',
+        finale: true
+      });
+      return;
+    }
+    if (action === 'finale_hit') {
+      // 终结：停掉连击整轨，只播第一拳独立片段（略提高音量）
+      try {
+        reactionSounds.stopReactionSound('boxing');
+      } catch (err) {
+        /* ignore */
+      }
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 1,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      this._boxingHitImpact({
+        side: 'right',
+        punchIndex: 99,
+        finale: true
+      });
+      return;
+    }
+    if (action === 'fly_back_start') {
+      const potato = this._cloneBoxingDeform(this._boxingDeform);
       potato.base = Math.max(1.35, potato.base * 0.55);
       potato.rot += 140;
-      self._boxingDeform = potato;
-      self.setData({
+      this._boxingDeform = potato;
+      this.setData({
         reactionBoxingDizzy: false,
         reactionBoxingGloveLeftPhase: '',
         reactionBoxingGloveRightPhase: '',
@@ -7633,150 +8527,141 @@ Page({
         reactionBoxingImpactWord: '',
         reactionBoxingImpactSide: '',
         reactionBoxingShake: false,
-        // 先向左弹出
-        reactionBoxingShellStyle: self._buildBoxingShellStyle(
-          Math.max(24, centerCx - winW * 0.22),
-          centerCy - 12,
-          seatW,
-          seatH,
+        reactionBoxingShellStyle: this._buildBoxingShellStyle(
+          Math.max(24, ctx.centerCx - (ctx.winW || 375) * 0.22),
+          ctx.centerCy - 12,
+          ctx.seatW,
+          ctx.seatH,
           140
         )
       });
-      self._applyBoxingDeformStyles(potato, 160);
-    }, flyBackAt);
-
-    this._boxingTimeout(function () {
-      const mid = self._cloneBoxingDeform(self._boxingDeform);
+      this._applyBoxingDeformStyles(potato, 160);
+      return;
+    }
+    if (action === 'fly_back_seat') {
+      const mid = this._cloneBoxingDeform(this._boxingDeform);
       mid.base = 1.05;
       mid.rot += 80;
-      self._boxingDeform = mid;
-      self.setData({
-        reactionBoxingShellStyle: self._buildBoxingShellStyle(
-          seatCx,
-          seatCy,
-          seatW,
-          seatH,
-          flyBackMs - 140
+      this._boxingDeform = mid;
+      this.setData({
+        reactionBoxingShellStyle: this._buildBoxingShellStyle(
+          ctx.seatCx,
+          ctx.seatCy,
+          ctx.seatW,
+          ctx.seatH,
+          (ctx.flyBackMs || 620) - 140
         )
       });
-      self._applyBoxingDeformStyles(mid, flyBackMs - 140);
-    }, flyBackAt + 140);
-
-    // 落座后恢复正圆，并恢复记分行原头像
-    const restoreAt = flyBackAt + flyBackMs;
-    this._boxingTimeout(function () {
-      const circle = self._buildBoxingCircleDeform(1);
-      self._boxingDeform = circle;
-      self._applyBoxingDeformStyles(circle, 220, {
+      this._applyBoxingDeformStyles(mid, (ctx.flyBackMs || 620) - 140);
+      return;
+    }
+    if (action === 'restore_circle') {
+      const circle = this._buildBoxingCircleDeform(1);
+      this._boxingDeform = circle;
+      this._applyBoxingDeformStyles(circle, 220, {
         reactionAvatarDetached: false,
         reactionAvatarDetachedPlayerId: ''
       });
-    }, restoreAt);
-
-    // 6) 淡出清理
-    const fadeAt = restoreAt + 280;
-    this._boxingTimeout(function () {
-      self.setData({ reactionScreenFading: true });
-      self._boxingTimeout(function () {
-        self._resetBoxingReactionVisuals({
-          reactionScreenVisible: false,
-          reactionScreenFading: false,
-          reactionScreenMode: ''
-        });
-        self._boxingDeform = null;
-        self._playerActionBoxingBusy = false;
-      }, 520);
-    }, fadeAt);
+      return;
+    }
+    if (action === 'fade_out') {
+      this.setData({ reactionScreenFading: true });
+      return;
+    }
+    if (action === 'cleanup') {
+      try {
+        reactionSounds.stopReactionSound('boxing');
+        reactionSounds.stopReactionSound('boxing_hit_first');
+      } catch (err) {
+        /* ignore */
+      }
+      this._resetBoxingReactionVisuals({
+        reactionScreenVisible: false,
+        reactionScreenFading: false,
+        reactionScreenMode: ''
+      });
+      this._boxingDeform = null;
+      this._boxingTimelineCtx = null;
+      this._playerActionBoxingBusy = false;
+    }
   },
 
-  /** Demo：普通拳 — 左下/右下冲入 + 累积变形（不回圆） */
-  _triggerBoxingPunch(opts) {
+  /** Demo：拳套冲入（命中前 GLOVE_LEAD；声音由 timeline 对齐峰值） */
+  _boxingGloveEnter(opts) {
     const o = opts || {};
+    const finale = !!o.finale;
     const side = o.side === 'left' ? 'left' : 'right';
-    const punchIndex = o.punchIndex != null ? o.punchIndex : 0;
-    const words = ['砰!', '嘭!', 'BAM!', '啪!', '咚!'];
-    const word = words[Math.floor(Math.random() * words.length)];
-
-    const settled = this._accumulateBoxingDeform(
-      this._boxingDeform,
-      side,
-      false,
-      punchIndex
-    );
-    const impact = this._buildBoxingImpactDeform(settled, side, false);
-    this._boxingDeform = settled;
-
-    this.setData({
-      reactionBoxingGloveLeftPhase: '',
-      reactionBoxingGloveRightPhase: '',
+    const patch = {
       reactionBoxingImpactVisible: false
-    });
-
+    };
+    if (finale) {
+      patch.reactionBoxingGloveRightPhase = '';
+      patch.reactionBoxingGloveLeftPhase = '';
+    } else {
+      patch.reactionBoxingGloveLeftPhase = '';
+      patch.reactionBoxingGloveRightPhase = '';
+    }
+    this.setData(patch);
     const self = this;
     this._boxingTimeout(function () {
-      const patch = {
-        reactionBoxingImpactVisible: true,
-        reactionBoxingImpactWord: word,
-        reactionBoxingImpactSide: side,
-        reactionBoxingShake: true
-      };
-      if (side === 'left') {
-        patch.reactionBoxingGloveLeftPhase = 'punch';
-      } else {
-        patch.reactionBoxingGloveRightPhase = 'punch';
-      }
-      self.setData(patch);
-      self._applyBoxingDeformStyles(impact, 70);
-
-      self._boxingTimeout(function () {
-        self._applyBoxingDeformStyles(settled, 160, {
-          reactionBoxingShake: false
-        });
-      }, 110);
-
-      self._boxingTimeout(function () {
+      if (finale) {
         self.setData({
-          reactionBoxingImpactVisible: false,
+          reactionBoxingGloveRightPhase: 'strike',
           reactionBoxingGloveLeftPhase: '',
+          reactionBoxingDizzy: false
+        });
+        return;
+      }
+      if (side === 'left') {
+        self.setData({
+          reactionBoxingGloveLeftPhase: 'punch',
           reactionBoxingGloveRightPhase: ''
         });
-      }, 260);
+      } else {
+        self.setData({
+          reactionBoxingGloveRightPhase: 'punch',
+          reactionBoxingGloveLeftPhase: ''
+        });
+      }
     }, 16);
   },
 
-  /** Demo：终结拳高速击中（蓄力阶段已由 phase=charge 展示） */
-  _triggerBoxingFinaleStrike() {
-    const side = 'right';
-    const words = ['BOOM!', '嘭！！', 'KO!'];
+  /** Demo：命中瞬间 — 变形 + 震动 + 冲击字（与 boxing 峰值同步） */
+  _boxingHitImpact(opts) {
+    const o = opts || {};
+    const finale = !!o.finale;
+    const side = o.side === 'left' ? 'left' : 'right';
+    const punchIndex = o.punchIndex != null ? o.punchIndex : 0;
+    const words = finale
+      ? ['BOOM!', '嘭！！', 'KO!']
+      : ['砰!', '嘭!', 'BAM!', '啪!', '咚!'];
     const word = words[Math.floor(Math.random() * words.length)];
-    const settled = this._accumulateBoxingDeform(this._boxingDeform, side, true, 99);
-    const impact = this._buildBoxingImpactDeform(settled, side, true);
+    const settled = this._accumulateBoxingDeform(
+      this._boxingDeform,
+      side,
+      finale,
+      punchIndex
+    );
+    const impact = this._buildBoxingImpactDeform(settled, side, finale);
     this._boxingDeform = settled;
-
     this.setData({
-      reactionBoxingGloveRightPhase: 'strike',
-      reactionBoxingGloveLeftPhase: '',
       reactionBoxingImpactVisible: true,
       reactionBoxingImpactWord: word,
-      reactionBoxingImpactSide: 'finale',
+      reactionBoxingImpactSide: finale ? 'finale' : side,
       reactionBoxingShake: true,
       reactionBoxingDizzy: false
     });
-    this._applyBoxingDeformStyles(impact, 60);
-
+    this._applyBoxingDeformStyles(impact, finale ? 60 : 70);
     const self = this;
     this._boxingTimeout(function () {
-      self._applyBoxingDeformStyles(settled, 140, {
+      self._applyBoxingDeformStyles(settled, finale ? 140 : 160, {
         reactionBoxingShake: false
       });
-    }, 120);
-
+    }, finale ? 120 : 110);
     this._boxingTimeout(function () {
-      self.setData({
-        reactionBoxingImpactVisible: false,
-        reactionBoxingGloveRightPhase: ''
-      });
-    }, 280);
+      // 仅收冲击层；拳套由下一拍 glove_enter / finale 流程接管（避免快节奏互清）
+      self.setData({ reactionBoxingImpactVisible: false });
+    }, finale ? 280 : 200);
   },
 
   /** Demo：互动动画目标头像定位（记分 #fb-player-avatar → 讨论区缓存/节点 → 屏中回退） */
@@ -7871,7 +8756,7 @@ Page({
   },
 
   /**
-   * Demo：🍅 → 定位目标头像中心，飞入并旋转 720°，到达后播命中反馈。
+   * Demo：🍅 → 按目标分流第一视角撞屏 / 第三方飞向头像。
    * 纯视觉：无写盘。
    */
   onPlayerActionTomatoTap() {
@@ -7888,51 +8773,37 @@ Page({
       console.log('[player-action-tomato] missing playerId');
       return;
     }
-    // Demo：第一视角撞屏（不再飞向头像）
     this._playerActionTomatoBusy = true;
-    this._playScreenTomatoReaction();
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('tomato', { playerId: playerId, target: target });
+    } else {
+      this._playObserverReaction('tomato', target);
+    }
   },
 
   /**
-   * Demo：🍅 第一视角撞屏 reaction。
-   * 远处飞入 → 贝塞尔撞向屏幕中心 → 爆裂碎片 → 全屏汁水/流淌 → 停留渐隐 → 清理 DOM。
-   * 无全屏 flash / 大面积 blur；不改头像 / 成绩 / modal 结构。
+   * Demo：🍅 SELF — 随机边缘入场 → 永远撞屏幕中心（不读头像、不用远距离原则）。
    */
-  _playScreenTomatoReaction() {
-    let winW = 375;
-    let winH = 667;
-    try {
-      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
-      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
-      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
-    } catch (err) {
-      winW = 375;
-      winH = 667;
-    }
+  _playScreenTomatoReaction(opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const size = this._getReactionWindowSize();
+    const winW = size.winW;
+    const winH = size.winH;
 
     const endX = winW / 2;
     const endY = winH / 2;
-    const edgePad = Math.max(96, Math.round(Math.min(winW, winH) * 0.22));
-    const origins = [
-      { key: 'left-top', x: -edgePad, y: -edgePad * 0.55 },
-      { key: 'left', x: -edgePad, y: endY + (Math.random() - 0.5) * winH * 0.25 },
-      { key: 'left-bottom', x: -edgePad, y: winH + edgePad * 0.55 },
-      { key: 'right-top', x: winW + edgePad, y: -edgePad * 0.55 },
-      { key: 'right', x: winW + edgePad, y: endY + (Math.random() - 0.5) * winH * 0.25 },
-      { key: 'right-bottom', x: winW + edgePad, y: winH + edgePad * 0.55 }
-    ];
-    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
     const startX = origin.x;
     const startY = origin.y;
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
-    // 弧线控制点：远离直线，强化“从远处砸来”
-    const sideSign = origin.key.indexOf('left') === 0 ? 1 : -1;
+    // 弧线控制点：远离直线，强化“从远处砸来”（仅视觉弧线，非远距离入场原则）
+    const sideSign = String(origin.key || '').indexOf('left') >= 0 ? 1 : -1;
     const ctrlX = midX + sideSign * (40 + Math.random() * 56);
     const ctrlY =
-      origin.key.indexOf('top') >= 0
+      String(origin.key || '').indexOf('top') >= 0
         ? midY - (36 + Math.random() * 48)
-        : origin.key.indexOf('bottom') >= 0
+        : String(origin.key || '').indexOf('bottom') >= 0
           ? midY + (36 + Math.random() * 48)
           : midY - sideSign * (28 + Math.random() * 40);
 
@@ -7941,6 +8812,7 @@ Page({
     const holdMs = 3200 + Math.floor(Math.random() * 1600); // 3~4.8s 停留（含流淌）
     const dripMs = 2200 + Math.floor(Math.random() * 1400); // 2~3.6s 流淌
     const fadeMs = 700;
+    void o; // perspective 预留
 
     const buildFlyStyle = function (x, y, rot, scale, opacity) {
       return (
@@ -7996,6 +8868,8 @@ Page({
       reactionTomatoImpactPhase: '',
       reactionTomatoJuiceActive: false,
       reactionTomatoDripActive: false,
+      reactionTomatoHitStyle: '',
+      reactionTomatoAnchorMode: 'screen',
       reactionFlowerFlyVisible: false,
       reactionFlowerFlyStyle: '',
       reactionFlowerItems: []
@@ -8076,7 +8950,10 @@ Page({
               reactionTomatoSplashVisible: false,
               reactionTomatoImpactPhase: '',
               reactionTomatoJuiceActive: false,
-              reactionTomatoDripActive: false
+              reactionTomatoDripActive: false,
+              reactionTomatoHitStyle: '',
+              reactionTomatoAnchorMode: '',
+              playerActionHitPlayerId: ''
             });
             self._playerActionTomatoBusy = false;
           }, fadeMs);
@@ -8085,6 +8962,137 @@ Page({
 
       tick();
     }, 30);
+  },
+
+  /**
+   * Demo：🍅 OBSERVER — 远距离入场 → 落点目标头像（不影响 self 屏中撞屏）。
+   */
+  _playObserverTomatoReaction(rect, playerId) {
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playScreenTomatoReaction({ perspective: 'self' });
+      return;
+    }
+    const entry = this._getReactionEntryPoint(rect);
+    const endX = entry.targetX;
+    const endY = entry.targetY;
+    const startX = entry.x;
+    const startY = entry.y;
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const ctrlX = midX + (startX < endX ? 28 : -28);
+    const ctrlY = midY - 36;
+    const flyMs = 860;
+    const fadeMs = 560;
+    const startOpacity = 0.7;
+
+    const buildFlyStyle = function (x, y, rot, scale, opacity) {
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;opacity:' +
+        opacity +
+        ';transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg) scale(' +
+        scale +
+        ');transition:none;'
+      );
+    };
+    const easeIn = function (t) {
+      return t * t * t;
+    };
+    const scaleAt = function (t) {
+      if (t <= 0.55) return 0.35 + 0.75 * (t / 0.55);
+      return 1.1 + 0.35 * ((t - 0.55) / 0.45);
+    };
+
+    this._clearPlayerActionTomatoTimers();
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionTomatoVisible: false,
+      playerActionBurstVisible: false,
+      playerActionJuiceVisible: false,
+      playerActionHitPlayerId: '',
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'tomato',
+      reactionTomatoFlyVisible: true,
+      reactionTomatoFlyStyle: buildFlyStyle(startX, startY, -24, 0.35, startOpacity),
+      reactionTomatoSplashVisible: false,
+      reactionTomatoImpactPhase: '',
+      reactionTomatoJuiceActive: false,
+      reactionTomatoDripActive: false,
+      reactionTomatoHitStyle:
+        'left:' + endX + 'px;top:' + endY + 'px;transform:translate(-50%,-50%) scale(0.42);',
+      reactionTomatoAnchorMode: 'avatar',
+      reactionFlowerFlyVisible: false,
+      reactionFlowerItems: []
+    });
+
+    const self = this;
+    this._playerActionTomatoFlyTimer = setTimeout(function () {
+      self._playerActionTomatoFlyTimer = null;
+      const t0 = Date.now();
+      const tick = function () {
+        const elapsed = Date.now() - t0;
+        let raw = elapsed / flyMs;
+        if (raw >= 1) raw = 1;
+        const t = easeIn(raw);
+        const u = 1 - t;
+        const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+        const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
+        self.setData({
+          reactionTomatoFlyStyle: buildFlyStyle(
+            x,
+            y,
+            -24 + 720 * t,
+            scaleAt(t),
+            startOpacity + (1 - startOpacity) * t
+          )
+        });
+        if (raw < 1) {
+          self._playerActionTomatoArcTimer = setTimeout(tick, 16);
+          return;
+        }
+        self._playerActionTomatoArcTimer = null;
+        self.setData({
+          reactionTomatoFlyVisible: false,
+          reactionTomatoFlyStyle: '',
+          reactionTomatoSplashVisible: true,
+          reactionTomatoImpactPhase: 'impact',
+          playerActionHitPlayerId: hitPlayerId
+        });
+        self._playerActionTomatoHitTimer = setTimeout(function () {
+          self._playerActionTomatoHitTimer = null;
+          self.setData({ reactionTomatoImpactPhase: 'burst' });
+        }, 160);
+        self._playerActionTomatoBurstTimer = setTimeout(function () {
+          self._playerActionTomatoBurstTimer = null;
+          self.setData({
+            reactionTomatoSplashVisible: false,
+            reactionTomatoImpactPhase: '',
+            playerActionHitPlayerId: ''
+          });
+        }, 520);
+        self._playerActionTomatoClearTimer = setTimeout(function () {
+          self._playerActionTomatoClearTimer = null;
+          self.setData({
+            reactionScreenVisible: false,
+            reactionScreenFading: false,
+            reactionScreenMode: '',
+            reactionTomatoHitStyle: '',
+            reactionTomatoAnchorMode: '',
+            playerActionHitPlayerId: ''
+          });
+          self._playerActionTomatoBusy = false;
+        }, 520 + fadeMs);
+      };
+      tick();
+    }, 24);
   },
 
   /** Demo：清理🍅 / 撞屏 reaction 延时器 */
@@ -8107,19 +9115,22 @@ Page({
     }
   },
 
-  /** 旧：头像命中番茄（demo 已改撞屏；保留空壳以免外部误调崩溃） */
+  /** 旧：头像命中番茄（转第一视角撞屏） */
   _playPlayerActionTomatoFly() {
-    this._playScreenTomatoReaction();
+    this._playScreenTomatoReaction({ perspective: 'self' });
   },
   _playPlayerActionTomatoHit() {
     /* deprecated: screen reaction */
   },
 
   /**
-   * Demo：🪣 → 复用 playerId + #fb-player-avatar 定位；独立下降/倒水动画（不复用🍅轨迹）。
+   * Demo：🪣 → 第一视角全屏覆水 / 第三方飞向头像倒水。
    */
   onPlayerActionBucketTap() {
     if (this._playerActionBucketBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
     const target = this.data.playerActionTarget;
     const playerId =
       target && (target.playerId || target.userId) != null
@@ -8129,15 +9140,228 @@ Page({
       console.log('[player-action-bucket] missing playerId');
       return;
     }
-    const self = this;
     this._playerActionBucketBusy = true;
-    this._queryPlayerActionAvatarRect(playerId, function (rect) {
-      if (!rect) {
-        self._playerActionBucketBusy = false;
-        return;
-      }
-      self._playPlayerActionBucket(rect, playerId);
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('bucket', { playerId: playerId, target: target });
+    } else {
+      this._playObserverReaction('bucket', target);
+    }
+  },
+
+  /**
+   * Demo：🪣 SELF — 随机边缘入场，水覆盖屏幕中央（不用远距离原则）。
+   * 音效由 bucketReactionTimeline 对齐动画节点，不在点击时播完整轨。
+   */
+  _playSelfBucketScreenReaction() {
+    const size = this._getReactionWindowSize();
+    const winW = size.winW;
+    const winH = size.winH;
+    const entry = this._getRandomSelfReactionEntryPoint(winW, winH);
+    const endX = winW / 2;
+    const endY = winH * 0.28;
+    const timing = bucketReactionTimeline.getBucketTiming('self');
+    const buildBucketStyle = function (x, y, rot) {
+      return (
+        'left:' +
+        x +
+        'px;top:' +
+        y +
+        'px;transform:translate(-50%,-50%) rotate(' +
+        rot +
+        'deg);'
+      );
+    };
+
+    this._clearPlayerActionBucketTimers();
+    this._stopBucketReactionSounds();
+    this._resetPlayerActionBucketVisuals({
+      playerActionSheetVisible: false,
+      playerActionTarget: null
     });
+    this._bucketTimelineCtx = {
+      mode: 'self',
+      endX: endX,
+      endY: endY,
+      buildBucketStyle: buildBucketStyle,
+      timing: timing
+    };
+    this.setData({
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'bucket',
+      reactionBucketScreenActive: true,
+      playerActionBucketVisible: true,
+      playerActionBucketDropping: false,
+      playerActionBucketPouring: false,
+      playerActionBucketStyle: buildBucketStyle(entry.x, entry.y, 0)
+    });
+
+    this._runBucketReactionTimeline(
+      bucketReactionTimeline.buildBucketReactionTimeline('self')
+    );
+  },
+
+  /** Demo：bucket timeline 定时器 */
+  _bucketTimeout(fn, ms) {
+    const self = this;
+    if (!this._bucketTimelineTimers) this._bucketTimelineTimers = [];
+    const id = setTimeout(function () {
+      const list = self._bucketTimelineTimers || [];
+      const idx = list.indexOf(id);
+      if (idx >= 0) list.splice(idx, 1);
+      try {
+        fn();
+      } catch (err) {
+        console.log('[bucket-timeline] handler error', err);
+      }
+    }, ms);
+    this._bucketTimelineTimers.push(id);
+    return id;
+  },
+
+  _runBucketReactionTimeline(timeline) {
+    const self = this;
+    const list = timeline || [];
+    for (let i = 0; i < list.length; i++) {
+      (function (ev) {
+        self._bucketTimeout(function () {
+          self._dispatchBucketTimelineEvent(ev);
+        }, ev.time);
+      })(list[i]);
+    }
+  },
+
+  _stopBucketReactionSounds() {
+    try {
+      reactionSounds.stopReactionSound('bucket_water');
+      reactionSounds.stopReactionSound('bucket_start');
+      reactionSounds.stopReactionSound('bucket_pour');
+      reactionSounds.stopReactionSound('bucket_end');
+    } catch (err) {
+      /* ignore */
+    }
+  },
+
+  _dispatchBucketTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._bucketTimelineCtx || {};
+    const build =
+      typeof ctx.buildBucketStyle === 'function'
+        ? ctx.buildBucketStyle
+        : function () {
+            return '';
+          };
+
+    if (action === 'fly_in') {
+      if (ctx.mode === 'self') {
+        this.setData({
+          playerActionBucketDropping: true,
+          playerActionBucketStyle: build(ctx.endX, ctx.endY, 0)
+        });
+      } else {
+        this.setData({
+          playerActionBucketDropping: true,
+          playerActionBucketStyle: build(ctx.hoverX, ctx.hoverY, 0)
+        });
+      }
+      return;
+    }
+
+    if (action === 'arrive') {
+      // 阶段2：到达提示音（非整轨）
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.7,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      return;
+    }
+
+    if (action === 'pour') {
+      // 阶段3：翻转倒水瞬间播主体水声（停掉到达提示，避免叠音）
+      try {
+        reactionSounds.stopReactionSound('bucket_start');
+      } catch (err) {
+        /* ignore */
+      }
+      if (ctx.mode === 'self') {
+        this.setData({
+          playerActionBucketDropping: false,
+          playerActionBucketPouring: true,
+          playerActionBucketStyle: build(ctx.endX, ctx.endY, 128),
+          reactionBucketScreenPouring: true
+        });
+      } else {
+        this.setData({
+          playerActionBucketDropping: false,
+          playerActionBucketPouring: true,
+          playerActionBucketStyle: build(ctx.hoverX, ctx.hoverY, 128),
+          playerActionWaterVisible: true,
+          playerActionWaterStyle: ctx.waterStyle || '',
+          playerActionWaterFloodVisible: true,
+          playerActionWaterFloodStyle: ctx.floodStyle || '',
+          playerActionWaterDripVisible: true,
+          playerActionWaterDripStyle: ctx.dripStyle || ''
+        });
+      }
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.95,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      return;
+    }
+
+    if (action === 'hide_bucket') {
+      this.setData({
+        playerActionBucketVisible: false,
+        playerActionBucketDropping: false,
+        playerActionBucketPouring: false,
+        playerActionBucketStyle: ''
+      });
+      return;
+    }
+
+    if (action === 'hide_flood') {
+      this.setData({
+        playerActionWaterFloodVisible: false,
+        playerActionWaterFloodStyle: ''
+      });
+      return;
+    }
+
+    if (action === 'hide_drip') {
+      this.setData({
+        playerActionWaterDripVisible: false,
+        playerActionWaterDripStyle: ''
+      });
+      return;
+    }
+
+    if (action === 'fade_out') {
+      this.setData({ reactionScreenFading: true });
+      return;
+    }
+
+    if (action === 'cleanup') {
+      this._stopBucketReactionSounds();
+      if (ctx.mode === 'self') {
+        this._resetPlayerActionBucketVisuals({
+          reactionScreenVisible: false,
+          reactionScreenFading: false,
+          reactionScreenMode: '',
+          reactionBucketScreenActive: false,
+          reactionBucketScreenPouring: false
+        });
+      } else {
+        this._resetPlayerActionBucketVisuals();
+      }
+      this._bucketTimelineCtx = null;
+      this._playerActionBucketBusy = false;
+    }
   },
 
   /** Demo：清理🪣相关延时器 */
@@ -8158,14 +9382,22 @@ Page({
         this[k] = null;
       }
     }
+    const tl = this._bucketTimelineTimers;
+    if (tl && tl.length) {
+      for (let j = 0; j < tl.length; j++) {
+        clearTimeout(tl[j]);
+      }
+    }
+    this._bucketTimelineTimers = [];
   },
 
   /**
    * Demo：互动反应音效（独立模块；不改动画 / 记分）。
-   * @param {string} key 如 'bucket_water'
+   * @param {string} key 如 'bucket_water' | 'boxing'
+   * @param {{ volume?: number, seekMs?: number }=} opts
    */
-  _playReactionSound(key) {
-    reactionSounds.playReactionSound(key);
+  _playReactionSound(key, opts) {
+    reactionSounds.playReactionSound(key, opts);
   },
 
   /**
@@ -8195,11 +9427,15 @@ Page({
   },
 
   /**
-   * Demo：水桶右上屏外正立入场 → 移到头像正上方 → 停顿 → 翻转倒水 → 水流/水滴/湿水 → 消失。
-   * 飞行阶段不旋转；到目标后才翻桶。
+   * Demo：🪣 OBSERVER — 远距离入场 → 目标头像倒水。
+   * 音效由 bucketReactionTimeline 对齐动画节点，不在点击时播完整轨。
    */
   _playPlayerActionBucket(rect, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    if (this._isSelfReactionTarget(hitPlayerId)) {
+      this._playSelfBucketScreenReaction();
+      return;
+    }
     const left = Number(rect && rect.left);
     const top = Number(rect && rect.top);
     const width = Number(rect && rect.width);
@@ -8215,24 +9451,14 @@ Page({
       return;
     }
 
-    let winW = 375;
-    try {
-      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
-      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
-    } catch (err) {
-      winW = 375;
-    }
-
+    const entry = this._getReactionEntryPoint(rect);
     const centerX = left + width / 2;
     const avatarTop = top;
-    // 右上方屏外起点（x > windowWidth，y 为负）；目标：头像正上方
-    const startX = winW + 80;
-    const startY = -72;
+    const startX = entry.x;
+    const startY = entry.y;
     const hoverX = centerX;
     const hoverY = avatarTop - 18;
-    const approachMs = 650;
-    const pauseMs = 200;
-    const pourMs = 620;
+    const timing = bucketReactionTimeline.getBucketTiming('observer');
     const buildBucketStyle = function (x, y, rot) {
       return (
         'left:' +
@@ -8246,16 +9472,7 @@ Page({
     };
 
     this._clearPlayerActionBucketTimers();
-    // 开场先清干净，避免上次 opacity:0 节点残留
-    this._resetPlayerActionBucketVisuals({
-      playerActionSheetVisible: false,
-      playerActionTarget: null,
-      playerActionBucketVisible: true,
-      playerActionBucketStyle: buildBucketStyle(startX, startY, 0)
-    });
-
-    const self = this;
-    // 倒水/湿水严格限制在目标头像矩形内（不放大到邻头像）
+    this._stopBucketReactionSounds();
     const waterStyle =
       'left:' +
       Math.round(left) +
@@ -8270,75 +9487,32 @@ Page({
     const dripStyle =
       'left:' + centerX + 'px;top:' + (top + height * 0.92) + 'px;';
 
-    // 正立从右上屏外移到头像正上方（不旋转）
-    this._playerActionBucketDropTimer = setTimeout(function () {
-      self._playerActionBucketDropTimer = null;
-      self.setData({
-        playerActionBucketDropping: true,
-        playerActionBucketStyle: buildBucketStyle(hoverX, hoverY, 0)
-      });
-    }, 40);
+    this._bucketTimelineCtx = {
+      mode: 'observer',
+      hoverX: hoverX,
+      hoverY: hoverY,
+      waterStyle: waterStyle,
+      floodStyle: floodStyle,
+      dripStyle: dripStyle,
+      buildBucketStyle: buildBucketStyle,
+      timing: timing
+    };
 
-    // 到达后停顿，再翻桶倒水（夸张水流）；入场阶段不播声音
-    this._playerActionBucketPauseTimer = setTimeout(function () {
-      self._playerActionBucketPauseTimer = null;
-      self.setData({
-        playerActionBucketDropping: false,
-        playerActionBucketPouring: true,
-        playerActionBucketStyle: buildBucketStyle(hoverX, hoverY, 128),
-        playerActionWaterVisible: true,
-        playerActionWaterStyle: waterStyle,
-        playerActionWaterFloodVisible: true,
-        playerActionWaterFloodStyle: floodStyle,
-        playerActionWaterDripVisible: true,
-        playerActionWaterDripStyle: dripStyle
-      });
-      // 翻转倒水 / 水流出现的同时播流水声（测试）
-      self._playReactionSound('bucket_water');
-    }, 40 + approachMs + pauseMs);
+    this._resetPlayerActionBucketVisuals({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      playerActionBucketVisible: true,
+      playerActionBucketStyle: buildBucketStyle(startX, startY, 0)
+    });
 
-    const pourStart = 40 + approachMs + pauseMs;
-
-    // 倒水结束：先拆水桶层（含桶口水流）
-    this._playerActionBucketHideTimer = setTimeout(function () {
-      self._playerActionBucketHideTimer = null;
-      self.setData({
-        playerActionBucketVisible: false,
-        playerActionBucketDropping: false,
-        playerActionBucketPouring: false,
-        playerActionBucketStyle: ''
-      });
-    }, pourStart + pourMs);
-
-    // 瀑布层动画约 1.35s：结束后立刻 wx:if 移除，勿留 opacity:0 合成层
-    this._playerActionBucketFloodTimer = setTimeout(function () {
-      self._playerActionBucketFloodTimer = null;
-      self.setData({
-        playerActionWaterFloodVisible: false,
-        playerActionWaterFloodStyle: ''
-      });
-    }, pourStart + 1500);
-
-    // 水滴最晚 delay 0.95 + 2.2s ≈ 3.15s：结束后立刻移除
-    this._playerActionBucketDripTimer = setTimeout(function () {
-      self._playerActionBucketDripTimer = null;
-      self.setData({
-        playerActionWaterDripVisible: false,
-        playerActionWaterDripStyle: ''
-      });
-    }, pourStart + 3200);
-
-    // 湿水 overlay 3.2s：到期后一次性清光所有 bucket/water 层
-    this._playerActionBucketWaterTimer = setTimeout(function () {
-      self._playerActionBucketWaterTimer = null;
-      self._resetPlayerActionBucketVisuals();
-      self._playerActionBucketBusy = false;
-    }, pourStart + 3400);
+    this._runBucketReactionTimeline(
+      bucketReactionTimeline.buildBucketReactionTimeline('observer')
+    );
   },
 
   /**
-   * Demo：🥚 → 第一视角连续砸屏连击（5 普攻 + 1 终结）。
-   * 仅 demo-weekend-amateur；不改原头像连击 _playPlayerActionEggCombo。
+   * Demo：🥚 → 第一视角砸屏 / 第三方飞向头像连击。
+   * 仅 demo-weekend-amateur。
    */
   onPlayerActionEggTap() {
     if (this._playerActionEggBusy) return;
@@ -8355,7 +9529,11 @@ Page({
       return;
     }
     this._playerActionEggBusy = true;
-    this._playScreenEggComboReaction();
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('egg', { playerId: playerId, target: target });
+    } else {
+      this._playObserverReaction('egg', target);
+    }
   },
 
   /**
@@ -8433,26 +9611,14 @@ Page({
     }, finaleAt);
   },
 
-  /** Demo：单枚砸屏鸡蛋（普通 / 终结） */
+  /** Demo：单枚砸屏鸡蛋（普通 / 终结）— 第一视角随机边缘入场 */
   _launchScreenEggHit(opts) {
     const o = opts || {};
     const winW = Number(o.winW) || 375;
     const winH = Number(o.winH) || 667;
     const finale = !!o.finale;
-    const edgePad = finale
-      ? Math.max(140, Math.round(Math.min(winW, winH) * 0.38))
-      : Math.max(88, Math.round(Math.min(winW, winH) * 0.22));
-    const origins = [
-      { x: -edgePad, y: Math.random() * winH },
-      { x: winW + edgePad, y: Math.random() * winH },
-      { x: Math.random() * winW, y: -edgePad },
-      { x: Math.random() * winW, y: winH + edgePad },
-      { x: -edgePad, y: -edgePad * 0.5 },
-      { x: winW + edgePad, y: -edgePad * 0.5 },
-      { x: -edgePad, y: winH + edgePad * 0.5 },
-      { x: winW + edgePad, y: winH + edgePad * 0.5 }
-    ];
-    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    // 第一视角：随机边缘，不用头像远距离原则
+    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
     const startX = origin.x;
     const startY = origin.y;
     // 普通击中点略偏中心；终结直砸中心
@@ -8770,13 +9936,14 @@ Page({
   },
 
   /**
-   * Demo：🥚 连击节奏
-   * - 6 枚同一屏外起点、同一轨迹连续命中，蛋清/蛋黄持续叠加不清理
-   * - 完成后停顿 1–1.5s，再同轨迹最后一击最大流淌
-   * - 残留拉长，整体约 8s；无震动/glow/闪光；纯视觉不写盘。
+   * Demo：🥚 OBSERVER — 远距离入场 → 目标头像连击糊脸（不影响 self 砸屏）。
    */
   _playPlayerActionEggCombo(rect, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    if (this._isSelfReactionTarget(hitPlayerId)) {
+      this._playScreenEggComboReaction();
+      return;
+    }
     const left = Number(rect && rect.left);
     const top = Number(rect && rect.top);
     const width = Number(rect && rect.width);
@@ -8792,22 +9959,11 @@ Page({
       return;
     }
 
-    let winW = 375;
-    let winH = 667;
-    try {
-      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
-      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
-      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
-    } catch (err) {
-      winW = 375;
-      winH = 667;
-    }
-
     const endX = left + width / 2;
     const endY = top + height / 2;
-    // 整轮共用同一屏外起点 + 同一旋转轨迹（连续投掷感）
-    const originX = winW + 72;
-    const originY = Math.max(32, Math.min(winH - 32, endY));
+    const entry = this._getReactionEntryPoint(rect);
+    const originX = entry.x;
+    const originY = entry.y;
     const startRot = -18;
     const endRot = 462;
     const comboCount = 6;
@@ -8887,8 +10043,8 @@ Page({
   },
 
   /**
-   * Demo：🌹 → 第一视角花雨（reaction-screen-layer / flower-screen-reaction）。
-   * 仅 demo-weekend-amateur；仍追加讨论区系统消息；不改 modal / 其它 reaction。
+   * Demo：🌹 → 第一视角花雨 / 第三方飞向头像送花。
+   * 仅 demo-weekend-amateur；仍追加讨论区系统消息。
    */
   onPlayerActionFlowerTap() {
     if (this._playerActionFlowerBusy) return;
@@ -8905,7 +10061,11 @@ Page({
       return;
     }
     this._playerActionFlowerBusy = true;
-    this._playScreenFlowerReaction();
+    if (this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('flower', { playerId: playerId, target: target });
+    } else {
+      this._playObserverReaction('flower', target);
+    }
     this._appendDemoFlowerSystemMessage(target);
   },
 
@@ -8971,34 +10131,16 @@ Page({
   },
 
   /**
-   * Demo：🌹 第一视角花雨。
-   * 远处飞入中心 → 360° 柔和散开 → 中心持续生成 → 缓慢飘落 → 渐隐清理。
-   * 复用 reaction-screen-layer；DOM 上限约 28；无 canvas / 无爆炸感。
+   * Demo：🌹 SELF — 随机边缘入场 → 永远飞向屏幕中心开放（不读头像、不用远距离原则）。
    */
   _playScreenFlowerReaction() {
-    let winW = 375;
-    let winH = 667;
-    try {
-      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
-      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
-      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
-    } catch (err) {
-      winW = 375;
-      winH = 667;
-    }
+    const size = this._getReactionWindowSize();
+    const winW = size.winW;
+    const winH = size.winH;
 
     const endX = winW / 2;
     const endY = winH * 0.46;
-    const edgePad = Math.max(72, Math.round(Math.min(winW, winH) * 0.2));
-    const origins = [
-      { x: -edgePad, y: -edgePad * 0.4 },
-      { x: -edgePad, y: endY },
-      { x: -edgePad, y: winH + edgePad * 0.4 },
-      { x: winW + edgePad, y: -edgePad * 0.4 },
-      { x: winW + edgePad, y: endY },
-      { x: winW + edgePad, y: winH + edgePad * 0.4 }
-    ];
-    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
+    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
     const startX = origin.x;
     const startY = origin.y;
     const midX = (startX + endX) / 2;
@@ -9084,6 +10226,13 @@ Page({
           return;
         }
         self._playerActionFlowerArcTimer = null;
+        // flower_arrive：花真正到达屏中瞬间播送花音（飞行阶段无声）
+        self._dispatchFlowerTimelineEvent({
+          action: 'flower_arrive',
+          sound: 'flower_send',
+          volume: 0.92,
+          seekMs: 0
+        });
         // 中心开放：隐藏飞入主花，开始持续生成花雨
         self.setData({
           reactionFlowerFlyVisible: false,
@@ -9102,7 +10251,33 @@ Page({
         });
       };
       tick();
-    }, 30);
+    }, flowerReactionTimeline.FLOWER_TIMING.self.flyAt);
+  },
+
+  /**
+   * Demo：🌹 flower timeline 音效节点（仅到达瞬间播；飞行无声）。
+   * 复用 reactionSounds 缓存实例，不新建 AudioContext。
+   * @param {{ action:string, sound?:string, volume?:number, seekMs?:number }} ev
+   */
+  _dispatchFlowerTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    if (action === 'flower_arrive') {
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.92,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      return;
+    }
+    if (action === 'cleanup') {
+      try {
+        reactionSounds.stopReactionSound('flower_send');
+      } catch (err) {
+        /* ignore */
+      }
+    }
   },
 
   /**
@@ -9277,6 +10452,7 @@ Page({
       self._playerActionFlowerClearTimer = setTimeout(function () {
         self._playerActionFlowerClearTimer = null;
         self._flowerScreenSpawnMeta = [];
+        self._dispatchFlowerTimelineEvent({ action: 'cleanup' });
         self.setData({
           reactionScreenVisible: false,
           reactionScreenFading: false,
@@ -9294,8 +10470,13 @@ Page({
    * Demo：旧头像花环路径（demo 已改第一视角花雨；保留以免外部误调）。
    * 花朵从中线右侧随机起点柔和飘入 → 轻漂浮旋转 → 到达开放 + 花瓣 + 花环 → 自动清理。
    */
+  /** Demo：🌹 OBSERVER — 远距离入场 → 落点目标头像（误传 self 则回退屏中花雨） */
   _playPlayerActionFlower(rect, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    if (this._isSelfReactionTarget(hitPlayerId)) {
+      this._playScreenFlowerReaction();
+      return;
+    }
     const left = Number(rect && rect.left);
     const top = Number(rect && rect.top);
     const width = Number(rect && rect.width);
@@ -9314,36 +10495,11 @@ Page({
     const endX = left + width / 2 + 6;
     const endY = top + height / 2 - 4;
 
-    let winW = 375;
-    let winH = 667;
-    try {
-      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
-      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
-      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
-    } catch (err) {
-      winW = 375;
-      winH = 667;
-    }
-
-    // 随机起点：必须在横向中线右侧（不从左侧进入）
-    const midX = winW * 0.5;
-    const origins = [
-      { key: 'right-top', x: winW + 56, y: -48 },
-      { key: 'right', x: winW + 72, y: endY },
-      { key: 'right-bottom', x: winW + 56, y: winH + 48 },
-      { key: 'mid-right-up', x: midX + winW * 0.28, y: Math.max(24, endY - 90) }
-    ];
-    const origin = origins[Math.floor(Math.random() * origins.length)] || origins[0];
-    // 兜底：强制 startX 落在中线右侧
-    const startX = Math.max(midX + 8, Number(origin.x));
-    const startY = Number(origin.y);
-    const ctrlX = (startX + endX) / 2 + (origin.key === 'mid-right-up' ? 18 : -10);
-    const ctrlY =
-      origin.key === 'right-top' || origin.key === 'mid-right-up'
-        ? Math.min(startY, endY) - 28
-        : origin.key === 'right-bottom'
-          ? Math.max(startY, endY) + 24
-          : (startY + endY) / 2 - 32;
+    const entry = this._getReactionEntryPoint(rect);
+    const startX = entry.x;
+    const startY = entry.y;
+    const ctrlX = (startX + endX) / 2 + (startX < endX ? 18 : -18);
+    const ctrlY = (startY + endY) / 2 - 32;
     const flyMs = 1400;
 
     const easeInOut = function (t) {
@@ -9405,6 +10561,13 @@ Page({
           return;
         }
         self._playerActionFlowerArcTimer = null;
+        // 真正到达头像：timeline flower_arrive → 播送花音
+        self._dispatchFlowerTimelineEvent({
+          action: 'flower_arrive',
+          sound: 'flower_send',
+          volume: 0.92,
+          seekMs: 0
+        });
         // 到达后进入花环状态（不立即结束）
         self._playPlayerActionFlowerWreath({
           playerId: hitPlayerId,
@@ -9418,7 +10581,7 @@ Page({
       };
 
       tick();
-    }, 40);
+    }, flowerReactionTimeline.FLOWER_TIMING.observer.flyAt);
   },
 
   /**
@@ -9519,6 +10682,7 @@ Page({
       });
       self._playerActionFlowerClearTimer = setTimeout(function () {
         self._playerActionFlowerClearTimer = null;
+        self._dispatchFlowerTimelineEvent({ action: 'cleanup' });
         self.setData({
           playerActionWreathVisible: false,
           playerActionWreathAppear: false,
