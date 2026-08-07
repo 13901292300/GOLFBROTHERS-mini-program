@@ -10,24 +10,35 @@
  */
 
 const SOUND_SRC = {
-  /** Demo bucket：水桶.mov 有效倒水段（1170–1920ms），翻转倒水主音 */
-  bucket_water: '/subpackages/scoring/assets/sounds/bucket_water.wav',
-  /** Demo bucket：到达提示（1175–1310ms） */
-  bucket_start: '/subpackages/scoring/assets/sounds/bucket_start.wav',
-  /** Demo bucket：与 bucket_water 同段，timeline 别名 */
-  bucket_pour: '/subpackages/scoring/assets/sounds/bucket_pour.wav',
-  /** Demo bucket：尾部短促（1720–1920ms），资源保留 */
-  bucket_end: '/subpackages/scoring/assets/sounds/bucket_end.wav',
+  /** Demo bucket：水桶.mov 重新接入倒水段（500–1350ms）；翻转倒水唯一音轨 */
+  bucket_water_new: '/subpackages/scoring/assets/sounds/bucket_water_new.wav',
+  /** 旧蛋击 key（保留兼容）；demo 连击改用 egg_hit_1..6 / egg_hit_final */
   egg_hit: '/subpackages/scoring/assets/sounds/egg_hit.wav',
   egg_hit_finale: '/subpackages/scoring/assets/sounds/egg_hit_finale.wav',
-  /** Demo boxing：由 音频文件/拳击.mov 转码；连击整段节奏 */
-  boxing: '/subpackages/scoring/assets/sounds/boxing.wav',
-  /** Demo boxing 终结拳：从 boxing.wav 截取第一拳片段（430–640ms） */
+  /** Demo egg：西红柿音源变化连击整轨 */
+  egg_combo: '/subpackages/scoring/assets/sounds/egg_combo.wav',
+  /** Demo egg：终结一击（更强更长） */
+  egg_hit_final: '/subpackages/scoring/assets/sounds/egg_hit_final.wav',
+  egg_hit_1: '/subpackages/scoring/assets/sounds/egg_hit_1.wav',
+  egg_hit_2: '/subpackages/scoring/assets/sounds/egg_hit_2.wav',
+  egg_hit_3: '/subpackages/scoring/assets/sounds/egg_hit_3.wav',
+  egg_hit_4: '/subpackages/scoring/assets/sounds/egg_hit_4.wav',
+  egg_hit_5: '/subpackages/scoring/assets/sounds/egg_hit_5.wav',
+  egg_hit_6: '/subpackages/scoring/assets/sounds/egg_hit_6.wav',
+  /** Demo boxing：音频文件/拳击.mp3；连击整段节奏 */
+  boxing: '/subpackages/scoring/assets/sounds/boxing.mp3',
+  /** Demo boxing 终结拳：从原拳击轨截取第一拳片段（430–640ms） */
   boxing_hit_first: '/subpackages/scoring/assets/sounds/boxing_hit_first.wav',
   /** Demo kiss：亲吻.mov 有效接触段（540–900ms） */
   kiss: '/subpackages/scoring/assets/sounds/kiss.wav',
   /** Demo flower：送花.mov 有效段（220–900ms），到达目标瞬间播放 */
-  flower_send: '/subpackages/scoring/assets/sounds/flower_send.wav'
+  flower_send: '/subpackages/scoring/assets/sounds/flower_send.wav',
+  /** Demo beer：音频文件/干杯.mp3；beer_main_fly 从 0ms 整轨播放（不 seek） */
+  cheers: '/subpackages/scoring/assets/sounds/cheers.mp3',
+  /** Demo tomato：西红柿.mov 撞击段（620–1500ms）；tomato_hit 瞬间播放 */
+  tomato_hit: '/subpackages/scoring/assets/sounds/tomato_hit.wav',
+  /** Demo rocket：音频文件/火箭.mp3；rocket_explosion 起播（seek 到 peak≈660ms） */
+  rocket: '/subpackages/scoring/assets/sounds/rocket.mp3'
 };
 
 /** @type {Object.<string, any>} */
@@ -96,7 +107,7 @@ function _playNow(soundKey, opts) {
 /**
  * 播放反应音效（可重复触发；同 key 会停掉再播）。
  * 播放动作 defer 到下一拍，避免与页面 setData 同帧抢合成。
- * @param {string} key 音效键，如 'bucket_water' | 'boxing'
+ * @param {string} key 音效键，如 'bucket_water_new' | 'boxing'
  * @param {{ volume?: number, seekMs?: number }=} opts
  */
 function playReactionSound(key, opts) {

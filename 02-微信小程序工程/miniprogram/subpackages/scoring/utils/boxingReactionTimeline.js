@@ -1,19 +1,19 @@
 /**
  * Demo：boxing reaction timeline（仅 demo-weekend-amateur）
  *
- * 连击：整段 boxing.wav 节奏（峰值对齐 hit）
+ * 连击：整段 boxing.mp3 节奏（峰值对齐 hit）
  * 终结：独立片段 boxing_hit_first.wav（从原音频截取第一拳，不重播完整轨）
  */
 
-/** boxing.wav 内明显拳击峰值（ms，相对音频 t=0）— 7 击 */
+/** boxing.mp3 内明显拳击峰值（ms，相对音频 t=0）— 7 击 */
 const BOXING_AUDIO_HIT_MS = [514, 664, 814, 965, 1162, 1312, 1462];
 
 /**
- * boxing_hit_first.wav 截取区间（相对 boxing.wav）
+ * boxing_hit_first.wav 截取区间（相对原 boxing 轨）
  * start 430ms → end 640ms（第一拳体，止于第二拳前）
  */
 const BOXING_HIT_FIRST_CLIP = {
-  source: 'boxing.wav',
+  source: 'boxing.mp3',
   startMs: 430,
   endMs: 640,
   file: 'boxing_hit_first.wav'

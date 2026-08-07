@@ -1,12 +1,10 @@
 /**
  * Demo：kiss reaction timeline（仅 demo-weekend-amateur）
  *
+ * reaction-view-model-v2：仅目标头像中央舞台（Self）。
+ * 害羞脸：独立资源 kiss_shy_face.png
  * 源：音频文件/亲吻.mov → kiss.wav（540–900ms）
- *
- * Self（第一视角 / 近镜头）：
- *   kiss_fly → kiss_hit(+sound) → heart_spawn → lips_fade → cleanup
- *
- * Observer：fly_start → kiss_hit(+sound，头像中心) → hearts_start → lips_fade
+ * 音效仅 kiss_hit；飞行无声。
  */
 
 const KISS_AUDIO_CLIP = {
@@ -16,96 +14,113 @@ const KISS_AUDIO_CLIP = {
   file: 'kiss.wav'
 };
 
-/** Observer：远距离入场 → 头像中心命中 → 停留亲吻 → 红心 */
-const KISS_TIMING = {
-  flyAt: 30,
-  flyMs: 980,
-  holdMs: 1500,
-  heartsLeadMs: 70,
-  hitPulseMs: 320,
-  fadeMs: 420,
-  cleanupAfterFadeMs: 900,
-  hitVolume: 0.95
-};
-
-/** Self：更长飞入 + 命中脉冲 + 爱心爆发 */
-const SELF_KISS_TIMING = {
-  flyAt: 30,
-  flyMs: 1080,
-  holdMs: 1680,
-  heartsLeadMs: 90,
-  hitPulseMs: 280,
-  fadeMs: 480,
-  cleanupAfterFadeMs: 1100,
-  hitVolume: 1
-};
-
 /**
- * @param {object=} opts
- * @param {'self'|'observer'=} opts.mode
- * @param {number=} opts.flyMs
- * @param {number=} opts.holdMs
- * @returns {Array<{time:number, action:string, sound?:string, volume?:number, seekMs?:number, scale?:string}>}
+ * Self：命中 → 隐藏原头像内容 → 独立卡通害羞脸 → 嘴唇 hold → 带卡通脸回座 → 恢复
  */
-function buildKissReactionTimeline(opts) {
-  const o = opts && typeof opts === 'object' ? opts : {};
-  const mode = o.mode === 'observer' ? 'observer' : 'self';
+const SELF_KISS_TIMING = {
+  centerScale: 4,
+  toCenterMs: 420,
+  toCenterAt: 40,
+  flyAt: 480,
+  flyMs: 980,
+  hitPulseMs: 280,
+  shyDelayMs: 80,
+  lipHoldMs: 1800,
+  lipsLeaveMs: 420,
+  heartsLeadMs: 160,
+  shySeatClearMs: 900,
+  holdAfterHeartsMs: 200,
+  returnMs: 720,
+  seatFloatMs: 1400,
+  heartsFadeMs: 900,
+  restoreGapMs: 80,
+  hitVolume: 1,
+  holdMs: 1800,
+  shyLeadMs: 0,
+  fadeMs: 420,
+  cleanupAfterFadeMs: 1100
+};
 
-  if (mode === 'self') {
-    const flyAt = SELF_KISS_TIMING.flyAt;
-    const flyMs = o.flyMs != null ? o.flyMs : SELF_KISS_TIMING.flyMs;
-    const holdMs = o.holdMs != null ? o.holdMs : SELF_KISS_TIMING.holdMs;
-    const hitAt = flyAt + flyMs;
-    const heartsAt = hitAt + SELF_KISS_TIMING.heartsLeadMs;
-    const fadeAt = hitAt + holdMs;
-    const cleanupAt =
-      fadeAt + SELF_KISS_TIMING.fadeMs + SELF_KISS_TIMING.cleanupAfterFadeMs;
-    return [
-      { time: flyAt, action: 'kiss_fly' },
-      {
-        time: hitAt,
-        action: 'kiss_hit',
-        sound: 'kiss',
-        volume: SELF_KISS_TIMING.hitVolume,
-        seekMs: 0,
-        scale: 'large'
-      },
-      { time: heartsAt, action: 'heart_spawn' },
-      { time: fadeAt, action: 'lips_fade' },
-      { time: cleanupAt, action: 'cleanup' }
-    ].sort(function (a, b) {
-      return a.time - b.time;
-    });
-  }
-
-  const flyAt = KISS_TIMING.flyAt;
-  const flyMs = o.flyMs != null ? o.flyMs : KISS_TIMING.flyMs;
-  const holdMs = o.holdMs != null ? o.holdMs : KISS_TIMING.holdMs;
-  const hitAt = flyAt + flyMs;
-  const heartsAt = hitAt + KISS_TIMING.heartsLeadMs;
-  const fadeAt = hitAt + holdMs;
-  const cleanupAt = fadeAt + KISS_TIMING.fadeMs + KISS_TIMING.cleanupAfterFadeMs;
+function buildKissSelfReactionTimeline() {
+  const t = SELF_KISS_TIMING;
+  const hitAt = t.flyAt + t.flyMs;
+  const holdAt = hitAt + t.hitPulseMs;
+  const heartsAt = hitAt + t.heartsLeadMs;
+  const lipsLeaveAt = hitAt + t.lipHoldMs;
+  const returnAt = lipsLeaveAt + t.lipsLeaveMs + t.holdAfterHeartsMs;
+  const seatFloatAt = returnAt + t.returnMs;
+  const heartsFadeAt = seatFloatAt + t.seatFloatMs;
+  const restoreAt = heartsFadeAt + t.heartsFadeMs + t.restoreGapMs;
 
   return [
-    { time: flyAt, action: 'fly_start' },
+    {
+      time: t.toCenterAt,
+      action: 'self_avatar_center',
+      duration: t.toCenterMs
+    },
+    {
+      time: t.flyAt,
+      action: 'kiss_fly',
+      duration: t.flyMs
+    },
     {
       time: hitAt,
       action: 'kiss_hit',
       sound: 'kiss',
-      volume: 0.95,
-      seekMs: 0
+      volume: t.hitVolume,
+      seekMs: 0,
+      scale: 'large'
     },
-    { time: heartsAt, action: 'hearts_start' },
-    { time: fadeAt, action: 'lips_fade' },
-    { time: cleanupAt, action: 'cleanup' }
+    {
+      time: hitAt + (t.shyDelayMs != null ? t.shyDelayMs : 80),
+      action: 'shy_face_show'
+    },
+    {
+      time: holdAt,
+      action: 'kiss_hold',
+      duration: t.lipHoldMs - t.hitPulseMs
+    },
+    {
+      time: heartsAt,
+      action: 'heart_spawn'
+    },
+    {
+      time: lipsLeaveAt,
+      action: 'lips_leave',
+      duration: t.lipsLeaveMs
+    },
+    {
+      time: returnAt,
+      action: 'avatar_return_with_hearts',
+      duration: t.returnMs
+    },
+    {
+      time: seatFloatAt,
+      action: 'seat_hearts_float',
+      duration: t.seatFloatMs
+    },
+    {
+      time: heartsFadeAt,
+      action: 'heart_fade',
+      duration: t.heartsFadeMs
+    },
+    {
+      time: restoreAt,
+      action: 'restore'
+    }
   ].sort(function (a, b) {
     return a.time - b.time;
   });
 }
 
+/** @deprecated 兼容旧调用 → Self */
+function buildKissReactionTimeline() {
+  return buildKissSelfReactionTimeline();
+}
+
 module.exports = {
   KISS_AUDIO_CLIP: KISS_AUDIO_CLIP,
-  KISS_TIMING: KISS_TIMING,
   SELF_KISS_TIMING: SELF_KISS_TIMING,
+  buildKissSelfReactionTimeline: buildKissSelfReactionTimeline,
   buildKissReactionTimeline: buildKissReactionTimeline
 };

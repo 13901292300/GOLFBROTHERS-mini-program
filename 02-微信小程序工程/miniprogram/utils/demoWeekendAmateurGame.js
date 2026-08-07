@@ -9,6 +9,13 @@ const gameStore = require('./gameStore.js');
 const DEMO_WEEKEND_AMATEUR_GAME_ID = 'demo-weekend-amateur';
 const DEMO_WEEKEND_AMATEUR_TITLE = '周末业余挑战赛';
 
+/**
+ * Demo 第一视角测试入口身份（展示名 / 约定 id）。
+ * 种子数据里该球员 playerId/userId 为 "me"；正式产品勿复用此判断。
+ */
+const DEMO_SELF_PLAYER_KEY = 'TIGERHOODS';
+const DEMO_SELF_PLAYER_IDS = ['TIGERHOODS', 'me'];
+
 /** 固化种子（深拷贝自源 GAME；运行时 ensure 再深拷贝一份写入 Storage） */
 const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
   "gameId": "demo-weekend-amateur",
@@ -601,10 +608,53 @@ function isDemoWeekendAmateurGameId(gameId) {
   return String(gameId || '') === DEMO_WEEKEND_AMATEUR_GAME_ID;
 }
 
+/**
+ * Demo-only：是否为第一视角测试目标（TIGERHOODS）。
+ * 不替代正式 currentUser 身份判断；仅 demo-weekend-amateur 生效。
+ *
+ * @param {string} gameId
+ * @param {string|{userId?:string,playerId?:string,id?:string,name?:string}|null|undefined} playerOrId
+ */
+function isDemoSelfPlayer(gameId, playerOrId) {
+  if (!isDemoWeekendAmateurGameId(gameId)) return false;
+  let tid = '';
+  let name = '';
+  if (playerOrId != null && typeof playerOrId === 'object') {
+    tid = String(
+      playerOrId.userId || playerOrId.playerId || playerOrId.id || ''
+    ).trim();
+    name = String(playerOrId.name || playerOrId.nickname || '').trim();
+  } else {
+    tid = playerOrId != null ? String(playerOrId).trim() : '';
+  }
+  const key = DEMO_SELF_PLAYER_KEY.toUpperCase();
+  if (tid && tid.toUpperCase() === key) return true;
+  if (name && name.toUpperCase() === key) return true;
+  for (let i = 0; i < DEMO_SELF_PLAYER_IDS.length; i++) {
+    if (tid && tid === DEMO_SELF_PLAYER_IDS[i]) return true;
+  }
+  return false;
+}
+
+/**
+ * Demo-only：🚀 允许以 TIGERHOODS 为 Observer 火箭受击目标。
+ * 不改 currentUserId / 正式 Self 判断；其它 reaction 仍走 isDemoSelfPlayer。
+ *
+ * @param {string} gameId
+ * @param {string|{userId?:string,playerId?:string,id?:string,name?:string}|null|undefined} playerOrId
+ */
+function isDemoRocketOpenTarget(gameId, playerOrId) {
+  if (!isDemoWeekendAmateurGameId(gameId)) return false;
+  return isDemoSelfPlayer(gameId, playerOrId);
+}
+
 module.exports = {
   DEMO_WEEKEND_AMATEUR_GAME_ID,
   DEMO_WEEKEND_AMATEUR_TITLE,
+  DEMO_SELF_PLAYER_KEY,
   getDemoWeekendAmateurGame,
   ensureDemoWeekendAmateurGame,
-  isDemoWeekendAmateurGameId
+  isDemoWeekendAmateurGameId,
+  isDemoSelfPlayer,
+  isDemoRocketOpenTarget
 };

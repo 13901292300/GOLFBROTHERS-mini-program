@@ -1,123 +1,122 @@
 /**
  * Demo：bucket reaction timeline（仅 demo-weekend-amateur）
  *
- * 源：音频文件/水桶.mov
- * 有效声段约 1175–1920ms（此前为静音），按动画节点拆为 start / pour / end。
- *
- * 阶段：
- * 1 fly_in     — 远处飞入，不播主音
- * 2 arrive     — 到达目标，播 bucket_start（轻提示）
- * 3 pour       — 翻转倒水瞬间，播 bucket_water / bucket_pour 主体
- * 4 cover      — 水流覆盖，主体水声自然延续
- * 5 end/cleanup— 水滴收尾；音频尾部自然结束，cleanup 停轨
+ * reaction-view-model-v2：仅目标头像中央舞台（Self）。
+ * 源：音频文件/水桶.mov → bucket_water_new.wav
  */
 
-/** 相对 水桶.mov / 全长 wav 的截取区间（ms） */
-const BUCKET_AUDIO_CLIPS = {
+const BUCKET_AUDIO_CLIP = {
   source: '水桶.mov',
-  activeStartMs: 1170,
-  activeEndMs: 1920,
-  start: { file: 'bucket_start.wav', startMs: 1175, endMs: 1310 },
-  pour: { file: 'bucket_pour.wav', startMs: 1170, endMs: 1920 },
-  water: { file: 'bucket_water.wav', startMs: 1170, endMs: 1920 },
-  end: { file: 'bucket_end.wav', startMs: 1720, endMs: 1920 }
+  startMs: 500,
+  endMs: 1350,
+  file: 'bucket_water_new.wav',
+  soundKey: 'bucket_water_new'
 };
 
+/** Self：与拳击 Self 一致 centerScale=4 */
 const SELF_TIMING = {
+  centerScale: 4,
+  bucketScale: 1.75,
+  toCenterMs: 420,
+  toCenterAt: 40,
+  bucketEnterAt: 480,
+  bucketEnterMs: 380,
+  tiltAt: 900,
+  tiltMs: 280,
+  pourAt: 980,
+  pourMs: 720,
+  wetAt: 1180,
+  dripHoldAt: 1750,
+  dripHoldMs: 1500,
+  returnAt: 3250,
+  returnMs: 720,
+  restoreGapMs: 80,
   flyAt: 40,
   approachMs: 620,
   pauseMs: 180,
-  pourMs: 700,
   coverMs: 2800,
   fadeMs: 600
 };
 
-const OBSERVER_TIMING = {
-  flyAt: 40,
-  approachMs: 650,
-  pauseMs: 200,
-  pourMs: 620,
-  floodMs: 1500,
-  dripMs: 3200,
-  cleanupMs: 3400
-};
-
-/**
- * @param {'self'|'observer'} mode
- * @returns {{ flyAt:number, arriveAt:number, pourAt:number, approachMs:number, pauseMs:number, pourMs:number }}
- */
-function getBucketTiming(mode) {
-  const t = mode === 'observer' ? OBSERVER_TIMING : SELF_TIMING;
-  const arriveAt = t.flyAt + t.approachMs;
-  const pourAt = arriveAt + t.pauseMs;
-  return {
-    flyAt: t.flyAt,
-    arriveAt: arriveAt,
-    pourAt: pourAt,
-    approachMs: t.approachMs,
-    pauseMs: t.pauseMs,
+function getBucketTiming() {
+  const t = SELF_TIMING;
+  return Object.assign({}, t, {
+    flyAt: t.toCenterAt,
+    arriveAt: t.bucketEnterAt,
+    pourAt: t.tiltAt,
+    approachMs: t.bucketEnterMs,
+    pauseMs: Math.max(0, t.tiltAt - t.bucketEnterAt - t.bucketEnterMs),
     pourMs: t.pourMs,
-    coverMs: t.coverMs,
-    floodMs: t.floodMs,
-    dripMs: t.dripMs,
-    cleanupMs: t.cleanupMs,
-    fadeMs: t.fadeMs
-  };
+    coverMs: t.dripHoldMs,
+    fadeMs: t.returnMs
+  });
 }
 
 /**
- * @param {'self'|'observer'} mode
- * @returns {Array<{time:number, action:string, sound?:string, volume?:number, seekMs?:number}>}
+ * Self 中央舞台 timeline
+ * 音效仅在 bucket_tilt / water_pour_start，桶进入无声。
  */
-function buildBucketReactionTimeline(mode) {
-  const m = mode === 'observer' ? 'observer' : 'self';
-  const t = getBucketTiming(m);
-  const events = [];
-
-  // 阶段1：飞入，无声
-  events.push({ time: t.flyAt, action: 'fly_in' });
-
-  // 阶段2：到达 — 轻提示，非整轨
-  events.push({
-    time: t.arriveAt,
-    action: 'arrive',
-    sound: 'bucket_start',
-    volume: 0.7,
-    seekMs: 0
-  });
-
-  // 阶段3：翻转倒水 — 主体水声（与水流层同时）
-  events.push({
-    time: t.pourAt,
-    action: 'pour',
-    sound: 'bucket_water',
-    volume: 0.95,
-    seekMs: 0
-  });
-
-  // 阶段4：覆盖期间不另起整轨；主体自然播完
-  events.push({ time: t.pourAt + t.pourMs, action: 'hide_bucket' });
-
-  if (m === 'observer') {
-    events.push({ time: t.pourAt + t.floodMs, action: 'hide_flood' });
-    events.push({ time: t.pourAt + t.dripMs, action: 'hide_drip' });
-    // 阶段5：主体水声（含尾部）自然结束；cleanup 停轨
-    events.push({ time: t.pourAt + t.cleanupMs, action: 'cleanup' });
-  } else {
-    events.push({ time: t.pourAt + t.coverMs, action: 'fade_out' });
-    events.push({ time: t.pourAt + t.coverMs + t.fadeMs, action: 'cleanup' });
-  }
-
+function buildBucketSelfReactionTimeline() {
+  const t = SELF_TIMING;
+  const returnDone = t.returnAt + t.returnMs;
+  const events = [
+    {
+      time: t.toCenterAt,
+      action: 'self_avatar_center',
+      duration: t.toCenterMs
+    },
+    {
+      time: t.bucketEnterAt,
+      action: 'bucket_self_enter',
+      duration: t.bucketEnterMs
+    },
+    {
+      time: t.tiltAt,
+      action: 'bucket_tilt',
+      duration: t.tiltMs,
+      sound: 'bucket_water_new',
+      volume: 0.95,
+      seekMs: 0
+    },
+    {
+      time: t.pourAt,
+      action: 'water_pour_start',
+      duration: t.pourMs
+    },
+    {
+      time: t.wetAt,
+      action: 'wet_avatar_show'
+    },
+    {
+      time: t.dripHoldAt,
+      action: 'water_drip_hold',
+      duration: t.dripHoldMs
+    },
+    {
+      time: t.returnAt,
+      action: 'avatar_return',
+      duration: t.returnMs
+    },
+    {
+      time: returnDone + t.restoreGapMs,
+      action: 'restore'
+    }
+  ];
   events.sort(function (a, b) {
     return a.time - b.time;
   });
   return events;
 }
 
+/** @deprecated 兼容旧调用 → Self */
+function buildBucketReactionTimeline() {
+  return buildBucketSelfReactionTimeline();
+}
+
 module.exports = {
-  BUCKET_AUDIO_CLIPS: BUCKET_AUDIO_CLIPS,
+  BUCKET_AUDIO_CLIP: BUCKET_AUDIO_CLIP,
   SELF_TIMING: SELF_TIMING,
-  OBSERVER_TIMING: OBSERVER_TIMING,
   getBucketTiming: getBucketTiming,
+  buildBucketSelfReactionTimeline: buildBucketSelfReactionTimeline,
   buildBucketReactionTimeline: buildBucketReactionTimeline
 };

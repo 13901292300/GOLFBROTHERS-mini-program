@@ -21,7 +21,12 @@ const boxingReactionTimeline = require('../../utils/boxingReactionTimeline.js');
 const bucketReactionTimeline = require('../../utils/bucketReactionTimeline.js');
 const kissReactionTimeline = require('../../utils/kissReactionTimeline.js');
 const flowerReactionTimeline = require('../../utils/flowerReactionTimeline.js');
+const beerReactionTimeline = require('../../utils/beerReactionTimeline.js');
+const tomatoReactionTimeline = require('../../utils/tomatoReactionTimeline.js');
+const eggReactionTimeline = require('../../utils/eggReactionTimeline.js');
+const rocketReactionTimeline = require('../../utils/rocketReactionTimeline.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
+const reactionPanelConfig = require('../../utils/reactionPanelConfig.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const teeSheetManage = require('../../../../utils/teeSheetManage.js');
@@ -2223,6 +2228,8 @@ Page({
     /** Demo：球员头像互动中央弹窗（仅 demo-weekend-amateur；无写盘） */
     playerActionSheetVisible: false,
     playerActionTarget: null,
+    /** Demo：reaction panel 展示配置（icon + cost；仅 UI，不扣金币） */
+    playerActionReactions: reactionPanelConfig.PLAYER_ACTION_REACTIONS,
     /** Demo：🍅 飞行动画层（旧：命中头像；现 demo 改撞屏，保留字段以免残留） */
     playerActionTomatoVisible: false,
     playerActionTomatoAnimating: false,
@@ -2237,7 +2244,42 @@ Page({
     /** Demo：第一视角 reaction-screen-layer（tomato | flower） */
     reactionScreenVisible: false,
     reactionScreenFading: false,
-    reactionScreenMode: '', // tomato | flower | egg | boxing | kiss
+    reactionScreenMode: '', // tomato | flower | egg | boxing | kiss | beer | rocket
+    /** Demo：🚀 Observer 火箭炸飞（仅第三方） */
+    reactionRocketFlyVisible: false,
+    reactionRocketFlyStyle: '',
+    reactionRocketBlastVisible: false,
+    reactionRocketBlastStyle: '',
+    reactionRocketBlastBurst: false,
+    reactionRocketShaking: false,
+    reactionRocketAvatarVisible: false,
+    reactionRocketAvatarUrl: '',
+    reactionRocketAvatarStyle: '',
+    reactionRocketAvatarPhase: '', // observer: seat|lift|hold|drop|restore; self: center|face|hold|return|restore
+    reactionRocketBlastFace: false,
+    reactionRocketHairPop: false,
+    reactionRocketSmokeCover: false,
+    reactionRocketSmokeClearing: false,
+    reactionRocketFaceShake: false,
+    reactionRocketSmokeActive: false,
+    /** Demo：🍺 干杯（beer-screen-reaction；self 第一视角 / observer 第三视角） */
+    reactionBeerMainVisible: false,
+    reactionBeerMainPhase: '', // fly | hold | clash | fade | ready
+    reactionBeerMainStyle: '',
+    reactionBeerLeftVisible: false,
+    reactionBeerLeftPhase: '',
+    reactionBeerLeftStyle: '',
+    reactionBeerRightVisible: false,
+    reactionBeerRightPhase: '',
+    reactionBeerRightStyle: '',
+    reactionBeerSplashVisible: false,
+    reactionBeerSplashStyle: '',
+    reactionBeerFlashVisible: false,
+    reactionBeerFlashStyle: '',
+    reactionBeerShaking: false,
+    reactionBeerBubbles: [],
+    /** Demo：🍺 Self 第一视角双杯碰杯标记 */
+    reactionBeerIsSelf: false,
     /** Demo：👄 亲吻（kiss-screen-reaction；原 🚗 入口） */
     reactionKissLipsVisible: false,
     reactionKissLipsStyle: '',
@@ -2245,7 +2287,20 @@ Page({
     reactionKissHearts: [],
     /** Demo：👄 Self 近镜头增强（不影响 observer） */
     reactionKissIsSelf: false,
-    /** Demo：👄 Observer — kiss-target-layer（锚定目标头像 rect） */
+    /** Demo：👄 Self 中央临时头像 + 害羞卡通脸（与 Observer 分离） */
+    reactionKissSelfAvatarVisible: false,
+    reactionKissSelfAvatarUrl: '',
+    reactionKissSelfAvatarStyle: '',
+    reactionKissSelfAvatarPhase: '', // seat|center|kiss|shy|return|seat|restore
+    reactionKissSelfShyVisible: false,
+    /** Demo：👄 Self 临时层模式：normal | kissShy | restore（独立卡通脸，不改原头像） */
+    reactionAvatarMode: 'normal',
+    showKissShyFace: false,
+    kissShyFaceSrc: '/subpackages/scoring/assets/reaction/kiss_shy_face.png',
+    /** Demo：👄 Self 纯嘟嘴亲吻素材（非 emoji） */
+    kissLipsSrc: '/subpackages/scoring/assets/reaction/kiss_lips.png',
+    reactionKissSelfHeartsFading: false,
+    /** @deprecated reaction-view-model-v2：kiss Observer 层已移除 */
     reactionKissTargetVisible: false,
     reactionKissTargetStyle: '',
     reactionKissTargetLipsStyle: '',
@@ -2256,15 +2311,41 @@ Page({
     reactionTomatoImpactPhase: '', // impact | burst | flow
     reactionTomatoJuiceActive: false,
     reactionTomatoDripActive: false,
+    /** Demo：🍅 Observer 头像挂汁层样式 / 淡出 */
+    reactionTomatoJuiceStyle: '',
+    reactionTomatoJuiceFading: false,
     reactionTomatoHitStyle: '',
-    reactionTomatoAnchorMode: '', // screen | avatar
-    /** Demo：🪣 第一视角全屏覆水 */
+    reactionTomatoAnchorMode: '', // self | avatar（Self/Observer 分离）
+    /** Demo：🍅 Self 中央临时头像 + cartoon tomato face */
+    reactionTomatoSelfAvatarVisible: false,
+    reactionTomatoSelfAvatarUrl: '',
+    reactionTomatoSelfAvatarStyle: '',
+    reactionTomatoSelfAvatarPhase: '', // seat|center|hit|hold|return|restore
+    reactionTomatoSelfShake: false,
+    reactionTomatoSelfFaceVisible: false,
+    reactionTomatoSelfDripHold: false,
+    /** Demo：🪣 Self 中央头像浇水（与 Observer 座位倒水分离） */
     reactionBucketScreenActive: false,
     reactionBucketScreenPouring: false,
-    /** Demo：🌹 第一视角花雨（flower-screen-reaction） */
+    reactionBucketSelfAvatarVisible: false,
+    reactionBucketSelfAvatarUrl: '',
+    reactionBucketSelfAvatarStyle: '',
+    reactionBucketSelfAvatarPhase: '', // seat|center|wet|return|restore
+    reactionBucketSelfBucketVisible: false,
+    reactionBucketSelfBucketStyle: '',
+    reactionBucketSelfBucketDropping: false,
+    reactionBucketSelfBucketPouring: false,
+    reactionBucketSelfStreamVisible: false,
+    reactionBucketSelfStreamStyle: '',
+    reactionBucketSelfWetVisible: false,
+    reactionBucketSelfCartoonWet: false,
+    reactionBucketSelfDripHold: false,
+    /** Demo：🌹 第一视角花雨（flower-screen-reaction；随机花束） */
     reactionFlowerFlyVisible: false,
     reactionFlowerFlyStyle: '',
+    reactionFlowerFlyEmoji: '🌹',
     reactionFlowerItems: [],
+    reactionFlowerPetals: [],
     /** Demo：🥚 第一视角连击砸屏（egg-screen-reaction；不改头像连击） */
     reactionEggFlies: [],
     reactionEggHitLevel: 0,
@@ -2273,6 +2354,14 @@ Page({
     reactionEggBurstStyle: '',
     reactionEggFinaleActive: false,
     reactionEggShake: false,
+    /** Demo：🥚 Self 中央临时头像 + cartoon egg face（与 Observer 座位层分离） */
+    reactionEggSelfAvatarVisible: false,
+    reactionEggSelfAvatarUrl: '',
+    reactionEggSelfAvatarStyle: '',
+    reactionEggSelfAvatarPhase: '', // seat|center|hit|overlay|hold|return|restore
+    reactionEggSelfFaceVisible: false,
+    reactionEggSelfDripHold: false,
+    reactionEggSelfDirection: 'right',
     /** Demo：👊 第三人称卡通拳击（boxing-reaction-layer；克隆头像变形，不改原头像/成绩） */
     reactionBoxingAvatarUrl: '',
     reactionBoxingShellStyle: '',
@@ -2302,17 +2391,20 @@ Page({
     playerActionWaterDripStyle: '',
     playerActionWaterFloodVisible: false,
     playerActionWaterFloodStyle: '',
-    /** Demo：🌹 送花动画（独立于🍅/🪣） */
+    /** Demo：🌹 送花动画（独立于🍅/🪣；随机花束） */
     playerActionFlowerVisible: false,
     playerActionFlowerBloom: false,
     playerActionFlowerStyle: '',
+    playerActionFlowerEmoji: '🌹',
     playerActionPetalVisible: false,
     playerActionPetalStyle: '',
+    playerActionPetalItems: [],
     /** Demo：🌹 仅目标头像轻缩放（局部，无全局 glow/flash） */
     playerActionFlowerScalePlayerId: '',
-    /** Demo：🌹 命中后花环（围绕头像） */
+    /** Demo：🌹 命中后自然花环（围绕头像） */
     playerActionWreathVisible: false,
     playerActionWreathAppear: false,
+    playerActionWreathExpand: false,
     playerActionWreathFading: false,
     playerActionWreathStyle: '',
     playerActionWreathItems: [],
@@ -7171,6 +7263,51 @@ Page({
     });
   },
 
+  /**
+   * Demo：reaction panel 点击分发（仅 UI 入口；不扣金币）。
+   * 按配置 key 转调既有动画 handler，不改动画逻辑。
+   */
+  onPlayerActionReactionItemTap(e) {
+    const key =
+      e &&
+      e.currentTarget &&
+      e.currentTarget.dataset &&
+      e.currentTarget.dataset.key != null
+        ? String(e.currentTarget.dataset.key).trim()
+        : '';
+    if (key === 'flower') {
+      this.onPlayerActionFlowerTap();
+      return;
+    }
+    if (key === 'beer') {
+      this.onPlayerActionBeerTap();
+      return;
+    }
+    if (key === 'bucket') {
+      this.onPlayerActionBucketTap();
+      return;
+    }
+    if (key === 'tomato') {
+      this.onPlayerActionTomatoTap();
+      return;
+    }
+    if (key === 'kiss') {
+      this.onPlayerActionKissTap();
+      return;
+    }
+    if (key === 'egg') {
+      this.onPlayerActionEggTap();
+      return;
+    }
+    if (key === 'rocket') {
+      this.onPlayerActionRocketTap();
+      return;
+    }
+    if (key === 'boxing') {
+      this.onPlayerActionBoxingTap();
+    }
+  },
+
   /** Demo：中央弹窗「进入主页」；仅 demo-weekend-amateur */
   onPlayerActionProfileTap() {
     if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
@@ -7190,8 +7327,746 @@ Page({
     wx.showToast({ title: '他人主页暂未开放', icon: 'none' });
   },
 
-  /** Demo：占位互动元素（🍺🚀）仅展示，不播动画 */
-  onPlayerActionPlaceholderTap() {},
+  /**
+   * Demo：🚀 入口 — Self / Observer 完全隔离。
+   * - TIGERHOODS / currentUser → rocketSelfReaction（中央，拳击尺寸）
+   * - 其他玩家 → rocketObserverReaction（目标头像座位炸飞）
+   * 仅 demo-weekend-amateur；不改正式身份逻辑。
+   */
+  onPlayerActionRocketTap() {
+    if (this._playerActionRocketBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
+    if (!playerId) {
+      console.log('[player-action-rocket] missing playerId');
+      return;
+    }
+    this._playerActionRocketBusy = true;
+    // reaction-view-model-v2：火箭统一目标头像中央舞台（所有人同效果）
+    this._playSelfReaction('rocket', {
+      playerId: playerId,
+      avatarUrl:
+        (target && (target.avatar || target.avatarUrl || target.headimgurl)) ||
+        '',
+      target: target
+    });
+  },
+
+  /** @deprecated 占位已改为 onPlayerActionRocketTap */
+  onPlayerActionPlaceholderTap() {
+    this.onPlayerActionRocketTap();
+  },
+
+  /**
+   * Demo：🚀 SELF（TIGERHOODS）—
+   * 头像进中央(拳击尺寸) → 火箭飞来 → 爆炸+火光+浓烟 → 烟雾散开
+   * → 炸黑漫画脸 → 炸毛 → 轻抖 → 停留 → 旋转回座位。
+   * 不走 Observer 座位炸飞。
+   */
+  _playSelfRocketReaction(rect, avatarUrl, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const norm =
+      this._normalizePlayerActionAvatarRect(rect) ||
+      this._fallbackPlayerActionAvatarRect() ||
+      rect;
+    const left = Number(norm.left);
+    const top = Number(norm.top);
+    const width = Number(norm.width);
+    const height = Number(norm.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionRocketBusy = false;
+      return;
+    }
+
+    const seatX = left + width / 2;
+    const seatY = top + height / 2;
+    const win = this._getReactionWindowSize();
+    const centerX = win.winW / 2;
+    const centerY = win.winH * 0.42;
+    const selfTiming = rocketReactionTimeline.ROCKET_SELF_TIMING || {};
+    // 与拳击 Self 一致，勿与 Observer 原头像尺寸共用
+    const centerScale =
+      selfTiming.centerScale != null ? selfTiming.centerScale : 4;
+    const centerW = width * centerScale;
+    const centerH = height * centerScale;
+    const entry = this._getRandomSelfReactionEntryPoint(win.winW, win.winH);
+    const flyMs = selfTiming.flyMs != null ? selfTiming.flyMs : 900;
+    const toCenterMs =
+      selfTiming.toCenterMs != null ? selfTiming.toCenterMs : 420;
+    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 720;
+    const returnSpin = Math.random() > 0.5 ? 360 : -360;
+    const url = avatarUrl != null ? String(avatarUrl) : '';
+
+    this._clearRocketReactionTimers();
+    try {
+      reactionSounds.stopReactionSound('rocket');
+    } catch (err) {
+      /* ignore */
+    }
+
+    this._rocketTimelineCtx = {
+      mode: 'self',
+      seatX: seatX,
+      seatY: seatY,
+      cx: centerX,
+      cy: centerY,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      centerW: centerW,
+      centerH: centerH,
+      centerScale: centerScale,
+      startX: entry.x,
+      startY: entry.y,
+      entryKey: entry.key || '',
+      flyMs: flyMs,
+      toCenterMs: toCenterMs,
+      returnMs: returnMs,
+      returnSpin: returnSpin,
+      playerId: hitPlayerId,
+      avatarUrl: url
+    };
+
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'rocket',
+      reactionRocketFlyVisible: false,
+      reactionRocketFlyStyle: '',
+      reactionRocketBlastVisible: false,
+      reactionRocketBlastStyle: '',
+      reactionRocketBlastBurst: false,
+      reactionRocketShaking: false,
+      reactionRocketAvatarVisible: false,
+      reactionRocketAvatarUrl: url,
+      reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+        x: seatX,
+        y: seatY,
+        w: width,
+        h: height,
+        rise: 0,
+        sway: 0,
+        rot: 0,
+        scaleX: 1,
+        scaleY: 1,
+        ms: 0
+      }),
+      reactionRocketAvatarPhase: '',
+      reactionRocketBlastFace: false,
+      reactionRocketHairPop: false,
+      reactionRocketSmokeCover: false,
+      reactionRocketSmokeClearing: false,
+      reactionRocketFaceShake: false,
+      reactionRocketSmokeActive: false,
+      reactionAvatarDetached: false,
+      reactionAvatarDetachedPlayerId: ''
+    });
+
+    const timeline = rocketReactionTimeline.buildRocketSelfTimeline();
+    this._runRocketReactionTimeline(timeline);
+  },
+
+  _clearRocketReactionTimers() {
+    if (this._rocketArcTimer) {
+      clearTimeout(this._rocketArcTimer);
+      this._rocketArcTimer = null;
+    }
+    const tl = this._rocketTimelineTimers;
+    if (tl && tl.length) {
+      for (let i = 0; i < tl.length; i++) clearTimeout(tl[i]);
+    }
+    this._rocketTimelineTimers = [];
+  },
+
+  _rocketTimeout(fn, ms) {
+    const self = this;
+    if (!this._rocketTimelineTimers) this._rocketTimelineTimers = [];
+    const id = setTimeout(function () {
+      const list = self._rocketTimelineTimers || [];
+      const idx = list.indexOf(id);
+      if (idx >= 0) list.splice(idx, 1);
+      try {
+        fn();
+      } catch (err) {
+        console.log('[rocket-timeline] handler error', err);
+      }
+    }, ms);
+    this._rocketTimelineTimers.push(id);
+    return id;
+  },
+
+  _runRocketReactionTimeline(timeline) {
+    const self = this;
+    const list = timeline || [];
+    for (let i = 0; i < list.length; i++) {
+      (function (ev) {
+        self._rocketTimeout(function () {
+          self._dispatchRocketTimelineEvent(ev);
+        }, ev.time);
+      })(list[i]);
+    }
+  },
+
+  _buildRocketAvatarStyle(opts) {
+    const o = opts || {};
+    const x = o.x != null ? o.x : 0;
+    const y = o.y != null ? o.y : 0;
+    const w = o.w != null ? o.w : 44;
+    const h = o.h != null ? o.h : 44;
+    const rise = o.rise != null ? o.rise : 0;
+    const sway = o.sway != null ? o.sway : 0;
+    const rot = o.rot != null ? o.rot : 0;
+    const scaleX = o.scaleX != null ? o.scaleX : 1;
+    const scaleY = o.scaleY != null ? o.scaleY : 1;
+    const ms = o.ms != null ? Number(o.ms) : 0;
+    const ease = o.ease || 'cubic-bezier(0.22, 0.7, 0.28, 1)';
+    const transition =
+      ms > 0
+        ? 'left ' +
+          ms +
+          'ms ' +
+          ease +
+          ',top ' +
+          ms +
+          'ms ' +
+          ease +
+          ',width ' +
+          ms +
+          'ms ' +
+          ease +
+          ',height ' +
+          ms +
+          'ms ' +
+          ease +
+          ',transform ' +
+          ms +
+          'ms ' +
+          ease
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px;transform:translate(-50%,-50%) translate(' +
+      sway +
+      'px,' +
+      rise +
+      'px) rotate(' +
+      rot +
+      'deg) scale(' +
+      scaleX +
+      ',' +
+      scaleY +
+      ');transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  _dispatchRocketTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._rocketTimelineCtx || {};
+    const mode = ctx.mode != null ? String(ctx.mode) : '';
+    // reaction-view-model-v2：火箭仅目标中央舞台 Self
+    if (mode !== 'self') return;
+    const page = this;
+    const isSelf = true;
+
+    // —— Self：进中央（拳击尺寸）——
+    if (action === 'avatar_to_center') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.toCenterMs || 420;
+      this.setData({
+        reactionAvatarDetached: true,
+        reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionRocketAvatarVisible: true,
+        reactionRocketAvatarPhase: 'center',
+        reactionRocketBlastFace: false,
+        reactionRocketHairPop: false,
+        reactionRocketSmokeCover: false,
+        reactionRocketSmokeClearing: false,
+        reactionRocketFaceShake: false,
+        reactionRocketSmokeActive: false,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rise: 0,
+          sway: 0,
+          rot: 0,
+          scaleX: 1,
+          scaleY: 1,
+          ms: 0
+        })
+      });
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx || page._rocketTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionRocketAvatarStyle: page._buildRocketAvatarStyle({
+            x: ctx.cx,
+            y: ctx.cy,
+            w: ctx.centerW || ctx.width * 4,
+            h: ctx.centerH || ctx.height * 4,
+            rise: 0,
+            sway: 0,
+            rot: 0,
+            scaleX: 1,
+            scaleY: 1,
+            ms: ms
+          })
+        });
+      }, 24);
+      return;
+    }
+
+    if (action === 'rocket_fly') {
+      this.setData({
+        reactionRocketFlyVisible: true,
+        reactionRocketFlyStyle: this._buildRocketProjectileStyle(
+          ctx.startX,
+          ctx.startY,
+          -28,
+          0.28,
+          0.75,
+          0
+        )
+      });
+      this._startRocketProjectileFlight(ctx);
+      return;
+    }
+
+    if (action === 'rocket_explosion') {
+      if (this._rocketArcTimer) {
+        clearTimeout(this._rocketArcTimer);
+        this._rocketArcTimer = null;
+      }
+      const peakMs =
+        (rocketReactionTimeline.ROCKET_AUDIO &&
+          rocketReactionTimeline.ROCKET_AUDIO.peakMs) ||
+        660;
+      const seekMs = e.seekMs != null ? e.seekMs : peakMs;
+      this._playReactionSound(e.sound || 'rocket', {
+        volume: e.volume != null ? e.volume : 1,
+        seekMs: seekMs
+      });
+      // Observer：命中瞬间显座位克隆；Self：中央拳击尺寸 + 同帧浓烟罩
+      const patch = {
+        reactionRocketFlyVisible: false,
+        reactionRocketFlyStyle: '',
+        reactionRocketBlastVisible: true,
+        reactionRocketBlastBurst: true,
+        reactionRocketBlastStyle: 'left:' + ctx.cx + 'px;top:' + ctx.cy + 'px;',
+        reactionRocketShaking: true,
+        reactionRocketSmokeActive: true
+      };
+      if (isSelf) {
+        patch.reactionRocketSmokeCover = true;
+        patch.reactionRocketSmokeClearing = false;
+        patch.reactionRocketBlastFace = false;
+        patch.reactionRocketHairPop = false;
+        patch.reactionRocketAvatarPhase = 'center';
+        patch.reactionRocketAvatarVisible = true;
+        patch.reactionRocketAvatarStyle = this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: ctx.cy,
+          w: ctx.centerW || ctx.width * 4,
+          h: ctx.centerH || ctx.height * 4,
+          rise: 0,
+          sway: 0,
+          rot: 0,
+          scaleX: 1,
+          scaleY: 1,
+          ms: 0
+        });
+      } else {
+        patch.reactionAvatarDetached = true;
+        patch.reactionAvatarDetachedPlayerId = ctx.playerId || '';
+        patch.reactionRocketAvatarVisible = true;
+        patch.reactionRocketAvatarPhase = 'seat';
+        patch.reactionRocketBlastFace = false;
+        patch.reactionRocketHairPop = false;
+        patch.reactionRocketAvatarStyle = this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: ctx.cy,
+          w: ctx.width,
+          h: ctx.height,
+          rise: 0,
+          sway: 0,
+          rot: 0,
+          scaleX: 1,
+          scaleY: 1,
+          ms: 0
+        });
+      }
+      this.setData(patch);
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx) return;
+        page.setData({ reactionRocketShaking: false });
+      }, 420);
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx) return;
+        page.setData({
+          reactionRocketBlastVisible: false,
+          reactionRocketBlastBurst: false
+        });
+      }, 980);
+      return;
+    }
+
+    // —— Observer：漫画脸 + 飞起 + 空中停留 + 掉回 ——
+    if (action === 'blast_face_transform') {
+      if (isSelf) return;
+      this.setData({
+        reactionRocketBlastFace: true,
+        reactionRocketHairPop: true,
+        reactionRocketAvatarPhase: 'face',
+        reactionRocketSmokeActive: true
+      });
+      return;
+    }
+
+    if (action === 'avatar_blast_up') {
+      if (isSelf) return;
+      const blastUpMs = ctx.blastUpMs != null ? ctx.blastUpMs : 480;
+      this.setData({
+        reactionRocketAvatarPhase: 'lift',
+        reactionRocketBlastFace: true,
+        reactionRocketHairPop: true,
+        reactionRocketSmokeActive: true,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: ctx.cy,
+          w: ctx.width,
+          h: ctx.height,
+          rise: ctx.risePx,
+          sway: ctx.swayPx,
+          rot: ctx.rotDeg,
+          scaleX: 1.12,
+          scaleY: 0.88,
+          ms: blastUpMs
+        })
+      });
+      return;
+    }
+
+    if (action === 'avatar_smoke_hold') {
+      if (isSelf) return;
+      this.setData({
+        reactionRocketAvatarPhase: 'hold',
+        reactionRocketBlastFace: true,
+        reactionRocketHairPop: true,
+        reactionRocketSmokeActive: true,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: ctx.cy,
+          w: ctx.width,
+          h: ctx.height,
+          rise: ctx.risePx,
+          sway: (ctx.swayPx || 0) * 0.55,
+          rot: (ctx.rotDeg || 0) * 0.45,
+          scaleX: 0.96,
+          scaleY: 1.04,
+          ms: 220
+        })
+      });
+      return;
+    }
+
+    if (action === 'avatar_drop_back') {
+      if (isSelf) return;
+      const dropMs = ctx.dropMs != null ? ctx.dropMs : 620;
+      this.setData({
+        reactionRocketAvatarPhase: 'drop',
+        reactionRocketBlastFace: true,
+        reactionRocketHairPop: true,
+        reactionRocketSmokeActive: true,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: ctx.cy,
+          w: ctx.width,
+          h: ctx.height,
+          rise: 10,
+          sway: 0,
+          rot: 0,
+          scaleX: 1.1,
+          scaleY: 0.86,
+          ms: dropMs
+        })
+      });
+      return;
+    }
+
+    // —— Self-only：浓烟 / 露脸 / 旋回 ——
+    if (action === 'smoke_cover') {
+      if (!isSelf) return;
+      this.setData({
+        reactionRocketSmokeCover: true,
+        reactionRocketSmokeClearing: false,
+        reactionRocketSmokeActive: true,
+        reactionRocketBlastFace: false,
+        reactionRocketHairPop: false,
+        reactionRocketAvatarPhase: 'center'
+      });
+      return;
+    }
+
+    if (action === 'smoke_clear') {
+      if (!isSelf) return;
+      this.setData({
+        reactionRocketSmokeCover: true,
+        reactionRocketSmokeClearing: true
+      });
+      const clearMs =
+        e.duration != null
+          ? e.duration
+          : (rocketReactionTimeline.ROCKET_SELF_TIMING &&
+              rocketReactionTimeline.ROCKET_SELF_TIMING.smokeClearMs) ||
+            720;
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx || page._rocketTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionRocketSmokeCover: false,
+          reactionRocketSmokeClearing: false
+        });
+      }, clearMs);
+      return;
+    }
+
+    if (action === 'blast_face_reveal') {
+      if (!isSelf) return;
+      this.setData({
+        reactionRocketBlastFace: true,
+        reactionRocketAvatarPhase: 'face',
+        reactionRocketSmokeActive: true
+      });
+      return;
+    }
+
+    if (action === 'blast_hair_pop') {
+      if (!isSelf) return;
+      this.setData({ reactionRocketHairPop: true });
+      return;
+    }
+
+    if (action === 'avatar_shake') {
+      if (!isSelf) return;
+      this.setData({ reactionRocketFaceShake: true });
+      const shakeMs = e.duration != null ? e.duration : 420;
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx) return;
+        page.setData({ reactionRocketFaceShake: false });
+      }, shakeMs);
+      return;
+    }
+
+    if (action === 'avatar_hold') {
+      if (!isSelf) return;
+      this.setData({
+        reactionRocketAvatarPhase: 'hold',
+        reactionRocketBlastFace: true,
+        reactionRocketHairPop: true,
+        reactionRocketSmokeActive: true,
+        reactionRocketFaceShake: false
+      });
+      return;
+    }
+
+    if (action === 'avatar_return') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.returnMs || 720;
+      const spin = ctx.returnSpin != null ? ctx.returnSpin : 360;
+      this.setData({
+        reactionRocketAvatarPhase: 'return',
+        reactionRocketSmokeActive: false,
+        reactionRocketSmokeCover: false,
+        reactionRocketFaceShake: false,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rise: 0,
+          sway: 0,
+          rot: spin,
+          scaleX: 1,
+          scaleY: 1,
+          ms: ms,
+          ease: 'cubic-bezier(0.28, 0.65, 0.32, 1)'
+        })
+      });
+      return;
+    }
+
+    if (action === 'avatar_restore') {
+      const restoreX = isSelf ? ctx.seatX : ctx.cx;
+      const restoreY = isSelf ? ctx.seatY : ctx.cy;
+      this.setData({
+        reactionRocketAvatarPhase: 'restore',
+        reactionRocketBlastFace: false,
+        reactionRocketHairPop: false,
+        reactionRocketSmokeActive: false,
+        reactionRocketSmokeCover: false,
+        reactionRocketSmokeClearing: false,
+        reactionRocketFaceShake: false,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: restoreX,
+          y: restoreY,
+          w: ctx.width,
+          h: ctx.height,
+          rise: 0,
+          sway: 0,
+          rot: 0,
+          scaleX: 1,
+          scaleY: 1,
+          ms: 220
+        })
+      });
+      return;
+    }
+
+    if (action === 'cleanup') {
+      this._cleanupRocketReactionLayer();
+    }
+  },
+
+  _buildRocketProjectileStyle(x, y, rot, scale, opacity, ms) {
+    const transition =
+      ms > 0
+        ? 'left ' +
+          ms +
+          'ms linear,top ' +
+          ms +
+          'ms linear,transform ' +
+          ms +
+          'ms linear'
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;opacity:' +
+      opacity +
+      ';transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg) scale(' +
+      scale +
+      ');transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  _startRocketProjectileFlight(ctx) {
+    const self = this;
+    const c = ctx || this._rocketTimelineCtx || {};
+    const startX = c.startX;
+    const startY = c.startY;
+    const endX = c.cx;
+    const endY = c.cy;
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const key = String(c.entryKey || '');
+    const sideSign =
+      key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
+    const ctrlX = midX + sideSign * (48 + Math.random() * 60);
+    const ctrlY = midY - (40 + Math.random() * 50);
+    const flyMs = c.flyMs != null ? c.flyMs : 920;
+    const easeIn = function (t) {
+      return t * t * t;
+    };
+    const t0 = Date.now();
+
+    const tick = function () {
+      if (!self._rocketTimelineCtx) return;
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeIn(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
+      const ang =
+        (Math.atan2(endY - startY, endX - startX) * 180) / Math.PI + 90;
+      const scale = 0.28 + 0.95 * t;
+      const opacity = 0.75 + 0.25 * t;
+      self.setData({
+        reactionRocketFlyStyle: self._buildRocketProjectileStyle(
+          x,
+          y,
+          ang,
+          scale,
+          opacity,
+          0
+        )
+      });
+      if (raw < 1) {
+        self._rocketArcTimer = setTimeout(tick, 16);
+        return;
+      }
+      self._rocketArcTimer = null;
+    };
+    tick();
+  },
+
+  _cleanupRocketReactionLayer() {
+    try {
+      reactionSounds.stopReactionSound('rocket');
+    } catch (err) {
+      /* ignore */
+    }
+    this._clearRocketReactionTimers();
+    this.setData({
+      reactionScreenVisible: false,
+      reactionScreenFading: false,
+      reactionScreenMode: '',
+      reactionRocketFlyVisible: false,
+      reactionRocketFlyStyle: '',
+      reactionRocketBlastVisible: false,
+      reactionRocketBlastStyle: '',
+      reactionRocketBlastBurst: false,
+      reactionRocketShaking: false,
+      reactionRocketAvatarVisible: false,
+      reactionRocketAvatarUrl: '',
+      reactionRocketAvatarStyle: '',
+      reactionRocketAvatarPhase: '',
+      reactionRocketBlastFace: false,
+      reactionRocketHairPop: false,
+      reactionRocketSmokeCover: false,
+      reactionRocketSmokeClearing: false,
+      reactionRocketFaceShake: false,
+      reactionRocketSmokeActive: false,
+      reactionAvatarDetached: false,
+      reactionAvatarDetachedPlayerId: ''
+    });
+    this._rocketTimelineCtx = null;
+    this._playerActionRocketBusy = false;
+  },
 
   /** Demo：reaction 窗口尺寸 */
   _getReactionWindowSize() {
@@ -7220,12 +8095,20 @@ Page({
     return 'me';
   },
 
-  /** Demo：target === 当前用户 → 第一视角 */
+  /** Demo：target === 当前用户 → 第一视角（正式身份判断，勿改） */
   _isSelfReactionTarget(targetUserId) {
     const tid = targetUserId != null ? String(targetUserId).trim() : '';
     if (!tid) return false;
     if (isSameUserIdentity(tid, 'me')) return true;
     return isSameUserIdentity(tid, this._getCurrentReactionUserId());
+  },
+
+  /**
+   * Demo-only：TIGERHOODS 第一视角测试入口。
+   * 不修改 _isSelfReactionTarget / 真实 currentUser 判断；仅 demo-weekend-amateur。
+   */
+  _isDemoSelfPlayer(playerOrId) {
+    return demoWeekendAmateurGame.isDemoSelfPlayer(this.data.gameId, playerOrId);
   },
 
   /**
@@ -7311,7 +8194,23 @@ Page({
     const t = type != null ? String(type).trim() : '';
     const context = ctx && typeof ctx === 'object' ? ctx : {};
     if (t === 'tomato') {
-      this._playScreenTomatoReaction({ perspective: 'self' });
+      // 西红柿：目标头像中央舞台（拳击尺寸）+ 边缘飞砸
+      const playerId = String(context.playerId || '').trim();
+      const avatarUrl =
+        context.avatarUrl ||
+        (context.target &&
+          (context.target.avatar ||
+            context.target.avatarUrl ||
+            context.target.headimgurl)) ||
+        '';
+      const self = this;
+      this._queryPlayerActionAvatarRect(playerId, function (rect) {
+        if (!rect) {
+          self._playerActionTomatoBusy = false;
+          return;
+        }
+        self._playSelfTomatoReaction(rect, avatarUrl, playerId);
+      });
       return;
     }
     if (t === 'flower') {
@@ -7319,11 +8218,43 @@ Page({
       return;
     }
     if (t === 'egg') {
-      this._playScreenEggComboReaction();
+      // 鸡蛋：目标头像中央舞台（拳击尺寸）+ 固定方向连击
+      const playerId = String(context.playerId || '').trim();
+      const avatarUrl =
+        context.avatarUrl ||
+        (context.target &&
+          (context.target.avatar ||
+            context.target.avatarUrl ||
+            context.target.headimgurl)) ||
+        '';
+      const self = this;
+      this._queryPlayerActionAvatarRect(playerId, function (rect) {
+        if (!rect) {
+          self._playerActionEggBusy = false;
+          return;
+        }
+        self._playSelfEggReaction(rect, avatarUrl, playerId);
+      });
       return;
     }
     if (t === 'bucket') {
-      this._playSelfBucketScreenReaction();
+      // 水桶：目标头像中央舞台（拳击尺寸）+ 桶口倒水
+      const playerId = String(context.playerId || '').trim();
+      const avatarUrl =
+        context.avatarUrl ||
+        (context.target &&
+          (context.target.avatar ||
+            context.target.avatarUrl ||
+            context.target.headimgurl)) ||
+        '';
+      const self = this;
+      this._queryPlayerActionAvatarRect(playerId, function (rect) {
+        if (!rect) {
+          self._playerActionBucketBusy = false;
+          return;
+        }
+        self._playSelfBucketScreenReaction(rect, avatarUrl, playerId);
+      });
       return;
     }
     if (t === 'boxing') {
@@ -7341,16 +8272,48 @@ Page({
       return;
     }
     if (t === 'kiss') {
-      this._playSelfKissReaction();
+      // 亲吻：目标头像中央舞台（拳击尺寸）+ 嘴唇飞入 + 害羞脸 + 红心回座
+      const playerId = String(context.playerId || '').trim();
+      const avatarUrl =
+        context.avatarUrl ||
+        (context.target &&
+          (context.target.avatar ||
+            context.target.avatarUrl ||
+            context.target.headimgurl)) ||
+        '';
+      const self = this;
+      this._queryPlayerActionAvatarRect(playerId, function (rect) {
+        if (!rect) {
+          self._playerActionKissBusy = false;
+          return;
+        }
+        self._playSelfKissReaction(rect, avatarUrl, playerId);
+      });
+      return;
+    }
+    if (t === 'beer') {
+      this._playSelfBeerReaction();
+      return;
+    }
+    if (t === 'rocket') {
+      // 火箭：目标头像中央舞台（拳击尺寸）
+      const playerId = String(context.playerId || '').trim();
+      const avatarUrl = context.avatarUrl || '';
+      const self = this;
+      this._queryPlayerActionAvatarRect(playerId, function (rect) {
+        if (!rect) {
+          self._playerActionRocketBusy = false;
+          return;
+        }
+        self._playSelfRocketReaction(rect, avatarUrl, playerId);
+      });
       return;
     }
   },
 
   /**
-   * Demo：OBSERVER / 第三方统一入口（targetUserId !== currentUserId）。
-   * - 目标头像为视觉中心，动画落点 = 目标头像
-   * - 入场仅此处使用 _getReactionEntryPoint（远距离原则）
-   * - 若误传入 self 目标，回退 _playSelfReaction，避免污染第一视角
+   * Demo：OBSERVER 入口（reaction-view-model-v2）。
+   * 仅 flower / beer 保留双视角；其余类型回退目标头像中央舞台 Self。
    */
   _playObserverReaction(type, targetPlayer) {
     if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
@@ -7365,7 +8328,23 @@ Page({
       console.log('[reaction-observer] missing playerId', t);
       return;
     }
-    // 防误调：self 目标不得走远距离入场 / 头像落点路径
+    // 6 个统一中央舞台：误走 Observer 时回退 Self
+    if (
+      t === 'tomato' ||
+      t === 'egg' ||
+      t === 'bucket' ||
+      t === 'boxing' ||
+      t === 'kiss' ||
+      t === 'rocket'
+    ) {
+      this._playSelfReaction(t, {
+        playerId: playerId,
+        avatarUrl: avatarUrl,
+        target: target
+      });
+      return;
+    }
+    // 防误调：currentUser self 不得走 Observer
     if (this._isSelfReactionTarget(playerId)) {
       this._playSelfReaction(t, {
         playerId: playerId,
@@ -7377,43 +8356,23 @@ Page({
     const self = this;
     this._queryPlayerActionAvatarRect(playerId, function (rect) {
       if (!rect) {
-        if (t === 'tomato') self._playerActionTomatoBusy = false;
-        else if (t === 'flower') self._playerActionFlowerBusy = false;
-        else if (t === 'egg') self._playerActionEggBusy = false;
-        else if (t === 'bucket') self._playerActionBucketBusy = false;
-        else if (t === 'boxing') self._playerActionBoxingBusy = false;
-        else if (t === 'kiss') self._playerActionKissBusy = false;
-        return;
-      }
-      if (t === 'tomato') {
-        self._playObserverTomatoReaction(rect, playerId);
+        if (t === 'flower') self._playerActionFlowerBusy = false;
+        else if (t === 'beer') self._playerActionBeerBusy = false;
         return;
       }
       if (t === 'flower') {
         self._playPlayerActionFlower(rect, playerId);
         return;
       }
-      if (t === 'egg') {
-        self._playPlayerActionEggCombo(rect, playerId);
-        return;
-      }
-      if (t === 'bucket') {
-        self._playPlayerActionBucket(rect, playerId);
-        return;
-      }
-      if (t === 'boxing') {
-        self._playScreenBoxingReaction(rect, avatarUrl, playerId);
-        return;
-      }
-      if (t === 'kiss') {
-        self._playObserverKissReaction(rect, playerId);
+      if (t === 'beer') {
+        self._playObserverBeerReaction(rect, playerId);
         return;
       }
     });
   },
 
   /**
-   * Demo：👊 → 拳击 reaction（按目标分流第一视角 / 第三方）。
+   * Demo：👊 → 拳击 reaction（目标头像中央舞台；所有人同效果）。
    * 仅 demo-weekend-amateur；复用 player-action-modal；不改成绩。
    */
   onPlayerActionBoxingTap() {
@@ -7433,16 +8392,15 @@ Page({
     const avatarUrl =
       (target && (target.avatar || target.avatarUrl || target.headimgurl)) || '';
     this._playerActionBoxingBusy = true;
-    const ctx = { playerId: playerId, avatarUrl: avatarUrl, target: target };
-    if (this._isSelfReactionTarget(playerId)) {
-      this._playSelfReaction('boxing', ctx);
-    } else {
-      this._playObserverReaction('boxing', target);
-    }
+    this._playSelfReaction('boxing', {
+      playerId: playerId,
+      avatarUrl: avatarUrl,
+      target: target
+    });
   },
 
   /**
-   * Demo：👄 → 亲吻 reaction（原 🚗 入口位置）。
+   * Demo：👄 → 亲吻 reaction（目标头像中央舞台；所有人同效果）。
    * 仅 demo-weekend-amateur；不改成绩 / modal 结构。
    */
   onPlayerActionKissTap() {
@@ -7460,36 +8418,48 @@ Page({
       return;
     }
     this._playerActionKissBusy = true;
-    if (this._isSelfReactionTarget(playerId)) {
-      this._playSelfReaction('kiss', { playerId: playerId, target: target });
-    } else {
-      this._playObserverReaction('kiss', target);
-    }
-  },
-
-  /** Demo：👄 SELF — 随机边缘入场 → 屏中亲吻 + 红心 */
-  _playSelfKissReaction() {
-    const size = this._getReactionWindowSize();
-    const winW = size.winW;
-    const winH = size.winH;
-    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
-    this._playScreenKissReaction({
-      mode: 'self',
-      startX: origin.x,
-      startY: origin.y,
-      entryKey: origin.key || '',
-      endX: winW / 2,
-      endY: winH / 2
+    this._playSelfReaction('kiss', {
+      playerId: playerId,
+      target: target,
+      avatarUrl:
+        (target && (target.avatar || target.avatarUrl || target.headimgurl)) ||
+        ''
     });
   },
 
-  /** Demo：👄 OBSERVER — 远距离入场 → 嘴唇停在目标头像正中心 */
-  _playObserverKissReaction(rect, playerId) {
+  /**
+   * Demo：👄 SELF 入口 — 克隆头像到中央（拳击尺寸），嘴唇从远处飞入亲吻，
+   * 害羞卡通脸 + 红心升起，带着红心旋回座位后继续漂浮再淡出。
+   */
+  _playSelfKissReaction(rect, avatarUrl, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
-    if (this._isSelfReactionTarget(hitPlayerId)) {
-      this._playSelfKissReaction();
+    // 兼容旧无参调用
+    if (rect == null || typeof rect !== 'object') {
+      const target = this.data.playerActionTarget || {};
+      const pid = String(
+        hitPlayerId || target.playerId || target.userId || ''
+      ).trim();
+      const url =
+        (avatarUrl != null ? String(avatarUrl) : '') ||
+        target.avatar ||
+        target.avatarUrl ||
+        target.headimgurl ||
+        '';
+      const self = this;
+      if (!pid) {
+        this._playerActionKissBusy = false;
+        return;
+      }
+      this._queryPlayerActionAvatarRect(pid, function (r) {
+        if (!r) {
+          self._playerActionKissBusy = false;
+          return;
+        }
+        self._playSelfKissReaction(r, url, pid);
+      });
       return;
     }
+
     const norm =
       this._normalizePlayerActionAvatarRect(rect) ||
       this._fallbackPlayerActionAvatarRect() ||
@@ -7507,25 +8477,259 @@ Page({
       this._playerActionKissBusy = false;
       return;
     }
-    const entry = this._getReactionEntryPoint(norm);
-    // 嘴唇最终落点 = 头像几何中心（不用屏中 / 旁侧偏移）
-    const endX = left + width / 2;
-    const endY = top + height / 2;
-    this._playScreenKissReaction({
-      mode: 'observer',
-      startX: entry.x,
-      startY: entry.y,
-      entryKey: entry.key || '',
-      endX: endX,
-      endY: endY,
+
+    const selfTiming = kissReactionTimeline.SELF_KISS_TIMING || {};
+    const centerScale =
+      selfTiming.centerScale != null ? selfTiming.centerScale : 4;
+    const win = this._getReactionWindowSize();
+    const seatX = left + width / 2;
+    const seatY = top + height / 2;
+    const centerX = win.winW / 2;
+    const centerY = win.winH * 0.42;
+    const centerW = width * centerScale;
+    const centerH = height * centerScale;
+    const origin = this._getRandomSelfReactionEntryPoint(win.winW, win.winH);
+    const startX = origin.x;
+    const startY = origin.y;
+    const midX = (startX + centerX) / 2;
+    const midY = (startY + centerY) / 2;
+    const key = String(origin.key || '');
+    const sideSign =
+      key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : 1;
+    const ctrlX = midX + sideSign * (40 + Math.random() * 48);
+    const ctrlY =
+      key.indexOf('top') >= 0
+        ? midY - (32 + Math.random() * 40)
+        : key.indexOf('bottom') >= 0
+          ? midY + (32 + Math.random() * 40)
+          : midY - sideSign * (28 + Math.random() * 36);
+    const flyMs = selfTiming.flyMs != null ? selfTiming.flyMs : 980;
+    const toCenterMs =
+      selfTiming.toCenterMs != null ? selfTiming.toCenterMs : 420;
+    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 720;
+    const returnSpin = Math.random() > 0.5 ? 360 : -360;
+    /** Self 到达中央：相对素材基准 1.2–1.5，略大于旧 emoji 视觉 */
+    const arriveScale = 1.2 + Math.random() * 0.3;
+    const url = avatarUrl != null ? String(avatarUrl) : '';
+
+    this._clearKissReactionTimers();
+    this._stopKissReactionSounds();
+    this._kissTimelineCtx = {
+      mode: 'self',
+      seatX: seatX,
+      seatY: seatY,
+      cx: centerX,
+      cy: centerY,
+      endX: centerX,
+      endY: centerY,
+      startX: startX,
+      startY: startY,
+      ctrlX: ctrlX,
+      ctrlY: ctrlY,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      centerW: centerW,
+      centerH: centerH,
+      centerScale: centerScale,
+      flyMs: flyMs,
+      toCenterMs: toCenterMs,
+      returnMs: returnMs,
+      returnSpin: returnSpin,
+      arriveScale: arriveScale,
+      entryKey: key,
       playerId: hitPlayerId,
-      targetRect: {
-        left: left,
-        top: top,
-        width: width,
-        height: height
-      }
+      avatarUrl: url
+    };
+
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'kiss',
+      reactionKissIsSelf: true,
+      reactionKissLipsVisible: false,
+      reactionKissLipsPhase: '',
+      reactionKissLipsStyle: '',
+      reactionKissHearts: [],
+      reactionKissTargetVisible: false,
+      reactionKissTargetStyle: '',
+      reactionKissTargetLipsStyle: '',
+      reactionKissTargetHearts: [],
+      reactionKissSelfAvatarVisible: true,
+      reactionKissSelfAvatarUrl: url,
+      reactionKissSelfAvatarPhase: 'seat',
+      reactionKissSelfShyVisible: false,
+      reactionAvatarMode: 'normal',
+      showKissShyFace: false,
+      kissShyFaceSrc: '/subpackages/scoring/assets/reaction/kiss_shy_face.png',
+      kissLipsSrc: '/subpackages/scoring/assets/reaction/kiss_lips.png',
+      reactionKissSelfHeartsFading: false,
+      reactionKissSelfAvatarStyle: this._buildKissSelfAvatarStyle({
+        x: seatX,
+        y: seatY,
+        w: width,
+        h: height,
+        rot: 0,
+        ms: 0
+      }),
+      reactionAvatarDetached: !!hitPlayerId,
+      reactionAvatarDetachedPlayerId: hitPlayerId
     });
+
+    const timeline =
+      kissReactionTimeline.buildKissSelfReactionTimeline
+        ? kissReactionTimeline.buildKissSelfReactionTimeline()
+        : kissReactionTimeline.buildKissReactionTimeline({ mode: 'self' });
+    this._runKissReactionTimeline(timeline);
+  },
+
+  _buildKissSelfAvatarStyle(opts) {
+    const o = opts || {};
+    const x = o.x != null ? o.x : 0;
+    const y = o.y != null ? o.y : 0;
+    const w = o.w != null ? o.w : 44;
+    const h = o.h != null ? o.h : 44;
+    const rot = o.rot != null ? o.rot : 0;
+    const ms = o.ms != null ? Number(o.ms) : 0;
+    const ease = o.ease || 'cubic-bezier(0.22, 0.7, 0.28, 1)';
+    const transition =
+      ms > 0
+        ? 'left ' +
+          ms +
+          'ms ' +
+          ease +
+          ',top ' +
+          ms +
+          'ms ' +
+          ease +
+          ',width ' +
+          ms +
+          'ms ' +
+          ease +
+          ',height ' +
+          ms +
+          'ms ' +
+          ease +
+          ',transform ' +
+          ms +
+          'ms ' +
+          ease
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px;transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg);transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  /**
+   * Demo：👄 Self — 隐藏临时层原头像，切换为独立卡通害羞脸整图。
+   * 不分析/不修改用户真实头像。
+   */
+  _showKissShyFace() {
+    this.setData({
+      reactionAvatarMode: 'kissShy',
+      showKissShyFace: true,
+      reactionKissSelfShyVisible: true,
+      reactionKissSelfAvatarPhase: 'shy',
+      kissShyFaceSrc: '/subpackages/scoring/assets/reaction/kiss_shy_face.png'
+    });
+  },
+
+  /** Demo：👄 Self — 恢复临时层为原头像模式（清理卡通脸） */
+  _hideKissShyFace() {
+    this.setData({
+      reactionAvatarMode: 'restore',
+      showKissShyFace: false,
+      reactionKissSelfShyVisible: false
+    });
+  },
+
+  /** Demo：👄 Self 红心相对临时头像层中心（随头像回座一起移动） */
+  _buildKissSelfAttachedHearts() {
+    const count = 5 + Math.floor(Math.random() * 3); // 5–7
+    const hearts = [];
+    for (let i = 0; i < count; i++) {
+      const scale = (0.65 + Math.random() * 0.7).toFixed(2);
+      const delay = (0.02 + i * 0.08 + Math.random() * 0.05).toFixed(2);
+      const dur = (1.1 + Math.random() * 0.7).toFixed(2);
+      const drift = Math.round(-36 + Math.random() * 72);
+      const rise = Math.round(-(70 + Math.random() * 80));
+      const ox = Math.round(-16 + Math.random() * 32);
+      const oy = Math.round(-22 + Math.random() * 18);
+      hearts.push({
+        id: 'skh-' + i + '-' + Date.now(),
+        pop: true,
+        attached: true,
+        style:
+          'left:calc(50% + ' +
+          ox +
+          'px);top:calc(50% + ' +
+          oy +
+          'px);--kiss-heart-scale:' +
+          scale +
+          ';--kiss-heart-drift:' +
+          drift +
+          'px;--kiss-heart-rise:' +
+          rise +
+          'px;animation-duration:' +
+          dur +
+          's;animation-delay:' +
+          delay +
+          's;'
+      });
+    }
+    return hearts;
+  },
+
+  /** Demo：👄 Self 回座后：红心改绝对定位在座位继续漂浮 */
+  _buildKissSelfSeatHearts(seatX, seatY) {
+    const count = 4 + Math.floor(Math.random() * 3);
+    const hearts = [];
+    for (let i = 0; i < count; i++) {
+      const scale = (0.55 + Math.random() * 0.65).toFixed(2);
+      const delay = (0.05 + i * 0.12).toFixed(2);
+      const dur = (1.35 + Math.random() * 0.7).toFixed(2);
+      const drift = Math.round(-30 + Math.random() * 60);
+      const rise = Math.round(-(90 + Math.random() * 70));
+      const ox = Math.round(seatX + (-14 + Math.random() * 28));
+      const oy = Math.round(seatY + (-10 + Math.random() * 14));
+      hearts.push({
+        id: 'ssh-' + i + '-' + Date.now(),
+        pop: false,
+        attached: false,
+        style:
+          'left:' +
+          ox +
+          'px;top:' +
+          oy +
+          'px;--kiss-heart-scale:' +
+          scale +
+          ';--kiss-heart-drift:' +
+          drift +
+          'px;--kiss-heart-rise:' +
+          rise +
+          'px;animation-duration:' +
+          dur +
+          's;animation-delay:' +
+          delay +
+          's;'
+      });
+    }
+    return hearts;
   },
 
   _clearKissReactionTimers() {
@@ -7665,178 +8869,6 @@ Page({
     spawnOne();
   },
 
-  /**
-   * Demo：👄 Observer — 红心相对 kiss-target-layer 中心（头像中心）生成。
-   * @returns {Array<{id:string, style:string}>}
-   */
-  _buildObserverKissTargetHearts() {
-    const count = 3 + Math.floor(Math.random() * 4); // 3–6
-    const hearts = [];
-    for (let i = 0; i < count; i++) {
-      const scale = (0.55 + Math.random() * 0.7).toFixed(2);
-      const delay = (0.04 + i * (0.1 + Math.random() * 0.08) + Math.random() * 0.06).toFixed(2);
-      const dur = (1.1 + Math.random() * 0.75).toFixed(2);
-      const drift = Math.round(-26 + Math.random() * 52);
-      const rise = Math.round(-(78 + Math.random() * 64));
-      hearts.push({
-        id: 'okh-' + i + '-' + Date.now(),
-        style:
-          'left:50%;top:50%;--kiss-heart-scale:' +
-          scale +
-          ';--kiss-heart-drift:' +
-          drift +
-          'px;--kiss-heart-rise:' +
-          rise +
-          'px;animation-duration:' +
-          dur +
-          's;animation-delay:' +
-          delay +
-          's;'
-      });
-    }
-    return hearts;
-  },
-
-  /** Demo：👄 Observer — kiss-target-layer 锚定头像 rect */
-  _buildKissTargetLayerStyle(targetRect) {
-    const tr = targetRect || {};
-    const left = Number(tr.left);
-    const top = Number(tr.top);
-    const width = Number(tr.width);
-    const height = Number(tr.height);
-    if (
-      !Number.isFinite(left) ||
-      !Number.isFinite(top) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height)
-    ) {
-      return '';
-    }
-    return (
-      'left:' +
-      left +
-      'px;top:' +
-      top +
-      'px;width:' +
-      width +
-      'px;height:' +
-      height +
-      'px;'
-    );
-  },
-
-  _buildKissTargetLipsStyle(targetRect) {
-    const tr = targetRect || {};
-    const width = Number(tr.width);
-    const height = Number(tr.height);
-    const side = Math.max(
-      28,
-      Math.round(Math.max(Number.isFinite(width) ? width : 40, Number.isFinite(height) ? height : 40) * 0.98)
-    );
-    return (
-      '--kiss-target-side:' +
-      side +
-      'px;--kiss-target-font:' +
-      Math.round(side * 0.86) +
-      'px;'
-    );
-  },
-
-  /**
-   * Demo：👄 共用演出（self 屏中增强 / observer 头像保持原节奏）。
-   * 音效仅 kiss_hit 节点播放。
-   */
-  _playScreenKissReaction(opts) {
-    const o = opts && typeof opts === 'object' ? opts : {};
-    const mode = o.mode === 'observer' ? 'observer' : 'self';
-    const isSelf = mode === 'self';
-    const startX = Number(o.startX);
-    const startY = Number(o.startY);
-    const endX = Number(o.endX);
-    const endY = Number(o.endY);
-    if (
-      !Number.isFinite(startX) ||
-      !Number.isFinite(startY) ||
-      !Number.isFinite(endX) ||
-      !Number.isFinite(endY)
-    ) {
-      this._playerActionKissBusy = false;
-      return;
-    }
-
-    const flyMs = isSelf
-      ? kissReactionTimeline.SELF_KISS_TIMING.flyMs
-      : kissReactionTimeline.KISS_TIMING.flyMs;
-    const holdMs = isSelf
-      ? kissReactionTimeline.SELF_KISS_TIMING.holdMs + Math.floor(Math.random() * 200)
-      : 1200 + Math.floor(Math.random() * 600); // observer 停留 1.2–1.8s
-    const midX = (startX + endX) / 2;
-    const midY = (startY + endY) / 2;
-    const key = String(o.entryKey || '');
-    const sideSign = key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
-    const ctrlX = midX + sideSign * (36 + Math.random() * 52);
-    const ctrlY =
-      key.indexOf('top') >= 0
-        ? midY - (30 + Math.random() * 44)
-        : key.indexOf('bottom') >= 0
-          ? midY + (30 + Math.random() * 44)
-          : midY - sideSign * (24 + Math.random() * 36);
-    const arriveScale = isSelf ? 1.8 + Math.random() * 0.4 : 1; // self 1.8–2.2
-    const targetRect =
-      !isSelf && o.targetRect && typeof o.targetRect === 'object' ? o.targetRect : null;
-    const targetStyle = !isSelf ? this._buildKissTargetLayerStyle(targetRect) : '';
-    const targetLipsStyle = !isSelf ? this._buildKissTargetLipsStyle(targetRect) : '';
-
-    this._clearKissReactionTimers();
-    this._stopKissReactionSounds();
-    this._kissTimelineCtx = {
-      mode: mode,
-      startX: startX,
-      startY: startY,
-      endX: endX,
-      endY: endY,
-      ctrlX: ctrlX,
-      ctrlY: ctrlY,
-      flyMs: flyMs,
-      holdMs: holdMs,
-      arriveScale: arriveScale,
-      targetRect: targetRect,
-      targetStyle: targetStyle,
-      targetLipsStyle: targetLipsStyle
-    };
-
-    const startScale = isSelf ? 0.32 + Math.random() * 0.08 : 0.32;
-    this.setData({
-      playerActionSheetVisible: false,
-      playerActionTarget: null,
-      reactionScreenVisible: true,
-      reactionScreenFading: false,
-      reactionScreenMode: 'kiss',
-      reactionKissIsSelf: isSelf,
-      reactionKissLipsVisible: true,
-      reactionKissLipsPhase: 'fly',
-      reactionKissLipsStyle: this._buildKissLipsStyle(
-        startX,
-        startY,
-        -12,
-        startScale,
-        isSelf ? 0.7 : 0.72
-      ),
-      reactionKissHearts: [],
-      reactionKissTargetVisible: false,
-      reactionKissTargetStyle: targetStyle,
-      reactionKissTargetLipsStyle: targetLipsStyle,
-      reactionKissTargetHearts: []
-    });
-
-    const timeline = kissReactionTimeline.buildKissReactionTimeline({
-      mode: mode,
-      flyMs: flyMs,
-      holdMs: holdMs
-    });
-    this._runKissReactionTimeline(timeline);
-  },
-
   _runKissReactionTimeline(timeline) {
     const self = this;
     const list = timeline || [];
@@ -7853,98 +8885,293 @@ Page({
     const e = ev || {};
     const action = e.action != null ? String(e.action) : '';
     const ctx = this._kissTimelineCtx || {};
-    const isSelf = ctx.mode === 'self';
+    // reaction-view-model-v2：kiss 仅目标中央舞台
+    if (ctx.mode !== 'self') return;
+    const isSelf = true;
+    const page = this;
 
-    if (action === 'fly_start' || action === 'kiss_fly') {
+    if (action === 'self_avatar_center') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.toCenterMs || 420;
+      this.setData({
+        reactionAvatarDetached: true,
+        reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionKissSelfAvatarVisible: true,
+        reactionKissSelfAvatarPhase: 'seat',
+        reactionKissSelfShyVisible: false,
+        reactionAvatarMode: 'normal',
+        showKissShyFace: false,
+        reactionKissSelfHeartsFading: false,
+        reactionKissHearts: [],
+        reactionKissSelfAvatarStyle: this._buildKissSelfAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rot: 0,
+          ms: 0
+        })
+      });
+      this._kissTimeout(function () {
+        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') return;
+        page.setData({
+          reactionKissSelfAvatarPhase: 'center',
+          reactionKissSelfAvatarStyle: page._buildKissSelfAvatarStyle({
+            x: ctx.cx,
+            y: ctx.cy,
+            w: ctx.centerW || ctx.width * 4,
+            h: ctx.centerH || ctx.height * 4,
+            rot: 0,
+            ms: ms
+          })
+        });
+      }, 24);
+      return;
+    }
+
+    if (action === 'kiss_self_fly' || (action === 'kiss_fly' && isSelf)) {
+      if (!isSelf) return;
+      this.setData({
+        reactionKissLipsVisible: true,
+        reactionKissLipsPhase: 'fly',
+        reactionKissLipsStyle: this._buildKissLipsStyle(
+          ctx.startX,
+          ctx.startY,
+          -14,
+          0.34,
+          0.68
+        )
+      });
       this._startKissArcFlight(ctx);
       return;
     }
 
+    // 害羞脸：kiss_hit +50~100ms；不在此节点淡出嘴唇
+    if (action === 'shy_face_show') {
+      if (!isSelf) return;
+      this._showKissShyFace();
+      return;
+    }
+
+    // 嘴唇停留：贴合中央 + 呼吸缩放；保持卡通害羞脸
+    if (action === 'kiss_hold' || action === 'lip_hold') {
+      if (!isSelf) return;
+      const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.35;
+      if (this.data.reactionAvatarMode !== 'kissShy') {
+        this._showKissShyFace();
+      }
+      this.setData({
+        reactionKissLipsVisible: true,
+        reactionKissLipsPhase: 'hold',
+        reactionAvatarMode: 'kissShy',
+        showKissShyFace: true,
+        reactionKissSelfShyVisible: true,
+        reactionKissLipsStyle:
+          'left:' +
+          (ctx.cx != null ? ctx.cx : ctx.endX) +
+          'px;top:' +
+          (ctx.cy != null ? ctx.cy : ctx.endY) +
+          'px;opacity:1;--kiss-arrive-scale:' +
+          arriveScale.toFixed(2) +
+          ';'
+      });
+      return;
+    }
+
+    // 停留结束：嘴唇先离开；卡通害羞脸保持
+    if (action === 'lips_leave') {
+      if (!isSelf) return;
+      this.setData({
+        reactionKissLipsPhase: 'fade',
+        reactionAvatarMode: 'kissShy',
+        showKissShyFace: true,
+        reactionKissSelfShyVisible: true
+      });
+      const leaveMs =
+        e.duration != null
+          ? e.duration
+          : (kissReactionTimeline.SELF_KISS_TIMING &&
+              kissReactionTimeline.SELF_KISS_TIMING.lipsLeaveMs) ||
+            420;
+      this._kissTimeout(function () {
+        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionKissLipsVisible: false,
+          reactionKissLipsStyle: '',
+          reactionKissLipsPhase: ''
+        });
+      }, leaveMs);
+      return;
+    }
+
+    if (action === 'avatar_return' || action === 'avatar_return_with_hearts') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.returnMs || 720;
+      const spin = ctx.returnSpin != null ? ctx.returnSpin : 360;
+      // 回座全程保持卡通害羞脸，中途不切回原头像
+      this.setData({
+        reactionKissSelfAvatarPhase: 'return',
+        reactionAvatarMode: 'kissShy',
+        showKissShyFace: true,
+        reactionKissSelfShyVisible: true,
+        reactionKissLipsVisible: false,
+        reactionKissLipsStyle: '',
+        reactionKissLipsPhase: '',
+        reactionKissSelfAvatarStyle: this._buildKissSelfAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rot: spin,
+          ms: ms,
+          ease: 'cubic-bezier(0.28, 0.65, 0.32, 1)'
+        })
+      });
+      return;
+    }
+
+    if (action === 'seat_hearts_float') {
+      if (!isSelf) return;
+      // 回座后：卡通脸仍在座位短暂保留 → 红心漂浮 → 延迟恢复原头像
+      this.setData({
+        reactionKissSelfAvatarPhase: 'seat',
+        reactionAvatarMode: 'kissShy',
+        showKissShyFace: true,
+        reactionKissSelfShyVisible: true,
+        reactionKissHearts: this._buildKissSelfSeatHearts(ctx.seatX, ctx.seatY),
+        reactionKissSelfHeartsFading: false
+      });
+      const clearMs =
+        (kissReactionTimeline.SELF_KISS_TIMING &&
+          kissReactionTimeline.SELF_KISS_TIMING.shySeatClearMs) ||
+        900;
+      this._kissTimeout(function () {
+        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionKissSelfAvatarVisible: false,
+          reactionAvatarMode: 'restore',
+          showKissShyFace: false,
+          reactionKissSelfShyVisible: false,
+          reactionAvatarDetached: false,
+          reactionAvatarDetachedPlayerId: ''
+        });
+      }, clearMs);
+      return;
+    }
+
+    if (action === 'hearts_fade' || action === 'heart_fade') {
+      if (!isSelf) return;
+      this.setData({ reactionKissSelfHeartsFading: true });
+      return;
+    }
+
+    if (action === 'restore') {
+      if (!isSelf) return;
+      this._stopKissReactionSounds();
+      this._clearKissReactionTimers();
+      this.setData({
+        reactionScreenVisible: false,
+        reactionScreenFading: false,
+        reactionScreenMode: '',
+        reactionKissLipsVisible: false,
+        reactionKissLipsStyle: '',
+        reactionKissLipsPhase: '',
+        reactionKissHearts: [],
+        reactionKissIsSelf: false,
+        reactionKissTargetVisible: false,
+        reactionKissTargetStyle: '',
+        reactionKissTargetLipsStyle: '',
+        reactionKissTargetHearts: [],
+        reactionKissSelfAvatarVisible: false,
+        reactionKissSelfAvatarUrl: '',
+        reactionKissSelfAvatarStyle: '',
+        reactionKissSelfAvatarPhase: '',
+        reactionKissSelfShyVisible: false,
+        reactionAvatarMode: 'normal',
+        showKissShyFace: false,
+        reactionKissSelfHeartsFading: false,
+        reactionAvatarDetached: false,
+        reactionAvatarDetachedPlayerId: ''
+      });
+      this._kissTimelineCtx = null;
+      this._playerActionKissBusy = false;
+      return;
+    }
+
     if (action === 'kiss_hit') {
-      const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.9;
-      if (isSelf) {
-        // Self：接触瞬间放大脉冲 + 强音（飞行途中不播）
-        this.setData({
-          reactionKissLipsPhase: 'hit',
+      if (!isSelf) return;
+      const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.35;
+      if (this._kissArcTimer) {
+        clearTimeout(this._kissArcTimer);
+        this._kissArcTimer = null;
+      }
+      // 命中：音效 + 嘴唇贴合；害羞脸由 shy_face_show（+80ms）触发
+      this.setData({
+        reactionKissLipsVisible: true,
+        reactionKissLipsPhase: 'hit',
+        reactionKissSelfAvatarPhase: 'kiss',
+        reactionKissLipsStyle:
+          'left:' +
+          (ctx.cx != null ? ctx.cx : ctx.endX) +
+          'px;top:' +
+          (ctx.cy != null ? ctx.cy : ctx.endY) +
+          'px;opacity:1;--kiss-arrive-scale:' +
+          arriveScale.toFixed(2) +
+          ';'
+      });
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 1,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      const shyDelay =
+        (kissReactionTimeline.SELF_KISS_TIMING &&
+          kissReactionTimeline.SELF_KISS_TIMING.shyDelayMs) ||
+        80;
+      this._kissTimeout(function () {
+        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') {
+          return;
+        }
+        if (!page.data.showKissShyFace) {
+          page._showKissShyFace();
+        }
+      }, shyDelay);
+      const pulseMs =
+        (kissReactionTimeline.SELF_KISS_TIMING &&
+          kissReactionTimeline.SELF_KISS_TIMING.hitPulseMs) ||
+        280;
+      this._kissTimeout(function () {
+        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionKissLipsPhase: 'hold',
+          reactionAvatarMode: 'kissShy',
+          showKissShyFace: true,
+          reactionKissSelfShyVisible: true,
           reactionKissLipsStyle:
             'left:' +
-            ctx.endX +
+            (ctx.cx != null ? ctx.cx : ctx.endX) +
             'px;top:' +
-            ctx.endY +
+            (ctx.cy != null ? ctx.cy : ctx.endY) +
             'px;opacity:1;--kiss-arrive-scale:' +
             arriveScale.toFixed(2) +
             ';'
         });
-        if (e.sound) {
-          this._playReactionSound(e.sound, {
-            volume: e.volume != null ? e.volume : 1,
-            seekMs: e.seekMs != null ? e.seekMs : 0
-          });
-        }
-        const pulseMs =
-          (kissReactionTimeline.SELF_KISS_TIMING &&
-            kissReactionTimeline.SELF_KISS_TIMING.hitPulseMs) ||
-          280;
-        const self = this;
-        this._kissTimeout(function () {
-          if (!self._kissTimelineCtx || self._kissTimelineCtx.mode !== 'self') return;
-          self.setData({
-            reactionKissLipsPhase: 'hold',
-            reactionKissLipsStyle:
-              'left:' +
-              ctx.endX +
-              'px;top:' +
-              ctx.endY +
-              'px;opacity:1;--kiss-arrive-scale:' +
-              arriveScale.toFixed(2) +
-              ';'
-          });
-        }, pulseMs);
-        return;
-      }
-      // Observer：飞入嘴唇卸下 → kiss-target-layer 覆盖头像中心 + 亲吻脉冲
-      this.setData({
-        reactionKissLipsVisible: false,
-        reactionKissLipsStyle: '',
-        reactionKissTargetVisible: true,
-        reactionKissTargetStyle: ctx.targetStyle || this._buildKissTargetLayerStyle(ctx.targetRect),
-        reactionKissTargetLipsStyle:
-          ctx.targetLipsStyle || this._buildKissTargetLipsStyle(ctx.targetRect),
-        reactionKissLipsPhase: 'hit'
-      });
-      if (e.sound) {
-        this._playReactionSound(e.sound, {
-          volume: e.volume != null ? e.volume : 0.95,
-          seekMs: e.seekMs != null ? e.seekMs : 0
-        });
-      }
-      const pulseMs =
-        (kissReactionTimeline.KISS_TIMING && kissReactionTimeline.KISS_TIMING.hitPulseMs) ||
-        320;
-      const page = this;
-      this._kissTimeout(function () {
-        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'observer') return;
-        page.setData({ reactionKissLipsPhase: 'hold' });
       }, pulseMs);
       return;
     }
 
     if (action === 'hearts_start' || action === 'heart_spawn') {
-      if (isSelf) {
-        this._startSelfKissHeartSpawn(ctx.endX, ctx.endY);
-      } else {
-        // Observer：从头像中心（target layer）冒出，非屏中
-        this.setData({
-          reactionKissTargetHearts: this._buildObserverKissTargetHearts()
-        });
-      }
-      return;
-    }
-
-    if (action === 'lips_fade') {
+      if (!isSelf) return;
       this.setData({
-        reactionKissLipsPhase: 'fade',
-        reactionScreenFading: true
+        reactionKissHearts: this._buildKissSelfAttachedHearts(),
+        reactionKissSelfHeartsFading: false
       });
       return;
     }
@@ -7964,7 +9191,17 @@ Page({
         reactionKissTargetVisible: false,
         reactionKissTargetStyle: '',
         reactionKissTargetLipsStyle: '',
-        reactionKissTargetHearts: []
+        reactionKissTargetHearts: [],
+        reactionKissSelfAvatarVisible: false,
+        reactionKissSelfAvatarUrl: '',
+        reactionKissSelfAvatarStyle: '',
+        reactionKissSelfAvatarPhase: '',
+        reactionKissSelfShyVisible: false,
+        reactionAvatarMode: 'normal',
+        showKissShyFace: false,
+        reactionKissSelfHeartsFading: false,
+        reactionAvatarDetached: false,
+        reactionAvatarDetachedPlayerId: ''
       });
       this._kissTimelineCtx = null;
       this._playerActionKissBusy = false;
@@ -7983,7 +9220,8 @@ Page({
     const ctrlX = c.ctrlX;
     const ctrlY = c.ctrlY;
     const flyMs = c.flyMs != null ? c.flyMs : isSelf ? 1080 : 980;
-    const arriveScale = c.arriveScale != null ? c.arriveScale : 2;
+    const arriveScale =
+      c.arriveScale != null ? c.arriveScale : isSelf ? 1.35 : 1;
     const easeIn = function (t) {
       return t * t * t;
     };
@@ -7992,11 +9230,11 @@ Page({
       if (t <= 0.5) return 0.32 + (0.7 - 0.32) * (t / 0.5);
       return 0.7 + (1.05 - 0.7) * ((t - 0.5) / 0.5);
     };
-    // Self：0.35 → 0.8 → 1.3 → 1.8~2.2（越近越大）
+    // Self：飞近放大 → arriveScale 1.2–1.5（纯嘟嘴素材基准更大）
     const scaleAtSelf = function (t) {
-      if (t <= 0.42) return 0.35 + (0.8 - 0.35) * (t / 0.42);
-      if (t <= 0.72) return 0.8 + (1.3 - 0.8) * ((t - 0.42) / 0.3);
-      return 1.3 + (arriveScale - 1.3) * ((t - 0.72) / 0.28);
+      if (t <= 0.42) return 0.4 + (0.85 - 0.4) * (t / 0.42);
+      if (t <= 0.72) return 0.85 + (1.05 - 0.85) * ((t - 0.42) / 0.3);
+      return 1.05 + (arriveScale - 1.05) * ((t - 0.72) / 0.28);
     };
     const t0 = Date.now();
 
@@ -8046,6 +9284,920 @@ Page({
       }
     };
 
+    tick();
+  },
+
+  /**
+   * Demo：🍺 → 干杯 reaction。
+   * Self（demo TIGERHOODS / 当前用户）→ 第一视角；他人 → Observer 第三视角。
+   * 仅 demo-weekend-amateur。
+   */
+  onPlayerActionBeerTap() {
+    if (this._playerActionBeerBusy) return;
+    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) {
+      return;
+    }
+    const target = this.data.playerActionTarget;
+    const playerId =
+      target && (target.playerId || target.userId) != null
+        ? String(target.playerId || target.userId).trim()
+        : '';
+    if (!playerId) {
+      console.log('[player-action-beer] missing playerId');
+      return;
+    }
+    this._playerActionBeerBusy = true;
+    // demo TIGERHOODS → Self；正式 currentUser 判断保持 _isSelfReactionTarget 不变
+    if (this._isDemoSelfPlayer(target || playerId) || this._isSelfReactionTarget(playerId)) {
+      this._playSelfReaction('beer', { playerId: playerId, target: target });
+      return;
+    }
+    this._playObserverReaction('beer', target);
+  },
+
+  /**
+   * Demo：🍺 SELF — 第一视角双杯碰杯。
+   * 第一杯边缘入场 → 第二杯对向入场 → 屏中碰杯 → 增强啤酒花；不读头像 rect。
+   */
+  _playSelfBeerReaction() {
+    const size = this._getReactionWindowSize();
+    const winW = size.winW;
+    const winH = size.winH;
+    const firstEntry = this._getRandomSelfReactionEntryPoint(winW, winH);
+    const secondEntry = this._getOppositeSelfReactionEntryPoint(
+      firstEntry,
+      winW,
+      winH
+    );
+    const cx = winW / 2;
+    const cy = winH / 2;
+    const selfTiming = beerReactionTimeline.BEER_SELF_TIMING || {};
+    const audioClip = beerReactionTimeline.BEER_AUDIO_CLIP || {};
+    const firstFlyMs = selfTiming.firstFlyMs != null ? selfTiming.firstFlyMs : 780;
+    const secondFlyMs = selfTiming.secondFlyMs != null ? selfTiming.secondFlyMs : 520;
+    const finalScale = selfTiming.finalScale != null ? selfTiming.finalScale : 1.75;
+    const clashScale =
+      selfTiming.clashScalePeak != null ? selfTiming.clashScalePeak : 1.18;
+    const cheersPath =
+      (reactionSounds.SOUND_SRC && reactionSounds.SOUND_SRC.cheers) ||
+      '/subpackages/scoring/assets/sounds/cheers.mp3';
+    const cheersDuration = audioClip.durationMs != null ? audioClip.durationMs : 2135;
+    const peakMs = audioClip.peakMs != null ? audioClip.peakMs : 1520;
+    // 大杯落点：略分左右，视觉中心仍在屏中
+    const cupGap = Math.max(38, Math.round(28 * finalScale));
+
+    this._clearBeerReactionTimers();
+    this._stopBeerSelfHoldBubbles();
+    try {
+      reactionSounds.stopReactionSound('cheers');
+    } catch (err) {
+      /* ignore */
+    }
+
+    console.log('[beer] beer reaction start', {
+      mode: 'self',
+      dual: true,
+      audioSync: true,
+      peakMs: peakMs,
+      finalScale: finalScale
+    });
+    console.log('[beer] cheers duration', cheersDuration);
+
+    this._beerTimelineCtx = {
+      mode: 'self',
+      cx: cx,
+      cy: cy,
+      firstEndX: cx - cupGap,
+      firstEndY: cy,
+      secondEndX: cx + cupGap,
+      secondEndY: cy,
+      startX: firstEntry.x,
+      startY: firstEntry.y,
+      entryKey: firstEntry.key || '',
+      secondStartX: secondEntry.x,
+      secondStartY: secondEntry.y,
+      secondEntryKey: secondEntry.key || '',
+      firstFlyMs: firstFlyMs,
+      secondFlyMs: secondFlyMs,
+      finalScale: finalScale,
+      clashScale: clashScale,
+      mainFlyMs: firstFlyMs,
+      sideFlyMs: 0,
+      cheersPath: cheersPath,
+      cheersDuration: cheersDuration,
+      peakMs: peakMs
+    };
+
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'beer',
+      reactionBeerIsSelf: true,
+      reactionBeerMainVisible: false,
+      reactionBeerMainPhase: '',
+      reactionBeerMainStyle: '',
+      reactionBeerLeftVisible: false,
+      reactionBeerLeftPhase: '',
+      reactionBeerLeftStyle: '',
+      reactionBeerRightVisible: false,
+      reactionBeerRightPhase: '',
+      reactionBeerRightStyle: '',
+      reactionBeerSplashVisible: false,
+      reactionBeerSplashStyle: '',
+      reactionBeerFlashVisible: false,
+      reactionBeerFlashStyle: '',
+      reactionBeerShaking: false,
+      reactionBeerBubbles: []
+    });
+
+    const timeline = beerReactionTimeline.buildBeerSelfReactionTimeline
+      ? beerReactionTimeline.buildBeerSelfReactionTimeline()
+      : beerReactionTimeline.buildBeerReactionTimeline({ mode: 'self' });
+    this._runBeerReactionTimeline(timeline);
+  },
+
+  /** Demo：🍺 Self — 与第一杯入口对向的边缘点 */
+  _getOppositeSelfReactionEntryPoint(firstEntry, winW, winH) {
+    const w = Number(winW) || 375;
+    const h = Number(winH) || 667;
+    const pad = Math.max(72, Math.round(Math.min(w, h) * 0.2));
+    const key = String((firstEntry && firstEntry.key) || '');
+    const map = {
+      top: { key: 'bottom', x: w * 0.5, y: h + pad },
+      bottom: { key: 'top', x: w * 0.5, y: -pad },
+      left: { key: 'right', x: w + pad, y: h * 0.5 },
+      right: { key: 'left', x: -pad, y: h * 0.5 },
+      'top-left': { key: 'bottom-right', x: w + pad, y: h + pad },
+      'top-right': { key: 'bottom-left', x: -pad, y: h + pad },
+      'bottom-left': { key: 'top-right', x: w + pad, y: -pad },
+      'bottom-right': { key: 'top-left', x: -pad, y: -pad }
+    };
+    if (map[key]) return map[key];
+    // 兜底：镜像坐标
+    const fx = Number(firstEntry && firstEntry.x);
+    const fy = Number(firstEntry && firstEntry.y);
+    return {
+      key: 'mirror',
+      x: Number.isFinite(fx) ? w - fx : w + pad,
+      y: Number.isFinite(fy) ? h - fy : -pad
+    };
+  },
+
+  /** Demo：🍺 OBSERVER — 锚定目标头像中心干杯 */
+  _playObserverBeerReaction(rect, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    if (this._isDemoSelfPlayer(hitPlayerId) || this._isSelfReactionTarget(hitPlayerId)) {
+      this._playSelfBeerReaction();
+      return;
+    }
+    const norm =
+      this._normalizePlayerActionAvatarRect(rect) ||
+      this._fallbackPlayerActionAvatarRect() ||
+      rect;
+    const left = Number(norm.left);
+    const top = Number(norm.top);
+    const width = Number(norm.width);
+    const height = Number(norm.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionBeerBusy = false;
+      return;
+    }
+    const cx = left + width / 2;
+    const cy = top + height / 2;
+    const entry = this._getReactionEntryPoint(norm);
+    const mainFlyMs = beerReactionTimeline.BEER_TIMING.mainFlyMs;
+    const sideFlyMs = beerReactionTimeline.BEER_TIMING.sideFlyMs;
+    const sidePad = Math.max(72, Math.round(Math.max(width, height) * 2.2));
+    const cheersPath =
+      (reactionSounds.SOUND_SRC && reactionSounds.SOUND_SRC.cheers) ||
+      '/subpackages/scoring/assets/sounds/cheers.mp3';
+    const cheersDuration =
+      (beerReactionTimeline.BEER_AUDIO_CLIP &&
+        beerReactionTimeline.BEER_AUDIO_CLIP.durationMs) ||
+      2135;
+
+    this._clearBeerReactionTimers();
+    try {
+      reactionSounds.stopReactionSound('cheers');
+    } catch (err) {
+      /* ignore */
+    }
+
+    console.log('[beer] beer reaction start', { mode: 'observer' });
+    console.log('[beer] cheers duration', cheersDuration);
+
+    this._beerTimelineCtx = {
+      mode: 'observer',
+      cx: cx,
+      cy: cy,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      startX: entry.x,
+      startY: entry.y,
+      entryKey: entry.key || '',
+      mainFlyMs: mainFlyMs,
+      sideFlyMs: sideFlyMs,
+      cheersPath: cheersPath,
+      cheersDuration: cheersDuration,
+      sideLeftStartX: cx - sidePad,
+      sideLeftStartY: cy + (-18 + Math.random() * 36),
+      sideRightStartX: cx + sidePad,
+      sideRightStartY: cy + (-18 + Math.random() * 36)
+    };
+
+    this.setData({
+      playerActionSheetVisible: false,
+      playerActionTarget: null,
+      reactionScreenVisible: true,
+      reactionScreenFading: false,
+      reactionScreenMode: 'beer',
+      reactionBeerIsSelf: false,
+      reactionBeerMainVisible: true,
+      reactionBeerMainPhase: 'fly',
+      reactionBeerMainStyle: this._buildBeerCupStyle(entry.x, entry.y, -10, 0.32, 0.7),
+      reactionBeerLeftVisible: false,
+      reactionBeerLeftPhase: '',
+      reactionBeerLeftStyle: '',
+      reactionBeerRightVisible: false,
+      reactionBeerRightPhase: '',
+      reactionBeerRightStyle: '',
+      reactionBeerSplashVisible: false,
+      reactionBeerSplashStyle: '',
+      reactionBeerFlashVisible: false,
+      reactionBeerFlashStyle: '',
+      reactionBeerShaking: false,
+      reactionBeerBubbles: this._buildBeerHoldBubbles()
+    });
+
+    const timeline = beerReactionTimeline.buildBeerReactionTimeline({ mode: 'observer' });
+    this._runBeerReactionTimeline(timeline);
+  },
+
+  _clearBeerReactionTimers() {
+    this._stopBeerSelfHoldBubbles();
+    const keys = [
+      '_beerArcTimer',
+      '_beerSideLeftTimer',
+      '_beerSideRightTimer',
+      '_beerSelfSecondTimer'
+    ];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (this[k]) {
+        clearTimeout(this[k]);
+        this[k] = null;
+      }
+    }
+    const tl = this._beerTimelineTimers;
+    if (tl && tl.length) {
+      for (let j = 0; j < tl.length; j++) {
+        clearTimeout(tl[j]);
+      }
+    }
+    this._beerTimelineTimers = [];
+  },
+
+  _beerTimeout(fn, ms) {
+    const self = this;
+    if (!this._beerTimelineTimers) this._beerTimelineTimers = [];
+    const id = setTimeout(function () {
+      const list = self._beerTimelineTimers || [];
+      const idx = list.indexOf(id);
+      if (idx >= 0) list.splice(idx, 1);
+      try {
+        fn();
+      } catch (err) {
+        console.log('[beer-timeline] handler error', err);
+      }
+    }, ms);
+    this._beerTimelineTimers.push(id);
+    return id;
+  },
+
+  _runBeerReactionTimeline(timeline) {
+    const self = this;
+    const list = timeline || [];
+    const isSelf =
+      this._beerTimelineCtx && this._beerTimelineCtx.mode === 'self';
+    for (let i = 0; i < list.length; i++) {
+      (function (ev) {
+        self._beerTimeout(function () {
+          if (isSelf) {
+            self._dispatchBeerSelfTimelineEvent(ev);
+          } else {
+            self._dispatchBeerTimelineEvent(ev);
+          }
+        }, ev.time);
+      })(list[i]);
+    }
+  },
+
+  _buildBeerCupStyle(x, y, rot, scale, opacity) {
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;opacity:' +
+      opacity +
+      ';transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg) scale(' +
+      scale +
+      ');'
+    );
+  },
+
+  _buildBeerHoldBubbles() {
+    const list = [];
+    for (let i = 0; i < 5; i++) {
+      list.push({
+        id: 'bb-' + i,
+        style:
+          'left:' +
+          (28 + Math.random() * 44).toFixed(1) +
+          '%;animation-delay:' +
+          (i * 0.14 + Math.random() * 0.2).toFixed(2) +
+          's;animation-duration:' +
+          (0.85 + Math.random() * 0.55).toFixed(2) +
+          's;--beer-bubble-size:' +
+          (3 + Math.floor(Math.random() * 4)) +
+          'px;'
+      });
+    }
+    return list;
+  },
+
+  /** Demo：🍺 Observer timeline 调度（与 Self 分离） */
+  _dispatchBeerTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._beerTimelineCtx || {};
+    if (ctx.mode === 'self') return;
+
+    if (action === 'beer_main_fly') {
+      const cheersPath =
+        ctx.cheersPath ||
+        (reactionSounds.SOUND_SRC && reactionSounds.SOUND_SRC.cheers) ||
+        '/subpackages/scoring/assets/sounds/cheers.mp3';
+      const cheersDuration =
+        ctx.cheersDuration != null
+          ? ctx.cheersDuration
+          : (beerReactionTimeline.BEER_AUDIO_CLIP &&
+              beerReactionTimeline.BEER_AUDIO_CLIP.durationMs) ||
+            2135;
+      console.log('[beer] cheers play start', {
+        sound: e.sound || 'cheers',
+        seekMs: 0,
+        path: cheersPath,
+        mode: 'observer'
+      });
+      console.log('[beer] cheers duration', cheersDuration);
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.95,
+          seekMs: 0
+        });
+      } else {
+        this._playReactionSound('cheers', { volume: 0.95, seekMs: 0 });
+      }
+      this._startBeerMainFlight(ctx);
+      return;
+    }
+
+    if (action === 'beer_main_hold') {
+      this.setData({
+        reactionBeerMainPhase: 'hold',
+        reactionBeerMainStyle: this._buildBeerCupStyle(ctx.cx, ctx.cy, 0, 1.05, 1),
+        reactionBeerBubbles: this._buildBeerHoldBubbles()
+      });
+      return;
+    }
+
+    if (action === 'beer_side_enter') {
+      this.setData({
+        reactionBeerLeftVisible: true,
+        reactionBeerLeftPhase: 'fly',
+        reactionBeerLeftStyle: this._buildBeerCupStyle(
+          ctx.sideLeftStartX,
+          ctx.sideLeftStartY,
+          -18,
+          0.45,
+          0.8
+        ),
+        reactionBeerRightVisible: true,
+        reactionBeerRightPhase: 'fly',
+        reactionBeerRightStyle: this._buildBeerCupStyle(
+          ctx.sideRightStartX,
+          ctx.sideRightStartY,
+          18,
+          0.45,
+          0.8
+        )
+      });
+      this._startBeerSideFlight('left', ctx);
+      this._startBeerSideFlight('right', ctx);
+      return;
+    }
+
+    if (action === 'beer_clash') {
+      console.log('[beer] beer clash start', { mode: 'observer' });
+      this.setData({
+        reactionBeerMainPhase: 'clash',
+        reactionBeerMainStyle: this._buildBeerCupStyle(ctx.cx, ctx.cy - 2, 0, 1.12, 1),
+        reactionBeerLeftPhase: 'clash',
+        reactionBeerLeftStyle: this._buildBeerCupStyle(ctx.cx - 10, ctx.cy + 3, -12, 1.1, 1),
+        reactionBeerRightPhase: 'clash',
+        reactionBeerRightStyle: this._buildBeerCupStyle(ctx.cx + 10, ctx.cy + 3, 12, 1.1, 1),
+        reactionBeerShaking: true,
+        reactionBeerFlashVisible: true,
+        reactionBeerFlashStyle: 'left:' + ctx.cx + 'px;top:' + ctx.cy + 'px;'
+      });
+      const page = this;
+      this._beerTimeout(function () {
+        if (!page._beerTimelineCtx) return;
+        page.setData({ reactionBeerFlashVisible: false, reactionBeerShaking: false });
+      }, 380);
+      return;
+    }
+
+    if (action === 'beer_splash') {
+      this.setData({
+        reactionBeerSplashVisible: true,
+        reactionBeerSplashStyle: 'left:' + ctx.cx + 'px;top:' + ctx.cy + 'px;'
+      });
+      return;
+    }
+
+    if (action === 'beer_fade') {
+      this.setData({
+        reactionBeerMainPhase: 'fade',
+        reactionBeerLeftPhase: 'fade',
+        reactionBeerRightPhase: 'fade',
+        reactionScreenFading: true
+      });
+      return;
+    }
+
+    if (action === 'cleanup') {
+      this._cleanupBeerReactionLayer();
+    }
+  },
+
+  /**
+   * Demo：🍺 Self timeline 调度。
+   * cheers 在 beer_self_first_fly 从 0ms 起播；碰杯对齐音频 peak。
+   */
+  _dispatchBeerSelfTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._beerTimelineCtx || {};
+    if (ctx.mode !== 'self') return;
+    const finalScale = ctx.finalScale != null ? ctx.finalScale : 1.75;
+    const clashScale = ctx.clashScale != null ? ctx.clashScale : 1.18;
+
+    if (action === 'beer_self_first_fly') {
+      const cheersPath =
+        ctx.cheersPath ||
+        (reactionSounds.SOUND_SRC && reactionSounds.SOUND_SRC.cheers) ||
+        '/subpackages/scoring/assets/sounds/cheers.mp3';
+      console.log('[beer] cheers play start', {
+        sound: e.sound || 'cheers',
+        seekMs: 0,
+        path: cheersPath,
+        mode: 'self',
+        at: 'beer_self_first_fly',
+        peakMs: ctx.peakMs || 1520
+      });
+      console.log('[beer] cheers duration', ctx.cheersDuration || 2135);
+      // 完整轨从 0ms 起播（不 seek）；动画对齐 mid / peak
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.98,
+          seekMs: 0
+        });
+      } else {
+        this._playReactionSound('cheers', { volume: 0.98, seekMs: 0 });
+      }
+      this.setData({
+        reactionBeerMainVisible: true,
+        reactionBeerMainPhase: 'fly',
+        reactionBeerMainStyle: this._buildBeerCupStyle(
+          ctx.startX,
+          ctx.startY,
+          -14,
+          finalScale * 0.38,
+          0.78
+        ),
+        reactionBeerBubbles: this._buildBeerHoldBubbles()
+      });
+      this._startBeerSelfFirstFlight(ctx);
+      return;
+    }
+
+    if (action === 'beer_self_first_hold') {
+      const ex = ctx.firstEndX != null ? ctx.firstEndX : ctx.cx - 38;
+      const ey = ctx.firstEndY != null ? ctx.firstEndY : ctx.cy;
+      this.setData({
+        reactionBeerMainPhase: 'hold',
+        reactionBeerMainStyle: this._buildBeerCupStyle(ex, ey, -4, finalScale, 1),
+        reactionBeerBubbles: this._buildBeerHoldBubbles()
+      });
+      return;
+    }
+
+    if (action === 'beer_self_second_fly') {
+      if (e.secondFlyMs != null) {
+        ctx.secondFlyMs = Number(e.secondFlyMs) || ctx.secondFlyMs;
+      }
+      this.setData({
+        reactionBeerRightVisible: true,
+        reactionBeerRightPhase: 'fly',
+        reactionBeerRightStyle: this._buildBeerCupStyle(
+          ctx.secondStartX,
+          ctx.secondStartY,
+          16,
+          finalScale * 0.36,
+          0.82
+        )
+      });
+      this._startBeerSelfSecondFlight(ctx);
+      return;
+    }
+
+    if (action === 'beer_self_clash') {
+      console.log('[beer] beer clash start', {
+        mode: 'self',
+        peakMs: ctx.peakMs || 1520,
+        audioSynced: true
+      });
+      const leftX = ctx.firstEndX != null ? ctx.firstEndX : ctx.cx - 38;
+      const rightX = ctx.secondEndX != null ? ctx.secondEndX : ctx.cx + 38;
+      const cy = ctx.cy;
+      const peak = finalScale * clashScale;
+      this.setData({
+        reactionBeerMainPhase: 'clash',
+        reactionBeerMainStyle: this._buildBeerCupStyle(
+          leftX + 10,
+          cy - 4,
+          -8,
+          peak,
+          1
+        ),
+        reactionBeerRightPhase: 'clash',
+        reactionBeerRightStyle: this._buildBeerCupStyle(
+          rightX - 10,
+          cy - 4,
+          8,
+          peak,
+          1
+        ),
+        reactionBeerShaking: true,
+        reactionBeerFlashVisible: true,
+        reactionBeerFlashStyle: 'left:' + ctx.cx + 'px;top:' + cy + 'px;',
+        reactionBeerBubbles: this._buildBeerHoldBubbles()
+      });
+      const page = this;
+      this._beerTimeout(function () {
+        if (!page._beerTimelineCtx) return;
+        page.setData({
+          reactionBeerMainStyle: page._buildBeerCupStyle(
+            leftX + 6,
+            cy,
+            -5,
+            finalScale,
+            1
+          ),
+          reactionBeerRightStyle: page._buildBeerCupStyle(
+            rightX - 6,
+            cy,
+            5,
+            finalScale,
+            1
+          ),
+          reactionBeerFlashVisible: false,
+          reactionBeerShaking: false
+        });
+      }, 340);
+      return;
+    }
+
+    if (action === 'beer_self_splash') {
+      this.setData({
+        reactionBeerSplashVisible: true,
+        reactionBeerSplashStyle: 'left:' + ctx.cx + 'px;top:' + ctx.cy + 'px;'
+      });
+      return;
+    }
+
+    if (action === 'beer_self_hold') {
+      const leftX = ctx.firstEndX != null ? ctx.firstEndX : ctx.cx - 38;
+      const rightX = ctx.secondEndX != null ? ctx.secondEndX : ctx.cx + 38;
+      const cy = ctx.cy;
+      this.setData({
+        reactionBeerMainPhase: 'celebrate',
+        reactionBeerMainStyle: this._buildBeerCupStyle(
+          leftX + 6,
+          cy,
+          -4,
+          finalScale,
+          1
+        ),
+        reactionBeerRightPhase: 'celebrate',
+        reactionBeerRightStyle: this._buildBeerCupStyle(
+          rightX - 6,
+          cy,
+          4,
+          finalScale,
+          1
+        ),
+        reactionBeerBubbles: this._buildBeerHoldBubbles()
+      });
+      this._startBeerSelfHoldBubbles();
+      return;
+    }
+
+    if (action === 'beer_self_fade') {
+      this._stopBeerSelfHoldBubbles();
+      this.setData({
+        reactionBeerMainPhase: 'fade',
+        reactionBeerRightPhase: 'fade',
+        reactionScreenFading: true
+      });
+      return;
+    }
+
+    if (action === 'cleanup') {
+      this._cleanupBeerReactionLayer();
+    }
+  },
+
+  /** Demo：🍺 Self — 停留期持续冒泡 */
+  _startBeerSelfHoldBubbles() {
+    this._stopBeerSelfHoldBubbles();
+    const self = this;
+    const tick = function () {
+      if (!self._beerTimelineCtx || self._beerTimelineCtx.mode !== 'self') return;
+      const phase = self.data.reactionBeerMainPhase;
+      if (phase !== 'celebrate' && phase !== 'clash' && phase !== 'hold') return;
+      self.setData({ reactionBeerBubbles: self._buildBeerHoldBubbles() });
+      self._beerSelfHoldBubbleTimer = setTimeout(tick, 420);
+    };
+    this._beerSelfHoldBubbleTimer = setTimeout(tick, 420);
+  },
+
+  _stopBeerSelfHoldBubbles() {
+    if (this._beerSelfHoldBubbleTimer) {
+      clearTimeout(this._beerSelfHoldBubbleTimer);
+      this._beerSelfHoldBubbleTimer = null;
+    }
+  },
+
+  _cleanupBeerReactionLayer() {
+    try {
+      reactionSounds.stopReactionSound('cheers');
+    } catch (err) {
+      /* ignore */
+    }
+    this._stopBeerSelfHoldBubbles();
+    this._clearBeerReactionTimers();
+    this.setData({
+      reactionScreenVisible: false,
+      reactionScreenFading: false,
+      reactionScreenMode: '',
+      reactionBeerIsSelf: false,
+      reactionBeerMainVisible: false,
+      reactionBeerMainPhase: '',
+      reactionBeerMainStyle: '',
+      reactionBeerLeftVisible: false,
+      reactionBeerLeftPhase: '',
+      reactionBeerLeftStyle: '',
+      reactionBeerRightVisible: false,
+      reactionBeerRightPhase: '',
+      reactionBeerRightStyle: '',
+      reactionBeerSplashVisible: false,
+      reactionBeerSplashStyle: '',
+      reactionBeerFlashVisible: false,
+      reactionBeerFlashStyle: '',
+      reactionBeerShaking: false,
+      reactionBeerBubbles: []
+    });
+    this._beerTimelineCtx = null;
+    this._playerActionBeerBusy = false;
+  },
+
+  /** Demo：🍺 Self — 第一杯：边缘 → 屏中（小→大 + 轻旋） */
+  _startBeerSelfFirstFlight(ctx) {
+    const self = this;
+    const c = ctx || this._beerTimelineCtx || {};
+    const finalScale = c.finalScale != null ? c.finalScale : 1.75;
+    const startScale = finalScale * 0.38;
+    const startX = c.startX;
+    const startY = c.startY;
+    const endX = c.firstEndX != null ? c.firstEndX : c.cx - 38;
+    const endY = c.firstEndY != null ? c.firstEndY : c.cy;
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const key = String(c.entryKey || '');
+    const sideSign =
+      key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
+    const ctrlX = midX + sideSign * (40 + Math.random() * 52);
+    const ctrlY = midY - (32 + Math.random() * 44);
+    const flyMs = c.firstFlyMs != null ? c.firstFlyMs : 780;
+    const easeOut = function (t) {
+      return 1 - Math.pow(1 - t, 2.4);
+    };
+    const t0 = Date.now();
+
+    const tick = function () {
+      if (!self._beerTimelineCtx || self._beerTimelineCtx.mode !== 'self') return;
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeOut(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const bob = Math.sin(raw * Math.PI * 1.6) * (14 * (1 - raw * 0.35));
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
+      const rot = -18 + 22 * t + Math.sin(raw * Math.PI) * 8;
+      const scale = startScale + (finalScale - startScale) * t;
+      const opacity = 0.78 + 0.22 * t;
+      self.setData({
+        reactionBeerMainPhase: 'fly',
+        reactionBeerMainStyle: self._buildBeerCupStyle(x, y, rot, scale, opacity)
+      });
+      if (raw < 1) {
+        self._beerArcTimer = setTimeout(tick, 16);
+        return;
+      }
+      self._beerArcTimer = null;
+      self.setData({
+        reactionBeerMainStyle: self._buildBeerCupStyle(endX, endY, -4, finalScale, 1)
+      });
+    };
+    tick();
+  },
+
+  /** Demo：🍺 Self — 第二杯：对向加速入场，近中心减速（到达 = 音频 peak） */
+  _startBeerSelfSecondFlight(ctx) {
+    const self = this;
+    const c = ctx || this._beerTimelineCtx || {};
+    const finalScale = c.finalScale != null ? c.finalScale : 1.75;
+    const startScale = finalScale * 0.36;
+    const startX = c.secondStartX;
+    const startY = c.secondStartY;
+    const endX = c.secondEndX != null ? c.secondEndX : c.cx + 38;
+    const endY = c.secondEndY != null ? c.secondEndY : c.cy;
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const key = String(c.secondEntryKey || '');
+    const sideSign =
+      key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
+    const ctrlX = midX + sideSign * (28 + Math.random() * 40);
+    const ctrlY = midY - (20 + Math.random() * 36);
+    const flyMs = c.secondFlyMs != null ? c.secondFlyMs : 520;
+    const easeAccelDecel = function (t) {
+      if (t < 0.55) {
+        const u = t / 0.55;
+        return 0.62 * (u * u);
+      }
+      const u = (t - 0.55) / 0.45;
+      return 0.62 + 0.38 * (1 - Math.pow(1 - u, 2.8));
+    };
+    const t0 = Date.now();
+
+    const tick = function () {
+      if (!self._beerTimelineCtx || self._beerTimelineCtx.mode !== 'self') return;
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeAccelDecel(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
+      const rot = 18 - 24 * t + Math.sin(raw * Math.PI) * 7;
+      const scale = startScale + (finalScale - startScale) * t;
+      const opacity = 0.82 + 0.18 * t;
+      self.setData({
+        reactionBeerRightPhase: 'fly',
+        reactionBeerRightStyle: self._buildBeerCupStyle(x, y, rot, scale, opacity)
+      });
+      if (raw < 1) {
+        self._beerSelfSecondTimer = setTimeout(tick, 16);
+        return;
+      }
+      self._beerSelfSecondTimer = null;
+      self.setData({
+        reactionBeerRightStyle: self._buildBeerCupStyle(endX, endY, 5, finalScale, 1)
+      });
+    };
+    tick();
+  },
+
+  /** Demo：🍺 Observer — 主杯贝塞尔飞向头像中心 */
+  _startBeerMainFlight(ctx) {
+    const self = this;
+    const c = ctx || this._beerTimelineCtx || {};
+    const startX = c.startX;
+    const startY = c.startY;
+    const endX = c.cx;
+    const endY = c.cy;
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const key = String(c.entryKey || '');
+    const sideSign =
+      key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
+    const ctrlX = midX + sideSign * (34 + Math.random() * 48);
+    const ctrlY = midY - (28 + Math.random() * 40);
+    const flyMs = c.mainFlyMs != null ? c.mainFlyMs : 920;
+    const easeIn = function (t) {
+      return t * t * t;
+    };
+    const t0 = Date.now();
+
+    const tick = function () {
+      if (!self._beerTimelineCtx) return;
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeIn(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const bob = Math.sin(raw * Math.PI * 2) * (10 * (1 - raw * 0.4));
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
+      const rot = -12 + 26 * t + Math.sin(raw * Math.PI) * 10;
+      const scale = 0.32 + 0.73 * t;
+      const opacity = 0.7 + 0.3 * t;
+      self.setData({
+        reactionBeerMainPhase: 'fly',
+        reactionBeerMainStyle: self._buildBeerCupStyle(x, y, rot, scale, opacity)
+      });
+      if (raw < 1) {
+        self._beerArcTimer = setTimeout(tick, 16);
+        return;
+      }
+      self._beerArcTimer = null;
+      self.setData({
+        reactionBeerMainStyle: self._buildBeerCupStyle(endX, endY, 0, 1.05, 1)
+      });
+    };
+    tick();
+  },
+
+  /** Demo：🍺 侧杯从头像左/右远处汇入中心（ease-out 减速） */
+  _startBeerSideFlight(side, ctx) {
+    const self = this;
+    const c = ctx || this._beerTimelineCtx || {};
+    const isLeft = side === 'left';
+    const startX = isLeft ? c.sideLeftStartX : c.sideRightStartX;
+    const startY = isLeft ? c.sideLeftStartY : c.sideRightStartY;
+    const endX = c.cx + (isLeft ? -10 : 10);
+    const endY = c.cy + 3;
+    const ctrlX = (startX + endX) / 2 + (isLeft ? -12 : 12);
+    const ctrlY = (startY + endY) / 2 - 22;
+    const flyMs = c.sideFlyMs != null ? c.sideFlyMs : 520;
+    const easeOut = function (t) {
+      return 1 - Math.pow(1 - t, 2.6);
+    };
+    const t0 = Date.now();
+    const timerKey = isLeft ? '_beerSideLeftTimer' : '_beerSideRightTimer';
+    const phaseKey = isLeft ? 'reactionBeerLeftPhase' : 'reactionBeerRightPhase';
+    const styleKey = isLeft ? 'reactionBeerLeftStyle' : 'reactionBeerRightStyle';
+
+    const tick = function () {
+      if (!self._beerTimelineCtx) return;
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeOut(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
+      const rot = (isLeft ? -18 : 18) * (1 - t * 0.55);
+      const scale = 0.45 + 0.65 * t;
+      const opacity = 0.8 + 0.2 * t;
+      const patch = {};
+      patch[phaseKey] = 'fly';
+      patch[styleKey] = self._buildBeerCupStyle(x, y, rot, scale, opacity);
+      self.setData(patch);
+      if (raw < 1) {
+        self[timerKey] = setTimeout(tick, 16);
+        return;
+      }
+      self[timerKey] = null;
+      const done = {};
+      done[styleKey] = self._buildBeerCupStyle(endX, endY, isLeft ? -12 : 12, 1.1, 1);
+      self.setData(done);
+    };
     tick();
   },
 
@@ -8323,7 +10475,7 @@ Page({
 
   /**
    * Demo：👊 boxing-reaction-layer — timeline 驱动动画+拳击音频同步。
-   * 连击节奏对齐 boxing.wav 峰值；终结拳复用第一拳音频（seek）并提高音量。
+   * 连击节奏对齐 boxing.mp3 峰值；终结拳复用第一拳音频（seek）并提高音量。
    */
   _playScreenBoxingReaction(rect, avatarUrl, playerId) {
     let winW = 375;
@@ -8375,6 +10527,7 @@ Page({
       reactionTomatoDripActive: false,
       reactionFlowerFlyVisible: false,
       reactionFlowerItems: [],
+      reactionFlowerPetals: [],
       reactionEggFlies: [],
       reactionEggHitLevel: 0,
       reactionEggBurstVisible: false,
@@ -8412,7 +10565,7 @@ Page({
     this._runBoxingReactionTimeline(timeline);
   },
 
-  /** Demo：按 boxing timeline 统一调度动画与 boxing.wav */
+  /** Demo：按 boxing timeline 统一调度动画与 boxing.mp3 */
   _runBoxingReactionTimeline(timeline) {
     const self = this;
     const list = timeline || [];
@@ -8774,30 +10927,58 @@ Page({
       return;
     }
     this._playerActionTomatoBusy = true;
-    if (this._isSelfReactionTarget(playerId)) {
-      this._playSelfReaction('tomato', { playerId: playerId, target: target });
-    } else {
-      this._playObserverReaction('tomato', target);
-    }
+    // reaction-view-model-v2：西红柿统一目标头像中央舞台
+    this._playSelfReaction('tomato', {
+      playerId: playerId,
+      target: target,
+      avatarUrl:
+        (target && (target.avatar || target.avatarUrl || target.headimgurl)) ||
+        ''
+    });
   },
 
   /**
-   * Demo：🍅 SELF — 随机边缘入场 → 永远撞屏幕中心（不读头像、不用远距离原则）。
+   * Demo：🍅 SELF 入口 — 克隆头像到 reaction-screen-layer，放大至拳击 Self 尺寸，
+   * 边缘飞入砸中中央头像 + cartoon tomato face（不改真实头像 / 不走 Observer）。
    */
-  _playScreenTomatoReaction(opts) {
-    const o = opts && typeof opts === 'object' ? opts : {};
-    const size = this._getReactionWindowSize();
-    const winW = size.winW;
-    const winH = size.winH;
+  _playSelfTomatoReaction(rect, avatarUrl, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const norm =
+      this._normalizePlayerActionAvatarRect(rect) ||
+      this._fallbackPlayerActionAvatarRect() ||
+      rect;
+    const left = Number(norm.left);
+    const top = Number(norm.top);
+    const width = Number(norm.width);
+    const height = Number(norm.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionTomatoBusy = false;
+      return;
+    }
 
-    const endX = winW / 2;
-    const endY = winH / 2;
-    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
+    const selfTiming =
+      tomatoReactionTimeline.TOMATO_SELF_TIMING ||
+      tomatoReactionTimeline.TOMATO_TIMING.self ||
+      {};
+    const centerScale =
+      selfTiming.centerScale != null ? selfTiming.centerScale : 4;
+    const win = this._getReactionWindowSize();
+    const seatX = left + width / 2;
+    const seatY = top + height / 2;
+    const centerX = win.winW / 2;
+    const centerY = win.winH * 0.42;
+    const centerW = width * centerScale;
+    const centerH = height * centerScale;
+    const origin = this._getRandomSelfReactionEntryPoint(win.winW, win.winH);
     const startX = origin.x;
     const startY = origin.y;
-    const midX = (startX + endX) / 2;
-    const midY = (startY + endY) / 2;
-    // 弧线控制点：远离直线，强化“从远处砸来”（仅视觉弧线，非远距离入场原则）
+    const midX = (startX + centerX) / 2;
+    const midY = (startY + centerY) / 2;
     const sideSign = String(origin.key || '').indexOf('left') >= 0 ? 1 : -1;
     const ctrlX = midX + sideSign * (40 + Math.random() * 56);
     const ctrlY =
@@ -8806,45 +10987,45 @@ Page({
         : String(origin.key || '').indexOf('bottom') >= 0
           ? midY + (36 + Math.random() * 48)
           : midY - sideSign * (28 + Math.random() * 40);
-
-    const startOpacity = 0.6 + Math.random() * 0.2;
-    const flyMs = 980;
-    const holdMs = 3200 + Math.floor(Math.random() * 1600); // 3~4.8s 停留（含流淌）
-    const dripMs = 2200 + Math.floor(Math.random() * 1400); // 2~3.6s 流淌
-    const fadeMs = 700;
-    void o; // perspective 预留
-
-    const buildFlyStyle = function (x, y, rot, scale, opacity) {
-      return (
-        'left:' +
-        x +
-        'px;top:' +
-        y +
-        'px;opacity:' +
-        opacity +
-        ';transform:translate(-50%,-50%) rotate(' +
-        rot +
-        'deg) scale(' +
-        scale +
-        ');transition:none;'
-      );
-    };
-
-    // ease-in：前慢后快
-    const easeIn = function (t) {
-      return t * t * t;
-    };
-    // scale：0.3 → 1 → 2
-    const scaleAt = function (t) {
-      if (t <= 0.5) return 0.3 + 0.7 * (t / 0.5);
-      return 1 + 1 * ((t - 0.5) / 0.5);
-    };
+    const flyMs = selfTiming.flyMs != null ? selfTiming.flyMs : 900;
+    const toCenterMs =
+      selfTiming.toCenterMs != null ? selfTiming.toCenterMs : 420;
+    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 720;
+    const returnSpin = Math.random() > 0.5 ? 360 : -360;
+    const url = avatarUrl != null ? String(avatarUrl) : '';
+    const startOpacity = 0.55 + Math.random() * 0.2;
 
     this._clearPlayerActionTomatoTimers();
+    this._tomatoTimelineCtx = {
+      mode: 'self',
+      seatX: seatX,
+      seatY: seatY,
+      cx: centerX,
+      cy: centerY,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      centerW: centerW,
+      centerH: centerH,
+      centerScale: centerScale,
+      startX: startX,
+      startY: startY,
+      ctrlX: ctrlX,
+      ctrlY: ctrlY,
+      flyMs: flyMs,
+      toCenterMs: toCenterMs,
+      returnMs: returnMs,
+      returnSpin: returnSpin,
+      startOpacity: startOpacity,
+      entryKey: origin.key || '',
+      playerId: hitPlayerId,
+      avatarUrl: url
+    };
+
     this.setData({
       playerActionSheetVisible: false,
       playerActionTarget: null,
-      // 关闭旧头像命中层，避免双轨
       playerActionTomatoVisible: false,
       playerActionTomatoAnimating: false,
       playerActionTomatoStyle: '',
@@ -8856,243 +11037,448 @@ Page({
       reactionScreenVisible: true,
       reactionScreenFading: false,
       reactionScreenMode: 'tomato',
-      reactionTomatoFlyVisible: true,
-      reactionTomatoFlyStyle: buildFlyStyle(
-        startX,
-        startY,
-        -20,
-        0.3,
-        startOpacity
-      ),
+      reactionTomatoAnchorMode: 'self',
+      reactionTomatoFlyVisible: false,
+      reactionTomatoFlyStyle: '',
       reactionTomatoSplashVisible: false,
       reactionTomatoImpactPhase: '',
       reactionTomatoJuiceActive: false,
       reactionTomatoDripActive: false,
-      reactionTomatoHitStyle: '',
-      reactionTomatoAnchorMode: 'screen',
+      reactionTomatoJuiceFading: false,
+      reactionTomatoJuiceStyle: '',
+      reactionTomatoHitStyle:
+        'left:' +
+        centerX +
+        'px;top:' +
+        centerY +
+        'px;transform:translate(-50%,-50%) scale(1);',
+      reactionTomatoSelfAvatarVisible: true,
+      reactionTomatoSelfAvatarUrl: url,
+      reactionTomatoSelfAvatarPhase: 'seat',
+      reactionTomatoSelfShake: false,
+      reactionTomatoSelfFaceVisible: false,
+      reactionTomatoSelfDripHold: false,
+      reactionTomatoSelfAvatarStyle: this._buildTomatoSelfAvatarStyle({
+        x: seatX,
+        y: seatY,
+        w: width,
+        h: height,
+        rot: 0,
+        ms: 0
+      }),
+      reactionAvatarDetached: !!hitPlayerId,
+      reactionAvatarDetachedPlayerId: hitPlayerId,
       reactionFlowerFlyVisible: false,
       reactionFlowerFlyStyle: '',
-      reactionFlowerItems: []
+      reactionFlowerItems: [],
+      reactionFlowerPetals: []
     });
 
-    const self = this;
-    this._playerActionTomatoFlyTimer = setTimeout(function () {
-      self._playerActionTomatoFlyTimer = null;
-      const t0 = Date.now();
-
-      const tick = function () {
-        const elapsed = Date.now() - t0;
-        let raw = elapsed / flyMs;
-        if (raw >= 1) raw = 1;
-        const t = easeIn(raw);
-        const u = 1 - t;
-        const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
-        const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
-        const rot = -20 + 740 * t;
-        const scale = scaleAt(t);
-        const opacity = startOpacity + (1 - startOpacity) * t;
-        self.setData({
-          reactionTomatoFlyStyle: buildFlyStyle(x, y, rot, scale, opacity)
-        });
-        if (raw < 1) {
-          self._playerActionTomatoArcTimer = setTimeout(tick, 16);
-          return;
-        }
-        self._playerActionTomatoArcTimer = null;
-
-        // —— 撞击后三阶段（仅改渲染时序；飞行触发不变）——
-        // 0–200ms：冲击波 + 玻璃裂纹
-        self.setData({
-          reactionTomatoFlyVisible: false,
-          reactionTomatoFlyStyle: '',
-          reactionTomatoSplashVisible: true,
-          reactionTomatoImpactPhase: 'impact',
-          reactionTomatoJuiceActive: false,
-          reactionTomatoDripActive: false
-        });
-
-        // 200–500ms：厚重汁斑 + 碎肉放射
-        self._playerActionTomatoHitTimer = setTimeout(function () {
-          self._playerActionTomatoHitTimer = null;
-          self.setData({ reactionTomatoImpactPhase: 'burst' });
-        }, 200);
-
-        // 500ms+：玻璃挂液流淌（非红蒙版）；冲击瞬态层稍后卸掉
-        self._playerActionTomatoBurstTimer = setTimeout(function () {
-          self._playerActionTomatoBurstTimer = null;
-          self.setData({
-            reactionTomatoImpactPhase: 'flow',
-            reactionTomatoJuiceActive: true,
-            reactionTomatoDripActive: true
-          });
-        }, 500);
-
-        self._playerActionTomatoShakeTimer = setTimeout(function () {
-          self._playerActionTomatoShakeTimer = null;
-          self.setData({
-            reactionTomatoSplashVisible: false,
-            reactionTomatoImpactPhase: 'flow'
-          });
-        }, 780);
-
-        const lingerAfterDrip = Math.max(800, holdMs - dripMs);
-        self._playerActionTomatoJuiceTimer = setTimeout(function () {
-          self._playerActionTomatoJuiceTimer = null;
-          self.setData({ reactionScreenFading: true });
-          self._playerActionTomatoClearTimer = setTimeout(function () {
-            self._playerActionTomatoClearTimer = null;
-            self.setData({
-              reactionScreenVisible: false,
-              reactionScreenFading: false,
-              reactionScreenMode: '',
-              reactionTomatoFlyVisible: false,
-              reactionTomatoFlyStyle: '',
-              reactionTomatoSplashVisible: false,
-              reactionTomatoImpactPhase: '',
-              reactionTomatoJuiceActive: false,
-              reactionTomatoDripActive: false,
-              reactionTomatoHitStyle: '',
-              reactionTomatoAnchorMode: '',
-              playerActionHitPlayerId: ''
-            });
-            self._playerActionTomatoBusy = false;
-          }, fadeMs);
-        }, dripMs + lingerAfterDrip);
-      };
-
-      tick();
-    }, 30);
+    const timeline =
+      tomatoReactionTimeline.buildTomatoSelfReactionTimeline
+        ? tomatoReactionTimeline.buildTomatoSelfReactionTimeline()
+        : tomatoReactionTimeline.buildTomatoReactionTimeline('self');
+    this._runTomatoSelfReactionTimeline(timeline);
   },
 
-  /**
-   * Demo：🍅 OBSERVER — 远距离入场 → 落点目标头像（不影响 self 屏中撞屏）。
-   */
-  _playObserverTomatoReaction(rect, playerId) {
-    if (this._isSelfReactionTarget(playerId)) {
-      this._playScreenTomatoReaction({ perspective: 'self' });
+  /** 兼容旧调用名 → Self */
+  _playScreenTomatoReaction() {
+    const target = this.data.playerActionTarget || {};
+    const playerId = String(target.playerId || target.userId || '').trim();
+    const avatarUrl =
+      target.avatar || target.avatarUrl || target.headimgurl || '';
+    const self = this;
+    if (!playerId) {
+      this._playerActionTomatoBusy = false;
       return;
     }
-    const entry = this._getReactionEntryPoint(rect);
-    const endX = entry.targetX;
-    const endY = entry.targetY;
-    const startX = entry.x;
-    const startY = entry.y;
-    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
-    const midX = (startX + endX) / 2;
-    const midY = (startY + endY) / 2;
-    const ctrlX = midX + (startX < endX ? 28 : -28);
-    const ctrlY = midY - 36;
-    const flyMs = 860;
-    const fadeMs = 560;
-    const startOpacity = 0.7;
+    this._queryPlayerActionAvatarRect(playerId, function (rect) {
+      if (!rect) {
+        self._playerActionTomatoBusy = false;
+        return;
+      }
+      self._playSelfTomatoReaction(rect, avatarUrl, playerId);
+    });
+  },
 
-    const buildFlyStyle = function (x, y, rot, scale, opacity) {
-      return (
-        'left:' +
-        x +
-        'px;top:' +
-        y +
-        'px;opacity:' +
-        opacity +
-        ';transform:translate(-50%,-50%) rotate(' +
-        rot +
-        'deg) scale(' +
-        scale +
-        ');transition:none;'
-      );
-    };
+  _buildTomatoSelfAvatarStyle(opts) {
+    const o = opts || {};
+    const x = o.x != null ? o.x : 0;
+    const y = o.y != null ? o.y : 0;
+    const w = o.w != null ? o.w : 44;
+    const h = o.h != null ? o.h : 44;
+    const rot = o.rot != null ? o.rot : 0;
+    const ms = o.ms != null ? Number(o.ms) : 0;
+    const ease = o.ease || 'cubic-bezier(0.22, 0.7, 0.28, 1)';
+    const transition =
+      ms > 0
+        ? 'left ' +
+          ms +
+          'ms ' +
+          ease +
+          ',top ' +
+          ms +
+          'ms ' +
+          ease +
+          ',width ' +
+          ms +
+          'ms ' +
+          ease +
+          ',height ' +
+          ms +
+          'ms ' +
+          ease +
+          ',transform ' +
+          ms +
+          'ms ' +
+          ease
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px;transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg);transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  _tomatoSelfTimeout(fn, ms) {
+    const self = this;
+    if (!this._tomatoTimelineTimers) this._tomatoTimelineTimers = [];
+    const id = setTimeout(function () {
+      const list = self._tomatoTimelineTimers || [];
+      const idx = list.indexOf(id);
+      if (idx >= 0) list.splice(idx, 1);
+      try {
+        fn();
+      } catch (err) {
+        console.log('[tomato-self-timeline] handler error', err);
+      }
+    }, ms);
+    this._tomatoTimelineTimers.push(id);
+    return id;
+  },
+
+  _runTomatoSelfReactionTimeline(timeline) {
+    const self = this;
+    const list = timeline || [];
+    for (let i = 0; i < list.length; i++) {
+      (function (ev) {
+        self._tomatoSelfTimeout(function () {
+          self._dispatchTomatoTimelineEvent(ev);
+        }, ev.time);
+      })(list[i]);
+    }
+  },
+
+  _buildTomatoFlyStyle(x, y, rot, scale, opacity) {
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;opacity:' +
+      opacity +
+      ';transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg) scale(' +
+      scale +
+      ');transition:none;'
+    );
+  },
+
+  /** Demo：🍅 Self 西红柿加速飞向中央头像（由小变大 + 旋转） */
+  _startTomatoSelfFlight(ctx) {
+    const page = this;
+    const c = ctx || this._tomatoTimelineCtx || {};
+    const flyMs = c.flyMs != null ? c.flyMs : 900;
+    const startX = c.startX;
+    const startY = c.startY;
+    const endX = c.cx;
+    const endY = c.cy;
+    const ctrlX = c.ctrlX;
+    const ctrlY = c.ctrlY;
+    const startOpacity = c.startOpacity != null ? c.startOpacity : 0.6;
     const easeIn = function (t) {
       return t * t * t;
     };
     const scaleAt = function (t) {
-      if (t <= 0.55) return 0.35 + 0.75 * (t / 0.55);
-      return 1.1 + 0.35 * ((t - 0.55) / 0.45);
+      if (t <= 0.5) return 0.28 + 0.72 * (t / 0.5);
+      return 1 + 1.15 * ((t - 0.5) / 0.5);
     };
 
-    this._clearPlayerActionTomatoTimers();
+    if (this._playerActionTomatoArcTimer) {
+      clearTimeout(this._playerActionTomatoArcTimer);
+      this._playerActionTomatoArcTimer = null;
+    }
+
     this.setData({
-      playerActionSheetVisible: false,
-      playerActionTarget: null,
-      playerActionTomatoVisible: false,
-      playerActionBurstVisible: false,
-      playerActionJuiceVisible: false,
-      playerActionHitPlayerId: '',
-      reactionScreenVisible: true,
-      reactionScreenFading: false,
-      reactionScreenMode: 'tomato',
       reactionTomatoFlyVisible: true,
-      reactionTomatoFlyStyle: buildFlyStyle(startX, startY, -24, 0.35, startOpacity),
+      reactionTomatoFlyStyle: this._buildTomatoFlyStyle(
+        startX,
+        startY,
+        -24,
+        0.28,
+        startOpacity
+      )
+    });
+
+    const t0 = Date.now();
+    const tick = function () {
+      if (!page._tomatoTimelineCtx || page._tomatoTimelineCtx.mode !== 'self') {
+        return;
+      }
+      const elapsed = Date.now() - t0;
+      let raw = elapsed / flyMs;
+      if (raw >= 1) raw = 1;
+      const t = easeIn(raw);
+      const u = 1 - t;
+      const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
+      const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
+      page.setData({
+        reactionTomatoFlyStyle: page._buildTomatoFlyStyle(
+          x,
+          y,
+          -24 + 780 * t,
+          scaleAt(t),
+          startOpacity + (1 - startOpacity) * t
+        )
+      });
+      if (raw < 1) {
+        page._playerActionTomatoArcTimer = setTimeout(tick, 16);
+        return;
+      }
+      page._playerActionTomatoArcTimer = null;
+    };
+    tick();
+  },
+
+  _resetTomatoSelfVisuals(extra) {
+    const patch = {
+      reactionTomatoFlyVisible: false,
+      reactionTomatoFlyStyle: '',
       reactionTomatoSplashVisible: false,
       reactionTomatoImpactPhase: '',
       reactionTomatoJuiceActive: false,
       reactionTomatoDripActive: false,
-      reactionTomatoHitStyle:
-        'left:' + endX + 'px;top:' + endY + 'px;transform:translate(-50%,-50%) scale(0.42);',
-      reactionTomatoAnchorMode: 'avatar',
-      reactionFlowerFlyVisible: false,
-      reactionFlowerItems: []
-    });
+      reactionTomatoJuiceFading: false,
+      reactionTomatoJuiceStyle: '',
+      reactionTomatoHitStyle: '',
+      reactionTomatoAnchorMode: '',
+      reactionTomatoSelfAvatarVisible: false,
+      reactionTomatoSelfAvatarUrl: '',
+      reactionTomatoSelfAvatarStyle: '',
+      reactionTomatoSelfAvatarPhase: '',
+      reactionTomatoSelfShake: false,
+      reactionTomatoSelfFaceVisible: false,
+      reactionTomatoSelfDripHold: false,
+      playerActionHitPlayerId: ''
+    };
+    if (extra && typeof extra === 'object') {
+      const keys = Object.keys(extra);
+      for (let i = 0; i < keys.length; i++) {
+        patch[keys[i]] = extra[keys[i]];
+      }
+    }
+    this.setData(patch);
+  },
 
-    const self = this;
-    this._playerActionTomatoFlyTimer = setTimeout(function () {
-      self._playerActionTomatoFlyTimer = null;
-      const t0 = Date.now();
-      const tick = function () {
-        const elapsed = Date.now() - t0;
-        let raw = elapsed / flyMs;
-        if (raw >= 1) raw = 1;
-        const t = easeIn(raw);
-        const u = 1 - t;
-        const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
-        const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
-        self.setData({
-          reactionTomatoFlyStyle: buildFlyStyle(
-            x,
-            y,
-            -24 + 720 * t,
-            scaleAt(t),
-            startOpacity + (1 - startOpacity) * t
-          )
-        });
-        if (raw < 1) {
-          self._playerActionTomatoArcTimer = setTimeout(tick, 16);
+  /**
+   * Demo：🍅 tomato timeline 调度。
+   * Self：目标头像中央舞台视觉节点（reaction-view-model-v2）。
+   */
+  _dispatchTomatoTimelineEvent(ev) {
+    const e = ev || {};
+    const action = e.action != null ? String(e.action) : '';
+    const ctx = this._tomatoTimelineCtx || {};
+    const isSelf = ctx.mode === 'self';
+    const page = this;
+
+    // —— Self-only（tomatoSelfReactionTimeline）——
+    if (action === 'self_avatar_center') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.toCenterMs || 420;
+      this.setData({
+        reactionAvatarDetached: true,
+        reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionTomatoSelfAvatarVisible: true,
+        reactionTomatoSelfAvatarPhase: 'seat',
+        reactionTomatoSelfFaceVisible: false,
+        reactionTomatoSelfShake: false,
+        reactionTomatoSelfDripHold: false,
+        reactionTomatoSelfAvatarStyle: this._buildTomatoSelfAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rot: 0,
+          ms: 0
+        })
+      });
+      this._tomatoSelfTimeout(function () {
+        if (!page._tomatoTimelineCtx || page._tomatoTimelineCtx.mode !== 'self') {
           return;
         }
-        self._playerActionTomatoArcTimer = null;
-        self.setData({
-          reactionTomatoFlyVisible: false,
-          reactionTomatoFlyStyle: '',
-          reactionTomatoSplashVisible: true,
-          reactionTomatoImpactPhase: 'impact',
-          playerActionHitPlayerId: hitPlayerId
+        page.setData({
+          reactionTomatoSelfAvatarPhase: 'center',
+          reactionTomatoSelfAvatarStyle: page._buildTomatoSelfAvatarStyle({
+            x: ctx.cx,
+            y: ctx.cy,
+            w: ctx.centerW || ctx.width * 4,
+            h: ctx.centerH || ctx.height * 4,
+            rot: 0,
+            ms: ms
+          })
         });
-        self._playerActionTomatoHitTimer = setTimeout(function () {
-          self._playerActionTomatoHitTimer = null;
-          self.setData({ reactionTomatoImpactPhase: 'burst' });
-        }, 160);
-        self._playerActionTomatoBurstTimer = setTimeout(function () {
-          self._playerActionTomatoBurstTimer = null;
-          self.setData({
-            reactionTomatoSplashVisible: false,
-            reactionTomatoImpactPhase: '',
-            playerActionHitPlayerId: ''
-          });
-        }, 520);
-        self._playerActionTomatoClearTimer = setTimeout(function () {
-          self._playerActionTomatoClearTimer = null;
-          self.setData({
-            reactionScreenVisible: false,
-            reactionScreenFading: false,
-            reactionScreenMode: '',
-            reactionTomatoHitStyle: '',
-            reactionTomatoAnchorMode: '',
-            playerActionHitPlayerId: ''
-          });
-          self._playerActionTomatoBusy = false;
-        }, 520 + fadeMs);
-      };
-      tick();
-    }, 24);
+      }, 24);
+      return;
+    }
+
+    if (action === 'tomato_self_fly') {
+      if (!isSelf) return;
+      this._startTomatoSelfFlight(ctx);
+      return;
+    }
+
+    if (action === 'tomato_self_hit' || (action === 'tomato_hit' && isSelf)) {
+      if (!isSelf && action === 'tomato_self_hit') return;
+      if (this._playerActionTomatoArcTimer) {
+        clearTimeout(this._playerActionTomatoArcTimer);
+        this._playerActionTomatoArcTimer = null;
+      }
+      if (e.sound || action === 'tomato_self_hit') {
+        this._playReactionSound(e.sound || 'tomato_hit', {
+          volume: e.volume != null ? e.volume : 0.95,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      }
+      if (!isSelf) return;
+      this.setData({
+        reactionTomatoFlyVisible: false,
+        reactionTomatoFlyStyle: '',
+        reactionTomatoSplashVisible: true,
+        reactionTomatoImpactPhase: 'impact',
+        reactionTomatoSelfAvatarPhase: 'hit',
+        reactionTomatoSelfShake: true,
+        reactionTomatoHitStyle:
+          'left:' +
+          ctx.cx +
+          'px;top:' +
+          ctx.cy +
+          'px;transform:translate(-50%,-50%) scale(1);'
+      });
+      this._tomatoSelfTimeout(function () {
+        if (!page._tomatoTimelineCtx || page._tomatoTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({ reactionTomatoSelfShake: false });
+      }, 420);
+      return;
+    }
+
+    if (action === 'tomato_splash') {
+      if (!isSelf) return;
+      this.setData({
+        reactionTomatoImpactPhase: 'burst',
+        reactionTomatoSplashVisible: true
+      });
+      return;
+    }
+
+    if (action === 'tomato_face_overlay') {
+      if (!isSelf) return;
+      this.setData({
+        reactionTomatoImpactPhase: 'flow',
+        reactionTomatoSelfFaceVisible: true,
+        reactionTomatoSelfDripHold: false,
+        reactionTomatoSelfAvatarPhase: 'hit'
+      });
+      return;
+    }
+
+    if (action === 'tomato_drip_hold') {
+      if (!isSelf) return;
+      this.setData({
+        reactionTomatoSelfDripHold: true,
+        reactionTomatoSelfFaceVisible: true,
+        reactionTomatoSelfShake: true,
+        reactionTomatoSplashVisible: false,
+        reactionTomatoImpactPhase: 'flow',
+        reactionTomatoSelfAvatarPhase: 'hold'
+      });
+      this._tomatoSelfTimeout(function () {
+        if (!page._tomatoTimelineCtx || page._tomatoTimelineCtx.mode !== 'self') {
+          return;
+        }
+        // 停留期轻微晃动：间歇开关
+        page.setData({ reactionTomatoSelfShake: false });
+      }, 380);
+      this._tomatoSelfTimeout(function () {
+        if (!page._tomatoTimelineCtx || page._tomatoTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({ reactionTomatoSelfShake: true });
+      }, 900);
+      this._tomatoSelfTimeout(function () {
+        if (!page._tomatoTimelineCtx || page._tomatoTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({ reactionTomatoSelfShake: false });
+      }, 1280);
+      return;
+    }
+
+    if (action === 'avatar_return') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.returnMs || 720;
+      const spin = ctx.returnSpin != null ? ctx.returnSpin : 360;
+      this.setData({
+        reactionTomatoSelfAvatarPhase: 'return',
+        reactionTomatoSelfFaceVisible: true,
+        reactionTomatoSelfDripHold: true,
+        reactionTomatoSelfShake: false,
+        reactionTomatoSplashVisible: false,
+        reactionTomatoFlyVisible: false,
+        reactionTomatoSelfAvatarStyle: this._buildTomatoSelfAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rot: spin,
+          ms: ms,
+          ease: 'cubic-bezier(0.28, 0.65, 0.32, 1)'
+        })
+      });
+      return;
+    }
+
+    if (action === 'restore' || (action === 'cleanup' && isSelf)) {
+      if (!isSelf && action === 'restore') return;
+      try {
+        reactionSounds.stopReactionSound('tomato_hit');
+      } catch (err) {
+        /* ignore */
+      }
+      this._resetTomatoSelfVisuals({
+        reactionScreenVisible: false,
+        reactionScreenFading: false,
+        reactionScreenMode: '',
+        reactionAvatarDetached: false,
+        reactionAvatarDetachedPlayerId: ''
+      });
+      this._tomatoTimelineCtx = null;
+      this._playerActionTomatoBusy = false;
+      return;
+    }
+
   },
 
   /** Demo：清理🍅 / 撞屏 reaction 延时器 */
@@ -9104,7 +11490,8 @@ Page({
       '_playerActionTomatoHitTimer',
       '_playerActionTomatoBurstTimer',
       '_playerActionTomatoShakeTimer',
-      '_playerActionTomatoJuiceTimer'
+      '_playerActionTomatoJuiceTimer',
+      '_playerActionTomatoFadeTimer'
     ];
     for (let i = 0; i < keys.length; i++) {
       const k = keys[i];
@@ -9113,18 +11500,30 @@ Page({
         this[k] = null;
       }
     }
+    const tl = this._tomatoTimelineTimers;
+    if (tl && tl.length) {
+      for (let j = 0; j < tl.length; j++) {
+        clearTimeout(tl[j]);
+      }
+    }
+    this._tomatoTimelineTimers = [];
+    try {
+      reactionSounds.stopReactionSound('tomato_hit');
+    } catch (err) {
+      /* ignore */
+    }
   },
 
-  /** 旧：头像命中番茄（转第一视角撞屏） */
+  /** 旧：头像命中番茄（转第一视角） */
   _playPlayerActionTomatoFly() {
-    this._playScreenTomatoReaction({ perspective: 'self' });
+    this._playScreenTomatoReaction();
   },
   _playPlayerActionTomatoHit() {
     /* deprecated: screen reaction */
   },
 
   /**
-   * Demo：🪣 → 第一视角全屏覆水 / 第三方飞向头像倒水。
+   * Demo：🪣 → 目标头像中央舞台（所有人同效果）。
    */
   onPlayerActionBucketTap() {
     if (this._playerActionBucketBusy) return;
@@ -9141,34 +11540,94 @@ Page({
       return;
     }
     this._playerActionBucketBusy = true;
-    if (this._isSelfReactionTarget(playerId)) {
-      this._playSelfReaction('bucket', { playerId: playerId, target: target });
-    } else {
-      this._playObserverReaction('bucket', target);
-    }
+    this._playSelfReaction('bucket', {
+      playerId: playerId,
+      target: target,
+      avatarUrl:
+        (target && (target.avatar || target.avatarUrl || target.headimgurl)) ||
+        ''
+    });
   },
 
   /**
-   * Demo：🪣 SELF — 随机边缘入场，水覆盖屏幕中央（不用远距离原则）。
-   * 音效由 bucketReactionTimeline 对齐动画节点，不在点击时播完整轨。
+   * Demo：🪣 SELF 入口 — 克隆头像到 reaction-screen-layer，放大至拳击 Self 尺寸，
+   * 桶在头像正上方倾斜，水流从桶口浇下（不改真实头像 / 不走 Observer 路径）。
    */
-  _playSelfBucketScreenReaction() {
-    const size = this._getReactionWindowSize();
-    const winW = size.winW;
-    const winH = size.winH;
-    const entry = this._getRandomSelfReactionEntryPoint(winW, winH);
-    const endX = winW / 2;
-    const endY = winH * 0.28;
-    const timing = bucketReactionTimeline.getBucketTiming('self');
-    const buildBucketStyle = function (x, y, rot) {
+  _playSelfBucketScreenReaction(rect, avatarUrl, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const norm =
+      this._normalizePlayerActionAvatarRect(rect) ||
+      this._fallbackPlayerActionAvatarRect() ||
+      rect;
+    const left = Number(norm.left);
+    const top = Number(norm.top);
+    const width = Number(norm.width);
+    const height = Number(norm.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionBucketBusy = false;
+      return;
+    }
+
+    const selfTiming = bucketReactionTimeline.SELF_TIMING || {};
+    const centerScale =
+      selfTiming.centerScale != null ? selfTiming.centerScale : 4;
+    const bucketScale =
+      selfTiming.bucketScale != null ? selfTiming.bucketScale : 1.75;
+    const win = this._getReactionWindowSize();
+    const seatX = left + width / 2;
+    const seatY = top + height / 2;
+    const centerX = win.winW / 2;
+    const centerY = win.winH * 0.42;
+    const centerW = width * centerScale;
+    const centerH = height * centerScale;
+    const bucketBase = 40;
+    const bucketSize = Math.round(bucketBase * bucketScale);
+    // 桶口正对头像顶部：avatarCx + (avatarTop - bucketHeight/2)
+    const avatarTop = centerY - centerH / 2;
+    const hoverX = centerX;
+    const hoverY = avatarTop - bucketSize / 2;
+    const enterX = centerX;
+    const enterY = hoverY - Math.round(bucketSize * 0.55);
+    const returnSpin = Math.random() > 0.5 ? 360 : -360;
+    const url = avatarUrl != null ? String(avatarUrl) : '';
+    const toCenterMs =
+      selfTiming.toCenterMs != null ? selfTiming.toCenterMs : 420;
+    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 720;
+
+    // 尺寸已含 bucketScale（≈ Observer 1.75×）；enter 用 scale 做弹出，稳定态 scale=1
+    const buildSelfBucketStyle = function (x, y, rot, popScale, ms) {
+      const s = popScale != null ? popScale : 1;
+      const transition =
+        ms > 0
+          ? 'left ' +
+            ms +
+            'ms cubic-bezier(0.22, 0.61, 0.36, 1),top ' +
+            ms +
+            'ms cubic-bezier(0.22, 0.61, 0.36, 1),transform ' +
+            Math.min(ms, 320) +
+            'ms ease-out'
+          : 'none';
       return (
         'left:' +
         x +
         'px;top:' +
         y +
+        'px;width:' +
+        bucketSize +
+        'px;height:' +
+        bucketSize +
         'px;transform:translate(-50%,-50%) rotate(' +
-        rot +
-        'deg);'
+        (rot || 0) +
+        'deg) scale(' +
+        s +
+        ');transition:' +
+        transition +
+        ';'
       );
     };
 
@@ -9178,26 +11637,149 @@ Page({
       playerActionSheetVisible: false,
       playerActionTarget: null
     });
+
     this._bucketTimelineCtx = {
       mode: 'self',
-      endX: endX,
-      endY: endY,
-      buildBucketStyle: buildBucketStyle,
-      timing: timing
+      seatX: seatX,
+      seatY: seatY,
+      cx: centerX,
+      cy: centerY,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      centerW: centerW,
+      centerH: centerH,
+      centerScale: centerScale,
+      bucketScale: bucketScale,
+      bucketSize: bucketSize,
+      hoverX: hoverX,
+      hoverY: hoverY,
+      enterX: enterX,
+      enterY: enterY,
+      toCenterMs: toCenterMs,
+      returnMs: returnMs,
+      returnSpin: returnSpin,
+      playerId: hitPlayerId,
+      avatarUrl: url,
+      buildSelfBucketStyle: buildSelfBucketStyle,
+      timing: selfTiming
     };
+
     this.setData({
       reactionScreenVisible: true,
       reactionScreenFading: false,
       reactionScreenMode: 'bucket',
       reactionBucketScreenActive: true,
-      playerActionBucketVisible: true,
+      reactionBucketScreenPouring: false,
+      reactionAvatarDetached: !!hitPlayerId,
+      reactionAvatarDetachedPlayerId: hitPlayerId,
+      reactionBucketSelfAvatarVisible: true,
+      reactionBucketSelfAvatarUrl: url,
+      reactionBucketSelfAvatarPhase: 'seat',
+      reactionBucketSelfAvatarStyle: this._buildBucketSelfAvatarStyle({
+        x: seatX,
+        y: seatY,
+        w: width,
+        h: height,
+        rot: 0,
+        ms: 0
+      }),
+      reactionBucketSelfBucketVisible: false,
+      reactionBucketSelfBucketStyle: buildSelfBucketStyle(enterX, enterY, 0, 0.35, 0),
+      reactionBucketSelfBucketDropping: false,
+      reactionBucketSelfBucketPouring: false,
+      reactionBucketSelfStreamVisible: false,
+      reactionBucketSelfStreamStyle: '',
+      reactionBucketSelfWetVisible: false,
+      reactionBucketSelfCartoonWet: false,
+      reactionBucketSelfDripHold: false,
+      // Self 不用 Observer 的 fixed 桶层
+      playerActionBucketVisible: false,
       playerActionBucketDropping: false,
       playerActionBucketPouring: false,
-      playerActionBucketStyle: buildBucketStyle(entry.x, entry.y, 0)
+      playerActionBucketStyle: ''
     });
 
     this._runBucketReactionTimeline(
-      bucketReactionTimeline.buildBucketReactionTimeline('self')
+      bucketReactionTimeline.buildBucketSelfReactionTimeline
+        ? bucketReactionTimeline.buildBucketSelfReactionTimeline()
+        : bucketReactionTimeline.buildBucketReactionTimeline('self')
+    );
+  },
+
+  /** Demo：🪣 Self 临时头像层样式（座位 ↔ 中央拳击尺寸） */
+  _buildBucketSelfAvatarStyle(opts) {
+    const o = opts || {};
+    const x = o.x != null ? o.x : 0;
+    const y = o.y != null ? o.y : 0;
+    const w = o.w != null ? o.w : 44;
+    const h = o.h != null ? o.h : 44;
+    const rot = o.rot != null ? o.rot : 0;
+    const ms = o.ms != null ? Number(o.ms) : 0;
+    const ease = o.ease || 'cubic-bezier(0.22, 0.7, 0.28, 1)';
+    const transition =
+      ms > 0
+        ? 'left ' +
+          ms +
+          'ms ' +
+          ease +
+          ',top ' +
+          ms +
+          'ms ' +
+          ease +
+          ',width ' +
+          ms +
+          'ms ' +
+          ease +
+          ',height ' +
+          ms +
+          'ms ' +
+          ease +
+          ',transform ' +
+          ms +
+          'ms ' +
+          ease
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px;transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg);transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  /** Demo：🪣 Self 水流层 — 起点固定在桶口，向下浇过头像 */
+  _buildBucketSelfStreamStyle(ctx, pouring) {
+    const c = ctx || {};
+    const bucketSize = c.bucketSize != null ? c.bucketSize : 70;
+    const cx = c.hoverX != null ? c.hoverX : c.cx;
+    const bucketY = c.hoverY != null ? c.hoverY : c.cy;
+    // 桶口约在桶底附近；倾斜后仍以口为原点
+    const mouthY = bucketY + bucketSize * 0.28;
+    const avatarBottom =
+      (c.cy != null ? c.cy : 0) + (c.centerH != null ? c.centerH : 0) / 2;
+    const streamH = Math.max(48, Math.round(avatarBottom - mouthY + 12));
+    const streamW = Math.round(bucketSize * 0.55);
+    return (
+      'left:' +
+      cx +
+      'px;top:' +
+      mouthY +
+      'px;width:' +
+      streamW +
+      'px;height:' +
+      (pouring ? streamH : 0) +
+      'px;'
     );
   },
 
@@ -9233,10 +11815,7 @@ Page({
 
   _stopBucketReactionSounds() {
     try {
-      reactionSounds.stopReactionSound('bucket_water');
-      reactionSounds.stopReactionSound('bucket_start');
-      reactionSounds.stopReactionSound('bucket_pour');
-      reactionSounds.stopReactionSound('bucket_end');
+      reactionSounds.stopReactionSound('bucket_water_new');
     } catch (err) {
       /* ignore */
     }
@@ -9246,66 +11825,106 @@ Page({
     const e = ev || {};
     const action = e.action != null ? String(e.action) : '';
     const ctx = this._bucketTimelineCtx || {};
+    const page = this;
+    const isSelf = ctx.mode === 'self';
     const build =
       typeof ctx.buildBucketStyle === 'function'
         ? ctx.buildBucketStyle
         : function () {
             return '';
           };
+    const buildSelf =
+      typeof ctx.buildSelfBucketStyle === 'function'
+        ? ctx.buildSelfBucketStyle
+        : function () {
+            return '';
+          };
 
-    if (action === 'fly_in') {
-      if (ctx.mode === 'self') {
-        this.setData({
-          playerActionBucketDropping: true,
-          playerActionBucketStyle: build(ctx.endX, ctx.endY, 0)
+    // —— Self-only timeline（bucketSelfReactionTimeline）——
+    if (action === 'self_avatar_center') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.toCenterMs || 420;
+      this.setData({
+        reactionAvatarDetached: true,
+        reactionAvatarDetachedPlayerId: ctx.playerId || '',
+        reactionBucketSelfAvatarVisible: true,
+        reactionBucketSelfAvatarPhase: 'seat',
+        reactionBucketSelfWetVisible: false,
+        reactionBucketSelfCartoonWet: false,
+        reactionBucketSelfAvatarStyle: this._buildBucketSelfAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rot: 0,
+          ms: 0
+        })
+      });
+      this._bucketTimeout(function () {
+        if (!page._bucketTimelineCtx || page._bucketTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionBucketSelfAvatarPhase: 'center',
+          reactionBucketSelfAvatarStyle: page._buildBucketSelfAvatarStyle({
+            x: ctx.cx,
+            y: ctx.cy,
+            w: ctx.centerW || ctx.width * 4,
+            h: ctx.centerH || ctx.height * 4,
+            rot: 0,
+            ms: ms
+          })
         });
-      } else {
-        this.setData({
-          playerActionBucketDropping: true,
-          playerActionBucketStyle: build(ctx.hoverX, ctx.hoverY, 0)
-        });
-      }
+      }, 24);
       return;
     }
 
-    if (action === 'arrive') {
-      // 阶段2：到达提示音（非整轨）
-      if (e.sound) {
-        this._playReactionSound(e.sound, {
-          volume: e.volume != null ? e.volume : 0.7,
-          seekMs: e.seekMs != null ? e.seekMs : 0
+    if (action === 'bucket_self_enter') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : 380;
+      // 桶进入：无声；出现在中央头像上方
+      this.setData({
+        reactionBucketSelfBucketVisible: true,
+        reactionBucketSelfBucketDropping: true,
+        reactionBucketSelfBucketPouring: false,
+        reactionBucketSelfBucketStyle: buildSelf(
+          ctx.enterX,
+          ctx.enterY,
+          -8,
+          0.4,
+          0
+        )
+      });
+      this._bucketTimeout(function () {
+        if (!page._bucketTimelineCtx || page._bucketTimelineCtx.mode !== 'self') {
+          return;
+        }
+        page.setData({
+          reactionBucketSelfBucketStyle: buildSelf(
+            ctx.hoverX,
+            ctx.hoverY,
+            0,
+            1,
+            ms
+          )
         });
-      }
+      }, 24);
       return;
     }
 
-    if (action === 'pour') {
-      // 阶段3：翻转倒水瞬间播主体水声（停掉到达提示，避免叠音）
-      try {
-        reactionSounds.stopReactionSound('bucket_start');
-      } catch (err) {
-        /* ignore */
-      }
-      if (ctx.mode === 'self') {
-        this.setData({
-          playerActionBucketDropping: false,
-          playerActionBucketPouring: true,
-          playerActionBucketStyle: build(ctx.endX, ctx.endY, 128),
-          reactionBucketScreenPouring: true
-        });
-      } else {
-        this.setData({
-          playerActionBucketDropping: false,
-          playerActionBucketPouring: true,
-          playerActionBucketStyle: build(ctx.hoverX, ctx.hoverY, 128),
-          playerActionWaterVisible: true,
-          playerActionWaterStyle: ctx.waterStyle || '',
-          playerActionWaterFloodVisible: true,
-          playerActionWaterFloodStyle: ctx.floodStyle || '',
-          playerActionWaterDripVisible: true,
-          playerActionWaterDripStyle: ctx.dripStyle || ''
-        });
-      }
+    if (action === 'bucket_tilt') {
+      if (!isSelf) return;
+      this.setData({
+        reactionBucketSelfBucketDropping: false,
+        reactionBucketSelfBucketPouring: true,
+        reactionBucketSelfBucketStyle: buildSelf(
+          ctx.hoverX,
+          ctx.hoverY,
+          118,
+          1,
+          e.duration != null ? e.duration : 280
+        )
+      });
       if (e.sound) {
         this._playReactionSound(e.sound, {
           volume: e.volume != null ? e.volume : 0.95,
@@ -9315,53 +11934,97 @@ Page({
       return;
     }
 
-    if (action === 'hide_bucket') {
+    if (action === 'water_pour_start') {
+      if (!isSelf) return;
       this.setData({
-        playerActionBucketVisible: false,
-        playerActionBucketDropping: false,
-        playerActionBucketPouring: false,
-        playerActionBucketStyle: ''
+        reactionBucketScreenPouring: true,
+        reactionBucketSelfStreamVisible: true,
+        reactionBucketSelfStreamStyle: this._buildBucketSelfStreamStyle(
+          ctx,
+          true
+        ),
+        reactionBucketSelfBucketPouring: true
       });
-      return;
-    }
-
-    if (action === 'hide_flood') {
-      this.setData({
-        playerActionWaterFloodVisible: false,
-        playerActionWaterFloodStyle: ''
-      });
-      return;
-    }
-
-    if (action === 'hide_drip') {
-      this.setData({
-        playerActionWaterDripVisible: false,
-        playerActionWaterDripStyle: ''
-      });
-      return;
-    }
-
-    if (action === 'fade_out') {
-      this.setData({ reactionScreenFading: true });
-      return;
-    }
-
-    if (action === 'cleanup') {
-      this._stopBucketReactionSounds();
-      if (ctx.mode === 'self') {
-        this._resetPlayerActionBucketVisuals({
-          reactionScreenVisible: false,
-          reactionScreenFading: false,
-          reactionScreenMode: '',
-          reactionBucketScreenActive: false,
-          reactionBucketScreenPouring: false
+      // 音效已在 bucket_tilt；此处不重复起轨
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 0.95,
+          seekMs: e.seekMs != null ? e.seekMs : 0
         });
-      } else {
-        this._resetPlayerActionBucketVisuals();
       }
+      return;
+    }
+
+    if (action === 'wet_avatar_show') {
+      if (!isSelf) return;
+      this.setData({
+        reactionBucketSelfAvatarPhase: 'wet',
+        reactionBucketSelfWetVisible: true,
+        reactionBucketSelfCartoonWet: true
+      });
+      return;
+    }
+
+    if (action === 'water_drip_hold') {
+      if (!isSelf) return;
+      this.setData({
+        reactionBucketSelfDripHold: true,
+        reactionBucketSelfWetVisible: true,
+        reactionBucketSelfCartoonWet: true,
+        // 浇完后收起桶，水流变细滴落
+        reactionBucketSelfBucketVisible: false,
+        reactionBucketSelfBucketPouring: false,
+        reactionBucketSelfStreamVisible: true,
+        reactionBucketSelfStreamStyle: this._buildBucketSelfStreamStyle(
+          ctx,
+          true
+        )
+      });
+      return;
+    }
+
+    if (action === 'avatar_return') {
+      if (!isSelf) return;
+      const ms = e.duration != null ? e.duration : ctx.returnMs || 720;
+      const spin = ctx.returnSpin != null ? ctx.returnSpin : 360;
+      this.setData({
+        reactionBucketSelfAvatarPhase: 'return',
+        reactionBucketSelfDripHold: true,
+        reactionBucketSelfWetVisible: true,
+        reactionBucketSelfCartoonWet: true,
+        reactionBucketSelfStreamVisible: false,
+        reactionBucketSelfStreamStyle: '',
+        reactionBucketSelfBucketVisible: false,
+        reactionBucketSelfAvatarStyle: this._buildBucketSelfAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rot: spin,
+          ms: ms,
+          ease: 'cubic-bezier(0.28, 0.65, 0.32, 1)'
+        })
+      });
+      return;
+    }
+
+    if (action === 'restore' || (action === 'cleanup' && isSelf)) {
+      if (!isSelf && action === 'restore') return;
+      this._stopBucketReactionSounds();
+      this._resetPlayerActionBucketVisuals({
+        reactionScreenVisible: false,
+        reactionScreenFading: false,
+        reactionScreenMode: '',
+        reactionBucketScreenActive: false,
+        reactionBucketScreenPouring: false,
+        reactionAvatarDetached: false,
+        reactionAvatarDetachedPlayerId: ''
+      });
       this._bucketTimelineCtx = null;
       this._playerActionBucketBusy = false;
+      return;
     }
+
   },
 
   /** Demo：清理🪣相关延时器 */
@@ -9393,7 +12056,7 @@ Page({
 
   /**
    * Demo：互动反应音效（独立模块；不改动画 / 记分）。
-   * @param {string} key 如 'bucket_water' | 'boxing'
+   * @param {string} key 如 'bucket_water_new' | 'boxing'
    * @param {{ volume?: number, seekMs?: number }=} opts
    */
   _playReactionSound(key, opts) {
@@ -9415,7 +12078,20 @@ Page({
       playerActionWaterDripVisible: false,
       playerActionWaterDripStyle: '',
       playerActionWaterFloodVisible: false,
-      playerActionWaterFloodStyle: ''
+      playerActionWaterFloodStyle: '',
+      reactionBucketSelfAvatarVisible: false,
+      reactionBucketSelfAvatarUrl: '',
+      reactionBucketSelfAvatarStyle: '',
+      reactionBucketSelfAvatarPhase: '',
+      reactionBucketSelfBucketVisible: false,
+      reactionBucketSelfBucketStyle: '',
+      reactionBucketSelfBucketDropping: false,
+      reactionBucketSelfBucketPouring: false,
+      reactionBucketSelfStreamVisible: false,
+      reactionBucketSelfStreamStyle: '',
+      reactionBucketSelfWetVisible: false,
+      reactionBucketSelfCartoonWet: false,
+      reactionBucketSelfDripHold: false
     };
     if (extra && typeof extra === 'object') {
       const keys = Object.keys(extra);
@@ -9427,91 +12103,7 @@ Page({
   },
 
   /**
-   * Demo：🪣 OBSERVER — 远距离入场 → 目标头像倒水。
-   * 音效由 bucketReactionTimeline 对齐动画节点，不在点击时播完整轨。
-   */
-  _playPlayerActionBucket(rect, playerId) {
-    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
-    if (this._isSelfReactionTarget(hitPlayerId)) {
-      this._playSelfBucketScreenReaction();
-      return;
-    }
-    const left = Number(rect && rect.left);
-    const top = Number(rect && rect.top);
-    const width = Number(rect && rect.width);
-    const height = Number(rect && rect.height);
-    if (
-      !hitPlayerId ||
-      !Number.isFinite(left) ||
-      !Number.isFinite(top) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height)
-    ) {
-      this._playerActionBucketBusy = false;
-      return;
-    }
-
-    const entry = this._getReactionEntryPoint(rect);
-    const centerX = left + width / 2;
-    const avatarTop = top;
-    const startX = entry.x;
-    const startY = entry.y;
-    const hoverX = centerX;
-    const hoverY = avatarTop - 18;
-    const timing = bucketReactionTimeline.getBucketTiming('observer');
-    const buildBucketStyle = function (x, y, rot) {
-      return (
-        'left:' +
-        x +
-        'px;top:' +
-        y +
-        'px;transform:translate(-50%,-50%) rotate(' +
-        rot +
-        'deg);'
-      );
-    };
-
-    this._clearPlayerActionBucketTimers();
-    this._stopBucketReactionSounds();
-    const waterStyle =
-      'left:' +
-      Math.round(left) +
-      'px;top:' +
-      Math.round(top) +
-      'px;width:' +
-      Math.round(width) +
-      'px;height:' +
-      Math.round(height) +
-      'px;';
-    const floodStyle = waterStyle;
-    const dripStyle =
-      'left:' + centerX + 'px;top:' + (top + height * 0.92) + 'px;';
-
-    this._bucketTimelineCtx = {
-      mode: 'observer',
-      hoverX: hoverX,
-      hoverY: hoverY,
-      waterStyle: waterStyle,
-      floodStyle: floodStyle,
-      dripStyle: dripStyle,
-      buildBucketStyle: buildBucketStyle,
-      timing: timing
-    };
-
-    this._resetPlayerActionBucketVisuals({
-      playerActionSheetVisible: false,
-      playerActionTarget: null,
-      playerActionBucketVisible: true,
-      playerActionBucketStyle: buildBucketStyle(startX, startY, 0)
-    });
-
-    this._runBucketReactionTimeline(
-      bucketReactionTimeline.buildBucketReactionTimeline('observer')
-    );
-  },
-
-  /**
-   * Demo：🥚 → 第一视角砸屏 / 第三方飞向头像连击。
+   * Demo：🥚 → 目标头像中央舞台（所有人同效果）。
    * 仅 demo-weekend-amateur。
    */
   onPlayerActionEggTap() {
@@ -9529,47 +12121,110 @@ Page({
       return;
     }
     this._playerActionEggBusy = true;
-    if (this._isSelfReactionTarget(playerId)) {
-      this._playSelfReaction('egg', { playerId: playerId, target: target });
-    } else {
-      this._playObserverReaction('egg', target);
-    }
+    this._playSelfReaction('egg', {
+      playerId: playerId,
+      target: target,
+      avatarUrl:
+        (target && (target.avatar || target.avatarUrl || target.headimgurl)) ||
+        ''
+    });
   },
 
   /**
-   * Demo：🥚 screen reaction — 5 枚普通砸屏（间隔 250–400ms）→ 停顿 500ms → 大蛋终结。
-   * 复用 reaction-screen-layer；不改番茄/花/头像鸡蛋逻辑。
+   * Demo：🥚 SELF 入口 — 克隆头像到中央（拳击尺寸），固定右侧连击，
+   * 累积蛋液 → cartoon egg face → 旋回（不改真实头像 / 不走 Observer）。
    */
-  _playScreenEggComboReaction() {
-    let winW = 375;
-    let winH = 667;
-    try {
-      const info = (wx.getWindowInfo && wx.getWindowInfo()) || wx.getSystemInfoSync();
-      winW = (info && (info.windowWidth || info.screenWidth)) || 375;
-      winH = (info && (info.windowHeight || info.screenHeight)) || 667;
-    } catch (err) {
-      winW = 375;
-      winH = 667;
+  _playSelfEggReaction(rect, avatarUrl, playerId) {
+    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
+    const norm =
+      this._normalizePlayerActionAvatarRect(rect) ||
+      this._fallbackPlayerActionAvatarRect() ||
+      rect;
+    const left = Number(norm.left);
+    const top = Number(norm.top);
+    const width = Number(norm.width);
+    const height = Number(norm.height);
+    if (
+      !Number.isFinite(left) ||
+      !Number.isFinite(top) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      this._playerActionEggBusy = false;
+      return;
     }
 
+    const selfTiming = eggReactionTimeline.EGG_SELF_TIMING || {};
+    const centerScale =
+      selfTiming.centerScale != null ? selfTiming.centerScale : 4;
+    const win = this._getReactionWindowSize();
+    const seatX = left + width / 2;
+    const seatY = top + height / 2;
+    const centerX = win.winW / 2;
+    const centerY = win.winH * 0.42;
+    const centerW = width * centerScale;
+    const centerH = height * centerScale;
+    const direction = selfTiming.direction || 'right';
+    const flyMs =
+      selfTiming.normalFlyMs != null ? selfTiming.normalFlyMs : 320;
+    const finaleFlyMs =
+      selfTiming.finaleFlyMs != null ? selfTiming.finaleFlyMs : 520;
+    const toCenterMs =
+      selfTiming.toCenterMs != null ? selfTiming.toCenterMs : 420;
+    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 720;
+    const returnSpin = Math.random() > 0.5 ? 360 : -360;
+    const url = avatarUrl != null ? String(avatarUrl) : '';
+
     this._clearPlayerActionEggTimers();
+    try {
+      reactionSounds.stopReactionSound('egg_combo');
+      reactionSounds.stopReactionSound('egg_hit_final');
+      for (let s = 1; s <= 6; s++) reactionSounds.stopReactionSound('egg_hit_' + s);
+    } catch (err) {
+      /* ignore */
+    }
+
+    this._eggTimelineCtx = {
+      mode: 'self',
+      seatX: seatX,
+      seatY: seatY,
+      cx: centerX,
+      cy: centerY,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      centerW: centerW,
+      centerH: centerH,
+      centerScale: centerScale,
+      winW: win.winW,
+      winH: win.winH,
+      direction: direction,
+      flyMs: flyMs,
+      finaleFlyMs: finaleFlyMs,
+      toCenterMs: toCenterMs,
+      returnMs: returnMs,
+      returnSpin: returnSpin,
+      playerId: hitPlayerId,
+      avatarUrl: url
+    };
+
     this.setData({
       playerActionSheetVisible: false,
       playerActionTarget: null,
-      // 关闭头像鸡蛋层，避免双轨
       playerActionEggs: [],
       playerActionEggSplatVisible: false,
       playerActionEggSplatHiding: false,
       playerActionEggSplatStyle: '',
       playerActionEggLevel: 0,
       playerActionEggFinale: false,
-      // 关闭其它 screen mode 内容
       reactionTomatoFlyVisible: false,
       reactionTomatoSplashVisible: false,
       reactionTomatoJuiceActive: false,
       reactionTomatoDripActive: false,
       reactionFlowerFlyVisible: false,
       reactionFlowerItems: [],
+      reactionFlowerPetals: [],
       reactionScreenVisible: true,
       reactionScreenFading: false,
       reactionScreenMode: 'egg',
@@ -9579,62 +12234,334 @@ Page({
       reactionEggBurstFinale: false,
       reactionEggBurstStyle: '',
       reactionEggFinaleActive: false,
-      reactionEggShake: false
+      reactionEggShake: false,
+      reactionEggSelfAvatarVisible: true,
+      reactionEggSelfAvatarUrl: url,
+      reactionEggSelfAvatarPhase: 'seat',
+      reactionEggSelfFaceVisible: false,
+      reactionEggSelfDripHold: false,
+      reactionEggSelfDirection: direction,
+      reactionEggSelfAvatarStyle: this._buildEggSelfAvatarStyle({
+        x: seatX,
+        y: seatY,
+        w: width,
+        h: height,
+        rot: 0,
+        ms: 0
+      }),
+      reactionAvatarDetached: !!hitPlayerId,
+      reactionAvatarDetachedPlayerId: hitPlayerId
     });
 
+    const timeline =
+      eggReactionTimeline.buildEggSelfReactionTimeline
+        ? eggReactionTimeline.buildEggSelfReactionTimeline()
+        : eggReactionTimeline.buildEggReactionTimeline('self');
     const self = this;
-    const NORMAL_COUNT = 5;
-    let delay = 40;
-    for (let i = 0; i < NORMAL_COUNT; i++) {
-      (function (idx, at) {
+    for (let i = 0; i < timeline.length; i++) {
+      (function (ev) {
         self._eggTimeout(function () {
-          self._launchScreenEggHit({
-            winW: winW,
-            winH: winH,
-            finale: false,
-            index: idx
-          });
-        }, at);
-      })(i, delay);
-      delay += 250 + Math.floor(Math.random() * 151);
+          self._dispatchEggTimelineEvent(ev, self._eggTimelineCtx);
+        }, ev.time);
+      })(timeline[i]);
     }
-
-    // 第 5 枚起飞后再 + 飞行时间约 420ms + 停顿 500ms
-    const finaleAt = delay + 420 + 500;
-    this._eggTimeout(function () {
-      self._launchScreenEggHit({
-        winW: winW,
-        winH: winH,
-        finale: true,
-        index: NORMAL_COUNT
-      });
-    }, finaleAt);
   },
 
-  /** Demo：单枚砸屏鸡蛋（普通 / 终结）— 第一视角随机边缘入场 */
-  _launchScreenEggHit(opts) {
+  /** 兼容旧调用名 → Self */
+  _playScreenEggComboReaction() {
+    const target = this.data.playerActionTarget || {};
+    const playerId = String(target.playerId || target.userId || '').trim();
+    const avatarUrl =
+      target.avatar || target.avatarUrl || target.headimgurl || '';
+    const self = this;
+    if (!playerId) {
+      this._playerActionEggBusy = false;
+      return;
+    }
+    this._queryPlayerActionAvatarRect(playerId, function (rect) {
+      if (!rect) {
+        self._playerActionEggBusy = false;
+        return;
+      }
+      self._playSelfEggReaction(rect, avatarUrl, playerId);
+    });
+  },
+
+  _buildEggSelfAvatarStyle(opts) {
     const o = opts || {};
-    const winW = Number(o.winW) || 375;
-    const winH = Number(o.winH) || 667;
+    const x = o.x != null ? o.x : 0;
+    const y = o.y != null ? o.y : 0;
+    const w = o.w != null ? o.w : 44;
+    const h = o.h != null ? o.h : 44;
+    const rot = o.rot != null ? o.rot : 0;
+    const ms = o.ms != null ? Number(o.ms) : 0;
+    const ease = o.ease || 'cubic-bezier(0.22, 0.7, 0.28, 1)';
+    const transition =
+      ms > 0
+        ? 'left ' +
+          ms +
+          'ms ' +
+          ease +
+          ',top ' +
+          ms +
+          'ms ' +
+          ease +
+          ',width ' +
+          ms +
+          'ms ' +
+          ease +
+          ',height ' +
+          ms +
+          'ms ' +
+          ease +
+          ',transform ' +
+          ms +
+          'ms ' +
+          ease
+        : 'none';
+    return (
+      'left:' +
+      x +
+      'px;top:' +
+      y +
+      'px;width:' +
+      w +
+      'px;height:' +
+      h +
+      'px;transform:translate(-50%,-50%) rotate(' +
+      rot +
+      'deg);transition:' +
+      transition +
+      ';'
+    );
+  },
+
+  _resetEggSelfVisuals(extra) {
+    const patch = {
+      reactionEggFlies: [],
+      reactionEggHitLevel: 0,
+      reactionEggBurstVisible: false,
+      reactionEggBurstFinale: false,
+      reactionEggBurstStyle: '',
+      reactionEggFinaleActive: false,
+      reactionEggShake: false,
+      reactionEggSelfAvatarVisible: false,
+      reactionEggSelfAvatarUrl: '',
+      reactionEggSelfAvatarStyle: '',
+      reactionEggSelfAvatarPhase: '',
+      reactionEggSelfFaceVisible: false,
+      reactionEggSelfDripHold: false,
+      reactionEggSelfDirection: 'right'
+    };
+    if (extra && typeof extra === 'object') {
+      const keys = Object.keys(extra);
+      for (let i = 0; i < keys.length; i++) {
+        patch[keys[i]] = extra[keys[i]];
+      }
+    }
+    this.setData(patch);
+  },
+
+  /**
+   * Demo：🥚 Self timeline 调度。
+   * 目标头像中央舞台（reaction-view-model-v2）。
+   */
+  _dispatchEggTimelineEvent(ev, ctx) {
+    const e = ev || {};
+    const c = ctx || this._eggTimelineCtx || {};
+    const action = e.action != null ? String(e.action) : '';
+    const page = this;
+    const isSelf = c.mode === 'self';
+    if (!isSelf) return;
+
+    if (action === 'self_avatar_center') {
+      const ms = e.duration != null ? e.duration : c.toCenterMs || 420;
+      this.setData({
+        reactionAvatarDetached: true,
+        reactionAvatarDetachedPlayerId: c.playerId || '',
+        reactionEggSelfAvatarVisible: true,
+        reactionEggSelfAvatarPhase: 'seat',
+        reactionEggSelfFaceVisible: false,
+        reactionEggSelfDripHold: false,
+        reactionEggSelfAvatarStyle: this._buildEggSelfAvatarStyle({
+          x: c.seatX,
+          y: c.seatY,
+          w: c.width,
+          h: c.height,
+          rot: 0,
+          ms: 0
+        })
+      });
+      this._eggTimeout(function () {
+        if (!page._eggTimelineCtx || page._eggTimelineCtx.mode !== 'self') return;
+        page.setData({
+          reactionEggSelfAvatarPhase: 'center',
+          reactionEggSelfAvatarStyle: page._buildEggSelfAvatarStyle({
+            x: c.cx,
+            y: c.cy,
+            w: c.centerW || c.width * 4,
+            h: c.centerH || c.height * 4,
+            rot: 0,
+            ms: ms
+          })
+        });
+      }, 24);
+      return;
+    }
+
+    if (action === 'egg_self_fly' || action === 'egg_hit_sequence') {
+      // 标记节点：方向已写入 ctx；实际发射由 egg_launch 驱动
+      if (e.direction) {
+        this._eggTimelineCtx = Object.assign({}, c, {
+          direction: String(e.direction)
+        });
+        this.setData({ reactionEggSelfDirection: String(e.direction) });
+      }
+      return;
+    }
+
+    if (action === 'egg_launch' || action === 'egg_final_launch') {
+      const idx = e.index != null ? e.index : 0;
+      const finale = !!e.finale;
+      this._launchSelfEggHit({
+        index: idx,
+        finale: finale,
+        flyMs: finale ? c.finaleFlyMs : c.flyMs,
+        soundKey: finale ? 'egg_hit_final' : 'egg_hit_' + (idx + 1),
+        volume: finale ? 1 : 0.92,
+        direction: e.direction || c.direction || 'right'
+      });
+      return;
+    }
+
+    // 命中文档节点：音效已在飞行到达时播放，避免双播
+    if (
+      action.indexOf('egg_hit_') === 0 ||
+      action === 'egg_final' ||
+      action === 'egg_final_hit'
+    ) {
+      return;
+    }
+
+    if (action === 'egg_overlay_show') {
+      this.setData({
+        reactionEggSelfFaceVisible: true,
+        reactionEggSelfDripHold: false,
+        reactionEggSelfAvatarPhase: 'overlay',
+        reactionEggFinaleActive: true,
+        reactionEggHitLevel: Math.max(6, this.data.reactionEggHitLevel || 0)
+      });
+      return;
+    }
+
+    if (action === 'egg_drip_hold') {
+      this.setData({
+        reactionEggSelfDripHold: true,
+        reactionEggSelfFaceVisible: true,
+        reactionEggSelfAvatarPhase: 'hold',
+        reactionEggShake: true
+      });
+      this._eggTimeout(function () {
+        if (!page._eggTimelineCtx || page._eggTimelineCtx.mode !== 'self') return;
+        page.setData({ reactionEggShake: false });
+      }, 360);
+      this._eggTimeout(function () {
+        if (!page._eggTimelineCtx || page._eggTimelineCtx.mode !== 'self') return;
+        page.setData({ reactionEggShake: true });
+      }, 900);
+      this._eggTimeout(function () {
+        if (!page._eggTimelineCtx || page._eggTimelineCtx.mode !== 'self') return;
+        page.setData({ reactionEggShake: false });
+      }, 1300);
+      return;
+    }
+
+    if (action === 'avatar_return') {
+      const ms = e.duration != null ? e.duration : c.returnMs || 720;
+      const spin = c.returnSpin != null ? c.returnSpin : 360;
+      this.setData({
+        reactionEggSelfAvatarPhase: 'return',
+        reactionEggSelfFaceVisible: true,
+        reactionEggSelfDripHold: true,
+        reactionEggShake: false,
+        reactionEggBurstVisible: false,
+        reactionEggFlies: [],
+        reactionEggSelfAvatarStyle: this._buildEggSelfAvatarStyle({
+          x: c.seatX,
+          y: c.seatY,
+          w: c.width,
+          h: c.height,
+          rot: spin,
+          ms: ms,
+          ease: 'cubic-bezier(0.28, 0.65, 0.32, 1)'
+        })
+      });
+      return;
+    }
+
+    if (action === 'restore' || action === 'cleanup') {
+      try {
+        reactionSounds.stopReactionSound('egg_hit_final');
+        for (let s = 1; s <= 6; s++) {
+          reactionSounds.stopReactionSound('egg_hit_' + s);
+        }
+      } catch (err) {
+        /* ignore */
+      }
+      this._resetEggSelfVisuals({
+        reactionScreenVisible: false,
+        reactionScreenFading: false,
+        reactionScreenMode: '',
+        reactionAvatarDetached: false,
+        reactionAvatarDetachedPlayerId: ''
+      });
+      this._eggTimelineCtx = null;
+      this._playerActionEggBusy = false;
+    }
+  },
+
+  /**
+   * Demo：🥚 Self 单枚 — 固定方向（默认 right→center）飞向中央头像。
+   * 命中时播音；覆盖层累加不重置。
+   */
+  _launchSelfEggHit(opts) {
+    const o = opts || {};
+    const ctx = this._eggTimelineCtx || {};
+    const winW = Number(ctx.winW) || 375;
     const finale = !!o.finale;
-    // 第一视角：随机边缘，不用头像远距离原则
-    const origin = this._getRandomSelfReactionEntryPoint(winW, winH);
-    const startX = origin.x;
-    const startY = origin.y;
-    // 普通击中点略偏中心；终结直砸中心
-    const endX = finale
-      ? winW / 2
-      : winW / 2 + (Math.random() - 0.5) * Math.min(120, winW * 0.28);
-    const endY = finale
-      ? winH / 2
-      : winH / 2 + (Math.random() - 0.5) * Math.min(140, winH * 0.28);
-    const flyMs = finale ? 560 : 360 + Math.floor(Math.random() * 80);
-    const startScale = finale ? 1.15 : 0.85;
-    const endScale = finale ? 2.5 : 1.15 + Math.random() * 0.2;
-    const startRot = -40 + Math.random() * 80;
-    const endRot = startRot + (finale ? 540 : 320 + Math.random() * 160);
-    const eggId =
-      'seg-' + Date.now() + '-' + (o.index != null ? o.index : 0);
+    const direction = String(o.direction || ctx.direction || 'right');
+    const idx = o.index != null ? o.index : 0;
+    const endX = ctx.cx != null ? ctx.cx : winW / 2;
+    const endY = ctx.cy != null ? ctx.cy : 280;
+    // 固定入场：右侧（或左侧）屏外 → 中央；Y 仅按序号固定微偏，不随机方向
+    const ySpread = [-18, -8, 0, 8, 14, -12, 6];
+    const yOff = ySpread[idx % ySpread.length] || 0;
+    let startX;
+    let startY;
+    if (direction === 'left') {
+      startX = -48;
+      startY = endY + yOff;
+    } else {
+      startX = winW + 48;
+      startY = endY + yOff;
+    }
+    const flyMs =
+      o.flyMs != null
+        ? Number(o.flyMs)
+        : finale
+          ? 520
+          : 320;
+    const startScale = finale ? 1.2 : 0.78;
+    const endScale = finale ? 2.35 : 1.2 + idx * 0.04;
+    const startRot = direction === 'left' ? 28 : -28;
+    const endRot = startRot + (finale ? 520 : 300 + idx * 12);
+    const eggId = 'self-egg-' + Date.now() + '-' + idx + (finale ? '-f' : '');
+    const soundKey =
+      o.soundKey != null
+        ? String(o.soundKey)
+        : finale
+          ? 'egg_hit_final'
+          : 'egg_hit_' + (idx + 1);
 
     const buildStyle = function (x, y, rot, scale, ms) {
       const transition =
@@ -9663,7 +12590,6 @@ Page({
     };
 
     const flies = (this.data.reactionEggFlies || []).slice();
-    // 控制飞行 DOM：最多保留 2 枚
     while (flies.length >= 2) flies.shift();
     flies.push({
       id: eggId,
@@ -9674,6 +12600,7 @@ Page({
 
     const self = this;
     this._eggTimeout(function () {
+      if (!self._eggTimelineCtx || self._eggTimelineCtx.mode !== 'self') return;
       const list = (self.data.reactionEggFlies || []).slice();
       for (let i = 0; i < list.length; i++) {
         if (list[i] && list[i].id === eggId) {
@@ -9689,60 +12616,47 @@ Page({
     }, 24);
 
     this._eggTimeout(function () {
-      // 命中：移除飞行蛋，播碎片 / 残留 / 震动
-      const nextFlies = (self.data.reactionEggFlies || []).filter(function (e) {
-        return e && e.id !== eggId;
+      if (!self._eggTimelineCtx || self._eggTimelineCtx.mode !== 'self') return;
+      const nextFlies = (self.data.reactionEggFlies || []).filter(function (egg) {
+        return egg && egg.id !== eggId;
       });
-      const level = finale
-        ? self.data.reactionEggHitLevel
-        : Math.min(5, (self.data.reactionEggHitLevel || 0) + 1);
+      // 覆盖层累加，不在每次命中重置
+      const prev = self.data.reactionEggHitLevel || 0;
+      const level = finale ? Math.max(6, prev) : Math.min(6, prev + 1);
       self.setData({
         reactionEggFlies: nextFlies,
         reactionEggHitLevel: level,
         reactionEggBurstVisible: true,
         reactionEggBurstFinale: finale,
-        reactionEggBurstStyle: 'left:' + endX + 'px;top:' + endY + 'px;',
+        reactionEggBurstStyle:
+          'left:' + endX + 'px;top:' + endY + 'px;',
         reactionEggShake: true,
-        reactionEggFinaleActive: finale ? true : !!self.data.reactionEggFinaleActive
+        reactionEggSelfAvatarPhase: 'hit',
+        reactionEggFinaleActive: finale
+          ? true
+          : !!self.data.reactionEggFinaleActive
       });
       try {
-        self._playReactionSound(finale ? 'egg_hit_finale' : 'egg_hit');
-      } catch (e) {}
-
+        self._playReactionSound(soundKey, {
+          volume: o.volume != null ? o.volume : finale ? 1 : 0.92,
+          seekMs: 0
+        });
+      } catch (err) {
+        /* ignore */
+      }
       self._eggTimeout(function () {
+        if (!self._eggTimelineCtx) return;
         self.setData({ reactionEggShake: false });
-      }, finale ? 220 : 120);
-
+      }, finale ? 220 : 110);
       self._eggTimeout(function () {
+        if (!self._eggTimelineCtx) return;
         self.setData({
           reactionEggBurstVisible: false,
           reactionEggBurstFinale: false,
           reactionEggBurstStyle: ''
         });
-      }, finale ? 520 : 280);
-
-      if (finale) {
-        // 终结残留后渐隐清理
-        self._eggTimeout(function () {
-          self.setData({ reactionScreenFading: true });
-          self._eggTimeout(function () {
-            self.setData({
-              reactionScreenVisible: false,
-              reactionScreenFading: false,
-              reactionScreenMode: '',
-              reactionEggFlies: [],
-              reactionEggHitLevel: 0,
-              reactionEggBurstVisible: false,
-              reactionEggBurstFinale: false,
-              reactionEggBurstStyle: '',
-              reactionEggFinaleActive: false,
-              reactionEggShake: false
-            });
-            self._playerActionEggBusy = false;
-          }, 700);
-        }, 3200);
-      }
-    }, 24 + flyMs);
+      }, finale ? 480 : 260);
+    }, flyMs);
   },
 
   /** Demo：清理🥚相关延时器 */
@@ -9916,130 +12830,26 @@ Page({
   },
 
   /** Demo：命中只叠加 level / 最后一击流淌层（糊脸层已 fixed，无 flash） */
-  _applyPlayerActionEggHit(playerId, level, isFinale) {
+  _applyPlayerActionEggHit(playerId, level, isFinale, soundKey) {
     const nextLevel = Math.max(0, Number(level) || 0);
+    const key = soundKey != null ? String(soundKey) : '';
     if (isFinale) {
-      // 先 setData 再播声音：音效模块内部 nextTick，错开同帧原生音频初始化
       this.setData({
         playerActionEggLevel: nextLevel,
         playerActionEggFinale: true
       });
-      this._playReactionSound('egg_hit_finale');
+      if (key) {
+        this._playReactionSound(key, { volume: 1, seekMs: 0 });
+      }
       return;
     }
-    // 前 6 次：撞击头像瞬间播命中音（setData 之后调用，避免与建层同栈）
     this.setData({
       playerActionEggSplatVisible: true,
       playerActionEggLevel: nextLevel
     });
-    this._playReactionSound('egg_hit');
-  },
-
-  /**
-   * Demo：🥚 OBSERVER — 远距离入场 → 目标头像连击糊脸（不影响 self 砸屏）。
-   */
-  _playPlayerActionEggCombo(rect, playerId) {
-    const hitPlayerId = playerId != null ? String(playerId).trim() : '';
-    if (this._isSelfReactionTarget(hitPlayerId)) {
-      this._playScreenEggComboReaction();
-      return;
+    if (key) {
+      this._playReactionSound(key, { volume: 0.92, seekMs: 0 });
     }
-    const left = Number(rect && rect.left);
-    const top = Number(rect && rect.top);
-    const width = Number(rect && rect.width);
-    const height = Number(rect && rect.height);
-    if (
-      !hitPlayerId ||
-      !Number.isFinite(left) ||
-      !Number.isFinite(top) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height)
-    ) {
-      this._playerActionEggBusy = false;
-      return;
-    }
-
-    const endX = left + width / 2;
-    const endY = top + height / 2;
-    const entry = this._getReactionEntryPoint(rect);
-    const originX = entry.x;
-    const originY = entry.y;
-    const startRot = -18;
-    const endRot = 462;
-    const comboCount = 6;
-    const gapMs = 260;
-    const flyMs = 360;
-    const pauseMs = 1400;
-    const holdMs = 6200;
-    const finaleFlyMs = 300;
-    const self = this;
-
-    // 糊脸层尺寸=目标头像矩形（仅头像附近，不进成绩 wx:for）
-    const splatStyle =
-      'left:' +
-      Math.round(left) +
-      'px;top:' +
-      Math.round(top) +
-      'px;width:' +
-      Math.round(width) +
-      'px;height:' +
-      Math.round(height) +
-      'px;';
-
-    this._clearPlayerActionEggTimers();
-    this._resetPlayerActionEggVisuals({
-      playerActionSheetVisible: false,
-      playerActionTarget: null,
-      playerActionEggSplatStyle: splatStyle
-    });
-
-    const lastComboHitAt = (comboCount - 1) * gapMs + 24 + flyMs;
-    for (let i = 0; i < comboCount; i++) {
-      (function (index) {
-        self._eggTimeout(function () {
-          self._spawnPlayerActionEggFly(
-            {
-              endX: endX,
-              endY: endY,
-              flyMs: flyMs,
-              originX: originX,
-              originY: originY,
-              startRot: startRot,
-              endRot: endRot,
-              finale: false
-            },
-            function () {
-              self._applyPlayerActionEggHit(hitPlayerId, index + 1, false);
-            }
-          );
-        }, index * gapMs);
-      })(i);
-    }
-
-    // 前 6 个完成后停顿 1–1.5s → 同位置最后一击
-    const finaleStartAt = lastComboHitAt + pauseMs;
-    this._eggTimeout(function () {
-      self._spawnPlayerActionEggFly(
-        {
-          endX: endX,
-          endY: endY,
-          flyMs: finaleFlyMs,
-          originX: originX,
-          originY: originY,
-          startRot: startRot,
-          endRot: endRot + 180,
-          finale: true
-        },
-        function () {
-          self._applyPlayerActionEggHit(hitPlayerId, 7, true);
-          self._eggTimeout(function () {
-            // 残留结束后两阶段拆 fixed 层（先卸合成，再 wx:if 销毁）
-            self._teardownPlayerActionEggSplat();
-            self._playerActionEggBusy = false;
-          }, holdMs);
-        }
-      );
-    }, finaleStartAt);
   },
 
   /**
@@ -10116,10 +12926,14 @@ Page({
       '_playerActionFlowerArcTimer',
       '_playerActionFlowerBloomTimer',
       '_playerActionFlowerWreathTimer',
+      '_playerActionFlowerExpandTimer',
+      '_playerActionFlowerPetalTimer',
       '_playerActionFlowerFadeTimer',
       '_playerActionFlowerClearTimer',
       '_playerActionFlowerSpawnTimer',
-      '_playerActionFlowerDriftTimer'
+      '_playerActionFlowerDriftTimer',
+      '_playerActionFlowerBatch2Timer',
+      '_playerActionFlowerBatch3Timer'
     ];
     for (let i = 0; i < keys.length; i++) {
       const k = keys[i];
@@ -10128,10 +12942,38 @@ Page({
         this[k] = null;
       }
     }
+    const petalTimers = this._flowerPetalAnimTimers;
+    if (petalTimers && petalTimers.length) {
+      for (let p = 0; p < petalTimers.length; p++) clearTimeout(petalTimers[p]);
+    }
+    this._flowerPetalAnimTimers = [];
+    const spawnTimers = this._flowerSpawnTimers;
+    if (spawnTimers && spawnTimers.length) {
+      for (let s = 0; s < spawnTimers.length; s++) clearTimeout(spawnTimers[s]);
+    }
+    this._flowerSpawnTimers = [];
+  },
+
+  _flowerSchedule(fn, ms) {
+    if (!this._flowerSpawnTimers) this._flowerSpawnTimers = [];
+    const self = this;
+    const id = setTimeout(function () {
+      const list = self._flowerSpawnTimers || [];
+      const idx = list.indexOf(id);
+      if (idx >= 0) list.splice(idx, 1);
+      try {
+        fn();
+      } catch (err) {
+        console.log('[flower] timer error', err);
+      }
+    }, ms);
+    this._flowerSpawnTimers.push(id);
+    return id;
   },
 
   /**
-   * Demo：🌹 SELF — 随机边缘入场 → 永远飞向屏幕中心开放（不读头像、不用远距离原则）。
+   * Demo：🌹 SELF — 随机花束边缘入场 → 屏中开放（多批冒出 + 花瓣飘落）。
+   * 不改 Self/Observer 分流逻辑。
    */
   _playScreenFlowerReaction() {
     const size = this._getReactionWindowSize();
@@ -10147,17 +12989,30 @@ Page({
     const midY = (startY + endY) / 2;
     const ctrlX = midX + (startX < endX ? 36 : -36);
     const ctrlY = midY - 40;
-    const flyMs = 1200;
-    const MAX_FLOWERS = 28;
-    const SPAWN_MS = 2400;
-    const HOLD_MS = 2800;
-    const FADE_MS = 700;
-    const emojis = ['🌹', '🌸', '🌺', '🌹', '🌸', '💮'];
+    const flyMs = flowerReactionTimeline.FLOWER_TIMING.self.flyMs || 1200;
+    // v3：先定花束组合模式，颜色走权重（红色系为主）
+    const bouquetMode =
+      typeof flowerReactionTimeline.pickBouquetMode === 'function'
+        ? flowerReactionTimeline.pickBouquetMode()
+        : 'red_main';
+    this._flowerBouquetMode = bouquetMode;
+    const leadFlower = flowerReactionTimeline.pickRandomFlower({
+      mode: bouquetMode,
+      isLead: true,
+      forceRed: bouquetMode !== 'special',
+      scaleMin: 0.9,
+      scaleMax: 1.25
+    });
+    const bundle = flowerReactionTimeline.buildRandomFlowerBundle({
+      mode: bouquetMode,
+      minCount: 20,
+      maxCount: 40
+    });
 
     const easeOut = function (t) {
       return 1 - Math.pow(1 - t, 2.4);
     };
-    const buildFlyStyle = function (x, y, rot, scale, opacity) {
+    const buildFlyStyle = function (x, y, rot, scale, opacity, filter) {
       return (
         'left:' +
         x +
@@ -10169,23 +13024,29 @@ Page({
         rot +
         'deg) scale(' +
         scale +
-        ');transition:none;'
+        ');filter:' +
+        (filter || 'none') +
+        ';transition:none;'
       );
     };
 
     this._clearPlayerActionFlowerTimers();
     this._flowerScreenSpawnMeta = [];
+    this._flowerScreenBundle = bundle;
     this.setData({
       playerActionSheetVisible: false,
       playerActionTarget: null,
       playerActionFlowerVisible: false,
       playerActionFlowerBloom: false,
       playerActionFlowerStyle: '',
+      playerActionFlowerEmoji: leadFlower.emoji,
       playerActionPetalVisible: false,
       playerActionPetalStyle: '',
+      playerActionPetalItems: [],
       playerActionFlowerScalePlayerId: '',
       playerActionWreathVisible: false,
       playerActionWreathAppear: false,
+      playerActionWreathExpand: false,
       playerActionWreathFading: false,
       playerActionWreathStyle: '',
       playerActionWreathItems: [],
@@ -10198,8 +13059,17 @@ Page({
       reactionScreenFading: false,
       reactionScreenMode: 'flower',
       reactionFlowerFlyVisible: true,
-      reactionFlowerFlyStyle: buildFlyStyle(startX, startY, -12, 0.2, 0.5),
-      reactionFlowerItems: []
+      reactionFlowerFlyEmoji: leadFlower.emoji,
+      reactionFlowerFlyStyle: buildFlyStyle(
+        startX,
+        startY,
+        leadFlower.rotate,
+        0.2,
+        0.5,
+        leadFlower.filter
+      ),
+      reactionFlowerItems: [],
+      reactionFlowerPetals: []
     });
 
     const self = this;
@@ -10215,25 +13085,33 @@ Page({
         const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
         const bob = Math.sin(raw * Math.PI * 1.8) * 8 * (1 - raw);
         const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
-        const rot = -12 + 20 * Math.sin(raw * Math.PI);
-        const scale = 0.2 + 0.95 * t;
-        const opacity = 0.5 + 0.5 * t;
+        const rot = leadFlower.rotate - 16 + 40 * t + 18 * Math.sin(raw * Math.PI);
+        const scale = 0.22 + 1.05 * t;
+        const opacity = 0.45 + 0.55 * t;
         self.setData({
-          reactionFlowerFlyStyle: buildFlyStyle(x, y, rot, scale, opacity)
+          reactionFlowerFlyVisible: true,
+          reactionFlowerFlyStyle: buildFlyStyle(
+            x,
+            y,
+            rot,
+            scale,
+            opacity,
+            leadFlower.filter
+          )
         });
         if (raw < 1) {
           self._playerActionFlowerArcTimer = setTimeout(tick, 16);
           return;
         }
         self._playerActionFlowerArcTimer = null;
-        // flower_arrive：花真正到达屏中瞬间播送花音（飞行阶段无声）
+        self._dispatchFlowerTimelineEvent({ action: 'flower_hit_avatar' });
+        // flower_bloom：到达屏中瞬间播送花音
         self._dispatchFlowerTimelineEvent({
-          action: 'flower_arrive',
+          action: 'flower_bloom',
           sound: 'flower_send',
           volume: 0.92,
           seekMs: 0
         });
-        // 中心开放：隐藏飞入主花，开始持续生成花雨
         self.setData({
           reactionFlowerFlyVisible: false,
           reactionFlowerFlyStyle: ''
@@ -10243,11 +13121,7 @@ Page({
           cy: endY,
           winW: winW,
           winH: winH,
-          maxFlowers: MAX_FLOWERS,
-          spawnMs: SPAWN_MS,
-          holdMs: HOLD_MS,
-          fadeMs: FADE_MS,
-          emojis: emojis
+          bundle: bundle
         });
       };
       tick();
@@ -10255,20 +13129,30 @@ Page({
   },
 
   /**
-   * Demo：🌹 flower timeline 音效节点（仅到达瞬间播；飞行无声）。
-   * 复用 reactionSounds 缓存实例，不新建 AudioContext。
+   * Demo：🌹 flower timeline 节点（bloom 播音；enter/fly 无声）。
    * @param {{ action:string, sound?:string, volume?:number, seekMs?:number }} ev
    */
   _dispatchFlowerTimelineEvent(ev) {
     const e = ev || {};
     const action = e.action != null ? String(e.action) : '';
-    if (action === 'flower_arrive') {
+    // flower_enter / flower_fly / flower_hit_avatar：飞入由页面 tick 驱动，此处不跳过视觉
+    if (
+      action === 'flower_enter' ||
+      action === 'flower_fly' ||
+      action === 'flower_hit_avatar'
+    ) {
+      return;
+    }
+    if (action === 'flower_bloom' || action === 'flower_arrive') {
       if (e.sound) {
         this._playReactionSound(e.sound, {
           volume: e.volume != null ? e.volume : 0.92,
           seekMs: e.seekMs != null ? e.seekMs : 0
         });
       }
+      return;
+    }
+    if (action === 'flower_ring' || action === 'flower_ring_expand') {
       return;
     }
     if (action === 'cleanup') {
@@ -10281,7 +13165,7 @@ Page({
   },
 
   /**
-   * Demo：中心持续生成花朵（80–120ms），向 360° 柔和散开，再缓慢飘落渐隐。
+   * Demo：中心多批开放 —— 第一批快环绕、第二批继续冒出、第三批花瓣飘落。
    */
   _startScreenFlowerBloomSpawn(opts) {
     const o = opts || {};
@@ -10289,38 +13173,86 @@ Page({
     const cy = Number(o.cy);
     const winW = Number(o.winW) || 375;
     const winH = Number(o.winH) || 667;
-    const maxFlowers = o.maxFlowers || 28;
-    const spawnMs = o.spawnMs || 2400;
-    const holdMs = o.holdMs || 2800;
-    const fadeMs = o.fadeMs || 700;
-    const emojis = o.emojis || ['🌹', '🌸'];
+    const bundle =
+      o.bundle && o.bundle.length
+        ? o.bundle
+        : flowerReactionTimeline.buildRandomFlowerBundle({
+            minCount: 20,
+            maxCount: 40
+          });
     const maxDist = Math.min(winW, winH) * 0.42;
     const self = this;
-    const spawnStart = Date.now();
-    let seq = 0;
     this._flowerScreenSpawnMeta = [];
 
-    const scheduleNext = function () {
-      const elapsed = Date.now() - spawnStart;
-      if (elapsed >= spawnMs) {
-        self._playerActionFlowerSpawnTimer = null;
-        self._finishScreenFlowerRain({ holdMs: holdMs, fadeMs: fadeMs });
-        return;
-      }
+    const n = bundle.length;
+    const batch1End = Math.ceil(n * 0.42);
+    const batch2End = Math.ceil(n * 0.78);
+
+    const spawnOne = function (flower, seq, batch) {
       self._spawnScreenFlowerBloom({
         cx: cx,
         cy: cy,
         maxDist: maxDist,
-        maxFlowers: maxFlowers,
-        emojis: emojis,
-        seq: seq++
+        maxFlowers: n,
+        flower: flower,
+        seq: seq,
+        batch: batch
       });
-      const gap = 80 + Math.floor(Math.random() * 41);
-      self._playerActionFlowerSpawnTimer = setTimeout(scheduleNext, gap);
     };
 
-    // 首朵立刻从中心散开，形成开放感
-    scheduleNext();
+    // 第一批：快速环绕
+    for (let i = 0; i < batch1End; i++) {
+      (function (idx) {
+        const delay = Math.round(idx * 28 + Math.random() * 20);
+        self._flowerSchedule(function () {
+          spawnOne(bundle[idx], idx, 1);
+        }, delay);
+      })(i);
+    }
+
+    // 第二批：中心继续冒出
+    this._flowerSchedule(function () {
+      self._dispatchFlowerTimelineEvent({ action: 'flower_ring_expand' });
+      for (let j = batch1End; j < batch2End; j++) {
+        (function (idx) {
+          const delay = Math.round((idx - batch1End) * 55 + Math.random() * 40);
+          self._flowerSchedule(function () {
+            if (
+              !self.data.reactionScreenVisible ||
+              self.data.reactionScreenMode !== 'flower'
+            ) {
+              return;
+            }
+            spawnOne(bundle[idx], idx, 2);
+          }, delay);
+        })(j);
+      }
+    }, 420);
+
+    // 第三批：少量再冒
+    this._flowerSchedule(function () {
+      for (let k = batch2End; k < n; k++) {
+        (function (idx) {
+          const delay = Math.round((idx - batch2End) * 70 + Math.random() * 50);
+          self._flowerSchedule(function () {
+            if (
+              !self.data.reactionScreenVisible ||
+              self.data.reactionScreenMode !== 'flower'
+            ) {
+              return;
+            }
+            spawnOne(bundle[idx], idx, 3);
+          }, delay);
+        })(k);
+      }
+    }, 980);
+
+    // 花瓣飘落 1–2s
+    this._flowerSchedule(function () {
+      self._dispatchFlowerTimelineEvent({ action: 'flower_petals_fall' });
+      self._spawnScreenFlowerPetals({ cx: cx, cy: cy });
+      self._finishScreenFlowerRain({ holdMs: 1600, fadeMs: 700 });
+    }, 2100);
   },
 
   _spawnScreenFlowerBloom(opts) {
@@ -10328,28 +13260,35 @@ Page({
     const cx = Number(o.cx);
     const cy = Number(o.cy);
     const maxDist = Number(o.maxDist) || 120;
-    const maxFlowers = o.maxFlowers || 28;
-    const emojis = o.emojis || ['🌹'];
+    const maxFlowers = o.maxFlowers || 40;
+    const flower =
+      o.flower ||
+      flowerReactionTimeline.pickRandomFlower({
+        scaleMin: 0.6,
+        scaleMax: 1.4
+      });
     const seq = o.seq != null ? o.seq : 0;
+    const batch = o.batch != null ? o.batch : 1;
     const rad = Math.random() * Math.PI * 2;
-    const dist = 48 + Math.random() * Math.max(40, maxDist - 48);
+    const distFactor = batch === 1 ? 1 : batch === 2 ? 0.78 : 0.55;
+    const dist =
+      (36 + Math.random() * Math.max(36, maxDist - 36)) * distFactor;
     const dx = Math.cos(rad) * dist;
     const dy = Math.sin(rad) * dist * 0.92;
     const fall = 36 + Math.random() * 90;
-    const rot = -28 + Math.random() * 56;
-    const scale = 0.68 + Math.random() * 0.5;
-    const burstMs = 1.7 + Math.random() * 0.9;
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)] || '🌹';
-    const id = 'ff-' + Date.now() + '-' + seq;
-    const base =
-      'left:' +
-      cx +
-      'px;top:' +
-      cy +
-      'px;';
+    const rot = flower.rotate != null ? flower.rotate : -28 + Math.random() * 56;
+    const scale =
+      flower.scale != null ? flower.scale : 0.6 + Math.random() * 0.8;
+    const burstMs = 1.5 + Math.random() * 0.9;
+    const emoji = flower.emoji || '🌹';
+    const filter = flower.filter || 'none';
+    const id = flower.id || 'ff-' + Date.now() + '-' + seq;
+    const base = 'left:' + cx + 'px;top:' + cy + 'px;filter:' + filter + ';';
     const item = {
       id: id,
       emoji: emoji,
+      type: flower.type || '',
+      color: flower.color || '',
       style:
         base +
         'opacity:0.8;transform:translate(-50%,-50%) translate(0px,0px) rotate(0deg) scale(0.22);transition:none;'
@@ -10370,13 +13309,17 @@ Page({
       fall: fall,
       rot: rot,
       scale: scale,
-      base: base
+      base: base,
+      emoji: emoji
     });
     this.setData({ reactionFlowerItems: items });
 
     const self = this;
-    setTimeout(function () {
-      if (!self.data.reactionScreenVisible || self.data.reactionScreenMode !== 'flower') {
+    this._flowerSchedule(function () {
+      if (
+        !self.data.reactionScreenVisible ||
+        self.data.reactionScreenMode !== 'flower'
+      ) {
         return;
       }
       const list = (self.data.reactionFlowerItems || []).slice();
@@ -10385,6 +13328,8 @@ Page({
           list[i] = {
             id: id,
             emoji: emoji,
+            type: flower.type || '',
+            color: flower.color || '',
             style:
               base +
               'opacity:1;transform:translate(-50%,-50%) translate(' +
@@ -10408,8 +13353,88 @@ Page({
     }, 24);
   },
 
+  _spawnScreenFlowerPetals(opts) {
+    const o = opts || {};
+    const cx = Number(o.cx) || 0;
+    const cy = Number(o.cy) || 0;
+    const petals = flowerReactionTimeline.buildFallingPetals(
+      10 + Math.floor(Math.random() * 9),
+      { mode: this._flowerBouquetMode || 'red_main' }
+    );
+    const items = petals.map(function (p) {
+      return {
+        id: p.id,
+        style:
+          'left:' +
+          cx +
+          'px;top:' +
+          cy +
+          'px;width:' +
+          p.w +
+          'px;height:' +
+          p.h +
+          'px;margin-left:-' +
+          (p.w / 2).toFixed(1) +
+          'px;margin-top:-' +
+          (p.h / 2).toFixed(1) +
+          'px;background:' +
+          p.petalColor +
+          ';opacity:0.9;transform:translate(0,0) rotate(0deg) scale(0.7);transition:none;'
+      };
+    });
+    this.setData({ reactionFlowerPetals: items });
+
+    const self = this;
+    if (!this._flowerPetalAnimTimers) this._flowerPetalAnimTimers = [];
+    for (let i = 0; i < petals.length; i++) {
+      (function (p, idx) {
+        const tid = setTimeout(function () {
+          if (
+            !self.data.reactionScreenVisible ||
+            self.data.reactionScreenMode !== 'flower'
+          ) {
+            return;
+          }
+          const list = (self.data.reactionFlowerPetals || []).slice();
+          if (!list[idx]) return;
+          list[idx] = {
+            id: p.id,
+            style:
+              'left:' +
+              cx +
+              'px;top:' +
+              cy +
+              'px;width:' +
+              p.w +
+              'px;height:' +
+              p.h +
+              'px;margin-left:-' +
+              (p.w / 2).toFixed(1) +
+              'px;margin-top:-' +
+              (p.h / 2).toFixed(1) +
+              'px;background:' +
+              p.petalColor +
+              ';opacity:0;transform:translate(' +
+              p.dx +
+              'px,' +
+              p.dy +
+              'px) rotate(' +
+              p.rot +
+              'deg) scale(0.35);transition:transform ' +
+              (p.fallMs / 1000).toFixed(2) +
+              's cubic-bezier(0.22,0.55,0.3,1), opacity ' +
+              (p.fallMs / 1000).toFixed(2) +
+              's ease;'
+          };
+          self.setData({ reactionFlowerPetals: list });
+        }, 30 + p.delay);
+        self._flowerPetalAnimTimers.push(tid);
+      })(petals[i], i);
+    }
+  },
+
   _finishScreenFlowerRain(opts) {
-    const holdMs = (opts && opts.holdMs) || 2800;
+    const holdMs = (opts && opts.holdMs) || 1600;
     const fadeMs = (opts && opts.fadeMs) || 700;
     const meta = this._flowerScreenSpawnMeta || [];
     const list = (this.data.reactionFlowerItems || []).slice();
@@ -10422,20 +13447,22 @@ Page({
       if (!it) continue;
       const m = map[it.id];
       if (!m) continue;
-      const fallMs = 2.4 + Math.random() * 1.1;
+      const fallMs = 2.2 + Math.random() * 1.1;
       list[j] = {
         id: it.id,
         emoji: it.emoji,
+        type: it.type || '',
+        color: it.color || '',
         style:
           m.base +
-          'opacity:0.92;transform:translate(-50%,-50%) translate(' +
+          'opacity:0.88;transform:translate(-50%,-50%) translate(' +
           m.dx.toFixed(1) +
           'px,' +
           (m.dy + m.fall).toFixed(1) +
           'px) rotate(' +
-          (m.rot + 8).toFixed(1) +
+          (m.rot + 12).toFixed(1) +
           'deg) scale(' +
-          (m.scale * 0.92).toFixed(2) +
+          (m.scale * 0.9).toFixed(2) +
           ');transition:transform ' +
           fallMs.toFixed(2) +
           's cubic-bezier(0.2, 0.55, 0.3, 1), opacity ' +
@@ -10448,10 +13475,12 @@ Page({
     const self = this;
     this._playerActionFlowerDriftTimer = setTimeout(function () {
       self._playerActionFlowerDriftTimer = null;
+      self._dispatchFlowerTimelineEvent({ action: 'flower_fade' });
       self.setData({ reactionScreenFading: true });
       self._playerActionFlowerClearTimer = setTimeout(function () {
         self._playerActionFlowerClearTimer = null;
         self._flowerScreenSpawnMeta = [];
+        self._flowerScreenBundle = null;
         self._dispatchFlowerTimelineEvent({ action: 'cleanup' });
         self.setData({
           reactionScreenVisible: false,
@@ -10459,18 +13488,16 @@ Page({
           reactionScreenMode: '',
           reactionFlowerFlyVisible: false,
           reactionFlowerFlyStyle: '',
-          reactionFlowerItems: []
+          reactionFlowerFlyEmoji: '🌹',
+          reactionFlowerItems: [],
+          reactionFlowerPetals: []
         });
         self._playerActionFlowerBusy = false;
       }, fadeMs);
     }, holdMs);
   },
 
-  /**
-   * Demo：旧头像花环路径（demo 已改第一视角花雨；保留以免外部误调）。
-   * 花朵从中线右侧随机起点柔和飘入 → 轻漂浮旋转 → 到达开放 + 花瓣 + 花环 → 自动清理。
-   */
-  /** Demo：🌹 OBSERVER — 远距离入场 → 落点目标头像（误传 self 则回退屏中花雨） */
+  /** Demo：🌹 OBSERVER — 远距离入场 → 目标头像自然花环（误传 self 则回退屏中花雨） */
   _playPlayerActionFlower(rect, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
     if (this._isSelfReactionTarget(hitPlayerId)) {
@@ -10494,43 +13521,73 @@ Page({
 
     const endX = left + width / 2 + 6;
     const endY = top + height / 2 - 4;
-
     const entry = this._getReactionEntryPoint(rect);
     const startX = entry.x;
     const startY = entry.y;
     const ctrlX = (startX + endX) / 2 + (startX < endX ? 18 : -18);
     const ctrlY = (startY + endY) / 2 - 32;
-    const flyMs = 1400;
+    const flyMs = flowerReactionTimeline.FLOWER_TIMING.observer.flyMs || 1400;
+    // v3：Observer 同样红色主视觉；先定组合模式
+    const bouquetMode =
+      typeof flowerReactionTimeline.pickBouquetMode === 'function'
+        ? flowerReactionTimeline.pickBouquetMode()
+        : 'red_main';
+    this._flowerBouquetMode = bouquetMode;
+    const leadFlower = flowerReactionTimeline.pickRandomFlower({
+      mode: bouquetMode,
+      isLead: true,
+      forceRed: bouquetMode !== 'special',
+      scaleMin: 0.85,
+      scaleMax: 1.2
+    });
 
     const easeInOut = function (t) {
       return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     };
-    const buildFlowerStyle = function (x, y, rot, scale) {
+    const buildFlowerStyle = function (x, y, rot, scale, filter, opacity) {
+      const op = opacity != null ? Number(opacity) : 1;
       return (
         'left:' +
         x +
         'px;top:' +
         y +
-        'px;transform:translate(-50%,-50%) rotate(' +
+        'px;opacity:' +
+        (Number.isFinite(op) ? op : 1) +
+        ';transform:translate(-50%,-50%) rotate(' +
         rot +
         'deg) scale(' +
         scale +
-        ');transition:none;'
+        ');filter:' +
+        (filter || 'none') +
+        ';transition:none;'
       );
     };
 
     this._clearPlayerActionFlowerTimers();
+    // flower_enter：边缘小尺寸起步，飞行中放大（不可跳过）
+    const enterScale = 0.28;
+    const arriveScale = 1.18;
     this.setData({
       playerActionSheetVisible: false,
       playerActionTarget: null,
       playerActionFlowerVisible: true,
       playerActionFlowerBloom: false,
-      playerActionFlowerStyle: buildFlowerStyle(startX, startY, -10, 0.92),
+      playerActionFlowerEmoji: leadFlower.emoji,
+      playerActionFlowerStyle: buildFlowerStyle(
+        startX,
+        startY,
+        leadFlower.rotate - 18,
+        enterScale,
+        leadFlower.filter,
+        0.55
+      ),
       playerActionPetalVisible: false,
       playerActionPetalStyle: '',
+      playerActionPetalItems: [],
       playerActionFlowerScalePlayerId: '',
       playerActionWreathVisible: false,
       playerActionWreathAppear: false,
+      playerActionWreathExpand: false,
       playerActionWreathFading: false,
       playerActionWreathStyle: '',
       playerActionWreathItems: []
@@ -10548,27 +13605,35 @@ Page({
         const t = easeInOut(raw);
         const u = 1 - t;
         const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
-        // 轻微上下漂浮
-        const bob = Math.sin(raw * Math.PI * 2.2) * 10 * (1 - raw * 0.35);
+        const bob = Math.sin(raw * Math.PI * 2.2) * 12 * (1 - raw * 0.35);
         const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY + bob;
-        const rot = -14 + 28 * Math.sin(raw * Math.PI * 1.6);
-        const scale = 0.92 + 0.1 * t;
+        const rot = leadFlower.rotate - 18 + 46 * t + 22 * Math.sin(raw * Math.PI * 1.6);
+        const scale = enterScale + (arriveScale - enterScale) * t;
+        const opacity = 0.55 + 0.45 * t;
         self.setData({
-          playerActionFlowerStyle: buildFlowerStyle(x, y, rot, scale)
+          playerActionFlowerStyle: buildFlowerStyle(
+            x,
+            y,
+            rot,
+            scale,
+            leadFlower.filter,
+            opacity
+          )
         });
         if (raw < 1) {
           self._playerActionFlowerArcTimer = setTimeout(tick, 16);
           return;
         }
         self._playerActionFlowerArcTimer = null;
-        // 真正到达头像：timeline flower_arrive → 播送花音
         self._dispatchFlowerTimelineEvent({
-          action: 'flower_arrive',
+          action: 'flower_hit_avatar'
+        });
+        self._dispatchFlowerTimelineEvent({
+          action: 'flower_bloom',
           sound: 'flower_send',
           volume: 0.92,
           seekMs: 0
         });
-        // 到达后进入花环状态（不立即结束）
         self._playPlayerActionFlowerWreath({
           playerId: hitPlayerId,
           avatarCx: left + width / 2,
@@ -10576,6 +13641,7 @@ Page({
           avatarSize: Math.max(width, height),
           arriveX: endX,
           arriveY: endY,
+          leadFlower: leadFlower,
           buildFlowerStyle: buildFlowerStyle
         });
       };
@@ -10585,8 +13651,7 @@ Page({
   },
 
   /**
-   * Demo：🌹 命中花环 —— 围绕头像中心生成多朵花，缩放出现，停留约 1.5s 后淡出清理。
-   * 不改飞行轨迹 / 起点规则。
+   * Demo：🌹 Observer 自然花环 —— 不规则角度/距离/大小；分批开放 + 花瓣飘落。
    */
   _playPlayerActionFlowerWreath(opts) {
     const o = opts || {};
@@ -10596,10 +13661,13 @@ Page({
     const avatarSize = Number(o.avatarSize);
     const arriveX = Number(o.arriveX);
     const arriveY = Number(o.arriveY);
+    const leadFlower =
+      o.leadFlower ||
+      flowerReactionTimeline.pickRandomFlower({ scaleMin: 0.9, scaleMax: 1.2 });
     const buildFlowerStyle =
       typeof o.buildFlowerStyle === 'function'
         ? o.buildFlowerStyle
-        : function (x, y, rot, scale) {
+        : function (x, y, rot, scale, filter) {
             return (
               'left:' +
               x +
@@ -10609,7 +13677,9 @@ Page({
               rot +
               'deg) scale(' +
               scale +
-              ');transition:none;'
+              ');filter:' +
+              (filter || 'none') +
+              ';transition:none;'
             );
           };
 
@@ -10623,36 +13693,91 @@ Page({
       return;
     }
 
-    const wreathR = Math.max(30, (Number.isFinite(avatarSize) ? avatarSize : 40) / 2 + 16);
-    const emojis = ['🌸', '🌺', '🌸', '💮', '🌸', '🌺', '🌸', '💮'];
-    const items = [];
-    for (let i = 0; i < 8; i++) {
-      const deg = i * 45;
-      items.push({
-        id: 'wreath-' + i,
-        emoji: emojis[i],
-        delay: (i * 0.035).toFixed(3) + 's',
+    const obsTiming = flowerReactionTimeline.FLOWER_TIMING.observer || {};
+    // size-adjust-v3：主花放大约 1.5–2×，花环贴近头像边缘（中心不遮挡）
+    const edgePad = obsTiming.wreathEdgePad != null ? obsTiming.wreathEdgePad : 14;
+    const wreathR = Math.max(
+      28,
+      (Number.isFinite(avatarSize) ? avatarSize : 40) / 2 + edgePad
+    );
+    const wreathCountMin = obsTiming.wreathCountMin != null ? obsTiming.wreathCountMin : 6;
+    const wreathCountMax = obsTiming.wreathCountMax != null ? obsTiming.wreathCountMax : 10;
+    const wreathCount =
+      wreathCountMin +
+      Math.floor(Math.random() * (wreathCountMax - wreathCountMin + 1));
+    const scaleMin =
+      obsTiming.flowerScaleMin != null ? obsTiming.flowerScaleMin : 1.05;
+    const scaleMax =
+      obsTiming.flowerScaleMax != null ? obsTiming.flowerScaleMax : 1.45;
+    const fontBase =
+      obsTiming.flowerFontBase != null ? obsTiming.flowerFontBase : 30;
+    const rawItems = flowerReactionTimeline.buildNaturalWreathItems({
+      baseR: wreathR,
+      count: wreathCount,
+      countMin: wreathCountMin,
+      countMax: wreathCountMax,
+      scaleMin: scaleMin,
+      scaleMax: scaleMax,
+      radiusJitterMin: 0.96,
+      radiusJitterMax: 1.06,
+      mode: this._flowerBouquetMode || 'red_main'
+    });
+    const items = rawItems.map(function (it) {
+      // 相对 balance-v2 的 ~16px 基准放大约 1.5–2×
+      const fontSize =
+        Math.max(24, Math.round(fontBase * (it.scale || 1))) + 'px';
+      const box = Math.max(36, Math.round(38 * (it.scale || 1)));
+      const half = (box / 2).toFixed(1);
+      return {
+        id: it.id,
+        emoji: it.emoji,
+        type: it.type,
+        color: it.color,
+        scale: it.scale,
+        rotate: it.rotate,
+        filter: it.filter,
+        delay: it.delay,
+        batch: it.batch,
+        fontSize: fontSize,
         style:
-          'transform:rotate(' +
-          deg +
+          'width:' +
+          box +
+          'px;height:' +
+          box +
+          'px;margin:-' +
+          half +
+          'px 0 0 -' +
+          half +
+          'px;transform:rotate(' +
+          it.deg +
           'deg) translateY(-' +
-          wreathR +
-          'px) rotate(-' +
-          deg +
+          it.radius +
+          'px) rotate(' +
+          (-it.deg + (it.rotate || 0)) +
           'deg);'
-      });
-    }
+      };
+    });
 
-    // 先短暂绽放到达花，再切到花环；无全局 glow，仅目标头像轻缩放
     this.setData({
       playerActionFlowerBloom: true,
-      playerActionFlowerStyle: buildFlowerStyle(arriveX, arriveY, 0, 1.18),
-      playerActionPetalVisible: true,
-      playerActionPetalStyle: 'left:' + avatarCx + 'px;top:' + avatarCy + 'px;',
+      playerActionFlowerEmoji: leadFlower.emoji,
+      playerActionFlowerStyle: buildFlowerStyle(
+        arriveX,
+        arriveY,
+        leadFlower.rotate || 0,
+        1.05,
+        leadFlower.filter
+      ),
       playerActionFlowerScalePlayerId: hitPlayerId
     });
 
     const self = this;
+    const ringExpandMs = obsTiming.ringExpandMs != null ? obsTiming.ringExpandMs : 360;
+    const petalsAtMs = obsTiming.petalsAtMs != null ? obsTiming.petalsAtMs : 900;
+    const fadeAtMs = obsTiming.fadeAtMs != null ? obsTiming.fadeAtMs : 1800;
+    const cleanupAfterFadeMs =
+      obsTiming.cleanupAfterFadeMs != null ? obsTiming.cleanupAfterFadeMs : 420;
+
     this._playerActionFlowerBloomTimer = setTimeout(function () {
       self._playerActionFlowerBloomTimer = null;
       self.setData({
@@ -10661,24 +13786,43 @@ Page({
         playerActionFlowerStyle: '',
         playerActionWreathVisible: true,
         playerActionWreathAppear: false,
+        playerActionWreathExpand: false,
         playerActionWreathFading: false,
         playerActionWreathStyle: 'left:' + avatarCx + 'px;top:' + avatarCy + 'px;',
-        playerActionWreathItems: items
+        playerActionWreathItems: items,
+        playerActionPetalVisible: false,
+        playerActionPetalItems: []
       });
-      // 下一帧触发花环缩放出现
       self._playerActionFlowerWreathTimer = setTimeout(function () {
         self._playerActionFlowerWreathTimer = null;
         self.setData({ playerActionWreathAppear: true });
       }, 30);
-    }, 260);
+    }, 220);
 
-    // 花环保持约 1.5s 后淡出清理
+    // flower_ring：轻量第二批（数量已少，仅轻微展开感）
+    this._playerActionFlowerExpandTimer = setTimeout(function () {
+      self._playerActionFlowerExpandTimer = null;
+      self._dispatchFlowerTimelineEvent({ action: 'flower_ring' });
+      self._dispatchFlowerTimelineEvent({ action: 'flower_ring_expand' });
+      self.setData({ playerActionWreathExpand: true });
+    }, 220 + ringExpandMs);
+
+    // flower_petal：少量缓慢飘落
+    this._playerActionFlowerPetalTimer = setTimeout(function () {
+      self._playerActionFlowerPetalTimer = null;
+      self._dispatchFlowerTimelineEvent({ action: 'flower_petals_fall' });
+      self._playObserverFlowerPetals(avatarCx, avatarCy);
+    }, 220 + petalsAtMs);
+
+    // 环绕停留约 1.5–2s → 淡出
     this._playerActionFlowerFadeTimer = setTimeout(function () {
       self._playerActionFlowerFadeTimer = null;
+      self._dispatchFlowerTimelineEvent({ action: 'flower_fade' });
       self.setData({
         playerActionWreathFading: true,
         playerActionPetalVisible: false,
-        playerActionPetalStyle: ''
+        playerActionPetalStyle: '',
+        playerActionPetalItems: []
       });
       self._playerActionFlowerClearTimer = setTimeout(function () {
         self._playerActionFlowerClearTimer = null;
@@ -10686,14 +13830,89 @@ Page({
         self.setData({
           playerActionWreathVisible: false,
           playerActionWreathAppear: false,
+          playerActionWreathExpand: false,
           playerActionWreathFading: false,
           playerActionWreathStyle: '',
           playerActionWreathItems: [],
+          playerActionFlowerEmoji: '🌹',
           playerActionFlowerScalePlayerId: ''
         });
         self._playerActionFlowerBusy = false;
-      }, 420);
-    }, 260 + 30 + 1500);
+      }, cleanupAfterFadeMs);
+    }, 220 + fadeAtMs);
+  },
+
+  /** Demo：Observer 结束阶段少量花瓣缓慢飘落（3–8） */
+  _playObserverFlowerPetals(cx, cy) {
+    const obsTiming = flowerReactionTimeline.FLOWER_TIMING.observer || {};
+    const pMin = obsTiming.petalCountMin != null ? obsTiming.petalCountMin : 3;
+    const pMax = obsTiming.petalCountMax != null ? obsTiming.petalCountMax : 8;
+    const petalCount = pMin + Math.floor(Math.random() * (pMax - pMin + 1));
+    const petals = flowerReactionTimeline.buildFallingPetals(petalCount, {
+      mode: this._flowerBouquetMode || 'red_main',
+      slow: true
+    });
+    const items = petals.map(function (p) {
+      return {
+        id: p.id,
+        style:
+          'left:0;top:0;width:' +
+          p.w +
+          'px;height:' +
+          p.h +
+          'px;margin-left:-' +
+          (p.w / 2).toFixed(1) +
+          'px;margin-top:-' +
+          (p.h / 2).toFixed(1) +
+          'px;background:' +
+          p.petalColor +
+          ';opacity:0.92;transform:translate(0,0) rotate(0deg) scale(0.75);transition:none;'
+      };
+    });
+    this.setData({
+      playerActionPetalVisible: true,
+      playerActionPetalStyle: 'left:' + cx + 'px;top:' + cy + 'px;',
+      playerActionPetalItems: items
+    });
+
+    const self = this;
+    if (!this._flowerPetalAnimTimers) this._flowerPetalAnimTimers = [];
+    for (let i = 0; i < petals.length; i++) {
+      (function (p, idx) {
+        const tid = setTimeout(function () {
+          if (!self.data.playerActionPetalVisible) return;
+          const list = (self.data.playerActionPetalItems || []).slice();
+          if (!list[idx]) return;
+          list[idx] = {
+            id: p.id,
+            style:
+              'left:0;top:0;width:' +
+              p.w +
+              'px;height:' +
+              p.h +
+              'px;margin-left:-' +
+              (p.w / 2).toFixed(1) +
+              'px;margin-top:-' +
+              (p.h / 2).toFixed(1) +
+              'px;background:' +
+              p.petalColor +
+              ';opacity:0;transform:translate(' +
+              p.dx +
+              'px,' +
+              p.dy +
+              'px) rotate(' +
+              p.rot +
+              'deg) scale(0.3);transition:transform ' +
+              (p.fallMs / 1000).toFixed(2) +
+              's cubic-bezier(0.22,0.55,0.3,1), opacity ' +
+              (p.fallMs / 1000).toFixed(2) +
+              's ease;'
+          };
+          self.setData({ playerActionPetalItems: list });
+        }, 30 + p.delay);
+        self._flowerPetalAnimTimers.push(tid);
+      })(petals[i], i);
+    }
   },
 
   _isMatchPlayIdentityFixedCollapseMode() {

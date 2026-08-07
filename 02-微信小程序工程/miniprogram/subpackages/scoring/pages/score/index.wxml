@@ -589,7 +589,7 @@
                   >
                     <!-- hit-wrap：震动/汁水仅视觉，不改 avatar src，不参与布局位移 -->
                     <view
-                      class="avatar-group__hit-wrap {{playerActionHitPlayerId == m.playerId ? 'is-tomato-shake' : ''}} {{playerActionFlowerScalePlayerId == m.playerId ? 'is-flower-pulse' : ''}}"
+                      class="avatar-group__hit-wrap {{playerActionFlowerScalePlayerId == m.playerId ? 'is-flower-pulse' : ''}}"
                     >
                       <image
                         id="fb-player-avatar-{{m.playerId || m.id}}"
@@ -1920,33 +1920,83 @@
         >进入主页</view>
       </view>
       <view class="player-action-modal__actions">
-        <view class="player-action-modal__item" catchtap="onPlayerActionFlowerTap">🌹</view>
-        <view class="player-action-modal__item" catchtap="onPlayerActionBucketTap">🪣</view>
-        <view class="player-action-modal__item" catchtap="onPlayerActionTomatoTap">🍅</view>
-        <view class="player-action-modal__item" catchtap="onPlayerActionEggTap">🥚</view>
-        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🍺</view>
-        <view class="player-action-modal__item player-action-modal__item--placeholder" catchtap="onPlayerActionPlaceholderTap">🚀</view>
-        <view class="player-action-modal__item" catchtap="onPlayerActionBoxingTap">👊</view>
-        <view class="player-action-modal__item" catchtap="onPlayerActionKissTap">👄</view>
+        <!-- reaction-panel-coin-display-v1：配置数组驱动 icon + cost（不扣金币） -->
+        <view
+          wx:for="{{playerActionReactions}}"
+          wx:key="key"
+          class="player-action-modal__item"
+          data-key="{{item.key}}"
+          catchtap="onPlayerActionReactionItemTap"
+        >
+          <text class="player-action-modal__item-icon">{{item.icon}}</text>
+          <view class="player-action-modal__item-cost">
+            <text class="player-action-modal__item-coin">🪙</text>
+            <text class="player-action-modal__item-cost-num">×{{item.cost}}</text>
+          </view>
+        </view>
       </view>
     </view>
   </view>
 
-  <!-- Demo：reaction-screen-layer（tomato / flower / egg / boxing / kiss） -->
+  <!-- Demo：reaction-screen-layer（tomato / flower / egg / boxing / kiss / beer / rocket） -->
   <view
     wx:if="{{reactionScreenVisible}}"
     class="reaction-screen-layer {{reactionScreenFading ? 'is-fading' : ''}}"
   >
     <block wx:if="{{reactionScreenMode === 'tomato'}}">
+      <!-- Self：中央临时头像（拳击尺寸）+ cartoon tomato face（不改真实头像） -->
+      <view
+        wx:if="{{reactionTomatoAnchorMode === 'self' && reactionTomatoSelfAvatarVisible}}"
+        class="tomato-self-avatar-layer phase-{{reactionTomatoSelfAvatarPhase}} {{reactionTomatoSelfShake ? 'is-shake' : ''}} {{reactionTomatoSelfDripHold ? 'is-drip-hold' : ''}}"
+        style="{{reactionTomatoSelfAvatarStyle}}"
+      >
+        <view class="tomato-self-avatar-layer__avatar">
+          <image
+            wx:if="{{reactionTomatoSelfAvatarUrl}}"
+            class="tomato-self-avatar-layer__img"
+            src="{{reactionTomatoSelfAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view wx:else class="tomato-self-avatar-layer__fallback">🍅</view>
+        </view>
+
+        <view
+          wx:if="{{reactionTomatoSelfFaceVisible}}"
+          class="cartoon-tomato-face {{reactionTomatoSelfDripHold ? 'is-dripping' : ''}}"
+        >
+          <view class="cartoon-tomato-face__juice-cover"></view>
+          <view class="cartoon-tomato-face__crown"></view>
+          <view class="cartoon-tomato-face__run run-left"></view>
+          <view class="cartoon-tomato-face__run run-mid"></view>
+          <view class="cartoon-tomato-face__run run-right"></view>
+          <view class="cartoon-tomato-face__eye-cut eye-l"></view>
+          <view class="cartoon-tomato-face__eye-cut eye-r"></view>
+          <view class="cartoon-tomato-face__eye eye-l"></view>
+          <view class="cartoon-tomato-face__eye eye-r"></view>
+          <view class="cartoon-tomato-face__brow brow-l"></view>
+          <view class="cartoon-tomato-face__brow brow-r"></view>
+          <view class="cartoon-tomato-face__mouth"></view>
+          <view class="cartoon-tomato-face__seed sd0"></view>
+          <view class="cartoon-tomato-face__seed sd1"></view>
+          <view class="cartoon-tomato-face__seed sd2"></view>
+          <view class="cartoon-tomato-face__drop d0"></view>
+          <view class="cartoon-tomato-face__drop d1"></view>
+          <view class="cartoon-tomato-face__drop d2"></view>
+          <view class="cartoon-tomato-face__drop d3"></view>
+          <view class="cartoon-tomato-face__drop d4"></view>
+          <view class="cartoon-tomato-face__drop d5"></view>
+        </view>
+      </view>
+
       <view
         wx:if="{{reactionTomatoFlyVisible}}"
-        class="tomato-fly"
+        class="tomato-fly {{reactionTomatoAnchorMode === 'self' ? 'is-self' : ''}}"
         style="{{reactionTomatoFlyStyle}}"
       >🍅</view>
 
       <view
         wx:if="{{reactionTomatoSplashVisible}}"
-        class="tomato-hit tomato-hit--{{reactionTomatoImpactPhase}} {{reactionTomatoAnchorMode === 'avatar' ? 'is-avatar-anchor' : ''}}"
+        class="tomato-hit tomato-hit--{{reactionTomatoImpactPhase}} {{reactionTomatoAnchorMode === 'avatar' ? 'is-avatar-anchor' : ''}} {{reactionTomatoAnchorMode === 'self' ? 'is-self-anchor' : ''}}"
         style="{{reactionTomatoHitStyle}}"
       >
         <view class="tomato-hit__shockwave"></view>
@@ -1964,46 +2014,86 @@
         <view class="tomato-hit__pulp p5"></view>
       </view>
 
-      <view
-        wx:if="{{reactionTomatoAnchorMode !== 'avatar'}}"
-        class="tomato-smear {{reactionTomatoJuiceActive ? 'is-active' : ''}}"
-      >
-        <view class="tomato-smear__impact"></view>
-        <view class="tomato-smear__hang"></view>
-        <view class="tomato-smear__run run-left"></view>
-        <view class="tomato-smear__run run-mid"></view>
-        <view class="tomato-smear__run run-right"></view>
-        <view class="tomato-smear__streak s0"></view>
-        <view class="tomato-smear__streak s1"></view>
-        <view class="tomato-smear__streak s2"></view>
-      </view>
-
-      <view
-        wx:if="{{reactionTomatoAnchorMode !== 'avatar'}}"
-        class="tomato-drip {{reactionTomatoDripActive ? 'is-active' : ''}}"
-      >
-        <view class="tomato-drip__drop d0"></view>
-        <view class="tomato-drip__drop d1"></view>
-        <view class="tomato-drip__drop d2"></view>
-        <view class="tomato-drip__drop d3"></view>
-      </view>
     </block>
 
-    <!-- 🪣 第一视角全屏覆水 -->
+    <!-- 🪣 Self：中央临时头像 + 桶口水流 + 湿 overlay（不改真实头像；与 Observer 分离） -->
     <view
       wx:if="{{reactionScreenMode === 'bucket'}}"
-      class="bucket-screen-reaction {{reactionBucketScreenPouring ? 'is-pouring' : ''}}"
+      class="bucket-self-reaction"
     >
-      <view class="bucket-screen-reaction__sheet s0"></view>
-      <view class="bucket-screen-reaction__sheet s1"></view>
-      <view class="bucket-screen-reaction__sheet s2"></view>
-      <view class="bucket-screen-reaction__cascade c0"></view>
-      <view class="bucket-screen-reaction__cascade c1"></view>
-      <view class="bucket-screen-reaction__cascade c2"></view>
-      <view class="bucket-screen-reaction__pool"></view>
+      <view
+        wx:if="{{reactionBucketSelfAvatarVisible}}"
+        class="bucket-self-avatar-layer phase-{{reactionBucketSelfAvatarPhase}} {{reactionBucketSelfWetVisible ? 'is-wet' : ''}} {{reactionBucketSelfDripHold ? 'is-drip-hold' : ''}}"
+        style="{{reactionBucketSelfAvatarStyle}}"
+      >
+        <view class="bucket-self-avatar-layer__avatar">
+          <image
+            wx:if="{{reactionBucketSelfAvatarUrl}}"
+            class="bucket-self-avatar-layer__img"
+            src="{{reactionBucketSelfAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view wx:else class="bucket-self-avatar-layer__fallback">🪣</view>
+        </view>
+
+        <!-- wet-avatar-overlay：水覆 / 变深 / 水光 / 边缘水滴（不改真实头像） -->
+        <view wx:if="{{reactionBucketSelfWetVisible}}" class="wet-avatar-overlay">
+          <view class="wet-avatar-overlay__tint"></view>
+          <view class="wet-avatar-overlay__sheen"></view>
+          <view class="wet-avatar-overlay__sheet"></view>
+          <view class="wet-avatar-overlay__edge e0"></view>
+          <view class="wet-avatar-overlay__edge e1"></view>
+          <view class="wet-avatar-overlay__edge e2"></view>
+          <view class="wet-avatar-overlay__edge e3"></view>
+          <view class="wet-avatar-overlay__drop d0"></view>
+          <view class="wet-avatar-overlay__drop d1"></view>
+          <view class="wet-avatar-overlay__drop d2"></view>
+          <view class="wet-avatar-overlay__drop d3"></view>
+          <view class="wet-avatar-overlay__drop d4"></view>
+        </view>
+
+        <!-- cartoon-wet-face：卡通湿漉漉（贴发 / 水滴 / 表情） -->
+        <view wx:if="{{reactionBucketSelfCartoonWet}}" class="cartoon-wet-face">
+          <view class="cartoon-wet-face__hair">
+            <view class="cartoon-wet-face__strand s0"></view>
+            <view class="cartoon-wet-face__strand s1"></view>
+            <view class="cartoon-wet-face__strand s2"></view>
+            <view class="cartoon-wet-face__strand s3"></view>
+            <view class="cartoon-wet-face__strand s4"></view>
+            <view class="cartoon-wet-face__strand s5"></view>
+          </view>
+          <view class="cartoon-wet-face__eye eye-l"></view>
+          <view class="cartoon-wet-face__eye eye-r"></view>
+          <view class="cartoon-wet-face__mouth"></view>
+          <view class="cartoon-wet-face__drip dr0"></view>
+          <view class="cartoon-wet-face__drip dr1"></view>
+          <view class="cartoon-wet-face__drip dr2"></view>
+        </view>
+      </view>
+
+      <!-- self bucket water stream：起点 = bucket mouth -->
+      <view
+        wx:if="{{reactionBucketSelfStreamVisible}}"
+        class="bucket-self-water-stream {{reactionBucketSelfDripHold ? 'is-drip' : 'is-pour'}}"
+        style="{{reactionBucketSelfStreamStyle}}"
+      >
+        <view class="bucket-self-water-stream__col c0"></view>
+        <view class="bucket-self-water-stream__col c1"></view>
+        <view class="bucket-self-water-stream__col c2"></view>
+        <view class="bucket-self-water-stream__splash"></view>
+      </view>
+
+      <view
+        wx:if="{{reactionBucketSelfBucketVisible}}"
+        class="bucket-self-bucket {{reactionBucketSelfBucketDropping ? 'is-dropping' : ''}} {{reactionBucketSelfBucketPouring ? 'is-pouring' : ''}}"
+        style="{{reactionBucketSelfBucketStyle}}"
+      >
+        <text class="bucket-self-bucket__icon">🪣</text>
+        <view class="bucket-self-bucket__mouth"></view>
+      </view>
     </view>
 
-    <!-- 🌹 第一视角花雨：远处飞入 → 中心开放 → 持续生成 → 飘落 -->
+    <!-- 🌹 第一视角花雨：随机花束飞入 → 中心开放 → 多批冒出 → 花瓣飘落 -->
     <view
       wx:if="{{reactionScreenMode === 'flower'}}"
       class="flower-screen-reaction"
@@ -2012,63 +2102,96 @@
         wx:if="{{reactionFlowerFlyVisible}}"
         class="flower-screen-reaction__fly"
         style="{{reactionFlowerFlyStyle}}"
-      >🌹</view>
+      >{{reactionFlowerFlyEmoji}}</view>
       <view
         wx:for="{{reactionFlowerItems}}"
         wx:key="id"
         class="flower-screen-reaction__bloom"
         style="{{item.style}}"
       >{{item.emoji}}</view>
+      <view
+        wx:for="{{reactionFlowerPetals}}"
+        wx:key="id"
+        class="flower-screen-reaction__petal"
+        style="{{item.style}}"
+      ></view>
     </view>
 
-    <!-- 🥚 第一视角连击砸屏：5 普攻 + 1 终结（不改头像鸡蛋层） -->
+    <!-- 🥚 Self：中央临时头像连击 + cartoon egg face（固定方向；不改真实头像 / 与 Observer 分离） -->
     <view
       wx:if="{{reactionScreenMode === 'egg'}}"
-      class="egg-screen-reaction {{reactionEggShake ? 'is-shake' : ''}} {{reactionEggFinaleActive ? 'is-finale' : ''}}"
+      class="egg-self-reaction {{reactionEggShake ? 'is-shake' : ''}} dir-{{reactionEggSelfDirection}}"
     >
+      <view
+        wx:if="{{reactionEggSelfAvatarVisible}}"
+        class="egg-self-avatar-layer phase-{{reactionEggSelfAvatarPhase}} {{reactionEggShake ? 'is-shake' : ''}} {{reactionEggSelfDripHold ? 'is-drip-hold' : ''}}"
+        style="{{reactionEggSelfAvatarStyle}}"
+      >
+        <view class="egg-self-avatar-layer__avatar">
+          <image
+            wx:if="{{reactionEggSelfAvatarUrl}}"
+            class="egg-self-avatar-layer__img"
+            src="{{reactionEggSelfAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view wx:else class="egg-self-avatar-layer__fallback">🥚</view>
+        </view>
+
+        <!-- 连击累积覆盖（不重置） -->
+        <view class="egg-self-cover level-{{reactionEggHitLevel}}">
+          <view class="egg-self-cover__blot b0"></view>
+          <view class="egg-self-cover__blot b1"></view>
+          <view class="egg-self-cover__blot b2"></view>
+          <view class="egg-self-cover__blot b3"></view>
+          <view class="egg-self-cover__blot b4"></view>
+          <view class="egg-self-cover__blot b5"></view>
+        </view>
+
+        <!-- cartoon egg face：蛋清 + 蛋黄 + 碎壳（眼区可见） -->
+        <view
+          wx:if="{{reactionEggSelfFaceVisible}}"
+          class="cartoon-egg-face {{reactionEggSelfDripHold ? 'is-dripping' : ''}}"
+        >
+          <view class="cartoon-egg-face__white egg-white-overlay"></view>
+          <view class="cartoon-egg-face__yolk egg-yolk-overlay y0"></view>
+          <view class="cartoon-egg-face__yolk egg-yolk-overlay y1"></view>
+          <view class="cartoon-egg-face__run run-left"></view>
+          <view class="cartoon-egg-face__run run-mid"></view>
+          <view class="cartoon-egg-face__run run-right"></view>
+          <view class="cartoon-egg-face__eye-cut eye-l"></view>
+          <view class="cartoon-egg-face__eye-cut eye-r"></view>
+          <view class="cartoon-egg-face__eye eye-l"></view>
+          <view class="cartoon-egg-face__eye eye-r"></view>
+          <view class="cartoon-egg-face__shell sh0"></view>
+          <view class="cartoon-egg-face__shell sh1"></view>
+          <view class="cartoon-egg-face__shell sh2"></view>
+          <view class="cartoon-egg-face__shell sh3"></view>
+          <view class="cartoon-egg-face__shell sh4"></view>
+          <view class="cartoon-egg-face__drop d0"></view>
+          <view class="cartoon-egg-face__drop d1"></view>
+          <view class="cartoon-egg-face__drop d2"></view>
+          <view class="cartoon-egg-face__drop d3"></view>
+        </view>
+      </view>
+
       <view
         wx:for="{{reactionEggFlies}}"
         wx:key="id"
-        class="egg-screen-reaction__fly {{item.finale ? 'is-finale' : ''}}"
+        class="egg-self-reaction__fly {{item.finale ? 'is-finale' : ''}}"
         style="{{item.style}}"
       >🥚</view>
 
-      <!-- 普通连击：渐进小面积蛋液残留（level 1–5，不全屏覆盖） -->
-      <view class="egg-screen-reaction__smear level-{{reactionEggHitLevel}}">
-        <view class="egg-screen-reaction__blot b0"></view>
-        <view class="egg-screen-reaction__blot b1"></view>
-        <view class="egg-screen-reaction__blot b2"></view>
-        <view class="egg-screen-reaction__blot b3"></view>
-        <view class="egg-screen-reaction__blot b4"></view>
-      </view>
-
-      <!-- 命中瞬间：小/大蛋壳碎片 -->
       <view
         wx:if="{{reactionEggBurstVisible}}"
-        class="egg-screen-reaction__burst {{reactionEggBurstFinale ? 'is-finale' : ''}}"
+        class="egg-self-reaction__burst {{reactionEggBurstFinale ? 'is-finale' : ''}}"
         style="{{reactionEggBurstStyle}}"
       >
-        <view class="egg-screen-reaction__shard s0"></view>
-        <view class="egg-screen-reaction__shard s1"></view>
-        <view class="egg-screen-reaction__shard s2"></view>
-        <view class="egg-screen-reaction__shard s3"></view>
-        <view class="egg-screen-reaction__shard s4"></view>
-        <view class="egg-screen-reaction__yolk-pop"></view>
-      </view>
-
-      <!-- 终结：大范围蛋黄爆裂 + 蛋清流淌 -->
-      <view
-        wx:if="{{reactionEggFinaleActive}}"
-        class="egg-screen-reaction__finale"
-      >
-        <view class="egg-screen-reaction__finale-yolk"></view>
-        <view class="egg-screen-reaction__finale-white w0"></view>
-        <view class="egg-screen-reaction__finale-white w1"></view>
-        <view class="egg-screen-reaction__finale-white w2"></view>
-        <view class="egg-screen-reaction__finale-drip d0"></view>
-        <view class="egg-screen-reaction__finale-drip d1"></view>
-        <view class="egg-screen-reaction__finale-drip d2"></view>
-        <view class="egg-screen-reaction__finale-drip d3"></view>
+        <view class="egg-self-reaction__shard s0"></view>
+        <view class="egg-self-reaction__shard s1"></view>
+        <view class="egg-self-reaction__shard s2"></view>
+        <view class="egg-self-reaction__shard s3"></view>
+        <view class="egg-self-reaction__shard s4"></view>
+        <view class="egg-self-reaction__yolk-pop"></view>
       </view>
     </view>
 
@@ -2155,181 +2278,342 @@
       </view>
     </view>
 
-    <!-- 👄 亲吻：self 近镜头 / observer 锚定头像 kiss-target-layer -->
+    <!-- 👄 亲吻：目标头像中央舞台（reaction-view-model-v2） -->
     <view
       wx:if="{{reactionScreenMode === 'kiss'}}"
-      class="kiss-screen-reaction {{reactionKissIsSelf ? 'is-self' : 'is-observer'}}"
+      class="kiss-screen-reaction {{reactionKissIsSelf ? 'is-self' : 'is-observer'}} {{reactionKissSelfHeartsFading ? 'is-hearts-fading' : ''}}"
     >
-      <!-- 飞行嘴唇（self 全程；observer 仅飞入阶段） -->
+      <!-- Self：临时层 — normal=原头像 / kissShy=独立卡通害羞脸整图（不改真实头像） -->
+      <view
+        wx:if="{{reactionKissIsSelf && reactionKissSelfAvatarVisible}}"
+        class="kiss-self-avatar-layer phase-{{reactionKissSelfAvatarPhase}} mode-{{reactionAvatarMode}}"
+        style="{{reactionKissSelfAvatarStyle}}"
+      >
+        <view class="kiss-self-avatar-layer__avatar">
+          <!-- before kiss：用户头像副本 -->
+          <image
+            wx:if="{{reactionAvatarMode !== 'kissShy' && reactionKissSelfAvatarUrl}}"
+            class="kiss-self-avatar-layer__img avatar-image"
+            src="{{reactionKissSelfAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view
+            wx:elif="{{reactionAvatarMode !== 'kissShy'}}"
+            class="kiss-self-avatar-layer__fallback avatar-image"
+          >👄</view>
+
+          <!-- after kiss：独立卡通害羞脸（完整圆形资源，非透明五官 overlay） -->
+          <image
+            wx:if="{{reactionAvatarMode === 'kissShy'}}"
+            class="kiss-self-avatar-layer__img kiss-shy-face-image"
+            src="{{kissShyFaceSrc}}"
+            mode="aspectFill"
+          />
+        </view>
+        <block wx:for="{{reactionKissHearts}}" wx:key="id">
+          <view
+            wx:if="{{item.attached}}"
+            class="kiss-self-avatar-layer__heart {{item.pop ? 'is-pop' : ''}}"
+            style="{{item.style}}"
+          >❤️</view>
+        </block>
+      </view>
+
+      <!-- 飞行嘴唇：Self=纯嘟嘴 kiss_lips.png；Observer 飞入阶段仍用 emoji -->
       <view
         wx:if="{{reactionKissLipsVisible}}"
-        class="kiss-screen-reaction__lips phase-{{reactionKissLipsPhase}}"
+        class="kiss-screen-reaction__lips phase-{{reactionKissLipsPhase}} {{reactionKissIsSelf ? 'is-asset' : ''}}"
         style="{{reactionKissLipsStyle}}"
-      >👄</view>
-      <!-- Self 红心 -->
+      >
+        <image
+          wx:if="{{reactionKissIsSelf}}"
+          class="kiss-lips-image"
+          src="{{kissLipsSrc}}"
+          mode="aspectFit"
+        />
+        <text wx:else class="kiss-lips-emoji">👄</text>
+      </view>
+
+      <!-- Self 回座后：屏幕层红心继续漂浮再淡出 -->
       <block wx:if="{{reactionKissIsSelf}}">
-        <view
-          wx:for="{{reactionKissHearts}}"
-          wx:key="id"
-          class="kiss-screen-reaction__heart {{item.pop ? 'is-pop' : ''}}"
-          style="{{item.style}}"
-        >❤️</view>
+        <block wx:for="{{reactionKissHearts}}" wx:key="id">
+          <view
+            wx:if="{{!item.attached}}"
+            class="kiss-screen-reaction__heart {{item.pop ? 'is-pop' : ''}}"
+            style="{{item.style}}"
+          >❤️</view>
+        </block>
       </block>
 
-      <!-- Observer：锚定目标头像中心（嘴唇中心 = 头像中心） -->
+    </view>
+
+    <!-- 🍺 干杯：Self 双杯碰杯 / Observer 主杯+左右侧杯 -->
+    <view
+      wx:if="{{reactionScreenMode === 'beer'}}"
+      class="beer-screen-reaction {{reactionBeerShaking ? 'is-shake' : ''}} {{reactionBeerIsSelf ? 'is-self' : ''}}"
+    >
       <view
-        wx:if="{{reactionKissTargetVisible}}"
-        class="kiss-target-layer"
-        style="{{reactionKissTargetStyle}}"
+        wx:if="{{reactionBeerMainVisible}}"
+        class="beer-main phase-{{reactionBeerMainPhase}} {{reactionBeerIsSelf ? 'is-self' : ''}}"
+        style="{{reactionBeerMainStyle}}"
       >
+        <text class="beer-cup__emoji">🍺</text>
+        <view class="beer-cup__liquid"></view>
+        <view class="beer-cup__bubbles">
+          <view
+            wx:for="{{reactionBeerBubbles}}"
+            wx:key="id"
+            class="beer-bubble"
+            style="{{item.style}}"
+          ></view>
+        </view>
+      </view>
+
+      <view
+        wx:if="{{!reactionBeerIsSelf && reactionBeerLeftVisible}}"
+        class="beer-left phase-{{reactionBeerLeftPhase}}"
+        style="{{reactionBeerLeftStyle}}"
+      >
+        <text class="beer-cup__emoji">🍺</text>
+        <view class="beer-cup__liquid"></view>
+      </view>
+
+      <!-- Self 第二杯复用 beer-right；Observer 仍为右侧杯 -->
+      <view
+        wx:if="{{reactionBeerRightVisible}}"
+        class="beer-right phase-{{reactionBeerRightPhase}} {{reactionBeerIsSelf ? 'is-self beer-self-second' : ''}}"
+        style="{{reactionBeerRightStyle}}"
+      >
+        <text class="beer-cup__emoji">🍺</text>
+        <view class="beer-cup__liquid"></view>
+      </view>
+
+      <view
+        wx:if="{{reactionBeerFlashVisible}}"
+        class="beer-clash-flash {{reactionBeerIsSelf ? 'is-self' : ''}}"
+        style="{{reactionBeerFlashStyle}}"
+      ></view>
+
+      <view
+        wx:if="{{reactionBeerSplashVisible}}"
+        class="beer-splash {{reactionBeerIsSelf ? 'is-self' : ''}}"
+        style="{{reactionBeerSplashStyle}}"
+      >
+        <view class="beer-splash__arc a0"></view>
+        <view class="beer-splash__arc a1"></view>
+        <view class="beer-splash__arc a2"></view>
+        <view class="beer-splash__arc a3"></view>
+        <view class="beer-splash__arc a4"></view>
+        <view class="beer-splash__arc a5"></view>
+        <view class="beer-splash__arc a6"></view>
+        <view class="beer-splash__arc a7"></view>
+        <block wx:if="{{reactionBeerIsSelf}}">
+          <view class="beer-splash__arc a8"></view>
+          <view class="beer-splash__arc a9"></view>
+          <view class="beer-splash__arc a10"></view>
+          <view class="beer-splash__arc a11"></view>
+          <view class="beer-splash__lip l0"></view>
+          <view class="beer-splash__lip l1"></view>
+          <view class="beer-splash__lip l2"></view>
+          <view class="beer-splash__lip l3"></view>
+          <view class="beer-splash__lip l4"></view>
+          <view class="beer-splash__lip l5"></view>
+          <view class="beer-splash__stream s0"></view>
+          <view class="beer-splash__stream s1"></view>
+          <view class="beer-splash__stream s2"></view>
+          <view class="beer-splash__overflow o0"></view>
+          <view class="beer-splash__overflow o1"></view>
+        </block>
+        <view class="beer-splash__foam f0"></view>
+        <view class="beer-splash__foam f1"></view>
+        <view class="beer-splash__foam f2"></view>
+        <view class="beer-splash__foam f3"></view>
+        <view class="beer-splash__foam f4"></view>
+        <view class="beer-splash__foam f5"></view>
+        <block wx:if="{{reactionBeerIsSelf}}">
+          <view class="beer-splash__foam f6"></view>
+          <view class="beer-splash__foam f7"></view>
+          <view class="beer-splash__foam f8"></view>
+          <view class="beer-splash__foam f9"></view>
+          <view class="beer-splash__foam f10"></view>
+          <view class="beer-splash__foam f11"></view>
+        </block>
+        <view class="beer-splash__drop d0"></view>
+        <view class="beer-splash__drop d1"></view>
+        <view class="beer-splash__drop d2"></view>
+        <view class="beer-splash__drop d3"></view>
+        <view class="beer-splash__drop d4"></view>
+        <view class="beer-splash__drop d5"></view>
+        <block wx:if="{{reactionBeerIsSelf}}">
+          <view class="beer-splash__drop d6"></view>
+          <view class="beer-splash__drop d7"></view>
+          <view class="beer-splash__drop d8"></view>
+          <view class="beer-splash__drop d9"></view>
+        </block>
+        <view class="beer-splash__rise r0"></view>
+        <view class="beer-splash__rise r1"></view>
+        <view class="beer-splash__rise r2"></view>
+        <view class="beer-splash__rise r3"></view>
+        <block wx:if="{{reactionBeerIsSelf}}">
+          <view class="beer-splash__rise r4"></view>
+          <view class="beer-splash__rise r5"></view>
+          <view class="beer-splash__rise r6"></view>
+          <view class="beer-splash__rise r7"></view>
+        </block>
+      </view>
+    </view>
+
+    <!-- 🚀 rocket：Observer=座位炸飞；Self=中央（拳击尺寸）；mode 隔离 -->
+    <view
+      wx:if="{{reactionScreenMode === 'rocket'}}"
+      class="rocket-screen-reaction {{reactionRocketShaking ? 'is-shake' : ''}}"
+    >
+      <view
+        wx:if="{{reactionRocketFlyVisible}}"
+        class="rocket-projectile"
+        style="{{reactionRocketFlyStyle}}"
+      >
+        <view class="rocket-projectile__flame f0"></view>
+        <view class="rocket-projectile__flame f1"></view>
+        <view class="rocket-projectile__flame f2"></view>
+        <text class="rocket-projectile__emoji">🚀</text>
+      </view>
+
+      <!-- 中央爆炸：火光 / 冲击波 / 碎片 -->
+      <view
+        wx:if="{{reactionRocketBlastVisible}}"
+        class="rocket-explosion-layer {{reactionRocketBlastBurst ? 'is-burst' : ''}}"
+        style="{{reactionRocketBlastStyle}}"
+      >
+        <view class="rocket-explosion-layer__shock"></view>
+        <view class="rocket-explosion-layer__shock rocket-explosion-layer__shock--ring"></view>
+        <view class="rocket-explosion-layer__flash"></view>
+        <view class="rocket-explosion-layer__flame fl0"></view>
+        <view class="rocket-explosion-layer__flame fl1"></view>
+        <view class="rocket-explosion-layer__flame fl2"></view>
+        <view class="rocket-explosion-layer__flame fl3"></view>
+        <view class="rocket-explosion-layer__smoke sm0"></view>
+        <view class="rocket-explosion-layer__smoke sm1"></view>
+        <view class="rocket-explosion-layer__smoke sm2"></view>
+        <view class="rocket-explosion-layer__smoke sm3"></view>
+        <view class="rocket-explosion-layer__smoke sm4"></view>
+        <view class="rocket-explosion-layer__debris d0"></view>
+        <view class="rocket-explosion-layer__debris d1"></view>
+        <view class="rocket-explosion-layer__debris d2"></view>
+        <view class="rocket-explosion-layer__debris d3"></view>
+        <view class="rocket-explosion-layer__debris d4"></view>
+        <view class="rocket-explosion-layer__debris d5"></view>
+        <view class="rocket-explosion-layer__debris d6"></view>
+        <view class="rocket-explosion-layer__debris d7"></view>
+        <view class="rocket-explosion-layer__ember e0"></view>
+        <view class="rocket-explosion-layer__ember e1"></view>
+        <view class="rocket-explosion-layer__ember e2"></view>
+        <view class="rocket-explosion-layer__ember e3"></view>
+        <view class="rocket-explosion-layer__dot p0"></view>
+        <view class="rocket-explosion-layer__dot p1"></view>
+        <view class="rocket-explosion-layer__dot p2"></view>
+      </view>
+
+      <!--
+        临时克隆：座位 → 中央 → 旋回
+        原头像底层 + 浓烟罩 + cartoon-blast-face（不改真实头像）
+      -->
+      <view
+        wx:if="{{reactionRocketAvatarVisible}}"
+        class="avatar-blast-layer phase-{{reactionRocketAvatarPhase}} {{reactionRocketSmokeActive ? 'is-smoking' : ''}} {{reactionRocketFaceShake ? 'is-face-shake' : ''}}"
+        style="{{reactionRocketAvatarStyle}}"
+      >
+        <view class="avatar-blast-layer__avatar">
+          <image
+            wx:if="{{reactionRocketAvatarUrl}}"
+            class="avatar-blast-layer__img"
+            src="{{reactionRocketAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view wx:else class="avatar-blast-layer__fallback">🚀</view>
+        </view>
+
+        <!-- 浓烟覆盖：爆炸后盖住，再慢慢散开露出漫画脸 -->
         <view
-          class="kiss-target-layer__lips phase-{{reactionKissLipsPhase}}"
-          style="{{reactionKissTargetLipsStyle}}"
-        >👄</view>
-        <view
-          wx:for="{{reactionKissTargetHearts}}"
-          wx:key="id"
-          class="kiss-target-layer__heart"
-          style="{{item.style}}"
-        >❤️</view>
+          wx:if="{{reactionRocketSmokeCover}}"
+          class="rocket-smoke-cover {{reactionRocketSmokeClearing ? 'is-clearing' : 'is-thick'}}"
+        >
+          <view class="rocket-smoke-cover__blob b0"></view>
+          <view class="rocket-smoke-cover__blob b1"></view>
+          <view class="rocket-smoke-cover__blob b2"></view>
+          <view class="rocket-smoke-cover__blob b3"></view>
+          <view class="rocket-smoke-cover__glow"></view>
+        </view>
+
+        <view wx:if="{{reactionRocketBlastFace}}" class="cartoon-blast-face {{reactionRocketHairPop ? 'is-hair-pop' : ''}}">
+          <view class="cartoon-blast-face__hair blast-hair">
+            <view class="blast-hair__strand h0"></view>
+            <view class="blast-hair__strand h1"></view>
+            <view class="blast-hair__strand h2"></view>
+            <view class="blast-hair__strand h3"></view>
+            <view class="blast-hair__strand h4"></view>
+            <view class="blast-hair__strand h5"></view>
+            <view class="blast-hair__strand h6"></view>
+            <view class="blast-hair__strand h7"></view>
+          </view>
+          <view class="cartoon-blast-face__mask cartoon-face-mask">
+            <view class="cartoon-face-mask__soot"></view>
+            <view class="cartoon-face-mask__eye eye-l">
+              <view class="cartoon-face-mask__pupil"></view>
+            </view>
+            <view class="cartoon-face-mask__eye eye-r">
+              <view class="cartoon-face-mask__pupil"></view>
+            </view>
+            <view class="cartoon-face-mask__nostril n-l"></view>
+            <view class="cartoon-face-mask__nostril n-r"></view>
+            <view class="cartoon-face-mask__mouth"></view>
+          </view>
+        </view>
+
+        <view class="avatar-blast-layer__smoke blast-smoke s0"></view>
+        <view class="avatar-blast-layer__smoke blast-smoke s1"></view>
+        <view class="avatar-blast-layer__smoke blast-smoke s2"></view>
+        <view class="avatar-blast-layer__spark sp0"></view>
+        <view class="avatar-blast-layer__spark sp1"></view>
+        <view class="avatar-blast-layer__spark sp2"></view>
+        <view class="avatar-blast-layer__spark sp3"></view>
       </view>
     </view>
   </view>
-  <!-- Demo：🪣 湿水 — fixed 锚定目标头像 -->
-  <view
-    wx:if="{{playerActionWaterVisible}}"
-    class="player-action-bucket-water"
-    style="{{playerActionWaterStyle}}"
-  >
-    <view class="player-action-bucket-water__fill"></view>
-    <view class="player-action-bucket-water__sheet s0"></view>
-    <view class="player-action-bucket-water__sheet s1"></view>
-    <view class="player-action-bucket-water__sheet s2"></view>
-    <view class="player-action-bucket-water__sheet s3"></view>
-  </view>
-
-  <!-- Demo：🥚 连击飞入层（可多枚并存；独立于记分 wx:for，避免整表重绘闪白） -->
-  <view
-    wx:for="{{playerActionEggs}}"
-    wx:key="id"
-    class="player-action-egg-fly {{item.finale ? 'is-finale' : ''}}"
-    style="{{item.style}}"
-  >🥚</view>
-  <!-- Demo：🥚 糊脸层 — fixed 锚定目标头像矩形，不写入成绩列表 -->
-  <view
-    wx:if="{{playerActionEggSplatVisible}}"
-    class="player-action-egg-splat {{playerActionEggFinale ? 'is-finale' : ''}} {{playerActionEggSplatHiding ? 'is-hiding' : ''}}"
-    style="{{playerActionEggSplatStyle}}"
-  >
-    <view wx:if="{{playerActionEggLevel >= 1}}" class="player-action-egg-splat__white w0"></view>
-    <view wx:if="{{playerActionEggLevel >= 1}}" class="player-action-egg-splat__stream s0"></view>
-    <view wx:if="{{playerActionEggLevel >= 2}}" class="player-action-egg-splat__white w1"></view>
-    <view wx:if="{{playerActionEggLevel >= 2}}" class="player-action-egg-splat__stream s1"></view>
-    <view wx:if="{{playerActionEggLevel >= 2}}" class="player-action-egg-splat__drop d0"></view>
-    <view wx:if="{{playerActionEggLevel >= 3}}" class="player-action-egg-splat__white w2"></view>
-    <view wx:if="{{playerActionEggLevel >= 3}}" class="player-action-egg-splat__yolk y0"></view>
-    <view wx:if="{{playerActionEggLevel >= 3}}" class="player-action-egg-splat__stream s2"></view>
-    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__white w3"></view>
-    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__yolk y1"></view>
-    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__stream s3"></view>
-    <view wx:if="{{playerActionEggLevel >= 4}}" class="player-action-egg-splat__drop d1"></view>
-    <view wx:if="{{playerActionEggLevel >= 5}}" class="player-action-egg-splat__yolk y2"></view>
-    <view wx:if="{{playerActionEggLevel >= 5}}" class="player-action-egg-splat__stream s4"></view>
-    <view wx:if="{{playerActionEggLevel >= 5}}" class="player-action-egg-splat__drop d2"></view>
-    <view wx:if="{{playerActionEggLevel >= 6}}" class="player-action-egg-splat__drop d3"></view>
-    <!-- 最后一击：仅加大覆盖/流淌/滴落（无 flash / glow / 白闪） -->
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-white fw0"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-white fw1"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-white fw2"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-yolk fy0"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-yolk fy1"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-yolk fy2"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f0"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f1"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f2"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f3"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f4"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f5"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-stream f6"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd0"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd1"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd2"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd3"></view>
-    <view wx:if="{{playerActionEggFinale}}" class="player-action-egg-splat__finale-drip fd4"></view>
-  </view>
-
-  <!-- Demo：🪣 水桶（正上方下降 → 翻转倒水，独立于🍅） -->
-  <view
-    wx:if="{{playerActionBucketVisible}}"
-    class="player-action-bucket {{playerActionBucketDropping ? 'is-dropping' : ''}} {{playerActionBucketPouring ? 'is-pouring' : ''}}"
-    style="{{playerActionBucketStyle}}"
-  >
-    <text class="player-action-bucket__icon">🪣</text>
-    <view wx:if="{{playerActionBucketPouring}}" class="player-action-bucket__streams">
-      <view class="player-action-bucket__stream st0"></view>
-      <view class="player-action-bucket__stream st1"></view>
-      <view class="player-action-bucket__stream st2"></view>
-      <view class="player-action-bucket__stream st3"></view>
-      <view class="player-action-bucket__stream st4"></view>
-    </view>
-  </view>
-  <!-- 夸张倒水层：仅锚定目标头像，略宽于头像边缘 -->
-  <view
-    wx:if="{{playerActionWaterFloodVisible}}"
-    class="player-action-bucket-flood"
-    style="{{playerActionWaterFloodStyle}}"
-  >
-    <view class="player-action-bucket-flood__blast"></view>
-    <view class="player-action-bucket-flood__cascade c0"></view>
-    <view class="player-action-bucket-flood__cascade c1"></view>
-    <view class="player-action-bucket-flood__cascade c2"></view>
-    <view class="player-action-bucket-flood__cascade c3"></view>
-    <view class="player-action-bucket-flood__cascade c4"></view>
-  </view>
-  <view
-    wx:if="{{playerActionWaterDripVisible}}"
-    class="player-action-bucket-drip"
-    style="{{playerActionWaterDripStyle}}"
-  >
-    <view class="player-action-bucket-drip__drop d0"></view>
-    <view class="player-action-bucket-drip__drop d1"></view>
-    <view class="player-action-bucket-drip__drop d2"></view>
-    <view class="player-action-bucket-drip__drop d3"></view>
-    <view class="player-action-bucket-drip__drop d4"></view>
-    <view class="player-action-bucket-drip__drop d5"></view>
-    <view class="player-action-bucket-drip__drop d6"></view>
-    <view class="player-action-bucket-drip__drop d7"></view>
-  </view>
-
-  <!-- Demo：🌹 送花（柔和飘入 → 开放 + 花环） -->
+  <!-- Demo：🌹 送花 Observer（随机花束飞入 → 自然花环 → 花瓣飘落） -->
   <view
     wx:if="{{playerActionFlowerVisible}}"
     class="player-action-flower {{playerActionFlowerBloom ? 'is-bloom' : ''}}"
     style="{{playerActionFlowerStyle}}"
-  >🌹</view>
+  >{{playerActionFlowerEmoji}}</view>
   <view
     wx:if="{{playerActionPetalVisible}}"
     class="player-action-flower-petals"
     style="{{playerActionPetalStyle}}"
   >
-    <view class="player-action-flower-petals__p p0"></view>
-    <view class="player-action-flower-petals__p p1"></view>
-    <view class="player-action-flower-petals__p p2"></view>
-    <view class="player-action-flower-petals__p p3"></view>
+    <view
+      wx:for="{{playerActionPetalItems}}"
+      wx:key="id"
+      class="player-action-flower-petals__item"
+      style="{{item.style}}"
+    ></view>
   </view>
-  <!-- Demo：🌹 花环（围绕头像中心；外层定位，内层缩放） -->
+  <!-- Demo：🌹 自然花环（不规则角度/距离/大小） -->
   <view
     wx:if="{{playerActionWreathVisible}}"
-    class="player-action-flower-wreath {{playerActionWreathAppear ? 'is-appear' : ''}} {{playerActionWreathFading ? 'is-fading' : ''}}"
+    class="player-action-flower-wreath {{playerActionWreathAppear ? 'is-appear' : ''}} {{playerActionWreathExpand ? 'is-expand' : ''}} {{playerActionWreathFading ? 'is-fading' : ''}}"
     style="{{playerActionWreathStyle}}"
   >
     <view
       wx:for="{{playerActionWreathItems}}"
       wx:key="id"
-      class="player-action-flower-wreath__item"
+      class="player-action-flower-wreath__item batch-{{item.batch}}"
       style="{{item.style}}"
     >
-      <view class="player-action-flower-wreath__bloom" style="animation-delay:{{item.delay}};">{{item.emoji}}</view>
+      <view
+        class="player-action-flower-wreath__bloom"
+        style="animation-delay:{{item.delay}};filter:{{item.filter}};font-size:{{item.fontSize}};width:100%;height:100%;line-height:1;display:flex;align-items:center;justify-content:center;"
+      >{{item.emoji}}</view>
     </view>
   </view>
 
