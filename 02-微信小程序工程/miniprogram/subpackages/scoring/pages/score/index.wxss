@@ -3355,10 +3355,16 @@ page {
   background: var(--score-header-hole) !important;
   background-color: var(--score-header-hole) !important;
 }
+/*
+ * Classic：hole-par 透底（对齐 fourball），避免 230rpx 实心底盖住
+ * track-lead-tee 的 --fourball-classic-player-row-border 右沿；区色由下方 spacer/lead 承接
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container,
 .score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__hole,
 .score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__par {
-  background: var(--score-header-hole) !important;
-  background-color: var(--score-header-hole) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
 }
 .score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer.shell-row--head,
 .score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer.shell-row--par {
@@ -3812,6 +3818,16 @@ page {
   box-sizing: border-box;
 }
 /*
+ * Classic：关掉 diff 右沿（上条 .scoreboard-cell 会误套到 track-lead-diff）
+ * 同等具体度压过；只保留 T 右沿
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--head .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--par > .track-lead-diff {
+  border-right: none;
+}
+/*
  * 双线根因：吸边后 track 内 .track-lead-tee 与 sticky T 同位（x=identity+tee），
  * 且 head/par 的 .scoreboard-cell border-right 比旧清除规则更具体，右缘未关掉。
  * 同等具体度压过，仅关 track lead tee；保留 tee-sticky-overlay 右沿。
@@ -3820,18 +3836,6 @@ page {
 .score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--par > .track-lead-tee,
 .score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--player .track-lead-tee {
   border-right: none;
-}
-/*
- * Classic 吸边：hole-par 实心底右缘成线（非 border；无 ::before/::after）
- * 透明掉背景层，HOLE/PAR 区颜色由下方 player-column spacer 承接；
- * 固定区|成绩区只留 tee-sticky-overlay 右沿。
- */
-.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .hole-par-normal-container,
-.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .hole-par-normal-container__hole,
-.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .hole-par-normal-container__par {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
 }
 
 .hole-cell-meta,
