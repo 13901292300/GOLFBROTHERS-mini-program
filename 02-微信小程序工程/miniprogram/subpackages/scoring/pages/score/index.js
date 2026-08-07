@@ -1946,6 +1946,13 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         puttTotal: filled > 0 ? puttTotal : '',
         diffTotal,
         diffStr: specialDisp.diffStr,
+        // 与 fourball 列对齐：Elite OUT/IN 角标；Classic 整格色不挂 special
+        eliteDiffStr:
+          !isTot && filled > 0 ? formatClassicCellDiff(diffTotal) : '',
+        classicDiffStr: '',
+        classicClass: '',
+        isOut: isOut,
+        isIn: isIn,
         isTot,
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
         scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr)
@@ -1970,7 +1977,10 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         putts: '',
         diff: 0,
         diffStr: '',
+        eliteDiffStr: '',
+        classicDiffStr: '',
         scoreClass: '',
+        classicClass: '',
         classicScoreSizeClass: '',
         scoreMainWideClass: '',
         triangleClass:
@@ -2009,7 +2019,11 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       diff,
       // 右下角杆差：杆差模式下隐藏（主数字已是杆差，避免重复）；平杆统一 0
       diffStr: displayMode === 'diff' ? '' : formatCellDiff(diff),
+      eliteDiffStr: '',
+      // Classic / Elite 洞格右下角：-N / 0 / N（正数无 +）；复用 fourball 解析
+      classicDiffStr: displayMode === 'diff' ? '' : formatClassicCellDiff(diff),
       scoreClass: scoreStyle(diff),
+      classicClass: resolveClassicHoleClass(diff),
       classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
       scoreMainWideClass: resolveScoreMainWideClass(mainStr),
       triangleClass:
@@ -2978,12 +2992,25 @@ Page({
     });
   },
 
-  /** 演示赛显示风格 storage key（仅 demo-weekend-amateur） */
+  /**
+   * 显示风格 storage key：按 matchId / gameId 分场记忆（全站记分页共用）。
+   * 优先 matchId（队内/队际等），否则 gameId（普通球局 / demo）。
+   */
   _pageScoreStyleKey() {
-    return 'scoreStyle_demo_weekend_amateur';
+    const ms = this._matchState || this._readMatchState() || {};
+    const matchId =
+      ms.matchId != null && String(ms.matchId).trim()
+        ? String(ms.matchId).trim()
+        : '';
+    if (matchId) return 'scoreStyle_match_' + matchId;
+    const gameId = String(
+      this.data.gameId || ms.gameId || ''
+    ).trim();
+    if (gameId) return 'scoreStyle_game_' + gameId;
+    return 'scoreStyle_default';
   },
 
-  /** 读取演示赛 pageScoreStyle；缺省 classic（保持当前体验） */
+  /** 读取 pageScoreStyle；缺省 classic（与既有默认一致） */
   _getPageScoreStyle() {
     try {
       const value = wx.getStorageSync(this._pageScoreStyleKey());
@@ -2995,21 +3022,9 @@ Page({
 
   /**
    * 同步 pageScoreStyle → scoreHoleStyleClassic / isScoreClassicDemo / isScoreEliteDemo / 设置项可见性。
-   * 非 demo-weekend-amateur：强制关、隐藏设置项。
+   * 全站记分页（demo + 正式）均支持 classic / elite。
    */
   _syncPageScoreStyle(gameId) {
-    const gid = gameId != null ? gameId : this.data.gameId;
-    const isDemo = demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gid);
-    if (!isDemo) {
-      this.setData({
-        pageScoreStyle: 'elite',
-        scoreHoleStyleClassic: false,
-        isScoreClassicDemo: false,
-        isScoreEliteDemo: false,
-        showScoreStyleSetting: false
-      });
-      return;
-    }
     const pageScoreStyle = this._getPageScoreStyle();
     this.setData({
       pageScoreStyle: pageScoreStyle,
@@ -3020,9 +3035,8 @@ Page({
     });
   },
 
-  /** 写入演示赛显示风格（仅 demo-weekend-amateur；不改 fontScale / 成绩） */
+  /** 写入显示风格（classic / elite；不改 fontScale / 成绩计算） */
   _setPageScoreStyle(value) {
-    if (!demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId)) return;
     const next = value === 'elite' ? 'elite' : 'classic';
     try {
       wx.setStorageSync(this._pageScoreStyleKey(), next);
@@ -3037,7 +3051,7 @@ Page({
       },
       () => {
         // Elite -2 eagle marker 依赖 columns.scoreClass，切换风格后重建记分行
-        if (this.data.mode === 'fourball_best' && typeof this.refreshPlayers === 'function') {
+        if (typeof this.refreshPlayers === 'function') {
           this.refreshPlayers();
         }
       }
@@ -14636,6 +14650,10 @@ Page({
             score: c.val,
             putts: c.puttTotal,
             diffStr: c.diffStr || '',
+            // 透传 enrichPlayer 展示字段（与 fourball / stroke 统一 score display model）
+            eliteDiffStr: c.eliteDiffStr || '',
+            classicDiffStr: c.classicDiffStr || '',
+            classicClass: c.classicClass || '',
             diffClass: c.diffClass || 'diff-even',
             mainStr: c.mainStr != null ? c.mainStr : '',
             scoreClass: '',
@@ -14653,6 +14671,9 @@ Page({
           mainStr: c.mainStr != null ? c.mainStr : '',
           putts: c.putts,
           diffStr: c.diffStr || '',
+          eliteDiffStr: c.eliteDiffStr || '',
+          classicDiffStr: c.classicDiffStr || '',
+          classicClass: c.classicClass || '',
           diffClass: c.diffClass || 'diff-even',
           scoreClass: c.scoreClass || '',
           classicScoreSizeClass: c.classicScoreSizeClass || '',
@@ -16184,12 +16205,11 @@ Page({
   },
 
   openStyleSheet() {
-    const isDemo = demoWeekendAmateurGame.isDemoWeekendAmateurGameId(this.data.gameId);
     this.setData({
       showStyleSheet: true,
       fontScale: this._getFontScale(),
-      pageScoreStyle: isDemo ? this._getPageScoreStyle() : this.data.pageScoreStyle,
-      showScoreStyleSetting: isDemo
+      pageScoreStyle: this._getPageScoreStyle(),
+      showScoreStyleSetting: true
     });
   },
 
@@ -16205,7 +16225,7 @@ Page({
     this._setFontScale(value);
   },
 
-  /** 演示赛显示风格切换（精英 / 经典）；仅 demo-weekend-amateur */
+  /** 显示风格切换（精英 / 经典）；全站记分页共用 */
   onPageScoreStyleChange(e) {
     const value =
       e && e.currentTarget && e.currentTarget.dataset

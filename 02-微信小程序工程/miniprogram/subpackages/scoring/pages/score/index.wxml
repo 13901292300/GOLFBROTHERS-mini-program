@@ -111,9 +111,10 @@
       </view>
 
       <!-- ===== 个人比杆统一 Shell：普通创建个人比杆 + 球队赛 G1；纯 4+0 HOLE 以下同壳 ===== -->
+      <!-- g1-stroke：仅非 4+0 的个人比杆壳，用于对齐 demo 视觉（不碰 fourball / fourball40） -->
       <view
         wx:if="{{useStrokeScoreShell}}"
-        class="scoreboard-shell scoreboard-shell--game-single {{isFourball40StrokeShell ? 'scoreboard-shell--fourball40' : ''}} {{isTeeStickyVisible ? 'is-tee-sticky' : ''}}"
+        class="scoreboard-shell scoreboard-shell--game-single {{isFourball40StrokeShell ? 'scoreboard-shell--fourball40' : 'scoreboard-shell--g1-stroke'}} {{isTeeStickyVisible ? 'is-tee-sticky' : ''}}"
         style="{{scoreboardStyle}}"
       >
         <scroll-view
@@ -268,14 +269,14 @@
                 bindtap="onScoreCellTap"
                 data-player-idx="{{item.sourceGroupIndex != null ? item.sourceGroupIndex : pIdx}}"
                 data-col-idx="{{cIdx}}"
-                class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}}"
+                class="scoreboard-cell score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.isOut || cell.isIn || (cell.type === 'special' && !cell.isTot) ? 'scoreboard-cell--hole-special-col' : ''}} {{cell.isTot ? 'scoreboard-cell--tot-col' : ''}} {{cell.classicClass}}"
               >
                 <block wx:if="{{cell.type === 'special'}}">
                   <view class="special-cell-inner">
                     <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{cell.scoreMainWideClass}}">{{cell.val}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{cell.puttTotal}}</text>
-                      <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                      <text class="special-cell-diff {{cell.diffClass}}">{{isScoreEliteDemo ? cell.eliteDiffStr : cell.diffStr}}</text>
                     </view>
                   </view>
                 </block>
@@ -286,7 +287,7 @@
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{cell.putts}}</text>
-                      <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                      <text class="hole-cell-diff {{cell.diffClass}}">{{scoreHoleStyleClassic || isScoreEliteDemo ? cell.classicDiffStr : cell.diffStr}}</text>
                     </view>
                   </view>
                 </block>
@@ -1082,7 +1083,7 @@
                   <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{col.scoreMainWideClass}}">{{col.score}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{col.putts}}</text>
-                    <text class="special-cell-diff {{col.diffClass}}">{{col.diffStr}}</text>
+                    <text class="special-cell-diff {{col.diffClass}}">{{isScoreEliteDemo ? col.eliteDiffStr : col.diffStr}}</text>
                   </view>
                 </view>
               </block>
@@ -1094,7 +1095,7 @@
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{col.putts}}</text>
-                      <text class="hole-cell-diff {{col.diffClass}}">{{scoreHoleStyleClassic ? col.classicDiffStr : col.diffStr}}</text>
+                      <text class="hole-cell-diff {{col.diffClass}}">{{scoreHoleStyleClassic || isScoreEliteDemo ? col.classicDiffStr : col.diffStr}}</text>
                     </view>
                   </view>
                 </block>
@@ -1180,14 +1181,14 @@
               bindtap="onEntityScoreCellTap"
               data-entity-index="{{eIdx}}"
               data-hole-index="{{cell.holeIndex}}"
-              class="scoreboard-cell score-cell entity-score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}}"
+              class="scoreboard-cell score-cell entity-score-cell {{cell.type === 'special' ? 'scoreboard-cell--special-cell' : ''}} {{cell.classicClass}}"
             >
               <block wx:if="{{cell.type === 'special'}}">
                 <view class="special-cell-inner">
                   <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{cell.puttTotal}}</text>
-                    <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                    <text class="special-cell-diff {{cell.diffClass}}">{{isScoreEliteDemo ? cell.eliteDiffStr : cell.diffStr}}</text>
                   </view>
                 </view>
               </block>
@@ -1199,7 +1200,7 @@
                   </view>
                   <view class="hole-cell-meta">
                     <text class="hole-cell-putt">{{cell.putts}}</text>
-                    <text class="hole-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
+                    <text class="hole-cell-diff {{cell.diffClass}}">{{scoreHoleStyleClassic || isScoreEliteDemo ? cell.classicDiffStr : cell.diffStr}}</text>
                   </view>
                 </view>
               </block>

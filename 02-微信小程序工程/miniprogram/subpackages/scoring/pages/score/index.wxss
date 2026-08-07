@@ -1565,11 +1565,16 @@ page {
   padding: 0;
   box-sizing: border-box;
 }
+/* 与身份 spacer 同 token：HOLE=交叉蓝、PAR=身份蓝（避免横滑露白缝） */
 .scoreboard-shell--game-single .hole-par-normal-container__hole {
   height: 112rpx;
+  background: var(--score-header-intersection);
+  background-color: var(--score-header-intersection);
 }
 .scoreboard-shell--game-single .hole-par-normal-container__par {
   height: 72rpx;
+  background: var(--score-header-identity);
+  background-color: var(--score-header-identity);
 }
 /* HOLE/PAR 字阶对齐 G5 col-head/par-label；保留光学上移 */
 .scoreboard-shell--game-single .hole-par-normal-container__hole text,
@@ -1646,17 +1651,191 @@ page {
 .scoreboard-shell--game-single .hole-par-compact-container__par text {
   transform: translateY(-2rpx);
 }
+/*
+ * 身份列接缝对齐 fourball-player-column：
+ * 页面底 + 右侧 identity 遮罩，避免横滑露壳层白底。
+ */
 .scoreboard-shell--game-single .player-column {
   position: relative;
   z-index: 3;
-  background: transparent;
+  background: var(--bg-primary);
+  background-color: var(--bg-primary);
   border-right: none;
+  box-shadow: 12rpx 0 0 0 var(--score-header-identity);
+  box-sizing: border-box;
 }
-/* game-single：头像对齐 G5 80rpx；T 色仅走 T 线，头像无色环 */
+.scoreboard-shell--game-single .player-column__inner {
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: inset -1px 0 0 var(--score-header-intersection);
+}
+/* game-single：头像对齐 fourball / G5 80rpx；T 色仅走 T 线 */
 .scoreboard-shell--game-single .player-column__card .player-avatar-img {
   width: 80rpx;
   height: 80rpx;
 }
+/* 昵称对齐 fourball-single name-group__name */
+.scoreboard-shell--game-single .player-column__card .player-name-line,
+.scoreboard-shell--game-single .player-column__card .player-column__name {
+  margin-top: 8rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: none;
+  color: var(--text-primary);
+  max-width: 100%;
+}
+.scoreboard-shell--game-single .player-column__card {
+  padding: 12rpx 8rpx;
+}
+
+/*
+ * ===== G1 个人比杆专用（scoreboard-shell--g1-stroke）=====
+ * 对齐 demo fourball 视觉；不改 fourball / fourball40 / match-play。
+ */
+/*
+ * G1 identity 定宽：仅 player-column / spacer / row
+ * hole-par-normal 沿用 game-single 230rpx + JS translateX（中心 115→64）；不压宽、不冻 transform
+ */
+.scoreboard-shell--g1-stroke {
+  --g1-identity-width: 128rpx;
+}
+.scoreboard-shell--g1-stroke .player-column {
+  width: var(--g1-identity-width);
+  min-width: var(--g1-identity-width);
+  max-width: var(--g1-identity-width);
+}
+.scoreboard-shell--g1-stroke .player-column__inner,
+.scoreboard-shell--g1-stroke .player-column__spacer,
+.scoreboard-shell--g1-stroke .player-column__row {
+  width: var(--g1-identity-width);
+  min-width: var(--g1-identity-width);
+  max-width: var(--g1-identity-width);
+  box-sizing: border-box;
+}
+.scoreboard-shell--g1-stroke .tee-sticky-overlay {
+  left: var(--g1-identity-width);
+}
+
+.scoreboard-shell--g1-stroke .player-column__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 8rpx 12rpx;
+  box-sizing: border-box;
+}
+.scoreboard-shell--g1-stroke .player-column__card .player-name-line,
+.scoreboard-shell--g1-stroke .player-column__card .player-column__name {
+  margin-top: 0;
+}
+.scoreboard-shell--g1-stroke .track-lead-diff .player-diff-score {
+  font-size: 40rpx;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.scoreboard-shell--g1-stroke .track-lead-diff .player-diff-score.diff-under {
+  color: #ef4444 !important;
+}
+
+/*
+ * G1 identity Classic / Elite 字体体系（压过全局 .player-name-line / .player-diff-score）
+ * 颜色继续走既有 .diff-under / .diff-even / .diff-over；不新增硬编码色
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__card .player-name-line,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__card .player-column__name {
+  font-size: 22rpx;
+  line-height: 1.2;
+  min-height: 28rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--g1-stroke .player-column__card .player-name-line,
+.score-page.is-score-classic.font-large .scoreboard-shell--g1-stroke .player-column__card .player-column__name {
+  font-size: 26rpx;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff .player-diff-score {
+  font-size: 32rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--g1-stroke .track-lead-diff .player-diff-score {
+  font-size: 40rpx;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .track-lead-diff .player-diff-score {
+  font-weight: 400;
+}
+
+/* OUT/IN/TOT 汇总列字阶与 demo special 列一致 */
+.scoreboard-shell--g1-stroke .scoreboard-cell--hole-special-col .special-cell-val,
+.scoreboard-shell--g1-stroke .scoreboard-cell--tot-col .special-cell-val {
+  font-size: 48rpx;
+  font-weight: 900;
+  line-height: 1;
+}
+.scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell--special-par,
+.scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell--tot-col {
+  min-height: 72rpx;
+}
+.scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col,
+.scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  height: 156rpx;
+  min-height: 156rpx;
+  box-sizing: border-box;
+}
+
+/*
+ * G1 stroke 基础分隔线（对齐 demo fourball 默认线源；不含 Classic/Elite）
+ * 单源：cell/lead 横线 + cell 竖线；禁止 row 级 border-bottom
+ */
+.scoreboard-shell.scoreboard-shell--g1-stroke .scoreboard-row.shell-row--head,
+.scoreboard-shell.scoreboard-shell--g1-stroke .scoreboard-row.shell-row--par,
+.scoreboard-shell.scoreboard-shell--g1-stroke .scoreboard-row.shell-row--player,
+.scoreboard-shell.scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--head,
+.scoreboard-shell.scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--par,
+.scoreboard-shell.scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--player {
+  border-bottom: none;
+  box-shadow: none;
+}
+/* head 行勿裁切 cell 底边线 */
+.scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--head.shell-row--head {
+  overflow: visible;
+}
+/* 横线：HOLE / PAR / 成绩（含 OUT/IN/TOT）+ lead */
+.scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--head,
+.scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell,
+.scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--player .score-cell,
+.scoreboard-shell--g1-stroke .track-lead-diff--head,
+.scoreboard-shell--g1-stroke .track-lead-tee--head,
+.scoreboard-shell--g1-stroke .track-lead-diff--par,
+.scoreboard-shell--g1-stroke .track-lead-tee--par,
+.scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-diff,
+.scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+/* 左区 HOLE|PAR 横线（身份 spacer + HOLE/PAR overlay） */
+.scoreboard-shell--g1-stroke .player-column__spacer.shell-row--head {
+  border-bottom: 1px solid var(--fourball-score-row-border);
+}
+.scoreboard-shell--g1-stroke .hole-par-normal-container__hole {
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+/* 竖线：player-column|track 接缝（inner inset）+ T|第一洞（横滑左缘） */
+.scoreboard-shell--g1-stroke .player-column__inner {
+  box-shadow: inset -1px 0 0 var(--score-header-intersection);
+}
+.scoreboard-shell--g1-stroke .track-lead-tee {
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+/* 竖线：洞格 + OUT/IN/TOT（同一套 scoreboard-cell / score-cell） */
+.scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell,
+.scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell,
+.scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell {
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
 .scoreboard-shell--game-single .score-track {
   position: relative;
   z-index: 1;
@@ -1673,6 +1852,10 @@ page {
   border-bottom: 1px solid var(--score-header-intersection);
   box-sizing: border-box;
 }
+/* 末行以下不留横线（对齐 fourball identity 列） */
+.scoreboard-shell--game-single .player-column__inner > .player-column__row:last-child {
+  border-bottom: none;
+}
 /* HOLE × 身份交叉蓝（仅 head；无右边框/底边，底边由 track header row 统一绘制） */
 .scoreboard-shell--game-single .player-column__spacer.shell-row--head {
   height: 112rpx;
@@ -1687,9 +1870,21 @@ page {
 .scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player {
   background: transparent;
 }
-/* 记分行横向分隔：score-cell 铺底会盖住 row 的 border-bottom，改由 cell 自身绘制 */
-.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player .score-cell {
-  border-bottom: 1px solid var(--border-color);
+/*
+ * 记分行横向分隔：与 fourball 同 token（Light=border-color；Dark=增强灰）
+ * head / par / player 的 cell + lead 统一自绘底边
+ */
+.scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head,
+.scoreboard-shell--game-single .scoreboard-row--par > .scoreboard-cell,
+.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player .score-cell,
+.scoreboard-shell--game-single .track-lead-diff--head,
+.scoreboard-shell--game-single .track-lead-tee--head,
+.scoreboard-shell--game-single .track-lead-diff--par,
+.scoreboard-shell--game-single .track-lead-tee--par,
+.scoreboard-shell--game-single .scoreboard-row--player .track-lead-diff,
+.scoreboard-shell--game-single .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
 }
 /* lead 身份蓝；HOLE 行 lead 用交叉蓝覆盖 */
 .scoreboard-shell--game-single .track-lead-diff,
@@ -1697,57 +1892,57 @@ page {
 .scoreboard-shell--game-single .track-lead-tee,
 .scoreboard-shell--game-single .track-lead-tee--par {
   background: var(--score-header-identity) !important;
-}
-/* diff/T 身份区行分隔（par + 球员行；head 仍由 header row 统一绘制） */
-.scoreboard-shell--game-single .track-lead-diff--par,
-.scoreboard-shell--game-single .track-lead-tee--par,
-.scoreboard-shell--game-single .scoreboard-row--player .track-lead-diff,
-.scoreboard-shell--game-single .scoreboard-row--player .track-lead-tee {
-  border-bottom: 1px solid var(--score-header-intersection);
-  box-sizing: border-box;
+  background-color: var(--score-header-identity) !important;
 }
 .scoreboard-shell--game-single .track-lead-diff--head,
 .scoreboard-shell--game-single .track-lead-tee--head {
   height: 112rpx;
   min-height: 112rpx;
   background: var(--score-header-intersection) !important;
+  background-color: var(--score-header-intersection) !important;
   box-sizing: border-box;
 }
-/* head 底边由 row 绘制且不占高度，保证与左侧 spacer 交叉蓝同高 112rpx */
+/* head 底边不占高度，保证与左侧 spacer 交叉蓝同高 112rpx */
 .scoreboard-shell--game-single .scoreboard-row.scoreboard-row--head.shell-row--head {
   height: 112rpx;
   min-height: 112rpx;
   border-bottom: none;
-  box-shadow: 0 1px 0 var(--border-color);
+  box-shadow: none;
   overflow: hidden;
   box-sizing: border-box;
 }
 /* HOLE 行：1–18 + OUT/IN = HOLE蓝；TOTAL 头 = 交叉蓝（HOLE×身份） */
 .scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--head:not(.scoreboard-cell--special-head) {
   background: var(--score-header-hole);
+  background-color: var(--score-header-hole);
 }
 .scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--special-head {
   background: var(--score-header-hole);
+  background-color: var(--score-header-hole);
 }
 .scoreboard-shell--game-single .scoreboard-row--head .scoreboard-cell--tot-head {
   background: var(--score-header-intersection);
+  background-color: var(--score-header-intersection);
 }
-/* OUT/IN 整列身 = HOLE蓝（与 1–18 一致；覆盖 special-par / special-cell） */
-.scoreboard-shell--game-single .scoreboard-cell--hole-special-col {
-  background: var(--score-header-hole);
+/* OUT/IN 整列（含 PAR / 成绩 special）= HOLE蓝；压过 bg-primary */
+.scoreboard-shell--game-single .scoreboard-cell--hole-special-col,
+.scoreboard-shell--game-single .scoreboard-row--par > .scoreboard-cell--special-par:not(.scoreboard-cell--tot-col),
+.scoreboard-shell--game-single .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
 }
-/* TOTAL 身（PAR + 成绩格）= 身份蓝；行分隔用交叉蓝（不影响 1–18/OUT/IN） */
-.scoreboard-shell--game-single .scoreboard-cell--tot-col {
-  background: var(--score-header-identity);
+/* TOTAL 身（PAR + 成绩格）= 身份蓝 */
+.scoreboard-shell--game-single .scoreboard-cell--tot-col,
+.scoreboard-shell--game-single .scoreboard-row--player .score-cell.scoreboard-cell--tot-col,
+.scoreboard-shell--game-single .scoreboard-row--player .score-cell.score-cell--total {
+  background: var(--score-header-identity) !important;
+  background-color: var(--score-header-identity) !important;
 }
-.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--par .scoreboard-cell--tot-col,
-.scoreboard-shell--game-single .scoreboard-row.scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
-  border-bottom: 1px solid var(--score-header-intersection);
-}
-/* PAR 行 / 成绩格：保持原规则 */
-.scoreboard-shell--game-single .scoreboard-row--par > .scoreboard-cell:nth-child(n + 3):not(.scoreboard-cell--special-par),
-.scoreboard-shell--game-single .scoreboard-row--player .score-cell:not(.scoreboard-cell--special-cell) {
+/* PAR 行 1–18 / 普通洞格：页面底 */
+.scoreboard-shell--game-single .scoreboard-row--par > .scoreboard-cell:nth-child(n + 3):not(.scoreboard-cell--special-par):not(.scoreboard-cell--tot-col):not(.scoreboard-cell--hole-special-col),
+.scoreboard-shell--game-single .scoreboard-row--player .score-cell:not(.scoreboard-cell--special-cell):not(.scoreboard-cell--hole-special-col):not(.scoreboard-cell--tot-col) {
   background: var(--bg-primary);
+  background-color: var(--bg-primary);
 }
 /* track 内 T 列：宽=T线；底色同身份区；高度随成绩行 stretch */
 .scoreboard-shell--game-single .track-lead-tee {
@@ -3123,6 +3318,55 @@ page {
 }
 
 /*
+ * G1 stroke Classic：对齐 demo fourball classic 背景扁平化（统一 hole 底）
+ * 仅 .scoreboard-shell--g1-stroke；不改 fourball / fourball40 / match-play
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--special-head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.score-cell--total,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column,
+.score-page.is-score-elite-demo .scoreboard-shell--g1-stroke .player-column {
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--par,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__row {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff--par,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-tee--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-tee--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__hole,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer.shell-row--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/*
  * 演示 Elite：洞格主成绩去粗（不改字号/颜色/marker；不动 special-cell-val / Classic）
  * 原加粗来源：.hole-cell-score { font-weight: 900 }；score-* 本身无 font-weight
  */
@@ -3467,6 +3711,127 @@ page {
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .scoreboard-row--par > .scoreboard-cell,
 .score-page.is-score-elite-demo .scoreboard-shell--fourball .scoreboard-row--player .score-cell {
   border-right: 1px solid var(--fourball-classic-player-row-border);
+}
+
+/*
+ * G1 stroke Classic 专用分隔线（镜像 fourball Classic token；仅 border）
+ * 选择器：.score-page.is-score-classic .scoreboard-shell--g1-stroke
+ * 不改背景 / 字体 / Elite / fourball / match-play
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--par,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--player {
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+/* tee sticky：去掉叠加横线，保留 track cell/lead 单源 */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__spacer,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__inner > .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay__row {
+  border-top: none;
+  border-bottom: none;
+}
+
+/* —— 右区：cell / lead —— */
+/* HOLE 顶 + HOLE|PAR */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-tee--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+
+/* PAR|第一成绩（含 OUT/IN/TOT par 格） */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-diff--par,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-tee--par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/* 成绩行间 + 末行底（含 OUT/IN/TOT + diff/T lead） */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row.scoreboard-row--player .score-cell,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/* —— 左区：player-column + HOLE/PAR overlay —— */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__hole {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__spacer.shell-row--par,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__row,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__inner > .player-column__row:last-child,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+
+/* 竖线：T|第一洞（player-column|score track 边界）+ 洞格/OUT/IN/TOT */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .track-lead-tee {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+/*
+ * Classic 吸边后：track lead tee 随横滑离开视口，竖线改挂 tee-sticky 右沿
+ * （对齐 demo T 区右缘；不碰 hole-par transform）
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .tee-sticky-overlay,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .tee-sticky-overlay.is-visible {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+/*
+ * Classic：去掉 HOLE/PAR / 身份列右缘第二竖线（inset / border）
+ * 固定区|成绩区只保留 T 右沿一条线
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .player-column__inner {
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-compact-container,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__hole,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-normal-container__par,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-compact-container__hole,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .hole-par-compact-container__par {
+  border-right: none;
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--head .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke .scoreboard-row--player .score-cell {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+/*
+ * 双线根因：吸边后 track 内 .track-lead-tee 与 sticky T 同位（x=identity+tee），
+ * 且 head/par 的 .scoreboard-cell border-right 比旧清除规则更具体，右缘未关掉。
+ * 同等具体度压过，仅关 track lead tee；保留 tee-sticky-overlay 右沿。
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--head .track-lead-tee,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--par > .track-lead-tee,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .scoreboard-row--player .track-lead-tee {
+  border-right: none;
+}
+/*
+ * Classic 吸边：hole-par 实心底右缘成线（非 border；无 ::before/::after）
+ * 透明掉背景层，HOLE/PAR 区颜色由下方 player-column spacer 承接；
+ * 固定区|成绩区只留 tee-sticky-overlay 右沿。
+ */
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .hole-par-normal-container,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .hole-par-normal-container__hole,
+.score-page.is-score-classic .scoreboard-shell--g1-stroke.is-tee-sticky .hole-par-normal-container__par {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
 }
 
 .hole-cell-meta,
