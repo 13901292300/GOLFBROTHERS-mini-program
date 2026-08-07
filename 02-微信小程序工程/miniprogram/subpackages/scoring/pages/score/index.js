@@ -2176,10 +2176,10 @@ Page({
     playersView: [],
     entitiesView: [],
     /**
-     * 演示赛显示风格：仅 demo-weekend-amateur；elite | classic
+     * 显示风格：elite | classic；首次默认 elite（storage 有值则跟用户选择）
      * 驱动 scoreHoleStyleClassic → 根 class is-score-classic（不改成绩 / fontScale）
      */
-    pageScoreStyle: 'classic',
+    pageScoreStyle: 'elite',
     /** 显示设置中「显示风格」区块：仅演示赛可见 */
     showScoreStyleSetting: false,
     /** 由 pageScoreStyle === 'classic' 派生；勿再按 gameId 永久强制 */
@@ -2187,7 +2187,7 @@ Page({
     /** 演示赛 + classic：根 class is-score-classic-demo（HOLE/PAR T 区 6rpx 模型等专用覆盖） */
     isScoreClassicDemo: false,
     /** 演示赛 + elite：根 class is-score-elite-demo（仅分隔线复刻 Classic，不改成绩色） */
-    isScoreEliteDemo: false,
+    isScoreEliteDemo: true,
     /**
      * M2 Render Model（A1：仅 Adapter 产出，WXML 未接入）
      * { headerRows, scoreRows }
@@ -2993,30 +2993,20 @@ Page({
   },
 
   /**
-   * 显示风格 storage key：按 matchId / gameId 分场记忆（全站记分页共用）。
-   * 优先 matchId（队内/队际等），否则 gameId（普通球局 / demo）。
+   * 显示风格 storage key：用户级全局偏好（普通创建 / 队内赛 G1–G8 共用）。
+   * 不按 matchId / gameId 分场。
    */
   _pageScoreStyleKey() {
-    const ms = this._matchState || this._readMatchState() || {};
-    const matchId =
-      ms.matchId != null && String(ms.matchId).trim()
-        ? String(ms.matchId).trim()
-        : '';
-    if (matchId) return 'scoreStyle_match_' + matchId;
-    const gameId = String(
-      this.data.gameId || ms.gameId || ''
-    ).trim();
-    if (gameId) return 'scoreStyle_game_' + gameId;
-    return 'scoreStyle_default';
+    return 'scoreStyle_global';
   },
 
-  /** 读取 pageScoreStyle；缺省 classic（与既有默认一致） */
+  /** 读取 pageScoreStyle；无 storage / 非法值 → elite；仅 classic|elite 为有效已存选择 */
   _getPageScoreStyle() {
     try {
       const value = wx.getStorageSync(this._pageScoreStyleKey());
-      return value === 'elite' ? 'elite' : 'classic';
+      return value === 'classic' ? 'classic' : 'elite';
     } catch (e) {
-      return 'classic';
+      return 'elite';
     }
   },
 
