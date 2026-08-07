@@ -2245,23 +2245,36 @@ Page({
     reactionScreenVisible: false,
     reactionScreenFading: false,
     reactionScreenMode: '', // tomato | flower | egg | boxing | kiss | beer | rocket
-    /** Demo：🚀 Observer 火箭炸飞（仅第三方） */
+    /** Demo：🚀 Self 终极火箭（双爆炸 + 飞天 + 变形） */
     reactionRocketFlyVisible: false,
     reactionRocketFlyStyle: '',
     reactionRocketBlastVisible: false,
     reactionRocketBlastStyle: '',
     reactionRocketBlastBurst: false,
+    /** large | small */
+    reactionRocketBlastSize: '',
     reactionRocketShaking: false,
     reactionRocketAvatarVisible: false,
     reactionRocketAvatarUrl: '',
     reactionRocketAvatarStyle: '',
-    reactionRocketAvatarPhase: '', // observer: seat|lift|hold|drop|restore; self: center|face|hold|return|restore
+    /** center|hit|launch|fall|final_face|return|land|land_smoke|restore */
+    reactionRocketAvatarPhase: '',
     reactionRocketBlastFace: false,
     reactionRocketHairPop: false,
     reactionRocketSmokeCover: false,
     reactionRocketSmokeClearing: false,
     reactionRocketFaceShake: false,
     reactionRocketSmokeActive: false,
+    /** 飞天烟雾尾迹 */
+    reactionRocketTrailVisible: false,
+    /** 落座后头顶青烟 */
+    reactionRocketLandSmoke: false,
+    reactionRocketLandSmokeFading: false,
+    /** normal | black | eyes_only | restore — 独立卡通脸，不改原头像 */
+    rocketFaceMode: 'normal',
+    rocketBlackFaceSrc: '/subpackages/scoring/assets/reaction/rocket_black_face.png',
+    rocketEyesOnlyFaceSrc:
+      '/subpackages/scoring/assets/reaction/rocket_eyes_only_face.png',
     /** Demo：🍺 干杯（beer-screen-reaction；self 第一视角 / observer 第三视角） */
     reactionBeerMainVisible: false,
     reactionBeerMainPhase: '', // fly | hold | clash | fade | ready
@@ -2284,6 +2297,10 @@ Page({
     reactionKissLipsVisible: false,
     reactionKissLipsStyle: '',
     reactionKissLipsPhase: '', // fly | hit | hold | fade
+    /** Demo：👄 嘴唇开合：idle | close | open（同 kiss_lips.png，CSS 形变） */
+    reactionKissLipsMouth: 'idle',
+    /** Demo：👄 接触压力缩放脉冲（1 → 1.1 → 1） */
+    reactionKissLipsPress: false,
     reactionKissHearts: [],
     /** Demo：👄 Self 近镜头增强（不影响 observer） */
     reactionKissIsSelf: false,
@@ -2373,7 +2390,13 @@ Page({
     reactionBoxingImpactWord: '',
     reactionBoxingImpactSide: '', // left | right | finale
     reactionBoxingShake: false,
-    /** Demo：👊 击晕阶段（boxing-dizzy-layer） */
+    /** Demo：👊 临时层：normal | boxing_sad | boxing_dizzy | restore */
+    boxingFaceMode: 'normal',
+    boxingSadFaceSrc: '/subpackages/scoring/assets/reaction/boxing_sad_face_blue.png',
+    /** Demo：👊 @螺旋眼睛 / 落座后转 2 圈 */
+    reactionBoxingSpiralEyes: false,
+    reactionBoxingEyesSpinning: false,
+    /** Demo：👊 击晕阶段（boxing-dizzy-layer 头顶星星环） */
     reactionBoxingDizzy: false,
     reactionBoxingDizzyStarCount: 3,
     /** Demo：👊 boxing 离位 — 记分行原头像暂隐（占位尺寸保留） */
@@ -7364,10 +7387,9 @@ Page({
   },
 
   /**
-   * Demo：🚀 SELF（TIGERHOODS）—
-   * 头像进中央(拳击尺寸) → 火箭飞来 → 爆炸+火光+浓烟 → 烟雾散开
-   * → 炸黑漫画脸 → 炸毛 → 轻抖 → 停留 → 旋转回座位。
-   * 不走 Observer 座位炸飞。
+   * Demo：🚀 SELF final-return-smoke-v5 —
+   * 二次超级爆炸 → final 黑脸+爆炸头 → 黑脸滚回座位 → 落座
+   * → 头顶青烟约1s → 消散 → 恢复正常头像。
    */
   _playSelfRocketReaction(rect, avatarUrl, playerId) {
     const hitPlayerId = playerId != null ? String(playerId).trim() : '';
@@ -7400,12 +7422,31 @@ Page({
       selfTiming.centerScale != null ? selfTiming.centerScale : 4;
     const centerW = width * centerScale;
     const centerH = height * centerScale;
-    const entry = this._getRandomSelfReactionEntryPoint(win.winW, win.winH);
+    // rocket-front-hit-fix-v2：固定从屏幕上方进入（正面命中，不走侧/后方）
+    const topPad = Math.max(88, Math.round(Math.min(win.winW, win.winH) * 0.22));
+    const entry = {
+      key: 'top',
+      x: centerX + (Math.random() - 0.5) * 24,
+      y: -topPad
+    };
+    const impactRatio =
+      selfTiming.impactOffsetYRatio != null
+        ? selfTiming.impactOffsetYRatio
+        : 0.12;
+    // 命中点：头像中心偏上（额/鼻），爆炸仍覆盖整脸
+    const impactX = centerX;
+    const impactY = centerY - centerH * impactRatio;
     const flyMs = selfTiming.flyMs != null ? selfTiming.flyMs : 900;
     const toCenterMs =
       selfTiming.toCenterMs != null ? selfTiming.toCenterMs : 420;
-    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 720;
-    const returnSpin = Math.random() > 0.5 ? 360 : -360;
+    const returnMs = selfTiming.returnMs != null ? selfTiming.returnMs : 860;
+    const spinMin =
+      selfTiming.returnSpinMin != null ? selfTiming.returnSpinMin : 180;
+    const spinMax =
+      selfTiming.returnSpinMax != null ? selfTiming.returnSpinMax : 360;
+    const returnSpinAbs =
+      spinMin + Math.floor(Math.random() * (spinMax - spinMin + 1));
+    const returnSpin = (Math.random() > 0.5 ? 1 : -1) * returnSpinAbs;
     const url = avatarUrl != null ? String(avatarUrl) : '';
 
     this._clearRocketReactionTimers();
@@ -7415,12 +7456,22 @@ Page({
       /* ignore */
     }
 
+    const selfTimingFull = rocketReactionTimeline.ROCKET_SELF_TIMING || {};
+    const launchUpRatio =
+      selfTimingFull.launchUpRatio != null ? selfTimingFull.launchUpRatio : 0.22;
+    const launchY = Math.max(36, win.winH * launchUpRatio);
+
     this._rocketTimelineCtx = {
       mode: 'self',
       seatX: seatX,
       seatY: seatY,
       cx: centerX,
       cy: centerY,
+      impactX: impactX,
+      impactY: impactY,
+      launchY: launchY,
+      winW: win.winW,
+      winH: win.winH,
       left: left,
       top: top,
       width: width,
@@ -7430,7 +7481,7 @@ Page({
       centerScale: centerScale,
       startX: entry.x,
       startY: entry.y,
-      entryKey: entry.key || '',
+      entryKey: entry.key || 'top',
       flyMs: flyMs,
       toCenterMs: toCenterMs,
       returnMs: returnMs,
@@ -7450,6 +7501,7 @@ Page({
       reactionRocketBlastVisible: false,
       reactionRocketBlastStyle: '',
       reactionRocketBlastBurst: false,
+      reactionRocketBlastSize: '',
       reactionRocketShaking: false,
       reactionRocketAvatarVisible: false,
       reactionRocketAvatarUrl: url,
@@ -7472,11 +7524,20 @@ Page({
       reactionRocketSmokeClearing: false,
       reactionRocketFaceShake: false,
       reactionRocketSmokeActive: false,
+      reactionRocketTrailVisible: false,
+      reactionRocketLandSmoke: false,
+      reactionRocketLandSmokeFading: false,
+      rocketFaceMode: 'normal',
+      rocketBlackFaceSrc: '/subpackages/scoring/assets/reaction/rocket_black_face.png',
+      rocketEyesOnlyFaceSrc:
+        '/subpackages/scoring/assets/reaction/rocket_eyes_only_face.png',
       reactionAvatarDetached: false,
       reactionAvatarDetachedPlayerId: ''
     });
 
-    const timeline = rocketReactionTimeline.buildRocketSelfTimeline();
+    const timeline = rocketReactionTimeline.buildRocketSelfTimeline({
+      returnSpin: returnSpin
+    });
     this._runRocketReactionTimeline(timeline);
   },
 
@@ -7592,7 +7653,7 @@ Page({
     const page = this;
     const isSelf = true;
 
-    // —— Self：进中央（拳击尺寸）——
+    // —— Self：进中央 ——
     if (action === 'avatar_to_center') {
       if (!isSelf) return;
       const ms = e.duration != null ? e.duration : ctx.toCenterMs || 420;
@@ -7607,6 +7668,8 @@ Page({
         reactionRocketSmokeClearing: false,
         reactionRocketFaceShake: false,
         reactionRocketSmokeActive: false,
+        reactionRocketTrailVisible: false,
+        rocketFaceMode: 'normal',
         reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
           x: ctx.seatX,
           y: ctx.seatY,
@@ -7642,15 +7705,16 @@ Page({
       return;
     }
 
-    if (action === 'rocket_fly') {
+    if (action === 'rocket_enter' || action === 'rocket_fly') {
+      // 尖端朝下：从屏上俯冲正面；初始旋转约 180°
       this.setData({
         reactionRocketFlyVisible: true,
         reactionRocketFlyStyle: this._buildRocketProjectileStyle(
           ctx.startX,
           ctx.startY,
-          -28,
-          0.28,
-          0.75,
+          180,
+          0.32,
+          0.82,
           0
         )
       });
@@ -7658,7 +7722,8 @@ Page({
       return;
     }
 
-    if (action === 'rocket_explosion') {
+    // —— rocket_hit：正面命中（停飞 + 音效；爆炸视觉走 explosion_1）——
+    if (action === 'rocket_hit' || action === 'rocket_hit_front') {
       if (this._rocketArcTimer) {
         clearTimeout(this._rocketArcTimer);
         this._rocketArcTimer = null;
@@ -7672,24 +7737,12 @@ Page({
         volume: e.volume != null ? e.volume : 1,
         seekMs: seekMs
       });
-      // Observer：命中瞬间显座位克隆；Self：中央拳击尺寸 + 同帧浓烟罩
-      const patch = {
+      this.setData({
         reactionRocketFlyVisible: false,
         reactionRocketFlyStyle: '',
-        reactionRocketBlastVisible: true,
-        reactionRocketBlastBurst: true,
-        reactionRocketBlastStyle: 'left:' + ctx.cx + 'px;top:' + ctx.cy + 'px;',
-        reactionRocketShaking: true,
-        reactionRocketSmokeActive: true
-      };
-      if (isSelf) {
-        patch.reactionRocketSmokeCover = true;
-        patch.reactionRocketSmokeClearing = false;
-        patch.reactionRocketBlastFace = false;
-        patch.reactionRocketHairPop = false;
-        patch.reactionRocketAvatarPhase = 'center';
-        patch.reactionRocketAvatarVisible = true;
-        patch.reactionRocketAvatarStyle = this._buildRocketAvatarStyle({
+        reactionRocketAvatarVisible: true,
+        reactionRocketAvatarPhase: 'hit',
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
           x: ctx.cx,
           y: ctx.cy,
           w: ctx.centerW || ctx.width * 4,
@@ -7700,210 +7753,241 @@ Page({
           scaleX: 1,
           scaleY: 1,
           ms: 0
+        })
+      });
+      return;
+    }
+
+    // —— explosion_first / explosion_1：第一次巨大爆炸 ——
+    if (
+      action === 'explosion_first' ||
+      action === 'explosion_1' ||
+      action === 'explosion' ||
+      action === 'rocket_explosion'
+    ) {
+      this._triggerRocketExplosionBurst({
+        size: 'large',
+        duration:
+          e.duration != null
+            ? e.duration
+            : (rocketReactionTimeline.ROCKET_SELF_TIMING &&
+                rocketReactionTimeline.ROCKET_SELF_TIMING.explosion1Ms) ||
+              800,
+        shakeMs: 480,
+        smokeCover: true
+      });
+      return;
+    }
+
+    // —— black_face：卡通爆炸黑脸（独立资源，不改原头像）——
+    if (
+      action === 'black_face' ||
+      action === 'black_face_show' ||
+      action === 'blast_face_reveal'
+    ) {
+      this.setData({
+        rocketFaceMode: 'black',
+        rocketBlackFaceSrc:
+          '/subpackages/scoring/assets/reaction/rocket_black_face.png',
+        reactionRocketAvatarPhase: 'face',
+        reactionRocketSmokeActive: true,
+        reactionRocketSmokeCover: true,
+        reactionRocketSmokeClearing: true,
+        reactionRocketFaceShake: true
+      });
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx) return;
+        page.setData({
+          reactionRocketFaceShake: false,
+          reactionRocketSmokeCover: false,
+          reactionRocketSmokeClearing: false
         });
-      } else {
-        patch.reactionAvatarDetached = true;
-        patch.reactionAvatarDetachedPlayerId = ctx.playerId || '';
-        patch.reactionRocketAvatarVisible = true;
-        patch.reactionRocketAvatarPhase = 'seat';
-        patch.reactionRocketBlastFace = false;
-        patch.reactionRocketHairPop = false;
-        patch.reactionRocketAvatarStyle = this._buildRocketAvatarStyle({
+      }, 420);
+      return;
+    }
+
+    // —— launch_up：炸飞上天 scale 1→0.3 + 旋转 + 烟雾尾迹 ——
+    if (action === 'launch_up') {
+      const ms = e.duration != null ? e.duration : 1700;
+      const scaleEnd =
+        e.scaleEnd != null
+          ? e.scaleEnd
+          : (rocketReactionTimeline.ROCKET_SELF_TIMING &&
+              rocketReactionTimeline.ROCKET_SELF_TIMING.launchScaleEnd) ||
+            0.3;
+      const spin = e.spin != null ? e.spin : 540;
+      if (this._rocketTimelineCtx) {
+        this._rocketTimelineCtx.launchSpin = spin;
+        this._rocketTimelineCtx.launchScaleEnd = scaleEnd;
+      }
+      const launchY =
+        ctx.launchY != null
+          ? ctx.launchY
+          : Math.max(36, (ctx.winH || 640) * 0.22);
+      this.setData({
+        reactionRocketAvatarPhase: 'launch',
+        rocketFaceMode: 'black',
+        reactionRocketTrailVisible: true,
+        reactionRocketSmokeActive: true,
+        reactionRocketSmokeCover: false,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: launchY,
+          w: ctx.centerW || ctx.width * 4,
+          h: ctx.centerH || ctx.height * 4,
+          rise: 0,
+          sway: 0,
+          rot: spin,
+          scaleX: scaleEnd,
+          scaleY: scaleEnd,
+          ms: ms,
+          ease: 'cubic-bezier(0.18, 0.72, 0.22, 1)'
+        })
+      });
+      return;
+    }
+
+    // —— fall_down：从上落回中央（保持黑脸）——
+    if (action === 'fall_down') {
+      const ms = e.duration != null ? e.duration : 950;
+      const prevSpin =
+        ctx.launchSpin != null ? ctx.launchSpin : 540;
+      this.setData({
+        reactionRocketAvatarPhase: 'fall',
+        rocketFaceMode: 'black',
+        reactionRocketTrailVisible: true,
+        reactionRocketSmokeActive: true,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
           x: ctx.cx,
           y: ctx.cy,
-          w: ctx.width,
-          h: ctx.height,
+          w: ctx.centerW || ctx.width * 4,
+          h: ctx.centerH || ctx.height * 4,
+          rise: 0,
+          sway: 0,
+          rot: prevSpin + (prevSpin >= 0 ? 180 : -180),
+          scaleX: 1,
+          scaleY: 1,
+          ms: ms,
+          ease: 'cubic-bezier(0.36, 0.08, 0.28, 1)'
+        })
+      });
+      return;
+    }
+
+    // —— explosion_second_ultimate：第二次超级爆炸 ——
+    if (
+      action === 'explosion_second_ultimate' ||
+      action === 'explosion_2'
+    ) {
+      const peakMs =
+        (rocketReactionTimeline.ROCKET_AUDIO &&
+          rocketReactionTimeline.ROCKET_AUDIO.peakMs) ||
+        660;
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 1,
+          seekMs: e.seekMs != null ? e.seekMs : peakMs
+        });
+      }
+      this.setData({
+        reactionRocketTrailVisible: false,
+        reactionRocketLandSmoke: false,
+        reactionRocketLandSmokeFading: false,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.cx,
+          y: ctx.cy,
+          w: ctx.centerW || ctx.width * 4,
+          h: ctx.centerH || ctx.height * 4,
           rise: 0,
           sway: 0,
           rot: 0,
           scaleX: 1,
           scaleY: 1,
-          ms: 0
-        });
-      }
-      this.setData(patch);
-      this._rocketTimeout(function () {
-        if (!page._rocketTimelineCtx) return;
-        page.setData({ reactionRocketShaking: false });
-      }, 420);
-      this._rocketTimeout(function () {
-        if (!page._rocketTimelineCtx) return;
-        page.setData({
-          reactionRocketBlastVisible: false,
-          reactionRocketBlastBurst: false
-        });
-      }, 980);
-      return;
-    }
-
-    // —— Observer：漫画脸 + 飞起 + 空中停留 + 掉回 ——
-    if (action === 'blast_face_transform') {
-      if (isSelf) return;
-      this.setData({
-        reactionRocketBlastFace: true,
-        reactionRocketHairPop: true,
-        reactionRocketAvatarPhase: 'face',
-        reactionRocketSmokeActive: true
-      });
-      return;
-    }
-
-    if (action === 'avatar_blast_up') {
-      if (isSelf) return;
-      const blastUpMs = ctx.blastUpMs != null ? ctx.blastUpMs : 480;
-      this.setData({
-        reactionRocketAvatarPhase: 'lift',
-        reactionRocketBlastFace: true,
-        reactionRocketHairPop: true,
-        reactionRocketSmokeActive: true,
-        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
-          x: ctx.cx,
-          y: ctx.cy,
-          w: ctx.width,
-          h: ctx.height,
-          rise: ctx.risePx,
-          sway: ctx.swayPx,
-          rot: ctx.rotDeg,
-          scaleX: 1.12,
-          scaleY: 0.88,
-          ms: blastUpMs
+          ms: 120
         })
       });
-      return;
-    }
-
-    if (action === 'avatar_smoke_hold') {
-      if (isSelf) return;
-      this.setData({
-        reactionRocketAvatarPhase: 'hold',
-        reactionRocketBlastFace: true,
-        reactionRocketHairPop: true,
-        reactionRocketSmokeActive: true,
-        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
-          x: ctx.cx,
-          y: ctx.cy,
-          w: ctx.width,
-          h: ctx.height,
-          rise: ctx.risePx,
-          sway: (ctx.swayPx || 0) * 0.55,
-          rot: (ctx.rotDeg || 0) * 0.45,
-          scaleX: 0.96,
-          scaleY: 1.04,
-          ms: 220
-        })
+      this._triggerRocketExplosionBurst({
+        size: 'super',
+        duration:
+          e.duration != null
+            ? e.duration
+            : (rocketReactionTimeline.ROCKET_SELF_TIMING &&
+                rocketReactionTimeline.ROCKET_SELF_TIMING.explosion2Ms) ||
+              900,
+        shakeMs: 560,
+        smokeCover: true
       });
       return;
     }
 
-    if (action === 'avatar_drop_back') {
-      if (isSelf) return;
-      const dropMs = ctx.dropMs != null ? ctx.dropMs : 620;
+    // —— final_black_face：全黑双眼 + 爆炸头（贯穿返回/落座）——
+    if (
+      action === 'final_black_face' ||
+      action === 'rocket_final_black_face' ||
+      action === 'eyes_only' ||
+      action === 'transform_face'
+    ) {
       this.setData({
-        reactionRocketAvatarPhase: 'drop',
-        reactionRocketBlastFace: true,
+        reactionRocketAvatarPhase: 'final_face',
+        rocketFaceMode: 'eyes_only',
+        rocketEyesOnlyFaceSrc:
+          '/subpackages/scoring/assets/reaction/rocket_eyes_only_face.png',
         reactionRocketHairPop: true,
+        reactionRocketTrailVisible: false,
+        reactionRocketLandSmoke: false,
+        reactionRocketLandSmokeFading: false,
         reactionRocketSmokeActive: true,
+        reactionRocketSmokeCover: true,
+        reactionRocketSmokeClearing: true,
+        reactionRocketFaceShake: false,
         reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
           x: ctx.cx,
           y: ctx.cy,
-          w: ctx.width,
-          h: ctx.height,
-          rise: 10,
+          w: ctx.centerW || ctx.width * 4,
+          h: ctx.centerH || ctx.height * 4,
+          rise: 0,
           sway: 0,
           rot: 0,
-          scaleX: 1.1,
-          scaleY: 0.86,
-          ms: dropMs
+          scaleX: 1,
+          scaleY: 1,
+          ms: 160
         })
       });
-      return;
-    }
-
-    // —— Self-only：浓烟 / 露脸 / 旋回 ——
-    if (action === 'smoke_cover') {
-      if (!isSelf) return;
-      this.setData({
-        reactionRocketSmokeCover: true,
-        reactionRocketSmokeClearing: false,
-        reactionRocketSmokeActive: true,
-        reactionRocketBlastFace: false,
-        reactionRocketHairPop: false,
-        reactionRocketAvatarPhase: 'center'
-      });
-      return;
-    }
-
-    if (action === 'smoke_clear') {
-      if (!isSelf) return;
-      this.setData({
-        reactionRocketSmokeCover: true,
-        reactionRocketSmokeClearing: true
-      });
-      const clearMs =
-        e.duration != null
-          ? e.duration
-          : (rocketReactionTimeline.ROCKET_SELF_TIMING &&
-              rocketReactionTimeline.ROCKET_SELF_TIMING.smokeClearMs) ||
-            720;
       this._rocketTimeout(function () {
-        if (!page._rocketTimelineCtx || page._rocketTimelineCtx.mode !== 'self') {
-          return;
-        }
+        if (!page._rocketTimelineCtx) return;
         page.setData({
           reactionRocketSmokeCover: false,
           reactionRocketSmokeClearing: false
         });
-      }, clearMs);
+      }, 380);
       return;
     }
 
-    if (action === 'blast_face_reveal') {
-      if (!isSelf) return;
-      this.setData({
-        reactionRocketBlastFace: true,
-        reactionRocketAvatarPhase: 'face',
-        reactionRocketSmokeActive: true
-      });
-      return;
-    }
-
-    if (action === 'blast_hair_pop') {
-      if (!isSelf) return;
-      this.setData({ reactionRocketHairPop: true });
-      return;
-    }
-
-    if (action === 'avatar_shake') {
-      if (!isSelf) return;
-      this.setData({ reactionRocketFaceShake: true });
-      const shakeMs = e.duration != null ? e.duration : 420;
-      this._rocketTimeout(function () {
-        if (!page._rocketTimelineCtx) return;
-        page.setData({ reactionRocketFaceShake: false });
-      }, shakeMs);
-      return;
-    }
-
-    if (action === 'avatar_hold') {
-      if (!isSelf) return;
-      this.setData({
-        reactionRocketAvatarPhase: 'hold',
-        reactionRocketBlastFace: true,
-        reactionRocketHairPop: true,
-        reactionRocketSmokeActive: true,
-        reactionRocketFaceShake: false
-      });
-      return;
-    }
-
-    if (action === 'avatar_return') {
-      if (!isSelf) return;
-      const ms = e.duration != null ? e.duration : ctx.returnMs || 720;
-      const spin = ctx.returnSpin != null ? ctx.returnSpin : 360;
+    // —— black_face_return：保持黑脸+爆炸头，旋转滚回座位 ——
+    if (
+      action === 'black_face_return' ||
+      action === 'return' ||
+      action === 'avatar_return'
+    ) {
+      const ms = e.duration != null ? e.duration : ctx.returnMs || 860;
+      const spin =
+        e.spin != null
+          ? e.spin
+          : ctx.returnSpin != null
+            ? ctx.returnSpin
+            : 240;
+      if (this._rocketTimelineCtx) {
+        this._rocketTimelineCtx.returnSpin = spin;
+      }
       this.setData({
         reactionRocketAvatarPhase: 'return',
+        rocketFaceMode: 'eyes_only',
+        reactionRocketHairPop: true,
         reactionRocketSmokeActive: false,
         reactionRocketSmokeCover: false,
+        reactionRocketTrailVisible: false,
+        reactionRocketLandSmoke: false,
+        reactionRocketLandSmokeFading: false,
         reactionRocketFaceShake: false,
         reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
           x: ctx.seatX,
@@ -7922,20 +8006,78 @@ Page({
       return;
     }
 
-    if (action === 'avatar_restore') {
-      const restoreX = isSelf ? ctx.seatX : ctx.cx;
-      const restoreY = isSelf ? ctx.seatY : ctx.cy;
+    // —— rocket_land：坐回座位，仍保持 final 黑脸 ——
+    if (action === 'rocket_land') {
+      this.setData({
+        reactionRocketAvatarPhase: 'land',
+        rocketFaceMode: 'eyes_only',
+        reactionRocketHairPop: true,
+        reactionRocketFaceShake: false,
+        reactionRocketLandSmoke: false,
+        reactionRocketLandSmokeFading: false,
+        reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
+          x: ctx.seatX,
+          y: ctx.seatY,
+          w: ctx.width,
+          h: ctx.height,
+          rise: 0,
+          sway: 0,
+          rot: 0,
+          scaleX: 1,
+          scaleY: 1,
+          ms: 120
+        })
+      });
+      return;
+    }
+
+    // —— smoke_after_land：头顶 2–4 缕青烟 ——
+    if (
+      action === 'smoke_after_land' ||
+      action === 'rocket_smoke_after_land'
+    ) {
+      this.setData({
+        reactionRocketAvatarPhase: 'land_smoke',
+        rocketFaceMode: 'eyes_only',
+        reactionRocketHairPop: true,
+        reactionRocketLandSmoke: true,
+        reactionRocketLandSmokeFading: false
+      });
+      return;
+    }
+
+    // —— smoke_fade：青烟消散 ——
+    if (action === 'smoke_fade') {
+      this.setData({
+        reactionRocketLandSmoke: true,
+        reactionRocketLandSmokeFading: true,
+        rocketFaceMode: 'eyes_only',
+        reactionRocketHairPop: true
+      });
+      return;
+    }
+
+    // —— restore_avatar：青烟消散后才恢复正常头像 ——
+    if (
+      action === 'restore_avatar' ||
+      action === 'restore' ||
+      action === 'avatar_restore'
+    ) {
       this.setData({
         reactionRocketAvatarPhase: 'restore',
-        reactionRocketBlastFace: false,
-        reactionRocketHairPop: false,
+        rocketFaceMode: 'restore',
+        reactionRocketTrailVisible: false,
         reactionRocketSmokeActive: false,
         reactionRocketSmokeCover: false,
         reactionRocketSmokeClearing: false,
         reactionRocketFaceShake: false,
+        reactionRocketBlastFace: false,
+        reactionRocketHairPop: false,
+        reactionRocketLandSmoke: false,
+        reactionRocketLandSmokeFading: false,
         reactionRocketAvatarStyle: this._buildRocketAvatarStyle({
-          x: restoreX,
-          y: restoreY,
+          x: ctx.seatX,
+          y: ctx.seatY,
           w: ctx.width,
           h: ctx.height,
           rise: 0,
@@ -7946,12 +8088,62 @@ Page({
           ms: 220
         })
       });
+      this._rocketTimeout(function () {
+        if (!page._rocketTimelineCtx) return;
+        page.setData({ rocketFaceMode: 'normal' });
+      }, 200);
       return;
     }
 
     if (action === 'cleanup') {
       this._cleanupRocketReactionLayer();
     }
+  },
+
+  /** Self 火箭双爆炸视觉：large / small */
+  _triggerRocketExplosionBurst(opts) {
+    const o = opts || {};
+    const page = this;
+    const ctx = this._rocketTimelineCtx || {};
+    const blastX = ctx.impactX != null ? ctx.impactX : ctx.cx;
+    const blastY = ctx.impactY != null ? ctx.impactY : ctx.cy;
+    const size =
+      o.size === 'super' ? 'super' : o.size === 'small' ? 'small' : 'large';
+    const duration = o.duration != null ? o.duration : 800;
+    const shakeMs = o.shakeMs != null ? o.shakeMs : 420;
+    // 重启 burst 动画：先关再开
+    this.setData({
+      reactionRocketBlastVisible: false,
+      reactionRocketBlastBurst: false,
+      reactionRocketBlastSize: size
+    });
+    this._rocketTimeout(function () {
+      if (!page._rocketTimelineCtx) return;
+      const patch = {
+        reactionRocketBlastVisible: true,
+        reactionRocketBlastBurst: true,
+        reactionRocketBlastSize: size,
+        reactionRocketBlastStyle: 'left:' + blastX + 'px;top:' + blastY + 'px;',
+        reactionRocketShaking: true,
+        reactionRocketSmokeActive: true
+      };
+      if (o.smokeCover) {
+        patch.reactionRocketSmokeCover = true;
+        patch.reactionRocketSmokeClearing = false;
+      }
+      page.setData(patch);
+    }, 16);
+    this._rocketTimeout(function () {
+      if (!page._rocketTimelineCtx) return;
+      page.setData({ reactionRocketShaking: false });
+    }, shakeMs);
+    this._rocketTimeout(function () {
+      if (!page._rocketTimelineCtx) return;
+      page.setData({
+        reactionRocketBlastVisible: false,
+        reactionRocketBlastBurst: false
+      });
+    }, duration);
   },
 
   _buildRocketProjectileStyle(x, y, rot, scale, opacity, ms) {
@@ -7987,15 +8179,33 @@ Page({
     const c = ctx || this._rocketTimelineCtx || {};
     const startX = c.startX;
     const startY = c.startY;
-    const endX = c.cx;
-    const endY = c.cy;
+    // Self 正面命中：落点优先 impact（额/鼻），默认头像中心
+    const endX = c.impactX != null ? c.impactX : c.cx;
+    const endY = c.impactY != null ? c.impactY : c.cy;
     const midX = (startX + endX) / 2;
     const midY = (startY + endY) / 2;
     const key = String(c.entryKey || '');
-    const sideSign =
-      key.indexOf('left') >= 0 ? 1 : key.indexOf('right') >= 0 ? -1 : startX < endX ? 1 : -1;
-    const ctrlX = midX + sideSign * (48 + Math.random() * 60);
-    const ctrlY = midY - (40 + Math.random() * 50);
+    let ctrlX;
+    let ctrlY;
+    if (c.mode === 'self' || key === 'top') {
+      // 自上而下俯冲：经过头像顶部再落到正面中心偏上（不绕到后方）
+      const avatarTop =
+        (c.cy != null ? c.cy : endY) -
+        (c.centerH != null ? c.centerH : 160) * 0.5;
+      ctrlX = midX + (Math.random() - 0.5) * 18;
+      ctrlY = Math.min(midY, avatarTop - 12);
+    } else {
+      const sideSign =
+        key.indexOf('left') >= 0
+          ? 1
+          : key.indexOf('right') >= 0
+            ? -1
+            : startX < endX
+              ? 1
+              : -1;
+      ctrlX = midX + sideSign * (48 + Math.random() * 60);
+      ctrlY = midY - (40 + Math.random() * 50);
+    }
     const flyMs = c.flyMs != null ? c.flyMs : 920;
     const easeIn = function (t) {
       return t * t * t;
@@ -8011,10 +8221,12 @@ Page({
       const u = 1 - t;
       const x = u * u * startX + 2 * u * t * ctrlX + t * t * endX;
       const y = u * u * startY + 2 * u * t * ctrlY + t * t * endY;
-      const ang =
-        (Math.atan2(endY - startY, endX - startX) * 180) / Math.PI + 90;
-      const scale = 0.28 + 0.95 * t;
-      const opacity = 0.75 + 0.25 * t;
+      // 局部切线朝向（俯冲朝下 ≈ 180°）
+      const dx = 2 * (1 - t) * (ctrlX - startX) + 2 * t * (endX - ctrlX);
+      const dy = 2 * (1 - t) * (ctrlY - startY) + 2 * t * (endY - ctrlY);
+      const ang = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+      const scale = 0.32 + 0.95 * t;
+      const opacity = 0.82 + 0.18 * t;
       self.setData({
         reactionRocketFlyStyle: self._buildRocketProjectileStyle(
           x,
@@ -8050,6 +8262,7 @@ Page({
       reactionRocketBlastVisible: false,
       reactionRocketBlastStyle: '',
       reactionRocketBlastBurst: false,
+      reactionRocketBlastSize: '',
       reactionRocketShaking: false,
       reactionRocketAvatarVisible: false,
       reactionRocketAvatarUrl: '',
@@ -8061,6 +8274,10 @@ Page({
       reactionRocketSmokeClearing: false,
       reactionRocketFaceShake: false,
       reactionRocketSmokeActive: false,
+      reactionRocketTrailVisible: false,
+      reactionRocketLandSmoke: false,
+      reactionRocketLandSmokeFading: false,
+      rocketFaceMode: 'normal',
       reactionAvatarDetached: false,
       reactionAvatarDetachedPlayerId: ''
     });
@@ -8553,6 +8770,8 @@ Page({
       reactionKissLipsVisible: false,
       reactionKissLipsPhase: '',
       reactionKissLipsStyle: '',
+      reactionKissLipsMouth: 'idle',
+      reactionKissLipsPress: false,
       reactionKissHearts: [],
       reactionKissTargetVisible: false,
       reactionKissTargetStyle: '',
@@ -8934,6 +9153,8 @@ Page({
       this.setData({
         reactionKissLipsVisible: true,
         reactionKissLipsPhase: 'fly',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionKissLipsStyle: this._buildKissLipsStyle(
           ctx.startX,
           ctx.startY,
@@ -8953,7 +9174,79 @@ Page({
       return;
     }
 
-    // 嘴唇停留：贴合中央 + 呼吸缩放；保持卡通害羞脸
+    // 嘴唇闭合亲吻（CSS scaleY 形变，不换资源）
+    if (action === 'kiss_close') {
+      if (!isSelf) return;
+      const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.35;
+      const press = e.press !== false;
+      this.setData({
+        reactionKissLipsVisible: true,
+        reactionKissLipsPhase: 'kiss',
+        reactionKissLipsMouth: 'close',
+        reactionKissLipsPress: !!press,
+        reactionKissLipsStyle:
+          'left:' +
+          (ctx.cx != null ? ctx.cx : ctx.endX) +
+          'px;top:' +
+          (ctx.cy != null ? ctx.cy : ctx.endY) +
+          'px;opacity:1;--kiss-arrive-scale:' +
+          arriveScale.toFixed(2) +
+          ';'
+      });
+      if (press) {
+        const pageClose = this;
+        this._kissTimeout(function () {
+          if (!pageClose._kissTimelineCtx || pageClose._kissTimelineCtx.mode !== 'self') {
+            return;
+          }
+          pageClose.setData({ reactionKissLipsPress: false });
+        }, 280);
+      }
+      return;
+    }
+
+    // 嘴唇轻微打开
+    if (action === 'kiss_open') {
+      if (!isSelf) return;
+      const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.35;
+      this.setData({
+        reactionKissLipsVisible: true,
+        reactionKissLipsPhase: 'kiss',
+        reactionKissLipsMouth: 'open',
+        reactionKissLipsPress: false,
+        reactionKissLipsStyle:
+          'left:' +
+          (ctx.cx != null ? ctx.cx : ctx.endX) +
+          'px;top:' +
+          (ctx.cy != null ? ctx.cy : ctx.endY) +
+          'px;opacity:1;--kiss-arrive-scale:' +
+          arriveScale.toFixed(2) +
+          ';'
+      });
+      return;
+    }
+
+    // 亲吻音效：与首次 kiss_close 同步
+    if (action === 'kiss_sound') {
+      if (!isSelf) return;
+      if (e.sound) {
+        this._playReactionSound(e.sound, {
+          volume: e.volume != null ? e.volume : 1,
+          seekMs: e.seekMs != null ? e.seekMs : 0
+        });
+      } else {
+        this._playReactionSound('kiss', {
+          volume:
+            (kissReactionTimeline.SELF_KISS_TIMING &&
+              kissReactionTimeline.SELF_KISS_TIMING.hitVolume) ||
+            1,
+          seekMs: 0
+        });
+      }
+      return;
+    }
+
+    // 嘴唇停留：贴合中央 + 轻微开合；保持卡通害羞脸
     if (action === 'kiss_hold' || action === 'lip_hold') {
       if (!isSelf) return;
       const arriveScale = ctx.arriveScale != null ? ctx.arriveScale : 1.35;
@@ -8963,6 +9256,8 @@ Page({
       this.setData({
         reactionKissLipsVisible: true,
         reactionKissLipsPhase: 'hold',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionAvatarMode: 'kissShy',
         showKissShyFace: true,
         reactionKissSelfShyVisible: true,
@@ -8983,6 +9278,8 @@ Page({
       if (!isSelf) return;
       this.setData({
         reactionKissLipsPhase: 'fade',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionAvatarMode: 'kissShy',
         showKissShyFace: true,
         reactionKissSelfShyVisible: true
@@ -9000,7 +9297,9 @@ Page({
         page.setData({
           reactionKissLipsVisible: false,
           reactionKissLipsStyle: '',
-          reactionKissLipsPhase: ''
+          reactionKissLipsPhase: '',
+          reactionKissLipsMouth: 'idle',
+          reactionKissLipsPress: false
         });
       }, leaveMs);
       return;
@@ -9019,6 +9318,8 @@ Page({
         reactionKissLipsVisible: false,
         reactionKissLipsStyle: '',
         reactionKissLipsPhase: '',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionKissSelfAvatarStyle: this._buildKissSelfAvatarStyle({
           x: ctx.seatX,
           y: ctx.seatY,
@@ -9080,6 +9381,8 @@ Page({
         reactionKissLipsVisible: false,
         reactionKissLipsStyle: '',
         reactionKissLipsPhase: '',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionKissHearts: [],
         reactionKissIsSelf: false,
         reactionKissTargetVisible: false,
@@ -9109,10 +9412,12 @@ Page({
         clearTimeout(this._kissArcTimer);
         this._kissArcTimer = null;
       }
-      // 命中：音效 + 嘴唇贴合；害羞脸由 shy_face_show（+80ms）触发
+      // 命中：贴合中央 + 轻微放大；开合/音效由 kiss_close + kiss_sound 驱动
       this.setData({
         reactionKissLipsVisible: true,
         reactionKissLipsPhase: 'hit',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionKissSelfAvatarPhase: 'kiss',
         reactionKissLipsStyle:
           'left:' +
@@ -9123,47 +9428,13 @@ Page({
           arriveScale.toFixed(2) +
           ';'
       });
+      // 兼容旧 timeline：若仍挂 sound 则播放；正式路径用 kiss_sound
       if (e.sound) {
         this._playReactionSound(e.sound, {
           volume: e.volume != null ? e.volume : 1,
           seekMs: e.seekMs != null ? e.seekMs : 0
         });
       }
-      const shyDelay =
-        (kissReactionTimeline.SELF_KISS_TIMING &&
-          kissReactionTimeline.SELF_KISS_TIMING.shyDelayMs) ||
-        80;
-      this._kissTimeout(function () {
-        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') {
-          return;
-        }
-        if (!page.data.showKissShyFace) {
-          page._showKissShyFace();
-        }
-      }, shyDelay);
-      const pulseMs =
-        (kissReactionTimeline.SELF_KISS_TIMING &&
-          kissReactionTimeline.SELF_KISS_TIMING.hitPulseMs) ||
-        280;
-      this._kissTimeout(function () {
-        if (!page._kissTimelineCtx || page._kissTimelineCtx.mode !== 'self') {
-          return;
-        }
-        page.setData({
-          reactionKissLipsPhase: 'hold',
-          reactionAvatarMode: 'kissShy',
-          showKissShyFace: true,
-          reactionKissSelfShyVisible: true,
-          reactionKissLipsStyle:
-            'left:' +
-            (ctx.cx != null ? ctx.cx : ctx.endX) +
-            'px;top:' +
-            (ctx.cy != null ? ctx.cy : ctx.endY) +
-            'px;opacity:1;--kiss-arrive-scale:' +
-            arriveScale.toFixed(2) +
-            ';'
-        });
-      }, pulseMs);
       return;
     }
 
@@ -9186,6 +9457,8 @@ Page({
         reactionKissLipsVisible: false,
         reactionKissLipsStyle: '',
         reactionKissLipsPhase: '',
+        reactionKissLipsMouth: 'idle',
+        reactionKissLipsPress: false,
         reactionKissHearts: [],
         reactionKissIsSelf: false,
         reactionKissTargetVisible: false,
@@ -10440,6 +10713,10 @@ Page({
       reactionBoxingImpactWord: '',
       reactionBoxingImpactSide: '',
       reactionBoxingShake: false,
+      boxingFaceMode: 'normal',
+      boxingSadFaceSrc: '/subpackages/scoring/assets/reaction/boxing_sad_face_blue.png',
+      reactionBoxingSpiralEyes: false,
+      reactionBoxingEyesSpinning: false,
       reactionBoxingDizzy: false,
       reactionBoxingDizzyStarCount: 3,
       reactionAvatarDetached: false,
@@ -10474,8 +10751,9 @@ Page({
   },
 
   /**
-   * Demo：👊 boxing-reaction-layer — timeline 驱动动画+拳击音频同步。
-   * 连击节奏对齐 boxing.mp3 峰值；终结拳复用第一拳音频（seek）并提高音量。
+   * Demo：👊 boxing Self —
+   * 第一拳立即卡通脸 → 二三拳 → 金星⭐ → 再打几拳
+   * → 最后一拳 @@ → 打回座位 → 落座@转2圈 → 恢复。
    */
   _playScreenBoxingReaction(rect, avatarUrl, playerId) {
     let winW = 375;
@@ -10553,14 +10831,20 @@ Page({
       reactionBoxingImpactWord: '',
       reactionBoxingImpactSide: '',
       reactionBoxingShake: false,
+      boxingFaceMode: 'normal',
+      boxingSadFaceSrc: '/subpackages/scoring/assets/reaction/boxing_sad_face_blue.png',
+      reactionBoxingSpiralEyes: false,
+      reactionBoxingEyesSpinning: false,
       reactionBoxingDizzy: false,
       reactionBoxingDizzyStarCount: dizzyStars
     });
 
     const timeline = boxingReactionTimeline.buildBoxingReactionTimeline({
-      dizzyMs: 1000,
-      chargeMs: 500,
-      flyBackMs: flyBackMs
+      chargeMs: 380,
+      flyBackMs: flyBackMs,
+      eyesSpinMs: boxingReactionTimeline.EYES_SPIN_2_MS || 1100,
+      comboHitCount: 6,
+      starsAfterHit: 3
     });
     this._runBoxingReactionTimeline(timeline);
   },
@@ -10582,11 +10866,15 @@ Page({
     const e = ev || {};
     const action = e.action != null ? String(e.action) : '';
     const ctx = this._boxingTimelineCtx || {};
-    if (action === 'fly_in') {
+    if (action === 'boxing_enter' || action === 'fly_in') {
       const next = this._cloneBoxingDeform(this._boxingDeform);
       next.base = ctx.centerScale != null ? ctx.centerScale : 4;
       this._boxingDeform = next;
       this.setData({
+        reactionBoxingSpiralEyes: false,
+        reactionBoxingEyesSpinning: false,
+        reactionBoxingDizzy: false,
+        boxingFaceMode: 'normal',
         reactionBoxingShellStyle: this._buildBoxingShellStyle(
           ctx.centerCx,
           ctx.centerCy,
@@ -10612,17 +10900,51 @@ Page({
       });
       return;
     }
-    if (action === 'hit') {
+    // 连续拳 hit_1..hit_6（卡通脸；金星后仍可继续；全程无 @眼）
+    if (
+      action === 'hit' ||
+      action === 'hit_1' ||
+      action === 'hit_2' ||
+      action === 'hit_3' ||
+      action === 'hit_4' ||
+      action === 'hit_5' ||
+      action === 'hit_6'
+    ) {
       this._boxingHitImpact({
         side: e.side,
         punchIndex: e.punchIndex,
         finale: false
       });
+      // 连击震动；不出现 @眼；若已出金星则保持金星环
+      this.setData({
+        reactionBoxingShake: true,
+        reactionBoxingSpiralEyes: false,
+        reactionBoxingEyesSpinning: false,
+        reactionBoxingDizzy: !!this.data.reactionBoxingDizzy
+      });
       return;
     }
-    if (action === 'dizzy_start') {
+    if (
+      action === 'show_boxing_face' ||
+      action === 'boxing_sad_face_show'
+    ) {
+      // 第一拳命中瞬间：隐藏原头像副本，显示卡通脸（全程保持至最终晕眩）
+      this.setData({
+        boxingFaceMode: 'boxing_sad',
+        boxingSadFaceSrc:
+          '/subpackages/scoring/assets/reaction/boxing_sad_face_blue.png',
+        reactionBoxingSpiralEyes: false,
+        reactionBoxingEyesSpinning: false
+      });
+      return;
+    }
+    if (action === 'show_star_ring' || action === 'dizzy_start') {
+      // 金星环：被打晕前兆；仍无 @眼，保持卡通表情
       this.setData({
         reactionBoxingDizzy: true,
+        reactionBoxingSpiralEyes: false,
+        reactionBoxingEyesSpinning: false,
+        boxingFaceMode: 'boxing_sad',
         reactionBoxingGloveLeftPhase: '',
         reactionBoxingGloveRightPhase: '',
         reactionBoxingImpactVisible: false,
@@ -10633,7 +10955,9 @@ Page({
     }
     if (action === 'finale_charge') {
       this.setData({
-        reactionBoxingDizzy: false,
+        reactionBoxingDizzy: true,
+        reactionBoxingSpiralEyes: false,
+        boxingFaceMode: 'boxing_sad',
         reactionBoxingGloveRightPhase: 'charge',
         reactionBoxingGloveLeftPhase: ''
       });
@@ -10643,12 +10967,12 @@ Page({
     if (action === 'finale_glove') {
       this._boxingGloveEnter({
         side: 'right',
-        finale: true
+        finale: true,
+        keepDizzy: true
       });
       return;
     }
-    if (action === 'finale_hit') {
-      // 终结：停掉连击整轨，只播第一拳独立片段（略提高音量）
+    if (action === 'final_hit' || action === 'finale_hit') {
       try {
         reactionSounds.stopReactionSound('boxing');
       } catch (err) {
@@ -10667,12 +10991,31 @@ Page({
       });
       return;
     }
-    if (action === 'fly_back_start') {
+    if (
+      action === 'show_at_eye' ||
+      action === 'spiral_eyes_show'
+    ) {
+      // 最后一拳后：真正晕眩 boxing_dizzy_face + @@
+      this.setData({
+        boxingFaceMode: 'boxing_dizzy',
+        boxingSadFaceSrc:
+          '/subpackages/scoring/assets/reaction/boxing_sad_face_blue.png',
+        reactionBoxingSpiralEyes: true,
+        reactionBoxingEyesSpinning: false,
+        reactionBoxingDizzy: false,
+        reactionBoxingShake: false
+      });
+      return;
+    }
+    if (action === 'return_to_seat' || action === 'fly_back_start') {
       const potato = this._cloneBoxingDeform(this._boxingDeform);
       potato.base = Math.max(1.35, potato.base * 0.55);
       potato.rot += 140;
       this._boxingDeform = potato;
       this.setData({
+        boxingFaceMode: 'boxing_dizzy',
+        reactionBoxingSpiralEyes: true,
+        reactionBoxingEyesSpinning: false,
         reactionBoxingDizzy: false,
         reactionBoxingGloveLeftPhase: '',
         reactionBoxingGloveRightPhase: '',
@@ -10697,6 +11040,8 @@ Page({
       mid.rot += 80;
       this._boxingDeform = mid;
       this.setData({
+        boxingFaceMode: 'boxing_dizzy',
+        reactionBoxingSpiralEyes: true,
         reactionBoxingShellStyle: this._buildBoxingShellStyle(
           ctx.seatCx,
           ctx.seatCy,
@@ -10708,13 +11053,52 @@ Page({
       this._applyBoxingDeformStyles(mid, (ctx.flyBackMs || 620) - 140);
       return;
     }
-    if (action === 'restore_circle') {
+    if (
+      action === 'land_dizzy_rotate' ||
+      action === 'land_dizzy' ||
+      action === 'eyes_spin_2'
+    ) {
+      const spinMs = e.duration != null ? e.duration : 1100;
       const circle = this._buildBoxingCircleDeform(1);
       this._boxingDeform = circle;
+      // 落座：保持晕眩脸+@眼转 2 圈；轻微晃动（无金星）
       this._applyBoxingDeformStyles(circle, 220, {
+        boxingFaceMode: 'boxing_dizzy',
+        reactionBoxingSpiralEyes: true,
+        reactionBoxingEyesSpinning: true,
+        reactionBoxingDizzy: false,
+        reactionBoxingShake: false,
         reactionAvatarDetached: false,
         reactionAvatarDetachedPlayerId: ''
       });
+      this.setData({
+        boxingFaceMode: 'boxing_dizzy',
+        reactionBoxingSpiralEyes: true,
+        reactionBoxingEyesSpinning: true,
+        reactionBoxingDizzy: false
+      });
+      const self = this;
+      this._boxingTimeout(function () {
+        if (!self._boxingTimelineCtx) return;
+        self.setData({ reactionBoxingEyesSpinning: false });
+      }, spinMs);
+      return;
+    }
+    if (
+      action === 'restore' ||
+      action === 'boxing_face_restore'
+    ) {
+      this.setData({
+        boxingFaceMode: 'restore',
+        reactionBoxingSpiralEyes: false,
+        reactionBoxingEyesSpinning: false,
+        reactionBoxingDizzy: false,
+        reactionBoxingShake: false
+      });
+      const self = this;
+      this._boxingTimeout(function () {
+        self.setData({ boxingFaceMode: 'normal' });
+      }, 40);
       return;
     }
     if (action === 'fade_out') {
@@ -10743,6 +11127,7 @@ Page({
   _boxingGloveEnter(opts) {
     const o = opts || {};
     const finale = !!o.finale;
+    const keepDizzy = !!o.keepDizzy;
     const side = o.side === 'left' ? 'left' : 'right';
     const patch = {
       reactionBoxingImpactVisible: false
@@ -10758,11 +11143,17 @@ Page({
     const self = this;
     this._boxingTimeout(function () {
       if (finale) {
-        self.setData({
+        const strikePatch = {
           reactionBoxingGloveRightPhase: 'strike',
           reactionBoxingGloveLeftPhase: '',
-          reactionBoxingDizzy: false
-        });
+          boxingFaceMode: 'boxing_sad',
+          // 终结拳命中前仍无 @眼；show_at_eye 再切换
+          reactionBoxingSpiralEyes: false
+        };
+        if (!keepDizzy) {
+          strikePatch.reactionBoxingDizzy = false;
+        }
+        self.setData(strikePatch);
         return;
       }
       if (side === 'left') {
@@ -10797,12 +11188,14 @@ Page({
     );
     const impact = this._buildBoxingImpactDeform(settled, side, finale);
     this._boxingDeform = settled;
+    // 金星阶段继续连击时保持星环；终结拳由后续 show_at_eye 接管
+    const keepStarRing = !finale && !!this.data.reactionBoxingDizzy;
     this.setData({
       reactionBoxingImpactVisible: true,
       reactionBoxingImpactWord: word,
       reactionBoxingImpactSide: finale ? 'finale' : side,
       reactionBoxingShake: true,
-      reactionBoxingDizzy: false
+      reactionBoxingDizzy: keepStarRing
     });
     this._applyBoxingDeformStyles(impact, finale ? 60 : 70);
     const self = this;
@@ -13651,7 +14044,8 @@ Page({
   },
 
   /**
-   * Demo：🌹 Observer 自然花环 —— 不规则角度/距离/大小；分批开放 + 花瓣飘落。
+   * Demo：🌹 Observer bloom-flower-ring-final-v7 —
+   * 花束到达 → 盛开完整花朵圆周花环（flowerRingConfig）→ 轻微外扩 → 少量花瓣辅助。
    */
   _playPlayerActionFlowerWreath(opts) {
     const o = opts || {};
@@ -13694,56 +14088,74 @@ Page({
     }
 
     const obsTiming = flowerReactionTimeline.FLOWER_TIMING.observer || {};
-    // size-adjust-v3：主花放大约 1.5–2×，花环贴近头像边缘（中心不遮挡）
-    const edgePad = obsTiming.wreathEdgePad != null ? obsTiming.wreathEdgePad : 14;
-    const wreathR = Math.max(
-      28,
-      (Number.isFinite(avatarSize) ? avatarSize : 40) / 2 + edgePad
-    );
-    const wreathCountMin = obsTiming.wreathCountMin != null ? obsTiming.wreathCountMin : 6;
-    const wreathCountMax = obsTiming.wreathCountMax != null ? obsTiming.wreathCountMax : 10;
-    const wreathCount =
-      wreathCountMin +
-      Math.floor(Math.random() * (wreathCountMax - wreathCountMin + 1));
-    const scaleMin =
-      obsTiming.flowerScaleMin != null ? obsTiming.flowerScaleMin : 1.05;
-    const scaleMax =
-      obsTiming.flowerScaleMax != null ? obsTiming.flowerScaleMax : 1.45;
-    const fontBase =
-      obsTiming.flowerFontBase != null ? obsTiming.flowerFontBase : 30;
-    const rawItems = flowerReactionTimeline.buildNaturalWreathItems({
-      baseR: wreathR,
-      count: wreathCount,
-      countMin: wreathCountMin,
-      countMax: wreathCountMax,
-      scaleMin: scaleMin,
-      scaleMax: scaleMax,
-      radiusJitterMin: 0.96,
-      radiusJitterMax: 1.06,
-      mode: this._flowerBouquetMode || 'red_main'
-    });
-    const items = rawItems.map(function (it) {
-      // 相对 balance-v2 的 ~16px 基准放大约 1.5–2×
-      const fontSize =
-        Math.max(24, Math.round(fontBase * (it.scale || 1))) + 'px';
-      const box = Math.max(36, Math.round(38 * (it.scale || 1)));
-      const half = (box / 2).toFixed(1);
+    const avatarW = Number.isFinite(avatarSize) && avatarSize > 0 ? avatarSize : 40;
+    const avatarR = avatarW / 2;
+    const countMin = obsTiming.wreathCountMin != null ? obsTiming.wreathCountMin : 8;
+    const countMax = obsTiming.wreathCountMax != null ? obsTiming.wreathCountMax : 12;
+    const flowerCount =
+      countMin + Math.floor(Math.random() * (countMax - countMin + 1));
+    const spread =
+      obsTiming.flowerSpread != null ? Number(obsTiming.flowerSpread) : 1.05;
+
+    const ring =
+      flowerReactionTimeline.buildOpenFlowerRing
+        ? flowerReactionTimeline.buildOpenFlowerRing({
+            avatarSize: avatarW,
+            avatarR: avatarR,
+            count: flowerCount,
+            countMin: countMin,
+            countMax: countMax,
+            spread: 1,
+            gapFill: obsTiming.flowerGapFill,
+            edgeClearance:
+              obsTiming.wreathEdgePad != null ? obsTiming.wreathEdgePad : 2,
+            mode: this._flowerBouquetMode || 'red_main'
+          })
+        : {
+            items: flowerReactionTimeline.buildNaturalWreathItems({
+              baseR: avatarR + 14,
+              count: flowerCount,
+              countMin: countMin,
+              countMax: countMax,
+              mode: this._flowerBouquetMode || 'red_main'
+            }),
+            layout: { radius: avatarR + 14, size: avatarW * 0.25, count: flowerCount },
+            flowerRingConfig: null
+          };
+    const rawItems = ring.items || [];
+    this._flowerOpenRingLayout = ring.layout || null;
+    this._flowerRingConfig = ring.flowerRingConfig || null;
+
+    const mapFlowerItem = function (it, radiusScale) {
+      const r = Number(it.radius) * (radiusScale != null ? radiusScale : 1);
+      const size = it.size != null ? Number(it.size) : avatarW * 0.25;
+      const half = (size / 2).toFixed(1);
+      const petalColor = it.petalColor || '#e11d48';
+      const centerColor = it.centerColor || '#fff7ed';
+      const petalCount = it.petalCount === 6 ? 6 : 5;
       return {
         id: it.id,
-        emoji: it.emoji,
-        type: it.type,
+        isPetal: false,
+        isOpenFlower: true,
+        hasSixPetals: petalCount === 6,
+        emoji: it.emoji || '🌹',
+        type: it.type || 'rose',
         color: it.color,
-        scale: it.scale,
-        rotate: it.rotate,
-        filter: it.filter,
+        family: it.family || 'red',
+        filter: it.filter || 'none',
+        petalColor: petalColor,
+        centerColor: centerColor,
+        petalCount: petalCount,
         delay: it.delay,
         batch: it.batch,
-        fontSize: fontSize,
+        deg: it.deg,
+        radius: r,
+        size: size,
         style:
           'width:' +
-          box +
+          size +
           'px;height:' +
-          box +
+          size +
           'px;margin:-' +
           half +
           'px 0 0 -' +
@@ -13751,12 +14163,21 @@ Page({
           'px;transform:rotate(' +
           it.deg +
           'deg) translateY(-' +
-          it.radius +
+          r.toFixed(1) +
           'px) rotate(' +
           (-it.deg + (it.rotate || 0)) +
-          'deg);'
+          'deg);',
+        bloomStyle: 'animation-delay:' + (it.delay || '0s') + ';',
+        petalStyle: 'background:' + petalColor + ';',
+        centerStyle: 'background:' + centerColor + ';'
       };
+    };
+
+    const items = rawItems.map(function (it) {
+      return mapFlowerItem(it, 1);
     });
+    this._flowerBloomRingRaw = rawItems;
+    this._flowerBloomRingMap = mapFlowerItem;
 
     this.setData({
       playerActionFlowerBloom: true,
@@ -13772,12 +14193,13 @@ Page({
     });
 
     const self = this;
-    const ringExpandMs = obsTiming.ringExpandMs != null ? obsTiming.ringExpandMs : 360;
+    const ringExpandMs = obsTiming.ringExpandMs != null ? obsTiming.ringExpandMs : 340;
     const petalsAtMs = obsTiming.petalsAtMs != null ? obsTiming.petalsAtMs : 900;
     const fadeAtMs = obsTiming.fadeAtMs != null ? obsTiming.fadeAtMs : 1800;
     const cleanupAfterFadeMs =
       obsTiming.cleanupAfterFadeMs != null ? obsTiming.cleanupAfterFadeMs : 420;
 
+    // flower_bloom：飞入花消失 → 多朵开放花逐朵开放成环
     this._playerActionFlowerBloomTimer = setTimeout(function () {
       self._playerActionFlowerBloomTimer = null;
       self.setData({
@@ -13796,25 +14218,33 @@ Page({
       self._playerActionFlowerWreathTimer = setTimeout(function () {
         self._playerActionFlowerWreathTimer = null;
         self.setData({ playerActionWreathAppear: true });
-      }, 30);
-    }, 220);
+      }, 24);
+    }, 180);
 
-    // flower_ring：轻量第二批（数量已少，仅轻微展开感）
+    // flower_ring：花环轻微外扩（保持连续，不拉开断裂）
     this._playerActionFlowerExpandTimer = setTimeout(function () {
       self._playerActionFlowerExpandTimer = null;
       self._dispatchFlowerTimelineEvent({ action: 'flower_ring' });
       self._dispatchFlowerTimelineEvent({ action: 'flower_ring_expand' });
-      self.setData({ playerActionWreathExpand: true });
-    }, 220 + ringExpandMs);
+      const raw = self._flowerBloomRingRaw || [];
+      const mapper = self._flowerBloomRingMap || mapFlowerItem;
+      const expanded = raw.map(function (it) {
+        return mapper(it, spread);
+      });
+      self.setData({
+        playerActionWreathExpand: true,
+        playerActionWreathItems: expanded
+      });
+    }, 180 + ringExpandMs);
 
-    // flower_petal：少量缓慢飘落
+    // flower_petal：少量缓慢飘落（辅助）
     this._playerActionFlowerPetalTimer = setTimeout(function () {
       self._playerActionFlowerPetalTimer = null;
       self._dispatchFlowerTimelineEvent({ action: 'flower_petals_fall' });
       self._playObserverFlowerPetals(avatarCx, avatarCy);
-    }, 220 + petalsAtMs);
+    }, 180 + petalsAtMs);
 
-    // 环绕停留约 1.5–2s → 淡出
+    // 停留约 1.5–2s → 淡出
     this._playerActionFlowerFadeTimer = setTimeout(function () {
       self._playerActionFlowerFadeTimer = null;
       self._dispatchFlowerTimelineEvent({ action: 'flower_fade' });
@@ -13827,6 +14257,10 @@ Page({
       self._playerActionFlowerClearTimer = setTimeout(function () {
         self._playerActionFlowerClearTimer = null;
         self._dispatchFlowerTimelineEvent({ action: 'cleanup' });
+        self._flowerBloomRingRaw = null;
+        self._flowerBloomRingMap = null;
+        self._flowerOpenRingLayout = null;
+        self._flowerRingConfig = null;
         self.setData({
           playerActionWreathVisible: false,
           playerActionWreathAppear: false,
@@ -13839,7 +14273,7 @@ Page({
         });
         self._playerActionFlowerBusy = false;
       }, cleanupAfterFadeMs);
-    }, 220 + fadeAtMs);
+    }, 180 + fadeAtMs);
   },
 
   /** Demo：Observer 结束阶段少量花瓣缓慢飘落（3–8） */

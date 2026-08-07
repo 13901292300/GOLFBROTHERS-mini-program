@@ -1,17 +1,27 @@
 /**
  * Demo：boxing reaction timeline（仅 demo-weekend-amateur）
  *
- * 连击：整段 boxing.mp3 节奏（峰值对齐 hit）
- * 终结：独立片段 boxing_hit_first.wav（从原音频截取第一拳，不重播完整轨）
+ * Self 流程（眼冒金星版）：
+ *   boxing_enter
+ *   → hit_1 + show_boxing_face（立即卡通脸）
+ *   → hit_2 → hit_3
+ *   → show_star_ring（头顶旋转金星 ⭐⭐⭐）
+ *   → hit_4 → hit_5 → hit_6（金星期间继续几拳）
+ *   → final_hit → show_at_eye（@@ 彻底晕）
+ *   → return_to_seat → land_dizzy_rotate（@转 2 圈）→ restore
+ *
+ * 连击阶段：卡通脸 + 震动；金星后仍无 @眼
+ * 最后一拳后才 @@
+ *
+ * 连击：boxing.mp3 前 6 峰；终结：boxing_hit_first.wav
  */
 
-/** boxing.mp3 内明显拳击峰值（ms，相对音频 t=0）— 7 击 */
+/** boxing.mp3 峰值（ms） */
 const BOXING_AUDIO_HIT_MS = [514, 664, 814, 965, 1162, 1312, 1462];
+/** 第三拳后出金星；金星后再打若干拳 */
+const BOXING_STARS_AFTER_HIT = 3;
+const BOXING_COMBO_HIT_COUNT = 6;
 
-/**
- * boxing_hit_first.wav 截取区间（相对原 boxing 轨）
- * start 430ms → end 640ms（第一拳体，止于第二拳前）
- */
 const BOXING_HIT_FIRST_CLIP = {
   source: 'boxing.mp3',
   startMs: 430,
@@ -19,29 +29,39 @@ const BOXING_HIT_FIRST_CLIP = {
   file: 'boxing_hit_first.wav'
 };
 
-/** 拳套冲入提前量：CSS punch ~280ms，命中约在 48% ≈ 134ms */
 const GLOVE_LEAD_MS = 134;
+const SHOW_FACE_DELAY_MS = 0;
+/** 第三拳后稍顿出金星 */
+const STAR_RING_AFTER_HIT3_MS = 80;
+const CHARGE_MS = 380;
+const FLY_BACK_MS = 620;
+const EYES_SPIN_2_MS = 1100;
+const RESTORE_AFTER_SPIN_MS = 80;
 
 const FLY_IN_AT = 30;
 const FLY_IN_MS = 420;
-/** 头像到位后稍停再启音频/连击 */
 const COMBO_AUDIO_DELAY_AFTER_FLY = 80;
 
 /**
  * @param {object=} opts
- * @returns {Array<{time:number, action:string, side?:string, punchIndex?:number, sound?:string, volume?:number, seekMs?:number}>}
  */
 function buildBoxingReactionTimeline(opts) {
   const o = opts && typeof opts === 'object' ? opts : {};
-  const dizzyMs = o.dizzyMs != null ? o.dizzyMs : 1000;
-  const chargeMs = o.chargeMs != null ? o.chargeMs : 500;
-  const flyBackMs = o.flyBackMs != null ? o.flyBackMs : 620;
-  const hits = BOXING_AUDIO_HIT_MS.slice();
+  const chargeMs = o.chargeMs != null ? o.chargeMs : CHARGE_MS;
+  const flyBackMs = o.flyBackMs != null ? o.flyBackMs : FLY_BACK_MS;
+  const eyesSpinMs = o.eyesSpinMs != null ? o.eyesSpinMs : EYES_SPIN_2_MS;
+  const comboCount =
+    o.comboHitCount != null ? Number(o.comboHitCount) : BOXING_COMBO_HIT_COUNT;
+  const starsAfterHit =
+    o.starsAfterHit != null ? Number(o.starsAfterHit) : BOXING_STARS_AFTER_HIT;
+  const hits = BOXING_AUDIO_HIT_MS.slice(
+    0,
+    Math.max(starsAfterHit, Math.min(6, comboCount))
+  );
   const comboAudioAt = FLY_IN_AT + FLY_IN_MS + COMBO_AUDIO_DELAY_AFTER_FLY;
 
   const events = [];
-  events.push({ time: FLY_IN_AT, action: 'fly_in' });
-  // 连击：整段 boxing 节奏轨（只播一次）
+  events.push({ time: FLY_IN_AT, action: 'boxing_enter' });
   events.push({
     time: comboAudioAt,
     action: 'audio_start',
@@ -54,28 +74,40 @@ function buildBoxingReactionTimeline(opts) {
     const peak = hits[i];
     const hitAt = comboAudioAt + peak;
     const side = i % 2 === 0 ? 'left' : 'right';
+    const punchIndex = i + 1;
     events.push({
       time: Math.max(comboAudioAt, hitAt - GLOVE_LEAD_MS),
       action: 'glove_enter',
       side: side,
-      punchIndex: i
+      punchIndex: punchIndex
     });
     events.push({
       time: hitAt,
-      action: 'hit',
+      action: 'hit_' + punchIndex,
       side: side,
-      punchIndex: i
+      punchIndex: punchIndex
     });
+    // 第一拳：立即卡通脸
+    if (i === 0) {
+      events.push({
+        time: hitAt + SHOW_FACE_DELAY_MS,
+        action: 'show_boxing_face'
+      });
+    }
+    // 第三拳后：头顶旋转金星（眼冒金星），之后继续几拳
+    if (punchIndex === starsAfterHit) {
+      events.push({
+        time: hitAt + STAR_RING_AFTER_HIT3_MS,
+        action: 'show_star_ring'
+      });
+    }
   }
 
-  const lastHitAt = comboAudioAt + hits[hits.length - 1];
-  const dizzyAt = lastHitAt + 280;
-  events.push({ time: dizzyAt, action: 'dizzy_start' });
-
-  const chargeAt = dizzyAt + dizzyMs;
+  const lastComboHitAt = comboAudioAt + hits[hits.length - 1];
+  // 金星阶段最后几拳打完 → 稍顿蓄力终结拳
+  const chargeAt = lastComboHitAt + 200;
   events.push({ time: chargeAt, action: 'finale_charge' });
 
-  // 终结：蓄力后延迟命中；只播第一拳独立片段，不重播完整 boxing
   const finaleHitAt = chargeAt + chargeMs;
   events.push({
     time: Math.max(chargeAt + 40, finaleHitAt - GLOVE_LEAD_MS),
@@ -84,19 +116,33 @@ function buildBoxingReactionTimeline(opts) {
   });
   events.push({
     time: finaleHitAt,
-    action: 'finale_hit',
+    action: 'final_hit',
     side: 'right',
     sound: 'boxing_hit_first',
     volume: 1,
     seekMs: 0
   });
+  // 最后一拳后：@@ 彻底晕
+  events.push({
+    time: finaleHitAt + 40,
+    action: 'show_at_eye'
+  });
 
   const flyBackAt = finaleHitAt + 180;
-  events.push({ time: flyBackAt, action: 'fly_back_start' });
+  events.push({ time: flyBackAt, action: 'return_to_seat' });
   events.push({ time: flyBackAt + 140, action: 'fly_back_seat' });
-  events.push({ time: flyBackAt + flyBackMs, action: 'restore_circle' });
-  events.push({ time: flyBackAt + flyBackMs + 280, action: 'fade_out' });
-  events.push({ time: flyBackAt + flyBackMs + 280 + 520, action: 'cleanup' });
+
+  const landAt = flyBackAt + flyBackMs;
+  events.push({
+    time: landAt,
+    action: 'land_dizzy_rotate',
+    duration: eyesSpinMs
+  });
+
+  const restoreAt = landAt + 40 + eyesSpinMs + RESTORE_AFTER_SPIN_MS;
+  events.push({ time: restoreAt, action: 'restore' });
+  events.push({ time: restoreAt + 200, action: 'fade_out' });
+  events.push({ time: restoreAt + 200 + 480, action: 'cleanup' });
 
   events.sort(function (a, b) {
     return a.time - b.time;
@@ -106,8 +152,11 @@ function buildBoxingReactionTimeline(opts) {
 
 module.exports = {
   BOXING_AUDIO_HIT_MS: BOXING_AUDIO_HIT_MS,
+  BOXING_COMBO_HIT_COUNT: BOXING_COMBO_HIT_COUNT,
+  BOXING_STARS_AFTER_HIT: BOXING_STARS_AFTER_HIT,
   BOXING_HIT_FIRST_CLIP: BOXING_HIT_FIRST_CLIP,
   GLOVE_LEAD_MS: GLOVE_LEAD_MS,
   FLY_IN_MS: FLY_IN_MS,
+  EYES_SPIN_2_MS: EYES_SPIN_2_MS,
   buildBoxingReactionTimeline: buildBoxingReactionTimeline
 };

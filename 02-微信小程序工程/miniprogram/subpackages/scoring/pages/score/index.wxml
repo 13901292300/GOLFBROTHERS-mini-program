@@ -2195,39 +2195,57 @@
       </view>
     </view>
 
-    <!-- 👊 卡通格斗：连击累积变形 → 击晕 → 巨型拳蓄力终结 → 飞回复圆 -->
+    <!-- 👊 第一拳卡通脸 → 金星⭐ → 再连击 → 终拳@@ → 打回 → 落座转2圈 -->
     <view
       wx:if="{{reactionScreenMode === 'boxing'}}"
-      class="boxing-reaction-layer {{reactionBoxingShake ? 'is-shake' : ''}} {{reactionBoxingDizzy ? 'is-dizzy' : ''}}"
+      class="boxing-reaction-layer {{reactionBoxingShake ? 'is-shake' : ''}} {{reactionBoxingDizzy ? 'is-dizzy' : ''}} {{reactionBoxingEyesSpinning ? 'is-land-sway' : ''}}"
     >
       <view class="boxing-reaction-layer__shell" style="{{reactionBoxingShellStyle}}">
-        <!-- 击晕摇晃包裹层（不改变形 transform） -->
-        <view class="boxing-reaction-layer__sway {{reactionBoxingDizzy ? 'is-sway' : ''}}">
+        <!-- 金星阶段 / 落座晃动包裹层 -->
+        <view class="boxing-reaction-layer__sway {{reactionBoxingDizzy || reactionBoxingEyesSpinning ? 'is-sway' : ''}}">
           <view class="boxing-reaction-layer__body" style="{{reactionBoxingBodyStyle}}">
-            <view class="boxing-reaction-layer__mask" style="{{reactionBoxingMaskStyle}}">
+            <view class="boxing-reaction-layer__mask mode-{{boxingFaceMode}}" style="{{reactionBoxingMaskStyle}}">
+              <!-- normal/restore：原头像副本；sad/dizzy：独立卡通脸（不改原头像） -->
               <image
-                wx:if="{{reactionBoxingAvatarUrl}}"
+                wx:if="{{boxingFaceMode !== 'boxing_sad' && boxingFaceMode !== 'boxing_dizzy' && reactionBoxingAvatarUrl}}"
                 class="boxing-reaction-layer__img"
                 src="{{reactionBoxingAvatarUrl}}"
                 mode="aspectFill"
               />
-              <view wx:else class="boxing-reaction-layer__fallback">拳</view>
+              <view
+                wx:elif="{{boxingFaceMode !== 'boxing_sad' && boxingFaceMode !== 'boxing_dizzy'}}"
+                class="boxing-reaction-layer__fallback"
+              >拳</view>
+              <image
+                wx:if="{{boxingFaceMode === 'boxing_sad' || boxingFaceMode === 'boxing_dizzy'}}"
+                class="boxing-reaction-layer__img boxing-sad-face-image"
+                src="{{boxingSadFaceSrc}}"
+                mode="aspectFill"
+              />
+              <!-- @眼睛：仅最终晕眩 / 返回 / 落座；连击阶段不出现 -->
+              <view
+                wx:if="{{reactionBoxingSpiralEyes && boxingFaceMode === 'boxing_dizzy'}}"
+                class="boxing-spiral-eyes {{reactionBoxingEyesSpinning ? 'is-spin-2' : 'is-idle'}}"
+              >
+                <view class="boxing-spiral-eyes__eye eye-l"><text class="boxing-spiral-eyes__glyph">@</text></view>
+                <view class="boxing-spiral-eyes__eye eye-r"><text class="boxing-spiral-eyes__glyph">@</text></view>
+              </view>
             </view>
           </view>
         </view>
 
-        <!-- 击晕：头顶立体透视环绕黄星（3~5，仅 boxing-dizzy-layer） -->
+        <!-- 金星环：连续拳后前兆（顺时针环绕 + 轻浮），非最终@@ -->
         <view
           wx:if="{{reactionBoxingDizzy}}"
           class="boxing-dizzy-layer stars-{{reactionBoxingDizzyStarCount}}"
         >
           <view class="boxing-dizzy-layer__stage">
             <view class="boxing-dizzy-layer__carousel">
-              <view class="boxing-dizzy-layer__star s0"><text class="boxing-dizzy-layer__glyph">✦</text></view>
-              <view class="boxing-dizzy-layer__star s1"><text class="boxing-dizzy-layer__glyph">✦</text></view>
-              <view class="boxing-dizzy-layer__star s2"><text class="boxing-dizzy-layer__glyph">✦</text></view>
-              <view class="boxing-dizzy-layer__star s3"><text class="boxing-dizzy-layer__glyph">✦</text></view>
-              <view class="boxing-dizzy-layer__star s4"><text class="boxing-dizzy-layer__glyph">✦</text></view>
+              <view class="boxing-dizzy-layer__star s0"><text class="boxing-dizzy-layer__glyph">⭐</text></view>
+              <view class="boxing-dizzy-layer__star s1"><text class="boxing-dizzy-layer__glyph">⭐</text></view>
+              <view class="boxing-dizzy-layer__star s2"><text class="boxing-dizzy-layer__glyph">⭐</text></view>
+              <view class="boxing-dizzy-layer__star s3"><text class="boxing-dizzy-layer__glyph">⭐</text></view>
+              <view class="boxing-dizzy-layer__star s4"><text class="boxing-dizzy-layer__glyph">⭐</text></view>
             </view>
           </view>
         </view>
@@ -2319,15 +2337,15 @@
         </block>
       </view>
 
-      <!-- 飞行嘴唇：Self=纯嘟嘴 kiss_lips.png；Observer 飞入阶段仍用 emoji -->
+      <!-- 飞行嘴唇：Self=kiss_lips.png + mouth idle/close/open 开合形变；Observer 飞入仍用 emoji -->
       <view
         wx:if="{{reactionKissLipsVisible}}"
-        class="kiss-screen-reaction__lips phase-{{reactionKissLipsPhase}} {{reactionKissIsSelf ? 'is-asset' : ''}}"
+        class="kiss-screen-reaction__lips phase-{{reactionKissLipsPhase}} mouth-{{reactionKissLipsMouth}} {{reactionKissLipsPress ? 'is-press' : ''}} {{reactionKissIsSelf ? 'is-asset' : ''}}"
         style="{{reactionKissLipsStyle}}"
       >
         <image
           wx:if="{{reactionKissIsSelf}}"
-          class="kiss-lips-image"
+          class="kiss-lips-image mouth-{{reactionKissLipsMouth}}"
           src="{{kissLipsSrc}}"
           mode="aspectFit"
         />
@@ -2463,11 +2481,100 @@
       </view>
     </view>
 
-    <!-- 🚀 rocket：Observer=座位炸飞；Self=中央（拳击尺寸）；mode 隔离 -->
+    <!-- 🚀 rocket Self v5：超级爆炸2→黑脸返回→落座→头顶青烟→恢复 -->
     <view
       wx:if="{{reactionScreenMode === 'rocket'}}"
-      class="rocket-screen-reaction {{reactionRocketShaking ? 'is-shake' : ''}}"
+      class="rocket-screen-reaction is-self-front {{reactionRocketShaking ? 'is-shake' : ''}}"
     >
+      <!--
+        层级：克隆头像(541) → 火箭(548) → 爆炸(560) → 卡通脸阶段抬至(550)
+        卡通脸为独立资源，不改真实头像
+      -->
+      <view
+        wx:if="{{reactionRocketAvatarVisible}}"
+        class="avatar-blast-layer phase-{{reactionRocketAvatarPhase}} face-{{rocketFaceMode}} {{reactionRocketSmokeActive ? 'is-smoking' : ''}} {{reactionRocketFaceShake ? 'is-face-shake' : ''}} {{reactionRocketHairPop ? 'is-hair-pop' : ''}} {{reactionRocketTrailVisible ? 'is-trail' : ''}} {{reactionRocketLandSmoke ? 'is-land-smoke' : ''}} {{reactionRocketLandSmokeFading ? 'is-land-smoke-fading' : ''}}"
+        style="{{reactionRocketAvatarStyle}}"
+      >
+        <!-- 飞天烟雾尾迹（头像后方） -->
+        <view wx:if="{{reactionRocketTrailVisible}}" class="rocket-launch-trail">
+          <view class="rocket-launch-trail__puff p0"></view>
+          <view class="rocket-launch-trail__puff p1"></view>
+          <view class="rocket-launch-trail__puff p2"></view>
+          <view class="rocket-launch-trail__puff p3"></view>
+        </view>
+
+        <view class="avatar-blast-layer__avatar">
+          <image
+            wx:if="{{reactionRocketAvatarUrl}}"
+            class="avatar-blast-layer__img"
+            src="{{reactionRocketAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view wx:else class="avatar-blast-layer__fallback">🚀</view>
+        </view>
+
+        <!-- 浓烟覆盖：第一次爆炸瞬间 -->
+        <view
+          wx:if="{{reactionRocketSmokeCover}}"
+          class="rocket-smoke-cover {{reactionRocketSmokeClearing ? 'is-clearing' : 'is-thick'}}"
+        >
+          <view class="rocket-smoke-cover__blob b0"></view>
+          <view class="rocket-smoke-cover__blob b1"></view>
+          <view class="rocket-smoke-cover__blob b2"></view>
+          <view class="rocket-smoke-cover__blob b3"></view>
+          <view class="rocket-smoke-cover__glow"></view>
+        </view>
+
+        <!-- 独立卡通脸：黑脸 / 全黑双眼（覆盖克隆层，非改原头像） -->
+        <image
+          wx:if="{{rocketFaceMode === 'black'}}"
+          class="rocket-cartoon-face rocket-cartoon-face--black"
+          src="{{rocketBlackFaceSrc}}"
+          mode="aspectFill"
+        />
+        <image
+          wx:if="{{rocketFaceMode === 'eyes_only'}}"
+          class="rocket-cartoon-face rocket-cartoon-face--eyes"
+          src="{{rocketEyesOnlyFaceSrc}}"
+          mode="aspectFill"
+        />
+
+        <!-- 爆炸头：第二次爆炸后竖起炸毛（返回/落座全程保持） -->
+        <view
+          wx:if="{{reactionRocketHairPop && rocketFaceMode === 'eyes_only'}}"
+          class="rocket-explosion-hair"
+        >
+          <view class="rocket-explosion-hair__strand h0"></view>
+          <view class="rocket-explosion-hair__strand h1"></view>
+          <view class="rocket-explosion-hair__strand h2"></view>
+          <view class="rocket-explosion-hair__strand h3"></view>
+          <view class="rocket-explosion-hair__strand h4"></view>
+          <view class="rocket-explosion-hair__strand h5"></view>
+          <view class="rocket-explosion-hair__strand h6"></view>
+          <view class="rocket-explosion-hair__strand h7"></view>
+        </view>
+
+        <!-- 落座后头顶青烟（不遮眼睛） -->
+        <view
+          wx:if="{{reactionRocketLandSmoke}}"
+          class="rocket-land-smoke {{reactionRocketLandSmokeFading ? 'is-fading' : ''}}"
+        >
+          <view class="rocket-land-smoke__wisp w0"></view>
+          <view class="rocket-land-smoke__wisp w1"></view>
+          <view class="rocket-land-smoke__wisp w2"></view>
+          <view class="rocket-land-smoke__wisp w3"></view>
+        </view>
+
+        <view class="avatar-blast-layer__smoke blast-smoke s0"></view>
+        <view class="avatar-blast-layer__smoke blast-smoke s1"></view>
+        <view class="avatar-blast-layer__smoke blast-smoke s2"></view>
+        <view class="avatar-blast-layer__spark sp0"></view>
+        <view class="avatar-blast-layer__spark sp1"></view>
+        <view class="avatar-blast-layer__spark sp2"></view>
+        <view class="avatar-blast-layer__spark sp3"></view>
+      </view>
+
+      <!-- 层级中：火箭弹体（必须在头像前方） -->
       <view
         wx:if="{{reactionRocketFlyVisible}}"
         class="rocket-projectile"
@@ -2479,10 +2586,10 @@
         <text class="rocket-projectile__emoji">🚀</text>
       </view>
 
-      <!-- 中央爆炸：火光 / 冲击波 / 碎片 -->
+      <!-- 层级顶：双爆炸（large / super） -->
       <view
         wx:if="{{reactionRocketBlastVisible}}"
-        class="rocket-explosion-layer {{reactionRocketBlastBurst ? 'is-burst' : ''}}"
+        class="rocket-explosion-layer {{reactionRocketBlastBurst ? 'is-burst' : ''}} is-{{reactionRocketBlastSize || 'large'}}"
         style="{{reactionRocketBlastStyle}}"
       >
         <view class="rocket-explosion-layer__shock"></view>
@@ -2513,74 +2620,9 @@
         <view class="rocket-explosion-layer__dot p1"></view>
         <view class="rocket-explosion-layer__dot p2"></view>
       </view>
-
-      <!--
-        临时克隆：座位 → 中央 → 旋回
-        原头像底层 + 浓烟罩 + cartoon-blast-face（不改真实头像）
-      -->
-      <view
-        wx:if="{{reactionRocketAvatarVisible}}"
-        class="avatar-blast-layer phase-{{reactionRocketAvatarPhase}} {{reactionRocketSmokeActive ? 'is-smoking' : ''}} {{reactionRocketFaceShake ? 'is-face-shake' : ''}}"
-        style="{{reactionRocketAvatarStyle}}"
-      >
-        <view class="avatar-blast-layer__avatar">
-          <image
-            wx:if="{{reactionRocketAvatarUrl}}"
-            class="avatar-blast-layer__img"
-            src="{{reactionRocketAvatarUrl}}"
-            mode="aspectFill"
-          />
-          <view wx:else class="avatar-blast-layer__fallback">🚀</view>
-        </view>
-
-        <!-- 浓烟覆盖：爆炸后盖住，再慢慢散开露出漫画脸 -->
-        <view
-          wx:if="{{reactionRocketSmokeCover}}"
-          class="rocket-smoke-cover {{reactionRocketSmokeClearing ? 'is-clearing' : 'is-thick'}}"
-        >
-          <view class="rocket-smoke-cover__blob b0"></view>
-          <view class="rocket-smoke-cover__blob b1"></view>
-          <view class="rocket-smoke-cover__blob b2"></view>
-          <view class="rocket-smoke-cover__blob b3"></view>
-          <view class="rocket-smoke-cover__glow"></view>
-        </view>
-
-        <view wx:if="{{reactionRocketBlastFace}}" class="cartoon-blast-face {{reactionRocketHairPop ? 'is-hair-pop' : ''}}">
-          <view class="cartoon-blast-face__hair blast-hair">
-            <view class="blast-hair__strand h0"></view>
-            <view class="blast-hair__strand h1"></view>
-            <view class="blast-hair__strand h2"></view>
-            <view class="blast-hair__strand h3"></view>
-            <view class="blast-hair__strand h4"></view>
-            <view class="blast-hair__strand h5"></view>
-            <view class="blast-hair__strand h6"></view>
-            <view class="blast-hair__strand h7"></view>
-          </view>
-          <view class="cartoon-blast-face__mask cartoon-face-mask">
-            <view class="cartoon-face-mask__soot"></view>
-            <view class="cartoon-face-mask__eye eye-l">
-              <view class="cartoon-face-mask__pupil"></view>
-            </view>
-            <view class="cartoon-face-mask__eye eye-r">
-              <view class="cartoon-face-mask__pupil"></view>
-            </view>
-            <view class="cartoon-face-mask__nostril n-l"></view>
-            <view class="cartoon-face-mask__nostril n-r"></view>
-            <view class="cartoon-face-mask__mouth"></view>
-          </view>
-        </view>
-
-        <view class="avatar-blast-layer__smoke blast-smoke s0"></view>
-        <view class="avatar-blast-layer__smoke blast-smoke s1"></view>
-        <view class="avatar-blast-layer__smoke blast-smoke s2"></view>
-        <view class="avatar-blast-layer__spark sp0"></view>
-        <view class="avatar-blast-layer__spark sp1"></view>
-        <view class="avatar-blast-layer__spark sp2"></view>
-        <view class="avatar-blast-layer__spark sp3"></view>
-      </view>
     </view>
   </view>
-  <!-- Demo：🌹 送花 Observer（随机花束飞入 → 自然花环 → 花瓣飘落） -->
+  <!-- Demo：🌹 送花 Observer（花束飞入 → 开放花朵花环 → 少量花瓣飘落） -->
   <view
     wx:if="{{playerActionFlowerVisible}}"
     class="player-action-flower {{playerActionFlowerBloom ? 'is-bloom' : ''}}"
@@ -2598,10 +2640,10 @@
       style="{{item.style}}"
     ></view>
   </view>
-  <!-- Demo：🌹 自然花环（不规则角度/距离/大小） -->
+  <!-- Demo：🌹 Observer 盛开完整花朵花环（bloom-flower-ring-final-v7） -->
   <view
     wx:if="{{playerActionWreathVisible}}"
-    class="player-action-flower-wreath {{playerActionWreathAppear ? 'is-appear' : ''}} {{playerActionWreathExpand ? 'is-expand' : ''}} {{playerActionWreathFading ? 'is-fading' : ''}}"
+    class="player-action-flower-wreath is-open-bloom {{playerActionWreathAppear ? 'is-appear' : ''}} {{playerActionWreathExpand ? 'is-expand' : ''}} {{playerActionWreathFading ? 'is-fading' : ''}}"
     style="{{playerActionWreathStyle}}"
   >
     <view
@@ -2610,10 +2652,20 @@
       class="player-action-flower-wreath__item batch-{{item.batch}}"
       style="{{item.style}}"
     >
+      <!-- 盛开完整花朵：花瓣 + 花心（非花瓣主体 / 非小图标） -->
       <view
-        class="player-action-flower-wreath__bloom"
-        style="animation-delay:{{item.delay}};filter:{{item.filter}};font-size:{{item.fontSize}};width:100%;height:100%;line-height:1;display:flex;align-items:center;justify-content:center;"
-      >{{item.emoji}}</view>
+        class="player-action-flower-wreath__bloom open-bloom-flower petals-{{item.petalCount || 5}} type-{{item.type}} color-{{item.color}}"
+        style="{{item.bloomStyle}}"
+      >
+        <view class="open-bloom-flower__petal p0" style="{{item.petalStyle}}"></view>
+        <view class="open-bloom-flower__petal p1" style="{{item.petalStyle}}"></view>
+        <view class="open-bloom-flower__petal p2" style="{{item.petalStyle}}"></view>
+        <view class="open-bloom-flower__petal p3" style="{{item.petalStyle}}"></view>
+        <view class="open-bloom-flower__petal p4" style="{{item.petalStyle}}"></view>
+        <view wx:if="{{item.hasSixPetals}}" class="open-bloom-flower__petal p5" style="{{item.petalStyle}}"></view>
+        <view class="open-bloom-flower__center" style="{{item.centerStyle}}"></view>
+        <view class="open-bloom-flower__center-dot"></view>
+      </view>
     </view>
   </view>
 

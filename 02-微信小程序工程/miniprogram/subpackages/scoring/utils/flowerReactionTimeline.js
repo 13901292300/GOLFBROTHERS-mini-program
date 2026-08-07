@@ -1,10 +1,14 @@
 /**
- * Demo：flower reaction timeline v3 / fly-entry-fix-v2（仅 demo-weekend-amateur）
+ * Demo：flower reaction timeline（仅 demo-weekend-amateur）
  *
- * 流程：flower_enter → flower_hit_avatar → flower_bloom → flower_ring
+ * Observer bloom-flower-ring-final-v7：
+ *   flower_enter → flower_hit_avatar → flower_bloom
+ *   → 盛开完整花朵花环（flowerRingConfig 圆周排布）
+ *   → flower_ring / expand → flower_petals_fall（辅助）→ fade
+ * Self：仍为屏中花雨（本文件 Self timing 不变）。
+ *
  * 源：音频文件/送花.mov → flower_send.wav（有效段约 220–900ms）
  * 声音：flower_bloom / 到达瞬间（飞行无声；enter 无声）
- *
  * 颜色：weighted random（红色系为主），非 uniform。
  */
 
@@ -90,24 +94,64 @@ const FLOWER_TIMING = {
     /** flower-observer-effect-balance-v2：飞入 500–800ms */
     flyMs: 680,
     bloomLeadMs: 0,
-    ringExpandMs: 360,
+    ringExpandMs: 340,
     petalsAtMs: 900,
     /** 环绕停留约 1.5–2s 后淡出 */
     fadeAtMs: 1800,
     cleanupAfterFadeMs: 420,
-    /** 花环主花 6–10；花瓣 3–8（仅 Observer） */
-    wreathCountMin: 6,
-    wreathCountMax: 10,
+    /** 结束飘落花瓣 3–8（辅助；主体是开放花朵花环） */
     petalCountMin: 3,
     petalCountMax: 8,
-    /** flower-observer-flower-size-adjust-v3：主花放大，贴近头像边缘 */
-    flowerScaleMin: 1.05,
-    flowerScaleMax: 1.45,
-    /** 相对头像半径外扩（px），形成贴边一圈 */
-    wreathEdgePad: 14,
-    flowerFontBase: 30
+    /**
+     * flower-observer-bloom-flower-ring-final-v7：
+     * 盛开完整花朵花环 8–12；尺寸≈头像宽 20–30%；圆周紧凑小间隙
+     */
+    wreathCountMin: 8,
+    wreathCountMax: 12,
+    /** flower_ring_expand 轻微外扩（保持连续） */
+    flowerSpread: 1.05,
+    /** 兼容旧字段 */
+    wreathEdgePad: 2,
+    flowerGapFill: 0.9,
+    flowerSizeMin: 0,
+    flowerSizeMax: 0
   }
 };
+
+/**
+ * Observer 花环主配置（v7）
+ * 用圆周算法排布盛开完整花朵；禁止手工散点。
+ */
+const FLOWER_RING_DEFAULTS = {
+  countMin: 8,
+  countMax: 12,
+  /** 单朵花相对头像宽度 */
+  flowerSizeRatioMin: 0.2,
+  flowerSizeRatioMax: 0.3,
+  /** 弧长占用：花径/槽位；越大越密（小间隙、不重叠） */
+  gapFill: 0.9,
+  /** 头像外缘到花体内缘的最小净空（px） */
+  edgeClearance: 2,
+  /** 相邻花最小间隙（px） */
+  gapMin: 1.2,
+  /** 相邻花最大间隙相对花径（过大则加朵数收紧） */
+  gapMaxRatio: 0.28,
+  expandSpread: 1.05,
+  /** 目标色比：红≥60% / 粉≈20% / 其它少量 */
+  colorRatio: { red: 0.62, pink: 0.2, other: 0.18 }
+};
+
+/** 花环用完整盛开花朵（可见花瓣/花心；排除花束/叶子碎点缀） */
+const OPEN_BLOOM_FLOWER_TYPES = FLOWER_TYPES.filter(function (t) {
+  return (
+    t.type === 'rose' ||
+    t.type === 'hibiscus' ||
+    t.type === 'cherry' ||
+    t.type === 'daisy' ||
+    t.type === 'sunflower' ||
+    t.type === 'tulip'
+  );
+});
 
 function _rand(min, max) {
   return min + Math.random() * (max - min);
@@ -355,8 +399,293 @@ function buildRandomFlowerBundle(opts) {
 }
 
 /**
- * Observer 自然花环：仍以红色为主视觉中心。
- * balance-v2：6–10 朵；size-adjust-v3：主花放大约 1.5–2×，贴边环绕。
+ * 由 flowerRingConfig 推导 slot / gap（圆周等分）。
+ */
+function computeOpenFlowerRingSize(radius, count, flowerSize) {
+  const n = Math.max(8, Math.min(12, Number(count) || 10));
+  const R = Math.max(20, Number(radius) || 36);
+  const size = Math.max(8, Number(flowerSize) || 16);
+  const slot = (2 * Math.PI * R) / n;
+  return {
+    count: n,
+    radius: Number(R.toFixed(1)),
+    size: Number(size.toFixed(1)),
+    flowerSize: Number(size.toFixed(1)),
+    slot: Number(slot.toFixed(2)),
+    gap: Number(Math.max(0, slot - size).toFixed(2))
+  };
+}
+
+/**
+ * 建立 Observer 花环配置（v7）。
+ * @returns {{
+ *   count:number, radius:number, flowerSize:number,
+ *   colors:object, gap:number, gapFill:number, avatarR:number, avatarW:number
+ * }}
+ */
+function buildFlowerRingConfig(opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const d = FLOWER_RING_DEFAULTS;
+  const avatarW = Math.max(
+    28,
+    Number(o.avatarSize != null ? o.avatarSize : o.avatarW) || 40
+  );
+  const avatarR =
+    o.avatarR != null ? Math.max(14, Number(o.avatarR)) : avatarW / 2;
+  const countMin =
+    o.countMin != null ? Number(o.countMin) : d.countMin;
+  const countMax =
+    o.countMax != null ? Number(o.countMax) : d.countMax;
+  let count =
+    o.count != null
+      ? Number(o.count)
+      : _randInt(countMin, countMax);
+  count = Math.max(8, Math.min(12, count));
+
+  const ratioMin =
+    o.flowerSizeRatioMin != null
+      ? Number(o.flowerSizeRatioMin)
+      : d.flowerSizeRatioMin;
+  const ratioMax =
+    o.flowerSizeRatioMax != null
+      ? Number(o.flowerSizeRatioMax)
+      : d.flowerSizeRatioMax;
+  let flowerSize =
+    o.flowerSize != null
+      ? Number(o.flowerSize)
+      : avatarW * _rand(ratioMin, ratioMax);
+  flowerSize = Math.max(
+    avatarW * ratioMin,
+    Math.min(avatarW * ratioMax, flowerSize)
+  );
+
+  const gapFill =
+    o.gapFill != null
+      ? Number(o.gapFill)
+      : o.flowerGapFill != null
+        ? Number(o.flowerGapFill)
+        : d.gapFill;
+  const edgeClearance =
+    o.edgeClearance != null ? Number(o.edgeClearance) : d.edgeClearance;
+  const gapMin = o.gapMin != null ? Number(o.gapMin) : d.gapMin;
+  const gapMaxRatio =
+    o.gapMaxRatio != null ? Number(o.gapMaxRatio) : d.gapMaxRatio;
+
+  // 圆周半径：优先紧贴头像外围，同时保证相邻不重叠、无明显空白
+  let radius = (count * flowerSize) / (gapFill * 2 * Math.PI);
+  let minR = avatarR + flowerSize / 2 + edgeClearance;
+  if (radius < minR) radius = minR;
+
+  // 间隙过大 → 先加朵数（≤12），再在 20–30% 内略增大花径填满
+  let slot = (2 * Math.PI * radius) / count;
+  let gap = slot - flowerSize;
+  let guard = 0;
+  while (gap > flowerSize * gapMaxRatio && count < 12 && guard < 6) {
+    count += 1;
+    radius = Math.max(
+      minR,
+      (count * flowerSize) / (gapFill * 2 * Math.PI)
+    );
+    slot = (2 * Math.PI * radius) / count;
+    gap = slot - flowerSize;
+    guard += 1;
+  }
+  guard = 0;
+  while (
+    gap > flowerSize * gapMaxRatio &&
+    flowerSize < avatarW * ratioMax - 0.15 &&
+    guard < 8
+  ) {
+    flowerSize = Math.min(avatarW * ratioMax, flowerSize + avatarW * 0.012);
+    minR = avatarR + flowerSize / 2 + edgeClearance;
+    radius = Math.max(minR, radius);
+    slot = (2 * Math.PI * radius) / count;
+    // 目标：花径 ≈ slot * gapFill
+    const target = slot * gapFill;
+    if (flowerSize < target) {
+      flowerSize = Math.min(avatarW * ratioMax, target);
+    }
+    gap = slot - flowerSize;
+    guard += 1;
+  }
+
+  // 重叠或间隙过小 → 略扩半径
+  if (gap < gapMin) {
+    radius = (count * (flowerSize + gapMin)) / (2 * Math.PI);
+    if (radius < minR) radius = minR;
+    slot = (2 * Math.PI * radius) / count;
+    gap = slot - flowerSize;
+  }
+
+  // 最终再钳一次花径，禁止重叠
+  const maxBySlot = slot * 0.96;
+  if (flowerSize > maxBySlot) {
+    flowerSize = Math.max(avatarW * ratioMin, maxBySlot);
+    gap = slot - flowerSize;
+  }
+
+  const colors = Object.assign({}, d.colorRatio, o.colors || {});
+
+  return {
+    count: count,
+    radius: Number(radius.toFixed(1)),
+    flowerSize: Number(flowerSize.toFixed(1)),
+    colors: colors,
+    gap: Number(Math.max(0, gap).toFixed(2)),
+    gapFill: gapFill,
+    edgeClearance: edgeClearance,
+    avatarR: Number(avatarR.toFixed(1)),
+    avatarW: Number(avatarW.toFixed(1)),
+    slot: Number(slot.toFixed(2))
+  };
+}
+
+/**
+ * Observer 盛开完整花朵花环（bloom-flower-ring-final-v7）。
+ * 主体：开放花朵（花瓣+花心）；圆周均匀；红色为主。
+ */
+function buildOpenFlowerRing(opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const mode = o.mode || pickBouquetMode();
+  const spread = o.spread != null ? Number(o.spread) : 1;
+
+  const avatarSize =
+    o.avatarSize != null
+      ? Number(o.avatarSize)
+      : o.avatarR != null
+        ? Number(o.avatarR) * 2
+        : o.baseR != null
+          ? Math.max(28, Number(o.baseR) * 2 - 4)
+          : 40;
+
+  const flowerRingConfig = buildFlowerRingConfig({
+    avatarSize: avatarSize,
+    avatarR: o.avatarR,
+    count: o.count,
+    countMin: o.countMin,
+    countMax: o.countMax,
+    flowerSize: o.flowerSize,
+    flowerSizeRatioMin: o.flowerSizeRatioMin,
+    flowerSizeRatioMax: o.flowerSizeRatioMax,
+    gapFill: o.gapFill != null ? o.gapFill : o.flowerGapFill,
+    edgeClearance:
+      o.edgeClearance != null
+        ? o.edgeClearance
+        : o.wreathEdgePad != null
+          ? o.wreathEdgePad
+          : undefined,
+    colors: o.colors
+  });
+
+  const n = flowerRingConfig.count;
+  const layout = computeOpenFlowerRingSize(
+    flowerRingConfig.radius,
+    n,
+    flowerRingConfig.flowerSize
+  );
+
+  const step = 360 / n;
+  const bloomPool =
+    OPEN_BLOOM_FLOWER_TYPES.length > 0 ? OPEN_BLOOM_FLOWER_TYPES : FLOWER_TYPES;
+  const items = [];
+  for (let i = 0; i < n; i++) {
+    const accent = _shouldAccent(mode, i, n);
+    // 强制红占比：前 round(n*0.62) 朵偏红
+    const forceRedByQuota = i < Math.ceil(n * (flowerRingConfig.colors.red || 0.62));
+    const forcePinkByQuota =
+      !forceRedByQuota &&
+      i <
+        Math.ceil(
+          n *
+            ((flowerRingConfig.colors.red || 0.62) +
+              (flowerRingConfig.colors.pink || 0.2))
+        );
+    const forceRed =
+      mode === 'special'
+        ? forceRedByQuota
+        : (mode === 'red_main' && !accent) || forceRedByQuota;
+    let colorInfo;
+    if (forceRed) {
+      colorInfo =
+        pickWeightedFlowerColor({
+          mode: 'red_main',
+          forceRed: true
+        }) || _colorByKey('red');
+    } else if (forcePinkByQuota || (accent && mode === 'red_pink_mix')) {
+      colorInfo = _pickWeighted(_colorsByFamily('pink')) || _colorByKey('pink');
+    } else {
+      colorInfo =
+        pickWeightedFlowerColor({
+          mode: mode,
+          forceRed: false,
+          accent: true
+        }) || _colorByKey('pink');
+    }
+
+    let typeInfo = _pick(bloomPool);
+    if (forceRed) {
+      const redBloom = bloomPool.filter(function (t) {
+        return t.family === 'red';
+      });
+      if (redBloom.length) typeInfo = _pick(redBloom);
+    } else if (forcePinkByQuota) {
+      const pinkBloom = bloomPool.filter(function (t) {
+        return t.family === 'pink';
+      });
+      if (pinkBloom.length) typeInfo = _pick(pinkBloom);
+    }
+
+    // 严格圆周：角度等分，半径几乎固定（极小抖动避免机械感）
+    const deg = step * i + _rand(-0.8, 0.8);
+    const r = layout.radius * spread * _rand(0.995, 1.008);
+    const rot = Math.round(_rand(-14, 14));
+    const delayMs = Math.round(i * 16 + _rand(0, 28));
+    const sizeJitter = layout.flowerSize * _rand(0.97, 1.03);
+    const petalColor = PETAL_COLORS[colorInfo.key] || '#e11d48';
+    const petalCount =
+      typeInfo.type === 'daisy' || typeInfo.type === 'sunflower' ? 6 : 5;
+
+    items.push({
+      id: 'open-flower-' + i + '-' + Date.now().toString(36),
+      isPetal: false,
+      isOpenFlower: true,
+      type: typeInfo.type,
+      emoji: typeInfo.emoji,
+      color: colorInfo.key,
+      family: colorInfo.family || typeInfo.family || 'red',
+      filter: colorInfo.filter || 'none',
+      petalColor: petalColor,
+      centerColor:
+        typeInfo.type === 'sunflower' || typeInfo.type === 'daisy'
+          ? '#f59e0b'
+          : '#fff7ed',
+      petalCount: petalCount,
+      deg: Number(deg.toFixed(2)),
+      radius: Number(r.toFixed(1)),
+      size: Number(sizeJitter.toFixed(1)),
+      rotate: rot,
+      delay: (delayMs / 1000).toFixed(3) + 's',
+      delayMs: delayMs,
+      bouquetMode: mode,
+      batch: i < Math.ceil(n * 0.4) ? 1 : i < Math.ceil(n * 0.75) ? 2 : 3
+    });
+  }
+
+  return {
+    items: items,
+    layout: layout,
+    flowerRingConfig: flowerRingConfig
+  };
+}
+
+/** @deprecated 兼容旧名 → buildOpenFlowerRing.items */
+function buildBloomPetalRing(opts) {
+  const ring = buildOpenFlowerRing(opts);
+  return ring && ring.items ? ring.items : [];
+}
+
+/**
+ * @deprecated 请用 buildOpenFlowerRing；保留供兼容。
  */
 function buildNaturalWreathItems(opts) {
   const o = opts && typeof opts === 'object' ? opts : {};
@@ -374,15 +703,15 @@ function buildNaturalWreathItems(opts) {
       ? Number(o.scaleMin)
       : FLOWER_TIMING.observer.flowerScaleMin != null
         ? FLOWER_TIMING.observer.flowerScaleMin
-        : 1.05;
+        : 0.65;
   const scaleMax =
     o.scaleMax != null
       ? Number(o.scaleMax)
       : FLOWER_TIMING.observer.flowerScaleMax != null
         ? FLOWER_TIMING.observer.flowerScaleMax
-        : 1.45;
-  const radiusJitterMin = o.radiusJitterMin != null ? Number(o.radiusJitterMin) : 0.96;
-  const radiusJitterMax = o.radiusJitterMax != null ? Number(o.radiusJitterMax) : 1.06;
+        : 0.95;
+  const radiusJitterMin = o.radiusJitterMin != null ? Number(o.radiusJitterMin) : 0.94;
+  const radiusJitterMax = o.radiusJitterMax != null ? Number(o.radiusJitterMax) : 1.1;
   // 特殊模式也保证至少约一半偏红，维持红色中心感（权重规则不变）
   const items = [];
   for (let i = 0; i < n; i++) {
@@ -510,10 +839,15 @@ module.exports = {
   BOUQUET_MODE_WEIGHTS: BOUQUET_MODE_WEIGHTS,
   PETAL_COLORS: PETAL_COLORS,
   FLOWER_TIMING: FLOWER_TIMING,
+  FLOWER_RING_DEFAULTS: FLOWER_RING_DEFAULTS,
   pickBouquetMode: pickBouquetMode,
   pickWeightedFlowerColor: pickWeightedFlowerColor,
   pickRandomFlower: pickRandomFlower,
   buildRandomFlowerBundle: buildRandomFlowerBundle,
+  buildFlowerRingConfig: buildFlowerRingConfig,
+  computeOpenFlowerRingSize: computeOpenFlowerRingSize,
+  buildOpenFlowerRing: buildOpenFlowerRing,
+  buildBloomPetalRing: buildBloomPetalRing,
   buildNaturalWreathItems: buildNaturalWreathItems,
   buildFallingPetals: buildFallingPetals,
   buildFlowerReactionTimeline: buildFlowerReactionTimeline
