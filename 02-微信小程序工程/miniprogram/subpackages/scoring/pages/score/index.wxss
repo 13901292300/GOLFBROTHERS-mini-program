@@ -3981,6 +3981,306 @@ page {
   border-right: none;
 }
 
+/*
+ * fourball40（4+0/3+1）Classic / Elite chrome
+ * 镜像 g1-stroke 稳定基线 + fourball 非记分区策略；独立选择器，不改 g1 / fourball / TEAM SCORE 内容
+ * .score-page.is-score-classic .scoreboard-shell--fourball40
+ * .score-page.is-score-elite-demo .scoreboard-shell--fourball40
+ */
+
+/* —— Classic 背景扁平 —— */
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--special-head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--par > .scoreboard-cell {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell.score-cell--total,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column {
+  box-shadow: none;
+  background: var(--bg-primary) !important;
+  background-color: var(--bg-primary) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__inner,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__inner {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__spacer.shell-row--par,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__row {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff--par,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-tee--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-tee--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container__hole,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container__par {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .tee-sticky-overlay__spacer.shell-row--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* —— Classic 单源分隔 —— */
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--par,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--player {
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .tee-sticky-overlay__spacer,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .tee-sticky-overlay__inner > .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .tee-sticky-overlay__row {
+  border-top: none;
+  border-bottom: none;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-tee--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff--par,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-tee--par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--player .score-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__spacer.shell-row--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container__hole {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__spacer.shell-row--par,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__row,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__inner > .player-column__row:last-child,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container__par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-tee {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40.is-tee-sticky .tee-sticky-overlay,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .tee-sticky-overlay.is-visible {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-compact-container,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container__hole,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-normal-container__par,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-compact-container__hole,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .hole-par-compact-container__par {
+  border-right: none;
+  box-shadow: none;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff--head,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--head .track-lead-diff,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .scoreboard-row--par > .track-lead-diff {
+  border-right: none;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40.is-tee-sticky .scoreboard-row--head .track-lead-tee,
+.score-page.is-score-classic .scoreboard-shell--fourball40.is-tee-sticky .scoreboard-row--par > .track-lead-tee,
+.score-page.is-score-classic .scoreboard-shell--fourball40.is-tee-sticky .scoreboard-row--player .track-lead-tee {
+  border-right: none;
+}
+
+/* —— Elite 背景扁平 —— */
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--special-head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--tot-head {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--par > .scoreboard-cell {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell.scoreboard-cell--hole-special-col,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell.score-cell--total,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell.scoreboard-cell--tot-col {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__spacer.shell-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__row {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff--par,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-tee--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-tee--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container__par {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .tee-sticky-overlay__spacer.shell-row--par {
+  background: var(--score-header-hole) !important;
+  background-color: var(--score-header-hole) !important;
+}
+
+/* —— Elite 单源分隔（对齐 Classic fourball40 / g1 v2） —— */
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--player {
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .tee-sticky-overlay__spacer,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .tee-sticky-overlay__inner > .tee-sticky-overlay__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .tee-sticky-overlay__row {
+  border-top: none;
+  border-bottom: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-tee--head {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff--par,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-tee--par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row.scoreboard-row--player .score-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .track-lead-tee {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__spacer.shell-row--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container__hole {
+  border-top: 1px solid var(--fourball-score-row-border);
+  border-bottom: 1px solid var(--fourball-score-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__spacer.shell-row--par,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__row,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .player-column__inner > .player-column__row:last-child,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container__par {
+  border-bottom: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-tee {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40.is-tee-sticky .tee-sticky-overlay,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .tee-sticky-overlay.is-visible {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-compact-container,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-normal-container__par,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-compact-container__hole,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .hole-par-compact-container__par {
+  border-right: none;
+  box-shadow: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--head .scoreboard-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--par > .scoreboard-cell,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--player .score-cell {
+  border-right: 1px solid var(--fourball-classic-player-row-border);
+  box-sizing: border-box;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff--head,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--head .track-lead-diff,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .scoreboard-row--par > .track-lead-diff {
+  border-right: none;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40.is-tee-sticky .scoreboard-row--head .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40.is-tee-sticky .scoreboard-row--par > .track-lead-tee,
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40.is-tee-sticky .scoreboard-row--player .track-lead-tee {
+  border-right: none;
+}
+
+/*
+ * fourball40：3+1 单人行身份字阶（对齐 g1-stroke Classic/Elite）
+ * 仅非 TEAM SCORE 卡片；不改 team-score 文案 / chrome 背景 / divider / sticky
+ */
+.scoreboard-shell--fourball40 .player-column__card:not(.player-column__card--team-score) .player-name-line,
+.scoreboard-shell--fourball40 .player-column__card:not(.player-column__card--team-score) .player-column__name {
+  margin-top: 0;
+}
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__card:not(.player-column__card--team-score) .player-name-line,
+.score-page.is-score-classic .scoreboard-shell--fourball40 .player-column__card:not(.player-column__card--team-score) .player-column__name {
+  font-size: 22rpx;
+  line-height: 1.2;
+  min-height: 28rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball40 .player-column__card:not(.player-column__card--team-score) .player-name-line,
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball40 .player-column__card:not(.player-column__card--team-score) .player-column__name {
+  font-size: 26rpx;
+}
+/* lead diff：与 G1 同阶（track 无 rowKind class，无法只绑 single；TEAM SCORE 文案不受影响） */
+.score-page.is-score-classic .scoreboard-shell--fourball40 .track-lead-diff .player-diff-score {
+  font-size: 32rpx;
+}
+.score-page.is-score-classic.font-large .scoreboard-shell--fourball40 .track-lead-diff .player-diff-score {
+  font-size: 40rpx;
+}
+.score-page.is-score-elite-demo .scoreboard-shell--fourball40 .track-lead-diff .player-diff-score {
+  font-weight: 400;
+}
+
 .hole-cell-meta,
 .special-cell-meta {
   position: absolute;
