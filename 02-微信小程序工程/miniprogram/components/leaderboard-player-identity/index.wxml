@@ -2,45 +2,50 @@
   <view class="sc-profile-left">
     <view class="sc-avatar-wrap">
       <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
-      <!-- 队际赛：本场代表球队 LOGO（页级 map）；其他：国旗 -->
+      <!-- 角标节点保留；显隐由 showAvatarBadge（avatarBadge 能力）控制 -->
       <view
-        wx:if="{{teamGroupLogoById[player.badgeTeamId] || player.flag}}"
-        class="sc-flag {{teamGroupLogoById[player.badgeTeamId] ? 'sc-flag--team' : ''}}"
+        wx:if="{{showAvatarBadge}}"
+        class="sc-flag {{avatarBadgeIsTeam ? 'sc-flag--team' : ''}}"
       >
-        <image
-          wx:if="{{teamGroupLogoById[player.badgeTeamId]}}"
-          src="{{teamGroupLogoById[player.badgeTeamId]}}"
-          mode="aspectFill"
-        ></image>
-        <image
-          wx:else
-          src="https://flagcdn.com/w40/{{player.flag}}.png"
-          mode="aspectFill"
-        ></image>
+        <image src="{{avatarBadgeSrc}}" mode="aspectFill"></image>
       </view>
     </view>
     <view class="sc-profile-meta">
       <view class="sc-name-line">
-        <text class="sc-name">{{player.name}}</text>
-        <text class="sc-chevron">›</text>
+        <!-- 昵称+性别紧凑组合：宽度随内容收缩，长昵称在组内省略 -->
+        <view class="name-gender-group">
+          <text class="sc-name">{{player.name}}</text>
+          <text
+            wx:if="{{showNameGender && displayGenderSymbol}}"
+            class="gender-icon sc-name-gender {{displayGenderClass}}"
+          >{{displayGenderSymbol}}</text>
+        </view>
+        <!-- 进入球员资料：独立点击区，在组合之后 -->
+        <text
+          wx:if="{{showProfileEntry}}"
+          class="sc-chevron"
+          catchtap="onProfileTap"
+        >›</text>
       </view>
-      <view class="sc-sub">
+      <!-- metaMode：countryAge=既有 COUNTRY/AGE；handicapFloat=队内赛江湖差点/浮动系数 -->
+      <view wx:if="{{metaMode === 'handicapFloat'}}" class="sc-sub">
+        江湖差点 <text class="sc-sub-strong">{{player.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText}}</text>
+      </view>
+      <view wx:else class="sc-sub">
         COUNTRY: <text class="sc-sub-strong">{{player.country || '—'}}</text>　AGE: <text class="sc-sub-strong">{{player.age || '—'}}</text>
       </view>
     </view>
   </view>
-  <!-- 加关注=操作按钮；好友/已关注=状态标签，二者不混用 -->
+  <!-- 加关注=操作按钮；好友/已关注=状态标签（不可点）；页面注入关系，组件不读 store -->
   <follow-action-btn
-    wx:if="{{!isSelf && displayStatus === 'none'}}"
+    wx:if="{{showFollowBtn}}"
     user-id="{{player.playerId}}"
+    loading="{{followLoading}}"
+    disabled="{{followLoading}}"
     bind:follow="onFollowTap"
   />
   <text
-    wx:elif="{{!isSelf && displayStatus === 'friend'}}"
-    class="sc-rel-tag sc-rel-tag--friend"
-  >好友</text>
-  <text
-    wx:elif="{{!isSelf && displayStatus === 'following'}}"
-    class="sc-rel-tag sc-rel-tag--following"
-  >已关注</text>
+    wx:elif="{{showRelationTag}}"
+    class="sc-rel-tag {{displayStatus === 'friend' ? 'sc-rel-tag--friend' : 'sc-rel-tag--following'}}"
+  >{{displayRelationLabel}}</text>
 </view>

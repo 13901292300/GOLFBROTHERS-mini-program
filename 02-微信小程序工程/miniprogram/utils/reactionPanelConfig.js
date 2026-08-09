@@ -45,6 +45,19 @@ const REACTION_MODE = PLAYER_ACTION_REACTIONS.reduce(function (map, item) {
 }, {});
 
 /**
+ * 赛事详情「讨论区」是否隐藏被点击消息头像（按 reactionKey，与记分行 self/observer 解耦）。
+ * flower / beer → 不隐藏；其余六种作用动画 → 隐藏。
+ */
+const DISCUSSION_DETACH_REACTION_KEYS = {
+  bucket: true,
+  tomato: true,
+  kiss: true,
+  egg: true,
+  rocket: true,
+  boxing: true
+};
+
+/**
  * @param {string} keyOrType
  * @returns {ReactionMode|''}
  */
@@ -71,11 +84,24 @@ function isObserverReactionMode(keyOrType) {
   return getReactionMode(keyOrType) === 'observer';
 }
 
+/**
+ * 讨论区宿主：是否应对目标消息头像做 detach 隐藏。
+ * 不得用 mode===self / playerId===currentUserId 代替本判断。
+ * @param {string} reactionKey
+ * @returns {boolean}
+ */
+function shouldDetachDiscussionReaction(reactionKey) {
+  const k = reactionKey != null ? String(reactionKey).trim() : '';
+  return !!DISCUSSION_DETACH_REACTION_KEYS[k];
+}
+
 module.exports = {
   PLAYER_ACTION_REACTIONS: PLAYER_ACTION_REACTIONS,
   REACTION_COST: REACTION_COST,
   REACTION_MODE: REACTION_MODE,
+  DISCUSSION_DETACH_REACTION_KEYS: DISCUSSION_DETACH_REACTION_KEYS,
   getReactionMode: getReactionMode,
   isSelfReactionMode: isSelfReactionMode,
-  isObserverReactionMode: isObserverReactionMode
+  isObserverReactionMode: isObserverReactionMode,
+  shouldDetachDiscussionReaction: shouldDetachDiscussionReaction
 };

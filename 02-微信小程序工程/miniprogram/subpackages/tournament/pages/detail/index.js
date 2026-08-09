@@ -16,6 +16,7 @@ const bannerConfig = require('../../../../utils/bannerConfig.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const {
   isTeamMatchFamily,
+  isTeamInternalMatch,
   isInterTeamMatch,
   resolveOrganizerDisplay,
   resolveParticipatingTeamViews,
@@ -52,6 +53,7 @@ const {
 const matchStatus = require('../../../../utils/matchStatus.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const contactStore = require('../../../../utils/contactStore.js');
+const contactFollowAction = require('../../../../utils/contactFollowAction.js');
 const scheduleStore = require('../../../../utils/scheduleStore.js');
 const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
 const { buildMatchPlayResultSummary } = require('../../../../utils/matchPlayResult.js');
@@ -130,7 +132,7 @@ const EMPTY_MATCH_VIEW = {
   formatLabel: '',
   typeLabel: '',
   organizer: '',
-  // 英雄区底部主体类型标签（inter-team → ORG.；其余 → 赛事组织）
+  // 英雄区底部主体类型标签（team-internal → CLUB；inter-team → ORG.；其余 → 赛事组织）
   organizerSectionLabel: '赛事组织',
   venue: '',
   timeText: '',
@@ -177,7 +179,7 @@ const TOURNAMENT_TABS = {
 };
 
 /**
- * 队际赛 LIVE：在讨论区之后插入「报名」Tab（去重；不改其他 Tab 相对顺序）。
+ * 球队赛家族 LIVE：在讨论区之后插入「报名」Tab（去重；不改其他 Tab 相对顺序）。
  * @param {Array<{id:string,label:string}>} tabs
  * @returns {Array<{id:string,label:string}>}
  */
@@ -197,7 +199,8 @@ function insertRegisterTabAfterDiscussion(tabs) {
 
 // 无 matchId / 未知状态时，沿用进行中 TAB 集，保持既有演示页视觉不变
 // G5–G8 比洞：leaderboard TAB 文案统一为「得分榜」（ongoing「领先榜」/ completed「成绩表」均改；id/排序/点击不变）
-// 队际赛 ongoing：保留报名 Tab，置于讨论区之后（仅展示顺序；registering / 队内 / completed 不变）
+// 球队赛家族（team-internal / inter-team）ongoing：保留报名 Tab，置于讨论区之后
+// （registering 原顺序不变；series / 普通球局 / completed 不进入此逻辑）
 function resolveTournamentTabs(status, match) {
   const base = TOURNAMENT_TABS[status] || TOURNAMENT_TABS.ongoing;
   let tabs = base.map((tab) => Object.assign({}, tab));
@@ -212,7 +215,7 @@ function resolveTournamentTabs(status, match) {
       }
     });
   }
-  if (status === MATCH_LIFECYCLE.ONGOING && isInterTeamMatch(match)) {
+  if (status === MATCH_LIFECYCLE.ONGOING && isTeamMatchFamily(match)) {
     tabs = insertRegisterTabAfterDiscussion(tabs);
   }
   return tabs;
@@ -572,6 +575,34 @@ const REGISTERING_FEATURES_COMMON = [
   { permission: 'register_for_other', glyph: '📝', label: '替他人报名' },
   { permission: 'invite_friends_register', glyph: '📤', label: '邀请好友报名' }
 ];
+
+/**
+ * LIVE 常用区菜单：仅 team-internal + ongoing 用「替他人报名」替换「显示设置」。
+ * 队际赛 LIVE / 完赛 / 其他类型保持 FEATURES_COMMON（含 theme）。不删除 theme 底层能力。
+ * @param {object|null} match
+ * @param {{ isOngoing?: boolean }|null} lifecycle
+ * @returns {Array<{permission:string,glyph:string,label:string}>}
+ */
+function resolveOngoingCommonFeatures(match, lifecycle) {
+  const base = FEATURES_COMMON.map((f) => Object.assign({}, f));
+  if (!(lifecycle && lifecycle.isOngoing && isTeamInternalMatch(match))) {
+    return base;
+  }
+  const proxy = REGISTERING_FEATURES_COMMON.find(
+    (f) => f && f.permission === 'register_for_other'
+  );
+  const next = [];
+  const seen = {};
+  base.forEach((f) => {
+    const item =
+      f && f.permission === 'theme' && proxy ? Object.assign({}, proxy) : f;
+    if (!item || !item.permission || seen[item.permission]) return;
+    seen[item.permission] = true;
+    next.push(item);
+  });
+  return next;
+}
+
 const REGISTERING_FEATURES_PERMISSION = [
   { permission: 'edit_match', glyph: '✏️', label: '修改比赛', tone: '' },
   { permission: 'edit_half', glyph: '⛳', label: '修改半场', tone: '' },
@@ -878,6 +909,32 @@ Page({
     matchStatus: EMPTY_MATCH_LIFECYCLE,
     eventInfoList: [],
     isInterTeamMatch: false,
+    /**
+     * 领先榜展开头像角标：none=队内赛不显示国旗；team=队际赛本场球队 LOGO；auto=兼容其他
+     */
+    leaderboardAvatarBadge: 'auto',
+    /**
+     * 领先榜展开辅助信息：handicapFloat=江湖差点/浮动系数；countryAge=COUNTRY/AGE
+     */
+    leaderboardMetaMode: 'countryAge',
+    /** 队内赛展开昵称行显示性别符号；队际赛等保持 false */
+    leaderboardShowExpandGender: false,
+    /** 领先榜关注：仅队内赛启用；复用通讯录 contactFollowAction */
+    leaderboardFollowEnabled: false,
+    currentUserId: '',
+    followMap: {},
+    /** none | following | friend */
+    relationMap: {},
+    /** playerId → 好友 | 已关注 */
+    relationLabelMap: {},
+    /** playerId → 是否本人（隐藏加关注） */
+    leaderboardSelfMap: {},
+    /** playerId → 可关注（稳定 id 且非本人） */
+    leaderboardFollowableMap: {},
+    /** playerId → 关注请求中 */
+    followLoadingMap: {},
+    /** playerId → 可进入资料页（稳定 userId，含本人） */
+    leaderboardProfileEntryMap: {},
     visibleParticipatingTeams: [],
     showParticipatingTeamsMore: false,
     participatingTeamsExpanded: false,
@@ -1073,6 +1130,8 @@ Page({
     const adminToken =
       options && options.adminToken ? decodeURIComponent(String(options.adminToken)) : '';
     this._pendingReactionPlay = null;
+    this._activeReactionTarget = null;
+    this._activeReactionKey = '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     this._syncFontScale();
@@ -1335,6 +1394,391 @@ Page({
   },
 
   /**
+   * 领先榜展开头像角标能力（与 leaderboard-player-identity.avatarBadge 对齐）。
+   * team-internal → none（不显示国旗）；inter-team → team（本场球队 LOGO）；其他 → auto。
+   */
+  _resolveLeaderboardAvatarBadge(match) {
+    if (isTeamInternalMatch(match)) return 'none';
+    if (isInterTeamMatch(match)) return 'team';
+    return 'auto';
+  },
+
+  /**
+   * 领先榜展开辅助信息模式（与 leaderboard-player-identity.metaMode 对齐）。
+   * team-internal → handicapFloat；其他保持 countryAge。
+   */
+  _resolveLeaderboardMetaMode(match) {
+    return isTeamInternalMatch(match) ? 'handicapFloat' : 'countryAge';
+  },
+
+  _resolveLeaderboardShowExpandGender(match) {
+    return isTeamInternalMatch(match);
+  },
+
+  /** 竞技指标：null/'' → 缺省；0 为有效值 */
+  _pickLeaderboardMetricValue(raw) {
+    if (raw == null || raw === '') return null;
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+    return raw;
+  },
+
+  /**
+   * 批量解析 userId → handicap / floatCoef（队内赛展开面板）。
+   * 优先报名快照；其次当前用户资料；再尝试联系人关系库中的真实字段。
+   * 不使用演示常量；不以昵称匹配。
+   */
+  _buildLeaderboardMetricMap(match) {
+    const map = {};
+    const merge = (userId, handicap, floatCoef) => {
+      const id = String(userId || '').trim();
+      if (!id) return;
+      if (!map[id]) map[id] = { handicap: null, floatCoef: null };
+      const cur = map[id];
+      if (cur.handicap == null) {
+        const h = this._pickLeaderboardMetricValue(handicap);
+        if (h != null) cur.handicap = h;
+      }
+      if (cur.floatCoef == null) {
+        const f = this._pickLeaderboardMetricValue(floatCoef);
+        if (f != null) cur.floatCoef = f;
+      }
+    };
+
+    const users =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    users.forEach((u) => {
+      if (!u) return;
+      const handicap = u.handicap;
+      const floatCoef = u.floatCoef;
+      [u.userId, u.playerId, u.id, u.uid, u.openid].forEach((id) => {
+        merge(id, handicap, floatCoef);
+      });
+    });
+
+    try {
+      const profile = userProfileStore.loadProfile() || {};
+      merge(profile.userId, profile.handicap, profile.floatCoef);
+      merge('me', profile.handicap, profile.floatCoef);
+      const current = gameStore.getCurrentUser() || {};
+      if (current.userId) {
+        merge(current.userId, profile.handicap, profile.floatCoef);
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // 联系人关系库：仅补 handicap（floatCoef 在 normalize 时缺省为 0，易误显，不从该库读取）
+      const store = contactFollowAction.getStore && contactFollowAction.getStore();
+      if (store) {
+        ['friends', 'following', 'followers', 'recommendations', 'newFollowers'].forEach(
+          (key) => {
+            (store[key] || []).forEach((c) => {
+              if (!c || !c.id) return;
+              merge(
+                c.id,
+                c.handicap != null && c.handicap !== '' ? c.handicap : null,
+                null
+              );
+            });
+          }
+        );
+      }
+    } catch (e) { /* ignore */ }
+
+    return map;
+  },
+
+  _resolveLeaderboardMetricsForPlayer(playerId, metricMap) {
+    const id = String(playerId || '').trim();
+    const raw = (metricMap && id && metricMap[id]) || null;
+    const handicap = raw && raw.handicap != null ? raw.handicap : null;
+    const floatCoef = raw && raw.floatCoef != null ? raw.floatCoef : null;
+    return {
+      handicap: handicap,
+      floatCoef: floatCoef,
+      handicapText: playerActionModal.formatPlayerActionMetric(handicap),
+      floatCoefText: playerActionModal.formatPlayerActionMetric(floatCoef)
+    };
+  },
+
+  _attachLeaderboardPlayerMetrics(player, metricMap) {
+    if (!player || typeof player !== 'object') return player;
+    const id = String(player.playerId || player.userId || '').trim();
+    if (!id) {
+      return Object.assign({}, player, {
+        handicapText: '--',
+        floatCoefText: '--'
+      });
+    }
+    return Object.assign({}, player, this._resolveLeaderboardMetricsForPlayer(id, metricMap));
+  },
+
+  /**
+   * 报名快照 userId → 用户（供展开性别/指标复用）。
+   */
+  _buildRegisterUserByIdMap(match) {
+    const map = {};
+    const users =
+      match && match.registerInfo && Array.isArray(match.registerInfo.users)
+        ? match.registerInfo.users
+        : [];
+    users.forEach((u) => {
+      if (!u) return;
+      [u.userId, u.playerId, u.id, u.uid, u.openid].forEach((rawId) => {
+        const id = String(rawId || '').trim();
+        if (id && !map[id]) map[id] = u;
+      });
+    });
+    return map;
+  },
+
+  /**
+   * 展开面板性别：matchGender → gender（快照）→ 本人资料 gender。
+   * 统一走 playerManage.getGenderDisplay；未知不显示符号。
+   */
+  _resolveLeaderboardExpandGenderDisplay(player, registerById) {
+    const id = String(
+      (player && (player.playerId || player.userId)) || ''
+    ).trim();
+    const reg = (id && registerById && registerById[id]) || null;
+    const matchGender =
+      (player && player.matchGender != null && String(player.matchGender).trim()) ||
+      (reg && reg.matchGender != null && String(reg.matchGender).trim()) ||
+      '';
+    const gender =
+      (player && player.gender != null && String(player.gender).trim()) ||
+      (reg && reg.gender != null && String(reg.gender).trim()) ||
+      '';
+    let profileGender = '';
+    if (!matchGender && !gender && id && this._isLeaderboardFollowSelf(id)) {
+      try {
+        const profile = userProfileStore.loadProfile() || {};
+        if (profile.gender != null && String(profile.gender).trim() !== '') {
+          profileGender = String(profile.gender).trim();
+        }
+      } catch (e) { /* ignore */ }
+    }
+    const preferred = matchGender || gender || profileGender;
+    return playerManage.getGenderDisplay({
+      matchGender: matchGender,
+      gender: preferred
+    });
+  },
+
+  _attachLeaderboardExpandGender(player, registerById) {
+    if (!player || typeof player !== 'object') return player;
+    const d = this._resolveLeaderboardExpandGenderDisplay(player, registerById);
+    return Object.assign({}, player, {
+      gender: d.gender || '',
+      genderIcon: d.icon || '',
+      genderSymbol: d.icon || '',
+      genderClass: d.className || ''
+    });
+  },
+
+  /** 个人榜行：附着江湖差点/浮动系数文案（仅队内赛需要，其它类型无副作用） */
+  _enrichLeaderboardRowsWithMetrics(rows, match) {
+    if (!isTeamInternalMatch(match)) return rows || [];
+    const metricMap = this._buildLeaderboardMetricMap(match);
+    const registerById = this._buildRegisterUserByIdMap(match);
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+      if (!row) return row;
+      let next = this._attachLeaderboardPlayerMetrics(row, metricMap);
+      next = this._attachLeaderboardExpandGender(next, registerById);
+      if (Array.isArray(row.members) && row.members.length) {
+        next.members = row.members.map((m) =>
+          this._attachLeaderboardExpandGender(
+            this._attachLeaderboardPlayerMetrics(m, metricMap),
+            registerById
+          )
+        );
+      }
+      return next;
+    });
+  },
+
+  /** 分队榜展开球员/Side 成员：附着竞技指标 + 展开性别 */
+  _enrichTeamLeaderboardWithMetrics(teams, match) {
+    if (!isTeamInternalMatch(match)) return teams || [];
+    const metricMap = this._buildLeaderboardMetricMap(match);
+    const registerById = this._buildRegisterUserByIdMap(match);
+    return (Array.isArray(teams) ? teams : []).map((team) => {
+      if (!team) return team;
+      const players = (team.players || []).map((p) => {
+        if (!p) return p;
+        let next = this._attachLeaderboardPlayerMetrics(p, metricMap);
+        next = this._attachLeaderboardExpandGender(next, registerById);
+        if (Array.isArray(p.members) && p.members.length) {
+          next.members = p.members.map((m) =>
+            this._attachLeaderboardExpandGender(
+              this._attachLeaderboardPlayerMetrics(m, metricMap),
+              registerById
+            )
+          );
+        }
+        return next;
+      });
+      return Object.assign({}, team, { players: players });
+    });
+  },
+
+  /**
+   * 领先榜关注用稳定 userId：仅 playerId/userId，禁止 scorecardKey / guest_。
+   */
+  _resolveLeaderboardFollowUserId(player) {
+    if (!player || typeof player !== 'object') return '';
+    const id = String(player.playerId || player.userId || '').trim();
+    if (!id) return '';
+    if (id.indexOf(':') >= 0) return '';
+    if (id.indexOf('guest_') === 0) return '';
+    return id;
+  },
+
+  _isLeaderboardFollowSelf(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return false;
+    const aliases = ['me'];
+    try {
+      const current = gameStore.getCurrentUser() || {};
+      if (current.userId) aliases.push(String(current.userId).trim());
+    } catch (e) { /* ignore */ }
+    try {
+      const profile = userProfileStore.loadProfile() || {};
+      if (profile.userId) aliases.push(String(profile.userId).trim());
+    } catch (e) { /* ignore */ }
+    return aliases.indexOf(id) >= 0;
+  },
+
+  _collectLeaderboardFollowIds(leaderboard, teamLeaderboard) {
+    const ids = [];
+    const seen = {};
+    const push = (player) => {
+      const id = this._resolveLeaderboardFollowUserId(player);
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      ids.push(id);
+    };
+    (Array.isArray(leaderboard) ? leaderboard : []).forEach((row) => {
+      push(row);
+      (row && Array.isArray(row.members) ? row.members : []).forEach(push);
+    });
+    (Array.isArray(teamLeaderboard) ? teamLeaderboard : []).forEach((team) => {
+      (team && Array.isArray(team.players) ? team.players : []).forEach((p) => {
+        push(p);
+        (p && Array.isArray(p.members) ? p.members : []).forEach(push);
+      });
+    });
+    return ids;
+  },
+
+  _relationLabelFromStatus(status) {
+    if (status === 'friend') return '好友';
+    if (status === 'following') return '已关注';
+    return '';
+  },
+
+  /**
+   * 领先榜资料入口：有稳定 userId 的球员（含本人）可点 ›。
+   * 与关注能力解耦；队内/队际共用。
+   */
+  _buildLeaderboardProfileEntryPatch(leaderboard, teamLeaderboard) {
+    const ids = this._collectLeaderboardFollowIds(leaderboard, teamLeaderboard);
+    const leaderboardProfileEntryMap = {};
+    ids.forEach((id) => {
+      leaderboardProfileEntryMap[id] = true;
+    });
+    return { leaderboardProfileEntryMap: leaderboardProfileEntryMap };
+  },
+
+  /**
+   * 批量投影通讯录关系 → 页级 map（与 Game Hub / contactFollowAction 一致）。
+   * 仅队内赛启用；不按昵称匹配；无稳定 id 不进入 map；不写回报名/成绩。
+   */
+  _buildLeaderboardRelationPatch(leaderboard, teamLeaderboard, match) {
+    if (!isTeamInternalMatch(match)) {
+      return {
+        leaderboardFollowEnabled: false,
+        currentUserId: '',
+        followMap: {},
+        relationMap: {},
+        relationLabelMap: {},
+        leaderboardSelfMap: {},
+        leaderboardFollowableMap: {},
+        followLoadingMap: this.data.followLoadingMap || {}
+      };
+    }
+    try {
+      contactFollowAction.ensureStore();
+    } catch (e) { /* ignore */ }
+    const ids = this._collectLeaderboardFollowIds(leaderboard, teamLeaderboard);
+    const relationMap = contactFollowAction.buildRelationMap(ids);
+    const followMap = {};
+    const relationLabelMap = {};
+    const leaderboardSelfMap = {};
+    const leaderboardFollowableMap = {};
+    ids.forEach((id) => {
+      const self = this._isLeaderboardFollowSelf(id);
+      leaderboardSelfMap[id] = self;
+      leaderboardFollowableMap[id] = !self;
+      const st = relationMap[id] || 'none';
+      if (!self && (st === 'friend' || st === 'following')) {
+        followMap[id] = true;
+        relationLabelMap[id] = this._relationLabelFromStatus(st);
+      }
+    });
+    let currentUserId = '';
+    try {
+      currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
+    } catch (e) { /* ignore */ }
+    if (!currentUserId) {
+      try {
+        currentUserId = String((userProfileStore.loadProfile() || {}).userId || '').trim();
+      } catch (e) { /* ignore */ }
+    }
+    return {
+      leaderboardFollowEnabled: true,
+      currentUserId: currentUserId,
+      followMap: followMap,
+      relationMap: relationMap,
+      relationLabelMap: relationLabelMap,
+      leaderboardSelfMap: leaderboardSelfMap,
+      leaderboardFollowableMap: leaderboardFollowableMap,
+      followLoadingMap: this.data.followLoadingMap || {}
+    };
+  },
+
+  _findLeaderboardPlayerByFollowId(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return null;
+    const matchId = (p) =>
+      p && (String(p.playerId || '').trim() === id || String(p.userId || '').trim() === id);
+    const rows = Array.isArray(this.data.leaderboard) ? this.data.leaderboard : [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (matchId(row)) return row;
+      const members = row && Array.isArray(row.members) ? row.members : [];
+      for (let j = 0; j < members.length; j++) {
+        if (matchId(members[j])) return members[j];
+      }
+    }
+    const teams = Array.isArray(this.data.teamLeaderboard) ? this.data.teamLeaderboard : [];
+    for (let t = 0; t < teams.length; t++) {
+      const players = teams[t] && Array.isArray(teams[t].players) ? teams[t].players : [];
+      for (let p = 0; p < players.length; p++) {
+        const player = players[p];
+        if (matchId(player)) return player;
+        const members = player && Array.isArray(player.members) ? player.members : [];
+        for (let m = 0; m < members.length; m++) {
+          if (matchId(members[m])) return members[m];
+        }
+      }
+    }
+    return null;
+  },
+
+  /**
    * 队际赛「参赛球队」卡片 UI：顺序沿用 teamGroups；展开态仅页面状态。
    * @param {object|null} match
    * @param {boolean} [expanded]
@@ -1391,6 +1835,14 @@ Page({
     const leaderboardTeamCompetitionEnabled = this._isTeamCompetitionEnabled(match);
     const showLeaderboardTeamColumn = this._shouldShowTeeSheetTeamLabel(match);
     const scorecardCourseTitle = this._buildScorecardCourseTitle(match);
+    const leaderboardRows = this._enrichLeaderboardRowsWithMetrics(
+      this._buildLeaderboardViewForView(match, leaderboardDefaultView),
+      match
+    );
+    const teamLeaderboardRows = this._enrichTeamLeaderboardWithMetrics(
+      this._buildTeamLeaderboardView(match),
+      match
+    );
     this.setData(Object.assign({
       matchId: matchId,
       match: this._mapMatchToView(match),
@@ -1415,9 +1867,12 @@ Page({
       leaderboardScoreType: 'gross',
       leaderboardViewLabel: this._buildLeaderboardViewLabel('gross', leaderboardDefaultView),
       leaderboardNetScoreAvailable: this._hasLeaderboardNetScore(match),
-      leaderboard: this._buildLeaderboardViewForView(match, leaderboardDefaultView),
-      teamLeaderboard: this._buildTeamLeaderboardView(match),
+      leaderboard: leaderboardRows,
+      teamLeaderboard: teamLeaderboardRows,
       teamGroupLogoById: this._buildTeamGroupLogoMap(match),
+      leaderboardAvatarBadge: this._resolveLeaderboardAvatarBadge(match),
+      leaderboardMetaMode: this._resolveLeaderboardMetaMode(match),
+      leaderboardShowExpandGender: this._resolveLeaderboardShowExpandGender(match),
       eventInfoList: this._resolveEventInfoList(match),
       registerSideLabel: isInterTeamMatch(match) ? '球队' : '分队',
       registerSheetGroupLabel: isInterTeamMatch(match) ? '选择球队' : '报名分组',
@@ -1426,7 +1881,7 @@ Page({
         ? '本次选择的选手将统一报名到同一支球队'
         : '本次选择的选手将统一报名到同一个分队',
       scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
-    }, this._buildParticipatingTeamsUiPatch(match, false), this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
+    }, this._buildLeaderboardProfileEntryPatch(leaderboardRows, teamLeaderboardRows), this._buildLeaderboardRelationPatch(leaderboardRows, teamLeaderboardRows, match), this._buildParticipatingTeamsUiPatch(match, false), this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
       this.applyMoreAccess();
     });
   },
@@ -1459,6 +1914,14 @@ Page({
     const resetMatchPlayExpanded =
       !!this._resetMatchPlayExpandedOnReturn || this._isReturningFromScorePage();
     this._resetMatchPlayExpandedOnReturn = false;
+    const leaderboardRows = this._enrichLeaderboardRowsWithMetrics(
+      this._buildLeaderboardViewForView(match, leaderboardView),
+      match
+    );
+    const teamLeaderboardRows = this._enrichTeamLeaderboardWithMetrics(
+      this._buildTeamLeaderboardView(match),
+      match
+    );
     this.setData(Object.assign({
       match: this._mapMatchToView(match),
       courseName: match.courseName || '',
@@ -1481,9 +1944,12 @@ Page({
       leaderboardScoreType: leaderboardScoreType,
       leaderboardViewLabel: this._buildLeaderboardViewLabel(leaderboardScoreType, leaderboardView),
       leaderboardNetScoreAvailable: netAvailable,
-      leaderboard: this._buildLeaderboardViewForView(match, leaderboardView),
-      teamLeaderboard: this._buildTeamLeaderboardView(match),
+      leaderboard: leaderboardRows,
+      teamLeaderboard: teamLeaderboardRows,
       teamGroupLogoById: this._buildTeamGroupLogoMap(match),
+      leaderboardAvatarBadge: this._resolveLeaderboardAvatarBadge(match),
+      leaderboardMetaMode: this._resolveLeaderboardMetaMode(match),
+      leaderboardShowExpandGender: this._resolveLeaderboardShowExpandGender(match),
       eventInfoList: this._resolveEventInfoList(match),
       registerSideLabel: isInterTeamMatch(match) ? '球队' : '分队',
       registerSheetGroupLabel: isInterTeamMatch(match) ? '选择球队' : '报名分组',
@@ -1492,7 +1958,7 @@ Page({
         ? '本次选择的选手将统一报名到同一支球队'
         : '本次选择的选手将统一报名到同一个分队',
       scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
-    }, this._buildParticipatingTeamsUiPatch(
+    }, this._buildLeaderboardProfileEntryPatch(leaderboardRows, teamLeaderboardRows), this._buildLeaderboardRelationPatch(leaderboardRows, teamLeaderboardRows, match), this._buildParticipatingTeamsUiPatch(
       match,
       // 同页刷新保留展开；切换赛事（matchId 变化）恢复收起
       String(matchId || '') === String(this.data.matchId || '')
@@ -3142,6 +3608,7 @@ Page({
         return {
           listKey: user.userId || ('register-user-' + groupId + '-' + index),
           userId: userId,
+          playerId: userId,
           competitionName: user.competitionName || '',
           gender: user.gender || '',
           sex: user.sex || '',
@@ -3207,14 +3674,14 @@ Page({
   /**
    * 报名 Tab 底部 CTA 是否允许展示（不含 activeTab / hideRegisterCTA）。
    * - registering：原逻辑
-   * - 队际赛 ongoing：保留报名 CTA，流程与报名期共用
-   * - completed / 队内 / 其他：不显示
+   * - 球队赛家族（team-internal / inter-team）ongoing：保留报名 CTA，流程与报名期共用
+   * - completed / series / 普通球局：不显示
    */
   _shouldShowRegisterTabCTA(match) {
     const lifecycle = this._getMatchLifecycle(match);
     if (!lifecycle || lifecycle.isCompleted) return false;
     if (lifecycle.isRegistering) return true;
-    return !!(lifecycle.isOngoing && isInterTeamMatch(match));
+    return !!(lifecycle.isOngoing && isTeamMatchFamily(match));
   },
 
   /**
@@ -3472,13 +3939,14 @@ Page({
 
   /**
    * 当前是否允许操作报名开关（显隐与动作共用）。
-   * 报名中任意球队赛；队际赛 ongoing；completed/finished 否。
+   * 报名中任意球队赛；球队赛家族（team-internal / inter-team）ongoing；
+   * completed/finished / series / 普通球局：否。
    */
   _canToggleRegistrationStatus(match) {
     const lifecycle = this._getMatchLifecycle(match);
     if (!lifecycle || lifecycle.isCompleted) return false;
     if (lifecycle.isRegistering) return true;
-    return !!(lifecycle.isOngoing && isInterTeamMatch(match));
+    return !!(lifecycle.isOngoing && isTeamMatchFamily(match));
   },
 
   toggleRegistrationStatus() {
@@ -3586,7 +4054,7 @@ Page({
 
   /* ===== 立即报名流程：分组选择 + 比赛名 + 手机号 ===== */
   openRegisterSheet() {
-    // 已完赛：不打开；报名中 / 队际赛 LIVE 与底部 CTA 门控一致
+    // 已完赛：不打开；报名中 / 球队赛家族 LIVE 与底部 CTA 门控一致
     const match = this.data.matchId
       ? teamMatchStore.getMatchById(this.data.matchId)
       : null;
@@ -3698,6 +4166,9 @@ Page({
         gender: this.data.registerGenderDraft ? String(this.data.registerGenderDraft) : '',
         avatar: user.avatar ? String(user.avatar) : '',
         phone: this.data.registerPhone ? String(this.data.registerPhone) : (user.phone ? String(user.phone) : ''),
+        // 竞技展示快照：来自用户资料真实字段（0 有效；缺省不写假值）
+        handicap: profile.handicap != null && profile.handicap !== '' ? profile.handicap : '',
+        floatCoef: profile.floatCoef != null && profile.floatCoef !== '' ? profile.floatCoef : '',
         groupId: groupId,
         groupName: selectedGroup.name || '',
         // 参赛侧快照：与 groupId/groupName 同值（队际=球队分组 id/短名，非 sourceTeamId）
@@ -4063,6 +4534,7 @@ Page({
   onUnload() {
     this._pendingReactionPlay = null;
     this._activeReactionTarget = null;
+    this._activeReactionKey = '';
     this._reactionBridge = null;
     if (typeof this._stopReactionOverlayWait === 'function') {
       this._stopReactionOverlayWait();
@@ -5304,7 +5776,7 @@ Page({
   /**
    * 队际赛头像角标：返回可匹配 teamGroups[].id 的 badgeTeamId。
    * LOGO 本体放在页级 teamGroupLogoById，避免复制到每个榜单行。
-   * 无匹配 id 时返回空串（不串队）；队内赛返回空（继续国旗）。
+   * 无匹配 id 时返回空串（不串队）；队内赛返回空（角标由 leaderboardAvatarBadge=none 关闭）。
    */
   _resolveInterTeamBadgeLogo(match, teamGroupId, logoMap) {
     if (!isInterTeamMatch(match)) return '';
@@ -6991,16 +7463,27 @@ Page({
     const match = matchId && !demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)
       ? teamMatchStore.getMatchById(matchId)
       : null;
-    this.setData({
+    const leaderboardRows = this._enrichLeaderboardRowsWithMetrics(
+      this._buildLeaderboardViewForView(match, this.data.leaderboardView || 'all'),
+      match
+    );
+    const teamLeaderboardRows = this._enrichTeamLeaderboardWithMetrics(
+      this._buildTeamLeaderboardView(match),
+      match
+    );
+    this.setData(Object.assign({
       showLeaderboardTeamColumn: this._shouldShowTeeSheetTeamLabel(match),
-      leaderboard: this._buildLeaderboardViewForView(match, this.data.leaderboardView || 'all'),
-      teamLeaderboard: this._buildTeamLeaderboardView(match),
+      leaderboard: leaderboardRows,
+      teamLeaderboard: teamLeaderboardRows,
       teamGroupLogoById: this._buildTeamGroupLogoMap(match),
+      leaderboardAvatarBadge: this._resolveLeaderboardAvatarBadge(match),
+      leaderboardMetaMode: this._resolveLeaderboardMetaMode(match),
+      leaderboardShowExpandGender: this._resolveLeaderboardShowExpandGender(match),
       leaderboardViewLabel: this._buildLeaderboardViewLabel(
         this.data.leaderboardScoreType || 'gross',
         this.data.leaderboardView || 'all'
       )
-    });
+    }, this._buildLeaderboardProfileEntryPatch(leaderboardRows, teamLeaderboardRows), this._buildLeaderboardRelationPatch(leaderboardRows, teamLeaderboardRows, match)));
   },
 
   openLeaderboardSettingSheet() {
@@ -7257,6 +7740,130 @@ Page({
   noop() {},
 
   /**
+   * 球员资料页预留：校验稳定 userId 后提示，不 navigate。
+   * TODO: 正式资料页完成后在此接入 navigateTo（以 userId 为主键）。
+   * @param {{ userId?: string, playerId?: string, name?: string, avatar?: string, userType?: string, identitySource?: string }} raw
+   */
+  _openReservedPlayerProfile(raw) {
+    const userId = this._resolveLeaderboardFollowUserId({
+      playerId: raw && (raw.userId || raw.playerId),
+      userId: raw && (raw.userId || raw.playerId)
+    });
+    if (!userId) return null;
+    wx.showToast({ title: '球员资料页开发中', icon: 'none', duration: 900 });
+    return userId;
+  },
+
+  /**
+   * 领先榜展开：昵称后 › → 球员资料页预留入口。
+   */
+  onLeaderboardPlayerProfileTap(e) {
+    const detail = (e && e.detail) || {};
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    this._openReservedPlayerProfile({
+      userId: detail.userId || detail.playerId || ds.userid || ds.userId,
+      playerId: detail.playerId || detail.userId || ds.playerid || ds.playerId,
+      name: detail.name || ds.name,
+      avatar: detail.avatar || ds.avatar,
+      userType: detail.userType || ds.usertype || ds.userType,
+      identitySource: detail.identitySource || ds.identitysource || ds.identitySource
+    });
+  },
+
+  /**
+   * 报名 Tab 用户行 → 球员资料页预留入口（队内赛 / 队际赛）。
+   * 行内独立操作须用 catchtap，避免与本事件同时触发。
+   */
+  onRegisterPlayerProfileTap(e) {
+    const matchId = this.data.matchId || '';
+    const match = matchId ? this._resolveMatchData(matchId) : null;
+    if (!isTeamMatchFamily(match || this.data.match)) return;
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    this._openReservedPlayerProfile({
+      userId: ds.userid || ds.userId,
+      playerId: ds.playerid || ds.playerId || ds.userid || ds.userId,
+      name: ds.name,
+      avatar: ds.avatar,
+      userType: ds.usertype || ds.userType,
+      identitySource: ds.identitysource || ds.identitySource
+    });
+  },
+
+  /**
+   * 领先榜展开「加关注」：复用通讯录 contactFollowAction.followUser。
+   * loading 防重复；失败保留按钮；成功后页级 map 同步所有可见位置。
+   */
+  onLeaderboardFollow(e) {
+    if (!this.data.leaderboardFollowEnabled) return;
+    const detail = (e && e.detail) || {};
+    const pid = this._resolveLeaderboardFollowUserId({
+      playerId: detail.playerId || detail.userId,
+      userId: detail.userId || detail.playerId
+    });
+    if (!pid || this._isLeaderboardFollowSelf(pid)) return;
+    if (!this.data.leaderboardFollowableMap || !this.data.leaderboardFollowableMap[pid]) return;
+    const existed = (this.data.relationMap && this.data.relationMap[pid]) || 'none';
+    if (existed === 'friend' || existed === 'following') return;
+    if (!this._followInFlightMap) this._followInFlightMap = {};
+    if (this._followInFlightMap[pid]) return;
+    this._followInFlightMap[pid] = true;
+
+    const followLoadingMap = Object.assign({}, this.data.followLoadingMap || {});
+    followLoadingMap[pid] = true;
+    this.setData({ followLoadingMap: followLoadingMap });
+
+    const clearLoading = () => {
+      this._followInFlightMap[pid] = false;
+      const nextLoading = Object.assign({}, this.data.followLoadingMap || {});
+      delete nextLoading[pid];
+      this.setData({ followLoadingMap: nextLoading });
+    };
+
+    try {
+      const player = detail.player || this._findLeaderboardPlayerByFollowId(pid) || {};
+      const status = contactFollowAction.followUser({
+        id: pid,
+        playerId: pid,
+        name: player.name,
+        nickname: player.name || player.nickname,
+        avatar: player.avatar,
+        gender: player.gender,
+        handicap: player.handicap,
+        floatCoef: player.floatCoef
+      });
+      if (!status) {
+        clearLoading();
+        wx.showToast({ title: '关注失败', icon: 'none', duration: 900 });
+        return;
+      }
+      const nextStatus = status === 'friend' ? 'friend' : 'following';
+      const followMap = Object.assign({}, this.data.followMap || {});
+      const relationMap = Object.assign({}, this.data.relationMap || {});
+      const relationLabelMap = Object.assign({}, this.data.relationLabelMap || {});
+      followMap[pid] = true;
+      relationMap[pid] = nextStatus;
+      relationLabelMap[pid] = this._relationLabelFromStatus(nextStatus);
+      const nextLoading = Object.assign({}, this.data.followLoadingMap || {});
+      delete nextLoading[pid];
+      this._followInFlightMap[pid] = false;
+      this.setData({
+        followMap: followMap,
+        relationMap: relationMap,
+        relationLabelMap: relationLabelMap,
+        followLoadingMap: nextLoading
+      });
+      wx.showToast({
+        title: nextStatus === 'friend' ? '已成为好友' : '已关注',
+        icon: 'none',
+        duration: 900
+      });
+    } catch (err) {
+      clearLoading();
+      wx.showToast({ title: '关注失败', icon: 'none', duration: 900 });
+    }
+  },
+
+  /**
    * 讨论区发言头像短按：discussion 上抛 playerAvatarTap → 同一中央弹窗。
    */
   onDiscussionAvatarTap(e) {
@@ -7467,12 +8074,37 @@ Page({
 
   _clearActiveReactionTarget() {
     this._activeReactionTarget = null;
+    this._activeReactionKey = '';
+  },
+
+  /** 解析讨论区当前 reactionKey（事件优先，其次播放中/pending） */
+  _resolveDiscussionReactionKey(reactionKeyHint) {
+    const fromHint =
+      reactionKeyHint != null ? String(reactionKeyHint).trim() : '';
+    if (fromHint) return fromHint;
+    const active =
+      this._activeReactionKey != null
+        ? String(this._activeReactionKey).trim()
+        : '';
+    if (active) return active;
+    const pending =
+      this._pendingReactionPlay && this._pendingReactionPlay.key != null
+        ? String(this._pendingReactionPlay.key).trim()
+        : '';
+    return pending || '';
   },
 
   /**
-   * 讨论区：按本次点击消息 index 隐藏头像（任意可播动画；不按 self/observer / 是否本人）。
+   * 讨论区：按 reactionKey 能力决定是否隐藏被点击消息头像。
+   * flower/beer 不隐藏并清残留；其余六种按 message index 隐藏。
    */
-  _applyDiscussionDetachByTarget(target, messageIndexHint) {
+  _applyDiscussionDetachByTarget(target, messageIndexHint, reactionKeyHint) {
+    const reactionKey = this._resolveDiscussionReactionKey(reactionKeyHint);
+    if (!reactionPanelConfig.shouldDetachDiscussionReaction(reactionKey)) {
+      // flower/beer 或未知 key：不写 detach，并清掉上一动画残留
+      this._clearDiscussionReactionDetach();
+      return;
+    }
     const t = target || this._getDiscussionReactionTarget();
     let idx = messageIndexHint;
     if (idx == null || idx === '') {
@@ -7497,7 +8129,7 @@ Page({
     ) {
       return;
     }
-    console.log('[reaction] discussion detach → index', n, userId);
+    console.log('[reaction] discussion detach →', reactionKey, 'index', n, userId);
     this.setData({
       discussionReactionDetachedIndex: n,
       discussionReactionDetachedUserId: userId
@@ -7517,11 +8149,15 @@ Page({
     });
   },
 
-  /** bind:seatdetach — overlay triggerEvent，任意动画开播 */
+  /** bind:seatdetach — overlay triggerEvent；是否隐藏由 shouldDetachDiscussionReaction 决定 */
   onReactionOverlaySeatDetach(e) {
     const detail = (e && e.detail) || {};
     const target = detail.target || this._getDiscussionReactionTarget();
-    this._applyDiscussionDetachByTarget(target, detail.messageIndex);
+    this._applyDiscussionDetachByTarget(
+      target,
+      detail.messageIndex,
+      detail.reactionKey
+    );
   },
 
   /** bind:seatrestore */
@@ -7530,12 +8166,23 @@ Page({
     this._clearActiveReactionTarget();
   },
 
-  /** bind:seatvisualstate — 仅在明确 restore 时清讨论区；隐藏以 seatdetach 为准 */
+  /**
+   * bind:seatvisualstate — 仅在明确 restore 时清讨论区。
+   * 若带 reactionAvatarDetached=true，走同一 key 能力判断（防 flower/beer 被旁路隐藏）。
+   */
   onReactionOverlaySeatVisualState(e) {
     const partial = (e && e.detail) || {};
-    if ('reactionAvatarDetached' in partial && !partial.reactionAvatarDetached) {
+    if (!('reactionAvatarDetached' in partial)) return;
+    if (!partial.reactionAvatarDetached) {
       this._clearDiscussionReactionDetach();
+      return;
     }
+    // 另一条事件路径写入 detach 时，仍按当前 reactionKey 能力判断
+    this._applyDiscussionDetachByTarget(
+      this._getDiscussionReactionTarget(),
+      null,
+      this._resolveDiscussionReactionKey('')
+    );
   },
 
   _ensureReactionHost() {
@@ -7565,21 +8212,28 @@ Page({
         } catch (e) { /* ignore */ }
         return 'me';
       },
-      // 讨论区隐藏以 WXML bind:seatdetach 为准；host 回调仅作兼容兜底（无 mode 门控）
+      // 讨论区隐藏以 reactionKey 能力为准；host 回调仅作兼容兜底
       onSeatDetach(playerId, reactionKey) {
-        self._applyDiscussionDetachByTarget(self._getDiscussionReactionTarget());
+        self._applyDiscussionDetachByTarget(
+          self._getDiscussionReactionTarget(),
+          null,
+          reactionKey
+        );
       },
       onSeatRestore() {
         self._clearDiscussionReactionDetach();
       },
       onSeatVisualState(partial) {
-        if (
-          partial &&
-          'reactionAvatarDetached' in partial &&
-          !partial.reactionAvatarDetached
-        ) {
+        if (!partial || !('reactionAvatarDetached' in partial)) return;
+        if (!partial.reactionAvatarDetached) {
           self._clearDiscussionReactionDetach();
+          return;
         }
+        self._applyDiscussionDetachByTarget(
+          self._getDiscussionReactionTarget(),
+          null,
+          self._resolveDiscussionReactionKey('')
+        );
       },
       appendFlowerSystemMessage(target) {
         self._appendDiscussionFlowerSystemMessage(target);
@@ -7749,6 +8403,7 @@ Page({
     const key = pending.key;
     const target = pending.target;
     this._activeReactionTarget = target;
+    this._activeReactionKey = key;
     this._pendingReactionPlay = null;
     this._stopReactionOverlayWait();
     this.setData({ reactionPackLoading: false });
@@ -8059,7 +8714,7 @@ Page({
     const split = splitPermissionFeatures(permissionFeatures);
     let footer = (split.featuresPermissionFooter || []).slice();
     let footerPad = split.featuresPermissionFooterPad || [];
-    // 队际赛 LIVE：报名开关插入底部行，固定 ID 序 cancel → close_registration → finish
+    // 球队赛家族 LIVE：报名开关插入底部行，固定 ID 序 cancel → close_registration → finish
     if (
       this._canToggleRegistrationStatus(match) &&
       visible('permission', 'close_registration')
@@ -8094,9 +8749,14 @@ Page({
         });
       }
     }
+    // 队内赛 LIVE：常用区 theme → register_for_other；队际赛 LIVE / 完赛仍保留显示设置
+    const commonFeatures = resolveOngoingCommonFeatures(
+      match,
+      this._getMatchLifecycle(match)
+    );
     this.setData({
       featuresCommon: this._withMoreFeatureDisabledState(
-        FEATURES_COMMON.filter((f) => allowFeature(f) && visible('common', f.permission)),
+        commonFeatures.filter((f) => allowFeature(f) && visible('common', f.permission)),
         match
       ),
       featuresPermission: this._withMoreFeatureDisabledState(split.featuresPermission, match),
@@ -8224,18 +8884,27 @@ Page({
       this._promptFinishMatch();
       return;
     }
-    if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
-      if (permission === 'register_for_other') {
-        const registerClosed =
-          !(this.data.registerPermission && this.data.registerPermission.isOpen);
-        this.setData({ showMoreSheet: false, moreFabExpanded: false });
-        if (registerClosed) {
-          this._showRegistrationClosedModal();
-          return;
-        }
-        this.openRegisterForOtherSheet();
+    // 替他人报名：报名中任意球队赛；队内赛 LIVE（与报名中同一套弹窗/写入）
+    if (permission === 'register_for_other') {
+      const lifecycle = this._getMatchLifecycle(match);
+      const allowProxyRegister =
+        !!(lifecycle && lifecycle.isRegistering) ||
+        !!(lifecycle && lifecycle.isOngoing && isTeamInternalMatch(match));
+      this.setData({ showMoreSheet: false, moreFabExpanded: false });
+      if (!allowProxyRegister) {
+        wx.showToast({ title: '功能开发中', icon: 'none' });
         return;
       }
+      const registerClosed =
+        !(this.data.registerPermission && this.data.registerPermission.isOpen);
+      if (registerClosed) {
+        this._showRegistrationClosedModal();
+        return;
+      }
+      this.openRegisterForOtherSheet();
+      return;
+    }
+    if (this.data.matchStatus && this.data.matchStatus.isRegistering) {
       if (permission === 'invite_friends_register') {
         this.setData({ showMoreSheet: false, moreFabExpanded: false });
         this.shareTournamentInvite();
@@ -8453,7 +9122,7 @@ Page({
   _resolveTempAdminGrantableFeatures() {
     const isRegistering = !!(this.data.matchStatus && this.data.matchStatus.isRegistering);
     let source = isRegistering ? REGISTERING_FEATURES_PERMISSION : FEATURES_PERMISSION;
-    // 队际赛 LIVE：授权列表含报名开关（与 M 面板一致）
+    // 球队赛家族 LIVE：授权列表含报名开关（与 M 面板一致）
     if (!isRegistering) {
       const match = this.data.matchId
         ? teamMatchStore.getMatchById(this.data.matchId)
@@ -10637,6 +11306,8 @@ Page({
       gender: p.gender != null ? String(p.gender) : '',
       avatar: p.avatar != null ? String(p.avatar) : '',
       phone: p.phone != null ? String(p.phone) : '',
+      handicap: p.handicap != null && p.handicap !== '' ? p.handicap : '',
+      floatCoef: p.floatCoef != null && p.floatCoef !== '' ? p.floatCoef : '',
       groupId: group && group.id != null ? String(group.id) : '',
       groupName: group && group.name ? String(group.name) : '',
       // 参赛侧快照：与 groupId/groupName 同值（队际短名，非 sourceTeamId）

@@ -18,9 +18,19 @@
     <!-- 球队 -->
     <view class="section">
       <view class="section-label"><text class="section-label__h2">球队设置</text></view>
+      <!-- 整卡进入球队选择；LOGO 用 catchtap 避免误跳转（对齐队际赛组织机构 LOGO） -->
       <view class="ds-card top-line team-card" bindtap="onSelectTeam">
         <view class="team-left">
-          <image wx:if="{{teamId}}" class="team-logo" src="{{teamLogo}}" mode="aspectFill"></image>
+          <view class="org-logo-wrap" catchtap="onChangeTeamLogo">
+            <image
+              wx:if="{{teamId}}"
+              class="team-logo"
+              src="{{teamLogo}}"
+              mode="aspectFill"
+            ></image>
+            <view wx:else class="team-logo org-logo-empty"></view>
+            <text class="org-logo-edit">换</text>
+          </view>
           <view class="field-main">
             <text class="{{teamId ? 'team-title' : 'field-placeholder'}}">{{teamName}}</text>
             <text wx:if="{{teamId && teamRole}}" class="ds-badge badge-gold">{{teamRole}}</text>
@@ -235,20 +245,6 @@
       </view>
     </view>
 
-    <!-- LOGO配置 -->
-    <view class="section">
-      <view class="section-label"><text class="section-label__h2">LOGO配置</text></view>
-      <view class="ds-card ds-field logo-config-card" bindtap="openLogoSheet">
-        <view class="field-main">
-          <text wx:if="{{logoConfig.type === 'custom'}}" class="field-value">已设置本场专属LOGO</text>
-          <text wx:else class="logo-config-desc ds-desc-text">用于设置本场比赛在广场显示的专属LOGO</text>
-        </view>
-        <view class="field-right">
-          <text class="field-icon">›</text>
-        </view>
-      </view>
-    </view>
-
     <!-- PARTNER 配置 -->
     <view class="section">
       <view class="section-label"><text class="section-label__h2">PARTNER 配置</text></view>
@@ -458,47 +454,6 @@
       <button class="sheet-cancel-btn" bindtap="cancelTeamGroupSheet">取消</button>
       <button class="sheet-confirm-btn sheet-confirm-btn--inline" bindtap="confirmTeamGroupSheet">确定</button>
     </view>
-  </view>
-  </block>
-
-  <!-- 底部弹层：LOGO配置 -->
-  <block wx:if="{{showLogoSheet}}">
-  <view class="sheet-mask show" bindtap="closeLogoSheet"></view>
-  <view class="bottom-sheet logo-sheet show" catchtap="noop">
-    <view class="sheet-handle"></view>
-    <view class="sheet-header">
-      <view>
-        <text class="sheet-overline">EVENT LOGO</text>
-        <text class="sheet-header__h3">LOGO配置</text>
-      </view>
-      <view class="sheet-close" bindtap="closeLogoSheet"><text>×</text></view>
-    </view>
-
-    <view class="logo-preview-panel">
-      <view class="logo-preview-box {{logoConfig.type === 'custom' ? 'has-custom' : 'is-default'}}">
-        <image
-          class="logo-preview-image"
-          src="{{logoConfig.type === 'custom' ? logoConfig.url : teamLogo}}"
-          mode="aspectFill"
-        ></image>
-      </view>
-      <text class="logo-preview-title">{{logoConfig.type === 'custom' ? '本场专属LOGO' : '当前使用球队默认LOGO'}}</text>
-      <text class="logo-preview-desc ds-desc-text">仅作用于本场赛事，不会修改球队默认 LOGO 或其他赛事。</text>
-    </view>
-
-    <view class="logo-action-list">
-      <button class="logo-upload-btn" bindtap="chooseLogoImage">
-        <text class="logo-upload-icon">＋</text>
-        <text>{{logoConfig.type === 'custom' ? '替换 LOGO' : '选择 / 上传 LOGO'}}</text>
-      </button>
-      <button
-        wx:if="{{logoConfig.type === 'custom'}}"
-        class="logo-delete-btn"
-        bindtap="deleteLogoConfig"
-      >删除当前 LOGO</button>
-    </view>
-
-    <text class="logo-sheet-hint ds-hint-text">建议上传正方形图片；支持选择后裁剪为 1:1。</text>
   </view>
   </block>
 

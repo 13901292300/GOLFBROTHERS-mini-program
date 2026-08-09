@@ -288,8 +288,11 @@ Component({
             if ('reactionAvatarDetached' in seat) {
               if (seat.reactionAvatarDetached) {
                 try {
+                  // 透传当前播放 key，供讨论区宿主按 shouldDetachDiscussionReaction 判断
                   self._emitSeatDetachEvent(
-                    '',
+                    self._playingReactionKey ||
+                      self.data.reactionScreenMode ||
+                      '',
                     seat.reactionAvatarDetachedPlayerId
                   );
                 } catch (e) {}
@@ -377,8 +380,9 @@ Component({
       const k = key != null ? String(key).trim() : '';
       const t = target && typeof target === 'object' ? target : null;
       this._reactionTarget = t;
+      this._playingReactionKey = k;
       this.setData({ playerActionTarget: t });
-      // 播放真正开始：通知宿主隐藏讨论区被点击消息头像（含 flower/beer）
+      // 播放真正开始：通知宿主；是否隐藏由宿主 shouldDetachDiscussionReaction(key) 决定
       if (k && t) {
         this._emitSeatDetachEvent(k, t.playerId || t.userId);
       }
@@ -415,6 +419,7 @@ Component({
         )
       );
       this._emitSeatRestoreEvent();
+      this._playingReactionKey = '';
       this._playerActionRocketBusy = false;
       this._playerActionBoxingBusy = false;
       this._playerActionKissBusy = false;

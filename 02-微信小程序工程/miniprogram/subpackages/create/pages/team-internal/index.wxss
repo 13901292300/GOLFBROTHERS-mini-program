@@ -1,2 +1,35 @@
 /* 队内赛创建页样式：公共样式在主包 styles，避免主包 @import 分包路径 */
 @import '/styles/create-team-common.wxss';
+
+/* 球队 LOGO 替换角标：复刻队际赛组织机构 LOGO（org-logo-*） */
+.org-logo-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.org-logo-empty {
+  background: var(--bg-subtle);
+}
+
+.org-logo-edit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 8rpx;
+  border-radius: 18rpx;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 36rpx;
+  text-align: center;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.35);
+}
+
+/* Dark：提高「换」角标对比，提示 LOGO 可点 */
+.create-page.dark-mode .org-logo-edit {
+  background: rgba(206, 146, 36, 0.92);
+  color: #111111;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.2);
+}

@@ -493,6 +493,8 @@ function normalizeRegisterUser(user) {
           ? String(raw.gender)
           : '',
     handicap: raw.handicap != null ? raw.handicap : '',
+    // 竞技展示字段：有则保留快照（0 为有效值）；无则空串，展示层格式化为 --
+    floatCoef: raw.floatCoef != null && raw.floatCoef !== '' ? raw.floatCoef : '',
     avatar: raw.avatar != null ? String(raw.avatar) : '',
     phone: raw.phone != null ? String(raw.phone) : '',
     groupId: raw.groupId != null ? raw.groupId : '',

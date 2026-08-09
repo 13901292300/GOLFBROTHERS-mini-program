@@ -1,1 +1,6 @@
-<view class="sc-follow-btn" hover-class="sc-follow-btn--hover" hover-stay-time="80" catchtap="onTap">加关注</view>
+<view
+  class="sc-follow-btn {{loading || disabled ? 'sc-follow-btn--disabled' : ''}}"
+  hover-class="{{loading || disabled ? 'none' : 'sc-follow-btn--hover'}}"
+  hover-stay-time="80"
+  catchtap="onTap"
+>加关注</view>

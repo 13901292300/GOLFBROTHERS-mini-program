@@ -17,3 +17,7 @@
 .sc-follow-btn--hover {
   opacity: 0.88;
 }
+
+.sc-follow-btn--disabled {
+  opacity: 0.55;
+}

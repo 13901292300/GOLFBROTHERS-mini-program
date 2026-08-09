@@ -12,20 +12,34 @@
 .sc-profile-meta {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  /* 勿 hidden：斜体昵称右上角外伸由 .sc-name 内 padding 消化 */
+  overflow: visible;
 }
 .sc-name-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  padding-top: 2rpx;
+  box-sizing: border-box;
+}
+/* 昵称+性别：内容收缩；受行内剩余宽度约束；勿 space-between */
+.name-gender-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   box-sizing: border-box;
 }
 .sc-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  line-height: 1.2;
-  padding-right: 8rpx;
+  line-height: 1.35;
+  padding: 4rpx 4rpx 2rpx 0;
   box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -33,9 +47,21 @@
   /* 继承页级主题 token；缺省回落 Bright 主色，避免组件内落成黑色 */
   color: var(--text-primary, #002d62);
 }
+.sc-name-gender {
+  flex-shrink: 0;
+  margin-left: 4rpx;
+  font-size: 22rpx;
+  line-height: 1;
+  font-weight: 700;
+}
 .sc-chevron {
   flex-shrink: 0;
+  margin-left: 8rpx;
+  padding: 8rpx 4rpx 8rpx 8rpx;
   color: var(--text-muted, #6b7280);
+  font-size: 24rpx;
+  line-height: 1;
+  box-sizing: border-box;
 }
 .sc-sub {
   color: var(--text-muted, #6b7280);

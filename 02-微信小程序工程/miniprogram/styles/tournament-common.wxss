@@ -529,19 +529,97 @@ page {
   display: flex;
   flex-direction: column;
 }
-.scorecard-profile { background: var(--bg-card); color: var(--text-primary); border-bottom: 1px solid var(--border); padding: 32rpx; display: flex; align-items: flex-start; justify-content: space-between; gap: 24rpx; }
-.sc-profile-left { display: flex; align-items: center; gap: 32rpx; min-width: 0; }
+.scorecard-profile { background: var(--bg-card); color: var(--text-primary); border-bottom: 1px solid var(--border); padding: 32rpx; display: flex; align-items: flex-start; justify-content: space-between; gap: 24rpx; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+.sc-profile-left { display: flex; align-items: center; gap: 32rpx; flex: 1 1 auto; min-width: 0; }
 .sc-avatar-wrap { position: relative; flex-shrink: 0; }
 .sc-avatar { width: 160rpx; height: 160rpx; border-radius: 999rpx; border: 1px solid var(--border); }
 .sc-flag { position: absolute; bottom: -8rpx; right: -8rpx; width: 48rpx; height: 48rpx; border-radius: 999rpx; border: 4rpx solid var(--bg-card); overflow: hidden; background: #fff; }
 .sc-flag image { width: 100%; height: 100%; }
-.sc-profile-meta { min-width: 0; }
-.sc-name-line { display: flex; align-items: center; min-width: 0; }
-.sc-name { font-size: 40rpx; font-weight: 900; font-style: italic; text-transform: uppercase; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sc-chevron { margin-left: 16rpx; color: var(--text-muted); font-size: 24rpx; }
+/* 省略链放在 .sc-name；meta 勿 overflow:hidden，避免斜体字重右上角被父级裁切 */
+.sc-profile-meta { flex: 1 1 auto; min-width: 0; overflow: visible; }
+.sc-name-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* 昵称+性别紧凑组：短昵称符号立即跟随；长昵称组内省略，› 仍在组外可见 */
+.name-gender-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+/* 斜体+900 字重字形外伸：用 line-height / padding 留白；勿 flex-grow，避免把性别推到右侧 */
+.sc-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 40rpx;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  line-height: 1.35;
+  padding: 4rpx 4rpx 2rpx 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-name-line .sc-name-gender {
+  flex-shrink: 0;
+  margin-left: 4rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+.sc-chevron {
+  flex-shrink: 0;
+  margin-left: 8rpx;
+  padding: 8rpx 4rpx 8rpx 8rpx;
+  color: var(--text-muted);
+  font-size: 24rpx;
+  line-height: 1;
+  box-sizing: border-box;
+}
 .sc-sub { font-size: 20rpx; font-weight: 700; color: var(--text-muted); margin-top: 8rpx; text-transform: uppercase; letter-spacing: 0.06em; }
 .sc-sub-strong { color: var(--text-primary); font-weight: 900; }
 .sc-follow-btn { flex-shrink: 0; padding: 12rpx 24rpx; border-radius: 999rpx; background: var(--champion-gold); color: #fff; font-size: 22rpx; font-weight: 700; white-space: nowrap; }
+.sc-follow-btn--disabled { opacity: 0.55; }
+
+/* 关系状态标签（非按钮；与通讯录 / leaderboard-player-identity 一致） */
+.sc-rel-tag {
+  flex-shrink: 0;
+  max-width: 42%;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  box-sizing: border-box;
+}
+.sc-rel-tag--friend {
+  border-color: rgba(206, 146, 36, 0.55);
+  background: rgba(206, 146, 36, 0.12);
+  color: var(--champion-gold);
+}
+.sc-rel-tag--following {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
 
 .scorecard-dark-panel { background: #111111; color: #fff; border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 32rpx 0; }
 .detail-page.bright-mode .scorecard-dark-panel { background: #f3f4f6; color: var(--text-primary); border-top: 1px solid var(--border); }

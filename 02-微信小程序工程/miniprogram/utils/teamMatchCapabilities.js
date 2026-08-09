@@ -156,14 +156,19 @@ function resolveOrganizerKindLabel(matchOrType) {
 
 /**
  * 详情英雄区底部主体类型标签：
- * - 仅 inter-team → ORG.（复用 ORGANIZER_KIND_LABEL_ORG）
- * - 队内赛及其他 → 赛事组织（不改）
+ * - team-internal → CLUB（无句点；复用 ORGANIZER_KIND_LABEL_CLUB）
+ * - inter-team → ORG.（复用 ORGANIZER_KIND_LABEL_ORG）
+ * - 其他赛事类型 → 赛事组织（默认，不改）
  * 名称 / LOGO 仍由 resolveOrganizerDisplay 读快照，本函数只出文案。
  * @param {object|string|null|undefined} matchOrType
  * @returns {string}
  */
 function resolveHeroOrganizerSectionLabel(matchOrType) {
-  if (resolveMatchType(matchOrType) === MATCH_TYPE_INTER_TEAM) {
+  const type = resolveMatchType(matchOrType);
+  if (type === MATCH_TYPE_TEAM_INTERNAL) {
+    return ORGANIZER_KIND_LABEL_CLUB;
+  }
+  if (type === MATCH_TYPE_INTER_TEAM) {
     return ORGANIZER_KIND_LABEL_ORG;
   }
   return HERO_ORGANIZER_SECTION_LABEL_DEFAULT;

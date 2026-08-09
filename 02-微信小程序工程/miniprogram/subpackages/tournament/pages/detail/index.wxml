@@ -286,7 +286,21 @@
             </view>
             <view class="roster-content">
               <view wx:if="{{registerDisplayUsers.length}}" class="roster-body">
-                <view wx:for="{{registerDisplayUsers}}" wx:key="listKey" class="roster-row">
+                <!-- 整行资料入口；未来行内操作（取消/分队/费用等）须 catchtap 阻冒泡 -->
+                <view
+                  wx:for="{{registerDisplayUsers}}"
+                  wx:key="listKey"
+                  class="roster-row"
+                  hover-class="roster-row--active"
+                  hover-stay-time="80"
+                  bindtap="onRegisterPlayerProfileTap"
+                  data-user-id="{{item.userId}}"
+                  data-player-id="{{item.playerId || item.userId}}"
+                  data-name="{{item.competitionName}}"
+                  data-avatar="{{item.avatar}}"
+                  data-user-type="{{item.userType}}"
+                  data-identity-source="{{item.identitySource}}"
+                >
                   <view class="roster-col roster-col--idx"><text>{{index + 1}}</text></view>
                   <view class="roster-col roster-col--player">
                     <image class="roster-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
@@ -691,36 +705,95 @@
                         wx:key="playerId"
                         player="{{mem}}"
                         team-group-logo-by-id="{{teamGroupLogoById}}"
-                        followed="{{false}}"
-                        is-self="{{false}}"
+                        avatar-badge="{{leaderboardAvatarBadge}}"
+                        meta-mode="{{leaderboardMetaMode}}"
+                        show-name-gender="{{leaderboardShowExpandGender}}"
+                        gender="{{mem.gender}}"
+                        gender-symbol="{{mem.genderSymbol || mem.genderIcon}}"
+                        gender-class="{{mem.genderClass}}"
+                        followed="{{leaderboardFollowEnabled ? followMap[mem.playerId] : false}}"
+                        relation-status="{{leaderboardFollowEnabled ? (relationMap[mem.playerId] || (followMap[mem.playerId] ? 'following' : 'none')) : 'none'}}"
+                        relationship-label="{{leaderboardFollowEnabled ? (relationLabelMap[mem.playerId] || '') : ''}}"
+                        can-follow="{{leaderboardFollowEnabled ? !!leaderboardFollowableMap[mem.playerId] : true}}"
+                        follow-loading="{{leaderboardFollowEnabled ? !!followLoadingMap[mem.playerId] : false}}"
+                        is-self="{{leaderboardFollowEnabled ? !leaderboardFollowableMap[mem.playerId] : false}}"
+                        bind:follow="onLeaderboardFollow"
+                        bind:profiletap="onLeaderboardPlayerProfileTap"
                       />
                     </view>
                     <view wx:else class="scorecard-profile">
                       <view class="sc-profile-left">
                         <view class="sc-avatar-wrap">
                           <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
+                          <!-- team：本场球队 LOGO；auto：无 LOGO 时回退国旗；none：不渲染（队内赛） -->
                           <view
-                            wx:if="{{teamGroupLogoById[player.badgeTeamId] || player.flag}}"
-                            class="sc-flag {{teamGroupLogoById[player.badgeTeamId] ? 'sc-flag--team' : ''}}"
+                            wx:if="{{leaderboardAvatarBadge !== 'none' && teamGroupLogoById[player.badgeTeamId]}}"
+                            class="sc-flag sc-flag--team"
                           >
                             <image
-                              wx:if="{{teamGroupLogoById[player.badgeTeamId]}}"
                               src="{{teamGroupLogoById[player.badgeTeamId]}}"
                               mode="aspectFill"
                             ></image>
+                          </view>
+                          <view
+                            wx:elif="{{leaderboardAvatarBadge === 'auto' && player.flag}}"
+                            class="sc-flag"
+                          >
                             <image
-                              wx:else
                               src="https://flagcdn.com/w40/{{player.flag}}.png"
                               mode="aspectFill"
                             ></image>
                           </view>
                         </view>
                         <view class="sc-profile-meta">
-                          <view class="sc-name-line"><text class="sc-name">{{player.name}}</text><text class="sc-chevron">›</text></view>
-                          <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{player.country}}</text>　AGE: <text class="sc-sub-strong">{{player.age}}</text></view>
+                          <view class="sc-name-line">
+                            <view class="name-gender-group">
+                              <text class="sc-name">{{player.name}}</text>
+                              <text
+                                wx:if="{{leaderboardShowExpandGender && player.genderIcon}}"
+                                class="gender-icon sc-name-gender {{player.genderClass}}"
+                              >{{player.genderIcon}}</text>
+                            </view>
+                            <text
+                              wx:if="{{leaderboardProfileEntryMap[player.playerId]}}"
+                              class="sc-chevron"
+                              catchtap="onLeaderboardPlayerProfileTap"
+                              data-user-id="{{player.playerId}}"
+                              data-name="{{player.name}}"
+                              data-avatar="{{player.avatar}}"
+                            >›</text>
+                          </view>
+                          <view wx:if="{{leaderboardMetaMode === 'handicapFloat'}}" class="sc-sub">
+                            江湖差点 <text class="sc-sub-strong">{{player.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText}}</text>
+                          </view>
+                          <view wx:else class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{player.country}}</text>　AGE: <text class="sc-sub-strong">{{player.age}}</text></view>
                         </view>
                       </view>
-                      <follow-action-btn user-id="{{player.playerId || player.scorecardKey}}" bind:follow="noop" />
+                      <!-- 队内赛：好友 > 已关注 > 加关注；队际赛等保持原占位「加关注」 -->
+                      <block wx:if="{{leaderboardFollowEnabled}}">
+                        <block wx:if="{{leaderboardFollowableMap[player.playerId]}}">
+                          <follow-action-btn
+                            wx:if="{{!relationLabelMap[player.playerId]}}"
+                            user-id="{{player.playerId}}"
+                            loading="{{!!followLoadingMap[player.playerId]}}"
+                            disabled="{{!!followLoadingMap[player.playerId]}}"
+                            bind:follow="onLeaderboardFollow"
+                          />
+                          <text
+                            wx:elif="{{relationMap[player.playerId] === 'friend'}}"
+                            class="sc-rel-tag sc-rel-tag--friend"
+                          >{{relationLabelMap[player.playerId]}}</text>
+                          <text
+                            wx:else
+                            class="sc-rel-tag sc-rel-tag--following"
+                          >{{relationLabelMap[player.playerId]}}</text>
+                        </block>
+                      </block>
+                      <follow-action-btn
+                        wx:else
+                        user-id="{{player.playerId || ''}}"
+                        bind:follow="noop"
+                      />
                     </view>
 
                     <view class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
@@ -809,8 +882,20 @@
                     wx:key="playerId"
                     player="{{mem}}"
                     team-group-logo-by-id="{{teamGroupLogoById}}"
-                    followed="{{false}}"
-                    is-self="{{false}}"
+                    avatar-badge="{{leaderboardAvatarBadge}}"
+                    meta-mode="{{leaderboardMetaMode}}"
+                    show-name-gender="{{leaderboardShowExpandGender}}"
+                    gender="{{mem.gender}}"
+                    gender-symbol="{{mem.genderSymbol || mem.genderIcon}}"
+                    gender-class="{{mem.genderClass}}"
+                    followed="{{leaderboardFollowEnabled ? followMap[mem.playerId] : false}}"
+                    relation-status="{{leaderboardFollowEnabled ? (relationMap[mem.playerId] || (followMap[mem.playerId] ? 'following' : 'none')) : 'none'}}"
+                    relationship-label="{{leaderboardFollowEnabled ? (relationLabelMap[mem.playerId] || '') : ''}}"
+                    can-follow="{{leaderboardFollowEnabled ? !!leaderboardFollowableMap[mem.playerId] : true}}"
+                    follow-loading="{{leaderboardFollowEnabled ? !!followLoadingMap[mem.playerId] : false}}"
+                    is-self="{{leaderboardFollowEnabled ? !leaderboardFollowableMap[mem.playerId] : false}}"
+                    bind:follow="onLeaderboardFollow"
+                    bind:profiletap="onLeaderboardPlayerProfileTap"
                   />
                 </view>
                 <view wx:else class="scorecard-profile">
@@ -818,27 +903,73 @@
                     <view class="sc-avatar-wrap">
                       <image class="sc-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
                       <view
-                        wx:if="{{teamGroupLogoById[item.badgeTeamId] || item.flag}}"
-                        class="sc-flag {{teamGroupLogoById[item.badgeTeamId] ? 'sc-flag--team' : ''}}"
+                        wx:if="{{leaderboardAvatarBadge !== 'none' && teamGroupLogoById[item.badgeTeamId]}}"
+                        class="sc-flag sc-flag--team"
                       >
                         <image
-                          wx:if="{{teamGroupLogoById[item.badgeTeamId]}}"
                           src="{{teamGroupLogoById[item.badgeTeamId]}}"
                           mode="aspectFill"
                         ></image>
+                      </view>
+                      <view
+                        wx:elif="{{leaderboardAvatarBadge === 'auto' && item.flag}}"
+                        class="sc-flag"
+                      >
                         <image
-                          wx:else
                           src="https://flagcdn.com/w40/{{item.flag}}.png"
                           mode="aspectFill"
                         ></image>
                       </view>
                     </view>
                     <view class="sc-profile-meta">
-                      <view class="sc-name-line"><text class="sc-name">{{item.name}}</text><text class="sc-chevron">›</text></view>
-                      <view class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
+                      <view class="sc-name-line">
+                        <view class="name-gender-group">
+                          <text class="sc-name">{{item.name}}</text>
+                          <text
+                            wx:if="{{leaderboardShowExpandGender && item.genderIcon}}"
+                            class="gender-icon sc-name-gender {{item.genderClass}}"
+                          >{{item.genderIcon}}</text>
+                        </view>
+                        <text
+                          wx:if="{{leaderboardProfileEntryMap[item.playerId]}}"
+                          class="sc-chevron"
+                          catchtap="onLeaderboardPlayerProfileTap"
+                          data-user-id="{{item.playerId}}"
+                          data-name="{{item.name}}"
+                          data-avatar="{{item.avatar}}"
+                        >›</text>
+                      </view>
+                      <view wx:if="{{leaderboardMetaMode === 'handicapFloat'}}" class="sc-sub">
+                        江湖差点 <text class="sc-sub-strong">{{item.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{item.floatCoefText}}</text>
+                      </view>
+                      <view wx:else class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
                     </view>
                   </view>
-                  <follow-action-btn user-id="{{item.playerId || item.id}}" bind:follow="noop" />
+                  <!-- 队内赛：好友 > 已关注 > 加关注；队际赛等保持原占位「加关注」 -->
+                  <block wx:if="{{leaderboardFollowEnabled}}">
+                    <block wx:if="{{leaderboardFollowableMap[item.playerId]}}">
+                      <follow-action-btn
+                        wx:if="{{!relationLabelMap[item.playerId]}}"
+                        user-id="{{item.playerId}}"
+                        loading="{{!!followLoadingMap[item.playerId]}}"
+                        disabled="{{!!followLoadingMap[item.playerId]}}"
+                        bind:follow="onLeaderboardFollow"
+                      />
+                      <text
+                        wx:elif="{{relationMap[item.playerId] === 'friend'}}"
+                        class="sc-rel-tag sc-rel-tag--friend"
+                      >{{relationLabelMap[item.playerId]}}</text>
+                      <text
+                        wx:else
+                        class="sc-rel-tag sc-rel-tag--following"
+                      >{{relationLabelMap[item.playerId]}}</text>
+                    </block>
+                  </block>
+                  <follow-action-btn
+                    wx:else
+                    user-id="{{item.playerId || ''}}"
+                    bind:follow="noop"
+                  />
                 </view>
 
                 <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
@@ -1293,7 +1424,7 @@
     </view>
   </view>
 
-  <!-- 报名/取消报名固定按钮：报名 TAB；报名中或队际赛 LIVE（showRegisterTabCTA）；弹层打开时降层 -->
+  <!-- 报名/取消报名固定按钮：报名 TAB；报名中或球队赛家族 LIVE（showRegisterTabCTA）；弹层打开时降层 -->
   <view
     wx:if="{{activeTab === 'register' && showRegisterTabCTA && !hideRegisterCTA}}"
     class="register-cta-bar {{(registerForOtherSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || registerSheetVisible) ? 'register-cta-bar--under-sheet' : ''}}"

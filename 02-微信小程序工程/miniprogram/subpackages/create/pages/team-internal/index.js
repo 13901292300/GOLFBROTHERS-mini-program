@@ -248,12 +248,12 @@ Page({
     visibility: 'public',
     accessCode: '',
 
+    // builder 兼容字段；本场 LOGO 以 teamLogo 为准，提交前清空 custom
     logoConfig: {
       type: 'default',
       url: '',
       source: 'team'
     },
-    showLogoSheet: false,
 
     partnerConfig: partnerConfigUtil.createDefaultPartnerConfig(''),
 
@@ -343,6 +343,18 @@ Page({
       this._freeModeTeamGroups = this._defaultTeamGroups();
     }
 
+    // 本场专用 LOGO：优先旧「LOGO配置」custom，否则已保存 teamLogo（不读球队目录覆盖）
+    const legacyCustomLogo =
+      form.logoConfig &&
+      form.logoConfig.type === 'custom' &&
+      form.logoConfig.url
+        ? String(form.logoConfig.url).trim()
+        : '';
+    const teamLogo =
+      legacyCustomLogo ||
+      String(form.teamLogo || EMPTY_TEAM_LOGO).trim() ||
+      EMPTY_TEAM_LOGO;
+
     const patch = Object.assign(
       {
         isEditMode: true,
@@ -352,7 +364,7 @@ Page({
         submitButtonText: '保存修改',
         teamId: form.teamId || '',
         teamName: form.teamName || EMPTY_TEAM_LABEL,
-        teamLogo: form.teamLogo || EMPTY_TEAM_LOGO,
+        teamLogo: teamLogo,
         teamRole: '',
         roundName: form.roundName || '',
         courseId: form.courseId || '',
@@ -382,7 +394,7 @@ Page({
         groupPermission: form.groupPermission === 'player' ? 'player' : 'admin',
         visibility: form.visibility === 'private' ? 'private' : 'public',
         accessCode: form.accessCode || '',
-        logoConfig: form.logoConfig || { type: 'default', url: '', source: 'team' },
+        logoConfig: { type: 'default', url: '', source: 'team' },
         partnerConfig: partnerConfig,
         bannerImage: form.bannerImage || ''
       },
@@ -462,6 +474,53 @@ Page({
       },
       fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
     });
+  },
+
+  /**
+   * 点击球队 LOGO：替换本场 teamLogo 快照。
+   * catchtap 阻止冒泡，不进入球队选择；不写球队目录主数据。
+   */
+  onChangeTeamLogo() {
+    if (!this._hasSelectedTeam()) {
+      this.onSelectTeam();
+      return;
+    }
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0];
+        if (!file || !file.tempFilePath) return;
+        this._applyTeamLogoFile(file.tempFilePath);
+      },
+      fail: () => {
+        // 取消或失败：保持原 LOGO，不清空
+      }
+    });
+  },
+
+  _applyTeamLogoFile(filePath) {
+    if (!filePath) return;
+    const apply = (url) => {
+      if (!url) return;
+      this.setData({ teamLogo: url });
+    };
+    if (wx.cropImage) {
+      wx.cropImage({
+        src: filePath,
+        cropScale: '1:1',
+        success: (res) => {
+          apply((res && res.tempFilePath) || filePath);
+        },
+        fail: () => {
+          apply(filePath);
+        }
+      });
+      return;
+    }
+    apply(filePath);
   },
 
   onSelectCourse() {
@@ -1279,67 +1338,6 @@ Page({
     });
   },
 
-  openLogoSheet() {
-    this.setData({ showLogoSheet: true });
-  },
-
-  closeLogoSheet() {
-    this.setData({ showLogoSheet: false });
-  },
-
-  _setCustomLogo(url) {
-    if (!url) return;
-    this.setData({
-      logoConfig: {
-        type: 'custom',
-        url,
-        source: 'custom'
-      }
-    });
-  },
-
-  _applyPickedLogo(filePath) {
-    if (!filePath) return;
-    if (wx.cropImage) {
-      wx.cropImage({
-        src: filePath,
-        cropScale: '1:1',
-        success: (res) => {
-          this._setCustomLogo(res.tempFilePath || filePath);
-        },
-        fail: () => {
-          this._setCustomLogo(filePath);
-        }
-      });
-      return;
-    }
-    this._setCustomLogo(filePath);
-  },
-
-  chooseLogoImage() {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      sizeType: ['compressed'],
-      success: (res) => {
-        const file = res.tempFiles && res.tempFiles[0];
-        if (!file || !file.tempFilePath) return;
-        this._applyPickedLogo(file.tempFilePath);
-      }
-    });
-  },
-
-  deleteLogoConfig() {
-    this.setData({
-      logoConfig: {
-        type: 'default',
-        url: '',
-        source: 'team'
-      }
-    });
-  },
-
   onPartnerTitleInput(e) {
     this.setData({ 'partnerConfig.partnerTitle': e.detail.value });
   },
@@ -1586,6 +1584,13 @@ Page({
     if (!this._assertMatchPlayTeamGroupsOrTip()) {
       return;
     }
+
+    // 本场 LOGO 以 teamLogo 为准；清空独立 logoConfig，避免旧 custom 覆盖
+    const logoPatch = {
+      logoConfig: { type: 'default', url: '', source: 'team' }
+    };
+    Object.assign(this.data, logoPatch);
+    this.setData(logoPatch);
 
     if (this.data.isEditMode) {
       this._submitEditMatch();

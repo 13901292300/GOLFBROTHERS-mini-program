@@ -412,6 +412,9 @@
   padding: 20rpx 32rpx;
   border-bottom: 1px solid var(--border);
 }
+.roster-row--active {
+  background: var(--bg-hover);
+}
 .roster-row:last-child { border-bottom: none; }
 .roster-col--handicap {
   box-sizing: border-box;
