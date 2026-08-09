@@ -1,6 +1,7 @@
 const matchJoinQrAccess = require('../../../utils/matchJoinQrAccess.js');
 const matchJoinIdentity = require('../../../utils/matchJoinIdentity.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
+const { resolveOrganizerDisplay } = require('../../../utils/teamMatchCapabilities.js');
 const userIdentityAlias = require('../../../utils/userIdentityAlias.js');
 const gameStore = require('../../../utils/gameStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
@@ -83,9 +84,9 @@ function resolveMatchName(match, matchId) {
   if (!match) return matchId || '未知赛事';
   const roundName = String(match.roundName || '').trim();
   if (roundName) return roundName;
-  const organizationName = String(match.organizationName || '').trim();
-  const teamName = String(match.teamName || '').trim();
-  if (organizationName || teamName) return [organizationName, teamName].filter(Boolean).join(' · ');
+  // 队际优先 organization* 快照；队内用 team*；避免 org/team 同步后重复拼接
+  const orgName = resolveOrganizerDisplay(match).name;
+  if (orgName) return orgName;
   return String(match.courseName || matchId || '未知赛事').trim();
 }
 

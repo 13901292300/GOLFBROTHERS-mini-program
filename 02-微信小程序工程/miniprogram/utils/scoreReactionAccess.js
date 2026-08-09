@@ -1,9 +1,8 @@
 /**
- * 记分页头像互动（reaction）能力门控。
+ * 记分页头像互动（reaction）能力门控（主包轻量模块）。
  *
- * 全站正式记分共用 subpackages/scoring/pages/score/index；
+ * 打开动作面板时即可同步使用，不触发 reaction 分包下载。
  * 不再以 demo-weekend-amateur 作为 reaction 启用条件。
- * 演示赛显示风格（elite/classic）等 UI 仍由 demoWeekendAmateurGame 单独门控。
  */
 
 /**

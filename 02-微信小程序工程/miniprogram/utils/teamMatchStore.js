@@ -72,13 +72,76 @@ function cloneEventInfoList(list) {
 
 function cloneTeamGroups(list) {
   if (!Array.isArray(list)) return [];
-  return list.map((item, index) => ({
-    id: item && item.id != null ? item.id : index + 1,
-    renderKey: item && item.renderKey
-      ? String(item.renderKey)
-      : ('team-group-' + (item && item.id != null ? item.id : index + 1)),
-    name: item && item.name ? String(item.name).trim() : ''
-  }));
+  return list.map((item, index) => {
+    const name = item && item.name ? String(item.name).trim() : '';
+    const sourceTeamShortName =
+      item && item.sourceTeamShortName != null && String(item.sourceTeamShortName).trim() !== ''
+        ? String(item.sourceTeamShortName).trim()
+        : '';
+    return {
+      id: item && item.id != null ? item.id : index + 1,
+      renderKey: item && item.renderKey
+        ? String(item.renderKey)
+        : ('team-group-' + (item && item.id != null ? item.id : index + 1)),
+      name: name,
+      // 队际赛：分队可绑定正式注册球队；队内赛缺省为空串（向后兼容，不静默裁剪）
+      sourceTeamId:
+        item && item.sourceTeamId != null && String(item.sourceTeamId).trim() !== ''
+          ? String(item.sourceTeamId).trim()
+          : '',
+      sourceTeamName:
+        item && item.sourceTeamName != null && String(item.sourceTeamName).trim() !== ''
+          ? String(item.sourceTeamName).trim()
+          : '',
+      sourceTeamShortName: sourceTeamShortName,
+      sourceTeamLogo:
+        item && item.sourceTeamLogo != null && String(item.sourceTeamLogo).trim() !== ''
+          ? String(item.sourceTeamLogo).trim()
+          : ''
+    };
+  });
+}
+
+/**
+ * 解析发起主体快照：队际赛以 organization* 为准，并同步到 team*（旧读取兼容）。
+ * 参赛球队不得写入根级 teamId。
+ */
+function resolveOrganizerSnapshot(pageData, matchType) {
+  const data = pageData || {};
+  const type = String(matchType || '').trim() || 'team-internal';
+  if (type === 'inter-team') {
+    const organizationId = String(
+      data.organizationId != null && String(data.organizationId).trim() !== ''
+        ? data.organizationId
+        : data.teamId || ''
+    ).trim();
+    const organizationName = String(
+      data.organizationName != null && String(data.organizationName).trim() !== ''
+        ? data.organizationName
+        : data.teamName || ''
+    ).trim();
+    const organizationLogo = String(
+      data.organizationLogo != null && String(data.organizationLogo).trim() !== ''
+        ? data.organizationLogo
+        : data.teamLogo || ''
+    ).trim();
+    return {
+      organizationId: organizationId,
+      organizationName: organizationName,
+      organizationLogo: organizationLogo,
+      teamId: organizationId,
+      teamName: organizationName,
+      teamLogo: organizationLogo
+    };
+  }
+  return {
+    organizationId: data.organizationId != null ? String(data.organizationId) : '',
+    organizationName: data.organizationName != null ? String(data.organizationName) : '',
+    organizationLogo: data.organizationLogo != null ? String(data.organizationLogo) : '',
+    teamId: data.teamId || '',
+    teamName: data.teamName || '',
+    teamLogo: data.teamLogo || ''
+  };
 }
 
 function normalizeTeamCompetition(input, groupCount) {
@@ -314,10 +377,21 @@ function normalizeSideScoreRecord(sideId, sideKey, record) {
 
 function normalizeStoredMatch(match) {
   if (!match || typeof match !== 'object') return match;
-  if (!match.scoreData || typeof match.scoreData !== 'object' || Array.isArray(match.scoreData)) {
-    return Object.assign({}, match, { scoreData: {} });
+  const next = Object.assign({}, match);
+  if (!next.scoreData || typeof next.scoreData !== 'object' || Array.isArray(next.scoreData)) {
+    next.scoreData = {};
   }
-  return match;
+  // 队际赛最小字段：读路径补齐缺省，不静默裁剪 teamGroups / 不改存量 matchType
+  if (next.organizationId == null) next.organizationId = '';
+  else next.organizationId = String(next.organizationId);
+  if (next.organizationName == null) next.organizationName = '';
+  else next.organizationName = String(next.organizationName);
+  if (next.organizationLogo == null) next.organizationLogo = '';
+  else next.organizationLogo = String(next.organizationLogo);
+  if (Array.isArray(next.teamGroups)) {
+    next.teamGroups = cloneTeamGroups(next.teamGroups);
+  }
+  return next;
 }
 
 function createDefaultRegisterInfo() {
@@ -477,11 +551,13 @@ function buildMatchFromCreatePage(pageData) {
   const creator = gameStore.getCurrentUser();
   const creatorId = data.createdBy || data.creatorId || (creator && creator.userId) || '';
   const matchId = 'team-match-' + Date.now();
+  const matchType = data.matchType || 'team-internal';
+  const organizer = resolveOrganizerSnapshot(data, matchType);
   return {
     matchId,
-    teamId: data.teamId || '',
-    teamName: data.teamName || '',
-    teamLogo: data.teamLogo || '',
+    teamId: organizer.teamId,
+    teamName: organizer.teamName,
+    teamLogo: organizer.teamLogo,
     matchLogo: resolveMatchLogo(data),
     logoConfig: data.logoConfig && typeof data.logoConfig === 'object'
       ? {
@@ -492,8 +568,10 @@ function buildMatchFromCreatePage(pageData) {
       : { type: 'default', url: '', source: 'team' },
     roundName: data.roundName || '',
     gameMode: data.gameMode || data.selectedGameMode || '',
-    matchType: data.matchType || 'team-internal',
-    organizationName: data.organizationName || '',
+    matchType: matchType,
+    organizationId: organizer.organizationId,
+    organizationName: organizer.organizationName,
+    organizationLogo: organizer.organizationLogo,
     feeList: cloneFeeList(data.feeList),
     eventInfoList: cloneEventInfoList(data.eventInfoList),
     teamGroups: cloneTeamGroups(data.teamGroups),
@@ -544,9 +622,22 @@ function updateMatchFromCreatePage(existing, pageData, options) {
   const data = pageData || {};
   const opts = options || {};
   const next = Object.assign({}, existing);
-  next.teamId = data.teamId || '';
-  next.teamName = data.teamName || '';
-  next.teamLogo = data.teamLogo || '';
+  next.matchType = existing.matchType || data.matchType || 'team-internal';
+  const organizerInput = {
+    teamId: data.teamId != null ? data.teamId : existing.teamId,
+    teamName: data.teamName != null ? data.teamName : existing.teamName,
+    teamLogo: data.teamLogo != null ? data.teamLogo : existing.teamLogo,
+    organizationId: data.organizationId != null ? data.organizationId : existing.organizationId,
+    organizationName: data.organizationName != null ? data.organizationName : existing.organizationName,
+    organizationLogo: data.organizationLogo != null ? data.organizationLogo : existing.organizationLogo
+  };
+  const organizer = resolveOrganizerSnapshot(organizerInput, next.matchType);
+  next.teamId = organizer.teamId;
+  next.teamName = organizer.teamName;
+  next.teamLogo = organizer.teamLogo;
+  next.organizationId = organizer.organizationId;
+  next.organizationName = organizer.organizationName;
+  next.organizationLogo = organizer.organizationLogo;
   next.matchLogo = resolveMatchLogo(data);
   next.logoConfig = data.logoConfig && typeof data.logoConfig === 'object'
     ? {
@@ -557,10 +648,6 @@ function updateMatchFromCreatePage(existing, pageData, options) {
     : (existing.logoConfig || { type: 'default', url: '', source: 'team' });
   next.roundName = data.roundName || '';
   next.gameMode = data.gameMode || data.selectedGameMode || existing.gameMode || '';
-  next.matchType = existing.matchType || data.matchType || 'team-internal';
-  next.organizationName = data.organizationName != null
-    ? data.organizationName
-    : (existing.organizationName || '');
   next.feeList = cloneFeeList(data.feeList);
   next.eventInfoList = cloneEventInfoList(data.eventInfoList);
   next.teamGroups = cloneTeamGroups(data.teamGroups);
@@ -1438,6 +1525,10 @@ function hydrateCreatePageFromMatch(match) {
     teamId: match.teamId || '',
     teamName: match.teamName || '',
     teamLogo: match.teamLogo || '',
+    matchType: match.matchType || 'team-internal',
+    organizationId: match.organizationId != null ? String(match.organizationId) : '',
+    organizationName: match.organizationName || '',
+    organizationLogo: match.organizationLogo != null ? String(match.organizationLogo) : '',
     roundName: match.roundName || '',
     courseId: match.courseId || '',
     courseName: match.courseName || '',
@@ -1484,6 +1575,42 @@ function listMatches() {
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
+/**
+ * 按正式球队 ID 查询其作为参赛方的队际赛（含已完赛）。
+ * - 只匹配 match.teamGroups[].sourceTeamId
+ * - 不用根级 teamId（根级为赛事机构）
+ * - 不修改记录、不双写关联表
+ */
+function listInterTeamMatchesByParticipatingTeamId(teamId) {
+  const tid = String(teamId || '').trim();
+  if (!tid) return [];
+  const seen = {};
+  const out = [];
+  const list = listMatches();
+  for (let i = 0; i < list.length; i++) {
+    const match = list[i];
+    if (!match || String(match.matchType || '').trim() !== 'inter-team') continue;
+    const matchId = match.matchId != null ? String(match.matchId) : '';
+    if (!matchId || seen[matchId]) continue;
+    const groups = Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    let hit = false;
+    for (let g = 0; g < groups.length; g++) {
+      const sid =
+        groups[g] && groups[g].sourceTeamId != null
+          ? String(groups[g].sourceTeamId).trim()
+          : '';
+      if (sid && sid === tid) {
+        hit = true;
+        break;
+      }
+    }
+    if (!hit) continue;
+    seen[matchId] = true;
+    out.push(match);
+  }
+  return out;
+}
+
 function getMatchById(matchId) {
   if (!matchId) return null;
   return normalizeStoredMatch(_readAll().find((item) => item && item.matchId === matchId) || null);
@@ -1510,20 +1637,34 @@ function resolveTournamentCardStatusLabel(match) {
 function toTournamentCard(match) {
   if (!match) return null;
   const venue = buildVenueLabel(match.courseName, match.courseHalfText);
+  const caps = require('./teamMatchCapabilities.js');
+  const org = caps.resolveOrganizerDisplay(match);
+  const matchType = String((match && match.matchType) || '').trim();
+  const typeLabel =
+    matchType === 'inter-team' ? '队际赛' : matchType === 'team-internal' ? '队内赛' : '';
   return {
     id: match.matchId,
     matchId: match.matchId,
+    matchType: matchType,
+    typeLabel: typeLabel,
+    // 卡片底部主体类型标签（CLUB / ORG.）；名称与 LOGO 仍走 org 快照
+    organizerKindLabel: caps.resolveOrganizerKindLabel(match),
     favorited: false,
-    clubLogo: match.matchLogo || match.teamLogo || '',
+    clubLogo: match.matchLogo || org.logo || '',
     clubDate: formatClubDate(match.teeTime),
-    title: match.roundName || match.teamName || '球队赛',
-    teamName: match.teamName || '',
+    title: match.roundName || org.name || '球队赛',
+    // 发起主体快照（队际=机构；队内=球队）；不含参赛球队列表
+    teamName: org.name || match.teamName || '',
     venue: venue,
     views: '0',
     statusLabel: resolveTournamentCardStatusLabel(match),
     navUrl: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(match.matchId)
   };
 }
+
+const {
+  validateTeamMatchSideGroups: validateTeamMatchSideGroupsFn
+} = require('./teamMatchCapabilities.js');
 
 module.exports = {
   STORAGE_KEY,
@@ -1533,6 +1674,8 @@ module.exports = {
   INDIVIDUAL_STROKE_MODE,
   INDIVIDUAL_MATCH_PLAY_MODE,
   GAME_MODE_CHANGE_CLEAR_GROUPS_TIP,
+  validateTeamMatchSideGroups: validateTeamMatchSideGroupsFn,
+  cloneTeamGroups,
   isPairingStrokeFormat,
   getPairingStrokeLabel,
   isComboGameMode,
@@ -1578,6 +1721,7 @@ module.exports = {
   hydrateCreatePageFromMatch,
   saveMatch,
   listMatches,
+  listInterTeamMatchesByParticipatingTeamId,
   getMatchById,
   removeMatch,
   toTournamentCard,

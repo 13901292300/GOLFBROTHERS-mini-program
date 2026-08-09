@@ -2,6 +2,10 @@ const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const playerManage = require('../../../../utils/playerManage.js');
 const {
+  isInterTeamMatch,
+  isTeamMatchFamily
+} = require('../../../../utils/teamMatchCapabilities.js');
+const {
   buildRegisterTeamMap,
   isG5MatchPlayMode,
   isG6G7MatchPlayMode,
@@ -15,6 +19,10 @@ const {
 const TEE_BLUE = 'BLUE_T';
 const TEE_RED = 'RED_T';
 
+function resolvePickSideUnit(matchLike) {
+  return isInterTeamMatch(matchLike) ? '球队' : '分队';
+}
+
 function listFilledPickPlayers(players) {
   return (Array.isArray(players) ? players : [])
     .map((p) => ({
@@ -25,12 +33,13 @@ function listFilledPickPlayers(players) {
     .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
 }
 
-function ensurePlayersHaveTeam(filled, teamMap) {
+function ensurePlayersHaveTeam(filled, teamMap, sideUnit) {
+  const unit = sideUnit || '分队';
   for (let i = 0; i < filled.length; i++) {
     const uid = filled[i].userId;
     const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
     if (!teamId) {
-      return '存在未归属分队的球员，请先完成报名分队';
+      return '存在未归属' + unit + '的球员，请先完成报名' + unit;
     }
   }
   return '';
@@ -83,7 +92,7 @@ function generatePairCompositionsByTeam(filled, teamMap) {
 /**
  * 校验每个成绩组合内部同队，且 2 人 pair 无落单
  */
-function validateGeneratedPairCompositions(compositions, teamMap, expectedPairCount) {
+function validateGeneratedPairCompositions(compositions, teamMap, expectedPairCount, sideUnit) {
   if (!Array.isArray(compositions) || compositions.length !== expectedPairCount) {
     return '无法形成合法的同队两人组合';
   }
@@ -95,20 +104,20 @@ function validateGeneratedPairCompositions(compositions, teamMap, expectedPairCo
       return '无法形成合法的同队两人组合';
     }
     if (!isSameTeamMembers(members, teamMap)) {
-      return '成绩组合不能跨分队';
+      return '成绩组合不能跨' + (sideUnit || '分队');
     }
   }
   return '';
 }
 
 /**
- * G4：先按分队生成 2 人 pair，再验每组合内部同队
+ * G4：先按分队/球队生成 2 人 pair，再验每组合内部同队
  */
-function validateG4GroupStructurePlayers(players, teamMap) {
+function validateG4GroupStructurePlayers(players, teamMap, sideUnit) {
   const filled = listFilledPickPlayers(players);
   if (!filled.length) return '';
 
-  const teamErr = ensurePlayersHaveTeam(filled, teamMap);
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap, sideUnit);
   if (teamErr) return teamErr;
 
   const n = filled.length;
@@ -117,16 +126,17 @@ function validateG4GroupStructurePlayers(players, teamMap) {
   }
 
   const compositions = generatePairCompositionsByTeam(filled, teamMap);
-  return validateGeneratedPairCompositions(compositions, teamMap, n / 2);
+  return validateGeneratedPairCompositions(compositions, teamMap, n / 2, sideUnit);
 }
 
 /**
- * G2/G3 2+2：按分队数量与各队人数判断能否拆成两个组合（每组合最多 2 人）
- * - 1 分队：永远合法
- * - 2 分队：各队人数均 ≤2（允许 2+2 / 2+1 / 1+1；禁止 3+1）
- * - 3+ 分队：非法
+ * G2/G3 2+2：按分队/球队数量与各队人数判断能否拆成两个组合（每组合最多 2 人）
+ * - 1 侧：永远合法
+ * - 2 侧：各队人数均 ≤2（允许 2+2 / 2+1 / 1+1；禁止 3+1）
+ * - 3+ 侧：非法
  */
-function validateG2G3TwoPlusTwoPlayers(filled, teamMap) {
+function validateG2G3TwoPlusTwoPlayers(filled, teamMap, sideUnit) {
+  const unit = sideUnit || '分队';
   if (!filled.length) return '';
   if (filled.length > 4) {
     return '2+2模式下每组最多 4 人';
@@ -147,38 +157,39 @@ function validateG2G3TwoPlusTwoPlayers(filled, teamMap) {
   if (teamCount === 2) {
     for (let i = 0; i < teamIds.length; i++) {
       if (buckets[teamIds[i]].length > 2) {
-        return '2+2模式下每个组合最多 2 人，无法按分队拆成合法组合';
+        return '2+2模式下每个组合最多 2 人，无法按' + unit + '拆成合法组合';
       }
     }
     return '';
   }
-  return '2+2模式同组最多来自两个分队';
+  return '2+2模式同组最多来自两个' + unit;
 }
 
 /**
  * G2/G3：先按模式生成组合，再验每组合内部同队
  */
-function validateStrokeCompositionPlayers(players, compositionMode, teamMap) {
+function validateStrokeCompositionPlayers(players, compositionMode, teamMap, sideUnit) {
   const mode = compositionMode === '2+2' ? '2+2' : '4+0';
+  const unit = sideUnit || '分队';
   const filled = listFilledPickPlayers(players);
   if (!filled.length) return '';
 
-  const teamErr = ensurePlayersHaveTeam(filled, teamMap);
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap, unit);
   if (teamErr) return teamErr;
 
   if (mode === '4+0') {
-    // 一个组合最多 4 人；允许 1–4；整组即一个组合，不可跨分队
+    // 一个组合最多 4 人；允许 1–4；整组即一个组合，不可跨分队/球队
     if (filled.length > 4) {
       return '4+0模式下每组最多 4 人';
     }
     const ids = filled.map((p) => p.userId);
     if (!isSameTeamMembers(ids, teamMap)) {
-      return '4+0组合不能跨分队';
+      return '4+0组合不能跨' + unit;
     }
     return '';
   }
 
-  return validateG2G3TwoPlusTwoPlayers(filled, teamMap);
+  return validateG2G3TwoPlusTwoPlayers(filled, teamMap, unit);
 }
 
 function createEmptySlot(position) {
@@ -191,7 +202,8 @@ function createEmptySlot(position) {
     handicap: '',
     tee: '',
     teeLabel: '',
-    teeMarkerClass: ''
+    teeMarkerClass: '',
+    teamLabel: ''
   };
 }
 
@@ -260,25 +272,57 @@ function normalizeUser(user) {
     genderIcon: genderDisplay.icon,
     genderClass: genderDisplay.className,
     handicap: user && user.handicap != null && user.handicap !== '' ? String(user.handicap) : '-',
-    groupId: user && user.groupId != null ? String(user.groupId) : ''
+    groupId: user && user.groupId != null ? String(user.groupId) : '',
+    matchTeamId: user && user.matchTeamId != null ? String(user.matchTeamId).trim() : '',
+    matchTeamName: user && user.matchTeamName != null ? String(user.matchTeamName).trim() : '',
+    groupName: user && user.groupName != null ? String(user.groupName).trim() : ''
   };
 }
 
-function hydrateSlotsFromPlayers(players) {
+function resolveSlotTeamLabel(raw, matchLike, registerLookup) {
+  if (!isTeamMatchFamily(matchLike)) return '';
+  const teamGroups = matchLike && Array.isArray(matchLike.teamGroups) ? matchLike.teamGroups : [];
+  if (!teamGroups.length) return '';
+  const userId = raw && raw.userId != null ? String(raw.userId).trim() : '';
+  const reg = userId && registerLookup ? registerLookup[userId] || {} : {};
+  const rawForLabel = Object.assign({}, reg, raw || {});
+  return playerManage.resolveAvatarTeamLabel(rawForLabel, teamGroups) || '';
+}
+
+function buildPickRegisterLookup(registerInfo) {
+  const map = {};
+  const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+  users.forEach((u) => {
+    const id = u && u.userId != null ? String(u.userId).trim() : '';
+    if (!id) return;
+    map[id] = {
+      matchTeamId: u.matchTeamId != null ? String(u.matchTeamId).trim() : '',
+      groupId: u.groupId != null ? String(u.groupId).trim() : '',
+      matchTeamName: u.matchTeamName != null ? String(u.matchTeamName).trim() : '',
+      groupName: u.groupName != null ? String(u.groupName).trim() : ''
+    };
+  });
+  return map;
+}
+
+function hydrateSlotsFromPlayers(players, matchLike, registerInfo) {
   const slots = createSlots();
   if (!Array.isArray(players)) return slots;
+  const registerLookup = buildPickRegisterLookup(registerInfo);
   players.forEach((p) => {
     const pos = Number(p && p.position);
     if (!(pos >= 1 && pos <= 4)) return;
     const idx = pos - 1;
     const teeFields = teeDisplayFields(p.tee);
+    const userId = p.userId ? String(p.userId) : '';
     slots[idx] = Object.assign({
       position: pos,
-      userId: p.userId ? String(p.userId) : '',
+      userId: userId,
       avatar: p.avatar ? String(p.avatar) : '',
       displayName: resolveRegisterDisplayName(p) || (p.displayName ? String(p.displayName) : ''),
       gender: p.gender ? String(p.gender) : '',
-      handicap: p.handicap != null && p.handicap !== '' ? String(p.handicap) : '-'
+      handicap: p.handicap != null && p.handicap !== '' ? String(p.handicap) : '-',
+      teamLabel: resolveSlotTeamLabel(p, matchLike, registerLookup)
     }, teeFields);
   });
   return slots;
@@ -342,7 +386,8 @@ Page({
 
     const tabs = this._resolveTabs(payload.match, payload.registerSubTabs, payload.registerInfo);
     const activeSubTabId = tabs.length ? tabs[0].id : '';
-    const slots = hydrateSlotsFromPlayers(payload.players);
+    this._registerLookup = buildPickRegisterLookup(this._registerInfo);
+    const slots = hydrateSlotsFromPlayers(payload.players, this._match, this._registerInfo);
     this._initialSlotsSnapshot = snapshotSlots(slots);
     this.setData({
       groupId: groupId,
@@ -645,8 +690,9 @@ Page({
       return true;
     }
 
+    const sideUnit = resolvePickSideUnit(this._match);
     if (isG4FamilyMode(gameMode) || gameMode === '四人两球比杆赛') {
-      const err = validateG4GroupStructurePlayers(payload.players, teamMap);
+      const err = validateG4GroupStructurePlayers(payload.players, teamMap, sideUnit);
       if (err) {
         wx.showToast({ title: err, icon: 'none' });
         return false;
@@ -659,7 +705,8 @@ Page({
       const err = validateStrokeCompositionPlayers(
         payload.players,
         this._strokeCompositionMode,
-        teamMap
+        teamMap,
+        sideUnit
       );
       if (err) {
         wx.showToast({ title: err, icon: 'none' });
@@ -813,7 +860,8 @@ Page({
       avatar: user.avatar || '',
       displayName: user.displayName || '',
       gender: gender,
-      handicap: user.handicap || '-'
+      handicap: user.handicap || '-',
+      teamLabel: resolveSlotTeamLabel(user, this._match, this._registerLookup || {})
     }, teeFields);
 
     const displayUsers = this._buildDisplayUsers(

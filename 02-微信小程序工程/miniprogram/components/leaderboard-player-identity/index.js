@@ -4,6 +4,11 @@ Component({
       type: Object,
       value: {}
     },
+    /** 队际赛角标 LOGO 页级 map：key=badgeTeamId */
+    teamGroupLogoById: {
+      type: Object,
+      value: {}
+    },
     /** @deprecated 兼容旧用法；优先 relationStatus */
     followed: {
       type: Boolean,

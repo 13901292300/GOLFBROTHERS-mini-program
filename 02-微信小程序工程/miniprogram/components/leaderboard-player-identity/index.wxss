@@ -1,14 +1,63 @@
+/* 组件内补强：与 tournament-common 展开身份卡省略链一致（apply-shared 下双保险） */
+.scorecard-profile {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.sc-profile-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sc-profile-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.sc-name-line {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding-top: 2rpx;
+  box-sizing: border-box;
+}
+.sc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.2;
+  padding-right: 8rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 继承页级主题 token；缺省回落 Bright 主色，避免组件内落成黑色 */
+  color: var(--text-primary, #002d62);
+}
+.sc-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted, #6b7280);
+}
+.sc-sub {
+  color: var(--text-muted, #6b7280);
+}
+.sc-sub-strong {
+  color: var(--text-primary, #002d62);
+}
 .sc-rel-tag {
   flex-shrink: 0;
+  max-width: 42%;
   padding: 6rpx 14rpx;
   border-radius: 999rpx;
   font-size: 20rpx;
   font-weight: 800;
   line-height: 1.2;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border: 1px solid var(--border, #e5e7eb);
   background: var(--bg-subtle, #f3f4f6);
   color: var(--text-muted, #6b7280);
+  box-sizing: border-box;
 }
 
 .sc-rel-tag--friend {

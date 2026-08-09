@@ -52,16 +52,21 @@
               <text class="tee-group-badge">{{item.badge}}</text>
             </view>
             <view class="gb-group-player-grid">
-              <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="gb-group-player">
-                <view class="gb-group-player-avatar-wrap">
-                  <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
-                  <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
-                </view>
-                <view class="gb-group-player-meta">
-                  <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
-                  <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
-                    <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
-                    <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel}}</text>
+              <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="position" class="gb-group-player {{pl.teamLabel ? 'gb-group-player--with-team' : ''}}">
+                <view class="gb-group-player-main-row">
+                  <view class="gb-group-player-avatar-col">
+                    <view class="gb-group-player-avatar-wrap">
+                      <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                      <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                    </view>
+                    <text wx:if="{{pl.teamLabel}}" class="gb-group-player-team-label">{{pl.teamLabel}}</text>
+                  </view>
+                  <view class="gb-group-player-meta">
+                    <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
+                    <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
+                      <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                      <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel}}</text>
+                    </view>
                   </view>
                 </view>
               </view>

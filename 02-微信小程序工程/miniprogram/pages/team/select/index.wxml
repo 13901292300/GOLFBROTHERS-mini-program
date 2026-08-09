@@ -6,8 +6,8 @@
           <text class="gb-header__chevron">‹</text>
         </view>
         <view>
-          <text class="gb-header__eyebrow">TEAM</text>
-          <text class="gb-header__title">{{mode === 'create' ? '创建球队' : '选择球队'}}</text>
+          <text class="gb-header__eyebrow">{{pageEyebrow}}</text>
+          <text class="gb-header__title">{{mode === 'create' ? createTitle : pageTitle}}</text>
         </view>
       </view>
     </view>
@@ -22,7 +22,7 @@
           class="search-bar__input"
           type="text"
           value="{{searchQuery}}"
-          placeholder="搜索球队名称"
+          placeholder="{{searchPlaceholder}}"
           placeholder-class="search-bar__ph"
           confirm-type="search"
           bindinput="handleSearchInput"
@@ -34,9 +34,10 @@
 
     <scroll-view class="team-scroll" scroll-y>
       <view class="team-content">
-        <view wx:if="{{selectedTeam}}" class="section">
+        <!-- 单选已选 -->
+        <view wx:if="{{!isParticipantMode && selectedTeam}}" class="section">
           <view class="section-label">
-            <text class="section-label__h2">已选球队</text>
+            <text class="section-label__h2">已选{{isEventOrgMode ? '机构' : '球队'}}</text>
             <text class="section-note">1 个</text>
           </view>
           <view class="ds-card team-selected-chip">
@@ -46,10 +47,29 @@
           </view>
         </view>
 
+        <!-- 多选已选 -->
+        <view wx:if="{{isParticipantMode && selectedParticipants.length}}" class="section">
+          <view class="section-label">
+            <text class="section-label__h2">已选球队</text>
+            <text class="section-note">{{selectedParticipants.length}} 支 · 按加入顺序</text>
+          </view>
+          <view class="participant-selected-list">
+            <view
+              wx:for="{{selectedParticipants}}"
+              wx:key="id"
+              class="ds-card team-selected-chip participant-chip"
+            >
+              <image class="team-selected-chip__logo" src="{{item.logo}}" mode="aspectFill"></image>
+              <text class="team-selected-chip__name">{{item.shortName}}</text>
+              <view class="team-selected-chip__remove" catchtap="onRemoveParticipant" data-id="{{item.id}}"><text>×</text></view>
+            </view>
+          </view>
+        </view>
+
         <view wx:if="{{!showEmptyState}}" class="section">
           <view class="section-label">
-            <text class="section-label__h2">全部球队</text>
-            <text class="section-note">选择一个球队</text>
+            <text class="section-label__h2">{{listSectionTitle}}</text>
+            <text class="section-note">{{listSectionNote}}</text>
           </view>
           <view class="team-list">
             <view
@@ -73,26 +93,26 @@
 
         <view wx:if="{{showEmptyState}}" class="team-empty team-empty--center">
           <view class="team-empty__icon"><text>🛡</text></view>
-          <text class="team-empty__title">未找到球队</text>
-          <text class="team-empty__desc">“{{emptyTerm}}”队目前不存在。</text>
-          <text class="team-empty__desc team-empty__desc-sub">你可以立即创建这个球队。</text>
-          <button class="team-create-btn" bindtap="openCreateTeam">立即创建</button>
+          <text class="team-empty__title">{{emptyTitle}}</text>
+          <text class="team-empty__desc">“{{emptyTerm}}”目前不存在。</text>
+          <text class="team-empty__desc team-empty__desc-sub">你可以立即创建。</text>
+          <button class="team-create-btn" bindtap="openCreateTeam">{{emptyCreateLabel}}</button>
         </view>
       </view>
     </scroll-view>
 
     <view class="footer">
-      <text class="footer-tip">已选择 <text class="footer-tip__strong">{{selectedTeam ? 1 : 0}}</text> 个球队，至少选择 1 个</text>
-      <button class="submit-btn {{selectedTeam ? '' : 'disabled'}}" bindtap="onConfirm">确认</button>
+      <text class="footer-tip">{{confirmTipPrefix}} <text class="footer-tip__strong">{{footerSelectedCount}}</text> {{confirmTipUnit}}，{{confirmMinTip}}</text>
+      <button class="submit-btn {{confirmEnabled ? '' : 'disabled'}}" bindtap="onConfirm">确认</button>
     </view>
   </block>
 
-  <!-- 创建球队子视图 -->
+  <!-- 创建子视图 -->
   <block wx:else>
     <scroll-view class="team-scroll" scroll-y>
       <view class="create-content">
         <view class="ds-card top-line team-form-card">
-          <text class="team-form-label">球队 Logo</text>
+          <text class="team-form-label">{{logoFieldLabel}}</text>
           <view class="team-logo-upload" bindtap="chooseTeamLogo">
             <block wx:if="{{createForm.logo}}">
               <image class="team-logo-preview" src="{{createForm.logo}}" mode="aspectFill"></image>
@@ -106,29 +126,44 @@
         </view>
 
         <view class="ds-card team-form-card">
-          <text class="team-form-label"><text class="team-required">*</text>球队名称</text>
+          <text class="team-form-label"><text class="team-required">*</text>{{nameFieldLabel}}</text>
           <view class="team-input-wrap">
             <input
               class="team-form-input"
               type="text"
               value="{{createForm.name}}"
               maxlength="{{30}}"
-              placeholder="请输入球队名称"
+              placeholder="{{namePlaceholder}}"
               bindinput="handleCreateTeamNameInput"
             />
             <text class="team-char-count">{{createNameCount}}/30</text>
           </view>
         </view>
 
+        <view wx:if="{{showCreateShortName}}" class="ds-card team-form-card">
+          <text class="team-form-label">球队简称</text>
+          <view class="team-input-wrap">
+            <input
+              class="team-form-input"
+              type="text"
+              value="{{createForm.shortName}}"
+              maxlength="{{shortNameMax}}"
+              placeholder="最多 4 个字，可选"
+              bindinput="handleCreateShortNameInput"
+            />
+            <text class="team-char-count">{{createShortNameCount}}/{{shortNameMax}}</text>
+          </view>
+        </view>
+
         <view class="ds-card team-form-card">
-          <text class="team-form-label">球队口号</text>
+          <text class="team-form-label">{{isEventOrgMode ? '机构口号' : '球队口号'}}</text>
           <view class="team-input-wrap">
             <input
               class="team-form-input"
               type="text"
               value="{{createForm.slogan}}"
               maxlength="{{50}}"
-              placeholder="请输入球队口号"
+              placeholder="{{isEventOrgMode ? '请输入机构口号' : '请输入球队口号'}}"
               bindinput="handleCreateSloganInput"
             />
             <text class="team-char-count">{{createSloganCount}}/50</text>
@@ -136,13 +171,13 @@
         </view>
 
         <view class="ds-card team-form-card">
-          <text class="team-form-label">球队描述</text>
+          <text class="team-form-label">{{isEventOrgMode ? '机构描述' : '球队描述'}}</text>
           <view class="team-textarea-wrap">
             <textarea
               class="team-form-textarea"
               value="{{createForm.desc}}"
               maxlength="{{500}}"
-              placeholder="请输入球队描述，介绍一下你的球队..."
+              placeholder="{{isEventOrgMode ? '请输入机构描述…' : '请输入球队描述，介绍一下你的球队...'}}"
               bindinput="handleCreateDescInput"
             ></textarea>
             <text class="team-char-count team-textarea-count">{{createDescCount}}/500</text>
@@ -154,7 +189,31 @@
     </scroll-view>
 
     <view class="footer">
-      <button class="create-team-btn {{createForm.name ? '' : 'disabled'}}" bindtap="submitCreateTeam">创建球队</button>
+      <button class="create-team-btn {{createForm.name ? '' : 'disabled'}}" bindtap="submitCreateTeam">{{createSubmitLabel}}</button>
     </view>
   </block>
+
+  <!-- 本场简称弹层 -->
+  <view wx:if="{{showShortNameSheet}}" class="short-name-mask" catchtouchmove="true">
+    <view class="short-name-sheet" catchtap="true">
+      <text class="short-name-sheet__title">本场球队简称</text>
+      <text class="short-name-sheet__sub">{{shortNameTeamName}}</text>
+      <view class="short-name-input-wrap">
+        <input
+          class="short-name-input"
+          type="text"
+          value="{{shortNameDraft}}"
+          maxlength="{{shortNameMax}}"
+          placeholder="必填，最多 4 个字"
+          focus="{{true}}"
+          bindinput="onShortNameInput"
+        />
+        <text class="short-name-count">{{shortNameCount}}/{{shortNameMax}}</text>
+      </view>
+      <view class="short-name-actions">
+        <button class="short-name-btn cancel" bindtap="cancelShortNameSheet">取消</button>
+        <button class="short-name-btn ok" bindtap="confirmShortNameSheet">确认</button>
+      </view>
+    </view>
+  </view>
 </view>

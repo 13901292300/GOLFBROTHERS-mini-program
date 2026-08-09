@@ -6,6 +6,11 @@
     "player-source-sheet": "/components/player-source-sheet/index",
     "phone-bind-sheet": "/components/phone-bind-sheet/index",
     "leaderboard-player-identity": "/components/leaderboard-player-identity/index",
-    "follow-action-btn": "/components/follow-action-btn/index"
+    "follow-action-btn": "/components/follow-action-btn/index",
+    "player-action-modal": "/components/player-action-modal/index",
+    "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index"
+  },
+  "componentPlaceholder": {
+    "player-reaction-overlay": "view"
   }
 }

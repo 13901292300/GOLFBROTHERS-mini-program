@@ -165,3 +165,44 @@ page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 头像下方分队/球队标签（分组表 / 分组编辑 / 出发表） */
+.gb-group-player--with-team {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.gb-group-player-main-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+.gb-group-player-avatar-col {
+  width: 80rpx;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.gb-group-player-main-row .gb-group-player-meta {
+  margin-left: 8rpx;
+  margin-top: 8rpx;
+}
+.gb-group-player-team-label {
+  display: block;
+  width: 80rpx;
+  max-width: 80rpx;
+  box-sizing: border-box;
+  padding: 0 2rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--text-muted, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

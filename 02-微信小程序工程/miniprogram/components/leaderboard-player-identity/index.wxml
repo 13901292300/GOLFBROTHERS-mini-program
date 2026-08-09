@@ -2,8 +2,21 @@
   <view class="sc-profile-left">
     <view class="sc-avatar-wrap">
       <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
-      <view wx:if="{{player.flag}}" class="sc-flag">
-        <image src="https://flagcdn.com/w40/{{player.flag}}.png" mode="aspectFill"></image>
+      <!-- 队际赛：本场代表球队 LOGO（页级 map）；其他：国旗 -->
+      <view
+        wx:if="{{teamGroupLogoById[player.badgeTeamId] || player.flag}}"
+        class="sc-flag {{teamGroupLogoById[player.badgeTeamId] ? 'sc-flag--team' : ''}}"
+      >
+        <image
+          wx:if="{{teamGroupLogoById[player.badgeTeamId]}}"
+          src="{{teamGroupLogoById[player.badgeTeamId]}}"
+          mode="aspectFill"
+        ></image>
+        <image
+          wx:else
+          src="https://flagcdn.com/w40/{{player.flag}}.png"
+          mode="aspectFill"
+        ></image>
       </view>
     </view>
     <view class="sc-profile-meta">

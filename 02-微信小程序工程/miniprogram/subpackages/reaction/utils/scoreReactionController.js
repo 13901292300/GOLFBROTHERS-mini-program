@@ -3,13 +3,13 @@
  *
  * 动画时间轴与播放逻辑仍留在 pages/score/index，本模块不复制、不改写动画。
  * 资源统一引用：
- *   - subpackages/scoring/assets/reaction
- *   - subpackages/scoring/assets/sounds
+ *   - subpackages/reaction/assets/reaction
+ *   - subpackages/reaction/assets/sounds
  * Timeline 统一复用各 *ReactionTimeline.js（不复制文件）。
  */
 
-const scoreReactionAccess = require('./scoreReactionAccess.js');
-const reactionPanelConfig = require('./reactionPanelConfig.js');
+const scoreReactionAccess = require('../../../utils/scoreReactionAccess.js');
+const reactionPanelConfig = require('../../../utils/reactionPanelConfig.js');
 const reactionSounds = require('./reactionSounds.js');
 const rocketReactionTimeline = require('./rocketReactionTimeline.js');
 const boxingReactionTimeline = require('./boxingReactionTimeline.js');

@@ -11,7 +11,7 @@ const TOMATO_AUDIO_CLIP = {
   endMs: 1500,
   file: 'tomato_hit.wav',
   soundKey: 'tomato_hit',
-  path: '/subpackages/scoring/assets/sounds/tomato_hit.wav'
+  path: '/subpackages/reaction/assets/sounds/tomato_hit.wav'
 };
 
 const TOMATO_SELF_TIMING = {

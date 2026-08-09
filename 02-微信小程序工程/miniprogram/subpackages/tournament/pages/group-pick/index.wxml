@@ -16,16 +16,21 @@
   <view class="slots-fixed">
     <view class="group-title">{{groupName}}</view>
     <view class="gb-group-player-grid">
-      <view wx:for="{{slots}}" wx:key="position" class="gb-group-player slot-item">
-        <view class="gb-group-player-avatar-wrap">
-          <image wx:if="{{item.avatar}}" class="gb-group-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
-          <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
-        </view>
-        <view class="gb-group-player-meta">
-          <text class="gb-group-player-name">{{item.displayName || item.nickname || item.name || ''}}</text>
-          <view wx:if="{{item.teeText || item.teeLabel}}" class="gb-group-player-tee">
-            <view wx:if="{{item.teeMarkerClass}}" class="gb-group-player-tee-dot {{item.teeMarkerClass}}"></view>
-            <text class="gb-group-player-tee-text">{{item.teeText || item.teeLabel}}</text>
+      <view wx:for="{{slots}}" wx:key="position" class="gb-group-player slot-item {{item.teamLabel ? 'gb-group-player--with-team' : ''}}">
+        <view class="gb-group-player-main-row">
+          <view class="gb-group-player-avatar-col">
+            <view class="gb-group-player-avatar-wrap">
+              <image wx:if="{{item.avatar}}" class="gb-group-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+            </view>
+            <text wx:if="{{item.teamLabel}}" class="gb-group-player-team-label">{{item.teamLabel}}</text>
+          </view>
+          <view class="gb-group-player-meta">
+            <text class="gb-group-player-name">{{item.displayName || item.nickname || item.name || ''}}</text>
+            <view wx:if="{{item.teeText || item.teeLabel}}" class="gb-group-player-tee">
+              <view wx:if="{{item.teeMarkerClass}}" class="gb-group-player-tee-dot {{item.teeMarkerClass}}"></view>
+              <text class="gb-group-player-tee-text">{{item.teeText || item.teeLabel}}</text>
+            </view>
           </view>
         </view>
       </view>

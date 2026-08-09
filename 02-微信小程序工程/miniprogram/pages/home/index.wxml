@@ -129,7 +129,7 @@
                 </view>
                 <view class="ds-club-footer">
                   <view class="ds-club-footer-line"></view>
-                  <text class="ds-club-footer-label">CLUB</text>
+                  <text class="ds-club-footer-label">{{item.organizerKindLabel || 'CLUB'}}</text>
                   <view class="ds-club-footer-line ds-club-footer-line--right"></view>
                 </view>
               </view>
@@ -205,7 +205,7 @@
               </view>
               <view class="ds-club-footer">
                 <view class="ds-club-footer-line"></view>
-                <text class="ds-club-footer-label">CLUB</text>
+                <text class="ds-club-footer-label">{{item.organizerKindLabel || 'CLUB'}}</text>
                 <view class="ds-club-footer-line ds-club-footer-line--right"></view>
               </view>
             </view>
@@ -250,7 +250,7 @@
         <view wx:if="{{showPlazaTournamentContent}}" id="plaza-tournament-content">
           <view class="ds-main space-y-4">
             <view wx:if="{{plazaTournamentCards.length === 0}}" class="ds-card-dashed p-8 flex flex-col items-center justify-center opacity-60">
-              <text class="text-xs font-bold text-slate-400 uppercase tracking-widest">暂无球队比赛</text>
+              <text class="text-xs font-bold text-slate-400 uppercase tracking-widest">暂无团体比赛</text>
             </view>
             <view wx:for="{{plazaTournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
               <view class="ds-card-club-main">
@@ -291,7 +291,7 @@
               </view>
               <view class="ds-club-footer">
                 <view class="ds-club-footer-line"></view>
-                <text class="ds-club-footer-label">CLUB</text>
+                <text class="ds-club-footer-label">{{item.organizerKindLabel || 'CLUB'}}</text>
                 <view class="ds-club-footer-line ds-club-footer-line--right"></view>
               </view>
             </view>

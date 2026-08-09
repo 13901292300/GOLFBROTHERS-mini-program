@@ -1,9 +1,10 @@
-/* 人员来源选择弹窗 — 对齐 create/normal「添加人员」视觉规范 */
+/* 人员来源选择弹窗 — 层级对齐 tournament-common Bottom Sheet：
+   sheet-overlay=150 / bottom-sheet=180，须高于页面固定 CTA（如 register-cta-bar=120） */
 .pss-mask {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.46);
-  z-index: 80;
+  z-index: 150;
 }
 
 .pss-sheet {
@@ -17,7 +18,7 @@
   border-radius: 32rpx 32rpx 0 0;
   box-shadow: 0 -16rpx 36rpx rgba(0, 0, 0, 0.24);
   padding: 20rpx 32rpx calc(36rpx + env(safe-area-inset-bottom));
-  z-index: 90;
+  z-index: 180;
   color: var(--text-primary);
   overflow: hidden;
 }

@@ -41,7 +41,13 @@ Component({
     // 内容不足时由宿主注入的底部补齐高度（px），渲染在聊天列表末尾
     bottomSpacerHeight: { type: Number, value: 0 },
     // 是否渲染组件内围观行（宿主页面可外置二级 sticky 层时设为 false）
-    showWatchersStrip: { type: Boolean, value: true }
+    showWatchersStrip: { type: Boolean, value: true },
+    /**
+     * reaction self 动画播放中：按消息 index 隐藏该条头像（占位，不删节点）。
+     * -1 表示未隐藏；须与 reactionDetachedUserId 一并由宿主在 onSeatDetach 时写入。
+     */
+    reactionDetachedMessageIndex: { type: Number, value: -1 },
+    reactionDetachedUserId: { type: String, value: '' }
   },
 
   data: {

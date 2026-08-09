@@ -13,10 +13,10 @@
         data-userid="{{item.userId}}"
         data-name="{{item.name}}"
         data-avatar="{{item.avatar}}"
-        bindtouchstart="onAvatarTouchStart"
-        bindtouchmove="onAvatarTouchMove"
-        bindtouchend="onAvatarTouchEnd"
-        bindtouchcancel="onAvatarTouchEnd"
+        catchtouchstart="onAvatarTouchStart"
+        catchtouchmove="onAvatarTouchMove"
+        catchtouchend="onAvatarTouchEnd"
+        catchtouchcancel="onAvatarTouchEnd"
       >
         <image class="discussion-avatar-img" src="{{item.avatar}}" mode="aspectFill"></image>
       </view>
@@ -37,7 +37,7 @@
           <image
             wx:if="{{!item.self}}"
             id="ds-msg-avatar-{{index}}"
-            class="chat-avatar ds-player-avatar"
+            class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == index ? 'is-reaction-detached' : ''}}"
             src="{{item.avatar}}"
             mode="aspectFill"
             data-role="chat"
@@ -45,10 +45,10 @@
             data-name="{{item.name}}"
             data-avatar="{{item.avatar}}"
             data-index="{{index}}"
-            bindtouchstart="onAvatarTouchStart"
-            bindtouchmove="onAvatarTouchMove"
-            bindtouchend="onAvatarTouchEnd"
-            bindtouchcancel="onAvatarTouchEnd"
+            catchtouchstart="onAvatarTouchStart"
+            catchtouchmove="onAvatarTouchMove"
+            catchtouchend="onAvatarTouchEnd"
+            catchtouchcancel="onAvatarTouchEnd"
           ></image>
           <view class="chat-col">
             <text class="chat-meta">{{item.name}}</text>
@@ -57,7 +57,7 @@
           <image
             wx:if="{{item.self}}"
             id="ds-msg-avatar-{{index}}"
-            class="chat-avatar ds-player-avatar"
+            class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == index ? 'is-reaction-detached' : ''}}"
             src="{{item.avatar}}"
             mode="aspectFill"
             data-role="chat"
@@ -65,10 +65,10 @@
             data-name="{{item.name}}"
             data-avatar="{{item.avatar}}"
             data-index="{{index}}"
-            bindtouchstart="onAvatarTouchStart"
-            bindtouchmove="onAvatarTouchMove"
-            bindtouchend="onAvatarTouchEnd"
-            bindtouchcancel="onAvatarTouchEnd"
+            catchtouchstart="onAvatarTouchStart"
+            catchtouchmove="onAvatarTouchMove"
+            catchtouchend="onAvatarTouchEnd"
+            catchtouchcancel="onAvatarTouchEnd"
           ></image>
         </view>
       </block>

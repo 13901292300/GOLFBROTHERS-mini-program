@@ -490,6 +490,11 @@
   border-top: 2rpx solid var(--border-color, rgba(15, 23, 42, 0.08));
   box-sizing: border-box;
 }
+/* 报名相关 Bottom Sheet 打开时：CTA 仍留在 DOM，但压到遮罩之下且不可点 */
+.register-cta-bar--under-sheet {
+  z-index: 110;
+  pointer-events: none;
+}
 .register-cta-btn {
   text-align: center;
   padding: 26rpx 0;
@@ -749,7 +754,20 @@
   font-weight: 600;
 }
 
-.discussion-inline { display: block; }
+/* 讨论区宿主：撑满 detail-main 剩余高度，避免 min-height 空隙露出页面白底 */
+.discussion-inline {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+/* 与 components/discussion .ds-bright/.ds-dark 的 --ds-surface 同色，空态与有会话一致 */
+.detail-page.bright-mode .detail-main--flush {
+  background: #ededed;
+}
+.detail-page.dark-mode .detail-main--flush {
+  background: #0a0a0a;
+}
 .game-tab-panel { margin-bottom: 32rpx; }
 .game-tab-body { margin-bottom: 0; }
 .game-tab-spacer {
@@ -1226,10 +1244,24 @@
   max-width: 100%;
   overflow: hidden;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.mp-sb-progress__logo {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-secondary, #f3f4f6);
+}
+.mp-sb-progress__score--b .mp-sb-progress__name {
+  flex-direction: row-reverse;
 }
 .mp-sb-progress__name-text {
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 28rpx;
   font-weight: 900;
   font-style: normal; /* 顶部队名不斜体；球员昵称仍用 .mp-sb-side__name italic */
@@ -1830,12 +1862,34 @@
   background: var(--bg-card);
 }
 .detail-page.dark-mode .mp-sb-status.winner-a .mp-sb-side--right,
-.detail-page.dark-mode .mp-sb-status.winner-b .mp-sb-side--left {
+.detail-page.dark-mode .mp-sb-status.winner-b .mp-sb-side--left,
+.detail-page.dark-mode .mp-sb-status.not-started .mp-sb-side--left,
+.detail-page.dark-mode .mp-sb-status.not-started .mp-sb-side--right {
   color: var(--text-primary);
 }
 .detail-page.dark-mode .mp-sb-status.winner-a .mp-sb-side--right .mp-sb-side__name,
-.detail-page.dark-mode .mp-sb-status.winner-b .mp-sb-side--left .mp-sb-side__name {
+.detail-page.dark-mode .mp-sb-status.winner-b .mp-sb-side--left .mp-sb-side__name,
+.detail-page.dark-mode .mp-sb-status.not-started .mp-sb-side--left .mp-sb-side__name,
+.detail-page.dark-mode .mp-sb-status.not-started .mp-sb-side--right .mp-sb-side__name {
   color: var(--text-primary);
+}
+/* VS / 阶段说明：覆盖 Bright 硬编码深色，避免贴深色卡片底 */
+.detail-page.dark-mode .mp-sb-lead--vs {
+  color: var(--text-primary);
+}
+.detail-page.dark-mode .mp-sb-center__phase,
+.detail-page.dark-mode .mp-sb-summary {
+  color: var(--text-muted);
+}
+.detail-page.dark-mode .mp-sb-lead--as {
+  color: var(--text-muted);
+}
+/* 胜方红/蓝语义色 Dark 保持 */
+.detail-page.dark-mode .mp-sb-lead--a { color: #E31837; }
+.detail-page.dark-mode .mp-sb-lead--b { color: #004B87; }
+.detail-page.dark-mode .mp-sb-center__btn {
+  background: var(--cloud-blue);
+  color: #ffffff;
 }
 /* HOLE/PAR 等普通格；STATUS 用 .mp-sb-cell.mp-sb-st--* 更高优先级保住 */
 .detail-page.dark-mode .mp-sb-cell { background: var(--bg-secondary); color: var(--text-primary); }
@@ -1875,4 +1929,61 @@
 .detail-page.dark-mode .mp-sb-split--a .mp-sb-split__a,
 .detail-page.dark-mode .mp-sb-split--b .mp-sb-split__b {
   color: #fff;
+}
+
+/* 队际赛：参赛球队列表（详情 TAB） */
+.participating-teams-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.participating-team-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  min-width: 0;
+}
+.participating-team-row__logo {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-secondary, #f3f4f6);
+}
+.participating-team-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 超过 4 支时底部「更多/收起」：复用 perm-section-card__toggle（含 Dark） */
+.participating-teams-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20rpx;
+  padding-top: 8rpx;
+}
+.participating-teams-more .perm-section-card__toggle {
+  margin-top: 0;
+  padding: 8rpx 16rpx;
+}
+
+/* 报名 / 代报名：分组芯片内球队 logo */
+.register-sheet__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  line-height: 1;
+}
+.register-sheet__group-logo {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-secondary, #f3f4f6);
 }

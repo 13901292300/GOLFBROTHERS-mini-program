@@ -15,31 +15,607 @@
 
   <scroll-view class="content-scroll" scroll-y="{{true}}" enhanced show-scrollbar="{{false}}">
     <view class="content">
-      <view class="section">
-        <view class="section-label"><text class="section-label__h2">时间设置</text></view>
-        <view class="ds-card top-line time-card">
-          <view class="inner-row" bindtap="openTimePicker" data-target="tee">
-            <view>
-              <text class="meta-label">开球时间</text>
-              <text class="data-value">{{teeTimeText}}</text>
-            </view>
-            <text class="field-icon">›</text>
+    <!-- 组织机构设置 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">组织机构设置</text></view>
+      <!-- 整卡进入机构选择（对齐队内赛 team-card）；LOGO/可编辑名称用 catchtap 避免误跳转 -->
+      <view class="ds-card top-line team-card org-card" bindtap="onSelectOrganization">
+        <view class="team-left">
+          <view class="org-logo-wrap" catchtap="onChangeOrganizationLogo">
+            <image
+              wx:if="{{organizationId}}"
+              class="team-logo"
+              src="{{organizationLogo}}"
+              mode="aspectFill"
+            ></image>
+            <view wx:else class="team-logo org-logo-empty"></view>
+            <text class="org-logo-edit">换</text>
           </view>
-          <view class="inner-row" bindtap="openTimePicker" data-target="deadline">
-            <view>
-              <text class="meta-label">报名截止</text>
-              <text class="data-value">{{deadlineTimeText}}</text>
+          <view class="field-main org-name-main">
+            <block wx:if="{{isDefaultInterTeamOrganizer}}">
+              <input
+                class="org-name-input"
+                type="text"
+                value="{{organizationName}}"
+                placeholder="请输入机构名称"
+                bindinput="onOrganizationNameInput"
+                catchtap="noop"
+              />
+            </block>
+            <text
+              wx:else
+              class="{{organizationId ? 'team-title' : 'field-placeholder'}}"
+            >{{organizationName}}</text>
+          </view>
+        </view>
+        <text class="field-icon">›</text>
+      </view>
+    </view>
+
+    <!-- 参赛球队设置 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">参赛球队设置</text></view>
+      <!-- 与场地/赛制同构：ds-field + field-main + field-icon；多选摘要不改变行对齐 -->
+      <view class="ds-card ds-field participants-card" bindtap="onSelectParticipants">
+        <view class="field-main">
+          <view wx:if="{{teamGroups.length}}" class="participant-chips">
+            <view
+              wx:for="{{teamGroups}}"
+              wx:for-item="teamGroup"
+              wx:for-index="teamGroupIndex"
+              wx:key="renderKey"
+              class="participant-chip"
+            >
+              <image
+                class="participant-chip__logo"
+                src="{{teamGroup.sourceTeamLogo || '/assets/mock-avatars/default-avatar.jpg'}}"
+                mode="aspectFill"
+              ></image>
+              <text class="participant-chip__name">{{teamGroup.sourceTeamShortName || teamGroup.name}}</text>
+              <text
+                class="participant-chip__remove"
+                data-index="{{teamGroupIndex}}"
+                catchtap="onRemoveParticipant"
+              >×</text>
             </view>
-            <text class="field-icon">›</text>
+          </view>
+          <text wx:else class="field-placeholder">选择参赛球队</text>
+        </view>
+        <view class="field-right">
+          <text class="field-icon">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 比赛名称 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">比赛名称设置</text></view>
+      <view class="ds-card ds-field">
+        <view class="field-main">
+          <input class="round-name-input" type="text" value="{{roundName}}" placeholder="请输入比赛名称" bindinput="onRoundNameInput" />
+        </view>
+      </view>
+    </view>
+
+    <!-- 比赛场地 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">场地设置</text></view>
+      <view class="ds-card ds-field" bindtap="onSelectCourse">
+        <view class="field-main">
+          <block wx:if="{{courseName}}">
+            <text class="field-value strong italic">{{courseName}}{{courseHalfText}}</text>
+            <text wx:if="{{courseLocation}}" class="field-subvalue ds-desc-text">{{courseLocation}}</text>
+          </block>
+          <text wx:else class="field-placeholder">选择球场</text>
+        </view>
+        <text class="field-icon">›</text>
+      </view>
+    </view>
+
+    <!-- 时间设置 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">时间设置</text></view>
+      <view class="ds-card top-line time-card">
+        <view class="inner-row" bindtap="openTimePicker" data-target="tee">
+          <view>
+            <text class="meta-label">开球时间</text>
+            <text class="data-value">{{teeTimeText}}</text>
+          </view>
+          <text class="field-icon">›</text>
+        </view>
+        <view class="inner-row" bindtap="openTimePicker" data-target="deadline">
+          <view>
+            <text class="meta-label">报名截止</text>
+            <text class="data-value">{{deadlineTimeText}}</text>
+          </view>
+          <text class="field-icon">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 选择赛制 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">赛制设置</text></view>
+      <view class="ds-card ds-field game-mode-field" bindtap="openGameModeSheet">
+        <view class="field-main">
+          <text class="field-value italic">{{selectedGameMode}}</text>
+        </view>
+        <text class="field-icon">›</text>
+      </view>
+    </view>
+
+    <!-- PK 设置（G1-G4，独立卡片） -->
+    <view wx:if="{{!isMatchPlayMode && teamGroups.length >= 2}}" class="section">
+      <view class="section-label"><text class="section-label__h2">PK 设置</text></view>
+      <view class="ds-card team-competition-rule pk-card">
+        <view class="team-competition-rule__row">
+          <text class="team-competition-rule__name">球队 PK</text>
+          <switch checked="{{teamCompetition.enabled}}" bindchange="onTeamCompetitionToggle" color="#C9A45C" />
+        </view>
+        <view wx:if="{{teamCompetition.enabled}}" class="team-competition-rule__topn">
+          <text class="team-competition-rule__label">每队取前</text>
+          <input
+            class="team-competition-rule__input"
+            type="number"
+            value="{{teamCompetition.topN}}"
+            bindinput="onTeamCompetitionTopNInput"
+          />
+          <text class="team-competition-rule__label">名成绩</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 参赛费用 -->
+    <view class="section">
+      <view class="section-label">
+        <text class="section-label__h2">费用设置</text>
+      </view>
+      <view class="ds-card fee-card" bindtap="onFeeSettings">
+        <view class="fee-left">
+          <view wx:if="{{feeList.length}}" class="fee-tags">
+            <view wx:for="{{feeList}}" wx:for-item="feeItem" wx:for-index="feeIndex" wx:key="id" class="fee-tag">
+              <text class="fee-tag-text">{{feeItem.name}} {{isDiamondMode ? feeItem.amount + '💎' : '￥' + feeItem.amount}}</text>
+            </view>
+          </view>
+          <text wx:else class="field-placeholder">进入费用设置</text>
+        </view>
+        <view class="fee-action">
+          <text class="field-icon">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 赛事信息 -->
+    <view class="section">
+      <view class="section-label">
+        <text class="section-label__h2">赛事信息设置</text>
+        <text class="section-note ds-desc-text">（可手工拖动进行信息排序）</text>
+      </view>
+      <movable-area
+        wx:if="{{eventInfoList.length}}"
+        class="event-info-list event-info-sort-area"
+        style="height: {{eventInfoSortAreaHeight}};"
+      >
+        <movable-view
+          wx:for="{{eventInfoList}}"
+          wx:for-item="eventInfo"
+          wx:for-index="eventInfoIndex"
+          wx:key="id"
+          class="event-info-movable {{eventInfoDraggingId === eventInfo.id ? 'dragging' : ''}}"
+          direction="vertical"
+          x="{{0}}"
+          y="{{eventInfoDragPositions[eventInfoIndex]}}"
+          out-of-bounds="{{false}}"
+          damping="{{30}}"
+          friction="{{2}}"
+          data-id="{{eventInfo.id}}"
+          data-index="{{eventInfoIndex}}"
+          bindchange="onEventInfoDragChange"
+          bindtouchstart="onEventInfoDragStart"
+          bindtouchend="onEventInfoDragEnd"
+        >
+          <view
+            class="ds-card ds-field event-info-create-row"
+            bindtap="openEventDetailEditor"
+            data-id="{{eventInfo.id}}"
+          >
+            <view class="event-info-row-left">
+              <text class="event-info-drag-handle">☰</text>
+              <view class="field-main">
+                <text class="field-value">{{eventInfo.title === '交通说明' ? '照片直播' : eventInfo.title}}</text>
+                <text class="field-subvalue ds-desc-text">{{eventInfo.type === 'image' ? '图片信息' : ((eventInfo.title === '照片直播' || eventInfo.title === '交通说明') ? '链接信息' : '文本信息')}}</text>
+              </view>
+            </view>
+            <view class="field-right">
+              <text class="ds-badge {{eventInfo.status === '已设置' ? 'badge-gold' : 'badge-info'}}">{{eventInfo.status}}</text>
+              <text class="field-icon">›</text>
+            </view>
+          </view>
+        </movable-view>
+      </movable-area>
+      <view class="add-event-info-btn" bindtap="openAddEventInfoSheet">
+        <view class="add-event-info-icon"><text>+</text></view>
+        <text>添加赛事信息</text>
+      </view>
+    </view>
+
+    <!-- 分组权限 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">分组权限设置</text></view>
+      <view class="ds-card group-permission-card">
+        <view class="permission-option-list">
+          <view
+            class="permission-option {{groupPermission === 'admin' ? 'active' : ''}}"
+            bindtap="onGroupPermissionChange"
+            data-value="admin"
+          >
+            <view class="choice-dot"></view>
+            <view class="permission-option-text">
+              <text class="permission-option-title">管理员分组</text>
+              <text class="permission-option-desc ds-desc-text">由管理员统一安排参赛球员分组</text>
+            </view>
+          </view>
+          <view
+            class="permission-option {{groupPermission === 'player' ? 'active' : ''}}"
+            bindtap="onGroupPermissionChange"
+            data-value="player"
+          >
+            <view class="choice-dot"></view>
+            <view class="permission-option-text">
+              <text class="permission-option-title">球员自行分组</text>
+              <text class="permission-option-desc ds-desc-text">参赛球员可自行选择或调整所在组</text>
+            </view>
           </view>
         </view>
       </view>
-      <view class="content-spacer"></view>
+    </view>
+
+    <!-- 隐私设置（与普通创建页一致） -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">隐私设置</text></view>
+      <view class="ds-card privacy-card">
+        <view class="privacy-row">
+          <view class="privacy-left" catchtap="toggleVisibility">
+            <view class="privacy-switch {{visibility === 'private' ? 'is-private' : ''}}">
+              <view class="privacy-switch__thumb"></view>
+            </view>
+          </view>
+          <view class="privacy-center">
+            <text class="privacy-state {{visibility === 'private' ? 'is-private' : ''}}">{{visibility === 'private' ? '私密' : '公开'}}</text>
+          </view>
+          <view wx:if="{{visibility === 'private'}}" class="privacy-right">
+            <text class="access-code-label">访问密码</text>
+            <text class="access-code-value">{{accessCode}}</text>
+            <view class="access-code-copy" catchtap="copyAccessCode"><text>复制</text></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- PARTNER 配置 -->
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">PARTNER 配置</text></view>
+      <view class="ds-card partner-config-card">
+        <text class="partner-config-desc ds-desc-text">用于赛事详情 TAB 底部合作伙伴展示</text>
+        <view class="partner-config-row">
+          <text class="partner-config-label">展示标题</text>
+          <input
+            class="partner-title-input"
+            value="{{partnerConfig.partnerTitle}}"
+            maxlength="40"
+            placeholder="例如：北京湘鹰高尔夫俱乐部 Partner"
+            bindinput="onPartnerTitleInput"
+          />
+        </view>
+        <view class="partner-logo-grid">
+          <view
+            wx:for="{{partnerConfig.partnerLogos}}"
+            wx:key="index"
+            class="partner-logo-item"
+          >
+            <view class="partner-logo-dual">
+              <view class="partner-logo-slot" bindtap="choosePartnerLogoByTheme" data-index="{{index}}" data-theme="bright">
+                <text class="partner-logo-slot__label">BRIGHT模式图片</text>
+                <image
+                  wx:if="{{item.bright || item.dark}}"
+                  class="partner-logo-img"
+                  src="{{item.bright || item.dark}}"
+                  mode="aspectFit"
+                  data-index="{{index}}"
+                  data-theme="bright"
+                  binderror="onPartnerLogoError"
+                />
+                <view wx:else class="partner-logo-slot__empty">
+                  <text class="partner-logo-slot__plus">+</text>
+                </view>
+              </view>
+              <view class="partner-logo-slot" bindtap="choosePartnerLogoByTheme" data-index="{{index}}" data-theme="dark">
+                <text class="partner-logo-slot__label">DARK模式图片</text>
+                <image
+                  wx:if="{{item.dark || item.bright}}"
+                  class="partner-logo-img"
+                  src="{{item.dark || item.bright}}"
+                  mode="aspectFit"
+                  data-index="{{index}}"
+                  data-theme="dark"
+                  binderror="onPartnerLogoError"
+                />
+                <view wx:else class="partner-logo-slot__empty">
+                  <text class="partner-logo-slot__plus">+</text>
+                </view>
+              </view>
+            </view>
+            <view class="partner-logo-remove" catchtap="removePartnerLogo" data-index="{{index}}">
+              <text>×</text>
+            </view>
+          </view>
+          <view
+            wx:if="{{partnerConfig.partnerLogos.length < 8}}"
+            class="partner-logo-add"
+            bindtap="onAddPartnerLogoSlot"
+          >
+            <text class="partner-logo-add__icon">+</text>
+            <text class="partner-logo-add__text">新增 PARTNER</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="content-spacer"></view>
     </view>
   </scroll-view>
 
   <view class="footer">
-    <button class="submit-btn" bindtap="onSubmit">创建并开启报名</button>
+    <button class="submit-btn" bindtap="onSubmit">{{submitButtonText}}</button>
+  </view>
+
+  <!-- 底部弹层：费用设置 -->
+  <block wx:if="{{showFeeSheet}}">
+  <view class="sheet-mask show" bindtap="cancelFeeSheet"></view>
+  <view class="bottom-sheet fee-sheet show" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header fee-sheet-header">
+      <view>
+        <text class="sheet-overline">FEE SETTINGS</text>
+        <text class="sheet-header__h3">费用设置</text>
+      </view>
+      <view class="fee-diamond-toggle">
+        <text class="fee-diamond-label">预付费</text>
+        <text class="fee-diamond-icon">💎</text>
+        <switch
+          class="fee-diamond-switch"
+          checked="{{draftIsDiamondMode}}"
+          color="#ce9224"
+          bindchange="onToggleDiamondMode"
+        />
+      </view>
+      <view class="sheet-close" bindtap="cancelFeeSheet"><text>×</text></view>
+    </view>
+
+    <view class="fee-list" wx:if="{{draftFeeList.length}}">
+      <view wx:for="{{draftFeeList}}" wx:for-item="draftFee" wx:for-index="draftFeeIndex" wx:key="id" class="fee-row">
+        <input
+          class="fee-name-input"
+          value="{{draftFee.name}}"
+          data-index="{{draftFeeIndex}}"
+          maxlength="20"
+          placeholder="例如：正式队员 / 嘉宾 / 赞助会员"
+          bindinput="handleFeeNameInput"
+        />
+        <view class="fee-amount-wrap">
+          <input
+            class="fee-amount-input"
+            value="{{draftFee.amount}}"
+            data-index="{{draftFeeIndex}}"
+            type="number"
+            placeholder="{{draftIsDiamondMode ? '💎 0' : '￥0'}}"
+            bindinput="handleFeeAmountInput"
+          />
+          <text wx:if="{{draftIsDiamondMode}}" class="fee-amount-diamond">💎</text>
+        </view>
+        <view
+          wx:if="{{draftFeeList.length > 1}}"
+          class="fee-delete"
+          data-index="{{draftFeeIndex}}"
+          catchtap="deleteFeeItem"
+        >删除</view>
+      </view>
+    </view>
+
+    <view class="add-fee-btn" bindtap="addFeeItem">
+      <view class="add-fee-icon"><text>+</text></view>
+      <text>添加费用项</text>
+    </view>
+
+    <view class="sheet-actions-two">
+      <button class="sheet-cancel-btn" bindtap="cancelFeeSheet">取消</button>
+      <button class="sheet-confirm-btn sheet-confirm-btn--inline" bindtap="confirmFeeSheet">确定</button>
+    </view>
+  </view>
+  </block>
+
+  <!-- 底部弹层：选择赛制 -->
+  <view class="sheet-mask {{showGameModeSheet ? 'show' : ''}}" bindtap="closeGameModeSheet"></view>
+  <view class="bottom-sheet {{showGameModeSheet ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">GAME MODE</text>
+        <text class="sheet-header__h3">选择赛制</text>
+      </view>
+      <view class="sheet-close" bindtap="closeGameModeSheet"><text>×</text></view>
+    </view>
+    <view class="game-mode-list">
+      <view
+        wx:for="{{gameModes}}"
+        wx:for-item="gm"
+        wx:for-index="gmIndex"
+        wx:key="name"
+        class="game-mode-option {{gm.name === selectedGameMode ? 'active' : ''}} {{gm.disabled ? 'disabled' : ''}}"
+        bindtap="selectGameMode"
+        data-name="{{gm.name}}"
+        data-disabled="{{gm.disabled}}"
+      >
+        <view class="mode-icon"><text>{{gm.icon}}</text></view>
+        <view class="mode-text">
+          <text class="mode-text__strong">{{gm.name}}</text>
+          <text class="mode-text__em ds-desc-text">{{gm.disabled ? matchPlayTeamsTip : gm.desc}}</text>
+        </view>
+        <text class="mode-check">✓</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部弹层：添加赛事信息 -->
+  <view class="sheet-mask {{showAddEventInfoSheet ? 'show' : ''}}" bindtap="closeAddEventInfoSheet"></view>
+  <view class="bottom-sheet event-info-sheet {{showAddEventInfoSheet ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">ADD EVENT INFO</text>
+        <text class="sheet-header__h3">添加赛事信息</text>
+      </view>
+      <view class="sheet-close" bindtap="closeAddEventInfoSheet"><text>×</text></view>
+    </view>
+
+    <view class="add-info-recommend-list">
+      <view
+        wx:for="{{recommendedEventInfo}}"
+        wx:for-item="recommendInfo"
+        wx:for-index="recommendIndex"
+        wx:key="title"
+        class="recommend-option {{selectedRecommendIndex === recommendIndex ? 'active' : ''}} {{eventTitleAddedMap[recommendInfo.title] ? 'disabled' : ''}}"
+        bindtap="selectRecommendInfo"
+        data-index="{{recommendIndex}}"
+      >
+        <text class="recommend-option-title">{{recommendInfo.title}}</text>
+        <text class="recommend-option-type ds-hint-text">{{recommendInfo.type === 'image' ? '图片' : '文本'}}</text>
+        <text class="recommend-check">✓</text>
+      </view>
+    </view>
+
+    <view class="custom-info-block">
+      <text class="custom-info-label ds-desc-text">或者手工添加信息项</text>
+      <view class="custom-info-type-row">
+        <view
+          class="custom-info-type {{manualInfoType === 'text' ? 'active' : ''}}"
+          bindtap="selectManualInfoType"
+          data-type="text"
+        >
+          <view class="choice-dot"></view>
+          <text>文本</text>
+        </view>
+        <view
+          class="custom-info-type {{manualInfoType === 'image' ? 'active' : ''}}"
+          bindtap="selectManualInfoType"
+          data-type="image"
+        >
+          <view class="choice-dot"></view>
+          <text>图片</text>
+        </view>
+      </view>
+      <input
+        class="custom-info-input"
+        type="text"
+        value="{{customEventInfoTitle}}"
+        placeholder="例如：晚宴安排、照片直播、着装要求"
+        bindinput="handleCustomEventInfoTitleInput"
+      />
+    </view>
+
+    <view class="sheet-actions-two">
+      <button class="sheet-cancel-btn" bindtap="closeAddEventInfoSheet">取消</button>
+      <button class="sheet-confirm-btn sheet-confirm-btn--inline" bindtap="confirmAddEventInfo">确认添加</button>
+    </view>
+  </view>
+
+  <!-- 底部弹层：编辑赛事信息 -->
+  <view class="sheet-mask {{showEventDetailSheet ? 'show' : ''}}" bindtap="closeEventDetailEditor"></view>
+  <view class="bottom-sheet event-info-sheet {{showEventDetailSheet ? 'show' : ''}}" catchtap="noop">
+    <view class="sheet-handle"></view>
+    <view class="sheet-header">
+      <view>
+        <text class="sheet-overline">EDIT EVENT INFO</text>
+        <text class="sheet-header__h3">{{eventDetailDraft.isPhotoLive ? '照片直播' : '编辑赛事信息'}}</text>
+      </view>
+      <view class="sheet-close" bindtap="closeEventDetailEditor"><text>×</text></view>
+    </view>
+
+    <view wx:if="{{!eventDetailDraft.isPhotoLive}}" class="event-detail-title ds-desc-text">
+      <text>当前编辑：</text>
+      <text class="event-detail-title-strong">{{eventDetailEditLabel}}</text>
+    </view>
+
+    <block wx:if="{{eventDetailDraft.type === 'image'}}">
+      <view
+        class="event-detail-image-box {{eventDetailDraft.brightImage ? 'has-image' : ''}}"
+        bindtap="chooseEventDetailBrightImage"
+      >
+        <text class="event-detail-image-title">BRIGHT模式图片</text>
+        <block wx:if="{{!eventDetailDraft.brightImage}}">
+          <text class="event-detail-image-icon">🖼</text>
+          <text class="event-detail-image-strong">点击上传 BRIGHT 图片</text>
+          <text class="event-detail-image-hint ds-hint-text">建议尺寸：宽 750px × 高 360px，JPG/PNG，允许仅上传一张</text>
+        </block>
+        <image
+          wx:if="{{eventDetailDraft.brightImage}}"
+          class="event-detail-image-preview"
+          src="{{eventDetailDraft.brightImage}}"
+          mode="widthFix"
+        ></image>
+      </view>
+
+      <view
+        class="event-detail-image-box {{eventDetailDraft.darkImage ? 'has-image' : ''}}"
+        bindtap="chooseEventDetailDarkImage"
+      >
+        <text class="event-detail-image-title">DARK模式图片</text>
+        <block wx:if="{{!eventDetailDraft.darkImage}}">
+          <text class="event-detail-image-icon">🖼</text>
+          <text class="event-detail-image-strong">点击上传 DARK 图片</text>
+          <text class="event-detail-image-hint ds-hint-text">建议尺寸：宽 750px × 高 360px，JPG/PNG，允许仅上传一张</text>
+        </block>
+        <image
+          wx:if="{{eventDetailDraft.darkImage}}"
+          class="event-detail-image-preview"
+          src="{{eventDetailDraft.darkImage}}"
+          mode="widthFix"
+        ></image>
+      </view>
+    </block>
+
+    <block wx:elif="{{eventDetailDraft.isPhotoLive}}">
+      <view class="event-detail-photo-live-desc">
+        <text class="event-detail-photo-live-desc__main">请输入摄影团队提供的照片直播链接。</text>
+        <text class="event-detail-photo-live-desc__hint">请复制粘贴完整 HTTPS 链接。</text>
+        <text class="event-detail-photo-live-desc__example">例如：https://example.com/live/xxxxx</text>
+      </view>
+      <input
+        class="event-detail-link-input"
+        type="text"
+        value="{{eventDetailDraft.content}}"
+        placeholder="请输入照片直播 HTTPS 链接"
+        bindinput="handleEventDetailTextInput"
+      />
+    </block>
+
+    <textarea
+      wx:elif="{{eventDetailDraft.type === 'text'}}"
+      class="event-detail-textarea"
+      value="{{eventDetailDraft.content}}"
+      placeholder="请输入详细内容"
+      bindinput="handleEventDetailTextInput"
+    ></textarea>
+
+    <button
+      class="event-detail-delete-btn {{deleteConfirming ? 'confirming' : ''}}"
+      bindtap="deleteEventInfo"
+    >{{deleteBtnText}}</button>
+
+    <view class="sheet-actions-two">
+      <button class="sheet-cancel-btn" bindtap="closeEventDetailEditor">取消</button>
+      <button class="sheet-confirm-btn sheet-confirm-btn--inline" bindtap="saveEventDetail">保存内容</button>
+    </view>
   </view>
 
   <time-wheel-picker

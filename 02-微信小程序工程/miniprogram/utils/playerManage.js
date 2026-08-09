@@ -126,6 +126,59 @@ function resolveMatchTeamName(raw) {
   ).trim();
 }
 
+/**
+ * 头像下分队/球队标签展示名（截断：中文 4 / 其它 8）。
+ * @param {string} name
+ * @returns {string}
+ */
+function formatTeamTagName(name) {
+  const text = String(name || '').trim();
+  if (!text) return '';
+  const chars = Array.from(text);
+  const hasChinese = /[\u4e00-\u9fff]/.test(text);
+  const limit = hasChinese ? 4 : 8;
+  return chars.slice(0, limit).join('');
+}
+
+/**
+ * 解析头像下方球队/分队标签：
+ * - id：matchTeamId → groupId
+ * - 名称：优先 match.teamGroups[].name（本场快照简称）；回退 matchTeamName/groupName
+ * @param {object|null|undefined} raw 报名/球员原始对象
+ * @param {Array|{ teamGroups?: Array }|null|undefined} teamGroupsOrMatch
+ * @returns {string} 已截断的展示名；无则 ''
+ */
+function resolveAvatarTeamLabel(raw, teamGroupsOrMatch) {
+  const teamId = resolveMatchTeamId(raw);
+  let list = [];
+  if (Array.isArray(teamGroupsOrMatch)) {
+    list = teamGroupsOrMatch;
+  } else if (
+    teamGroupsOrMatch &&
+    typeof teamGroupsOrMatch === 'object' &&
+    Array.isArray(teamGroupsOrMatch.teamGroups)
+  ) {
+    list = teamGroupsOrMatch.teamGroups;
+  }
+  if (teamId && list.length) {
+    for (let i = 0; i < list.length; i++) {
+      const g = list[i];
+      const id = g && g.id != null ? String(g.id).trim() : '';
+      if (!id || id !== teamId) continue;
+      const n = String((g && g.name) || '').trim();
+      if (n && !isPlaceholderTeamLabel(n)) {
+        return formatTeamTagName(n);
+      }
+      break;
+    }
+  }
+  const fallback = resolveMatchTeamName(raw);
+  if (fallback && !isPlaceholderTeamLabel(fallback)) {
+    return formatTeamTagName(fallback);
+  }
+  return '';
+}
+
 function sourceLabel(raw) {
   const src = String((raw && raw.source) || 'self').trim().toLowerCase();
   return SOURCE_LABELS[src] || '报名';
@@ -1557,6 +1610,8 @@ module.exports = {
   resolveMatchGender,
   resolveMatchTeamId,
   resolveMatchTeamName,
+  formatTeamTagName,
+  resolveAvatarTeamLabel,
   resolveSortName,
   getNameSortKey,
   getPlayerSortKey,

@@ -1,6 +1,6 @@
 /**
  * 互动反应音效（独立于动画 / 记分逻辑）
- * 资源目录：miniprogram/subpackages/scoring/assets/sounds/
+ * 资源目录：miniprogram/subpackages/reaction/assets/sounds/
  *
  * 注意：微信端在「动画 setData 同帧」同步 createInnerAudioContext / seek / play
  * 容易触发原生层与页面合成抢占，表现为全屏闪白。因此：
@@ -11,34 +11,34 @@
 
 const SOUND_SRC = {
   /** Demo bucket：水桶.mov 重新接入倒水段（500–1350ms）；翻转倒水唯一音轨 */
-  bucket_water_new: '/subpackages/scoring/assets/sounds/bucket_water_new.wav',
+  bucket_water_new: '/subpackages/reaction/assets/sounds/bucket_water_new.wav',
   /** 旧蛋击 key（保留兼容）；demo 连击改用 egg_hit_1..6 / egg_hit_final */
-  egg_hit: '/subpackages/scoring/assets/sounds/egg_hit.wav',
-  egg_hit_finale: '/subpackages/scoring/assets/sounds/egg_hit_finale.wav',
+  egg_hit: '/subpackages/reaction/assets/sounds/egg_hit.wav',
+  egg_hit_finale: '/subpackages/reaction/assets/sounds/egg_hit_finale.wav',
   /** Demo egg：西红柿音源变化连击整轨 */
-  egg_combo: '/subpackages/scoring/assets/sounds/egg_combo.wav',
+  egg_combo: '/subpackages/reaction/assets/sounds/egg_combo.wav',
   /** Demo egg：终结一击（更强更长） */
-  egg_hit_final: '/subpackages/scoring/assets/sounds/egg_hit_final.wav',
-  egg_hit_1: '/subpackages/scoring/assets/sounds/egg_hit_1.wav',
-  egg_hit_2: '/subpackages/scoring/assets/sounds/egg_hit_2.wav',
-  egg_hit_3: '/subpackages/scoring/assets/sounds/egg_hit_3.wav',
-  egg_hit_4: '/subpackages/scoring/assets/sounds/egg_hit_4.wav',
-  egg_hit_5: '/subpackages/scoring/assets/sounds/egg_hit_5.wav',
-  egg_hit_6: '/subpackages/scoring/assets/sounds/egg_hit_6.wav',
+  egg_hit_final: '/subpackages/reaction/assets/sounds/egg_hit_final.wav',
+  egg_hit_1: '/subpackages/reaction/assets/sounds/egg_hit_1.wav',
+  egg_hit_2: '/subpackages/reaction/assets/sounds/egg_hit_2.wav',
+  egg_hit_3: '/subpackages/reaction/assets/sounds/egg_hit_3.wav',
+  egg_hit_4: '/subpackages/reaction/assets/sounds/egg_hit_4.wav',
+  egg_hit_5: '/subpackages/reaction/assets/sounds/egg_hit_5.wav',
+  egg_hit_6: '/subpackages/reaction/assets/sounds/egg_hit_6.wav',
   /** Demo boxing：音频文件/拳击.mp3；连击整段节奏 */
-  boxing: '/subpackages/scoring/assets/sounds/boxing.mp3',
+  boxing: '/subpackages/reaction/assets/sounds/boxing.mp3',
   /** Demo boxing 终结拳：从原拳击轨截取第一拳片段（430–640ms） */
-  boxing_hit_first: '/subpackages/scoring/assets/sounds/boxing_hit_first.wav',
+  boxing_hit_first: '/subpackages/reaction/assets/sounds/boxing_hit_first.wav',
   /** Demo kiss：亲吻.mov 有效接触段（540–900ms） */
-  kiss: '/subpackages/scoring/assets/sounds/kiss.wav',
+  kiss: '/subpackages/reaction/assets/sounds/kiss.wav',
   /** Demo flower：送花.mov 有效段（220–900ms），到达目标瞬间播放 */
-  flower_send: '/subpackages/scoring/assets/sounds/flower_send.wav',
+  flower_send: '/subpackages/reaction/assets/sounds/flower_send.wav',
   /** Demo beer：音频文件/干杯.mp3；beer_main_fly 从 0ms 整轨播放（不 seek） */
-  cheers: '/subpackages/scoring/assets/sounds/cheers.mp3',
+  cheers: '/subpackages/reaction/assets/sounds/cheers.mp3',
   /** Demo tomato：西红柿.mov 撞击段（620–1500ms）；tomato_hit 瞬间播放 */
-  tomato_hit: '/subpackages/scoring/assets/sounds/tomato_hit.wav',
+  tomato_hit: '/subpackages/reaction/assets/sounds/tomato_hit.wav',
   /** Demo rocket：音频文件/火箭.mp3；rocket_explosion 起播（seek 到 peak≈660ms） */
-  rocket: '/subpackages/scoring/assets/sounds/rocket.mp3'
+  rocket: '/subpackages/reaction/assets/sounds/rocket.mp3'
 };
 
 /** @type {Object.<string, any>} */

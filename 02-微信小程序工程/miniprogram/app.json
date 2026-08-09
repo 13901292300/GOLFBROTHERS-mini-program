@@ -50,6 +50,13 @@
         "pages/group-pick/index",
         "pages/detail/index"
       ]
+    },
+    {
+      "root": "subpackages/reaction",
+      "name": "reaction",
+      "pages": [
+        "pages/_preload/index"
+      ]
     }
   ],
   "window": {

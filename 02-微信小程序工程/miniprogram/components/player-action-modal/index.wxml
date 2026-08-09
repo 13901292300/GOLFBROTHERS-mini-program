@@ -1,0 +1,51 @@
+<!-- 球员头像互动中央弹窗（记分页 / 赛事详情讨论区共用） -->
+<view
+  wx:if="{{visible}}"
+  bindtap="onMaskTap"
+  class="player-action-modal-mask"
+></view>
+<view
+  wx:if="{{visible && target}}"
+  class="player-action-modal {{dark ? 'player-action-modal--dark' : ''}}"
+  catchtap="onNoop"
+>
+  <view class="player-action-modal__card">
+    <view class="player-action-modal__profile">
+      <image
+        class="player-action-modal__avatar"
+        src="{{target.avatar}}"
+        mode="aspectFill"
+      ></image>
+      <view class="player-action-modal__meta">
+        <view class="player-action-modal__name-row">
+          <text class="player-action-modal__name">{{target.name}}</text>
+          <text wx:if="{{target.genderSymbol}}" class="player-action-modal__gender">{{target.genderSymbol}}</text>
+        </view>
+        <view class="player-action-modal__stats">
+          <text class="player-action-modal__stat">江湖差点 {{target.handicapText}}</text>
+          <text class="player-action-modal__stat-sep">·</text>
+          <text class="player-action-modal__stat">浮动系数 {{target.floatCoefText}}</text>
+        </view>
+      </view>
+      <view
+        class="player-action-modal__home"
+        catchtap="onProfileTap"
+      >进入主页</view>
+    </view>
+    <view class="player-action-modal__actions">
+      <view
+        wx:for="{{reactions}}"
+        wx:key="key"
+        class="player-action-modal__item"
+        data-key="{{item.key}}"
+        catchtap="onReactionTap"
+      >
+        <text class="player-action-modal__item-icon">{{item.icon}}</text>
+        <view class="player-action-modal__item-cost">
+          <text class="player-action-modal__item-coin">🪙</text>
+          <text class="player-action-modal__item-cost-num">×{{item.cost}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

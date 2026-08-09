@@ -17,7 +17,7 @@ const ROCKET_AUDIO = {
   source: '音频文件/火箭.mp3',
   file: 'rocket.mp3',
   soundKey: 'rocket',
-  path: '/subpackages/scoring/assets/sounds/rocket.mp3',
+  path: '/subpackages/reaction/assets/sounds/rocket.mp3',
   durationMs: 1833,
   peakMs: 660,
   loudOnsetMs: 660

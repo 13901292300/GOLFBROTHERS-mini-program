@@ -1015,7 +1015,7 @@ Page({
     this.setData({
       currentMainSection: 'plaza',
       primaryTabText: '普通球局',
-      secondaryTabText: '球队比赛',
+      secondaryTabText: '团体比赛',
       plazaTournamentCards: plazaTournamentCards
     });
     this.setHeroTabsVisible(true);

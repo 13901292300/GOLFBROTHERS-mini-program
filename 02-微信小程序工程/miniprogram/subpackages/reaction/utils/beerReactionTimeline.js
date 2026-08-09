@@ -13,7 +13,7 @@ const BEER_AUDIO_CLIP = {
   source: '音频文件/干杯.mp3',
   file: 'cheers.mp3',
   soundKey: 'cheers',
-  path: '/subpackages/scoring/assets/sounds/cheers.mp3',
+  path: '/subpackages/reaction/assets/sounds/cheers.mp3',
   /** 完整轨时长（ms）；勿裁剪 */
   durationMs: 2135,
   /** 相对音频 t=0 的结构点（不 seek） */

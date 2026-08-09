@@ -298,3 +298,93 @@ page {
 }
 .submit-btn::after { border: none; }
 .submit-btn.disabled { opacity: 0.45; }
+
+.participant-selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.participant-chip .team-selected-chip__name {
+  font-weight: 800;
+}
+
+.short-name-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+.short-name-sheet {
+  width: 100%;
+  max-width: 620rpx;
+  background: var(--bg-card, #fff);
+  border-radius: 16rpx;
+  padding: 36rpx 32rpx 28rpx;
+  box-sizing: border-box;
+}
+.short-name-sheet__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.short-name-sheet__sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+.short-name-input-wrap {
+  margin-top: 28rpx;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12rpx;
+  padding: 0 20rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+}
+.short-name-input {
+  flex: 1;
+  height: 88rpx;
+  font-size: 30rpx;
+  color: var(--text-primary);
+}
+.short-name-count {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  margin-left: 12rpx;
+}
+.short-name-actions {
+  margin-top: 28rpx;
+  display: flex;
+  gap: 16rpx;
+}
+.short-name-btn {
+  flex: 1;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  padding: 0;
+  border: 0;
+}
+.short-name-btn::after { border: none; }
+.short-name-btn.cancel {
+  background: var(--bg-subtle, #f3f4f6);
+  color: var(--text-secondary);
+}
+.short-name-btn.ok {
+  background: var(--tour-blue);
+  color: #fff;
+}

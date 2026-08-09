@@ -1,1 +1,120 @@
+/* 队际赛创建页样式：公共样式在主包 styles，避免主包 @import 分包路径 */
 @import '/styles/create-team-common.wxss';
+
+.org-logo-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.org-logo-empty {
+  background: var(--bg-subtle);
+}
+
+.org-logo-edit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 8rpx;
+  border-radius: 18rpx;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 36rpx;
+  text-align: center;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.35);
+}
+
+/* Dark：提高「换」角标对比，提示 LOGO 可点 */
+.create-page.dark-mode .org-logo-edit {
+  background: rgba(206, 146, 36, 0.92);
+  color: #111111;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.2);
+}
+
+.org-name-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.org-name-input {
+  width: 100%;
+  font-size: 32rpx;
+  line-height: 1.3;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* 参赛球队：复用 .ds-field（align-items:center / min-height:128rpx），勿用 flex-start 顶对齐 */
+.participants-card .field-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.participants-card .field-right {
+  align-self: center;
+}
+
+.participant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  align-items: center;
+  align-content: center;
+  width: 100%;
+}
+
+.participant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  max-width: 100%;
+  padding: 6rpx 10rpx 6rpx 6rpx;
+  border-radius: 999rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  box-sizing: border-box;
+}
+
+.participant-chip__logo {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  flex-shrink: 0;
+}
+
+.participant-chip__name {
+  font-size: 24rpx;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 160rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-chip__remove {
+  width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.pk-card {
+  padding: 28rpx 32rpx;
+}
+
+.game-mode-option.disabled {
+  opacity: 0.45;
+}
+
+.game-mode-option.disabled .mode-check {
+  opacity: 0;
+}
