@@ -27,7 +27,7 @@
           catchtap="onProfileTap"
         >›</text>
       </view>
-      <!-- metaMode：countryAge=既有 COUNTRY/AGE；handicapFloat=队内赛江湖差点/浮动系数 -->
+      <!-- metaMode：countryAge=既有 COUNTRY/AGE；handicapFloat=球队赛家族江湖差点/浮动系数 -->
       <view wx:if="{{metaMode === 'handicapFloat'}}" class="sc-sub">
         江湖差点 <text class="sc-sub-strong">{{player.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText}}</text>
       </view>

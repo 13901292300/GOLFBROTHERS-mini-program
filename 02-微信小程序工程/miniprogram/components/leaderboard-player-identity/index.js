@@ -30,14 +30,14 @@ Component({
     },
     /**
      * 辅助信息行：countryAge（默认 COUNTRY/AGE）| handicapFloat（江湖差点/浮动系数）
-     * 队内赛传 handicapFloat；队际赛/其他保持 countryAge，避免误改。
+     * 球队赛家族传 handicapFloat；普通球局/系列赛/Hub 默认 countryAge。
      */
     metaMode: {
       type: String,
       value: 'countryAge'
     },
     /**
-     * 昵称行是否展示性别符号（队内赛展开传 true；默认 false 避免队际/Hub 误显）
+     * 昵称行是否展示性别符号（球队赛家族展开传 true；默认 false）
      */
     showNameGender: {
       type: Boolean,

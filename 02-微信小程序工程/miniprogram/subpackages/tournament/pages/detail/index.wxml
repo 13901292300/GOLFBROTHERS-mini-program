@@ -769,7 +769,7 @@
                           <view wx:else class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{player.country}}</text>　AGE: <text class="sc-sub-strong">{{player.age}}</text></view>
                         </view>
                       </view>
-                      <!-- 队内赛：好友 > 已关注 > 加关注；队际赛等保持原占位「加关注」 -->
+                      <!-- 球队赛家族：好友 > 已关注 > 加关注；普通球局/系列赛保持原占位「加关注」 -->
                       <block wx:if="{{leaderboardFollowEnabled}}">
                         <block wx:if="{{leaderboardFollowableMap[player.playerId]}}">
                           <follow-action-btn
@@ -945,7 +945,7 @@
                       <view wx:else class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{item.country}}</text>　AGE: <text class="sc-sub-strong">{{item.age}}</text></view>
                     </view>
                   </view>
-                  <!-- 队内赛：好友 > 已关注 > 加关注；队际赛等保持原占位「加关注」 -->
+                  <!-- 球队赛家族：好友 > 已关注 > 加关注；普通球局/系列赛保持原占位「加关注」 -->
                   <block wx:if="{{leaderboardFollowEnabled}}">
                     <block wx:if="{{leaderboardFollowableMap[item.playerId]}}">
                       <follow-action-btn

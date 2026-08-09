@@ -577,15 +577,16 @@ const REGISTERING_FEATURES_COMMON = [
 ];
 
 /**
- * LIVE 常用区菜单：仅 team-internal + ongoing 用「替他人报名」替换「显示设置」。
- * 队际赛 LIVE / 完赛 / 其他类型保持 FEATURES_COMMON（含 theme）。不删除 theme 底层能力。
+ * LIVE 常用区菜单：球队赛家族（team-internal / inter-team）+ ongoing
+ * 用 register_for_other 替换 theme（原位、去重、不留空位）。
+ * 完赛 / series / 普通球局保持 FEATURES_COMMON（含 theme）。不删除 theme 底层能力。
  * @param {object|null} match
  * @param {{ isOngoing?: boolean }|null} lifecycle
  * @returns {Array<{permission:string,glyph:string,label:string}>}
  */
 function resolveOngoingCommonFeatures(match, lifecycle) {
   const base = FEATURES_COMMON.map((f) => Object.assign({}, f));
-  if (!(lifecycle && lifecycle.isOngoing && isTeamInternalMatch(match))) {
+  if (!(lifecycle && lifecycle.isOngoing && isTeamMatchFamily(match))) {
     return base;
   }
   const proxy = REGISTERING_FEATURES_COMMON.find(
@@ -915,11 +916,12 @@ Page({
     leaderboardAvatarBadge: 'auto',
     /**
      * 领先榜展开辅助信息：handicapFloat=江湖差点/浮动系数；countryAge=COUNTRY/AGE
+     * 球队赛家族（team-internal / inter-team）→ handicapFloat
      */
     leaderboardMetaMode: 'countryAge',
-    /** 队内赛展开昵称行显示性别符号；队际赛等保持 false */
+    /** 球队赛家族展开昵称行显示性别符号；普通球局/系列赛 false */
     leaderboardShowExpandGender: false,
-    /** 领先榜关注：仅队内赛启用；复用通讯录 contactFollowAction */
+    /** 领先榜关注：球队赛家族启用；复用通讯录 contactFollowAction */
     leaderboardFollowEnabled: false,
     currentUserId: '',
     followMap: {},
@@ -1405,14 +1407,14 @@ Page({
 
   /**
    * 领先榜展开辅助信息模式（与 leaderboard-player-identity.metaMode 对齐）。
-   * team-internal → handicapFloat；其他保持 countryAge。
+   * 球队赛家族 → handicapFloat；普通球局/系列赛保持 countryAge。
    */
   _resolveLeaderboardMetaMode(match) {
-    return isTeamInternalMatch(match) ? 'handicapFloat' : 'countryAge';
+    return isTeamMatchFamily(match) ? 'handicapFloat' : 'countryAge';
   },
 
   _resolveLeaderboardShowExpandGender(match) {
-    return isTeamInternalMatch(match);
+    return isTeamMatchFamily(match);
   },
 
   /** 竞技指标：null/'' → 缺省；0 为有效值 */
@@ -1424,7 +1426,7 @@ Page({
   },
 
   /**
-   * 批量解析 userId → handicap / floatCoef（队内赛展开面板）。
+   * 批量解析 userId → handicap / floatCoef（球队赛家族展开面板）。
    * 优先报名快照；其次当前用户资料；再尝试联系人关系库中的真实字段。
    * 不使用演示常量；不以昵称匹配。
    */
@@ -1578,9 +1580,9 @@ Page({
     });
   },
 
-  /** 个人榜行：附着江湖差点/浮动系数文案（仅队内赛需要，其它类型无副作用） */
+  /** 个人榜行：附着江湖差点/浮动系数 + 展开性别（球队赛家族；其它类型无副作用） */
   _enrichLeaderboardRowsWithMetrics(rows, match) {
-    if (!isTeamInternalMatch(match)) return rows || [];
+    if (!isTeamMatchFamily(match)) return rows || [];
     const metricMap = this._buildLeaderboardMetricMap(match);
     const registerById = this._buildRegisterUserByIdMap(match);
     return (Array.isArray(rows) ? rows : []).map((row) => {
@@ -1599,9 +1601,9 @@ Page({
     });
   },
 
-  /** 分队榜展开球员/Side 成员：附着竞技指标 + 展开性别 */
+  /** 分队榜展开球员/Side 成员：附着竞技指标 + 展开性别（球队赛家族） */
   _enrichTeamLeaderboardWithMetrics(teams, match) {
-    if (!isTeamInternalMatch(match)) return teams || [];
+    if (!isTeamMatchFamily(match)) return teams || [];
     const metricMap = this._buildLeaderboardMetricMap(match);
     const registerById = this._buildRegisterUserByIdMap(match);
     return (Array.isArray(teams) ? teams : []).map((team) => {
@@ -1694,10 +1696,10 @@ Page({
 
   /**
    * 批量投影通讯录关系 → 页级 map（与 Game Hub / contactFollowAction 一致）。
-   * 仅队内赛启用；不按昵称匹配；无稳定 id 不进入 map；不写回报名/成绩。
+   * 球队赛家族启用；不按昵称匹配；无稳定 id 不进入 map；不写回报名/成绩。
    */
   _buildLeaderboardRelationPatch(leaderboard, teamLeaderboard, match) {
-    if (!isTeamInternalMatch(match)) {
+    if (!isTeamMatchFamily(match)) {
       return {
         leaderboardFollowEnabled: false,
         currentUserId: '',
@@ -8749,7 +8751,7 @@ Page({
         });
       }
     }
-    // 队内赛 LIVE：常用区 theme → register_for_other；队际赛 LIVE / 完赛仍保留显示设置
+    // 球队赛家族 LIVE：常用区 theme → register_for_other；完赛仍保留显示设置
     const commonFeatures = resolveOngoingCommonFeatures(
       match,
       this._getMatchLifecycle(match)
@@ -8884,12 +8886,12 @@ Page({
       this._promptFinishMatch();
       return;
     }
-    // 替他人报名：报名中任意球队赛；队内赛 LIVE（与报名中同一套弹窗/写入）
+    // 替他人报名：报名中；球队赛家族 LIVE（与报名中同一套弹窗/写入；权限键仍为 register_for_other）
     if (permission === 'register_for_other') {
       const lifecycle = this._getMatchLifecycle(match);
       const allowProxyRegister =
         !!(lifecycle && lifecycle.isRegistering) ||
-        !!(lifecycle && lifecycle.isOngoing && isTeamInternalMatch(match));
+        !!(lifecycle && lifecycle.isOngoing && isTeamMatchFamily(match));
       this.setData({ showMoreSheet: false, moreFabExpanded: false });
       if (!allowProxyRegister) {
         wx.showToast({ title: '功能开发中', icon: 'none' });
