@@ -26,18 +26,18 @@
   color: var(--text-muted);
 }
 
-/* ===== 比杆头：赛制｜球场｜进入GAME（右侧固定不被挤掉） ===== */
+/* ===== 成绩卡头：赛制｜球场｜进入图标（右侧固定不被挤掉） ===== */
 .msc-stroke-head {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  padding: 16rpx 20rpx 8rpx;
+  gap: 10rpx;
+  padding: 12rpx 12rpx 8rpx 20rpx;
   min-width: 0;
 }
 
 .msc-tag {
   flex: 0 1 auto;
-  max-width: 38%;
+  max-width: 32%;
   min-width: 0;
   font-size: 20rpx;
   font-weight: 700;
@@ -51,7 +51,7 @@
 }
 
 .msc-course {
-  flex: 1 1 auto;
+  flex: 1;
   min-width: 0;
   font-size: 22rpx;
   font-weight: 600;
@@ -59,18 +59,37 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: center;
+  text-align: left;
 }
 
+/* 视觉约 46rpx；点击区 ≥ 64×64rpx；右对齐不被球场名挤压 */
 .msc-enter {
   flex: 0 0 auto;
-  font-size: 22rpx;
-  font-weight: 700;
-  color: var(--tour-blue);
-  white-space: nowrap;
+  width: 64rpx;
+  height: 64rpx;
+  margin-right: -4rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.msc.dark-mode .msc-enter {
+.msc-enter__icon {
+  width: 46rpx;
+  height: 46rpx;
+  border-radius: 999rpx;
+  box-sizing: border-box;
+  border: 2rpx solid rgba(0, 45, 98, 0.28);
+  color: var(--golf-blue);
+  font-size: 34rpx;
+  font-weight: 500;
+  line-height: 42rpx;
+  text-align: center;
+  padding-left: 2rpx;
+}
+
+.msc.dark-mode .msc-enter__icon {
+  border-color: rgba(147, 197, 253, 0.45);
   color: #93c5fd;
 }
 
@@ -369,6 +388,8 @@
 }
 
 .msc-mp-side {
+  position: relative;
+  z-index: 5;
   flex: 1 1 0;
   min-width: 0;
   align-self: stretch;

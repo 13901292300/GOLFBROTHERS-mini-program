@@ -1,17 +1,25 @@
-<view class="msc {{themeClass}} {{scorecard && scorecard.ok ? '' : 'is-unavailable'}}">
-  <!-- 不可用 -->
+<!-- 根节点 catchtap：成绩区只读，不冒泡到动态卡片；仅右侧图标进入比赛 -->
+<view class="msc {{themeClass}} {{scorecard && scorecard.ok ? '' : 'is-unavailable'}}" catchtap="noop">
+  <!-- 不可用：只读提示，不进入比赛 -->
   <block wx:if="{{!scorecard || scorecard.unavailable || !scorecard.ok}}">
-    <view class="msc__unavailable" bindtap="onEnterGame">
+    <view class="msc__unavailable">
       <text>{{scorecard.message || '成绩卡暂不可用'}}</text>
     </view>
   </block>
 
   <!-- 比杆 -->
   <block wx:elif="{{scorecard.kind === 'stroke' && scorecard.stroke}}">
-    <view class="msc-stroke-head" bindtap="onEnterGame">
+    <view class="msc-stroke-head">
       <text class="msc-tag">{{scorecard.modeLabel || '个人比杆赛'}}</text>
       <text class="msc-course">{{scorecard.courseName || '球场'}}</text>
-      <text class="msc-enter">进入GAME</text>
+      <view
+        wx:if="{{!hideEnter}}"
+        class="msc-enter"
+        aria-label="查看比赛"
+        catchtap="onEnterGame"
+      >
+        <text class="msc-enter__icon">›</text>
+      </view>
     </view>
     <view class="msc__summary">
       <text class="msc__sum-item">OUT {{scorecard.stroke.summary.outText}}</text>
@@ -57,15 +65,21 @@
 
   <!-- 比洞 -->
   <block wx:elif="{{scorecard.kind === 'match_play' && scorecard.matchPlay}}">
-    <view class="msc-stroke-head" bindtap="onEnterGame">
+    <view class="msc-stroke-head">
       <text class="msc-tag">{{scorecard.modeLabel || '个人比洞'}}</text>
       <text class="msc-course">{{scorecard.courseName || '球场'}}</text>
-      <text class="msc-enter">进入GAME</text>
+      <view
+        wx:if="{{!hideEnter}}"
+        class="msc-enter"
+        aria-label="查看比赛"
+        catchtap="onEnterGame"
+      >
+        <text class="msc-enter__icon">›</text>
+      </view>
     </view>
-    <!-- 头像行：状态层箭头（winner-a/b / all-square / not-started）+ 内容层 -->
+    <!-- 头像行：状态层箭头（winner-a/b / all-square / not-started）+ 内容层；只读 -->
     <view
       class="msc-mp-head msc-mp-status {{scorecard.matchPlay.trend.statusLayerClass}}"
-      bindtap="onEnterGame"
     >
       <view class="msc-mp-status-layer">
         <view class="msc-mp-st-fill msc-mp-st-fill--a"></view>
@@ -84,8 +98,10 @@
           <view
             wx:for="{{scorecard.matchPlay.sideAAvatars}}"
             wx:for-item="mem"
+            wx:for-index="memberIndex"
             wx:key="userId"
             class="msc-avatar-wrap"
+            style="z-index:{{mem.stackZ}}"
           >
             <image class="msc-avatar" src="{{mem.avatar}}" mode="aspectFill"></image>
           </view>
@@ -108,19 +124,20 @@
           <view
             wx:for="{{scorecard.matchPlay.sideBAvatars}}"
             wx:for-item="mem"
+            wx:for-index="memberIndex"
             wx:key="userId"
             class="msc-avatar-wrap"
+            style="z-index:{{mem.stackZ}}"
           >
             <image class="msc-avatar" src="{{mem.avatar}}" mode="aspectFill"></image>
           </view>
         </view>
       </view>
     </view>
-    <!-- 复用比洞得分榜卡片底部 18 洞圆点（mp-sb-holes / mp-sb-dot） -->
+    <!-- 复用比洞得分榜卡片底部 18 洞圆点（mp-sb-holes / mp-sb-dot）；只读 -->
     <view
       wx:if="{{scorecard.matchPlay.holeDots && scorecard.matchPlay.holeDots.length}}"
       class="mp-sb-holes mp-sb-holes--summary"
-      bindtap="onEnterGame"
     >
       <view
         wx:for="{{scorecard.matchPlay.holeDots}}"

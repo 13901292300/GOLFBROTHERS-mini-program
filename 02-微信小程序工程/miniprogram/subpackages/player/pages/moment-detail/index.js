@@ -6,7 +6,7 @@ const playerMomentStore = require('../../../../utils/playerMomentStore.js');
 const playerMomentInteractionStore = require('../../../../utils/playerMomentInteractionStore.js');
 const playerMomentMedia = require('../../../../utils/playerMomentMedia.js');
 const playerMomentImageLayout = require('../../../../utils/playerMomentImageLayout.js');
-const playerContentReportStore = require('../../../../utils/playerContentReportStore.js');
+const contentReportService = require('../../../../utils/contentReportService.js');
 const publicScorecardView = require('../../../../utils/publicScorecardView.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
@@ -63,7 +63,9 @@ Page({
     reportSheetTitle: '举报',
     reportSubmitting: false,
     ixActionOpen: false,
-    canInteract: false
+    canInteract: false,
+    /** 详情页单一主视频 active（不与 Feed 共享） */
+    activeVideoMomentId: ''
   },
 
   onLoad(query) {
@@ -90,6 +92,7 @@ Page({
   },
 
   onHide() {
+    this._stopActiveVideo();
     this.onCloseIxAction();
     this.setData({
       inputFocus: false,
@@ -102,6 +105,49 @@ Page({
   onCloseIxAction() {
     if (!this.data.ixActionOpen) return;
     this.setData({ ixActionOpen: false });
+  },
+
+  _stopActiveVideo() {
+    if (!this.data.activeVideoMomentId) return;
+    this.setData({ activeVideoMomentId: '' });
+  },
+
+  onVideoPlayRequest(e) {
+    const detail = (e && e.detail) || {};
+    const mid =
+      (detail.momentId != null ? String(detail.momentId) : '') ||
+      this.data.momentId ||
+      '';
+    if (!mid) return;
+    if (this.data.activeVideoMomentId === mid) {
+      const self = this;
+      this.setData({ activeVideoMomentId: '' }, function () {
+        self.setData({ activeVideoMomentId: mid });
+      });
+      return;
+    }
+    this.setData({ activeVideoMomentId: mid });
+  },
+
+  onVideoPlay() {},
+
+  /** 原生 pause / 评论键盘场景由页面主动 _stopActiveVideo；控件内 pause 保持 active */
+  onVideoPause() {},
+
+  onVideoEnded(e) {
+    const mid =
+      e && e.detail && e.detail.momentId != null ? String(e.detail.momentId) : '';
+    if (mid && mid === this.data.activeVideoMomentId) {
+      this.setData({ activeVideoMomentId: '' });
+    }
+  },
+
+  onVideoError(e) {
+    const mid =
+      e && e.detail && e.detail.momentId != null ? String(e.detail.momentId) : '';
+    if (mid && mid === this.data.activeVideoMomentId) {
+      this.setData({ activeVideoMomentId: '' });
+    }
   },
 
   noop() {},
@@ -151,6 +197,7 @@ Page({
   },
 
   onUnload() {
+    this._stopActiveVideo();
     this.setData({
       inputFocus: false,
       replyToCommentId: '',
@@ -224,7 +271,9 @@ Page({
         playerIdentityGuard.isStablePublicUserId(me) &&
         !playerIdentityGuard.isGuestPlayerId(me) &&
         !playerIdentityGuard.isMaskedPlayerId(me);
-      const projected = playerMomentStore.projectMomentsForViewer([raw], me);
+      const projected = playerMomentStore.projectMomentsForViewer([raw], me, {
+        skipMediaInspect: false
+      });
       let view = projected[0] || null;
       if (!view) {
         this.setData({ pageState: 'notFound', view: null });
@@ -259,7 +308,7 @@ Page({
       let canReportMoment = false;
       let momentReported = false;
       try {
-        const rs = playerContentReportStore.getReportState('moment', momentId, me);
+        const rs = contentReportService.getReportState('moment', momentId);
         momentReported = !!(rs && rs.reported);
         canReportMoment = !!(
           rs &&
@@ -326,7 +375,7 @@ Page({
       const items = page.items || [];
       let withReport = items;
       try {
-        withReport = playerContentReportStore.attachCommentReportStates(items, me);
+        withReport = contentReportService.attachCommentReportStates(items);
       } catch (re) {
         withReport = items;
       }
@@ -390,6 +439,7 @@ Page({
       wx.showToast({ title: '当前身份无法评论', icon: 'none' });
       return;
     }
+    this._stopActiveVideo();
     this.setData({
       ixActionOpen: false,
       inputFocus: true,
@@ -400,6 +450,7 @@ Page({
   onIxTapUser(e) {
     const d = (e && e.detail) || {};
     if (!d.userId) return;
+    this._stopActiveVideo();
     this.setData({ ixActionOpen: false });
     openPlayerProfileUtil.openPlayerProfile({
       userId: d.userId,
@@ -522,6 +573,7 @@ Page({
   },
 
   _openCommentActionMenu(d) {
+    this._stopActiveVideo();
     const src = d || {};
     const commentId = src.commentId || '';
     if (!commentId) return;
@@ -565,6 +617,10 @@ Page({
     wx.showActionSheet(sheetOpts);
   },
 
+
+  onCommentFocus() {
+    this._stopActiveVideo();
+  },
 
   onCommentInput(e) {
     let value = (e.detail && e.detail.value) || '';
@@ -672,6 +728,7 @@ Page({
   },
 
   _openReportSheet(target) {
+    this._stopActiveVideo();
     this._reportTarget = target || null;
     const sheet = this.selectComponent('#momentReportSheet');
     if (sheet && typeof sheet.resetForm === 'function') sheet.resetForm();
@@ -689,7 +746,7 @@ Page({
     this.setData({ reportSheetVisible: false, reportSubmitting: false });
   },
 
-  onSubmitReport(e) {
+  async onSubmitReport(e) {
     if (this.data.reportSubmitting) return;
     const detail = (e && e.detail) || {};
     const target = this._reportTarget;
@@ -698,30 +755,23 @@ Page({
       wx.showToast({ title: '请选择举报原因', icon: 'none' });
       return;
     }
-    const me = socialRelationStore.resolveCurrentUserId();
     this.setData({ reportSubmitting: true });
-    const result = playerContentReportStore.createContentReport(
-      {
+    let result = null;
+    try {
+      result = await contentReportService.submitReport({
         targetType: target.targetType,
         targetId: target.targetId,
         momentId: target.momentId || this.data.momentId,
         reasonCode: detail.reasonCode,
         description: detail.description || ''
-      },
-      me
-    );
+      });
+    } catch (err) {
+      result = { ok: false, error: 'submit_failed' };
+    }
     if (!result || !result.ok) {
       this.setData({ reportSubmitting: false });
-      const err = (result && result.error) || '';
       wx.showToast({
-        title:
-          err === 'cannot_report_self'
-            ? '不能举报自己'
-            : err === 'invalid_reporter'
-              ? '当前身份无法举报'
-              : err === 'reason_required'
-                ? '请选择举报原因'
-                : '举报失败，请重试',
+        title: contentReportService.formatSubmitError(result && result.error),
         icon: 'none'
       });
       return;
@@ -772,25 +822,6 @@ Page({
         self._interactionDirty = true;
         self._emitInteractionChanged();
         wx.showToast({ title: '已删除', icon: 'success', duration: 700 });
-      }
-    });
-  },
-
-  onTapScorecard(e) {
-    const detail = (e && e.detail) || {};
-    const view = this.data.view;
-    const url =
-      detail.viewUrl ||
-      (view && view.relatedGame && view.relatedGame.viewUrl) ||
-      '';
-    if (!url) {
-      wx.showToast({ title: '成绩卡暂不可用', icon: 'none' });
-      return;
-    }
-    wx.navigateTo({
-      url: url,
-      fail: function () {
-        wx.showToast({ title: '无法打开比赛', icon: 'none' });
       }
     });
   },
@@ -847,6 +878,7 @@ Page({
   onTapAuthor() {
     const view = this.data.view;
     if (!view || !view.canOpenProfile) return;
+    this._stopActiveVideo();
     try {
       const pages = getCurrentPages();
       const prev = pages && pages.length > 1 ? pages[pages.length - 2] : null;
@@ -895,6 +927,7 @@ Page({
       confirmColor: '#dc2626',
       success: function (res) {
         if (!res.confirm) return;
+        self._stopActiveVideo();
         const me = socialRelationStore.resolveCurrentUserId();
         const result = playerMomentStore.deleteMoment(view.momentId, me);
         if (!result.ok) {

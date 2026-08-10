@@ -16,13 +16,18 @@ function decorateTournamentCard(match, card) {
   if (!card) return null;
   const status = String((match && match.status) || '').trim().toLowerCase();
   const out = Object.assign({}, card);
+  // LIVE / 报名中 / 已结束 三态显式映射，禁止 LIVE 被显示成报名中
   if (status === 'finished') {
     out.statusLabel = '已结束';
     out.statusTone = 'finished';
-  } else if (out.statusLabel === 'LIVE') {
+  } else if (status === 'ongoing' || out.statusLabel === 'LIVE') {
+    out.statusLabel = 'LIVE';
     out.statusTone = 'live';
-  } else {
+  } else if (status === 'registering') {
+    out.statusLabel = '报名中';
     out.statusTone = 'default';
+  } else {
+    out.statusTone = out.statusLabel === 'LIVE' ? 'live' : 'default';
   }
   return out;
 }
@@ -117,8 +122,12 @@ Page({
     currentMainSection: 'home',
     primaryTabActive: true,
     secondaryTabActive: false,
+    tertiaryTabActive: false,
+    tertiaryTabVisible: true,
     primaryTabText: '我的',
     secondaryTabText: '日程',
+    tertiaryTabText: '报名',
+    registrationSegment: 'all',
     heroTabsVisible: true,
     showMyContent: true,
     showScheduleContent: false,
@@ -888,12 +897,17 @@ Page({
   },
 
   refreshTeamMatchCards() {
-    const latestCards = this._buildAllRegisteringTournamentCards();
-    this._myTournamentCards = latestCards;
-    if (this.data.currentMainSection === 'tournament' && this.data.primaryTabActive) {
-      this.setData({
-        tournamentCards: latestCards
-      });
+    const allCards = this._buildAllRegisteringTournamentCards();
+    this._myTournamentCards = allCards;
+    if (
+      this.data.currentMainSection === 'home' &&
+      this.data.tertiaryTabActive
+    ) {
+      const cards =
+        this.data.registrationSegment === 'mine'
+          ? this._buildMyRegisteredTournamentCards()
+          : allCards;
+      this.setData({ tournamentCards: cards });
     }
   },
 
@@ -946,10 +960,12 @@ Page({
     });
   },
 
+  /** 首页三态：primary=我的 / secondary=日程 / tertiary=报名；广场仅用 primary|secondary */
   setTabActive(which) {
     this.setData({
-      primaryTabActive: which !== 'secondary',
-      secondaryTabActive: which === 'secondary'
+      primaryTabActive: which === 'primary',
+      secondaryTabActive: which === 'secondary',
+      tertiaryTabActive: which === 'tertiary'
     });
   },
 
@@ -987,7 +1003,9 @@ Page({
     this.setData({
       currentMainSection: 'home',
       primaryTabText: '我的',
-      secondaryTabText: '日程'
+      secondaryTabText: '日程',
+      tertiaryTabText: '报名',
+      tertiaryTabVisible: true
     });
     this.setHeroTabsVisible(true);
     this.hideMainContents();
@@ -997,21 +1015,18 @@ Page({
   },
 
   showTournamentSection() {
-    this.setData({
-      currentMainSection: 'tournament',
-      primaryTabText: '所有报名',
-      secondaryTabText: '我的报名'
-    });
-    this.setHeroTabsVisible(true);
+    // 兼容旧的 ?section=tournament 和历史内部调用：报名现归入首页第三 TAB。
+    this.showHomeSection();
     this.hideMainContents();
     const myCards = this._buildAllRegisteringTournamentCards();
     this._myTournamentCards = myCards;
     this.setData({
+      registrationSegment: 'all',
       showTournamentContent: true,
       tournamentCards: myCards
     });
-    this.setTabActive('primary');
-    this.setBottomNavActive('tournament');
+    this.setTabActive('tertiary');
+    this.setBottomNavActive('home');
   },
 
   // 广场 TAB：顶部双 TAB（普通球局 / 球队比赛）
@@ -1022,6 +1037,7 @@ Page({
       currentMainSection: 'plaza',
       primaryTabText: '普通球局',
       secondaryTabText: '团体比赛',
+      tertiaryTabVisible: false,
       plazaTournamentCards: plazaTournamentCards
     });
     this.setHeroTabsVisible(true);
@@ -1032,7 +1048,7 @@ Page({
   },
 
   showProfileSection() {
-    this.setData({ currentMainSection: 'profile' });
+    this.setData({ currentMainSection: 'profile', tertiaryTabVisible: false });
     this.setHeroTabsVisible(false);
     this.hideMainContents();
     this.setData({ showProfileContent: true });
@@ -1046,7 +1062,13 @@ Page({
     this.setTabActive(which);
     const section = this.data.currentMainSection;
     if (section === 'home') {
-      if (which === 'secondary') {
+      if (which === 'tertiary') {
+        const cards = this.data.registrationSegment === 'mine'
+          ? this._buildMyRegisteredTournamentCards()
+          : this._buildAllRegisteringTournamentCards();
+        this._myTournamentCards = this._buildAllRegisteringTournamentCards();
+        this.setData({ showTournamentContent: true, tournamentCards: cards });
+      } else if (which === 'secondary') {
         this._focusCurrentScheduleMonth();
         this.setData({ showScheduleContent: true }, () => {
           setTimeout(() => {
@@ -1090,6 +1112,22 @@ Page({
     const text = e.currentTarget.dataset.text || '';
     const which = text.includes('日程') || text.includes('所有') ? 'secondary' : 'primary';
     this.switchTopTab({ currentTarget: { dataset: { which: which } } });
+  },
+
+  switchRegistrationSegment(e) {
+    const segment = e.currentTarget.dataset.segment === 'mine' ? 'mine' : 'all';
+    const cards = segment === 'mine'
+      ? this._buildMyRegisteredTournamentCards()
+      : this._buildAllRegisteringTournamentCards();
+    if (segment === 'all') this._myTournamentCards = cards;
+    this.setData({ registrationSegment: segment, tournamentCards: cards });
+  },
+
+  navigateToMoments() {
+    // 底部「球友圈」→ 公共动态流（player 分包，点击时再加载）
+    wx.navigateTo({
+      url: '/subpackages/player/pages/moments/index'
+    });
   },
 
   openMoreCreate() {

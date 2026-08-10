@@ -666,6 +666,11 @@ function _buildSideAvatarMembers(players, registerLookup, maxCount) {
       avatar: _resolvePlayerAvatar(p.userId, p.raw, registerLookup[p.userId])
     });
   }
+  // 叠放：数组左→右业务顺序不变；视觉上左侧最高（stackZ = n - index）
+  const n = out.length;
+  for (let j = 0; j < n; j++) {
+    out[j].stackZ = n - j;
+  }
   return out;
 }
 
@@ -820,6 +825,21 @@ function _resolveGameStrokeScores(game, authorUserId) {
   return null;
 }
 
+function _navIdentity(related, authorUserId, viewUrl) {
+  const r = related || {};
+  const uid = _canon(authorUserId || r.userId);
+  return {
+    authorUserId: uid,
+    targetUserId: uid,
+    sourceType: r.sourceType === 'team_match' ? 'team_match' : 'game',
+    gameId: r.gameId || null,
+    matchId: r.matchId || null,
+    groupId: r.groupId || null,
+    slotId: r.slotId || null,
+    viewUrl: viewUrl || ''
+  };
+}
+
 function _unavailable(message, extra) {
   return Object.assign(
     {
@@ -835,6 +855,13 @@ function _unavailable(message, extra) {
       modeLabel: '',
       publicScorecardId: '',
       scoreRevision: '0',
+      authorUserId: '',
+      targetUserId: '',
+      sourceType: '',
+      gameId: null,
+      matchId: null,
+      groupId: null,
+      slotId: null
     },
     extra || {}
   );
@@ -872,14 +899,17 @@ function resolvePublicScorecardView(publicScorecardId, viewerUserId, options) {
   }
 
   const mode = opts.scoreDisplayMode === 'diff' ? 'diff' : 'gross';
-  const viewUrl =
-    related.viewUrl || playerMomentPublishContext.buildRelatedGameViewUrl(related);
-  const baseMeta = {
-    matchName: related.matchName || '本场比赛',
-    publicScorecardId: psc,
-    viewUrl: viewUrl,
-    gameMode: related.gameMode || ''
-  };
+  const viewUrl = playerMomentPublishContext.buildRelatedGameViewUrl(related);
+  const nav = _navIdentity(related, authorUserId, viewUrl);
+  const baseMeta = Object.assign(
+    {
+      matchName: related.matchName || '本场比赛',
+      publicScorecardId: psc,
+      viewUrl: viewUrl,
+      gameMode: related.gameMode || ''
+    },
+    nav
+  );
 
   try {
     if (related.sourceType === 'team_match') {
@@ -912,23 +942,25 @@ function resolvePublicScorecardView(publicScorecardId, viewerUserId, options) {
         detail.sideAAvatars = sides.sideAAvatars;
         detail.sideBAvatars = sides.sideBAvatars;
         const matchStatusKey = String(match.status || '').toLowerCase();
-        return {
-          ok: true,
-          unavailable: false,
-          message: '',
-          kind: 'match_play',
-          stroke: null,
-          matchPlay: detail,
-          subjectType: 'match_play_side',
-          viewUrl: viewUrl,
-          matchName: baseMeta.matchName,
-          courseName: courseName,
-          modeLabel: resolveMatchPlayModeLabel(gameMode),
-          publicScorecardId: psc,
-          gameMode: gameMode,
-          scoreRevision: scoreRevision,
-          live: !groupCompleted && matchStatusKey === 'ongoing'
-        };
+        return Object.assign(
+          {
+            ok: true,
+            unavailable: false,
+            message: '',
+            kind: 'match_play',
+            stroke: null,
+            matchPlay: detail,
+            subjectType: 'match_play_side',
+            matchName: baseMeta.matchName,
+            courseName: courseName,
+            modeLabel: resolveMatchPlayModeLabel(gameMode),
+            publicScorecardId: psc,
+            gameMode: gameMode,
+            scoreRevision: scoreRevision,
+            live: !groupCompleted && matchStatusKey === 'ongoing'
+          },
+          nav
+        );
       }
 
       const strokeSrc = _resolveTeamMatchStrokeScores(
@@ -942,23 +974,25 @@ function resolvePublicScorecardView(publicScorecardId, viewerUserId, options) {
         matchStatus.isGroupConfirmedFinished(group && group.status) ||
         matchStatus.getMatchStatus(group, { source: 'groups' }).isCompleted
       );
-      return {
-        ok: true,
-        unavailable: false,
-        message: '',
-        kind: 'stroke',
-        stroke: stroke,
-        matchPlay: null,
-        subjectType: strokeSrc.subjectType,
-        viewUrl: viewUrl,
-        matchName: baseMeta.matchName,
-        courseName: courseName,
-        modeLabel: resolveStrokeModeLabel(gameMode),
-        publicScorecardId: psc,
-        gameMode: gameMode,
-        scoreRevision: scoreRevision,
-        live: !groupCompletedStroke && matchStatusKey === 'ongoing'
-      };
+      return Object.assign(
+        {
+          ok: true,
+          unavailable: false,
+          message: '',
+          kind: 'stroke',
+          stroke: stroke,
+          matchPlay: null,
+          subjectType: strokeSrc.subjectType,
+          matchName: baseMeta.matchName,
+          courseName: courseName,
+          modeLabel: resolveStrokeModeLabel(gameMode),
+          publicScorecardId: psc,
+          gameMode: gameMode,
+          scoreRevision: scoreRevision,
+          live: !groupCompletedStroke && matchStatusKey === 'ongoing'
+        },
+        nav
+      );
     }
 
     const game = gameStore.getGame(related.gameId);
@@ -971,23 +1005,25 @@ function resolvePublicScorecardView(publicScorecardId, viewerUserId, options) {
     const gameMode =
       _trim(related.gameMode || game.gameMode || game.formatType || '') || '个人比杆赛';
     const scoreRevision = resolveScoreRevisionForSource('game', game, related.groupId);
-    return {
-      ok: true,
-      unavailable: false,
-      message: '',
-      kind: 'stroke',
-      stroke: stroke,
-      matchPlay: null,
-      subjectType: strokeSrc.subjectType,
-      viewUrl: viewUrl,
-      matchName: baseMeta.matchName,
-      courseName: resolveCourseName(game, related),
-      modeLabel: resolveStrokeModeLabel(gameMode),
-      publicScorecardId: psc,
-      gameMode: gameMode,
-      scoreRevision: scoreRevision,
-      live: String(game.status || '').toLowerCase() === 'live'
-    };
+    return Object.assign(
+      {
+        ok: true,
+        unavailable: false,
+        message: '',
+        kind: 'stroke',
+        stroke: stroke,
+        matchPlay: null,
+        subjectType: strokeSrc.subjectType,
+        matchName: baseMeta.matchName,
+        courseName: resolveCourseName(game, related),
+        modeLabel: resolveStrokeModeLabel(gameMode),
+        publicScorecardId: psc,
+        gameMode: gameMode,
+        scoreRevision: scoreRevision,
+        live: String(game.status || '').toLowerCase() === 'live'
+      },
+      nav
+    );
   } catch (e) {
     return Object.assign(_unavailable('成绩卡暂不可用'), baseMeta);
   }

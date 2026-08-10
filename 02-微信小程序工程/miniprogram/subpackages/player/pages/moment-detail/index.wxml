@@ -59,23 +59,32 @@
           </view>
         </view>
         <text wx:if="{{view.content}}" class="md-content" user-select>{{view.content}}</text>
-        <moment-image-grid
-          wx:if="{{view.imageCount}}"
+        <moment-media-block
+          mediaType="{{view.mediaType}}"
           momentId="{{momentId}}"
           themeClass="{{themeClass}}"
+          variant="detail"
+          video="{{view.video}}"
+          active="{{activeVideoMomentId === momentId}}"
+          imageCount="{{view.imageCount}}"
           imageLayout="{{view.imageLayout}}"
           singleImageClass="{{view.singleImageClass}}"
           singleImageStyle="{{view.singleImageStyle}}"
           images="{{view.images}}"
+          catch:playrequest="onVideoPlayRequest"
+          catch:play="onVideoPlay"
+          catch:pause="onVideoPause"
+          catch:ended="onVideoEnded"
+          catch:error="onVideoError"
           catch:preview="onPreviewImage"
           catch:imageerror="onMomentImageError"
-        ></moment-image-grid>
+        ></moment-media-block>
 
         <moment-scorecard
           wx:if="{{view.relatedGame}}"
           scorecard="{{view.publicScorecard}}"
           themeClass="{{themeClass}}"
-          bind:opentap="onTapScorecard"
+          hideEnter="{{true}}"
         ></moment-scorecard>
 
         <view id="md-comments-anchor">
@@ -122,6 +131,7 @@
           hold-keyboard
           focus="{{inputFocus}}"
           maxlength="{{-1}}"
+          bindfocus="onCommentFocus"
           bindinput="onCommentInput"
           bindkeyboardheightchange="onKeyboardHeight"
           bindconfirm="onSubmitComment"

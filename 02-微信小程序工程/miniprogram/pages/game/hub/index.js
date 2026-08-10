@@ -2318,8 +2318,13 @@ Page({
     this._enterGroupScore(this.data.userGroupIndex || 0);
   },
 
-  // 返回首页「我的 TAB」
+  // 有上一页（如球友圈）则 navigateBack，保留来源页滚动；无栈时才回首页
   onBack() {
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    if (pages && pages.length > 1) {
+      wx.navigateBack({ delta: 1 });
+      return;
+    }
     wx.reLaunch({ url: '/pages/home/index?tab=my' });
   },
 

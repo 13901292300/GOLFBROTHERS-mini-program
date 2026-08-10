@@ -2256,3 +2256,39 @@ page {
 
 
 
+.registration-segment {
+  display: flex;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--ds-bg-muted, #eef1f4);
+}
+
+.registration-segment__item {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 9px;
+  color: var(--ds-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.registration-segment__item.is-active {
+  color: #002d62;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.ds-app.dark-theme .registration-segment {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ds-app.dark-theme .registration-segment__item {
+  color: #94a3b8;
+}
+
+.ds-app.dark-theme .registration-segment__item.is-active {
+  color: #e5eefc;
+  background: #1e293b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}

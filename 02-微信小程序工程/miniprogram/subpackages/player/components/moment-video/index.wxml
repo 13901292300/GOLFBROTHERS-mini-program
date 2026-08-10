@@ -1,0 +1,60 @@
+<view class="mv {{themeClass}} mv--{{variant}}" catchtap="noop">
+  <!-- 不可用：占位，无播放按钮 -->
+  <view wx:if="{{unavailable}}" class="mv-stage mv-stage--unavailable">
+    <image
+      wx:if="{{posterSrc}}"
+      class="mv-poster"
+      src="{{posterSrc}}"
+      mode="aspectFill"
+    ></image>
+    <view wx:else class="mv-poster mv-poster--placeholder"></view>
+    <view class="mv-unavailable">
+      <text class="mv-unavailable__text">视频暂不可用</text>
+    </view>
+  </view>
+
+  <!-- 可播：默认封面；active 后挂载 video -->
+  <view wx:else class="mv-stage">
+    <video
+      wx:if="{{activated && src}}"
+      id="{{videoId}}"
+      class="mv-player"
+      src="{{src}}"
+      poster="{{posterSrc}}"
+      controls="{{true}}"
+      autoplay="{{false}}"
+      loop="{{false}}"
+      show-center-play-btn="{{false}}"
+      enable-progress-gesture="{{true}}"
+      object-fit="contain"
+      bindplay="onVideoPlay"
+      bindpause="onVideoPause"
+      bindended="onVideoEnded"
+      binderror="onVideoError"
+    ></video>
+
+    <view wx:if="{{!activated}}" class="mv-cover" catchtap="onTapPlay">
+      <image
+        wx:if="{{posterSrc}}"
+        class="mv-poster"
+        src="{{posterSrc}}"
+        mode="aspectFill"
+      ></image>
+      <view wx:else class="mv-poster mv-poster--placeholder">
+        <text class="mv-ph">视频</text>
+      </view>
+      <view wx:if="{{!playFailed}}" class="mv-play" aria-label="播放视频">
+        <text class="mv-play__icon">▶</text>
+      </view>
+      <view wx:else class="mv-fail" catchtap="onTapRetry">
+        <text class="mv-fail__text">视频播放失败</text>
+        <text class="mv-fail__retry">点击重试</text>
+      </view>
+      <text wx:if="{{durationLabel}}" class="mv-duration">{{durationLabel}}</text>
+    </view>
+
+    <view wx:if="{{activated && loading}}" class="mv-loading">
+      <text class="mv-loading__text">加载中…</text>
+    </view>
+  </view>
+</view>

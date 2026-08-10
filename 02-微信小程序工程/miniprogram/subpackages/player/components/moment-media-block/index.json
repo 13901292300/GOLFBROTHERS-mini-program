@@ -1,0 +1,7 @@
+{
+  "component": true,
+  "usingComponents": {
+    "moment-video": "/subpackages/player/components/moment-video/index",
+    "moment-image-grid": "/subpackages/player/components/moment-image-grid/index"
+  }
+}

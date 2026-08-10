@@ -1,0 +1,24 @@
+<moment-video
+  wx:if="{{mediaType === 'video'}}"
+  momentId="{{momentId}}"
+  themeClass="{{themeClass}}"
+  video="{{video}}"
+  active="{{active}}"
+  variant="{{variant}}"
+  catch:playrequest="onPlayRequest"
+  catch:play="onPlay"
+  catch:pause="onPause"
+  catch:ended="onEnded"
+  catch:error="onError"
+></moment-video>
+<moment-image-grid
+  wx:if="{{(mediaType === 'images' || (!mediaType && imageCount)) && imageCount}}"
+  momentId="{{momentId}}"
+  themeClass="{{themeClass}}"
+  imageLayout="{{imageLayout}}"
+  singleImageClass="{{singleImageClass}}"
+  singleImageStyle="{{singleImageStyle}}"
+  images="{{images}}"
+  catch:preview="onPreview"
+  catch:imageerror="onImageError"
+></moment-image-grid>

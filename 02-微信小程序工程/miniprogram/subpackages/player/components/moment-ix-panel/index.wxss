@@ -22,11 +22,28 @@
 .mix__toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 12px;
   min-height: 36px;
   position: relative;
   z-index: 3;
+}
+
+.mix__toolbar-leading {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.mix__toolbar-trailing {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .mix__report {

@@ -298,17 +298,25 @@
               data-id="{{item.momentId}}"
               catchtap="onTapMomentExpand"
             >展开全文</text>
-            <moment-image-grid
-              wx:if="{{item.imageCount}}"
+            <moment-media-block
+              mediaType="{{item.mediaType}}"
               momentId="{{item.momentId}}"
               themeClass="{{themeClass}}"
+              video="{{item.video}}"
+              active="{{activeVideoMomentId === item.momentId}}"
+              imageCount="{{item.imageCount}}"
               imageLayout="{{item.imageLayout}}"
               singleImageClass="{{item.singleImageClass}}"
               singleImageStyle="{{item.singleImageStyle}}"
               images="{{item.images}}"
+              catch:playrequest="onVideoPlayRequest"
+              catch:play="onVideoPlay"
+              catch:pause="onVideoPause"
+              catch:ended="onVideoEnded"
+              catch:error="onVideoError"
               catch:preview="onPreviewMomentImage"
               catch:imageerror="onMomentImageError"
-            ></moment-image-grid>
+            ></moment-media-block>
             <moment-scorecard
               wx:if="{{item.relatedGame}}"
               scorecard="{{item.publicScorecard}}"
@@ -337,7 +345,14 @@
               catch:tapcomment="onIxTapComment"
               catch:tapreplymore="onIxTapReplyMore"
               catch:taplikemore="onIxTapLikeMore"
-            ></moment-ix-panel>
+            >
+              <view
+                slot="leading"
+                class="moment-detail-link"
+                data-id="{{item.momentId}}"
+                catchtap="onTapDetail"
+              >查看详情 ›</view>
+            </moment-ix-panel>
           </view>
           <view wx:if="{{momentHasMore}}" class="pp-hist-more" bindtap="onMomentLoadMore">加载更多</view>
         </view>

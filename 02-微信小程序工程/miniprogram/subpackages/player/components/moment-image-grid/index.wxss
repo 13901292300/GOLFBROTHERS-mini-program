@@ -1,5 +1,4 @@
 .mig {
-  --mig-cell: 210rpx;
   --mig-gap: 8rpx;
   --mig-broken-bg: #f3f4f6;
   --mig-broken-fg: #9ca3af;
@@ -38,54 +37,72 @@
   height: 100%;
 }
 
-/* 2 图：一行两正方形 */
-.mig--double .mig__cells {
-  width: calc(2 * var(--mig-cell) + var(--mig-gap));
-  max-width: 100%;
-}
-
-/* 3 图 / 5～9：三列宽 */
-.mig--triple .mig__cells,
-.mig--grid .mig__cells {
-  width: calc(3 * var(--mig-cell) + 2 * var(--mig-gap));
-  max-width: 100%;
-}
-
-/* 4 图：2×2，不占满三列 */
-.mig--quad .mig__cells {
-  width: calc(2 * var(--mig-cell) + var(--mig-gap));
+/* 多图：占满卡片内容宽，列数由 layout 类固定，避免窄屏 flex 折成两列 */
+.mig--double,
+.mig--triple,
+.mig--quad,
+.mig--grid {
+  width: 100%;
   max-width: 100%;
 }
 
 .mig__cells {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-content: flex-start;
+  display: grid;
   gap: var(--mig-gap);
+  width: 100%;
   box-sizing: border-box;
 }
 
+/* 2 图 / 4 图：固定两列（4 图保持 2×2，不会变成 3+1） */
+.mig--double .mig__cells,
+.mig--quad .mig__cells {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 3 图 / 5～9：固定三列（5=3+2，6=3×2，7=3+3+1，8=3+3+2，9=3×3） */
+.mig--triple .mig__cells,
+.mig--grid .mig__cells {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .mig__cell {
-  width: var(--mig-cell);
-  height: var(--mig-cell);
-  flex: 0 0 var(--mig-cell);
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: 6rpx;
   background: var(--mig-img-bg);
   box-sizing: border-box;
+  min-width: 0;
+}
+
+/* 不支持 aspect-ratio 时：padding 等比例占位，禁止回退固定 210rpx */
+@supports not (aspect-ratio: 1 / 1) {
+  .mig__cell {
+    height: 0;
+    padding-bottom: 100%;
+  }
 }
 
 .mig__cell .mig__img {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.mig__broken {
+.mig__cell .mig__broken {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
   background: var(--mig-broken-bg);
   box-sizing: border-box;
 }

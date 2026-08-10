@@ -192,3 +192,113 @@ page { height: 100%; background: var(--bg-primary); }
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
 }
+
+.mp-hint {
+  display: block;
+  margin: -4px 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.mp-video {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mp-video__stage {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b1220;
+}
+.mp-video__player {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.mp-video__cover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+.mp-video__poster {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.mp-video__poster--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+}
+.mp-video__ph-text {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.mp-video__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.mp-video__play-icon {
+  color: #fff;
+  font-size: 20px;
+  margin-left: 3px;
+  line-height: 1;
+}
+.mp-video__duration {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+.mp-video__size {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 700;
+}
+.mp-video__del {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}

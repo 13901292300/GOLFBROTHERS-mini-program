@@ -2,29 +2,34 @@
   class="mix {{themeClass}} {{mode === 'detail' ? 'mix--detail' : ''}}"
   catchtap="onPanelTap"
 >
-  <!-- 工具行：·· 仅正式用户；举报由页面卡头/顶栏承担（默认 showReport=false） -->
+  <!-- 工具行：左侧 leading slot（查看详情）；右侧 ·· / 举报。feed 始终展示以便 leading -->
   <view
-    wx:if="{{canInteract || (showReport && (canReport || reportedByCurrentUser))}}"
+    wx:if="{{mode === 'feed' || canInteract || (showReport && (canReport || reportedByCurrentUser))}}"
     class="mix__toolbar"
   >
-    <view
-      wx:if="{{showReport && (canReport || reportedByCurrentUser)}}"
-      class="mix__report {{reportedByCurrentUser ? 'is-reported' : ''}}"
-      catchtap="onReport"
-    >{{reportedByCurrentUser ? '已举报' : '举报'}}</view>
-    <view wx:if="{{canInteract}}" class="mix__more-wrap" catchtap="noop">
+    <view class="mix__toolbar-leading">
+      <slot name="leading"></slot>
+    </view>
+    <view class="mix__toolbar-trailing">
       <view
-        class="mix__more {{actionOpen ? 'is-open' : ''}}"
-        catchtap="onToggleAction"
-        aria-label="互动"
-      >··</view>
-      <view wx:if="{{actionOpen}}" class="mix__float" catchtap="noop">
+        wx:if="{{showReport && (canReport || reportedByCurrentUser)}}"
+        class="mix__report {{reportedByCurrentUser ? 'is-reported' : ''}}"
+        catchtap="onReport"
+      >{{reportedByCurrentUser ? '已举报' : '举报'}}</view>
+      <view wx:if="{{canInteract}}" class="mix__more-wrap" catchtap="noop">
         <view
-          class="mix__float-item {{likeBusy ? 'is-busy' : ''}}"
-          catchtap="onLike"
-        >{{likedByCurrentUser ? '取消' : '♡ 赞'}}</view>
-        <view class="mix__float-div"></view>
-        <view class="mix__float-item" catchtap="onComment">评论</view>
+          class="mix__more {{actionOpen ? 'is-open' : ''}}"
+          catchtap="onToggleAction"
+          aria-label="互动"
+        >··</view>
+        <view wx:if="{{actionOpen}}" class="mix__float" catchtap="noop">
+          <view
+            class="mix__float-item {{likeBusy ? 'is-busy' : ''}}"
+            catchtap="onLike"
+          >{{likedByCurrentUser ? '取消' : '♡ 赞'}}</view>
+          <view class="mix__float-div"></view>
+          <view class="mix__float-item" catchtap="onComment">评论</view>
+        </view>
       </view>
     </view>
   </view>

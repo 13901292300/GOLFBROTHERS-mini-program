@@ -18,8 +18,9 @@ const playerMomentStore = require('../../../../utils/playerMomentStore.js');
 const playerMomentInteractionStore = require('../../../../utils/playerMomentInteractionStore.js');
 const playerMomentMedia = require('../../../../utils/playerMomentMedia.js');
 const playerMomentImageLayout = require('../../../../utils/playerMomentImageLayout.js');
-const playerContentReportStore = require('../../../../utils/playerContentReportStore.js');
+const contentReportService = require('../../../../utils/contentReportService.js');
 const publicScorecardView = require('../../../../utils/publicScorecardView.js');
+const openMomentGameHub = require('../../../../utils/openMomentGameHub.js');
 
 const REMARK_NAME_MAX = contactStore.REMARK_NAME_MAX || 12;
 const MOMENT_PAGE_SIZE = playerMomentStore.PAGE_SIZE || 20;
@@ -141,7 +142,9 @@ Page({
     likeBusyMap: {},
     likeSheetVisible: false,
     likeSheetCount: 0,
-    likeSheetAvatars: []
+    likeSheetAvatars: [],
+    /** 主页 Feed 独立播放态（不与公共 Feed 共享） */
+    activeVideoMomentId: ''
   },
 
   onLoad(query) {
@@ -225,14 +228,56 @@ Page({
   },
 
   onHide() {
+    this._stopActiveVideo();
     this.onCloseIxAction();
     this.onCloseLikeSheet();
     this._clearSheetDrafts();
   },
 
   onUnload() {
+    this._stopActiveVideo();
     this.onCloseIxAction();
     this._clearSheetDrafts();
+  },
+
+  _stopActiveVideo() {
+    if (!this.data.activeVideoMomentId) return;
+    this.setData({ activeVideoMomentId: '' });
+  },
+
+  onVideoPlayRequest(e) {
+    const detail = (e && e.detail) || {};
+    const mid = detail.momentId != null ? String(detail.momentId) : '';
+    if (!mid) return;
+    if (this.data.activeVideoMomentId === mid) {
+      const self = this;
+      this.setData({ activeVideoMomentId: '' }, function () {
+        self.setData({ activeVideoMomentId: mid });
+      });
+      return;
+    }
+    this.setData({ activeVideoMomentId: mid });
+  },
+
+  onVideoPlay() {},
+
+  /** 原生 pause 不卸载；TAB/隐藏/跳转仍走 _stopActiveVideo */
+  onVideoPause() {},
+
+  onVideoEnded(e) {
+    const mid =
+      e && e.detail && e.detail.momentId != null ? String(e.detail.momentId) : '';
+    if (mid && mid === this.data.activeVideoMomentId) {
+      this.setData({ activeVideoMomentId: '' });
+    }
+  },
+
+  onVideoError(e) {
+    const mid =
+      e && e.detail && e.detail.momentId != null ? String(e.detail.momentId) : '';
+    if (mid && mid === this.data.activeVideoMomentId) {
+      this.setData({ activeVideoMomentId: '' });
+    }
   },
 
   onCloseIxAction() {
@@ -768,6 +813,7 @@ Page({
       '';
     if (tab !== 'home' && tab !== 'history' && tab !== 'feed') return;
     if (tab === this.data.activeTab) return;
+    this._stopActiveVideo();
     this.onCloseIxAction();
     this.setData({ activeTab: tab });
     if (tab === 'history') {
@@ -808,6 +854,7 @@ Page({
 
   onFeedScroll(e) {
     if (this.data.activeTab !== 'feed') return;
+    this._stopActiveVideo();
     this.onCloseIxAction();
     const top = e && e.detail && e.detail.scrollTop;
     if (Number.isFinite(top)) this._feedScrollTop = top;
@@ -880,9 +927,8 @@ Page({
 
   _attachReportStates(cards) {
     try {
-      const me = socialRelationStore.resolveCurrentUserId();
-      const next = playerContentReportStore.attachMomentReportStates(cards, me);
-      this._reportRevision = playerContentReportStore.getReportRevision();
+      const next = contentReportService.attachMomentReportStates(cards);
+      this._reportRevision = contentReportService.getReportRevision();
       return next;
     } catch (e) {
       return cards || [];
@@ -895,7 +941,7 @@ Page({
     if (!cards.length) return;
     let rev = '';
     try {
-      rev = playerContentReportStore.getReportRevision();
+      rev = contentReportService.getReportRevision();
     } catch (e) {
       return;
     }
@@ -914,7 +960,7 @@ Page({
       });
     });
     try {
-      this._reportRevision = playerContentReportStore.getReportRevision();
+      this._reportRevision = contentReportService.getReportRevision();
     } catch (e) { /* ignore */ }
     this.setData({ momentCards: next });
   },
@@ -992,6 +1038,7 @@ Page({
     ) {
       return;
     }
+    if (opts.force) this._stopActiveVideo();
     if (opts.forTab && this.data.momentState !== 'ready' && this.data.momentState !== 'empty') {
       this.setData({ momentState: 'loading' });
     }
@@ -1060,6 +1107,7 @@ Page({
     if (!this.data.momentHasMore || this.data.momentState !== 'ready') return;
     const profile = this.data.profile;
     if (!profile || !profile.userId) return;
+    this._stopActiveVideo();
     try {
       const me = socialRelationStore.resolveCurrentUserId();
       const page = playerMomentStore.listMomentsByAuthor(profile.userId, {
@@ -1087,31 +1135,52 @@ Page({
   },
 
   onMomentRefresh() {
+    this._stopActiveVideo();
     this.setData({ momentRefreshing: true });
     this.ensureMomentsLoaded({ forTab: true, force: true });
   },
 
   onTapScorecard(e) {
+    if (this._momentNavLock) return;
+    this._stopActiveVideo();
     const detail = (e && e.detail) || {};
-    const url = detail.viewUrl || '';
-    if (!url) {
-      if (detail.ok === false) {
-        wx.showToast({ title: '成绩卡暂不可用', icon: 'none' });
+    const cards = this.data.momentCards || [];
+    let card = null;
+    const psc = detail.publicScorecardId || '';
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i];
+      if (
+        c &&
+        c.relatedGame &&
+        psc &&
+        String(c.relatedGame.publicScorecardId || '') === String(psc)
+      ) {
+        card = c;
+        break;
       }
-      return;
     }
-    wx.navigateTo({
-      url: url,
-      fail: function () {
-        wx.showToast({ title: '无法打开比赛', icon: 'none' });
-      }
-    });
+    this._momentNavLock = true;
+    const self = this;
+    try {
+      openMomentGameHub.openMomentGameHub(
+        Object.assign({}, detail, {
+          relatedGame: (card && card.relatedGame) || null,
+          momentId: (card && card.momentId) || ''
+        }),
+        card
+      );
+    } finally {
+      setTimeout(function () {
+        self._momentNavLock = false;
+      }, 600);
+    }
   },
 
   _openMomentDetail(momentId, extraQuery) {
     const id = momentId != null ? String(momentId) : '';
     if (!id) return;
     if (this._momentNavLock) return;
+    this._stopActiveVideo();
     this._momentNavLock = true;
     const self = this;
     let url =
@@ -1172,6 +1241,17 @@ Page({
     this._openMomentDetail(id);
   },
 
+  /** 显式「查看详情 ›」：catchtap 防与卡片 bindtap 双重导航 */
+  onTapDetail(e) {
+    const id =
+      (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) ||
+      '';
+    if (!id) return;
+    this._stopActiveVideo();
+    this.onCloseIxAction();
+    this._openMomentDetail(id);
+  },
+
   onTapMomentExpand(e) {
     if (this.data.ixActionMomentId) {
       this.onCloseIxAction();
@@ -1219,6 +1299,7 @@ Page({
   onIxTapUser(e) {
     const d = (e && e.detail) || {};
     if (!d.userId) return;
+    this._stopActiveVideo();
     this.setData({ ixActionMomentId: '', likeSheetVisible: false });
     openPlayerProfileUtil.openPlayerProfile({
       userId: d.userId,
@@ -1254,6 +1335,7 @@ Page({
   onLikeSheetTapUser(e) {
     const d = (e && e.detail) || {};
     if (!d.userId) return;
+    this._stopActiveVideo();
     this.setData({ likeSheetVisible: false });
     openPlayerProfileUtil.openPlayerProfile({
       userId: d.userId,
@@ -1372,6 +1454,7 @@ Page({
   },
 
   _openReportSheet(target) {
+    this._stopActiveVideo();
     this._reportTarget = target || null;
     const sheet = this.selectComponent('#momentReportSheet');
     if (sheet && typeof sheet.resetForm === 'function') sheet.resetForm();
@@ -1388,7 +1471,7 @@ Page({
     this.setData({ reportSheetVisible: false, reportSubmitting: false });
   },
 
-  onSubmitReport(e) {
+  async onSubmitReport(e) {
     if (this.data.reportSubmitting) return;
     const detail = (e && e.detail) || {};
     const target = this._reportTarget;
@@ -1397,30 +1480,23 @@ Page({
       wx.showToast({ title: '请选择举报原因', icon: 'none' });
       return;
     }
-    const me = socialRelationStore.resolveCurrentUserId();
     this.setData({ reportSubmitting: true });
-    const result = playerContentReportStore.createContentReport(
-      {
+    let result = null;
+    try {
+      result = await contentReportService.submitReport({
         targetType: target.targetType,
         targetId: target.targetId,
         momentId: target.momentId,
         reasonCode: detail.reasonCode,
         description: detail.description || ''
-      },
-      me
-    );
+      });
+    } catch (err) {
+      result = { ok: false, error: 'submit_failed' };
+    }
     if (!result || !result.ok) {
       this.setData({ reportSubmitting: false });
-      const err = (result && result.error) || '';
       wx.showToast({
-        title:
-          err === 'cannot_report_self'
-            ? '不能举报自己'
-            : err === 'invalid_reporter'
-              ? '当前身份无法举报'
-              : err === 'reason_required'
-                ? '请选择举报原因'
-                : '举报失败，请重试',
+        title: contentReportService.formatSubmitError(result && result.error),
         icon: 'none'
       });
       return;

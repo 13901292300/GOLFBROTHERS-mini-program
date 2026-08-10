@@ -690,6 +690,30 @@ page {
   color: var(--data-blue);
 }
 
+/* 轻量「查看详情 ›」：成绩卡后、互动区前；左对齐；热区仅包文字 */
+.pp-moment-card__detail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 64rpx;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  padding: 0 12rpx 0 0;
+  box-sizing: border-box;
+  text-align: left;
+  max-width: 100%;
+}
+.pp-moment-card__detail-text {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--data-blue, #2563eb);
+  text-align: left;
+}
+.pp-page.dark-mode .pp-moment-card__detail-text {
+  color: #93c5fd;
+}
+
 .pp-moment-actions {
   display: flex;
   align-items: center;

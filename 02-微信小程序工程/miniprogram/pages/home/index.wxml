@@ -48,6 +48,7 @@
       <view wx:if="{{heroTabsVisible}}" id="main-tabs" class="ds-tab-nav main-tabs sticky shadow-lg mt-neg-20 flex">
         <button bindtap="switchTopTab" data-which="primary" class="ds-tab-item {{primaryTabActive ? 'ds-tab-item--active tab-active' : 'tab-inactive'}} uppercase tracking-widest"><view class="ds-tab-item__inner"><text class="tab-text">{{primaryTabText}}</text><view class="tab-indicator {{primaryTabActive ? 'active' : ''}}"></view></view></button>
         <button bindtap="switchTopTab" data-which="secondary" class="ds-tab-item {{secondaryTabActive ? 'ds-tab-item--active tab-active' : 'tab-inactive'}} uppercase tracking-widest"><view class="ds-tab-item__inner"><text class="tab-text">{{secondaryTabText}}</text><view class="tab-indicator {{secondaryTabActive ? 'active' : ''}}"></view></view></button>
+        <button wx:if="{{tertiaryTabVisible}}" bindtap="switchTopTab" data-which="tertiary" class="ds-tab-item {{tertiaryTabActive ? 'ds-tab-item--active tab-active' : 'tab-inactive'}} uppercase tracking-widest"><view class="ds-tab-item__inner"><text class="tab-text">{{tertiaryTabText}}</text><view class="tab-indicator {{tertiaryTabActive ? 'active' : ''}}"></view></view></button>
       </view>
 
       <!-- Tab Content -->
@@ -163,6 +164,10 @@
         <!-- 赛事内容 -->
         <view wx:if="{{showTournamentContent}}" id="tournament-content">
           <view class="ds-main space-y-4">
+            <view class="registration-segment">
+              <view catchtap="switchRegistrationSegment" data-segment="all" class="registration-segment__item {{registrationSegment === 'all' ? 'is-active' : ''}}">所有报名</view>
+              <view catchtap="switchRegistrationSegment" data-segment="mine" class="registration-segment__item {{registrationSegment === 'mine' ? 'is-active' : ''}}">我的报名</view>
+            </view>
             <view wx:for="{{tournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
               <view class="card-action-layer">
                 <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
@@ -444,10 +449,10 @@
           </view>
         </view>
         <view class="ds-bottom-nav-item ds-bottom-nav-item--placeholder"></view>
-        <view bindtap="showTournamentSection" class="ds-bottom-nav-item {{bottomNavActive === 'tournament' ? 'ds-bottom-nav-item--active' : ''}}">
+        <view bindtap="navigateToMoments" class="ds-bottom-nav-item">
           <view class="item-inner">
-            <text class="icon">📑</text>
-            <text class="bottom-tab-text">报名</text>
+            <text class="icon">💬</text>
+            <text class="bottom-tab-text">球友圈</text>
           </view>
         </view>
         <view bindtap="showProfileSection" class="ds-bottom-nav-item {{bottomNavActive === 'profile' ? 'ds-bottom-nav-item--active' : ''}}">

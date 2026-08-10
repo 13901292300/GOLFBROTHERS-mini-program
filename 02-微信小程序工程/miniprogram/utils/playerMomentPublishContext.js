@@ -96,11 +96,16 @@ function buildRelatedGameViewUrl(related) {
   if (_trim(r.sourceType) === 'team_match' && _trim(r.matchId)) {
     return (
       '/subpackages/tournament/pages/detail/index?matchId=' +
-      encodeURIComponent(_trim(r.matchId))
+      encodeURIComponent(_trim(r.matchId)) +
+      '&activeTab=leaderboard'
     );
   }
   if (_trim(r.gameId)) {
-    return '/pages/game/hub/index?gameId=' + encodeURIComponent(_trim(r.gameId));
+    return (
+      '/pages/game/hub/index?gameId=' +
+      encodeURIComponent(_trim(r.gameId)) +
+      '&activeTab=leaderboard'
+    );
   }
   return '';
 }

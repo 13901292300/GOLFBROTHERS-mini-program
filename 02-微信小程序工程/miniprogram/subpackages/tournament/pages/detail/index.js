@@ -1135,6 +1135,12 @@ Page({
       options && options.caddieToken ? decodeURIComponent(String(options.caddieToken)) : '';
     const adminToken =
       options && options.adminToken ? decodeURIComponent(String(options.adminToken)) : '';
+    // 安全展示 TAB：仅白名单 id，且须落在本场 resolveTournamentTabs 内；不授予权限
+    const rawTab = options && (options.activeTab || options.tab)
+      ? String(options.activeTab || options.tab).trim()
+      : '';
+    this._preferredActiveTab =
+      rawTab === 'leaderboard' || rawTab === '得分榜' ? 'leaderboard' : '';
     this._pendingReactionPlay = null;
     this._activeReactionTarget = null;
     this._activeReactionKey = '';
@@ -1851,6 +1857,13 @@ Page({
       this._buildTeamLeaderboardView(match),
       match
     );
+    // 首次进入：优先安全 preferred TAB（如球友圈 → 领先榜/得分榜）；否则 tabs[0]
+    let initialTab = tabs[0] && tabs[0].id ? tabs[0].id : 'details';
+    const preferred = this._preferredActiveTab || '';
+    if (preferred && tabs.some((t) => t && t.id === preferred)) {
+      initialTab = preferred;
+    }
+    this._preferredActiveTab = '';
     this.setData(Object.assign({
       matchId: matchId,
       match: this._mapMatchToView(match),
@@ -1862,8 +1875,7 @@ Page({
       matchPlayScoreboard: isMatchPlayScoreboard
         ? this._buildMatchPlayScoreboard(match, { resetExpanded: true })
         : null,
-      // 首次进入统一落到 tabs[0]（各状态首项均为 details）
-      activeTab: tabs[0].id,
+      activeTab: initialTab,
       leaderboardDefaultMode: leaderboardMode,
       leaderboardMode: leaderboardMode,
       leaderboardDefaultView: leaderboardDefaultView,

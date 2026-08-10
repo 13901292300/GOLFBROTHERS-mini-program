@@ -25,7 +25,7 @@
     bindscroll="onFeedScroll"
   >
     <view class="mm-main">
-      <!-- 扩展点：与公共球友圈共用 feedType 命名；我的流不展示 TAB -->
+      <!-- 扩展点：feedType TAB（all / featured / friends）；第一版仅全部动态 -->
       <view wx:if="{{feedTabsVisible}}" class="mm-feed-tabs">
         <text class="mm-feed-tabs__item is-active">全部动态</text>
       </view>

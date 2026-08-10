@@ -1,8 +1,13 @@
 /**
  * 朋友圈式互动：·· 浮层 + 点赞头像组 + 评论区（feed/detail 共用视觉）。
  * 数据由页面注入；不写入 Store。
+ * feed 可通过 named slot "leading" 注入左侧「查看详情 ›」。
  */
 Component({
+  options: {
+    multipleSlots: true
+  },
+
   properties: {
     momentId: { type: String, value: '' },
     themeClass: { type: String, value: 'bright-mode' },

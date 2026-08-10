@@ -41,13 +41,17 @@
           bindinput="onContentInput"
           auto-height
           show-confirm-bar="{{false}}"
+          disabled="{{publishing}}"
         />
         <text class="mp-count">{{contentCount}}/{{contentMax}}</text>
       </view>
 
       <view class="mp-card">
-        <text class="mp-label">图片（最多{{imagesMax}}张）</text>
-        <view class="mp-grid">
+        <text class="mp-label">图片/视频</text>
+        <text class="mp-hint">{{mediaHint}}</text>
+
+        <!-- 图片草稿 -->
+        <view wx:if="{{draftMediaType === 'images' || draftMediaType === 'none'}}" class="mp-grid">
           <view
             wx:for="{{images}}"
             wx:key="tempFilePath"
@@ -61,10 +65,48 @@
             >×</view>
           </view>
           <view
-            wx:if="{{images.length < imagesMax}}"
+            wx:if="{{draftMediaType !== 'video' && images.length < imagesMax}}"
             class="mp-grid__add"
-            bindtap="onChooseImages"
+            bindtap="onChooseMedia"
           ></view>
+        </view>
+
+        <!-- 视频草稿：封面 + 播放 + 时长 + 删除；不自动播放 -->
+        <view wx:if="{{draftMediaType === 'video' && videoDraft}}" class="mp-video">
+          <view class="mp-video__stage" bindtap="onTapVideoPreview">
+            <video
+              id="mpDraftVideo"
+              class="mp-video__player"
+              src="{{videoDraft.tempFilePath}}"
+              poster="{{videoDraft.posterSrc}}"
+              controls="{{videoPreviewPlaying}}"
+              show-center-play-btn="{{false}}"
+              show-play-btn="{{videoPreviewPlaying}}"
+              enable-progress-gesture="{{false}}"
+              object-fit="contain"
+              bindplay="onDraftVideoPlay"
+              bindpause="onDraftVideoPause"
+              bindended="onDraftVideoEnded"
+              binderror="onDraftVideoError"
+            ></video>
+            <view wx:if="{{!videoPreviewPlaying}}" class="mp-video__cover">
+              <image
+                wx:if="{{videoDraft.hasPoster}}"
+                class="mp-video__poster"
+                src="{{videoDraft.posterSrc}}"
+                mode="aspectFill"
+              ></image>
+              <view wx:else class="mp-video__poster mp-video__poster--placeholder">
+                <text class="mp-video__ph-text">视频</text>
+              </view>
+              <view class="mp-video__play" aria-label="预览视频">
+                <text class="mp-video__play-icon">▶</text>
+              </view>
+              <text class="mp-video__duration">{{videoDraft.durationLabel}}</text>
+              <text wx:if="{{videoDraft.sizeLabel}}" class="mp-video__size">{{videoDraft.sizeLabel}}</text>
+            </view>
+          </view>
+          <view class="mp-video__del" bindtap="onRemoveVideo">删除视频</view>
         </view>
       </view>
     </view>

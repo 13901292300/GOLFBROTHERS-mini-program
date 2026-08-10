@@ -1,11 +1,11 @@
 /**
  * 球友圈举报原因 Bottom Sheet（展示层）。
- * 提交由页面调用 playerContentReportStore；本组件不写 Storage。
+ * 提交由页面调用 contentReportService；本组件不写 Storage。
  */
-const playerContentReportStore = require('../../../../utils/playerContentReportStore.js');
+const contentReportService = require('../../../../utils/contentReportService.js');
 
-const REASONS = playerContentReportStore.REPORT_REASONS || [];
-const DESC_MAX = playerContentReportStore.DESCRIPTION_MAX_CHARS || 200;
+const REASONS = contentReportService.REPORT_REASONS || [];
+const DESC_MAX = contentReportService.DESCRIPTION_MAX_CHARS || 200;
 
 Component({
   properties: {
@@ -67,13 +67,13 @@ Component({
     onDescInput(e) {
       if (this.data.submitting) return;
       const raw = (e && e.detail && e.detail.value) != null ? String(e.detail.value) : '';
-      const sliced = playerContentReportStore.sliceChars
-        ? playerContentReportStore.sliceChars(raw, DESC_MAX)
+      const sliced = contentReportService.sliceChars
+        ? contentReportService.sliceChars(raw, DESC_MAX)
         : raw.slice(0, DESC_MAX);
       this.setData({
         description: sliced,
-        descCount: playerContentReportStore.countChars
-          ? playerContentReportStore.countChars(sliced)
+        descCount: contentReportService.countChars
+          ? contentReportService.countChars(sliced)
           : sliced.length
       });
     },

@@ -18,6 +18,8 @@ const playerMomentMedia = require('./playerMomentMedia.js');
 const playerMomentImageLayout = require('./playerMomentImageLayout.js');
 const playerMomentPublishContext = require('./playerMomentPublishContext.js');
 
+const MEDIA_IMAGES_MAX = playerMomentMedia.IMAGES_MAX || IMAGES_MAX;
+
 const MOMENT_DEBUG = false;
 function momentDebug() {
   if (!MOMENT_DEBUG) return;
@@ -84,9 +86,10 @@ function _normalizeMoment(raw) {
     raw.authorSnapshot && typeof raw.authorSnapshot === 'object'
       ? raw.authorSnapshot
       : {};
-  const images = Array.isArray(raw.images)
-    ? raw.images.map(_normalizeImage).filter(Boolean).slice(0, IMAGES_MAX)
-    : [];
+  // 优先 media；旧 images 投影为 type=image（不批量重写 Storage）
+  const media = playerMomentMedia.normalizeMomentMediaList(raw.media, raw.images);
+  // 镜像 images：纯视频时为空；旧读路径仍可读 images
+  const images = playerMomentMedia.imagesFromMedia(media).slice(0, MEDIA_IMAGES_MAX);
   const content = String(raw.content == null ? '' : raw.content);
   const status = _trim(raw.status) === 'deleted' ? 'deleted' : 'active';
   const relatedGame = playerMomentPublishContext.normalizeRelatedGame(raw.relatedGame);
@@ -99,6 +102,7 @@ function _normalizeMoment(raw) {
       avatar: _trim(snap.avatar)
     },
     content: content,
+    media: media,
     images: images,
     location: raw.location == null ? null : raw.location,
     relatedGame: relatedGame,
@@ -237,8 +241,8 @@ function _buildAuthorSnapshot(authorUserId) {
 }
 
 /**
- * @param {{ content?: string, images?: array, authorUserId?: string }} input
- *   images 须为已持久化的 { mediaId, path, width, height, storageMode }
+ * @param {{ content?: string, media?: array, images?: array, authorUserId?: string }} input
+ *   新动态优先 media（已持久化）；兼容仅传 images。
  */
 function createMoment(input) {
   const src = input && typeof input === 'object' ? input : {};
@@ -269,14 +273,20 @@ function createMoment(input) {
   if (countChars(content) > CONTENT_MAX_CHARS) {
     return { ok: false, error: 'content_too_long' };
   }
-  const images = Array.isArray(src.images)
-    ? src.images.map(_normalizeImage).filter(Boolean).slice(0, IMAGES_MAX)
-    : [];
-  if (!content && !images.length) {
-    return { ok: false, error: 'empty_moment' };
+
+  const mediaList = playerMomentMedia.normalizeMomentMediaList(src.media, src.images);
+  const mediaCheck = playerMomentMedia.validateMomentMedia(mediaList);
+  if (!mediaCheck.ok) {
+    return {
+      ok: false,
+      error: mediaCheck.error || 'media_invalid',
+      message: mediaCheck.message || ''
+    };
   }
-  if (images.length > IMAGES_MAX) {
-    return { ok: false, error: 'too_many_images' };
+  const media = mediaCheck.media || [];
+  const images = playerMomentMedia.imagesFromMedia(media).slice(0, MEDIA_IMAGES_MAX);
+  if (!content && !media.length) {
+    return { ok: false, error: 'empty_moment' };
   }
 
   // 强制关联本场有效 relatedGame（含无权限 publicScorecardId）
@@ -296,6 +306,8 @@ function createMoment(input) {
     authorUserId: authorUserId,
     authorSnapshot: _buildAuthorSnapshot(authorUserId),
     content: content,
+    // 新动态优先写 media；同步镜像 images（纯视频时为空）以兼容旧读路径
+    media: media,
     images: images,
     location: null,
     relatedGame: relatedCheck.relatedGame,
@@ -359,6 +371,37 @@ function listMomentsByAuthor(authorUserId, options) {
   };
 }
 
+/**
+ * 球友圈公开动态流（feedType=all）。
+ * - visibility=public 且有效；排除 deleted / 审核拒绝 / 平台下架等
+ * - 排序：createdAt 倒序，相同则 momentId 倒序
+ * - 分页：默认 PAGE_SIZE=20
+ * - 不读好友/关注；featured / friends 未实现（调用方勿依赖）
+ */
+function listPublicMoments(options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  // 内部预留：第一版仅 all；其它值仍按 all 查询并返回，避免调用方空白
+  const feedType = _trim(opts.feedType || 'all') || 'all';
+  void feedType;
+  const viewer = playerIdentityGuard.normalizePlayerUserId(opts.viewerUserId || '');
+  const limit = opts.limit > 0 ? Math.floor(opts.limit) : PAGE_SIZE;
+  const cursor = opts.cursor != null ? Math.max(0, Math.floor(Number(opts.cursor) || 0)) : 0;
+  const doc = _readDoc();
+  const filtered = _sortMoments(
+    doc.moments.filter(function (m) {
+      return canViewerSeeMoment(viewer, m, opts);
+    })
+  );
+  const slice = filtered.slice(cursor, cursor + limit);
+  const nextCursor = cursor + slice.length;
+  return {
+    items: slice,
+    nextCursor: nextCursor,
+    hasMore: nextCursor < filtered.length,
+    revision: String(doc.revision)
+  };
+}
+
 function listRecentMomentsByAuthor(authorUserId, limit, options) {
   const n = limit > 0 ? Math.floor(limit) : 2;
   const page = listMomentsByAuthor(authorUserId, Object.assign({}, options, { limit: n, cursor: 0 }));
@@ -387,19 +430,24 @@ function deleteMoment(momentId, currentUserId) {
   ) {
     return { ok: false, error: 'forbidden' };
   }
-  const images = (target.images || []).slice();
+  const mediaToClean = playerMomentMedia.normalizeMomentMediaList(
+    target.media,
+    target.images
+  );
+  // 先标记删除并清空 media/images 镜像，再清理文件；清理失败不恢复动态
   doc.moments[idx] = Object.assign({}, target, {
     status: 'deleted',
+    media: [],
+    images: [],
     deletedAt: _now(),
     updatedAt: _now()
   });
   _bumpRevision(doc);
   _writeDoc(doc);
-  // 清理本地文件；失败不恢复动态
   try {
-    playerMomentMedia.cleanupMomentLocalFiles(images);
+    playerMomentMedia.cleanupMomentMedia(mediaToClean);
   } catch (e) {
-    momentDebug('[moment] cleanup failed after delete');
+    momentDebug('[moment] cleanup failed after delete', e && e.message);
   }
   return { ok: true, revision: String(doc.revision) };
 }
@@ -476,13 +524,24 @@ function projectMomentsForViewer(moments, viewerUserId, options) {
       const canOpenProfile = playerIdentityGuard.isStablePublicUserId(authorId) &&
         !playerIdentityGuard.isGuestPlayerId(authorId) &&
         !playerIdentityGuard.isMaskedPlayerId(authorId);
-      // omitFullContent 只省略长正文；图片宫格字段必须保留（含 storageMode）
-      const hydrated = playerMomentMedia.hydrateMomentImagesForView(m.images || []);
-      const imageVm = playerMomentImageLayout.buildMomentImageLayout(hydrated);
+      // omitFullContent 只省略长正文；媒体摘要保留 images/video（含 storageMode）
+      // Feed（omitFullContent）默认 skipMediaInspect，避免列表同步 FS；详情可显式关闭
+      const mediaSource = playerMomentMedia.normalizeMomentMediaList(m.media, m.images);
+      const skipInspect =
+        opts.skipMediaInspect != null
+          ? !!opts.skipMediaInspect
+          : !!opts.omitFullContent;
+      const mediaVm = playerMomentMedia.projectMediaViewFields(mediaSource, {
+        skipInspect: skipInspect,
+        includeMediaArray: !!opts.includeMediaArray
+      });
+      const imageVm = playerMomentImageLayout.buildMomentImageLayout(
+        mediaVm.mediaType === 'images' ? mediaVm.images : []
+      );
       const relatedView = playerMomentPublishContext.projectRelatedGameForViewer(
         m.relatedGame
       );
-      return {
+      const card = {
         momentId: m.momentId,
         authorUserId: authorId,
         authorDisplayName: isSelf ? publicName : named.displayName,
@@ -491,11 +550,16 @@ function projectMomentsForViewer(moments, viewerUserId, options) {
         content: opts.omitFullContent ? '' : m.content,
         contentPreview: preview.preview,
         isContentCollapsed: preview.collapsed,
+        mediaType: mediaVm.mediaType || 'none',
         images: imageVm.images,
         imageCount: imageVm.imageCount,
         imageLayout: imageVm.imageLayout,
         singleImageClass: imageVm.singleImageClass,
         singleImageStyle: imageVm.singleImageStyle,
+        video: mediaVm.video || null,
+        videoCount: mediaVm.videoCount || 0,
+        poster: mediaVm.poster || null,
+        durationLabel: mediaVm.durationLabel || '',
         relatedGame: relatedView,
         moderationStatus: m.moderationStatus || 'local_unreviewed',
         createdAt: m.createdAt,
@@ -505,6 +569,10 @@ function projectMomentsForViewer(moments, viewerUserId, options) {
         showOriginName: !isSelf && !!named.hasRemark,
         originalNickname: named.hasRemark ? named.originalName : ''
       };
+      if (opts.includeMediaArray && mediaVm.media) {
+        card.media = mediaVm.media;
+      }
+      return card;
     });
 }
 
@@ -535,11 +603,24 @@ function patchMomentImageDimensions(momentId, mediaId, width, height) {
       changed = true;
       break;
     }
+    let media = Array.isArray(m.media) ? m.media.slice() : null;
+    if (media) {
+      for (let k = 0; k < media.length; k++) {
+        const item = media[k];
+        if (!item || _trim(item.mediaId) !== midMedia || item.type === 'video') continue;
+        if ((Number(item.width) || 0) > 0 && (Number(item.height) || 0) > 0) {
+          if (!changed) return { ok: true, changed: false };
+          break;
+        }
+        media[k] = Object.assign({}, item, { width: w, height: h });
+        changed = true;
+        break;
+      }
+    }
     if (changed) {
-      doc.moments[i] = Object.assign({}, m, {
-        images: images,
-        updatedAt: _now()
-      });
+      const patch = { images: images, updatedAt: _now() };
+      if (media) patch.media = media;
+      doc.moments[i] = Object.assign({}, m, patch);
       // 元数据补齐不 bump 列表 revision，避免 feed 全量重载
       _writeDoc(doc);
       return { ok: true, changed: true };
@@ -549,18 +630,45 @@ function patchMomentImageDimensions(momentId, mediaId, width, height) {
   return { ok: false, error: 'not_found' };
 }
 
+/**
+ * 按 publicScorecardId 找回动态（公开记分页冷启动恢复用）。
+ * 优先最新 createdAt；不含已删/不可见动态。
+ */
+function findMomentByPublicScorecardId(publicScorecardId, options) {
+  const psc = _trim(publicScorecardId);
+  if (!psc) return null;
+  const opts = options && typeof options === 'object' ? options : {};
+  const viewer = playerIdentityGuard.normalizePlayerUserId(opts.viewerUserId || '');
+  const doc = _readDoc();
+  let best = null;
+  for (let i = 0; i < doc.moments.length; i++) {
+    const m = doc.moments[i];
+    if (!m || !m.relatedGame) continue;
+    if (_trim(m.relatedGame.publicScorecardId) !== psc) continue;
+    if (!canViewerSeeMoment(viewer, m, opts)) continue;
+    if (!best || Number(m.createdAt) > Number(best.createdAt)) best = m;
+  }
+  if (!best) return null;
+  return { moment: best, relatedGame: best.relatedGame, authorUserId: best.authorUserId };
+}
+
 module.exports = {
   STORAGE_KEY: STORAGE_KEY,
   CONTENT_MAX_CHARS: CONTENT_MAX_CHARS,
   IMAGES_MAX: IMAGES_MAX,
+  VIDEO_MAX: playerMomentMedia.VIDEO_MAX,
+  VIDEO_MAX_DURATION_SEC: playerMomentMedia.VIDEO_MAX_DURATION_SEC,
+  VIDEO_MAX_SIZE_BYTES: playerMomentMedia.VIDEO_MAX_SIZE_BYTES,
   PAGE_SIZE: PAGE_SIZE,
   countChars: countChars,
   sliceChars: sliceChars,
   canViewerSeeMoment: canViewerSeeMoment,
   createMoment: createMoment,
   getMomentById: getMomentById,
+  listPublicMoments: listPublicMoments,
   listMomentsByAuthor: listMomentsByAuthor,
   listRecentMomentsByAuthor: listRecentMomentsByAuthor,
+  findMomentByPublicScorecardId: findMomentByPublicScorecardId,
   deleteMoment: deleteMoment,
   getMomentRevision: getMomentRevision,
   projectMomentsForViewer: projectMomentsForViewer,
