@@ -29,7 +29,7 @@
   </view>
 
   <view wx:if="{{!isProxyRegisterMode}}" class="me-row-wrap">
-    <view class="friend-row me-row {{occupiedMap[currentUser.playerId] ? 'is-disabled' : ''}}" bindtap="toggleMe">
+    <view class="friend-row me-row {{occupiedMap[currentUser.playerId] ? 'is-disabled' : ''}}" bindtap="toggleMe" data-id="{{currentUser.playerId}}">
       <image class="friend-avatar" src="{{currentUser.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="me"></image>
       <view class="friend-meta">
         <text class="friend-name">我</text>
@@ -55,8 +55,9 @@
         wx:for-item="f"
         wx:key="playerId"
         class="friend-row {{disabledMap[f.playerId] ? 'is-disabled' : ''}}"
-        bindtap="toggleFriend"
+        bindtap="onTapPlayer"
         data-id="{{f.playerId}}"
+        data-selection-key="{{f.playerId}}"
       >
         <image class="friend-avatar" src="{{f.avatar}}" mode="aspectFill" binderror="onAvatarError" data-type="friend" data-id="{{f.playerId}}"></image>
         <view class="friend-meta">

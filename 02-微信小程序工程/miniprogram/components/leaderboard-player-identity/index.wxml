@@ -20,16 +20,22 @@
             class="gender-icon sc-name-gender {{displayGenderClass}}"
           >{{displayGenderSymbol}}</text>
         </view>
-        <!-- 进入球员资料：独立点击区，在组合之后 -->
-        <text
+        <!-- 进入球员资料：独立点击区（catchtap 不冒泡）；无主页弱化 -->
+        <view
           wx:if="{{showProfileEntry}}"
-          class="sc-chevron"
+          class="sc-chevron {{profileEntryEnabled ? '' : 'sc-chevron--disabled'}}"
           catchtap="onProfileTap"
-        >›</text>
+          aria-label="进入球员主页"
+        >
+          <text class="sc-chevron__glyph">›</text>
+        </view>
       </view>
-      <!-- metaMode：countryAge=既有 COUNTRY/AGE；handicapFloat=球队赛家族江湖差点/浮动系数 -->
-      <view wx:if="{{metaMode === 'handicapFloat'}}" class="sc-sub">
-        江湖差点 <text class="sc-sub-strong">{{player.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText}}</text>
+      <!-- metaMode：页级显式开启；默认仍为 COUNTRY/AGE -->
+      <view wx:if="{{metaMode === 'handicapFloatHub'}}" class="sc-sub">
+        江湖差点 <text class="sc-sub-strong">{{player.handicapText || '--'}}</text> · 浮动系数 <text class="sc-sub-strong">{{player.floatCoefText || '--'}}</text>
+      </view>
+      <view wx:elif="{{metaMode === 'handicapFloat'}}" class="sc-sub">
+        江湖差点 <text class="sc-sub-strong">{{player.handicapText || '--'}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText || '--'}}</text>
       </view>
       <view wx:else class="sc-sub">
         COUNTRY: <text class="sc-sub-strong">{{player.country || '—'}}</text>　AGE: <text class="sc-sub-strong">{{player.age || '—'}}</text>

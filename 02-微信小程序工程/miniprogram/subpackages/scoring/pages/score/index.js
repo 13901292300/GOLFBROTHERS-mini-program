@@ -6914,12 +6914,154 @@ Page({
     );
   },
 
+  /** 开发环境：输出页面栈 route 列表（受 SCORE_DEBUG_LOG 开关） */
+  _scoreNavStackRoutes() {
+    try {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      return (pages || []).map(function (p) {
+        const route = (p && (p.route || p.__route__)) || '';
+        const gid =
+          (p && p.options && p.options.gameId != null && String(p.options.gameId)) || '';
+        return gid ? route + '?gameId=' + gid : route;
+      });
+    } catch (e) {
+      return [];
+    }
+  },
+
+  /**
+   * 统计栈内同 gameId 的 Game Hub 数量（诊断 / 去重）。
+   */
+  _countGameHubsInStack(pages, gameId) {
+    const hubRoute = 'pages/game/hub/index';
+    const gid = gameId != null ? String(gameId).trim() : '';
+    let count = 0;
+    const list = pages || [];
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      const route = (p && (p.route || p.__route__)) || '';
+      const pageGid =
+        p && p.options && p.options.gameId != null ? String(p.options.gameId).trim() : '';
+      if (route === hubRoute && gid && pageGid === gid) count += 1;
+    }
+    return count;
+  },
+
+  /**
+   * 上一页是否为「其它比赛」的 Game Hub（不得当作当前 GAME 中间页）。
+   */
+  _isForeignGameHubPrevPage(pages, gameId) {
+    const list = pages || [];
+    if (list.length < 2) return false;
+    const prev = list[list.length - 2];
+    const route = (prev && (prev.route || prev.__route__)) || '';
+    if (route !== 'pages/game/hub/index') return false;
+    const prevGid =
+      prev && prev.options && prev.options.gameId != null
+        ? String(prev.options.gameId).trim()
+        : '';
+    const gid = gameId != null ? String(gameId).trim() : '';
+    // 其它 gameId，或 Hub 无 gameId：均不安全
+    return !prevGid || !gid || prevGid !== gid;
+  },
+
+  /**
+   * 回到栈内已有同 gameId Game Hub（仅 navigateBack）。
+   * 找不到则返回 false，禁止 redirectTo/reLaunch 补建 Hub。
+   * @returns {boolean} 是否已发起返回 Hub 的导航
+   */
+  _returnToExistingGameHub(gameId, extraQuery, releaseBackLock) {
+    const gid = gameId != null ? String(gameId).trim() : '';
+    const hubRoute = 'pages/game/hub/index';
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    const stack = this._scoreNavStackRoutes();
+    const hubCountBefore = this._countGameHubsInStack(pages, gid);
+
+    scoreDebugLog('[SCORE_NAV_HUB]', {
+      op: 'returnToExistingGameHub',
+      gameId: gid,
+      stack: stack,
+      pageLen: pages ? pages.length : 0,
+      hubCountSameGameId: hubCountBefore,
+      extraQuery: extraQuery || ''
+    });
+
+    if (!gid || !pages || pages.length < 2) {
+      scoreDebugLog('[SCORE_NAV_HUB]', { op: 'not_found', gameId: gid });
+      return false;
+    }
+
+    for (let i = pages.length - 2; i >= 0; i--) {
+      const p = pages[i];
+      const route = (p && (p.route || p.__route__)) || '';
+      const pageGid =
+        p && p.options && p.options.gameId != null ? String(p.options.gameId).trim() : '';
+      if (route === hubRoute && pageGid && pageGid === gid) {
+        const delta = pages.length - 1 - i;
+        scoreDebugLog('[SCORE_NAV_HUB]', {
+          op: 'navigateBack',
+          delta: delta,
+          targetIndex: i,
+          gameId: gid,
+          expectedStackDepthAfter: i + 1,
+          hubCountSameGameId: hubCountBefore
+        });
+        let navFailed = false;
+        wx.navigateBack({
+          delta: delta,
+          fail: function () {
+            navFailed = true;
+            scoreDebugLog('[SCORE_NAV_HUB]', {
+              op: 'navigateBack_fail',
+              fallback: 'reLaunch_home'
+            });
+            // 禁止 redirectTo 补建 Hub
+            wx.reLaunch({
+              url: '/pages/home/index?tab=my',
+              complete: releaseBackLock
+            });
+          },
+          complete: function () {
+            // fail 已走 reLaunch：由其 complete 释放，避免此处提前解锁导致二次导航
+            if (!navFailed && typeof releaseBackLock === 'function') {
+              releaseBackLock();
+            }
+          }
+        });
+        return true;
+      }
+    }
+
+    scoreDebugLog('[SCORE_NAV_HUB]', {
+      op: 'not_found_same_gameId',
+      gameId: gid,
+      note: 'caller may navigateBack to source or reLaunch home; will not invent Hub'
+    });
+    return false;
+  },
+
   onBack() {
+    if (this._backNavLock) {
+      scoreDebugLog('[SCORE_BACK_CLICKED]', { skipped: 'nav_lock' });
+      return;
+    }
+    this._backNavLock = true;
+    const self = this;
+    let lockReleased = false;
+    const releaseBackLock = function () {
+      if (lockReleased) return;
+      lockReleased = true;
+      setTimeout(function () {
+        self._backNavLock = false;
+      }, 600);
+    };
+
     scoreDebugLog('[SCORE_BACK_CLICKED]', {
       gameId: this.data.gameId,
       pageGameId: (this._pageOptions && this._pageOptions.gameId) || (this.options && this.options.gameId),
       currentGroupId: this.data.groupId,
-      route: this.route
+      route: this.route,
+      stack: this._scoreNavStackRoutes()
     });
 
     const matchStateForBack = this._readMatchState();
@@ -6933,17 +7075,20 @@ Page({
       this.persistSession();
       const pages = getCurrentPages();
       if (pages.length > 1) {
-        wx.navigateBack();
+        wx.navigateBack({ complete: releaseBackLock });
       } else {
         wx.redirectTo({
           url: '/subpackages/tournament/pages/detail/index?matchId=' +
-            encodeURIComponent(matchStateForBack.matchId)
+            encodeURIComponent(matchStateForBack.matchId),
+          complete: releaseBackLock
         });
       }
       return;
     }
 
-    if (this.data.gameId && (this.data.mode === 'game' || this.data.mode === 'fourball_best')) {
+    const isOrdinaryGameMode =
+      this.data.mode === 'game' || this.data.mode === 'fourball_best';
+    if (this.data.gameId && isOrdinaryGameMode) {
       scoreDebugLog('[score-back-source]', {
         source: 'game',
         gameId: this.data.gameId
@@ -6952,58 +7097,82 @@ Page({
     }
 
     const gameId = this._resolveScoreBackGameId();
-    const latestGame = gameId ? gameStore.getGameById(gameId) : null;
-    const latestGroups = latestGame ? gameStore.listGroups(latestGame) : [];
-
-    scoreDebugLog('[SCORE_BACK_LATEST_GAME]', {
-      gameId,
-      hasGame: !!latestGame,
-      groupsLength: latestGroups ? latestGroups.length : 0,
-      groups: latestGroups
-    });
-
     if (!gameId) {
       scoreDebugLog('[SCORE_BACK_ACTION]', { action: 'home_no_gameId' });
-      wx.reLaunch({ url: '/pages/home/index?tab=my' });
+      wx.reLaunch({ url: '/pages/home/index?tab=my', complete: releaseBackLock });
       return;
     }
 
-    if (!latestGame) {
-      scoreDebugLog('[SCORE_BACK_ACTION]', { action: 'home_game_missing', gameId });
-      wx.reLaunch({ url: '/pages/home/index?tab=my' });
-      return;
-    }
+    // 普通 GAME（含 fourball_best）：不按单组/多组分支，统一栈优先
+    if (isOrdinaryGameMode) {
+      // 1) 栈内同 gameId Hub → navigateBack 到已有 Hub（多组来源）
+      if (
+        this._returnToExistingGameHub(
+          gameId,
+          'activeTab=teeingSheet&from=score',
+          releaseBackLock
+        )
+      ) {
+        scoreDebugLog('[SCORE_BACK_ACTION]', {
+          action: 'return_existing_hub',
+          gameId: gameId,
+          stack: this._scoreNavStackRoutes()
+        });
+        return;
+      }
 
-    if (latestGroups.length > 1) {
-      const hubUrl =
-        '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId) +
-        '&activeTab=teeingSheet&from=score';
-      scoreDebugLog('[SCORE_BACK_ACTION]', { action: 'redirectTo', hubUrl, groupsLength: latestGroups.length });
-      wx.redirectTo({
-        url: hubUrl,
-        fail: (err) => {
-          scoreDebugLog('[SCORE_BACK_ACTION]', { action: 'reLaunch', hubUrl, err: err && err.errMsg });
-          wx.reLaunch({ url: hubUrl });
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      // 2) 无同 gameId Hub，但有上一页 → navigateBack（球友圈/首页单组直达等）
+      if (pages && pages.length > 1) {
+        // 上一页若是其它 gameId 的 Hub：不得当作当前中间页
+        if (this._isForeignGameHubPrevPage(pages, gameId)) {
+          scoreDebugLog('[SCORE_BACK_ACTION]', {
+            action: 'home_foreign_hub_prev',
+            gameId: gameId,
+            stack: this._scoreNavStackRoutes()
+          });
+          wx.reLaunch({ url: '/pages/home/index?tab=my', complete: releaseBackLock });
+          return;
         }
+        scoreDebugLog('[SCORE_BACK_ACTION]', {
+          action: 'navigateBack_source',
+          gameId: gameId,
+          stack: this._scoreNavStackRoutes()
+        });
+        let navFailed = false;
+        wx.navigateBack({
+          delta: 1,
+          fail: function () {
+            navFailed = true;
+            wx.reLaunch({
+              url: '/pages/home/index?tab=my',
+              complete: releaseBackLock
+            });
+          },
+          complete: function () {
+            // fail 已走 reLaunch：由其 complete 释放，避免此处提前解锁导致二次导航
+            if (!navFailed) releaseBackLock();
+          }
+        });
+        return;
+      }
+
+      // 3) 冷启动根页：reLaunch 首页，不凭空创建 Hub
+      scoreDebugLog('[SCORE_BACK_ACTION]', {
+        action: 'home_cold_start',
+        gameId: gameId
       });
+      wx.reLaunch({ url: '/pages/home/index?tab=my', complete: releaseBackLock });
       return;
     }
 
-    scoreDebugLog('[SCORE_BACK_ACTION]', { action: 'home_single_group', gameId, groupsLength: latestGroups.length });
-    if (this.data.mode === 'game') {
-      wx.reLaunch({ url: '/pages/home/index?tab=my' });
-      return;
+    // 其它 mode：有上一页则返回，否则回首页
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    if (pages && pages.length > 1) {
+      wx.navigateBack({ complete: releaseBackLock });
+    } else {
+      wx.reLaunch({ url: '/pages/home/index', complete: releaseBackLock });
     }
-
-    const ms = this._readMatchState();
-    const groupCount = ms && ms.groupCount != null ? Number(ms.groupCount) : 0;
-    if (groupCount <= 1) {
-      wx.reLaunch({ url: '/pages/home/index' });
-      return;
-    }
-    const pages = getCurrentPages();
-    if (pages.length > 1) wx.navigateBack();
-    else wx.reLaunch({ url: '/pages/home/index' });
   },
 
   switchScorecardTab(e) {

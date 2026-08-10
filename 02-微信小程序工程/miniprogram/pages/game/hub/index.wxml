@@ -55,15 +55,19 @@
             <view wx:if="{{item.expanded}}" class="scorecard-row">
               <!-- 组合：每名成员完整身份（与个人展开面板同一组件） -->
               <view wx:if="{{item.isTeam}}" class="sc-team-stack-wrap">
+                <!-- 普通多组 Hub：无国旗；昵称下江湖差点/浮动（显式配置，不改组件默认） -->
                 <leaderboard-player-identity
                   wx:for="{{item.members}}"
                   wx:for-item="mem"
                   wx:key="playerId"
                   player="{{mem}}"
+                  avatar-badge="none"
+                  meta-mode="handicapFloatHub"
                   followed="{{followMap[mem.playerId]}}"
                   relation-status="{{relationMap[mem.playerId] || (followMap[mem.playerId] ? 'following' : 'none')}}"
                   is-self="{{mem.playerId === currentUserId}}"
                   bind:follow="onLeaderboardFollow"
+                  bind:profiletap="onLeaderboardPlayerProfileTap"
                 />
               </view>
 
@@ -71,10 +75,13 @@
               <leaderboard-player-identity
                 wx:else
                 player="{{item.player}}"
+                avatar-badge="none"
+                meta-mode="handicapFloatHub"
                 followed="{{followMap[item.playerId]}}"
                 relation-status="{{relationMap[item.playerId] || (followMap[item.playerId] ? 'following' : 'none')}}"
                 is-self="{{item.playerId === currentUserId}}"
                 bind:follow="onLeaderboardFollow"
+                bind:profiletap="onLeaderboardPlayerProfileTap"
               />
 
               <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">

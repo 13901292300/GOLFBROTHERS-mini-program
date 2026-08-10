@@ -754,14 +754,14 @@
                                 class="gender-icon sc-name-gender {{player.genderClass}}"
                               >{{player.genderIcon}}</text>
                             </view>
-                            <text
-                              wx:if="{{leaderboardProfileEntryMap[player.playerId]}}"
-                              class="sc-chevron"
+                            <view
+                              class="sc-chevron {{leaderboardProfileEntryMap[player.playerId] ? '' : 'sc-chevron--disabled'}}"
                               catchtap="onLeaderboardPlayerProfileTap"
                               data-user-id="{{player.playerId}}"
                               data-name="{{player.name}}"
                               data-avatar="{{player.avatar}}"
-                            >›</text>
+                              aria-label="进入球员主页"
+                            >›</view>
                           </view>
                           <view wx:if="{{leaderboardMetaMode === 'handicapFloat'}}" class="sc-sub">
                             江湖差点 <text class="sc-sub-strong">{{player.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText}}</text>
@@ -930,14 +930,14 @@
                             class="gender-icon sc-name-gender {{item.genderClass}}"
                           >{{item.genderIcon}}</text>
                         </view>
-                        <text
-                          wx:if="{{leaderboardProfileEntryMap[item.playerId]}}"
-                          class="sc-chevron"
+                        <view
+                          class="sc-chevron {{leaderboardProfileEntryMap[item.playerId] ? '' : 'sc-chevron--disabled'}}"
                           catchtap="onLeaderboardPlayerProfileTap"
                           data-user-id="{{item.playerId}}"
                           data-name="{{item.name}}"
                           data-avatar="{{item.avatar}}"
-                        >›</text>
+                          aria-label="进入球员主页"
+                        >›</view>
                       </view>
                       <view wx:if="{{leaderboardMetaMode === 'handicapFloat'}}" class="sc-sub">
                         江湖差点 <text class="sc-sub-strong">{{item.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{item.floatCoefText}}</text>

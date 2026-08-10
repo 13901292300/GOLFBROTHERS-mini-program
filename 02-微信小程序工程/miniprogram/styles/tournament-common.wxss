@@ -581,12 +581,25 @@ page {
 }
 .sc-chevron {
   flex-shrink: 0;
-  margin-left: 8rpx;
-  padding: 8rpx 4rpx 8rpx 8rpx;
+  margin-left: 4rpx;
+  min-width: 64rpx;
+  min-height: 64rpx;
+  padding: 0 4rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
-  font-size: 24rpx;
+  font-size: 28rpx;
   line-height: 1;
+  font-weight: 600;
   box-sizing: border-box;
+}
+.sc-chevron--disabled {
+  opacity: 0.32;
+  color: var(--text-muted);
+}
+.dark-mode .sc-chevron--disabled {
+  opacity: 0.4;
 }
 .sc-sub { font-size: 20rpx; font-weight: 700; color: var(--text-muted); margin-top: 8rpx; text-transform: uppercase; letter-spacing: 0.06em; }
 .sc-sub-strong { color: var(--text-primary); font-weight: 900; }

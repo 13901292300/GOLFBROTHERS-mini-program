@@ -152,21 +152,63 @@ function buildFromGame(game, groupIndex) {
   };
 }
 
+/** 开发诊断：enterScorePage 回调异常；默认关闭，不向用户抛错 */
+const ENTER_SCORE_DEBUG_LOG = false;
+function enterScoreDebugLog() {
+  if (!ENTER_SCORE_DEBUG_LOG) return;
+  try {
+    console['warn'].apply(console, arguments);
+  } catch (e) { /* ignore */ }
+}
+
+/**
+ * 安全执行可选回调：仅函数、try/catch 隔离、异常不外抛。
+ * 不挂 complete，保证 success/fail 各自至多触发一次业务回调。
+ */
+function _safeEnterScoreCallback(fn, args, label) {
+  if (typeof fn !== 'function') return;
+  try {
+    fn.apply(null, args || []);
+  } catch (err) {
+    enterScoreDebugLog('[enterScorePage]', label || 'callback_error', err);
+  }
+}
+
 /**
  * 统一进入记分页面：
  * - 读取 matchState；不存在（或无 formatType）→ 提示「暂无比赛数据」，不跳转。
  * - 存在 → 进入记分页（不携带任何赛制参数，记分页只认 matchState）。
+ * @param {object} [options]
+ * @param {function} [options.onFail] 失败回调（reason）；传入后可由调用方统一提示/回滚
+ * @param {function} [options.onSuccess] 导航成功回调
+ * @param {boolean} [options.silentToast] 为 true 时不弹默认 toast（需配合 onFail）
  */
-function enterScorePage() {
+function enterScorePage(options) {
+  const opts = options && typeof options === 'object' ? options : {};
   const ms = getMatchState();
   if (!ms || !ms.formatType) {
-    wx.showToast({ title: '暂无比赛数据', icon: 'none' });
+    if (typeof opts.onFail === 'function') {
+      _safeEnterScoreCallback(opts.onFail, ['no_match_state'], 'onFail');
+    } else if (!opts.silentToast) {
+      wx.showToast({ title: '暂无比赛数据', icon: 'none' });
+    }
     return false;
   }
   wx.navigateTo({
     url: SCORE_PAGE_URL,
-    fail: (err) =>
-      wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    success: function () {
+      _safeEnterScoreCallback(opts.onSuccess, [], 'onSuccess');
+    },
+    fail: function (err) {
+      if (typeof opts.onFail === 'function') {
+        _safeEnterScoreCallback(opts.onFail, ['navigate_fail', err], 'onFail');
+      } else if (!opts.silentToast) {
+        wx.showToast({
+          title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''),
+          icon: 'none'
+        });
+      }
+    }
   });
   return true;
 }

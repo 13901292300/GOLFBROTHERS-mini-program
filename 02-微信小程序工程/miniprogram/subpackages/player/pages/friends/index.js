@@ -290,6 +290,8 @@ Page({
     defaultAvatar: mockAvatars.DEFAULT_AVATAR,
     // proxy_register / proxy_register_team / select_temp_admin
     mode: '',
+    /** 好友选择页恒为选人模式（创建/邀请/代报名等） */
+    isSelectionMode: true,
     isProxyRegisterMode: false,
     isProxyTeamMode: false,
     isTempAdminSelectMode: false,
@@ -304,6 +306,9 @@ Page({
 
     const opt = options || {};
     const mode = opt.mode ? decodeURIComponent(String(opt.mode)) : '';
+    // 本页是创建/邀请/代报名等选人页：永远选人模式，禁止进主页
+    this._isSelectionMode = true;
+    this.setData({ isSelectionMode: true });
 
     if (isProxyRegisterModeValue(mode)) {
       this._initProxyRegisterMode(opt, mode);
@@ -684,8 +689,19 @@ Page({
     this._applyFriendFilter('');
   },
 
+  /**
+   * 选人页整行唯一入口：只 toggle，永不 openPlayerProfile。
+   * 头像 / 姓名 / 空白 / 勾选区均走本函数（行 bindtap）。
+   */
+  onTapPlayer(e) {
+    if (!this._isSelectionMode && !this.data.isSelectionMode) return;
+    const id =
+      (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '';
+    this._togglePlayer(id);
+  },
+
   toggleFriend(e) {
-    this._togglePlayer(e.currentTarget.dataset.id);
+    this.onTapPlayer(e);
   },
 
   toggleMe() {

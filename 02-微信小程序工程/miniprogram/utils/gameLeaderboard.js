@@ -5,6 +5,179 @@ const { getProfileById, FRIEND_ID_SET } = require('./playerDirectory.js');
 const mockAvatars = require('./mockAvatars.js');
 const holeLayout = require('./holeLayout.js');
 const playerManage = require('./playerManage.js');
+const {
+  formatPlayerActionMetric,
+  isSameUserIdentity
+} = require('./playerActionModal.js');
+
+/**
+ * 仅明确 DEMO GAME 可用的演示度量（与 playerActionModal 对齐）。
+ * 真实 GAME 字段缺失时显示 --，绝不回退本表。
+ */
+const DEMO_PLAYER_METRICS = {
+  'fr-1003': { handicap: 8.0, floatCoef: 0.6 },
+  'fr-1005': { handicap: 15.6, floatCoef: 2.0 },
+  'fr-1008': { handicap: 12.4, floatCoef: 1.3 }
+};
+
+/**
+ * DEMO GAME 判定（显式标志或既有 demo gameId）：
+ * - game.isDemo / game.demo / game.isMock === true
+ * - demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gameId)
+ */
+function isDemoLeaderboardGame(game) {
+  if (!game || typeof game !== 'object') return false;
+  if (game.isDemo === true || game.demo === true || game.isMock === true) {
+    return true;
+  }
+  const gid = String(game.gameId || '').trim();
+  if (!gid) return false;
+  try {
+    const demoWeekendAmateurGame = require('./demoWeekendAmateurGame.js');
+    if (
+      demoWeekendAmateurGame &&
+      typeof demoWeekendAmateurGame.isDemoWeekendAmateurGameId === 'function' &&
+      demoWeekendAmateurGame.isDemoWeekendAmateurGameId(gid)
+    ) {
+      return true;
+    }
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+/**
+ * 账号绑定 id：仅 userId → playerUserId。
+ * 不含 playerId：创建流会生成 p-<timestamp> / host-* 等比赛内临时人员 ID，
+ * 不得仅因字符串碰巧与登录 userId 相同而识别为本人。
+ */
+function resolveSlotAccountUserId(slot) {
+  if (!slot || typeof slot !== 'object') return '';
+  const userId = String(slot.userId || '').trim();
+  if (userId) return userId;
+  return String(slot.playerUserId || '').trim();
+}
+
+/**
+ * DEMO 度量查找键：账号 id 优先；仅在明确 DEMO GAME 下才回退 playerId
+ *（演示种子里 fr-* 常同时写在 playerId 上）。
+ */
+function resolveDemoMetricsLookupId(slot) {
+  const accountId = resolveSlotAccountUserId(slot);
+  if (accountId) return accountId;
+  return String((slot && slot.playerId) || '').trim();
+}
+
+/**
+ * 本人身份判定（严格）：
+ * 1) slot.userId 或 slot.playerUserId 非空；且
+ * 2) isSameUserIdentity(该 id, 当前登录 userId)。
+ * 不使用 playerId / 昵称 / 头像 / 下标。
+ */
+function isLeaderboardSelfSlot(slot, metricsCtx) {
+  const ctx = metricsCtx || null;
+  if (!ctx || !ctx.currentUserId) return false;
+  const accountId = resolveSlotAccountUserId(slot);
+  if (!accountId) return false;
+  try {
+    return !!isSameUserIdentity(accountId, ctx.currentUserId);
+  } catch (e) {
+    return accountId === ctx.currentUserId;
+  }
+}
+
+/** 展示格式：0→"0"；空/NaN/Infinity/非法→"--"；不转百分比 */
+function formatLeaderboardMetric(value) {
+  if (value == null || value === '') return '--';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '--';
+  // 有限数字走既有 formatPlayerActionMetric（与主页一致）
+  return formatPlayerActionMetric(n);
+}
+
+function pickSlotMetric(slot, key) {
+  if (!slot || typeof slot !== 'object') return null;
+  const v = slot[key];
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return v;
+}
+
+/**
+ * build() 内一次性上下文：当前用户 id + profile 度量；是否允许 DEMO 表。
+ * @param {object} [game]
+ * @param {object} [overrides] 可选覆盖（仅供调用方注入，业务路径不传）
+ */
+function createMetricsContext(game, overrides) {
+  let currentUserId = '';
+  let meHandicap = null;
+  let meFloatCoef = null;
+  try {
+    const gameStore = require('./gameStore.js');
+    const u = gameStore.getCurrentUser() || {};
+    currentUserId = String(u.userId || '').trim();
+  } catch (e) { /* ignore */ }
+  try {
+    const userProfileStore = require('./userProfileStore.js');
+    const profile = userProfileStore.loadProfile() || {};
+    const pid = String(profile.userId || '').trim();
+    if (pid && !currentUserId) currentUserId = pid;
+    if (profile.handicap != null && profile.handicap !== '') {
+      meHandicap = profile.handicap;
+    }
+    if (profile.floatCoef != null && profile.floatCoef !== '') {
+      meFloatCoef = profile.floatCoef;
+    }
+  } catch (e) { /* ignore */ }
+  if (!currentUserId) currentUserId = 'me';
+
+  const base = {
+    currentUserId: currentUserId,
+    meHandicap: meHandicap,
+    meFloatCoef: meFloatCoef,
+    allowDemoMetrics: isDemoLeaderboardGame(game)
+  };
+  if (overrides && typeof overrides === 'object') {
+    return Object.assign({}, base, overrides);
+  }
+  return base;
+}
+
+/**
+ * 差点/浮动归属：
+ * - slot 正式值优先；
+ * - 仅本人 slot 可回退 profile；
+ * - 他人缺字段 → null → "--"；
+ * - DEMO 表仅 allowDemoMetrics 时可用。
+ */
+function resolvePlayerMetrics(slot, metricsCtx) {
+  let handicap = pickSlotMetric(slot, 'handicap');
+  let floatCoef = pickSlotMetric(slot, 'floatCoef');
+  const ctx = metricsCtx || null;
+
+  if (isLeaderboardSelfSlot(slot, ctx)) {
+    if (handicap == null && ctx && ctx.meHandicap != null && ctx.meHandicap !== '') {
+      handicap = ctx.meHandicap;
+    }
+    if (floatCoef == null && ctx && ctx.meFloatCoef != null && ctx.meFloatCoef !== '') {
+      floatCoef = ctx.meFloatCoef;
+    }
+  } else if (ctx && ctx.allowDemoMetrics) {
+    const demoKey = resolveDemoMetricsLookupId(slot);
+    const demo = demoKey ? DEMO_PLAYER_METRICS[demoKey] : null;
+    if (demo) {
+      if (handicap == null) handicap = demo.handicap;
+      if (floatCoef == null) floatCoef = demo.floatCoef;
+    }
+  }
+
+  return {
+    handicap: handicap,
+    floatCoef: floatCoef,
+    handicapText: formatLeaderboardMetric(handicap),
+    floatCoefText: formatLeaderboardMetric(floatCoef)
+  };
+}
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -43,13 +216,18 @@ function getGroupComposition(game, group, groupIndex) {
   return null;
 }
 
-function enrichPlayerIdentity(m) {
+function enrichPlayerIdentity(m, metricsCtx) {
   const prof = getProfileById(m.playerId, m);
   const hasRawGender = !!(m && (m.gender || m.sex || m.matchGender));
   const genderSource = hasRawGender || FRIEND_ID_SET[m.playerId] ? prof : m;
   const genderDisplay = playerManage.getGenderDisplay(genderSource);
+  const metrics = resolvePlayerMetrics(m, metricsCtx);
   return {
     playerId: m.playerId,
+    // 与 playerId 同源稳定身份；供主页入口解析（勿用 slot/name）
+    userId: m.userId || m.playerUserId || m.playerId || '',
+    userType: m.userType || '',
+    identitySource: m.identitySource || '',
     name: m.name || '',
     avatar: mockAvatars.resolveAvatar(m.avatar, m.playerId || m.name),
     flag: prof.flag || '',
@@ -57,12 +235,18 @@ function enrichPlayerIdentity(m) {
     age: prof.age || '',
     isFemale: genderDisplay.gender === 'female',
     genderIcon: genderDisplay.icon,
-    genderClass: genderDisplay.className
+    genderClass: genderDisplay.className,
+    handicap: metrics.handicap,
+    floatCoef: metrics.floatCoef,
+    handicapText: metrics.handicapText,
+    floatCoefText: metrics.floatCoefText
   };
 }
 
-function normalizeMembers(team) {
-  return ((team && (team.members || team.players)) || []).map(enrichPlayerIdentity);
+function normalizeMembers(team, metricsCtx) {
+  return ((team && (team.members || team.players)) || []).map(function (m) {
+    return enrichPlayerIdentity(m, metricsCtx);
+  });
 }
 
 /** 是否存在球员组合（teams）数据 */
@@ -129,13 +313,16 @@ function computeTeamHoleScores(members, scoresByPlayer) {
   return scores;
 }
 
-function resolveTeamScores(group, teamIndex, team) {
+function resolveTeamScores(group, teamIndex, team, metricsCtx) {
   const entities = (group && group.teamScoresByEntity) || [];
   const entity = entities[teamIndex];
   if (entity && Array.isArray(entity.scores) && entity.scores.some(isFilled)) {
     return entity.scores.slice();
   }
-  return computeTeamHoleScores(normalizeMembers(team), group.scoresByPlayer || {});
+  return computeTeamHoleScores(
+    normalizeMembers(team, metricsCtx),
+    group.scoresByPlayer || {}
+  );
 }
 
 function aggregateScores(scores) {
@@ -152,16 +339,16 @@ function aggregateScores(scores) {
   return { total, diff: total - parThru, thru };
 }
 
-function buildTeamRows(game) {
+function buildTeamRows(game, metricsCtx) {
   const flat = [];
   (game.groups || []).forEach((grp, gi) => {
     const comp = getGroupComposition(game, grp, gi);
     if (!comp || !Array.isArray(comp.teams) || !comp.teams.length) return;
 
     comp.teams.forEach((team, ti) => {
-      const members = normalizeMembers(team);
+      const members = normalizeMembers(team, metricsCtx);
       if (!members.length) return;
-      const scores = resolveTeamScores(grp, ti, team);
+      const scores = resolveTeamScores(grp, ti, team, metricsCtx);
       const agg = aggregateScores(scores);
       const names = members.map((m) => m.name);
       const teamId = team.teamId || team.id || 'team-' + (ti + 1);
@@ -187,7 +374,7 @@ function buildTeamRows(game) {
   return flat;
 }
 
-function buildPlayerRows(game) {
+function buildPlayerRows(game, metricsCtx) {
   const flat = [];
   (game.groups || []).forEach((grp) => {
     (grp.playersSlots || []).filter(Boolean).forEach((p) => {
@@ -198,6 +385,7 @@ function buildPlayerRows(game) {
       const hasRawGender = !!(p && (p.gender || p.sex || p.matchGender));
       const genderSource = hasRawGender || FRIEND_ID_SET[p.playerId] ? prof : p;
       const genderDisplay = playerManage.getGenderDisplay(genderSource);
+      const playerVm = enrichPlayerIdentity(p, metricsCtx);
       flat.push({
         rowId: p.playerId,
         isTeam: false,
@@ -210,7 +398,7 @@ function buildPlayerRows(game) {
         flag: prof.flag,
         country: prof.country,
         age: prof.age,
-        player: enrichPlayerIdentity(p),
+        player: playerVm,
         total: agg.total,
         diff: agg.diff,
         thru: agg.thru,
@@ -248,8 +436,11 @@ function sortAndRank(flat) {
  * 构建领先榜行 + scoresIndex（rowId → 18 洞成绩数组）
  */
 function build(game, openIndex) {
+  const metricsCtx = createMetricsContext(game);
   const hasComp = gameHasComposition(game);
-  const raw = hasComp ? buildTeamRows(game) : buildPlayerRows(game);
+  const raw = hasComp
+    ? buildTeamRows(game, metricsCtx)
+    : buildPlayerRows(game, metricsCtx);
   const ranked = sortAndRank(raw);
 
   const scoresIndex = {};
@@ -271,5 +462,11 @@ module.exports = {
   gameHasComposition,
   formatTeamDisplayName,
   enrichPlayerIdentity,
-  build
+  build,
+  isDemoLeaderboardGame,
+  isLeaderboardSelfSlot,
+  resolveSlotAccountUserId,
+  resolvePlayerMetrics,
+  createMetricsContext,
+  formatLeaderboardMetric
 };

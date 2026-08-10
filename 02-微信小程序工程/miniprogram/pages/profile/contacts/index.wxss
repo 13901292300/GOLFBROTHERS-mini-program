@@ -264,6 +264,10 @@ page {
   background: var(--bg-primary);
 }
 
+.ct-row--hover {
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+}
+
 .ct-avatar {
   width: 84rpx;
   height: 84rpx;

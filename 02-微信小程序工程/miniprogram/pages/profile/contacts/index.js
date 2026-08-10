@@ -9,6 +9,7 @@ const contactNotifyStore = require('../../../utils/contactNotifyStore.js');
 const contactFollowAction = require('../../../utils/contactFollowAction.js');
 const playerDisplayName = require('../../../utils/playerDisplayName.js');
 const socialRelationStore = require('../../../utils/socialRelationStore.js');
+const openPlayerProfileUtil = require('../../../utils/openPlayerProfile.js');
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -414,8 +415,16 @@ function letterFromPinyin(pinyin) {
 function mapContactRow(f, remarkNameMap, viewerUserId) {
   const resolved = resolveDisplay(f, remarkNameMap, viewerUserId);
   const letter = letterFromPinyin(resolved.sortPinyin);
+  // 主页主键：稳定 userId / playerId；兼容 mock 行 id（与关注边同源）
+  const userId = openPlayerProfileUtil.resolveOpenableUserId({
+    userId: f.userId || f.playerId || f.id,
+    playerId: f.playerId || f.userId || f.id,
+    userType: f.userType || f.mpUserType || ''
+  });
   return {
     id: f.id,
+    userId: userId,
+    canOpenProfile: !!userId,
     nickname: String(f.nickname || '').trim(),
     remark: resolved.remark || String(f.remark || '').trim(),
     displayName: resolved.displayName,
@@ -426,7 +435,11 @@ function mapContactRow(f, remarkNameMap, viewerUserId) {
     handicapText: formatHandicap(f.handicap),
     floatText: formatFloat(f.floatCoef),
     signature: String(f.signature || '').trim(),
-    avatar: mockAvatars.avatarByIndex(f.avatarIndex)
+    avatar: mockAvatars.avatarByIndex(f.avatarIndex),
+    userType: f.userType || f.mpUserType || '',
+    gender: f.gender || '',
+    handicap: f.handicap,
+    floatCoef: f.floatCoef
   };
 }
 
@@ -662,6 +675,84 @@ function emptyTextForTab(tab, searchMode) {
   return '暂无双向关注球友';
 }
 
+/**
+ * 归一化选人模式：只认明确 query / 页面状态，不猜 TAB / 复选框 / 上一页。
+ * 创建/邀请等现网选人页在 friends；通讯录若带下列参数则视为选人。
+ */
+function resolveIsSelectionMode(options) {
+  const o = options && typeof options === 'object' ? options : {};
+  const truthy = function (v) {
+    if (v === true || v === 1) return true;
+    const s = String(v == null ? '' : v)
+      .trim()
+      .toLowerCase();
+    return s === '1' || s === 'true' || s === 'yes';
+  };
+  if (truthy(o.selectMode) || truthy(o.isSelectionMode) || truthy(o.selection)) return true;
+  if (truthy(o.select) || truthy(o.pick)) return true;
+  if (o.selectionContext != null && String(o.selectionContext).trim() !== '') return true;
+
+  const mode = String(o.mode || '')
+    .trim()
+    .toLowerCase();
+  if (
+    mode === 'select' ||
+    mode === 'picker' ||
+    mode === 'pick' ||
+    mode === 'invite' ||
+    mode === 'add_member' ||
+    mode === 'add-member' ||
+    mode === 'proxy_register' ||
+    mode === 'proxy_register_team' ||
+    mode === 'select_temp_admin'
+  ) {
+    return true;
+  }
+
+  const pickerMode = String(o.pickerMode || '')
+    .trim()
+    .toLowerCase();
+  if (
+    truthy(o.pickerMode) ||
+    pickerMode === 'select' ||
+    pickerMode === 'pick' ||
+    pickerMode === 'invite' ||
+    pickerMode === 'add'
+  ) {
+    return true;
+  }
+
+  const scene = String(o.scene || '')
+    .trim()
+    .toLowerCase();
+  if (
+    scene === 'select' ||
+    scene === 'picker' ||
+    scene === 'invite' ||
+    scene === 'add_member' ||
+    scene === 'pick' ||
+    scene === 'create'
+  ) {
+    return true;
+  }
+
+  const source = String(o.source || '')
+    .trim()
+    .toLowerCase();
+  if (
+    source === 'select' ||
+    source === 'picker' ||
+    source === 'invite' ||
+    source === 'add_member' ||
+    source === 'pick' ||
+    source === 'create'
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 Page({
   data: {
     themeClass: 'bright-mode',
@@ -681,12 +772,27 @@ Page({
     emptyText: '暂无双向关注球友',
     scrollIntoView: '',
     newFollowerRows: [],
-    followersTabBadge: false
+    followersTabBadge: false,
+    /** 明确选人模式（由 query 归一化，不猜 UI） */
+    isSelectionMode: false,
+    selectedMap: {}
   },
 
-  onLoad() {
+  onLoad(options) {
     this._searchTimer = null;
     this._keywordDraft = '';
+    this._profileNavLock = false;
+    this._selectionTapLock = false;
+    const opt = options || {};
+    // 唯一模式真相：显式参数 → isSelectionMode（首页入口无参 = 浏览）
+    const isSelectionMode = resolveIsSelectionMode(opt);
+    this._isSelectionMode = isSelectionMode;
+    this._selectMode = isSelectionMode; // 兼容旧字段名
+    this._selectedMap = {};
+    this.setData({
+      isSelectionMode: isSelectionMode,
+      selectedMap: {}
+    });
     /**
      * mock 关系库（运行时可变）：
      * friends / following / followers / newFollowers / recommendations
@@ -957,7 +1063,7 @@ Page({
     this.setData({ scrollIntoView: 'sec-' + letter });
   },
 
-  /** 推荐 / 粉丝：统一加关注入口（组件 bind:follow） */
+  /** 推荐 / 粉丝：统一加关注入口（组件 catchtap → bind:follow，不冒泡进主页） */
   onFollowAction(e) {
     const id = String(
       (e.detail && (e.detail.userId || e.detail.playerId)) ||
@@ -989,6 +1095,100 @@ Page({
       icon: 'none',
       duration: 900
     });
+  },
+
+  /**
+   * 球员整行唯一入口（头像 / 姓名 / 空白 / 勾选区共用）。
+   * 选人 → 仅 toggle；浏览 → 仅 openPlayerProfile。二者互斥。
+   */
+  onTapPlayer(e) {
+    if (this._isSelectionMode || this.data.isSelectionMode) {
+      this.togglePlayerSelection(e);
+      return;
+    }
+    this.openContactPlayerProfile(e);
+  },
+
+  /** @deprecated 兼容旧 bind；请用 onTapPlayer */
+  onTapContactRow(e) {
+    this.onTapPlayer(e);
+  },
+
+  /**
+   * 选人模式：按 selection key（行 id）切换选中；不要求 userId；不进主页。
+   * 确认/取消/全选等若由上层流程提供，保持其既有逻辑。
+   */
+  togglePlayerSelection(e) {
+    if (!(this._isSelectionMode || this.data.isSelectionMode)) return;
+    if (this._selectionTapLock) return;
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    // 选择键 ≠ 主页 targetUserId；临时球员可无 userId 仍可选
+    const selectionKey = String(
+      ds.selectionKey || ds.id || ds.playerId || ''
+    ).trim();
+    if (!selectionKey) return;
+
+    this._selectionTapLock = true;
+    const self = this;
+    setTimeout(function () {
+      self._selectionTapLock = false;
+    }, 280);
+
+    const prev = this._selectedMap || this.data.selectedMap || {};
+    const next = Object.assign({}, prev);
+    if (next[selectionKey]) delete next[selectionKey];
+    else next[selectionKey] = true;
+    this._selectedMap = next;
+    this.setData({ selectedMap: next });
+  },
+
+  /**
+   * 浏览模式：整行进入球员主页。
+   * 主页用 targetUserId；与选人 selection key 分离。
+   */
+  openContactPlayerProfile(e) {
+    if (this._isSelectionMode || this.data.isSelectionMode) return;
+    if (this._profileNavLock) return;
+
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const rowUserId = String(ds.userId || '').trim();
+    const nickname = String(ds.nickname || '').trim();
+    const avatar = String(ds.avatar || '').trim();
+    const userType = String(ds.userType || '').trim();
+
+    // 主页身份：只用稳定 userId；不把 selection id / 姓名当身份
+    const targetUserId = openPlayerProfileUtil.resolveOpenableUserId({
+      userId: rowUserId,
+      playerId: rowUserId,
+      userType: userType
+    });
+    if (!targetUserId) {
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return;
+    }
+
+    this._profileNavLock = true;
+    const self = this;
+    const opened = openPlayerProfileUtil.openPlayerProfile({
+      userId: targetUserId,
+      playerId: targetUserId,
+      publicName: nickname,
+      nickname: nickname,
+      avatar: avatar,
+      gender: ds.gender,
+      handicap: ds.handicap,
+      floatCoef: ds.floatCoef,
+      userType: userType,
+      identitySource: 'contacts'
+    });
+    if (!opened) {
+      this._profileNavLock = false;
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return;
+    }
+    setTimeout(function () {
+      self._profileNavLock = false;
+    }, 800);
   },
 
   onBack() {

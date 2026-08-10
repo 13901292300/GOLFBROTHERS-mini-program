@@ -31,8 +31,11 @@ Component({
       value: 'auto'
     },
     /**
-     * 辅助信息行：countryAge（默认 COUNTRY/AGE）| handicapFloat（江湖差点/浮动系数）
-     * 球队赛家族传 handicapFloat；普通球局/系列赛/Hub 默认 countryAge。
+     * 辅助信息行：
+     * - countryAge（默认 COUNTRY/AGE）
+     * - handicapFloat（球队赛：江湖差点　浮动系数）
+     * - handicapFloatHub（普通多组 Hub：江湖差点 · 浮动系数）
+     * 默认 countryAge；须由页面显式开启差点模式，禁止改默认牵动全局。
      */
     metaMode: {
       type: String,
@@ -101,7 +104,9 @@ Component({
     displayRelationLabel: '',
     showFollowBtn: false,
     showRelationTag: false,
+    /** 有球员行即显示 ›；无稳定身份时弱化 */
     showProfileEntry: false,
+    profileEntryEnabled: false,
     displayGenderSymbol: '',
     displayGenderClass: '',
     showAvatarBadge: false,
@@ -155,11 +160,11 @@ Component({
       if (Object.keys(patch).length) this.setData(patch);
     },
 
-    /** 资料页入口主键：稳定 userId；排除 scorecardKey / guest_ */
+    /** 资料页入口主键：稳定 userId；排除 scorecardKey / guest_ / 索引 */
     _resolveProfileUserId(player) {
       if (!player || typeof player !== 'object') return '';
       const id = playerIdentityGuard.normalizePlayerUserId(
-        player.playerId || player.userId
+        player.userId || player.playerUserId || player.playerId
       );
       if (!playerIdentityGuard.isStablePublicUserId(id, { userType: player.userType })) {
         return '';
@@ -168,10 +173,18 @@ Component({
     },
 
     _syncProfileEntry() {
-      const show = !!this._resolveProfileUserId(this.data.player || {});
-      if (this.data.showProfileEntry !== show) {
-        this.setData({ showProfileEntry: show });
-      }
+      const player = this.data.player || {};
+      const userId = this._resolveProfileUserId(player);
+      // 有球员行即展示进入图标；无稳定身份时弱化，点击由页面提示
+      const show = !!(
+        player &&
+        (player.playerId || player.userId || player.playerUserId || player.name || player.avatar)
+      );
+      const enabled = !!userId;
+      const patch = {};
+      if (this.data.showProfileEntry !== show) patch.showProfileEntry = show;
+      if (this.data.profileEntryEnabled !== enabled) patch.profileEntryEnabled = enabled;
+      if (Object.keys(patch).length) this.setData(patch);
     },
 
     _syncRelationDisplay() {
@@ -277,15 +290,17 @@ Component({
     /**
      * 昵称后进入按钮 → 球员资料页（页面负责路由；组件不跳转）。
      * catchtap 已阻冒泡，不触发展开/关注/reaction。
+     * 无稳定身份时仍抛 profiletap（unavailable），由页面统一提示。
      */
     onProfileTap() {
       const player = this.data.player || {};
       const userId = this._resolveProfileUserId(player);
-      if (!userId) return;
       const detail = {
         userId: userId,
         playerId: userId,
-        name: String(player.name || player.nickname || '').trim(),
+        unavailable: !userId,
+        name: String(player.name || player.nickname || player.publicName || '').trim(),
+        publicName: String(player.publicName || player.nickname || player.name || '').trim(),
         avatar: String(player.avatar || '').trim()
       };
       if (player.userType != null && String(player.userType).trim() !== '') {
@@ -294,6 +309,9 @@ Component({
       if (player.identitySource != null && String(player.identitySource).trim() !== '') {
         detail.identitySource = String(player.identitySource).trim();
       }
+      if (player.gender != null) detail.gender = player.gender;
+      if (player.handicap != null) detail.handicap = player.handicap;
+      if (player.floatCoef != null) detail.floatCoef = player.floatCoef;
       this.triggerEvent('profiletap', detail);
     }
   }

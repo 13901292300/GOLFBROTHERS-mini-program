@@ -23,6 +23,16 @@ const playerManage = require('../../../utils/playerManage.js');
 const teeSheetManage = require('../../../utils/teeSheetManage.js');
 const gameProgress = require('../../../utils/gameProgress.js');
 const contactFollowAction = require('../../../utils/contactFollowAction.js');
+const openPlayerProfileUtil = require('../../../utils/openPlayerProfile.js');
+
+/** 开发诊断：普通多组进组/返回栈；默认关闭 */
+const HUB_NAV_DEBUG = false;
+function hubNavDebug() {
+  if (!HUB_NAV_DEBUG) return;
+  try {
+    console['log'].apply(console, arguments);
+  } catch (e) { /* ignore */ }
+}
 
 function holePars() {
   return holeLayout.getLayout().holePars;
@@ -2297,15 +2307,43 @@ Page({
     this.setData({ scorePanel: value });
   },
 
+  _hubNavStackRoutes() {
+    try {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      return (pages || []).map(function (p) {
+        const route = (p && (p.route || p.__route__)) || '';
+        const gid =
+          (p && p.options && p.options.gameId != null && String(p.options.gameId)) || '';
+        return gid ? route + '?gameId=' + gid : route;
+      });
+    } catch (e) {
+      return [];
+    }
+  },
+
   // 进入某组记分页：先写好该组 matchState（本组球员/赛制/球场/组数），再统一 enterScorePage
   _enterGroupScore(gi) {
+    if (this._scoreEnterLock) return;
     const game = gameStore.getGameById(this._gameId || this.data.gameId);
     if (!game) {
       wx.showToast({ title: '暂无比赛数据', icon: 'none' });
       return;
     }
-    matchStateUtil.setMatchState(matchStateUtil.buildFromGame(game, gi));
+    this._scoreEnterLock = true;
+    const self = this;
+    const groupIndex = Number(gi) || 0;
+    hubNavDebug('[HUB_NAV]', {
+      op: 'enterGroupScore',
+      gameId: this._gameId || this.data.gameId,
+      groupIndex: groupIndex,
+      stack: this._hubNavStackRoutes(),
+      nav: 'enterScorePage/navigateTo'
+    });
+    matchStateUtil.setMatchState(matchStateUtil.buildFromGame(game, groupIndex));
     matchStateUtil.enterScorePage();
+    setTimeout(function () {
+      self._scoreEnterLock = false;
+    }, 800);
   },
 
   // 进入某组记分页（返回仍回到本 Game Hub）
@@ -2320,12 +2358,34 @@ Page({
 
   // 有上一页（如球友圈）则 navigateBack，保留来源页滚动；无栈时才回首页
   onBack() {
+    if (this._backNavLock) return;
+    this._backNavLock = true;
+    const self = this;
+    const release = function () {
+      setTimeout(function () {
+        self._backNavLock = false;
+      }, 500);
+    };
     const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    hubNavDebug('[HUB_NAV]', {
+      op: 'hubBack',
+      gameId: this._gameId || this.data.gameId,
+      stack: this._hubNavStackRoutes(),
+      nav: pages && pages.length > 1 ? 'navigateBack' : 'reLaunch_home'
+    });
     if (pages && pages.length > 1) {
-      wx.navigateBack({ delta: 1 });
+      wx.navigateBack({
+        delta: 1,
+        complete: release,
+        fail: release
+      });
       return;
     }
-    wx.reLaunch({ url: '/pages/home/index?tab=my' });
+    wx.reLaunch({
+      url: '/pages/home/index?tab=my',
+      complete: release,
+      fail: release
+    });
   },
 
   onLeaderboardFollow(e) {
@@ -2351,6 +2411,55 @@ Page({
       icon: 'none',
       duration: 900
     });
+  },
+
+  /**
+   * 领先榜展开 ›：统一 openPlayerProfile（navigateTo）。
+   * catchtap 在组件内；不触发展开/收起。组合成员各自绑定 mem.playerId。
+   */
+  onLeaderboardPlayerProfileTap(e) {
+    if (this._profileNavLock) return;
+    const detail = (e && e.detail) || {};
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const payload = {
+      userId: detail.userId || detail.playerId || ds.userid || ds.userId,
+      playerId: detail.playerId || detail.userId || ds.playerid || ds.playerId,
+      publicName:
+        detail.publicName || detail.name || ds.name || '',
+      name: detail.publicName || detail.name || ds.name || '',
+      nickname: detail.nickname || '',
+      avatar: detail.avatar || ds.avatar || '',
+      gender: detail.gender,
+      handicap: detail.handicap,
+      floatCoef: detail.floatCoef,
+      userType: detail.userType || ds.usertype || ds.userType,
+      identitySource: detail.identitySource || 'gameLeaderboard'
+    };
+    if (detail.unavailable) {
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return;
+    }
+    const targetUserId = openPlayerProfileUtil.resolveOpenableUserId(payload);
+    if (!targetUserId) {
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return;
+    }
+    this._profileNavLock = true;
+    const self = this;
+    const opened = openPlayerProfileUtil.openPlayerProfile(
+      Object.assign({}, payload, {
+        userId: targetUserId,
+        playerId: targetUserId
+      })
+    );
+    if (!opened) {
+      this._profileNavLock = false;
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return;
+    }
+    setTimeout(function () {
+      self._profileNavLock = false;
+    }, 800);
   },
 
   noop() {},

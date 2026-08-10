@@ -7883,13 +7883,29 @@ Page({
 
   /**
    * 球员主页统一入口（主包 openPlayerProfile；不复制身份判断）。
-   * @param {{ userId?: string, playerId?: string, name?: string, avatar?: string, userType?: string, identitySource?: string }} raw
+   * @param {{ userId?: string, playerId?: string, name?: string, avatar?: string, userType?: string, identitySource?: string, unavailable?: boolean }} raw
    */
   _openReservedPlayerProfile(raw) {
+    if (this._profileNavLock) return null;
     const payload = raw && typeof raw === 'object' ? raw : {};
-    const opened = openPlayerProfileUtil.openPlayerProfile({
+    if (payload.unavailable) {
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return null;
+    }
+    const targetUserId = openPlayerProfileUtil.resolveOpenableUserId({
       userId: payload.userId || payload.playerId,
       playerId: payload.playerId || payload.userId,
+      userType: payload.userType
+    });
+    if (!targetUserId) {
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return null;
+    }
+    this._profileNavLock = true;
+    const self = this;
+    const opened = openPlayerProfileUtil.openPlayerProfile({
+      userId: targetUserId,
+      playerId: targetUserId,
       // 公开/赛事快照昵称；禁止备注展示名进入导航 context
       publicName:
         payload.publicName ||
@@ -7909,14 +7925,21 @@ Page({
       handicap: payload.handicap,
       floatCoef: payload.floatCoef,
       userType: payload.userType,
-      identitySource: payload.identitySource,
-      silent: true
+      identitySource: payload.identitySource || 'tournamentLeaderboard'
     });
-    return opened ? openPlayerProfileUtil.resolveOpenableUserId(payload) : null;
+    if (!opened) {
+      this._profileNavLock = false;
+      wx.showToast({ title: '该球员暂无主页', icon: 'none', duration: 1200 });
+      return null;
+    }
+    setTimeout(function () {
+      self._profileNavLock = false;
+    }, 800);
+    return targetUserId;
   },
 
   /**
-   * 领先榜展开：昵称后 › → 球员资料页预留入口。
+   * 领先榜展开：昵称后 › → 球员主页（组件 profiletap / 行内 catchtap）。
    */
   onLeaderboardPlayerProfileTap(e) {
     const detail = (e && e.detail) || {};
@@ -7924,10 +7947,15 @@ Page({
     this._openReservedPlayerProfile({
       userId: detail.userId || detail.playerId || ds.userid || ds.userId,
       playerId: detail.playerId || detail.userId || ds.playerid || ds.playerId,
-      name: detail.name || ds.name,
+      publicName: detail.publicName || detail.name || ds.name,
+      name: detail.publicName || detail.name || ds.name,
       avatar: detail.avatar || ds.avatar,
+      gender: detail.gender,
+      handicap: detail.handicap,
+      floatCoef: detail.floatCoef,
       userType: detail.userType || ds.usertype || ds.userType,
-      identitySource: detail.identitySource || ds.identitysource || ds.identitySource
+      identitySource: detail.identitySource || ds.identitysource || ds.identitySource,
+      unavailable: !!detail.unavailable
     });
   },
 

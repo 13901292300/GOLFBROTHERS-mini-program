@@ -56,12 +56,28 @@
 }
 .sc-chevron {
   flex-shrink: 0;
-  margin-left: 8rpx;
-  padding: 8rpx 4rpx 8rpx 8rpx;
+  margin-left: 4rpx;
+  min-width: 64rpx;
+  min-height: 64rpx;
+  padding: 0 4rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted, #6b7280);
-  font-size: 24rpx;
-  line-height: 1;
   box-sizing: border-box;
+}
+.sc-chevron__glyph {
+  font-size: 28rpx;
+  line-height: 1;
+  font-weight: 600;
+}
+.sc-chevron--disabled {
+  opacity: 0.32;
+  color: var(--text-muted, #9ca3af);
+}
+.dark-mode .sc-chevron--disabled,
+.theme-dark .sc-chevron--disabled {
+  opacity: 0.4;
 }
 .sc-sub {
   color: var(--text-muted, #6b7280);
