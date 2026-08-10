@@ -434,13 +434,22 @@ page {
   height: 64rpx;
   border-radius: 12rpx;
   border: 1px solid var(--border);
-  background: #ffffff;
+  /* 勿写死 #fff：DARK 下主文字为浅色，白底会吞掉已输入数字 */
+  background: var(--bg-card);
   color: var(--text-primary);
+  caret-color: var(--text-primary);
   font-size: 30rpx;
   line-height: 1.4;
   font-weight: 800;
   text-align: center;
   box-sizing: border-box;
+}
+/* 原生 input 不一定继承外层色：DARK 下对控件本身再钉一次主文字/背景 */
+.create-page.dark-mode .team-competition-rule__input {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  caret-color: var(--text-primary);
+  border-color: var(--border);
 }
 .team-group-list {
   display: flex;
