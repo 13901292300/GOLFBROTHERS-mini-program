@@ -10,6 +10,7 @@ const { FRIEND_LIST } = require('../../../../utils/playerDirectory.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const { isInterTeamMatch } = require('../../../../utils/teamMatchCapabilities.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
@@ -297,7 +298,9 @@ Page({
     isTempAdminSelectMode: false,
     registrationStateMap: {},
     operatorUserId: '',
-    teamId: ''
+    teamId: '',
+    /** 队际赛成员来源球队名（展示用，非报名归属） */
+    sourceTeamName: ''
   },
 
   onLoad(options) {
@@ -414,11 +417,16 @@ Page({
   /** 代报名列表数据源：好友 FRIEND_LIST / 球队成员 getTeamMembers */
   _resolveProxyCandidateList(mode, teamId, matchId) {
     if (mode === PROXY_TEAM_MODE) {
+      // 只接受真实俱乐部 teamId（队际=sourceTeamId；队内=match.teamId）
+      // 禁止把 teamGroups.id（报名侧 groupId）传入 getTeamMembers
       let resolvedTeamId = String(teamId || '').trim();
       if (!resolvedTeamId && matchId) {
         try {
           const match = teamMatchStore.getMatchById(matchId);
-          resolvedTeamId = match && match.teamId ? String(match.teamId).trim() : '';
+          // 队际主办方 teamId ≠ 参赛俱乐部；仅队内赛可回退 match.teamId
+          if (match && !isInterTeamMatch(match)) {
+            resolvedTeamId = match.teamId ? String(match.teamId).trim() : '';
+          }
         } catch (e) {
           resolvedTeamId = '';
         }
@@ -439,6 +447,9 @@ Page({
     const mode = isProxyRegisterModeValue(modeFromUrl) ? modeFromUrl : PROXY_MODE;
     const matchId = opt.matchId ? decodeURIComponent(String(opt.matchId)) : '';
     const teamId = opt.teamId ? decodeURIComponent(String(opt.teamId)) : '';
+    const sourceTeamName = opt.sourceTeamName
+      ? decodeURIComponent(String(opt.sourceTeamName))
+      : '';
     const operatorFromUrl = opt.operatorUserId ? decodeURIComponent(String(opt.operatorUserId)) : '';
     const operatorFallback = operatorFromUrl || currentUser.playerId || '';
 
@@ -460,6 +471,7 @@ Page({
       isProxyTeamMode: mode === PROXY_TEAM_MODE,
       matchId: matchId,
       teamId: teamId,
+      sourceTeamName: sourceTeamName,
       slotId: opt.slotId || '',
       keyword: '',
       currentUser: currentUser,
@@ -576,6 +588,10 @@ Page({
       this._proxyTeamId ||
       this.data.teamId ||
       '';
+    const sourceTeamName =
+      (context.sourceTeamName != null ? String(context.sourceTeamName).trim() : '') ||
+      this.data.sourceTeamName ||
+      '';
 
     const registrationMap = {};
     users.forEach((u) => {
@@ -622,6 +638,7 @@ Page({
       isProxyTeamMode: mode === PROXY_TEAM_MODE,
       matchId: matchId,
       teamId: teamId || this.data.teamId || '',
+      sourceTeamName: sourceTeamName,
       slotId: opt.slotId || this.data.slotId || '',
       keyword: this.data.keyword || '',
       currentUser: currentUser,

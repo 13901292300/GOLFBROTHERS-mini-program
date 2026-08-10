@@ -23,6 +23,25 @@ page { height: 100%; background: var(--bg-primary); }
 .gb-header__title { display: block; color: #fff; font-size: 32rpx; font-weight: 900; font-style: italic; line-height: 1; }
 
 .search-bar-wrap { flex-shrink: 0; background: var(--bg-primary); padding: 20rpx 32rpx; }
+.proxy-source-banner {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+  margin-bottom: 16rpx;
+  padding: 0 4rpx;
+}
+.proxy-source-banner__label {
+  font-size: 22rpx;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.proxy-source-banner__name {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
 .search-bar { display: flex; align-items: center; gap: 16rpx; height: 76rpx; padding: 0 24rpx; border-radius: 999rpx; background: var(--bg-subtle); border: 1px solid var(--border); }
 .search-bar__icon { font-size: 28rpx; color: var(--text-muted); flex-shrink: 0; }
 .search-bar__input { flex: 1; min-width: 0; font-size: 28rpx; color: var(--text-primary); }

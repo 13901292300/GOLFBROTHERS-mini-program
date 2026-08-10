@@ -948,8 +948,9 @@ Page({
     teamGroupLogoById: {},
     registerSideLabel: '分队',
     registerSheetGroupLabel: '报名分组',
-    proxyGroupSheetTitle: '选择代表分队',
+    proxyGroupSheetTitle: '选择报名分队',
     proxyGroupSheetSub: '本次选择的选手将统一报名到同一个分队',
+    proxyRegistrationFieldLabel: '报名分队',
 
     // 报名 TAB（结构占位，暂无报名业务）
     registerInfo: EMPTY_REGISTER_INFO,
@@ -1122,11 +1123,16 @@ Page({
     registerForOtherManualName: '',
     registerForOtherManualPhone: '',
     registerForOtherManualGender: 'male',
-    // Patch 3：代报名待确认人员 + 分队选择弹窗（不写盘）
+    // Patch 3：代报名待确认人员 + 报名球队/分队选择弹窗（不写盘）
     pendingProxyPlayers: [],
     proxyGroupSheetVisible: false,
     proxyGroupOptions: [],
-    proxyGroupId: ''
+    proxyGroupId: '',
+    /** 队际赛·球队成员渠道：成员来源（筛选用，非报名归属） */
+    proxyMemberSourceDisplayName: '',
+    proxyMemberSourceSheetVisible: false,
+    proxyMemberSourceOptions: [],
+    proxyMemberSourceGroupId: ''
   },
 
   onLoad(options) {
@@ -1896,10 +1902,11 @@ Page({
       eventInfoList: this._resolveEventInfoList(match),
       registerSideLabel: isInterTeamMatch(match) ? '球队' : '分队',
       registerSheetGroupLabel: isInterTeamMatch(match) ? '选择球队' : '报名分组',
-      proxyGroupSheetTitle: isInterTeamMatch(match) ? '选择代表球队' : '选择代表分队',
+      proxyGroupSheetTitle: isInterTeamMatch(match) ? '选择报名球队' : '选择报名分队',
       proxyGroupSheetSub: isInterTeamMatch(match)
-        ? '本次选择的选手将统一报名到同一支球队'
+        ? '本次选择的选手将统一报名到同一支球队；可与成员来源不同'
         : '本次选择的选手将统一报名到同一个分队',
+      proxyRegistrationFieldLabel: isInterTeamMatch(match) ? '报名球队' : '报名分队',
       scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
     }, this._buildLeaderboardProfileEntryPatch(leaderboardRows, teamLeaderboardRows), this._buildLeaderboardRelationPatch(leaderboardRows, teamLeaderboardRows, match), this._buildParticipatingTeamsUiPatch(match, false), this._buildRegisterStatePatch(match), this._buildGroupsTabStatePatch(match)), () => {
       this.applyMoreAccess();
@@ -1973,10 +1980,11 @@ Page({
       eventInfoList: this._resolveEventInfoList(match),
       registerSideLabel: isInterTeamMatch(match) ? '球队' : '分队',
       registerSheetGroupLabel: isInterTeamMatch(match) ? '选择球队' : '报名分组',
-      proxyGroupSheetTitle: isInterTeamMatch(match) ? '选择代表球队' : '选择代表分队',
+      proxyGroupSheetTitle: isInterTeamMatch(match) ? '选择报名球队' : '选择报名分队',
       proxyGroupSheetSub: isInterTeamMatch(match)
-        ? '本次选择的选手将统一报名到同一支球队'
+        ? '本次选择的选手将统一报名到同一支球队；可与成员来源不同'
         : '本次选择的选手将统一报名到同一个分队',
+      proxyRegistrationFieldLabel: isInterTeamMatch(match) ? '报名球队' : '报名分队',
       scorecardAdImage: this._resolveScorecardAdImage(getApp().getTheme(), matchId)
     }, this._buildLeaderboardProfileEntryPatch(leaderboardRows, teamLeaderboardRows), this._buildLeaderboardRelationPatch(leaderboardRows, teamLeaderboardRows, match), this._buildParticipatingTeamsUiPatch(
       match,
@@ -10985,21 +10993,146 @@ Page({
   },
 
   /**
-   * Patch 7：球队成员选择（proxy_register_team）
-   * - 列表数据源：teamDirectory.getTeamMembers(match.teamId)
-   * - 三态权威：store.registerInfo.users（选择页内读取，避免 EventChannel 竞态）
+   * 队际赛参赛侧 → 成员来源选项（sourceTeamId=俱乐部通讯录；id=报名侧 groupId）。
+   * 二者不得混用：来源只筛成员，报名归属另选。
+   */
+  _resolveProxyMemberSourceOptions() {
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    const groups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    const out = [];
+    const seen = {};
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      if (!g) continue;
+      const groupId = g.id != null ? String(g.id).trim() : '';
+      const sourceTeamId =
+        g.sourceTeamId != null ? String(g.sourceTeamId).trim() : '';
+      if (!groupId || !sourceTeamId || seen[sourceTeamId]) continue;
+      seen[sourceTeamId] = true;
+      const name =
+        String(g.name || g.sourceTeamName || g.sourceTeamShortName || '').trim() ||
+        '未命名球队';
+      out.push({
+        id: groupId,
+        name: name,
+        logo: String(g.sourceTeamLogo || '').trim() || DEFAULT_ORG_LOGO,
+        sourceTeamId: sourceTeamId
+      });
+    }
+    return out;
+  },
+
+  _clearProxyMemberSourceState() {
+    this._proxyMemberSourceGroupId = '';
+    this._proxyMemberSourceTeamId = '';
+    this._proxyMemberSourceTeamName = '';
+    this.setData({
+      proxyMemberSourceDisplayName: '',
+      proxyMemberSourceSheetVisible: false,
+      proxyMemberSourceOptions: [],
+      proxyMemberSourceGroupId: ''
+    });
+  },
+
+  /** 队际赛：先选成员来源球队，再进成员列表 */
+  _openProxyMemberSourceSheet() {
+    const options = this._resolveProxyMemberSourceOptions();
+    if (!options.length) {
+      wx.showToast({ title: '暂无参赛球队成员可选', icon: 'none' });
+      return;
+    }
+    if (options.length === 1) {
+      this._confirmProxyMemberSourceAndOpenPicker(options[0]);
+      return;
+    }
+    this.setData({
+      proxyMemberSourceSheetVisible: true,
+      proxyMemberSourceOptions: options,
+      proxyMemberSourceGroupId: ''
+    });
+  },
+
+  selectProxyMemberSource(e) {
+    const id =
+      e && e.currentTarget && e.currentTarget.dataset
+        ? String(e.currentTarget.dataset.id || '')
+        : '';
+    if (!id) return;
+    this.setData({ proxyMemberSourceGroupId: id });
+  },
+
+  cancelProxyMemberSourceSheet() {
+    this._clearProxyMemberSourceState();
+  },
+
+  confirmProxyMemberSourceSheet() {
+    const groupId = String(this.data.proxyMemberSourceGroupId || '');
+    const options = this.data.proxyMemberSourceOptions || [];
+    const opt = options.find((g) => String(g.id) === groupId);
+    if (!opt || !opt.sourceTeamId) {
+      wx.showToast({ title: '请选择成员来源球队', icon: 'none' });
+      return;
+    }
+    this.setData({ proxyMemberSourceSheetVisible: false });
+    this._confirmProxyMemberSourceAndOpenPicker(opt);
+  },
+
+  _confirmProxyMemberSourceAndOpenPicker(opt) {
+    const source = opt || {};
+    const sourceTeamId = String(source.sourceTeamId || '').trim();
+    const groupId = source.id != null ? String(source.id).trim() : '';
+    const name = String(source.name || '').trim();
+    if (!sourceTeamId || !groupId) {
+      wx.showToast({ title: '成员来源球队无效', icon: 'none' });
+      return;
+    }
+    // 切换来源：清旧选择（新开选人页）；报名默认重置为该来源侧
+    this._proxyMemberSourceGroupId = groupId;
+    this._proxyMemberSourceTeamId = sourceTeamId;
+    this._proxyMemberSourceTeamName = name;
+    this.setData({
+      proxyMemberSourceDisplayName: name,
+      proxyMemberSourceGroupId: groupId
+    });
+    this._navigateProxyTeamMembersPicker(sourceTeamId, name);
+  },
+
+  /**
+   * 球队成员选择（proxy_register_team）
+   * - 队际赛：teamId = 所选参赛球队 sourceTeamId（成员来源，非报名归属）
+   * - 队内赛：teamId = match.teamId
    */
   _openRegisterForOtherTeamMembersPicker() {
     const matchId = this.data.matchId || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
-    const teamId = match && match.teamId ? String(match.teamId).trim() : '';
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    if (isInterTeamMatch(match)) {
+      this._openProxyMemberSourceSheet();
+      return;
+    }
+    const teamId = match.teamId ? String(match.teamId).trim() : '';
     if (!teamId) {
+      wx.showToast({ title: '本赛事未关联球队', icon: 'none' });
+      return;
+    }
+    this._clearProxyMemberSourceState();
+    this._navigateProxyTeamMembersPicker(teamId, '');
+  },
+
+  _navigateProxyTeamMembersPicker(teamId, sourceTeamName) {
+    const matchId = this.data.matchId || '';
+    const tid = String(teamId || '').trim();
+    if (!tid) {
       wx.showToast({ title: '本赛事未关联球队', icon: 'none' });
       return;
     }
     const operator = gameStore.getCurrentUser() || {};
     const operatorUserId = String(operator.userId || '');
     const registerUsers = ((this.data.registerInfo && this.data.registerInfo.users) || []).slice();
+    const sourceName = String(sourceTeamName || '').trim();
     const url =
       '/subpackages/player/pages/friends/index?mode=' +
       encodeURIComponent('proxy_register_team') +
@@ -11008,7 +11141,10 @@ Page({
       '&operatorUserId=' +
       encodeURIComponent(operatorUserId) +
       '&teamId=' +
-      encodeURIComponent(teamId) +
+      encodeURIComponent(tid) +
+      (sourceName
+        ? '&sourceTeamName=' + encodeURIComponent(sourceName)
+        : '') +
       '&slotId=' +
       encodeURIComponent('register-for-other-team');
     wx.navigateTo({
@@ -11020,7 +11156,8 @@ Page({
               registerUsers: registerUsers,
               operatorUserId: operatorUserId,
               matchId: matchId,
-              teamId: teamId
+              teamId: tid,
+              sourceTeamName: sourceName
             });
           }
         } catch (e) {
@@ -11335,6 +11472,8 @@ Page({
         phone: phone,
         groupId: groupId,
         groupName: groupName,
+        matchTeamId: groupId,
+        matchTeamName: groupName,
         registeredAt: registeredAt,
         source: 'proxy',
         registeredBy: registeredBy,
@@ -11485,13 +11624,22 @@ Page({
       wx.showToast({ title: '暂无' + side + '可选', icon: 'none' });
       return;
     }
+    // 报名球队（proxyGroupId / groupId）：默认=成员来源侧；允许改成其他参赛侧
+    const defaultRegId = String(this._proxyMemberSourceGroupId || '').trim();
+    const hasDefault = !!(
+      defaultRegId && options.some((g) => String(g.id) === defaultRegId)
+    );
+    const sourceName = String(this._proxyMemberSourceTeamName || '').trim();
+    const channel = pickChannel || '';
     this.setData({
       pendingProxyPlayers: list,
       proxyGroupOptions: options,
-      proxyGroupId: '',
+      proxyGroupId: hasDefault ? defaultRegId : '',
+      proxyMemberSourceDisplayName:
+        channel === 'team_members' && sourceName ? sourceName : '',
       proxyGroupSheetVisible: true
     });
-    this._proxyPickChannel = pickChannel || '';
+    this._proxyPickChannel = channel;
   },
 
   selectProxyGroup(e) {
@@ -11500,16 +11648,20 @@ Page({
     this.setData({ proxyGroupId: String(id) });
   },
 
-  /** 取消分队选择：关弹窗 + 清空 pending / commit plan，不写盘 */
+  /** 取消报名球队选择：关弹窗 + 清空 pending / commit plan，不写盘 */
   cancelProxyGroupSheet() {
     this.setData({
       proxyGroupSheetVisible: false,
       pendingProxyPlayers: [],
       proxyGroupOptions: [],
-      proxyGroupId: ''
+      proxyGroupId: '',
+      proxyMemberSourceDisplayName: ''
     });
     this._proxyPickChannel = '';
     this._proxyCommitPlan = null;
+    this._proxyMemberSourceGroupId = '';
+    this._proxyMemberSourceTeamId = '';
+    this._proxyMemberSourceTeamName = '';
   },
 
   _clearProxyRegistrationTempState() {
@@ -11517,9 +11669,16 @@ Page({
       proxyGroupSheetVisible: false,
       pendingProxyPlayers: [],
       proxyGroupOptions: [],
-      proxyGroupId: ''
+      proxyGroupId: '',
+      proxyMemberSourceDisplayName: '',
+      proxyMemberSourceSheetVisible: false,
+      proxyMemberSourceOptions: [],
+      proxyMemberSourceGroupId: ''
     });
     this._proxyPickChannel = '';
+    this._proxyMemberSourceGroupId = '';
+    this._proxyMemberSourceTeamId = '';
+    this._proxyMemberSourceTeamName = '';
   },
 
   /** 代报名人员 → registerInfo.users 记录（Patch 4） */
@@ -11691,11 +11850,50 @@ Page({
       return { ok: false, removedCount: 0, addedCount: 0 };
     }
 
+    // 提交时再校验报名状态（不以入口按钮/弹窗状态代替）
+    if (this._normalizeRegistrationStatus(match) === 'closed') {
+      this._clearProxyRegistrationTempState();
+      this._proxyCommitPlan = null;
+      this._showRegistrationClosedModal();
+      return { ok: false, removedCount: 0, addedCount: 0 };
+    }
+
     const operator = gameStore.getCurrentUser() || {};
     const operatorUserId = String(operator.userId || '');
     if (!operatorUserId) {
       wx.showToast({ title: '用户信息缺失', icon: 'none' });
       return { ok: false, removedCount: 0, addedCount: 0 };
+    }
+
+    // 有新增时：目标 groupId 必须仍属本场参赛侧（切换报名球队后的最终校验）
+    const addsPreview = Array.isArray(plan.adds) ? plan.adds : [];
+    if (addsPreview.length) {
+      const targetGroupId = String(
+        (plan.group && plan.group.id) ||
+          (addsPreview[0] && addsPreview[0].groupId) ||
+          ''
+      ).trim();
+      const liveGroups = Array.isArray(match.teamGroups) ? match.teamGroups : [];
+      const liveGroup = liveGroups.find((g) => g && String(g.id) === targetGroupId);
+      if (!targetGroupId || !liveGroup) {
+        this._clearProxyRegistrationTempState();
+        this._proxyCommitPlan = null;
+        const side = this.data.registerSideLabel || '分队';
+        wx.showToast({ title: '报名' + side + '不属于本场比赛', icon: 'none' });
+        return { ok: false, removedCount: 0, addedCount: 0 };
+      }
+      // 以赛事侧最新名称为准，保证 groupId/matchTeamId 同源
+      plan.group = {
+        id: String(liveGroup.id),
+        name: String(liveGroup.name || '').trim()
+      };
+      addsPreview.forEach((item) => {
+        if (!item) return;
+        item.groupId = plan.group.id;
+        item.groupName = plan.group.name;
+        item.matchTeamId = plan.group.id;
+        item.matchTeamName = plan.group.name;
+      });
     }
 
     if (!match.registerInfo || typeof match.registerInfo !== 'object') {
@@ -11758,6 +11956,18 @@ Page({
       const phone = item.phone != null ? String(item.phone).trim() : '';
       // Patch 6：手工添加写盘前再次按 phone 去重
       if (pickChannel === 'manual' && phone && existingPhones[phone]) return;
+      const sideId =
+        item.groupId != null && String(item.groupId).trim() !== ''
+          ? String(item.groupId).trim()
+          : item.matchTeamId != null
+            ? String(item.matchTeamId).trim()
+            : '';
+      const sideName =
+        item.groupName != null && String(item.groupName).trim() !== ''
+          ? String(item.groupName).trim()
+          : item.matchTeamName != null
+            ? String(item.matchTeamName).trim()
+            : '';
       const record = {
         userId: userId,
         userType: item.userType != null && String(item.userType).trim() !== ''
@@ -11770,8 +11980,11 @@ Page({
         gender: item.gender != null ? String(item.gender) : '',
         avatar: item.avatar != null ? String(item.avatar) : '',
         phone: phone,
-        groupId: item.groupId != null ? String(item.groupId) : '',
-        groupName: item.groupName != null ? String(item.groupName) : '',
+        groupId: sideId,
+        groupName: sideName,
+        // 参赛侧快照：与 groupId 同值（赛事侧 id，非 sourceTeamId / 通讯录 teamId）
+        matchTeamId: sideId,
+        matchTeamName: sideName,
         registeredAt: item.registeredAt != null ? item.registeredAt : Date.now(),
         source: item.source || 'proxy',
         registeredBy: item.registeredBy != null ? String(item.registeredBy) : '',
@@ -11818,6 +12031,10 @@ Page({
         pendingProxyPlayers: [],
         proxyGroupOptions: [],
         proxyGroupId: '',
+        proxyMemberSourceDisplayName: '',
+        proxyMemberSourceSheetVisible: false,
+        proxyMemberSourceOptions: [],
+        proxyMemberSourceGroupId: '',
         registerCancelModalVisible: false,
         registerCancelSubmitting: false
       }
@@ -11825,6 +12042,9 @@ Page({
     this._proxyPickChannel = '';
     this._proxyCommitPlan = null;
     this._pendingProxyCommitAfterConfirm = false;
+    this._proxyMemberSourceGroupId = '';
+    this._proxyMemberSourceTeamId = '';
+    this._proxyMemberSourceTeamName = '';
     this.setData(patch, () => {
       if (this.data.activeTab === 'register') this.measureRegisterExtTop();
       if (this.data.activeTab === 'groups') this.computeGroupsPanelMinHeight();
@@ -11841,8 +12061,9 @@ Page({
   },
 
   /**
-   * 确定分队：
-   * - friends / team_members / manual → add plan → _applyProxyCommitPlan 写盘
+   * 确定报名球队/分队（registrationTeamId = proxyGroupId = teamGroups.id）：
+   * - 写入 groupId / matchTeamId，不按成员来源 sourceTeamId 覆盖
+   * - 不校验「球员必须属于目标球队通讯录」
    */
   confirmProxyGroupSheet() {
     const groupId = String(this.data.proxyGroupId || '');
@@ -11850,9 +12071,33 @@ Page({
     const group = options.find((g) => String(g.id) === groupId);
     if (!group) {
       const side = this.data.registerSideLabel || '分队';
-      wx.showToast({ title: '请选择' + side, icon: 'none' });
+      wx.showToast({ title: '请选择报名' + side, icon: 'none' });
       return;
     }
+    // 提交前：以 store 最新赛事再校验（不以弹窗 options / 按钮态代替）
+    const match = this.data.matchId ? teamMatchStore.getMatchById(this.data.matchId) : null;
+    if (!match) {
+      wx.showToast({ title: '赛事数据缺失', icon: 'none' });
+      return;
+    }
+    if (this._normalizeRegistrationStatus(match) === 'closed') {
+      this._clearProxyRegistrationTempState();
+      this._proxyCommitPlan = null;
+      this._showRegistrationClosedModal();
+      return;
+    }
+    const groups = Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    const liveGroup = groups.find((g) => g && String(g.id) === groupId);
+    if (!liveGroup) {
+      const side = this.data.registerSideLabel || '分队';
+      wx.showToast({ title: '报名' + side + '不属于本场比赛', icon: 'none' });
+      return;
+    }
+    // 用赛事侧最新名称，避免 UI 缓存名与归属 id 不一致
+    const resolvedGroup = {
+      id: String(liveGroup.id),
+      name: String(liveGroup.name || group.name || '').trim()
+    };
     const players = this.data.pendingProxyPlayers || [];
     if (!players.length) {
       wx.showToast({ title: '未选择人员', icon: 'none' });
@@ -11868,8 +12113,8 @@ Page({
           ? 'team_members'
           : 'friends';
 
-    // 生成 add plan → 统一写盘
-    const addPlan = this._buildProxyAddPlan(players, group);
+    // 生成 add plan → 统一写盘（group 必须是赛事侧 groupId）
+    const addPlan = this._buildProxyAddPlan(players, resolvedGroup);
     detailDebugLog('[register-for-other] add plan', addPlan);
 
     // 手工添加：手机号已报名时优先提示「已报名」

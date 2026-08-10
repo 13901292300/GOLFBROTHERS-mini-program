@@ -1427,7 +1427,7 @@
   <!-- 报名/取消报名固定按钮：报名 TAB；报名中或球队赛家族 LIVE（showRegisterTabCTA）；弹层打开时降层 -->
   <view
     wx:if="{{activeTab === 'register' && showRegisterTabCTA && !hideRegisterCTA}}"
-    class="register-cta-bar {{(registerForOtherSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || registerSheetVisible) ? 'register-cta-bar--under-sheet' : ''}}"
+    class="register-cta-bar {{(registerForOtherSheetVisible || proxyMemberSourceSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || registerSheetVisible) ? 'register-cta-bar--under-sheet' : ''}}"
   >
     <view
       wx:if="{{!registerPermission.isOpen}}"
@@ -1448,7 +1448,7 @@
   <!-- 分组 TAB 底部操作：与报名 CTA 同层；弹层打开时降层，避免挡住替他人报名 -->
   <view
     wx:if="{{activeTab === 'groups' && canManageGroups && !hideRegisterCTA}}"
-    class="register-cta-bar {{(registerForOtherSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || registerSheetVisible) ? 'register-cta-bar--under-sheet' : ''}}"
+    class="register-cta-bar {{(registerForOtherSheetVisible || proxyMemberSourceSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || registerSheetVisible) ? 'register-cta-bar--under-sheet' : ''}}"
   >
     <view bindtap="onOpenGroupEditor" class="register-cta-btn">{{hasFormalGroups ? '修改分组' : '开始分组'}}</view>
   </view>
@@ -1514,18 +1514,53 @@
     </view>
   </view>
 
-  <!-- Patch 3：替他人报名 · 选择代表分队（复用报名弹窗分队标签视觉，不写盘） -->
+  <!-- 替他人报名 · 队际赛：选择成员来源球队（仅筛成员列表，非报名归属） -->
+  <view wx:if="{{proxyMemberSourceSheetVisible}}" bindtap="cancelProxyMemberSourceSheet" class="sheet-overlay"></view>
+  <view wx:if="{{proxyMemberSourceSheetVisible}}" class="bottom-sheet register-sheet proxy-group-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">Member Source</text>
+      <text class="register-sheet__title">选择成员来源球队</text>
+      <text class="register-sheet__sub">从哪支参赛球队的成员列表中选人；之后仍可更换报名球队</text>
+    </view>
+    <view class="register-sheet__field">
+      <text class="register-sheet__label">成员来源</text>
+      <view class="register-sheet__groups">
+        <view
+          wx:for="{{proxyMemberSourceOptions}}"
+          wx:key="id"
+          bindtap="selectProxyMemberSource"
+          data-id="{{item.id}}"
+          class="register-sheet__group {{proxyMemberSourceGroupId === item.id ? 'register-sheet__group--active' : ''}}"
+        >
+          <image wx:if="{{item.logo}}" class="register-sheet__group-logo" src="{{item.logo}}" mode="aspectFill" />
+          <text>{{item.name}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="register-sheet__actions">
+      <view bindtap="cancelProxyMemberSourceSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="confirmProxyMemberSourceSheet" class="register-sheet__confirm">下一步</view>
+    </view>
+  </view>
+
+  <!-- 替他人报名 · 选择报名球队/分队（registrationTeamId=proxyGroupId，可与成员来源不同） -->
   <view wx:if="{{proxyGroupSheetVisible}}" bindtap="cancelProxyGroupSheet" class="sheet-overlay"></view>
   <view wx:if="{{proxyGroupSheetVisible}}" class="bottom-sheet register-sheet proxy-group-sheet" catchtap="stopPropagation">
     <view class="sheet-top-accent"></view>
     <view class="sheet-handle"></view>
     <view class="register-sheet__head">
-      <text class="register-sheet__overline">Select Group</text>
+      <text class="register-sheet__overline">Registration Team</text>
       <text class="register-sheet__title">{{proxyGroupSheetTitle}}</text>
       <text class="register-sheet__sub">{{proxyGroupSheetSub}}</text>
     </view>
+    <view wx:if="{{proxyMemberSourceDisplayName}}" class="register-sheet__field">
+      <text class="register-sheet__label">成员来源</text>
+      <view class="register-sheet__readonly">{{proxyMemberSourceDisplayName}}</view>
+    </view>
     <view class="register-sheet__field">
-      <text class="register-sheet__label">代表{{registerSideLabel}}</text>
+      <text class="register-sheet__label">{{proxyRegistrationFieldLabel}}（可更换）</text>
       <view class="register-sheet__groups">
         <view
           wx:for="{{proxyGroupOptions}}"

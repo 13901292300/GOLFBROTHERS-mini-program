@@ -14,6 +14,10 @@
   </view>
 
   <view class="search-bar-wrap">
+    <view wx:if="{{isProxyTeamMode && sourceTeamName}}" class="proxy-source-banner">
+      <text class="proxy-source-banner__label">成员来源</text>
+      <text class="proxy-source-banner__name">{{sourceTeamName}}</text>
+    </view>
     <view class="search-bar">
       <text class="search-bar__icon">🔍</text>
       <input
