@@ -54,10 +54,14 @@ const matchStatus = require('../../../../utils/matchStatus.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const contactFollowAction = require('../../../../utils/contactFollowAction.js');
+const playerDisplayName = require('../../../../utils/playerDisplayName.js');
+const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const scheduleStore = require('../../../../utils/scheduleStore.js');
 const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
 const { buildMatchPlayResultSummary } = require('../../../../utils/matchPlayResult.js');
 const playerActionModal = require('../../../../utils/playerActionModal.js');
+const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 const reactionPanelConfig = require('../../../../utils/reactionPanelConfig.js');
 const scoreReactionAccess = require('../../../../utils/scoreReactionAccess.js');
 
@@ -1631,10 +1635,12 @@ Page({
    */
   _resolveLeaderboardFollowUserId(player) {
     if (!player || typeof player !== 'object') return '';
-    const id = String(player.playerId || player.userId || '').trim();
-    if (!id) return '';
-    if (id.indexOf(':') >= 0) return '';
-    if (id.indexOf('guest_') === 0) return '';
+    const id = playerIdentityGuard.normalizePlayerUserId(
+      player.playerId || player.userId
+    );
+    if (!playerIdentityGuard.isStablePublicUserId(id, { userType: player.userType })) {
+      return '';
+    }
     return id;
   },
 
@@ -2066,6 +2072,63 @@ Page({
   },
 
   /**
+   * 查看者私人备注 map（一次读取，按 revision 缓存）。
+   * 仅用于页面 View Model，禁止写回赛事 Store。
+   */
+  _getViewerRemarkNameMap() {
+    let viewer = '';
+    try {
+      viewer =
+        String((gameStore.getCurrentUser() || {}).userId || '').trim() ||
+        socialRelationStore.resolveCurrentUserId();
+    } catch (e) {
+      viewer = '';
+    }
+    const rev = playerDisplayName.getRemarkRevision();
+    if (
+      this._viewerRemarkCtx &&
+      this._viewerRemarkCtx.rev === rev &&
+      this._viewerRemarkCtx.viewer === viewer
+    ) {
+      return this._viewerRemarkCtx.map || {};
+    }
+    const map = playerDisplayName.buildRemarkNameMap(viewer);
+    this._viewerRemarkCtx = { rev: rev, viewer: viewer, map: map };
+    return map;
+  },
+
+  /**
+   * 查看者视角展示名：匿名预留 → 备注 → 公开/快照。
+   * @param {string} targetUserId
+   * @param {string} [publicOrSnapshotName]
+   * @param {{ publicName?: string, snapshotName?: string, identityMasked?: boolean }} [opts]
+   */
+  _resolveViewerDisplayName(targetUserId, publicOrSnapshotName, opts) {
+    const o = opts || {};
+    const fallback = publicOrSnapshotName != null ? String(publicOrSnapshotName).trim() : '';
+    const named = playerDisplayName.resolvePlayerDisplayNameForViewer({
+      viewerUserId: (this._viewerRemarkCtx && this._viewerRemarkCtx.viewer) || '',
+      targetUserId: targetUserId,
+      publicName: o.publicName != null ? o.publicName : fallback,
+      snapshotName: o.snapshotName != null ? o.snapshotName : fallback,
+      identityMasked: o.identityMasked === true,
+      remarkNameMap: this._getViewerRemarkNameMap(),
+      defaultName: '未知球员'
+    });
+    return named.displayName;
+  },
+
+  _applyViewerNamesToChat(messages) {
+    const viewer =
+      (this._viewerRemarkCtx && this._viewerRemarkCtx.viewer) ||
+      String((gameStore.getCurrentUser() || {}).userId || '').trim();
+    return playerDisplayName.mapMessageAuthorsForViewer(messages, {
+      viewerUserId: viewer,
+      remarkNameMap: this._getViewerRemarkNameMap()
+    });
+  },
+
+  /**
    * 收集报名/参赛名单原始列表（兼容 users / players / participants）
    */
   _collectRegisterPlayerSources(match) {
@@ -2161,9 +2224,16 @@ Page({
           gender: gender
         });
         const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
-        const nickname = src.nickname
-          || this._resolveAnyPlayerNickname(p)
-          || '未知球员';
+        const snapshotName =
+          this._resolveAnyPlayerNickname(p) ||
+          String(src.nickname || src.displayName || src.name || '').trim() ||
+          '';
+        const publicName = String(src.nickname || src.displayName || '').trim();
+        const nickname = this._resolveViewerDisplayName(userId, publicName || snapshotName || '未知球员', {
+          publicName: publicName,
+          snapshotName: snapshotName,
+          identityMasked: !!(src.identityMasked || p.identityMasked)
+        });
         const avatarSrc = src.avatar
           || (p.avatar ? String(p.avatar) : '')
           || (p.avatarUrl ? String(p.avatarUrl) : '')
@@ -2920,10 +2990,12 @@ Page({
     const fromSrc = src
       ? String(src.displayName || src.nickname || src.name || '').trim()
       : '';
-    if (fromSrc) return fromSrc;
     const fromSlot = this._resolveAnyPlayerNickname(slotPlayer);
-    if (fromSlot) return fromSlot;
-    return '未知球员';
+    return this._resolveViewerDisplayName(id, fromSrc || fromSlot || '未知球员', {
+      publicName: fromSrc,
+      snapshotName: fromSlot || fromSrc,
+      identityMasked: !!(src && src.identityMasked) || !!(slotPlayer && slotPlayer.identityMasked)
+    });
   },
 
   _buildMatchPlaySideMember(userId, slotPlayer, playerLookup) {
@@ -3246,10 +3318,14 @@ Page({
   _resolveGroupedPlayerName(userId, slotPlayer, playerLookup) {
     const id = userId != null ? String(userId).trim() : '';
     const src = (playerLookup && id && playerLookup[id]) || null;
-    if (src && src.nickname) return src.nickname;
+    const publicName = src && src.nickname ? String(src.nickname).trim() : '';
     const fromSlot = this._resolveAnyPlayerNickname(slotPlayer);
-    if (fromSlot) return fromSlot;
-    return '未知球员';
+    const snapshotName = fromSlot || '';
+    return this._resolveViewerDisplayName(id, publicName || snapshotName || '未知球员', {
+      publicName: publicName,
+      snapshotName: snapshotName,
+      identityMasked: !!(src && src.identityMasked) || !!(slotPlayer && slotPlayer.identityMasked)
+    });
   },
 
   _resolveGroupedPlayerAvatar(userId, slotPlayer, playerLookup) {
@@ -3592,26 +3668,29 @@ Page({
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
     const groupId = String(activeRegisterSubTab || '');
     if (!groupId) return [];
-    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
+    this._getViewerRemarkNameMap();
     return users
       .filter((user) => String(user.groupId) === groupId)
       .map((user, index) => {
         const genderDisplay = playerManage.getGenderDisplay(user);
         const userId = user.userId || '';
-        let contactRemark = '';
-        if (currentUserId && userId) {
-          try {
-            const contact = contactStore.findContact(currentUserId, userId);
-            contactRemark = contact && contact.remarkName ? String(contact.remarkName) : '';
-          } catch (e) {
-            contactRemark = '';
-          }
-        }
+        const snapshotName = playerManage.resolveMatchNickname(user) || '';
+        const publicName = String(user.nickname || user.displayName || '').trim();
+        const named = playerDisplayName.resolvePlayerDisplayNameForViewer({
+          viewerUserId: (this._viewerRemarkCtx && this._viewerRemarkCtx.viewer) || '',
+          targetUserId: userId,
+          publicName: publicName,
+          snapshotName: snapshotName,
+          identityMasked: !!user.identityMasked,
+          remarkNameMap: this._getViewerRemarkNameMap(),
+          defaultName: '未知球员'
+        });
         return {
           listKey: user.userId || ('register-user-' + groupId + '-' + index),
           userId: userId,
           playerId: userId,
-          competitionName: user.competitionName || '',
+          // 仅 View Model：备注优先；底层 registerInfo 未被修改
+          competitionName: named.displayName,
           gender: user.gender || '',
           sex: user.sex || '',
           genderIcon: user.genderIcon || genderDisplay.icon,
@@ -3635,7 +3714,7 @@ Page({
           identitySource: user.identitySource || '',
           identityLabel: user.identityLabel || '',
           identitySourceLabel: user.identitySourceLabel || '',
-          contactRemark: contactRemark,
+          contactRemark: '',
           realName: user.realName || '',
           remarkName: user.remarkName || ''
         };
@@ -4486,6 +4565,12 @@ Page({
     if (this._isReturningFromScorePage()) {
       this._resetMatchPlayExpandedOnReturn = true;
     }
+    // 私人备注变更：失效缓存，随后 refresh 重建展示名
+    const remarkRev = playerDisplayName.getRemarkRevision();
+    if (this._remarkDisplayRev != null && this._remarkDisplayRev !== remarkRev) {
+      this._viewerRemarkCtx = null;
+    }
+    this._remarkDisplayRev = remarkRev;
     // 显示偏好可能在记分页被切换 → 先同步，再 refresh，避免领先榜用旧 scoreDisplayMode 构建
     this.loadScoreDisplayMode();
     // 从「修改比赛」/记分页返回时刷新赛事基础信息，不强制重置 TAB
@@ -4496,6 +4581,10 @@ Page({
     // 出发表 groups 可能在记分页被更新 → 只重算出发表（领先榜已由上方 refreshMatchData 覆盖）
     this.refreshGroupsDerived();
     this.refreshPartnerSection();
+    // 讨论区作者名：仅投影 View Model，不写回消息存储
+    try {
+      this.setData({ chat: this._applyViewerNamesToChat(this.data.chat || []) });
+    } catch (e) { /* ignore */ }
     // 仅在已展开逐洞详情时同步刷新，避免每次 onShow 无意义分配 openScorecard
     if (this.data.openIndex != null && this.data.openIndex !== -1 && this.data.openIndex !== '') {
       this.updateOpenScorecard();
@@ -5677,7 +5766,20 @@ Page({
           scorePlayerId: scorePlayerId,
           slotIndex: slotIndex,
           position: slotIndex,
-          name: display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
+          name: this._resolveViewerDisplayName(
+            playerId,
+            display.displayName ||
+              display.name ||
+              lookup.nickname ||
+              this._resolveAnyPlayerNickname(player) ||
+              '未知球员',
+            {
+              publicName: String(lookup.nickname || display.nickname || '').trim(),
+              snapshotName: this._resolveAnyPlayerNickname(player) ||
+                String(display.displayName || display.name || '').trim(),
+              identityMasked: !!(lookup.identityMasked || player.identityMasked || display.identityMasked)
+            }
+          ),
           group: group.groupName || '',
           groupId: group.groupId || '',
           avatar: display.avatar || mockAvatars.resolveAvatar(player.avatar || player.avatarUrl || '', playerId),
@@ -6215,7 +6317,20 @@ Page({
           scorePlayerId: scorePlayerId || playerId,
           slotIndex: slotIndex,
           position: slotIndex,
-          name: display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员',
+          name: this._resolveViewerDisplayName(
+            playerId,
+            display.displayName ||
+              display.name ||
+              lookup.nickname ||
+              this._resolveAnyPlayerNickname(player) ||
+              '未知球员',
+            {
+              publicName: String(lookup.nickname || display.nickname || '').trim(),
+              snapshotName: this._resolveAnyPlayerNickname(player) ||
+                String(display.displayName || display.name || '').trim(),
+              identityMasked: !!(lookup.identityMasked || player.identityMasked || display.identityMasked)
+            }
+          ),
           group: group.groupName || '',
           groupId: group.groupId || '',
           avatar: display.avatar || mockAvatars.resolveAvatar(player.avatar || player.avatarUrl || '', playerId),
@@ -6440,7 +6555,20 @@ Page({
         const stat = this._computeMatchLeaderboardStats(match, group, player, playerId);
         const scoreFields = this._getLeaderboardScoreFields(stat);
         const scorePlayerId = this._resolveSlotScorePlayerId(player, playerId);
-        const name = display.displayName || display.name || lookup.nickname || this._resolveAnyPlayerNickname(player) || '未知球员';
+        const name = this._resolveViewerDisplayName(
+          playerId,
+          display.displayName ||
+            display.name ||
+            lookup.nickname ||
+            this._resolveAnyPlayerNickname(player) ||
+            '未知球员',
+          {
+            publicName: String(lookup.nickname || display.nickname || '').trim(),
+            snapshotName: this._resolveAnyPlayerNickname(player) ||
+              String(display.displayName || display.name || '').trim(),
+            identityMasked: !!(lookup.identityMasked || player.identityMasked || display.identityMasked)
+          }
+        );
         const avatar = display.avatar || mockAvatars.resolveAvatar(lookup.avatar || player.avatar || player.avatarUrl || '', playerId);
         // 角标用报名分队 id（teamGroups[].id），勿用出发表 group.groupId
         const badgeTeamId = this._resolveInterTeamBadgeLogo(
@@ -7742,18 +7870,37 @@ Page({
   noop() {},
 
   /**
-   * 球员资料页预留：校验稳定 userId 后提示，不 navigate。
-   * TODO: 正式资料页完成后在此接入 navigateTo（以 userId 为主键）。
+   * 球员主页统一入口（主包 openPlayerProfile；不复制身份判断）。
    * @param {{ userId?: string, playerId?: string, name?: string, avatar?: string, userType?: string, identitySource?: string }} raw
    */
   _openReservedPlayerProfile(raw) {
-    const userId = this._resolveLeaderboardFollowUserId({
-      playerId: raw && (raw.userId || raw.playerId),
-      userId: raw && (raw.userId || raw.playerId)
+    const payload = raw && typeof raw === 'object' ? raw : {};
+    const opened = openPlayerProfileUtil.openPlayerProfile({
+      userId: payload.userId || payload.playerId,
+      playerId: payload.playerId || payload.userId,
+      // 公开/赛事快照昵称；禁止备注展示名进入导航 context
+      publicName:
+        payload.publicName ||
+        payload.nickname ||
+        payload.matchNickname ||
+        payload.competitionName ||
+        '',
+      name:
+        payload.publicName ||
+        payload.nickname ||
+        payload.matchNickname ||
+        payload.competitionName ||
+        payload.name,
+      nickname: payload.nickname || payload.matchNickname || '',
+      avatar: payload.avatar,
+      gender: payload.gender,
+      handicap: payload.handicap,
+      floatCoef: payload.floatCoef,
+      userType: payload.userType,
+      identitySource: payload.identitySource,
+      silent: true
     });
-    if (!userId) return null;
-    wx.showToast({ title: '球员资料页开发中', icon: 'none', duration: 900 });
-    return userId;
+    return opened ? openPlayerProfileUtil.resolveOpenableUserId(payload) : null;
   },
 
   /**
@@ -8017,17 +8164,21 @@ Page({
 
   onPlayerActionProfileTap() {
     const target = this.data.playerActionTarget;
-    const playerId =
-      target && (target.playerId || target.userId) != null
-        ? String(target.playerId || target.userId).trim()
-        : '';
+    const payload = {
+      userId: target && (target.userId || target.playerId),
+      playerId: target && (target.playerId || target.userId),
+      publicName: target && (target.publicName || target.nickname || target.matchNickname),
+      name: target && (target.publicName || target.nickname || target.name),
+      nickname: target && (target.nickname || target.publicName),
+      avatar: target && target.avatar,
+      gender: target && target.gender,
+      handicap: target && target.handicap,
+      floatCoef: target && target.floatCoef,
+      userType: target && target.userType,
+      identitySource: target && target.identitySource
+    };
     this.closePlayerActionSheet();
-    if (!playerId) return;
-    if (playerActionModal.isSameUserIdentity(playerId, 'me')) {
-      wx.navigateTo({ url: '/pages/profile/footprints/index' });
-      return;
-    }
-    wx.showToast({ title: '他人主页暂未开放', icon: 'none' });
+    this._openReservedPlayerProfile(payload);
   },
 
   _getReactionOverlay() {
@@ -8077,6 +8228,7 @@ Page({
   _clearActiveReactionTarget() {
     this._activeReactionTarget = null;
     this._activeReactionKey = '';
+    this._activeReactionEventId = '';
   },
 
   /** 解析讨论区当前 reactionKey（事件优先，其次播放中/pending） */
@@ -8406,11 +8558,32 @@ Page({
     const target = pending.target;
     this._activeReactionTarget = target;
     this._activeReactionKey = key;
+    this._activeReactionEventId = pending.eventId || '';
     this._pendingReactionPlay = null;
     this._stopReactionOverlayWait();
     this.setData({ reactionPackLoading: false });
-    ov.playReaction(key, target, null);
+    const targetUserId = this._resolveReactionTargetUserId(target);
+    ov.playReaction(key, target, null, {
+      eventId: pending.eventId || '',
+      targetUserId: targetUserId,
+      sourceType: 'player_action',
+      sourceId: this.data.matchId || this.data.gameId || ''
+    });
     return true;
+  },
+
+  /** 从 active/pending target 快照取正式 userId（不用昵称/index） */
+  _resolveReactionTargetUserId(target) {
+    const t =
+      target ||
+      this._activeReactionTarget ||
+      (this._pendingReactionPlay && this._pendingReactionPlay.target) ||
+      null;
+    if (!t || typeof t !== 'object') return '';
+    const uid = t.userId != null ? String(t.userId).trim() : '';
+    if (uid) return uid;
+    const pid = t.playerId != null ? String(t.playerId).trim() : '';
+    return pid || '';
   },
 
   _stopReactionOverlayWait() {
@@ -8426,6 +8599,33 @@ Page({
     if (!(this._reactionBridge || _reactionHostBridge)) return;
     this._warmReactionSoundsIfReady();
     this._playPendingReaction();
+  },
+
+  /**
+   * overlay 确认动画真正开始后记账（主包 ledger）。
+   * eventId/targetUserId 以宿主一次动作快照为准；coinValue 只认主包配置。
+   */
+  onReactionStart(e) {
+    try {
+      const d = (e && e.detail) || {};
+      const pendingEventId =
+        this._activeReactionEventId ||
+        (d.eventId != null ? String(d.eventId).trim() : '');
+      const targetUserId =
+        this._resolveReactionTargetUserId(this._activeReactionTarget) ||
+        (d.targetUserId != null ? String(d.targetUserId).trim() : '');
+      const ledger = require('../../../../utils/reactionPopularityLedger.js');
+      ledger.recordReactionPopularity({
+        eventId: pendingEventId,
+        reactionKey: d.reactionKey,
+        targetUserId: targetUserId,
+        sourceType: d.sourceType || 'player_action',
+        sourceId: d.sourceId || this.data.matchId || this.data.gameId || '',
+        senderUserId: socialRelationStore.resolveCurrentUserId()
+      });
+    } catch (err) {
+      console.warn('[popularity] record failed', err && err.message);
+    }
   },
 
   _tryFinishPendingReactionPlay(reason) {
@@ -8485,7 +8685,12 @@ Page({
       return;
     }
 
-    this._pendingReactionPlay = { key: k, target: t };
+    const eventId =
+      'rx_' +
+      Date.now().toString(36) +
+      '_' +
+      Math.random().toString(36).slice(2, 10);
+    this._pendingReactionPlay = { key: k, target: t, eventId: eventId };
     console.log(
       '[reaction] pending snapshot',
       k,
@@ -9241,19 +9446,30 @@ Page({
 
   _syncPlayerManageDisplay(extra) {
     const draft = this._playerManageDraft;
-    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
+    const remarkMap = this._getViewerRemarkNameMap();
+    const viewer = (this._viewerRemarkCtx && this._viewerRemarkCtx.viewer) || '';
     const playersForDisplay = (draft && Array.isArray(draft.players) ? draft.players : []).map((item) => {
       const userId = String((item && item.userId) || '').trim();
-      let contactRemark = '';
-      if (currentUserId && userId) {
-        try {
-          const contact = contactStore.findContact(currentUserId, userId);
-          contactRemark = contact && contact.remarkName ? String(contact.remarkName) : '';
-        } catch (e) {
-          contactRemark = '';
-        }
-      }
-      return Object.assign({}, item, { contactRemark: contactRemark });
+      const snapshotName =
+        String((item && (item.matchNickname || item.competitionName)) || '').trim() ||
+        playerManage.resolveMatchNickname(item || {}) ||
+        '';
+      const publicName = String((item && (item.nickname || item.displayName)) || '').trim();
+      const named = playerDisplayName.resolvePlayerDisplayNameForViewer({
+        viewerUserId: viewer,
+        targetUserId: userId,
+        publicName: publicName,
+        snapshotName: snapshotName,
+        identityMasked: !!(item && item.identityMasked),
+        remarkNameMap: remarkMap,
+        defaultName: '未命名选手'
+      });
+      // 仅展示层覆盖；draft.players 原始对象未改写
+      return Object.assign({}, item, {
+        matchNickname: named.displayName,
+        competitionName: named.displayName,
+        contactRemark: ''
+      });
     });
     const view = playerManage.buildPlayerManageDisplay(playersForDisplay, {
       keyword: this.data.playerManageSearchKeyword,
@@ -9262,7 +9478,7 @@ Page({
       expandedUserId: this.data.expandedPlayerManageUserId
     });
     const displayUsers = (view.list || []).map((item) => {
-      return Object.assign({}, item, { contactRemark: item.contactRemark || '' });
+      return Object.assign({}, item, { contactRemark: '' });
     });
     const patch = Object.assign(
       {

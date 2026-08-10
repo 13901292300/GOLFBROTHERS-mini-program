@@ -39,10 +39,24 @@
             <text class="pe-row__chevron">›</text>
           </view>
         </view>
-        <view class="pe-row pe-row--last" bindtap="onTapSignature">
+        <view class="pe-row" bindtap="onTapSignature">
           <text class="pe-row__label">个人签名</text>
           <view class="pe-row__trail">
             <text class="pe-row__value pe-row__value--multi">{{userProfile.signatureText}}</text>
+            <text class="pe-row__chevron">›</text>
+          </view>
+        </view>
+        <view class="pe-row" bindtap="onTapNationality">
+          <text class="pe-row__label">国籍</text>
+          <view class="pe-row__trail">
+            <text class="pe-row__value {{userProfile.nationalityName ? '' : 'pe-row__value--muted'}}">{{userProfile.nationalityText}}</text>
+            <text class="pe-row__chevron">›</text>
+          </view>
+        </view>
+        <view class="pe-row pe-row--last" bindtap="onTapRegion">
+          <text class="pe-row__label">地域</text>
+          <view class="pe-row__trail">
+            <text class="pe-row__value {{userProfile.regionDisplayName ? '' : 'pe-row__value--muted'}}">{{userProfile.regionText}}</text>
             <text class="pe-row__chevron">›</text>
           </view>
         </view>
@@ -145,6 +159,33 @@
         />
         <text class="pe-editor__count">{{editorCount}}/{{editorMaxlength}}</text>
       </view>
+    </view>
+  </view>
+
+  <!-- 国籍 / 地域选择 Bottom Sheet -->
+  <view wx:if="{{pickerVisible}}" class="pe-picker {{themeClass}}">
+    <view class="pe-picker__mask" bindtap="onPickerCancel"></view>
+    <view class="pe-picker__panel" catchtap="noop">
+      <view class="pe-picker__head">
+        <text class="pe-picker__cancel" bindtap="onPickerCancel">取消</text>
+        <text class="pe-picker__title">{{pickerTitle}}</text>
+        <text
+          wx:if="{{pickerAllowClear}}"
+          class="pe-picker__clear"
+          bindtap="onPickerClear"
+        >清除</text>
+        <text wx:else class="pe-picker__clear pe-picker__clear--ghost"></text>
+      </view>
+      <scroll-view scroll-y class="pe-picker__list" enhanced show-scrollbar="{{false}}">
+        <view
+          wx:for="{{pickerItems}}"
+          wx:key="code"
+          class="pe-picker__item"
+          data-code="{{item.code}}"
+          data-name="{{item.name}}"
+          bindtap="onPickerSelect"
+        >{{item.label}}</view>
+      </scroll-view>
     </view>
   </view>
 </view>

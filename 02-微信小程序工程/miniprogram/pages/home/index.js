@@ -6,12 +6,12 @@ const quickCreate = require('../../utils/quickCreate.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
 const userProfileStore = require('../../utils/userProfileStore.js');
+const geoCatalog = require('../../utils/geoCatalog.js');
 const bannerConfig = require('../../utils/bannerConfig.js');
 const scheduleStore = require('../../utils/scheduleStore.js');
 const { sortSchedules } = require('../../utils/scheduleSort.js');
 const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 const contactNotifyStore = require('../../utils/contactNotifyStore.js');
-
 function decorateTournamentCard(match, card) {
   if (!card) return null;
   const status = String((match && match.status) || '').trim().toLowerCase();
@@ -780,13 +780,19 @@ Page({
 
   refreshUserProfile() {
     const profile = userProfileStore.loadProfile();
+    const nationalityName = String(profile.nationalityName || '').trim();
+    const regionDisplayName = geoCatalog.formatRegionDisplayName(profile);
     this.setData({
       userProfile: {
         nickname: profile.nickname || '',
         competitionName: profile.competitionName || '',
         avatar: profile.avatar || userProfileStore.DEFAULT_AVATAR,
         handicap: profile.handicap,
-        floatCoef: profile.floatCoef
+        floatCoef: profile.floatCoef,
+        nationalityName: nationalityName,
+        nationalityText: nationalityName || '未设置',
+        regionDisplayName: regionDisplayName,
+        regionText: regionDisplayName || '未设置'
       }
     });
   },
@@ -1265,6 +1271,21 @@ Page({
     });
   },
 
+  navigateToMyMoments() {
+    if (this._openingMyMoments) return;
+    this._openingMyMoments = true;
+    wx.navigateTo({
+      url: '/subpackages/player/pages/my-moments/index',
+      complete: () => {
+        this._openingMyMoments = false;
+      },
+      fail: () => {
+        this._openingMyMoments = false;
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
   navigateToProfileEdit() {
     wx.navigateTo({
       url: '/pages/profile/edit/index',
@@ -1312,19 +1333,11 @@ Page({
 
   onEditProfileSave() {
     const draft = this.data.profileEditDraft || {};
-    const saved = userProfileStore.updateProfile({
+    userProfileStore.updateProfile({
       nickname: draft.nickname != null ? String(draft.nickname).trim() : '',
       competitionName: draft.competitionName != null ? String(draft.competitionName).trim() : ''
     });
-    this.setData({
-      userProfile: {
-        nickname: saved.nickname || '',
-        competitionName: saved.competitionName || '',
-        avatar: saved.avatar || userProfileStore.DEFAULT_AVATAR,
-        handicap: saved.handicap,
-        floatCoef: saved.floatCoef
-      }
-    });
+    this.refreshUserProfile();
     this.toggleEditProfile(false);
   },
 

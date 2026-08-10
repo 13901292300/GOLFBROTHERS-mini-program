@@ -384,6 +384,13 @@
                   </view>
                   <text class="profile-menu-chevron">›</text>
                 </view>
+                <view class="ds-list-item" bindtap="navigateToMyMoments">
+                  <view class="profile-menu-label flex items-center gap-4">
+                    <view class="profile-menu-icon"><text class="text-green-500 text-xl">◎</text></view>
+                    <text class="ds-body font-normal">我的球友圈</text>
+                  </view>
+                  <text class="profile-menu-chevron">›</text>
+                </view>
               </view>
 
               <view class="ds-card ds-list-section rounded-xl overflow-hidden">
@@ -706,8 +713,8 @@
           <view><text class="profile-edit-label block mb-1">差点 Handicap</text><text class="text-lg font-black text-gold">11.6</text></view>
           <text class="profile-edit-hint mb-1">系统自动计算</text>
         </view>
-        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">国籍</text><picker mode="selector" range="{{['中国','美国','日本','韩国']}}"><view class="text-lg font-bold ds-text-primary">中国</view></picker></view>
-        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">所在省份</text><input type="text" value="广东" class="edit-field-input" /></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">国籍</text><view class="text-lg font-bold ds-text-primary">{{userProfile.nationalityText || '未设置'}}</view></view>
+        <view class="ds-profile-field"><text class="profile-edit-label block mb-1">地域</text><view class="text-lg font-bold ds-text-primary">{{userProfile.regionText || '未设置'}}</view></view>
         <view class="ds-profile-field"><text class="profile-edit-label block mb-1">常打球场</text><view class="w-full text-lg font-bold py-1 flex justify-between items-center ds-text-muted"><text>选择球场</text><text class="text-xs">🔍</text></view></view>
         <view class="ds-profile-field"><text class="profile-edit-label block mb-1">个人签名</text><textarea class="edit-field-textarea" placeholder="写下你的球场格言..."></textarea></view>
       </view>

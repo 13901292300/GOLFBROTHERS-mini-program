@@ -1,0 +1,131 @@
+<view class="mm-page {{themeClass}}" catchtap="onCloseIxAction">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">MOMENT</text>
+          <text class="gb-header__title">我的球友圈</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view
+    scroll-y
+    class="mm-body"
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-triggered="{{momentRefreshing}}"
+    bindrefresherrefresh="onRefresh"
+    bindscrolltolower="onLoadMore"
+    bindscroll="onCloseIxAction"
+  >
+    <view class="mm-main">
+      <view wx:if="{{pageState === 'loading'}}" class="mm-state">
+        <text class="mm-state__text">动态加载中…</text>
+      </view>
+      <view wx:elif="{{pageState === 'error'}}" class="mm-state">
+        <text class="mm-state__title">加载失败</text>
+        <view class="mm-state__btn" bindtap="onRetry">重试</view>
+      </view>
+      <view wx:elif="{{pageState === 'empty'}}" class="mm-state">
+        <text class="mm-state__text">暂无动态</text>
+        <text class="mm-state__hint">请在记分页「更多功能 → 发布到球友圈」发布</text>
+      </view>
+      <view wx:else class="mm-list">
+        <view
+          wx:for="{{momentCards}}"
+          wx:key="momentId"
+          class="mm-card"
+          data-id="{{item.momentId}}"
+          bindtap="onTapCard"
+        >
+          <view class="mm-card__head">
+            <image class="mm-card__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+            <view class="mm-card__meta">
+              <text class="mm-card__name">{{item.authorDisplayName}}</text>
+              <text class="mm-card__time">{{item.timeLabel}}</text>
+            </view>
+            <view
+              wx:if="{{item.canReport || item.reportedByCurrentUser}}"
+              class="mm-card__report {{item.reportedByCurrentUser ? 'is-reported' : ''}}"
+              data-id="{{item.momentId}}"
+              catchtap="onTapReport"
+            >{{item.reportedByCurrentUser ? '已举报' : '举报'}}</view>
+          </view>
+          <text wx:if="{{item.contentPreview}}" class="mm-card__text">{{item.contentPreview}}</text>
+          <text
+            wx:if="{{item.isContentCollapsed}}"
+            class="mm-card__more"
+            data-id="{{item.momentId}}"
+            catchtap="onTapExpand"
+          >展开全文</text>
+          <moment-image-grid
+            wx:if="{{item.imageCount}}"
+            momentId="{{item.momentId}}"
+            themeClass="{{themeClass}}"
+            imageLayout="{{item.imageLayout}}"
+            singleImageClass="{{item.singleImageClass}}"
+            singleImageStyle="{{item.singleImageStyle}}"
+            images="{{item.images}}"
+            catch:preview="onPreviewImage"
+            catch:imageerror="onMomentImageError"
+          ></moment-image-grid>
+          <moment-scorecard
+            wx:if="{{item.relatedGame}}"
+            scorecard="{{item.publicScorecard}}"
+            themeClass="{{themeClass}}"
+            catch:opentap="onTapScorecard"
+          ></moment-scorecard>
+          <moment-ix-panel
+            momentId="{{item.momentId}}"
+            themeClass="{{themeClass}}"
+            mode="feed"
+            actionOpen="{{ixActionMomentId === item.momentId}}"
+            likedByCurrentUser="{{item.likedByCurrentUser}}"
+            likeBusy="{{likeBusyMap[item.momentId]}}"
+            likeCount="{{item.likeCount}}"
+            likeAvatarPreview="{{item.likeAvatarPreview}}"
+            hiddenLikeCount="{{item.hiddenLikeCount}}"
+            comments="{{item.commentPreview}}"
+            hasInteraction="{{item.hasInteraction}}"
+            canInteract="{{item.canInteract}}"
+            catch:toggleaction="onToggleIxAction"
+            catch:closeaction="onCloseIxAction"
+            catch:like="onIxLike"
+            catch:comment="onIxComment"
+            catch:tapbox="onIxTapBox"
+            catch:tapuser="onIxTapUser"
+            catch:tapcomment="onIxTapComment"
+            catch:tapreplymore="onIxTapReplyMore"
+            catch:taplikemore="onIxTapLikeMore"
+          ></moment-ix-panel>
+        </view>
+        <view wx:if="{{momentHasMore}}" class="mm-more" bindtap="onLoadMore">加载更多</view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <moment-report-sheet
+    id="momentReportSheet"
+    visible="{{reportSheetVisible}}"
+    themeClass="{{themeClass}}"
+    title="{{reportSheetTitle}}"
+    submitting="{{reportSubmitting}}"
+    bind:close="onCloseReportSheet"
+    bind:submit="onSubmitReport"
+  ></moment-report-sheet>
+
+  <moment-like-sheet
+    visible="{{likeSheetVisible}}"
+    themeClass="{{themeClass}}"
+    likeCount="{{likeSheetCount}}"
+    likeAvatars="{{likeSheetAvatars}}"
+    bind:close="onCloseLikeSheet"
+    bind:tapuser="onLikeSheetTapUser"
+  ></moment-like-sheet>
+</view>

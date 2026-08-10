@@ -95,6 +95,20 @@ function shouldDetachDiscussionReaction(reactionKey) {
   return !!DISCUSSION_DETACH_REACTION_KEYS[k];
 }
 
+/**
+ * 合法 reaction 的展示/快照金币值；非法 key 返回 null。
+ * 面板仍用 REACTION_COST 展示；人气 ledger 只认此函数解析结果。
+ * @param {string} reactionKey
+ * @returns {number|null}
+ */
+function getReactionCost(reactionKey) {
+  const k = reactionKey != null ? String(reactionKey).trim() : '';
+  if (!k || !Object.prototype.hasOwnProperty.call(REACTION_COST, k)) return null;
+  const n = Number(REACTION_COST[k]);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
 module.exports = {
   PLAYER_ACTION_REACTIONS: PLAYER_ACTION_REACTIONS,
   REACTION_COST: REACTION_COST,
@@ -103,5 +117,6 @@ module.exports = {
   getReactionMode: getReactionMode,
   isSelfReactionMode: isSelfReactionMode,
   isObserverReactionMode: isObserverReactionMode,
-  shouldDetachDiscussionReaction: shouldDetachDiscussionReaction
+  shouldDetachDiscussionReaction: shouldDetachDiscussionReaction,
+  getReactionCost: getReactionCost
 };

@@ -1,0 +1,28 @@
+<view
+  class="mls {{themeClass}} {{visible ? 'is-open' : ''}}"
+  aria-hidden="{{!visible}}"
+  catchtouchmove="noop"
+>
+  <view class="mls__mask" catchtap="onMaskTap"></view>
+  <view class="mls__panel" catchtap="noop">
+    <view class="mls__handle"></view>
+    <text class="mls__title">点赞的人</text>
+    <text class="mls__count">{{likeCount}}人</text>
+    <scroll-view scroll-y class="mls__scroll" enhanced show-scrollbar="{{false}}">
+      <view class="mls__grid">
+        <view
+          wx:for="{{likeAvatars}}"
+          wx:key="userId"
+          wx:for-item="lu"
+          class="mls__cell {{lu.canOpenProfile ? 'is-link' : ''}}"
+          data-uid="{{lu.userId}}"
+          data-avatar="{{lu.avatar}}"
+          data-open="{{lu.canOpenProfile ? 1 : 0}}"
+          catchtap="onTapUser"
+        >
+          <image class="mls__avatar" src="{{lu.avatar}}" mode="aspectFill"></image>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

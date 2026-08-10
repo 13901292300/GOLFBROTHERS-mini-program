@@ -141,9 +141,53 @@ function buildMatchPlayResultSummary(scoresA, scoresB, startHole) {
   };
 }
 
+/**
+ * 比洞得分榜卡片底部 18 洞圆点（与 tournament detail holeDots 同规则）。
+ * - 洞号 n = 比赛序 1–18（从 startHole 环绕）
+ * - 颜色按该 Match Hole 对应 actualHole 双方 side 成绩比较（A 红 / B 蓝 / AS 平）
+ * - 未双方录入保持 empty；不另建总杆推断算法
+ * @returns {Array<{ n: number, actualHole: number, result: string, cls: string }>}
+ */
+function buildMatchPlayHoleDots(scoresA, scoresB, startHole) {
+  const a = Array.isArray(scoresA) ? scoresA : [];
+  const b = Array.isArray(scoresB) ? scoresB : [];
+  const order = buildMatchPlayHoleOrderIndexes(startHole);
+  const holeDots = [];
+  for (let ci = 0; ci < order.length; ci++) {
+    const hi = order[ci];
+    const actualHole = hi + 1;
+    let holeResult = '';
+    let dotCls = 'empty';
+    if (isFilledScore(a[hi]) && isFilledScore(b[hi])) {
+      const sa = Number(a[hi]);
+      const sb = Number(b[hi]);
+      if (Number.isFinite(sa) && Number.isFinite(sb)) {
+        if (sa < sb) {
+          holeResult = 'A';
+          dotCls = 'mp-sb-dot--a';
+        } else if (sb < sa) {
+          holeResult = 'B';
+          dotCls = 'mp-sb-dot--b';
+        } else {
+          holeResult = 'AS';
+          dotCls = 'mp-sb-dot--as';
+        }
+      }
+    }
+    holeDots.push({
+      n: ci + 1,
+      actualHole: actualHole,
+      result: holeResult,
+      cls: dotCls
+    });
+  }
+  return holeDots;
+}
+
 module.exports = {
   buildMatchPlayResultSummary: buildMatchPlayResultSummary,
   normalizeStartHole: normalizeStartHole,
   buildMatchPlayHoleOrderIndexes: buildMatchPlayHoleOrderIndexes,
+  buildMatchPlayHoleDots: buildMatchPlayHoleDots,
   isFilledScore: isFilledScore
 };

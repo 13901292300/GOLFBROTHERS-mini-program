@@ -1,0 +1,105 @@
+.mls {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mls.is-open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.mls__mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.mls__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 70vh;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.mls.dark-mode .mls__panel {
+  background: #121a2b;
+}
+
+.mls__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.55);
+  margin: 0 auto 12px;
+}
+
+.mls__title {
+  display: block;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.mls.dark-mode .mls__title {
+  color: #e5eefc;
+}
+
+.mls__count {
+  display: block;
+  text-align: center;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.mls.dark-mode .mls__count {
+  color: #94a3b8;
+}
+
+.mls__scroll {
+  flex: 1;
+  max-height: 52vh;
+  min-height: 120px;
+}
+
+.mls__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.mls__cell {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+}
+
+.mls__avatar {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e5e7eb;
+}
+
+.mls.dark-mode .mls__avatar {
+  background: #1f2937;
+}

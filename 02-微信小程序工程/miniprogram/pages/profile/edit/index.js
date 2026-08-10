@@ -3,6 +3,8 @@
  */
 const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const userProfileStore = require('../../../utils/userProfileStore.js');
+const genderNormalize = require('../../../utils/genderNormalize.js');
+const geoCatalog = require('../../../utils/geoCatalog.js');
 
 const IDENTITY_PLAYER = userProfileStore.IDENTITY_PLAYER || 'PLAYER';
 const IDENTITY_CADDIE = userProfileStore.IDENTITY_CADDIE || 'CADDIE';
@@ -45,12 +47,13 @@ function buildUserProfileView() {
   const displayName = String(p.displayName || p.competitionName || '').trim();
   const identityType = p.identityType === IDENTITY_CADDIE ? IDENTITY_CADDIE : IDENTITY_PLAYER;
   const signature = String(p.signature || '').trim();
-  const gender = String(p.gender || '').trim();
+  const nationalityName = String(p.nationalityName || '').trim();
+  const regionDisplayName = geoCatalog.formatRegionDisplayName(p);
 
   return {
     avatar: p.avatar || userProfileStore.DEFAULT_AVATAR,
     nickname: nickname,
-    gender: gender || '未设置',
+    gender: genderNormalize.genderLabelZh(p.gender),
     signature: signature,
     signatureText: signature || '未设置签名',
     identityType: identityType,
@@ -59,7 +62,11 @@ function buildUserProfileView() {
     displayNameText: displayName || nickname,
     phoneBound: p.phoneBound === true,
     phoneMasked: String(p.phoneMasked || '未绑定').trim() || '未绑定',
-    isCaddie: identityType === IDENTITY_CADDIE
+    isCaddie: identityType === IDENTITY_CADDIE,
+    nationalityName: nationalityName,
+    nationalityText: nationalityName || '未设置',
+    regionDisplayName: regionDisplayName,
+    regionText: regionDisplayName || '未设置'
   };
 }
 
@@ -82,7 +89,11 @@ Page({
       displayNameText: '',
       phoneBound: false,
       phoneMasked: '',
-      isCaddie: false
+      isCaddie: false,
+      nationalityName: '',
+      nationalityText: '未设置',
+      regionDisplayName: '',
+      regionText: '未设置'
     },
     editorVisible: false,
     editorField: '',
@@ -91,7 +102,13 @@ Page({
     editorMaxlength: 20,
     editorMultiline: false,
     editorDraft: '',
-    editorCount: 0
+    editorCount: 0,
+    /** nationality | regionProvince | regionCity */
+    pickerVisible: false,
+    pickerMode: '',
+    pickerTitle: '',
+    pickerItems: [],
+    pickerAllowClear: false
   },
 
   onLoad() {
@@ -231,6 +248,144 @@ Page({
     });
   },
 
+  onTapNationality() {
+    const items = geoCatalog.listNationalities().map((n) => ({
+      code: n.code,
+      name: n.name,
+      label: n.name
+    }));
+    this.setData({
+      pickerVisible: true,
+      pickerMode: 'nationality',
+      pickerTitle: '选择国籍',
+      pickerItems: items,
+      pickerAllowClear: true
+    });
+  },
+
+  onTapRegion() {
+    this._pendingRegionProvince = null;
+    const items = geoCatalog.listChinaProvinces().map((p) => ({
+      code: p.code,
+      name: p.name,
+      label: p.name
+    }));
+    this.setData({
+      pickerVisible: true,
+      pickerMode: 'regionProvince',
+      pickerTitle: '选择省份',
+      pickerItems: items,
+      pickerAllowClear: true
+    });
+  },
+
+  onPickerCancel() {
+    // 取消不落盘未确认的省/市草稿
+    this._pendingRegionProvince = null;
+    this.setData({
+      pickerVisible: false,
+      pickerMode: '',
+      pickerItems: [],
+      pickerAllowClear: false
+    });
+  },
+
+  onPickerClear() {
+    const mode = this.data.pickerMode;
+    if (mode === 'nationality') {
+      userProfileStore.updateProfile({
+        nationalityCode: '',
+        nationalityName: ''
+      });
+      this.onPickerCancel();
+      this.refreshProfile();
+      wx.showToast({ title: '已清除国籍', icon: 'success' });
+      return;
+    }
+    if (mode === 'regionProvince' || mode === 'regionCity') {
+      this._pendingRegionProvince = null;
+      userProfileStore.updateProfile({
+        regionCountryCode: '',
+        regionCountryName: '',
+        regionProvinceCode: '',
+        regionProvinceName: '',
+        regionCityCode: '',
+        regionCityName: ''
+      });
+      this.onPickerCancel();
+      this.refreshProfile();
+      wx.showToast({ title: '已清除地域', icon: 'success' });
+    }
+  },
+
+  onPickerSelect(e) {
+    const ds = (e.currentTarget && e.currentTarget.dataset) || {};
+    const code = String(ds.code || '').trim();
+    const name = String(ds.name || '').trim();
+    const mode = this.data.pickerMode;
+    if (!code || !name) return;
+
+    if (mode === 'nationality') {
+      userProfileStore.updateProfile({
+        nationalityCode: code,
+        nationalityName: name
+      });
+      this.onPickerCancel();
+      this.refreshProfile();
+      wx.showToast({ title: '已保存', icon: 'success' });
+      return;
+    }
+
+    if (mode === 'regionProvince') {
+      const cities = geoCatalog.listChinaCities(code);
+      const pending = {
+        regionCountryCode: 'CN',
+        regionCountryName: '中国',
+        regionProvinceCode: code,
+        regionProvinceName: name,
+        regionCityCode: '',
+        regionCityName: ''
+      };
+      if (!cities.length) {
+        userProfileStore.updateProfile(pending);
+        this._pendingRegionProvince = null;
+        this.onPickerCancel();
+        this.refreshProfile();
+        wx.showToast({ title: '已保存', icon: 'success' });
+        return;
+      }
+      // 市列表未确认前不写 Storage；取消则保留原值
+      this._pendingRegionProvince = pending;
+      this.setData({
+        pickerMode: 'regionCity',
+        pickerTitle: '选择城市',
+        pickerItems: cities.map((c) => ({
+          code: c.code,
+          name: c.name,
+          label: c.name
+        })),
+        pickerAllowClear: true
+      });
+      return;
+    }
+
+    if (mode === 'regionCity') {
+      const pending = this._pendingRegionProvince || {};
+      userProfileStore.updateProfile({
+        regionCountryCode: pending.regionCountryCode || 'CN',
+        regionCountryName: pending.regionCountryName || '中国',
+        regionProvinceCode: pending.regionProvinceCode || '',
+        regionProvinceName: pending.regionProvinceName || '',
+        regionCityCode: code,
+        regionCityName: name
+      });
+      this._pendingRegionProvince = null;
+      this.onPickerCancel();
+      this.refreshProfile();
+      wx.showToast({ title: '已保存', icon: 'success' });
+    }
+  },
+
   /** 身份类型 → store */
   onSelectIdentity(e) {
     const type = String(
@@ -257,5 +412,7 @@ Page({
 
   onBack() {
     wx.navigateBack({ fail: () => wx.redirectTo({ url: '/pages/home/index' }) });
-  }
+  },
+
+  noop() {}
 });

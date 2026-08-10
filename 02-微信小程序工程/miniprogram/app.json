@@ -30,7 +30,12 @@
       "pages": [
         "pages/friends/index",
         "pages/combos/index",
-        "pages/manual/index"
+        "pages/manual/index",
+        "pages/profile/index",
+        "pages/battle-pk/index",
+        "pages/moment-publish/index",
+        "pages/moment-detail/index",
+        "pages/my-moments/index"
       ]
     },
     {

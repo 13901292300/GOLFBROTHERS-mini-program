@@ -6,6 +6,9 @@
 const userProfileStore = require('./userProfileStore.js');
 const userIdentityAlias = require('./userIdentityAlias.js');
 const { getGenderById } = require('./playerDirectory.js');
+const socialRelationStore = require('./socialRelationStore.js');
+const playerDisplayName = require('./playerDisplayName.js');
+const playerIdentityGuard = require('./playerIdentityGuard.js');
 
 function resolveCanonicalUserId(userId) {
   const id = String(userId || '').trim();
@@ -118,11 +121,12 @@ function resolvePlayerActionTarget(playerId, hooks) {
     return null;
   }
 
-  let name =
-    (source && (source.name || source.nickname || source.displayName)) ||
-    (member && (member.name || member.displayName || member.nickname)) ||
+  const publicName =
+    (source && (source.nickname || source.matchNickname || source.competitionName || source.name || source.displayName)) ||
+    (member && (member.nickname || member.matchNickname || member.competitionName || member.name || member.displayName)) ||
     (isSameUserIdentity(key, 'me') ? '我' : '') ||
     '球员';
+  let name = String(publicName || '').trim() || '球员';
   let avatar =
     (member && member.avatar) ||
     (source && source.avatar) ||
@@ -179,10 +183,28 @@ function resolvePlayerActionTarget(playerId, hooks) {
     }
   }
 
+  // 查看者私人备注名（展示层）；不写回 source/member；保留 publicName 供主页导航快照
+  const snapshotPublicName = name;
+  if (playerIdentityGuard.isStablePublicUserId(key)) {
+    try {
+      const viewer = socialRelationStore.resolveCurrentUserId();
+      const named = playerDisplayName.resolvePlayerDisplayNameForViewer({
+        viewerUserId: viewer,
+        targetUserId: key,
+        publicName: snapshotPublicName,
+        snapshotName: snapshotPublicName,
+        identityMasked: !!(source && source.identityMasked) || !!(member && member.identityMasked)
+      });
+      if (named && named.displayName) name = named.displayName;
+    } catch (e) { /* ignore display overlay */ }
+  }
+
   return {
     playerId: key,
     userId: key,
     name: name,
+    /** 公开/赛事快照昵称（不含私人备注），供 openPlayerProfile context */
+    publicName: snapshotPublicName,
     avatar: avatar,
     gender: gender,
     genderLabel: genderLabel,

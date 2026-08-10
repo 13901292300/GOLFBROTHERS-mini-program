@@ -1,0 +1,9 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "moment-scorecard": "/subpackages/player/components/moment-scorecard/index",
+    "moment-report-sheet": "/subpackages/player/components/moment-report-sheet/index",
+    "moment-ix-panel": "/subpackages/player/components/moment-ix-panel/index",
+    "moment-image-grid": "/subpackages/player/components/moment-image-grid/index"
+  }
+}

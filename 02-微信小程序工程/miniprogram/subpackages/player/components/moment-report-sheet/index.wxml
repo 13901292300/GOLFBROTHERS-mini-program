@@ -1,0 +1,48 @@
+<view
+  class="mrs {{themeClass}} {{visible ? 'is-open' : ''}}"
+  aria-hidden="{{!visible}}"
+  catchtouchmove="noop"
+>
+  <view class="mrs__mask" catchtap="onMaskTap"></view>
+  <view class="mrs__panel" catchtap="noop">
+    <view class="mrs__handle"></view>
+    <text class="mrs__title">{{title}}</text>
+    <text class="mrs__hint">请选择举报原因</text>
+
+    <view class="mrs__list">
+      <view
+        wx:for="{{reasons}}"
+        wx:key="code"
+        class="mrs__item {{selectedCode === item.code ? 'is-active' : ''}}"
+        data-code="{{item.code}}"
+        catchtap="onSelectReason"
+      >
+        <text class="mrs__item-label">{{item.label}}</text>
+        <text class="mrs__item-check">{{selectedCode === item.code ? '✓' : ''}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{showDesc}}" class="mrs__desc">
+      <view class="mrs__desc-head">
+        <text>补充说明（选填）</text>
+        <text class="mrs__count">{{descCount}}/{{descMax}}</text>
+      </view>
+      <textarea
+        class="mrs__textarea"
+        value="{{description}}"
+        maxlength="{{descMax}}"
+        placeholder="请简要说明情况"
+        disable-default-padding
+        show-confirm-bar="{{false}}"
+        adjust-position
+        bindinput="onDescInput"
+      ></textarea>
+    </view>
+
+    <view
+      class="mrs__submit {{canSubmit && !submitting ? '' : 'is-disabled'}}"
+      catchtap="onSubmit"
+    >{{submitting ? '提交中…' : '提交举报'}}</view>
+    <view class="mrs__cancel" catchtap="onCancel">取消</view>
+  </view>
+</view>

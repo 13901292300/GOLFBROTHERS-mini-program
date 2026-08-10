@@ -21,6 +21,8 @@ const userProfileStore = require('../../../../utils/userProfileStore.js');
 const reactionPanelConfig = require('../../../../utils/reactionPanelConfig.js');
 const scoreReactionAccess = require('../../../../utils/scoreReactionAccess.js');
 const playerActionModal = require('../../../../utils/playerActionModal.js');
+const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+const playerMomentPublishContext = require('../../../../utils/playerMomentPublishContext.js');
 
 /**
  * reaction 重逻辑分包：仅在用户选择具体动画后 require.async。
@@ -62,6 +64,8 @@ const userDirectory = require('../../../../utils/userDirectory.js');
 const userStore = require('../../../../utils/userStore.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
+const playerDisplayName = require('../../../../utils/playerDisplayName.js');
+const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
 const {
   resolveStrokeKind,
@@ -464,7 +468,7 @@ const MORE_MENU_ITEMS_COMPACT = [
   { icon: '✐', label: '球童记分', bg: 'bg-pga-blue', action: 'caddie_score' },
   { icon: '▦', label: '成绩卡', bg: 'bg-pga-blue', action: 'scorecard' },
   { icon: '↗', label: '统计数据', bg: 'bg-pga-blue', action: 'stats' },
-  { icon: '👥', label: '球友圈', bg: 'bg-pga-blue', action: 'circle' },
+  { icon: '◎', label: '发布到球友圈', bg: 'bg-pga-blue', action: 'publish_moment' },
   { icon: '🪪', label: '海报', bg: 'bg-pga-blue', action: 'poster' },
   { icon: '📖', label: '记账本', bg: 'bg-pga-blue', action: 'ledger' },
   { icon: '🎨', label: '显示设置', bg: 'bg-pga-blue', action: 'theme' },
@@ -493,7 +497,7 @@ const MORE_MENU_ITEMS_LEGACY_MAIN = [
   { icon: '✐', label: '球童记分', bg: 'bg-pga-blue', action: 'caddie_score' },
   { icon: '▦', label: '成绩卡', bg: 'bg-pga-blue', action: 'scorecard' },
   { icon: '↗', label: '统计数据', bg: 'bg-pga-blue', action: 'stats' },
-  { icon: '👥', label: '球友圈', bg: 'bg-pga-blue', action: 'circle' },
+  { icon: '◎', label: '发布到球友圈', bg: 'bg-pga-blue', action: 'publish_moment' },
   { icon: '🪪', label: '海报', bg: 'bg-pga-blue', action: 'poster' },
   { icon: '📖', label: '记账本', bg: 'bg-pga-blue', action: 'ledger' },
   { icon: '🎨', label: '显示设置', bg: 'bg-pga-blue', action: 'theme' },
@@ -631,6 +635,22 @@ function isFinishMatchMenuItem(item) {
  * finish_match →「已结束」+ disabled。
  * 非 finished：保留菜单源文案（「结束本组比赛」等）
  */
+/** 无发布资格时隐藏「发布到球友圈」（Store/发布页仍二次校验） */
+function applyMomentPublishMenuVisibility(items, canPublish) {
+  return (Array.isArray(items) ? items : []).filter(function (item) {
+    if (!item || item.empty) return true;
+    const action = item.action != null ? String(item.action) : '';
+    const label = item.label != null ? String(item.label) : '';
+    const isPublish =
+      action === 'publish_moment' ||
+      label === '发布到球友圈' ||
+      label === '球友圈' ||
+      action === 'circle';
+    if (!isPublish) return true;
+    return !!canPublish;
+  });
+}
+
 function applyFinishedScoreMoreMenuState(items, matchFinished) {
   const list = Array.isArray(items) ? items : [];
   if (!matchFinished) {
@@ -2723,7 +2743,82 @@ Page({
         moreMenuItems: applyFinishedScoreMoreMenuState(panels.moreMenuItems, matchFinished)
       };
     }
+    if (panels && panels.moreMenuItems) {
+      panels = {
+        moreMenuItems: applyMomentPublishMenuVisibility(
+          panels.moreMenuItems,
+          this._canPublishMomentToCircle()
+        )
+      };
+    }
     return panels;
+  },
+
+  /**
+   * 记分页发布资格：正式用户 + 本场有效 Slot/参赛 + 可生成无权限公开成绩卡标识。
+   */
+  _canPublishMomentToCircle() {
+    return !!this._resolveMomentPublishEligibility().ok;
+  },
+
+  _resolveMomentPublishEligibility() {
+    const ms = this._matchState || this._readMatchState() || {};
+    const gameId = String(this.data.gameId || ms.gameId || '').trim();
+    const matchId = String(ms.matchId || '').trim();
+    const groupId = String(this.data.groupId || ms.groupId || '').trim();
+    const sourceHint =
+      isTeamMatchFamilyScoreContext(ms) && matchId && !gameStore.getGame(gameId)
+        ? 'team_match'
+        : 'game';
+    return playerMomentPublishContext.resolveScorePublishEligibility({
+      currentUserId: socialRelationStore.resolveCurrentUserId(),
+      gameId: gameId,
+      matchId: matchId,
+      groupId: groupId,
+      slots: this._draftSlots || this.data.groupSlots || [],
+      players: this._playersSource || [],
+      matchName: this.data.courseName || this.data.matchName || '',
+      gameMode: this.data.mode || '',
+      sourceHint: sourceHint
+    });
+  },
+
+  _openMomentPublishFromScore() {
+    const eligibility = this._resolveMomentPublishEligibility();
+    if (!eligibility.ok) {
+      let tip = '当前无法发布到球友圈';
+      if (eligibility.error === 'invalid_user') tip = '当前身份无法发布';
+      else if (eligibility.error === 'not_in_slot' || eligibility.error === 'not_in_game') {
+        tip = '仅本场参赛球员可发布';
+      } else if (eligibility.error === 'no_active_game') {
+        tip = '当前无有效比赛';
+      }
+      wx.showToast({ title: tip, icon: 'none' });
+      return;
+    }
+    const created = playerMomentPublishContext.createMomentPublishContext({
+      currentUserId: eligibility.currentUserId,
+      gameId: eligibility.relatedGame.gameId,
+      matchId: eligibility.relatedGame.matchId,
+      groupId: eligibility.relatedGame.groupId,
+      slots: this._draftSlots || this.data.groupSlots || [],
+      players: this._playersSource || [],
+      matchName: eligibility.relatedGame.matchName,
+      gameMode: eligibility.relatedGame.gameMode,
+      sourceHint: eligibility.relatedGame.sourceType
+    });
+    if (!created.ok || !created.token) {
+      wx.showToast({ title: '发布入口创建失败', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url:
+        '/subpackages/player/pages/moment-publish/index?publishToken=' +
+        encodeURIComponent(created.token),
+      fail: function () {
+        wx.showToast({ title: '无法打开发布页', icon: 'none' });
+      }
+    });
   },
 
   /** 底部「添加/删除」是否冻结：match.status=finished 或本组已结束 */
@@ -4069,6 +4164,48 @@ Page({
   },
 
   /** 报名名单 userId → 展示名（仅展示用） */
+  _getScoreViewerRemarkContext() {
+    let viewer = '';
+    try {
+      viewer =
+        String((gameStore.getCurrentUser() || {}).userId || '').trim() ||
+        socialRelationStore.resolveCurrentUserId();
+    } catch (e) {
+      viewer = '';
+    }
+    const rev = playerDisplayName.getRemarkRevision();
+    if (
+      this._scoreRemarkCtx &&
+      this._scoreRemarkCtx.rev === rev &&
+      this._scoreRemarkCtx.viewer === viewer
+    ) {
+      return this._scoreRemarkCtx;
+    }
+    const map = playerDisplayName.buildRemarkNameMap(viewer);
+    this._scoreRemarkCtx = { rev: rev, viewer: viewer, map: map };
+    return this._scoreRemarkCtx;
+  },
+
+  /** 记分页展示名（View Model）；不写回 _playersSource / Entity */
+  _resolveScoreViewerDisplayName(player) {
+    const p = player || {};
+    const uid = String(p.userId || p.playerId || p.id || '').trim();
+    const snapshotName = String(
+      p.matchNickname || p.competitionName || p.name || ''
+    ).trim();
+    const publicName = String(p.nickname || p.displayName || '').trim();
+    const ctx = this._getScoreViewerRemarkContext();
+    return playerDisplayName.resolvePlayerDisplayNameForViewer({
+      viewerUserId: ctx.viewer,
+      targetUserId: uid,
+      publicName: publicName || snapshotName,
+      snapshotName: snapshotName || publicName,
+      identityMasked: !!p.identityMasked,
+      remarkNameMap: ctx.map,
+      defaultName: snapshotName || publicName || uid || '球员'
+    }).displayName;
+  },
+
   _resolveEntityMemberNameMap() {
     const ms = this._matchState || this._readMatchState() || {};
     const matchId = (ms && ms.matchId) || '';
@@ -4077,18 +4214,30 @@ Page({
       match && match.registerInfo && Array.isArray(match.registerInfo.users)
         ? match.registerInfo.users
         : [];
+    const ctx = this._getScoreViewerRemarkContext();
     const map = {};
     users.forEach((user) => {
       if (!user) return;
       const uid = user.userId != null ? String(user.userId).trim() : '';
       if (!uid) return;
-      const name =
+      const snapshotName =
         (user.competitionName && String(user.competitionName).trim()) ||
         (user.matchNickname && String(user.matchNickname).trim()) ||
+        '';
+      const publicName =
         (user.nickname && String(user.nickname).trim()) ||
+        (user.displayName && String(user.displayName).trim()) ||
         (user.name && String(user.name).trim()) ||
-        uid;
-      map[uid] = name;
+        '';
+      map[uid] = playerDisplayName.resolvePlayerDisplayNameForViewer({
+        viewerUserId: ctx.viewer,
+        targetUserId: uid,
+        publicName: publicName,
+        snapshotName: snapshotName || publicName,
+        identityMasked: !!user.identityMasked,
+        remarkNameMap: ctx.map,
+        defaultName: uid
+      }).displayName;
     });
     return map;
   },
@@ -4850,14 +4999,43 @@ Page({
   onShow() {
     this.applyTheme(getApp().getTheme());
     this._syncFontScale();
-    if (this.data.gameId && !this.data.noMatch) {
+    const remarkRev = playerDisplayName.getRemarkRevision();
+    const remarkChanged =
+      this._remarkDisplayRev != null && this._remarkDisplayRev !== remarkRev;
+    this._remarkDisplayRev = remarkRev;
+    // 备注变更：先清缓存，让后续 refresh 走新 remark map（不重载比赛/不写成绩）
+    if (remarkChanged) {
+      this._scoreRemarkCtx = null;
+    }
+
+    const hasLiveGame = !!(this.data.gameId && !this.data.noMatch);
+    if (hasLiveGame) {
+      // 内含 init* → refreshPlayers，备注 map 已随 ctx 失效更新
       this._refreshScorePageFromGame();
     } else if (this.data.gameId) {
       this._syncGameFinishedState();
       this._maybeShowEndGroupPrompt();
+      if (remarkChanged) {
+        this.refreshPlayers();
+      }
     } else {
       this._maybeRefreshTeamMatchScoreMode();
       this._syncScoreFinishedUiState();
+      // 队内/队际：主流程未必重建展示名；备注变更时只刷新 View Model
+      if (remarkChanged) {
+        this.refreshPlayers();
+      }
+    }
+
+    // 未改备注时不做讨论区作者名大投影
+    if (remarkChanged) {
+      const ctx = this._getScoreViewerRemarkContext();
+      this.setData({
+        chatMessages: playerDisplayName.mapMessageAuthorsForViewer(this.data.chatMessages || [], {
+          viewerUserId: ctx.viewer,
+          remarkNameMap: ctx.map
+        })
+      });
     }
   },
 
@@ -5413,14 +5591,25 @@ Page({
       players = [];
     } else if (isMatchPlayBoard && isG5Only) {
       this._matchSidesSource = [];
-      players = this._playersSource.map((p, i) => enrichPlayerG5(p, i, displayMode));
+      players = this._playersSource.map((p, i) =>
+        enrichPlayerG5(
+          Object.assign({}, p, { name: this._resolveScoreViewerDisplayName(p) }),
+          i,
+          displayMode
+        )
+      );
     } else {
       this._matchSidesSource = [];
       // 洞格右下角统一 formatCellDiff（0/+N/-N）；头像旁 relScore 仍用 formatDiff
       players = this._playersSource.map((p, i) =>
-        enrichPlayer(p, i, displayMode, {
-          hideCorners: matchPlayScoreMode
-        })
+        enrichPlayer(
+          Object.assign({}, p, { name: this._resolveScoreViewerDisplayName(p) }),
+          i,
+          displayMode,
+          {
+            hideCorners: matchPlayScoreMode
+          }
+        )
       );
     }
     const patch = { playersView: players, matchSidesView: [] };
@@ -7226,6 +7415,31 @@ Page({
     });
   },
 
+  /**
+   * 互动面板「进入主页」→ 统一 openPlayerProfile（修复缺失 handler；不改 reaction）。
+   */
+  onPlayerActionProfileTap() {
+    const target = this.data.playerActionTarget;
+    const payload = {
+      userId: target && (target.userId || target.playerId),
+      playerId: target && (target.playerId || target.userId),
+      // 公开/赛事快照昵称；禁止把备注展示名写入导航 context
+      publicName: target && (target.publicName || target.nickname || target.matchNickname),
+      name: target && (target.publicName || target.nickname || target.name),
+      nickname: target && (target.nickname || target.publicName),
+      avatar: target && target.avatar,
+      gender: target && target.gender,
+      handicap: target && target.handicap,
+      floatCoef: target && target.floatCoef,
+      userType: target && target.userType,
+      identitySource: target && target.identitySource
+    };
+    this.closePlayerActionSheet();
+    openPlayerProfileUtil.openPlayerProfile(
+      Object.assign({}, payload, { silent: true })
+    );
+  },
+
   /** 关闭面板但不依赖异步；播放目标必须事先写入 pending 快照 */
   _dismissPlayerActionSheetAfterPending() {
     this.setData({
@@ -7501,6 +7715,7 @@ Page({
 
   _clearActiveReactionTarget() {
     this._activeReactionTarget = null;
+    this._activeReactionEventId = '';
   },
 
   /**
@@ -7623,11 +7838,32 @@ Page({
     const key = pending.key;
     const target = pending.target;
     this._activeReactionTarget = target;
+    this._activeReactionEventId = pending.eventId || '';
     this._pendingReactionPlay = null;
     this._stopReactionOverlayWait();
     this.setData({ reactionPackLoading: false });
-    ov.playReaction(key, target, null);
+    const targetUserId = this._resolveReactionTargetUserId(target);
+    ov.playReaction(key, target, null, {
+      eventId: pending.eventId || '',
+      targetUserId: targetUserId,
+      sourceType: 'player_action',
+      sourceId: this.data.gameId || ''
+    });
     return true;
+  },
+
+  /** 从 active/pending target 快照取正式 userId（不用昵称/index） */
+  _resolveReactionTargetUserId(target) {
+    const t =
+      target ||
+      this._activeReactionTarget ||
+      (this._pendingReactionPlay && this._pendingReactionPlay.target) ||
+      null;
+    if (!t || typeof t !== 'object') return '';
+    const uid = t.userId != null ? String(t.userId).trim() : '';
+    if (uid) return uid;
+    const pid = t.playerId != null ? String(t.playerId).trim() : '';
+    return pid || '';
   },
 
   _stopReactionOverlayWait() {
@@ -7643,6 +7879,33 @@ Page({
     if (!(this._reactionBridge || _reactionHostBridge)) return;
     this._warmReactionSoundsIfReady();
     this._playPendingReaction();
+  },
+
+  /**
+   * overlay 确认动画真正开始后记账（主包 ledger）。
+   * eventId/targetUserId 以宿主一次动作快照为准；coinValue 只认主包配置。
+   */
+  onReactionStart(e) {
+    try {
+      const d = (e && e.detail) || {};
+      const pendingEventId =
+        this._activeReactionEventId ||
+        (d.eventId != null ? String(d.eventId).trim() : '');
+      const targetUserId =
+        this._resolveReactionTargetUserId(this._activeReactionTarget) ||
+        (d.targetUserId != null ? String(d.targetUserId).trim() : '');
+      const ledger = require('../../../../utils/reactionPopularityLedger.js');
+      ledger.recordReactionPopularity({
+        eventId: pendingEventId,
+        reactionKey: d.reactionKey,
+        targetUserId: targetUserId,
+        sourceType: d.sourceType || 'player_action',
+        sourceId: d.sourceId || this.data.gameId || '',
+        senderUserId: socialRelationStore.resolveCurrentUserId()
+      });
+    } catch (err) {
+      console.warn('[popularity] record failed', err && err.message);
+    }
   },
 
   _tryFinishPendingReactionPlay(reason) {
@@ -7702,7 +7965,13 @@ Page({
       return;
     }
 
-    this._pendingReactionPlay = { key: k, target: t };
+    // 一次用户动作生成唯一 eventId，全链路复用（pending → playReaction → reactionstart → ledger）
+    const eventId =
+      'rx_' +
+      Date.now().toString(36) +
+      '_' +
+      Math.random().toString(36).slice(2, 10);
+    this._pendingReactionPlay = { key: k, target: t, eventId: eventId };
     console.log(
       '[reaction] pending snapshot',
       k,
@@ -9520,6 +9789,16 @@ Page({
         url: '/pages/feedback/index?' + qs.join('&'),
         fail: () => wx.showToast({ title: '反馈页面尚未注册', icon: 'none' })
       });
+      return;
+    }
+
+    if (
+      action === 'publish_moment' ||
+      label === '发布到球友圈' ||
+      label === '球友圈' ||
+      action === 'circle'
+    ) {
+      this._openMomentPublishFromScore();
     }
   },
 

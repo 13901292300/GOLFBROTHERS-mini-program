@@ -374,17 +374,41 @@ Component({
      * @param {string} key
      * @param {object} target playerActionTarget
      * @param {object=} host
+     * @param {object=} meta 宿主一次动作生成的 eventId 等（全链路复用，不在此重新生成）
      */
-    playReaction(key, target, host) {
+    playReaction(key, target, host, meta) {
       if (host) this.setReactionHost(host);
       const k = key != null ? String(key).trim() : '';
       const t = target && typeof target === 'object' ? target : null;
+      const m = meta && typeof meta === 'object' ? meta : {};
       this._reactionTarget = t;
       this._playingReactionKey = k;
       this.setData({ playerActionTarget: t });
       // 播放真正开始：通知宿主；是否隐藏由宿主 shouldDetachDiscussionReaction(key) 决定
       if (k && t) {
         this._emitSeatDetachEvent(k, t.playerId || t.userId);
+        // 人气记账：仅开播时把宿主传入的 eventId 回传；不在分包生成新 id、不 require 主包 Store
+        try {
+          const eventId =
+            m.eventId != null && String(m.eventId).trim()
+              ? String(m.eventId).trim()
+              : '';
+          const targetUserId =
+            m.targetUserId != null && String(m.targetUserId).trim()
+              ? String(m.targetUserId).trim()
+              : String(
+                  (t.userId != null && String(t.userId).trim()) ||
+                    (t.playerId != null && String(t.playerId).trim()) ||
+                    ''
+                ).trim();
+          this.triggerEvent('reactionstart', {
+            eventId: eventId,
+            reactionKey: k,
+            targetUserId: targetUserId,
+            sourceType: m.sourceType || 'player_action',
+            sourceId: m.sourceId != null ? String(m.sourceId) : ''
+          });
+        } catch (eEmit) { /* ignore */ }
       }
       const fakeEvent = { detail: { key: k } };
       this.onPlayerActionReactionItemTap(fakeEvent);

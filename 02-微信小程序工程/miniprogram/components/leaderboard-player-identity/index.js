@@ -9,6 +9,8 @@
  * 关系展示由页面注入（组件不读 store）：
  * - relationStatus / relationshipLabel / canFollow / followLoading / isSelf
  */
+const playerIdentityGuard = require('../../utils/playerIdentityGuard.js');
+
 Component({
   properties: {
     player: {
@@ -156,10 +158,12 @@ Component({
     /** 资料页入口主键：稳定 userId；排除 scorecardKey / guest_ */
     _resolveProfileUserId(player) {
       if (!player || typeof player !== 'object') return '';
-      const id = String(player.playerId || player.userId || '').trim();
-      if (!id) return '';
-      if (id.indexOf(':') >= 0) return '';
-      if (id.indexOf('guest_') === 0) return '';
+      const id = playerIdentityGuard.normalizePlayerUserId(
+        player.playerId || player.userId
+      );
+      if (!playerIdentityGuard.isStablePublicUserId(id, { userType: player.userType })) {
+        return '';
+      }
       return id;
     },
 

@@ -1,0 +1,53 @@
+<view
+  wx:if="{{images.length}}"
+  class="mig {{themeClass}} mig--{{imageLayout}}"
+  catchtap="noop"
+>
+  <!-- 单图：按比例容器，左对齐 -->
+  <block wx:if="{{imageLayout === 'single'}}">
+    <view
+      class="mig__single {{singleImageClass}}"
+      style="{{singleImageStyle}}"
+    >
+      <image
+        wx:if="{{!images[0].unavailable}}"
+        class="mig__img"
+        src="{{images[0].renderPath}}"
+        mode="{{images[0].displayMode || 'aspectFit'}}"
+        lazy-load
+        data-index="0"
+        data-unavailable="0"
+        catchtap="onPreview"
+        binderror="onImageError"
+      ></image>
+      <view wx:else class="mig__img mig__broken">
+        <text class="mig__broken-text">图片已失效</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 多图：等大正方形宫格 -->
+  <view wx:else class="mig__cells">
+    <view
+      wx:for="{{images}}"
+      wx:for-item="img"
+      wx:key="mediaId"
+      class="mig__cell {{img.cellClass}}"
+    >
+      <image
+        wx:if="{{!img.unavailable}}"
+        class="mig__img"
+        src="{{img.renderPath}}"
+        mode="aspectFill"
+        lazy-load
+        data-index="{{img.previewIndex}}"
+        data-unavailable="0"
+        catchtap="onPreview"
+        binderror="onImageError"
+      ></image>
+      <view wx:else class="mig__img mig__broken">
+        <text class="mig__broken-text">图片已失效</text>
+      </view>
+    </view>
+  </view>
+</view>

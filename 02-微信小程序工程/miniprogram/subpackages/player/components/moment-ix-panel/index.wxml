@@ -1,0 +1,146 @@
+<view
+  class="mix {{themeClass}} {{mode === 'detail' ? 'mix--detail' : ''}}"
+  catchtap="onPanelTap"
+>
+  <!-- 工具行：·· 仅正式用户；举报由页面卡头/顶栏承担（默认 showReport=false） -->
+  <view
+    wx:if="{{canInteract || (showReport && (canReport || reportedByCurrentUser))}}"
+    class="mix__toolbar"
+  >
+    <view
+      wx:if="{{showReport && (canReport || reportedByCurrentUser)}}"
+      class="mix__report {{reportedByCurrentUser ? 'is-reported' : ''}}"
+      catchtap="onReport"
+    >{{reportedByCurrentUser ? '已举报' : '举报'}}</view>
+    <view wx:if="{{canInteract}}" class="mix__more-wrap" catchtap="noop">
+      <view
+        class="mix__more {{actionOpen ? 'is-open' : ''}}"
+        catchtap="onToggleAction"
+        aria-label="互动"
+      >··</view>
+      <view wx:if="{{actionOpen}}" class="mix__float" catchtap="noop">
+        <view
+          class="mix__float-item {{likeBusy ? 'is-busy' : ''}}"
+          catchtap="onLike"
+        >{{likedByCurrentUser ? '取消' : '♡ 赞'}}</view>
+        <view class="mix__float-div"></view>
+        <view class="mix__float-item" catchtap="onComment">评论</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 朋友圈式互动容器：有赞或有评才显示 -->
+  <view
+    wx:if="{{hasInteraction}}"
+    class="mix__box"
+    catchtap="onTapInteractionBox"
+  >
+    <view wx:if="{{likeAvatarPreview.length}}" class="mix__likes" catchtap="noop">
+      <text class="mix__heart">♡</text>
+      <view class="mix__like-avatars {{mode === 'detail' ? 'is-wrap' : ''}}">
+        <image
+          wx:for="{{likeAvatarPreview}}"
+          wx:key="userId"
+          wx:for-item="lu"
+          class="mix__like-avatar {{lu.canOpenProfile ? 'is-link' : ''}}"
+          src="{{lu.avatar}}"
+          mode="aspectFill"
+          data-uid="{{lu.userId}}"
+          data-avatar="{{lu.avatar}}"
+          data-open="{{lu.canOpenProfile ? 1 : 0}}"
+          catchtap="onTapLikeAvatar"
+        ></image>
+        <view
+          wx:if="{{mode === 'feed' && hiddenLikeCount > 0}}"
+          class="mix__like-more"
+          catchtap="onTapLikeMore"
+        >+{{hiddenLikeCount}}</view>
+        <text
+          wx:if="{{mode === 'detail' && likeCount > 0}}"
+          class="mix__like-total"
+        >{{likeCount}}人</text>
+      </view>
+    </view>
+
+    <view
+      wx:if="{{likeAvatarPreview.length && comments.length}}"
+      class="mix__sep"
+    ></view>
+
+    <block wx:for="{{comments}}" wx:key="commentId" wx:for-item="cmt">
+      <!-- 线程展开/收起 -->
+      <view
+        wx:if="{{cmt.rowType === 'thread_toggle'}}"
+        class="mix__thread-toggle"
+        data-root="{{cmt.rootCommentId}}"
+        data-expanded="{{cmt.expanded ? 1 : 0}}"
+        catchtap="onToggleThread"
+      >{{cmt.toggleLabel}}</view>
+
+      <view
+        wx:elif="{{cmt.rowType !== 'thread_toggle'}}"
+        id="cmt-{{cmt.commentId}}"
+        class="mix__cmt mix__cmt--d{{cmt.visualDepth || 0}} {{cmt.isDeleted ? 'is-deleted' : ''}}"
+        data-id="{{cmt.commentId}}"
+        data-name="{{cmt.authorDisplayName}}"
+        data-root="{{cmt.rootCommentId}}"
+        data-isauthor="{{cmt.isCommentAuthor ? 1 : 0}}"
+        data-candelete="{{cmt.canDelete ? 1 : 0}}"
+        data-canreport="{{cmt.canReport && !cmt.reportedByCurrentUser ? 1 : 0}}"
+        data-reported="{{cmt.reportedByCurrentUser ? 1 : 0}}"
+        data-deleted="{{cmt.isDeleted ? 1 : 0}}"
+        catchtap="onTapCommentRow"
+        bindlongpress="onLongPressComment"
+      >
+        <view class="mix__cmt-line">
+          <block wx:if="{{cmt.isDeleted}}">
+            <text class="mix__cmt-deleted">{{cmt.deletedPlaceholder || '该评论已删除'}}</text>
+          </block>
+          <block wx:else>
+            <text
+              class="mix__name {{(cmt.authorCanOpenProfile || cmt.canOpenProfile) ? 'is-link' : ''}}"
+              data-uid="{{cmt.authorUserId}}"
+              data-name="{{cmt.authorPublicName || cmt.authorDisplayName}}"
+              data-avatar="{{cmt.avatar}}"
+              data-open="{{(cmt.authorCanOpenProfile || cmt.canOpenProfile) ? 1 : 0}}"
+              catchtap="onTapCommentAuthor"
+            >{{cmt.authorDisplayName}}</text>
+            <block wx:if="{{cmt.isReply}}">
+              <text class="mix__cmt-plain"> 回复 </text>
+              <text wx:if="{{cmt.replyToDeleted}}" class="mix__cmt-plain">原评论已删除</text>
+              <text
+                wx:else
+                class="mix__name {{cmt.replyToCanOpenProfile ? 'is-link' : ''}}"
+                data-uid="{{cmt.replyToUserId}}"
+                data-name="{{cmt.replyToDisplayName || cmt.replyTargetDisplayName}}"
+                data-open="{{cmt.replyToCanOpenProfile ? 1 : 0}}"
+                catchtap="onTapReplyTo"
+              >{{cmt.replyToDisplayName || cmt.replyTargetDisplayName}}</text>
+            </block>
+            <text class="mix__cmt-plain">：</text>
+            <text class="mix__cmt-text">{{cmt.contentPreview || cmt.content}}</text>
+          </block>
+        </view>
+        <text
+          wx:if="{{mode === 'detail' && !cmt.isDeleted && (cmt.canDelete || cmt.canReport || cmt.reportedByCurrentUser)}}"
+          class="mix__cmt-more {{cmt.reportedByCurrentUser ? 'is-muted' : ''}}"
+          data-id="{{cmt.commentId}}"
+          data-isauthor="{{cmt.isCommentAuthor ? 1 : 0}}"
+          data-candelete="{{cmt.canDelete ? 1 : 0}}"
+          data-canreport="{{cmt.canReport && !cmt.reportedByCurrentUser ? 1 : 0}}"
+          data-reported="{{cmt.reportedByCurrentUser ? 1 : 0}}"
+          catchtap="onTapCommentMore"
+        >{{cmt.reportedByCurrentUser ? '已举报' : '更多'}}</text>
+      </view>
+
+      <!-- feed：一级评论下的回复入口 -->
+      <view
+        wx:if="{{mode === 'feed' && cmt.isRoot && cmt.replyCount > 0}}"
+        class="mix__reply-more"
+        data-id="{{cmt.commentId}}"
+        data-root="{{cmt.rootCommentId || cmt.commentId}}"
+        catchtap="onTapReplyMore"
+      >{{cmt.replyCountLabel || ('查看' + cmt.replyCount + '条回复')}}</view>
+    </block>
+  </view>
+</view>

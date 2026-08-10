@@ -1,0 +1,423 @@
+<view class="pp-page {{themeClass}}" catchtap="onCloseIxAction">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">PLAYER</text>
+          <text class="gb-header__title">球员主页</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{pageState === 'loading'}}" class="pp-state">
+    <text class="pp-state__text">加载中…</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'notFound'}}" class="pp-state">
+    <text class="pp-state__title">未找到该球员资料</text>
+    <text class="pp-state__text">该用户身份不可用或不存在</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="pp-state">
+    <text class="pp-state__title">资料加载失败，请稍后重试</text>
+    <view class="pp-state__btn" bindtap="onRetry">重试</view>
+  </view>
+
+  <block wx:else>
+    <view class="pp-tabs">
+      <view
+        class="pp-tabs__item {{activeTab === 'home' ? 'is-active' : ''}}"
+        data-tab="home"
+        bindtap="onSwitchTab"
+      >主页</view>
+      <view
+        class="pp-tabs__item {{activeTab === 'history' ? 'is-active' : ''}}"
+        data-tab="history"
+        bindtap="onSwitchTab"
+      >战绩</view>
+      <view
+        class="pp-tabs__item {{activeTab === 'feed' ? 'is-active' : ''}}"
+        data-tab="feed"
+        bindtap="onSwitchTab"
+      >动态</view>
+    </view>
+
+    <scroll-view
+      scroll-y
+      class="pp-body"
+      enhanced
+      show-scrollbar="{{false}}"
+      scroll-top="{{feedScrollTop}}"
+      refresher-enabled="{{activeTab === 'feed'}}"
+      refresher-triggered="{{momentRefreshing}}"
+      bindrefresherrefresh="onMomentRefresh"
+      bindscroll="onFeedScroll"
+      bindscrolltolower="onHistoryLoadMore"
+    >
+      <!-- 主页 TAB -->
+      <view wx:if="{{activeTab === 'home'}}" class="pp-main">
+        <view class="pp-card pp-hero">
+          <view class="pp-avatar-ring">
+            <image class="pp-avatar" src="{{view.avatar}}" mode="aspectFill"></image>
+          </view>
+          <view class="pp-hero__meta">
+            <view class="pp-name-line">
+              <view class="pp-name-gender">
+                <text class="pp-name">{{view.heroName}}</text>
+                <text wx:if="{{view.genderSymbol}}" class="pp-gender {{view.genderClass}}">{{view.genderSymbol}}</text>
+              </view>
+            </view>
+            <text wx:if="{{view.showOriginalNickname}}" class="pp-origin-name">原昵称：{{view.originalNickname}}</text>
+            <text wx:if="{{view.isCurrentUser}}" class="pp-self-tag">我</text>
+            <view class="pp-counts">
+              <text class="pp-counts__item">关注 {{social.followingCount}}</text>
+              <text class="pp-counts__sep">｜</text>
+              <text class="pp-counts__item">粉丝 {{social.followerCount}}</text>
+            </view>
+          <view class="pp-hero-actions">
+            <view
+              wx:if="{{social.showFollowBtn}}"
+              class="pp-follow-btn {{social.relationStatus !== 'none' ? 'is-muted' : ''}} {{social.relationLoading ? 'is-loading' : ''}}"
+              hover-class="pp-follow-btn--hover"
+              catchtap="onTapFollowAction"
+            >{{social.relationLoading ? '…' : social.relationLabel}}</view>
+            <view
+              wx:if="{{showBattlePkBtn}}"
+              class="pp-pk-btn"
+              hover-class="pp-pk-btn--hover"
+              catchtap="onTapBattlePk"
+            >战绩PK</view>
+          </view>
+            <text wx:if="{{view.showSignature}}" class="pp-signature">{{view.signature}}</text>
+            <view wx:if="{{view.showGeo}}" class="pp-geo">
+              <text wx:if="{{view.nationalityName}}" class="pp-geo__item">{{view.nationalityName}}</text>
+              <text wx:if="{{view.nationalityName && view.regionDisplayName}}" class="pp-geo__dot">·</text>
+              <text wx:if="{{view.regionDisplayName}}" class="pp-geo__item">{{view.regionDisplayName}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="pp-card">
+          <text class="pp-card__label">竞技指标</text>
+          <view class="pp-metrics">
+            <view class="pp-metric">
+              <text class="pp-metric__label">江湖差点</text>
+              <text class="pp-metric__value pp-metric__value--gold">{{view.handicapText}}</text>
+            </view>
+            <view class="pp-metric">
+              <text class="pp-metric__label">浮动系数</text>
+              <text class="pp-metric__value pp-metric__value--blue">{{view.floatCoefText}}</text>
+            </view>
+            <view class="pp-metric">
+              <text class="pp-metric__label">人气值</text>
+              <text class="pp-metric__value pp-metric__value--pop">{{view.popularityText}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{viewerPrivate.canEditRemark}}" class="pp-card">
+          <view class="pp-remark-head">
+            <text class="pp-card__label pp-card__label--inline">我的备注</text>
+            <text class="pp-remark-edit" bindtap="onTapEditRemark">编辑</text>
+          </view>
+          <text wx:if="{{viewerPrivate.hasRemarkNote}}" class="pp-remark-body">{{viewerPrivate.remarkNote}}</text>
+          <text wx:else class="pp-remark-empty" bindtap="onTapEditRemark">{{viewerPrivate.remarkPlaceholder}}</text>
+        </view>
+
+        <view class="pp-card">
+          <text class="pp-card__label">所属球队</text>
+          <view wx:if="{{teams.loadFailed}}" class="pp-teams-empty">
+            <text class="pp-teams-empty__text">球队信息加载失败</text>
+          </view>
+          <view wx:elif="{{teams.empty}}" class="pp-teams-empty">
+            <text class="pp-teams-empty__text">暂未加入球队</text>
+          </view>
+          <view wx:else class="pp-teams">
+            <view
+              wx:for="{{teams.previewList}}"
+              wx:key="teamId"
+              class="pp-team-row"
+              hover-class="pp-team-row--hover"
+              bindtap="onTapTeamRow"
+            >
+              <image class="pp-team-logo" src="{{item.logo}}" mode="aspectFill"></image>
+              <view class="pp-team-meta">
+                <text class="pp-team-name">{{item.name}}</text>
+                <text class="pp-team-sub">
+                  <text wx:if="{{item.shortName}}">{{item.shortName}} · </text>{{item.roleLabel}}
+                </text>
+              </view>
+            </view>
+            <view
+              wx:if="{{teams.showToggle}}"
+              class="pp-teams-toggle"
+              bindtap="onToggleTeamsExpand"
+            >{{teams.toggleLabel}}</view>
+          </view>
+        </view>
+
+        <view class="pp-card">
+          <view class="pp-remark-head">
+            <text class="pp-card__label pp-card__label--inline">最近战绩</text>
+            <text wx:if="{{!historySummary.empty}}" class="pp-remark-edit" bindtap="onTapViewAllHistory">查看全部战绩</text>
+          </view>
+          <view class="pp-hist-stats">
+            <view class="pp-hist-stat">
+              <text class="pp-hist-stat__n">{{historySummary.playedCount}}</text>
+              <text class="pp-hist-stat__l">参赛</text>
+            </view>
+            <view class="pp-hist-stat">
+              <text class="pp-hist-stat__n">{{historySummary.completedCount}}</text>
+              <text class="pp-hist-stat__l">完赛</text>
+            </view>
+            <view class="pp-hist-stat">
+              <text class="pp-hist-stat__n">{{historySummary.bestGrossText}}</text>
+              <text class="pp-hist-stat__l">最佳总杆</text>
+            </view>
+          </view>
+          <view wx:if="{{historySummary.empty}}" class="pp-teams-empty">
+            <text class="pp-teams-empty__text">暂无历史战绩</text>
+          </view>
+          <view wx:else class="pp-hist-list">
+            <view
+              wx:for="{{historySummary.recentCards}}"
+              wx:key="recordId"
+              class="pp-hist-card"
+              data-url="{{item.navUrl}}"
+              bindtap="onTapHistoryCard"
+            >
+              <view class="pp-hist-card__top">
+                <text class="pp-hist-card__date">{{item.dateLabel}}</text>
+                <text class="pp-hist-card__tag">{{item.familyLabel}} · {{item.modeLabel}}</text>
+              </view>
+              <text class="pp-hist-card__title">{{item.matchName}}</text>
+              <text wx:if="{{item.courseName}}" class="pp-hist-card__course">{{item.courseName}}</text>
+              <view class="pp-hist-card__result">
+                <text class="pp-hist-card__primary">{{item.resultPrimary}}</text>
+                <text class="pp-hist-card__secondary">{{item.resultSecondary}}</text>
+              </view>
+              <view wx:if="{{item.teamLine}}" class="pp-hist-card__team">{{item.teamLine}}</view>
+              <text wx:if="{{item.hasNav}}" class="pp-hist-card__nav">查看赛事详情 ›</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 战绩 TAB -->
+      <view wx:elif="{{activeTab === 'history'}}" class="pp-main">
+        <view class="pp-filter">
+          <view
+            wx:for="{{historyFilters}}"
+            wx:key="key"
+            class="pp-filter__item {{historyFilter === item.key ? 'is-active' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="onSelectHistoryFilter"
+          >{{item.label}}</view>
+        </view>
+
+        <view wx:if="{{historyState === 'loading'}}" class="pp-tab-state">
+          <text class="pp-state__text">战绩加载中…</text>
+        </view>
+        <view wx:elif="{{historyState === 'private'}}" class="pp-tab-state">
+          <text class="pp-state__title">战绩未公开</text>
+          <text class="pp-state__text">该球员已关闭历史战绩可见性</text>
+        </view>
+        <view wx:elif="{{historyState === 'error'}}" class="pp-tab-state">
+          <text class="pp-state__title">战绩加载失败</text>
+          <view class="pp-state__btn" bindtap="onRetryHistory">重试</view>
+        </view>
+        <view wx:elif="{{historyState === 'empty'}}" class="pp-tab-state">
+          <text class="pp-state__text">暂无历史战绩</text>
+        </view>
+        <view wx:else class="pp-hist-list">
+          <view
+            wx:for="{{historyCards}}"
+            wx:key="recordId"
+            class="pp-hist-card pp-hist-card--full"
+            data-url="{{item.navUrl}}"
+            bindtap="onTapHistoryCard"
+          >
+            <view class="pp-hist-card__top">
+              <text class="pp-hist-card__date">{{item.dateLabel}}</text>
+              <text class="pp-hist-card__tag">{{item.familyLabel}} · {{item.modeLabel}}</text>
+            </view>
+            <text class="pp-hist-card__title">{{item.matchName}}</text>
+            <text wx:if="{{item.courseName}}" class="pp-hist-card__course">{{item.courseName}}</text>
+            <view class="pp-hist-card__result">
+              <text class="pp-hist-card__primary">{{item.resultPrimary}}</text>
+              <text class="pp-hist-card__secondary">{{item.resultSecondary}}</text>
+            </view>
+            <view wx:if="{{item.teamLine}}" class="pp-hist-card__team">代表 {{item.teamLine}}</view>
+            <text wx:if="{{item.hasNav}}" class="pp-hist-card__nav">查看赛事详情 ›</text>
+          </view>
+          <view wx:if="{{historyHasMore}}" class="pp-hist-more" bindtap="onHistoryLoadMore">加载更多</view>
+        </view>
+      </view>
+
+      <!-- 动态 TAB（只读浏览；发布仅在记分页） -->
+      <view wx:else class="pp-main">
+        <view wx:if="{{momentState === 'loading'}}" class="pp-tab-state">
+          <text class="pp-state__text">动态加载中…</text>
+        </view>
+        <view wx:elif="{{momentState === 'error'}}" class="pp-tab-state">
+          <text class="pp-state__title">动态加载失败</text>
+          <view class="pp-state__btn" bindtap="onRetryMoments">重试</view>
+        </view>
+        <view wx:elif="{{momentState === 'empty' || momentState === 'idle'}}" class="pp-tab-state">
+          <text class="pp-state__text">暂无公开动态</text>
+        </view>
+        <view wx:else class="pp-moment-list">
+          <view
+            wx:for="{{momentCards}}"
+            wx:key="momentId"
+            class="pp-moment-card pp-moment-card--full"
+            data-id="{{item.momentId}}"
+            bindtap="onTapMomentCard"
+          >
+            <view class="pp-moment-card__head">
+              <image class="pp-moment-card__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <view class="pp-moment-card__meta">
+                <text class="pp-moment-card__name">{{item.authorDisplayName}}</text>
+                <text class="pp-moment-card__time">{{item.timeLabel}}</text>
+              </view>
+              <view
+                wx:if="{{item.canReport || item.reportedByCurrentUser}}"
+                class="pp-moment-card__report {{item.reportedByCurrentUser ? 'is-reported' : ''}}"
+                data-id="{{item.momentId}}"
+                catchtap="onTapMomentReport"
+              >{{item.reportedByCurrentUser ? '已举报' : '举报'}}</view>
+            </view>
+            <text wx:if="{{item.contentPreview}}" class="pp-moment-card__text">{{item.contentPreview}}</text>
+            <text
+              wx:if="{{item.isContentCollapsed}}"
+              class="pp-moment-card__more"
+              data-id="{{item.momentId}}"
+              catchtap="onTapMomentExpand"
+            >展开全文</text>
+            <moment-image-grid
+              wx:if="{{item.imageCount}}"
+              momentId="{{item.momentId}}"
+              themeClass="{{themeClass}}"
+              imageLayout="{{item.imageLayout}}"
+              singleImageClass="{{item.singleImageClass}}"
+              singleImageStyle="{{item.singleImageStyle}}"
+              images="{{item.images}}"
+              catch:preview="onPreviewMomentImage"
+              catch:imageerror="onMomentImageError"
+            ></moment-image-grid>
+            <moment-scorecard
+              wx:if="{{item.relatedGame}}"
+              scorecard="{{item.publicScorecard}}"
+              themeClass="{{themeClass}}"
+              catch:opentap="onTapScorecard"
+            ></moment-scorecard>
+            <moment-ix-panel
+              momentId="{{item.momentId}}"
+              themeClass="{{themeClass}}"
+              mode="feed"
+              actionOpen="{{ixActionMomentId === item.momentId}}"
+              likedByCurrentUser="{{item.likedByCurrentUser}}"
+              likeBusy="{{likeBusyMap[item.momentId]}}"
+              likeCount="{{item.likeCount}}"
+              likeAvatarPreview="{{item.likeAvatarPreview}}"
+              hiddenLikeCount="{{item.hiddenLikeCount}}"
+              comments="{{item.commentPreview}}"
+              hasInteraction="{{item.hasInteraction}}"
+              canInteract="{{item.canInteract}}"
+              catch:toggleaction="onToggleIxAction"
+              catch:closeaction="onCloseIxAction"
+              catch:like="onIxLike"
+              catch:comment="onIxComment"
+              catch:tapbox="onIxTapBox"
+              catch:tapuser="onIxTapUser"
+              catch:tapcomment="onIxTapComment"
+              catch:tapreplymore="onIxTapReplyMore"
+              catch:taplikemore="onIxTapLikeMore"
+            ></moment-ix-panel>
+          </view>
+          <view wx:if="{{momentHasMore}}" class="pp-hist-more" bindtap="onMomentLoadMore">加载更多</view>
+        </view>
+      </view>
+    </scroll-view>
+  </block>
+
+  <!-- 取消关注 Bottom Sheet：常挂载 + is-open，避免 flex 页内 fixed 失效时不可见 -->
+  <view
+    class="pp-sheet pp-sheet--relation {{themeClass}} {{relationSheetVisible ? 'is-open' : ''}}"
+    aria-hidden="{{!relationSheetVisible}}"
+  >
+    <view class="pp-sheet__mask" catchtap="onCloseRelationSheet"></view>
+    <view class="pp-sheet__panel" catchtap="noop">
+      <view class="pp-sheet__handle"></view>
+      <text class="pp-sheet__title">{{relationSheetTitle}}</text>
+      <view
+        class="pp-sheet__danger {{social.relationLoading ? 'is-disabled' : ''}}"
+        catchtap="onConfirmUnfollow"
+      >取消关注</view>
+      <view class="pp-sheet__cancel" catchtap="onCloseRelationSheet">取消</view>
+    </view>
+  </view>
+
+  <!-- 备注编辑 Bottom Sheet -->
+  <view wx:if="{{remarkSheetVisible}}" class="pp-sheet {{themeClass}}">
+    <view class="pp-sheet__mask" bindtap="onCloseRemarkSheet"></view>
+    <view class="pp-sheet__panel pp-sheet__panel--form" catchtap="noop">
+      <view class="pp-sheet__handle"></view>
+      <view class="pp-sheet__head-row">
+        <text class="pp-sheet__link" bindtap="onCloseRemarkSheet">取消</text>
+        <text class="pp-sheet__title">编辑备注</text>
+        <text class="pp-sheet__link pp-sheet__link--primary" bindtap="onSaveRemark">保存</text>
+      </view>
+      <view class="pp-sheet__field">
+        <view class="pp-sheet__field-label">
+          <text>备注名</text>
+          <text class="pp-sheet__count">{{remarkNameCount}}/{{remarkNameMax}}</text>
+        </view>
+        <input
+          class="pp-sheet__input"
+          value="{{remarkDraftName}}"
+          maxlength="{{remarkNameMax}}"
+          placeholder="仅自己可见"
+          bindinput="onRemarkNameInput"
+        />
+      </view>
+      <view class="pp-sheet__field">
+        <view class="pp-sheet__field-label">
+          <text>备注内容</text>
+          <text class="pp-sheet__count">{{remarkNoteCount}}/{{remarkNoteMax}}</text>
+        </view>
+        <textarea
+          class="pp-sheet__textarea"
+          value="{{remarkDraftNote}}"
+          maxlength="{{remarkNoteMax}}"
+          placeholder="记录你们的球友信息"
+          bindinput="onRemarkNoteInput"
+          auto-height
+        />
+      </view>
+    </view>
+  </view>
+
+  <moment-report-sheet
+    id="momentReportSheet"
+    visible="{{reportSheetVisible}}"
+    themeClass="{{themeClass}}"
+    title="{{reportSheetTitle}}"
+    submitting="{{reportSubmitting}}"
+    bind:close="onCloseReportSheet"
+    bind:submit="onSubmitReport"
+  ></moment-report-sheet>
+
+  <moment-like-sheet
+    visible="{{likeSheetVisible}}"
+    themeClass="{{themeClass}}"
+    likeCount="{{likeSheetCount}}"
+    likeAvatars="{{likeSheetAvatars}}"
+    bind:close="onCloseLikeSheet"
+    bind:tapuser="onLikeSheetTapUser"
+  ></moment-like-sheet>
+</view>

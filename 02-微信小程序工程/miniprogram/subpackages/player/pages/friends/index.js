@@ -13,6 +13,8 @@ const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
+const playerDisplayName = require('../../../../utils/playerDisplayName.js');
+const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 
 const MAX_GROUP_SIZE = 4;
 const PROXY_MODE = 'proxy_register';
@@ -53,27 +55,40 @@ function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '').trim();
 }
 
-function resolveContactDisplayName(contact, fallback) {
+function resolveContactDisplayName(contact, fallback, remarkNameMap) {
   const source = contact || {};
   const fb = fallback || {};
-  return String(
-    source.remarkName ||
-      fb.nickname ||
-      fb.displayName ||
-      fb.name ||
-      fb.competitionName ||
-      source.targetUserId ||
-      ''
+  const targetId = String(source.targetUserId || fb.playerId || fb.userId || '').trim();
+  const publicName = String(
+    fb.nickname || fb.displayName || fb.name || fb.competitionName || ''
   ).trim();
+  const viewer = socialRelationStore.resolveCurrentUserId();
+  const map = Object.assign(
+    {},
+    remarkNameMap || playerDisplayName.buildRemarkNameMap(viewer)
+  );
+  // contact 行内 remarkName 并入 map（同次构建不重复读 Storage）
+  const inlineRemark = String(source.remarkName || '').trim();
+  if (targetId && inlineRemark) {
+    map[targetId] = inlineRemark;
+  }
+  return playerDisplayName.resolvePlayerDisplayNameForViewer({
+    viewerUserId: viewer,
+    targetUserId: targetId,
+    publicName: publicName,
+    snapshotName: String(fb.competitionName || fb.matchNickname || '').trim(),
+    remarkNameMap: map,
+    defaultName: targetId || '未知'
+  }).displayName;
 }
 
-function contactToFriendRow(contact, fallback) {
+function contactToFriendRow(contact, fallback, remarkNameMap) {
   const source = contact || {};
   const fb = fallback || {};
   const playerId = String(source.targetUserId || fb.playerId || fb.userId || '').trim();
   if (!playerId) return null;
   const phone = normalizePhone(source.phone || fb.phone);
-  const name = resolveContactDisplayName(source, fb);
+  const name = resolveContactDisplayName(source, fb, remarkNameMap);
   return mapFriendRow({
     userId: playerId,
     playerId: playerId,
@@ -93,6 +108,8 @@ function contactToFriendRow(contact, fallback) {
 
 function mergeContactFriends(ownerUserId, fallbackList) {
   const fallback = Array.isArray(fallbackList) ? fallbackList : [];
+  const viewer = ownerUserId || socialRelationStore.resolveCurrentUserId();
+  const remarkNameMap = playerDisplayName.buildRemarkNameMap(viewer);
   const fallbackById = {};
   const fallbackByPhone = {};
   fallback.forEach((item) => {
@@ -111,7 +128,7 @@ function mergeContactFriends(ownerUserId, fallbackList) {
     const id = String(contact && contact.targetUserId || '').trim();
     const phone = normalizePhone(contact && contact.phone);
     const fallbackRow = (id && fallbackById[id]) || (phone && fallbackByPhone[phone]) || null;
-    const row = contactToFriendRow(contact, fallbackRow);
+    const row = contactToFriendRow(contact, fallbackRow, remarkNameMap);
     if (!row) return;
     const rowId = String(row.playerId || row.userId || '').trim();
     const rowPhone = normalizePhone(row.phone);
@@ -121,10 +138,21 @@ function mergeContactFriends(ownerUserId, fallbackList) {
   });
 
   fallback.forEach((item) => {
-    const row = mapFriendRow(item || {});
-    const id = String(row.playerId || row.userId || '').trim();
-    const phone = normalizePhone(row.phone);
+    const base = item || {};
+    const id = String(base.playerId || base.userId || '').trim();
+    const phone = normalizePhone(base.phone);
     if ((id && seenIds[id]) || (phone && seenPhones[phone])) return;
+    const named = resolveContactDisplayName(
+      { targetUserId: id, remarkName: base.remarkName || base.remark || '' },
+      base,
+      remarkNameMap
+    );
+    const row = mapFriendRow(
+      Object.assign({}, base, {
+        name: named || base.name,
+        displayName: named || base.displayName || base.name
+      })
+    );
     merged.push(row);
     if (id) seenIds[id] = true;
     if (phone) seenPhones[phone] = true;
@@ -186,7 +214,15 @@ function filterFriends(list, keyword) {
   if (!q) return list;
   const lower = q.toLowerCase();
   return list.filter((f) => {
-    const fields = [f.name, f.pinyin, f.phone, f.remark, f.displayName];
+    const fields = [
+      f.name,
+      f.nickname,
+      f.pinyin,
+      f.phone,
+      f.remark,
+      f.remarkName,
+      f.displayName
+    ];
     return fields.some((v) => v && String(v).toLowerCase().includes(lower));
   });
 }
@@ -600,6 +636,18 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    // 备注名变更后返回本页时，按版本号重建展示名
+    const rev = playerDisplayName.getRemarkRevision();
+    if (this._remarkRev != null && this._remarkRev !== rev) {
+      const ownerId =
+        (this.data.currentUser && this.data.currentUser.playerId) ||
+        socialRelationStore.resolveCurrentUserId();
+      if (!isProxyRegisterModeValue(this._mode)) {
+        this._allFriends = mergeContactFriends(ownerId, FRIEND_LIST || []);
+        this._applyFriendFilter(this.data.keyword || '');
+      }
+    }
+    this._remarkRev = rev;
   },
 
   applyTheme(theme) {

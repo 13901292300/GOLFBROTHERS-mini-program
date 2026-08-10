@@ -2118,6 +2118,7 @@
   wx:if="{{reactionOverlayMounted}}"
   id="player-reaction-overlay"
   bind:ready="onReactionOverlayReady"
+  bind:reactionstart="onReactionStart"
   bind:seatdetach="onReactionOverlaySeatDetach"
   bind:seatrestore="onReactionOverlaySeatRestore"
   bind:seatvisualstate="onReactionOverlaySeatVisualState"

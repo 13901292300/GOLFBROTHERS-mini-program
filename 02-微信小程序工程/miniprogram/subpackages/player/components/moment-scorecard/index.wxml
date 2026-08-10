@@ -1,0 +1,133 @@
+<view class="msc {{themeClass}} {{scorecard && scorecard.ok ? '' : 'is-unavailable'}}">
+  <!-- 不可用 -->
+  <block wx:if="{{!scorecard || scorecard.unavailable || !scorecard.ok}}">
+    <view class="msc__unavailable" bindtap="onEnterGame">
+      <text>{{scorecard.message || '成绩卡暂不可用'}}</text>
+    </view>
+  </block>
+
+  <!-- 比杆 -->
+  <block wx:elif="{{scorecard.kind === 'stroke' && scorecard.stroke}}">
+    <view class="msc-stroke-head" bindtap="onEnterGame">
+      <text class="msc-tag">{{scorecard.modeLabel || '个人比杆赛'}}</text>
+      <text class="msc-course">{{scorecard.courseName || '球场'}}</text>
+      <text class="msc-enter">进入GAME</text>
+    </view>
+    <view class="msc__summary">
+      <text class="msc__sum-item">OUT {{scorecard.stroke.summary.outText}}</text>
+      <text class="msc__sum-item">IN {{scorecard.stroke.summary.inText}}</text>
+      <text class="msc__sum-item">TOTAL {{scorecard.stroke.summary.totalText}}</text>
+      <text class="msc__sum-item">{{scorecard.stroke.summary.toParText}}</text>
+    </view>
+    <view class="msc-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+      <view class="tour-scorecard">
+        <view class="tsc-row tsc-head">
+          <text wx:for="{{scorecard.stroke.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+        </view>
+        <view class="tsc-row">
+          <text wx:for="{{scorecard.stroke.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+        </view>
+        <view class="tsc-row">
+          <view wx:for="{{scorecard.stroke.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+            <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+              <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+            </view>
+            <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="tour-scorecard">
+        <view class="tsc-row tsc-head">
+          <text wx:for="{{scorecard.stroke.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+        </view>
+        <view class="tsc-row">
+          <text wx:for="{{scorecard.stroke.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+        </view>
+        <view class="tsc-row">
+          <view wx:for="{{scorecard.stroke.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+            <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+              <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+            </view>
+            <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 比洞 -->
+  <block wx:elif="{{scorecard.kind === 'match_play' && scorecard.matchPlay}}">
+    <view class="msc-stroke-head" bindtap="onEnterGame">
+      <text class="msc-tag">{{scorecard.modeLabel || '个人比洞'}}</text>
+      <text class="msc-course">{{scorecard.courseName || '球场'}}</text>
+      <text class="msc-enter">进入GAME</text>
+    </view>
+    <!-- 头像行：状态层箭头（winner-a/b / all-square / not-started）+ 内容层 -->
+    <view
+      class="msc-mp-head msc-mp-status {{scorecard.matchPlay.trend.statusLayerClass}}"
+      bindtap="onEnterGame"
+    >
+      <view class="msc-mp-status-layer">
+        <view class="msc-mp-st-fill msc-mp-st-fill--a"></view>
+        <view class="msc-mp-st-chevron msc-mp-st-chevron--a"></view>
+        <view class="msc-mp-st-edge msc-mp-st-edge--b"></view>
+        <view class="msc-mp-st-fill msc-mp-st-fill--b"></view>
+        <view class="msc-mp-st-chevron msc-mp-st-chevron--b"></view>
+        <view class="msc-mp-st-edge msc-mp-st-edge--a"></view>
+        <view class="msc-mp-st-fill msc-mp-st-fill--as-l"></view>
+        <view class="msc-mp-st-chevron msc-mp-st-chevron--as-l"></view>
+        <view class="msc-mp-st-fill msc-mp-st-fill--as-r"></view>
+        <view class="msc-mp-st-chevron msc-mp-st-chevron--as-r"></view>
+      </view>
+      <view class="msc-mp-content-layer">
+        <view class="msc-mp-side msc-mp-side--red">
+          <view
+            wx:for="{{scorecard.matchPlay.sideAAvatars}}"
+            wx:for-item="mem"
+            wx:key="userId"
+            class="msc-avatar-wrap"
+          >
+            <image class="msc-avatar" src="{{mem.avatar}}" mode="aspectFill"></image>
+          </view>
+        </view>
+        <!-- 中比分：对齐正式比洞得分榜 mp-sb-center（同视觉行 + baseline，非上下等权双行） -->
+        <view class="msc-mp-trend">
+          <text
+            wx:if="{{scorecard.matchPlay.trend.phaseLabel}}"
+            class="msc-mp-trend__phase"
+          >{{scorecard.matchPlay.trend.phaseLabel}}</text>
+          <view class="msc-mp-trend__status {{scorecard.matchPlay.trend.statusLeadClass}}">
+            <text class="msc-mp-trend__main">{{scorecard.matchPlay.trend.statusMain}}</text>
+            <text
+              wx:if="{{scorecard.matchPlay.trend.statusSub}}"
+              class="msc-mp-trend__sub"
+            >{{scorecard.matchPlay.trend.statusSub}}</text>
+          </view>
+        </view>
+        <view class="msc-mp-side msc-mp-side--blue">
+          <view
+            wx:for="{{scorecard.matchPlay.sideBAvatars}}"
+            wx:for-item="mem"
+            wx:key="userId"
+            class="msc-avatar-wrap"
+          >
+            <image class="msc-avatar" src="{{mem.avatar}}" mode="aspectFill"></image>
+          </view>
+        </view>
+      </view>
+    </view>
+    <!-- 复用比洞得分榜卡片底部 18 洞圆点（mp-sb-holes / mp-sb-dot） -->
+    <view
+      wx:if="{{scorecard.matchPlay.holeDots && scorecard.matchPlay.holeDots.length}}"
+      class="mp-sb-holes mp-sb-holes--summary"
+      bindtap="onEnterGame"
+    >
+      <view
+        wx:for="{{scorecard.matchPlay.holeDots}}"
+        wx:for-item="dot"
+        wx:key="n"
+        class="mp-sb-dot {{dot.cls}}"
+      >{{dot.n}}</view>
+    </view>
+  </block>
+</view>

@@ -5,9 +5,12 @@
  * identityType：PLAYER | CADDIE
  * signature / caddieCourse / phoneBound / phoneMasked
  * handicap / floatCoef：竞技展示字段（非编辑页写入）
+ * nationality* / region*：公开地理字段（均可空；不复用球队 region）
+ * updatedAt：成功保存时更新
  */
 
 const gameStore = require('./gameStore.js');
+const geoCatalog = require('./geoCatalog.js');
 
 const STORAGE_KEY = 'gb_user_profile_v1';
 
@@ -58,6 +61,11 @@ function _normalizeGender(value, fallback) {
   return fb || '';
 }
 
+function _strOrEmpty(value) {
+  if (value == null) return '';
+  return String(value).trim();
+}
+
 function _baseFromCurrentUser() {
   const user = gameStore.getCurrentUser() || {};
   return {
@@ -73,7 +81,16 @@ function _baseFromCurrentUser() {
     phoneMasked: '未绑定',
     avatar: DEFAULT_AVATAR,
     handicap: DEFAULT_HANDICAP,
-    floatCoef: DEFAULT_FLOAT_COEF
+    floatCoef: DEFAULT_FLOAT_COEF,
+    nationalityCode: '',
+    nationalityName: '',
+    regionCountryCode: '',
+    regionCountryName: '',
+    regionProvinceCode: '',
+    regionProvinceName: '',
+    regionCityCode: '',
+    regionCityName: '',
+    updatedAt: ''
   };
 }
 
@@ -85,57 +102,81 @@ function _toNumberOr(value, fallback) {
 
 function normalizeProfile(raw) {
   const base = _baseFromCurrentUser();
-  const data = raw && typeof raw === 'object' ? raw : {};
+  const src = raw && typeof raw === 'object' ? raw : {};
   const avatarRaw =
-    data.avatar != null && String(data.avatar).trim() !== ''
-      ? String(data.avatar).trim()
+    src.avatar != null && String(src.avatar).trim() !== ''
+      ? String(src.avatar).trim()
       : base.avatar;
 
   // displayName 优先；兼容旧 competitionName
   const displayName =
-    data.displayName != null && String(data.displayName).trim() !== ''
-      ? String(data.displayName).trim()
-      : data.competitionName != null
-        ? String(data.competitionName).trim()
+    src.displayName != null && String(src.displayName).trim() !== ''
+      ? String(src.displayName).trim()
+      : src.competitionName != null
+        ? String(src.competitionName).trim()
         : base.displayName;
 
+  const nationalityCode = _strOrEmpty(src.nationalityCode);
+  let nationalityName = _strOrEmpty(src.nationalityName);
+  if (nationalityCode && !nationalityName) {
+    const hit = geoCatalog.findNationalityByCode(nationalityCode);
+    if (hit) nationalityName = hit.name;
+  }
+
+  const regionCountryCode = _strOrEmpty(src.regionCountryCode);
+  let regionCountryName = _strOrEmpty(src.regionCountryName);
+  if (regionCountryCode && !regionCountryName) {
+    const hit = geoCatalog.findNationalityByCode(regionCountryCode);
+    if (hit) regionCountryName = hit.name;
+  }
+
   return {
-    userId: data.userId || base.userId,
-    nickname: data.nickname != null ? String(data.nickname) : base.nickname,
+    userId: src.userId || base.userId,
+    nickname: src.nickname != null ? String(src.nickname) : base.nickname,
     gender: _normalizeGender(
-      data.gender != null && data.gender !== '' ? data.gender : base.gender,
+      src.gender != null && src.gender !== '' ? src.gender : base.gender,
       base.gender
     ),
-    signature: data.signature != null ? String(data.signature) : base.signature,
+    signature: src.signature != null ? String(src.signature) : base.signature,
     identityType: _normalizeIdentityType(
-      data.identityType != null ? data.identityType : base.identityType
+      src.identityType != null ? src.identityType : base.identityType
     ),
-    caddieCourse: data.caddieCourse != null ? String(data.caddieCourse).trim() : base.caddieCourse,
+    caddieCourse: src.caddieCourse != null ? String(src.caddieCourse).trim() : base.caddieCourse,
     displayName: displayName,
     // 兼容旧报名/出发表读取
     competitionName: displayName,
-    phoneBound: data.phoneBound === true,
+    phoneBound: src.phoneBound === true,
     phoneMasked:
-      data.phoneMasked != null && String(data.phoneMasked).trim() !== ''
-        ? String(data.phoneMasked).trim()
+      src.phoneMasked != null && String(src.phoneMasked).trim() !== ''
+        ? String(src.phoneMasked).trim()
         : base.phoneMasked,
     avatar: avatarRaw || DEFAULT_AVATAR,
-    handicap: _toNumberOr(data.handicap != null ? data.handicap : base.handicap, DEFAULT_HANDICAP),
+    handicap: _toNumberOr(src.handicap != null ? src.handicap : base.handicap, DEFAULT_HANDICAP),
     floatCoef: _toNumberOr(
-      data.floatCoef != null ? data.floatCoef : base.floatCoef,
+      src.floatCoef != null ? src.floatCoef : base.floatCoef,
       DEFAULT_FLOAT_COEF
-    )
+    ),
+    nationalityCode: nationalityCode,
+    nationalityName: nationalityName,
+    regionCountryCode: regionCountryCode,
+    regionCountryName: regionCountryName,
+    regionProvinceCode: _strOrEmpty(src.regionProvinceCode),
+    regionProvinceName: _strOrEmpty(src.regionProvinceName),
+    regionCityCode: _strOrEmpty(src.regionCityCode),
+    regionCityName: _strOrEmpty(src.regionCityName),
+    updatedAt: _strOrEmpty(src.updatedAt)
   };
 }
 
-/** 读取用户资料（storage + gameStore 默认） */
+/** 读取用户资料（storage + gameStore 默认）；旧数据缺字段自动补空 */
 function loadProfile() {
   return normalizeProfile(_readRaw());
 }
 
-/** 保存完整用户资料 */
+/** 保存完整用户资料（更新 updatedAt） */
 function saveProfile(profile) {
   const next = normalizeProfile(profile);
+  next.updatedAt = new Date().toISOString();
   _writeRaw(next);
   return next;
 }
@@ -148,7 +189,11 @@ function updateProfile(patch) {
     merged.displayName = patch.displayName != null ? String(patch.displayName).trim() : '';
     merged.competitionName = merged.displayName;
   }
-  if (patch && Object.prototype.hasOwnProperty.call(patch, 'competitionName') && !Object.prototype.hasOwnProperty.call(patch, 'displayName')) {
+  if (
+    patch &&
+    Object.prototype.hasOwnProperty.call(patch, 'competitionName') &&
+    !Object.prototype.hasOwnProperty.call(patch, 'displayName')
+  ) {
     merged.displayName = patch.competitionName != null ? String(patch.competitionName).trim() : '';
     merged.competitionName = merged.displayName;
   }

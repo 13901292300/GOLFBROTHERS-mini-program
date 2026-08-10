@@ -1,0 +1,146 @@
+<view class="md-page {{themeClass}}" style="padding-bottom: {{keyboardHeight}}px;" catchtap="onCloseIxAction">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">MOMENT</text>
+          <text class="gb-header__title">动态详情</text>
+        </view>
+      </view>
+      <view class="md-header-actions">
+        <view
+          wx:if="{{pageState === 'ready' && (canReportMoment || momentReported)}}"
+          class="md-report {{momentReported ? 'is-reported' : ''}}"
+          catchtap="onTapReportMoment"
+        >{{momentReported ? '已举报' : '举报'}}</view>
+        <view
+          wx:if="{{pageState === 'ready' && view.canDelete}}"
+          class="md-del"
+          bindtap="onDelete"
+        >删除</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{pageState === 'loading'}}" class="md-state">
+    <text class="md-state__text">加载中…</text>
+  </view>
+  <view wx:elif="{{pageState === 'notFound'}}" class="md-state">
+    <text class="md-state__title">动态不存在</text>
+  </view>
+  <view wx:elif="{{pageState === 'deleted'}}" class="md-state">
+    <text class="md-state__title">该动态已删除</text>
+  </view>
+  <view wx:elif="{{pageState === 'error'}}" class="md-state">
+    <text class="md-state__title">加载失败</text>
+    <view class="md-state__btn" bindtap="onRetry">重试</view>
+  </view>
+
+  <block wx:else>
+    <scroll-view
+      scroll-y
+      class="md-body"
+      enhanced
+      show-scrollbar="{{false}}"
+      scroll-into-view="{{scrollIntoView}}"
+      scroll-with-animation
+      bindscroll="onCloseIxAction"
+    >
+      <view class="md-main" wx:if="{{view}}" catchtap="onCloseIxAction">
+        <view class="md-author" bindtap="onTapAuthor">
+          <image class="md-avatar" src="{{view.avatar}}" mode="aspectFill"></image>
+          <view class="md-author__meta">
+            <text class="md-name">{{view.authorDisplayName}}</text>
+            <text wx:if="{{view.showOriginName}}" class="md-origin">原昵称：{{view.originalNickname}}</text>
+            <text class="md-time">{{view.timeLabel}}</text>
+          </view>
+        </view>
+        <text wx:if="{{view.content}}" class="md-content" user-select>{{view.content}}</text>
+        <moment-image-grid
+          wx:if="{{view.imageCount}}"
+          momentId="{{momentId}}"
+          themeClass="{{themeClass}}"
+          imageLayout="{{view.imageLayout}}"
+          singleImageClass="{{view.singleImageClass}}"
+          singleImageStyle="{{view.singleImageStyle}}"
+          images="{{view.images}}"
+          catch:preview="onPreviewImage"
+          catch:imageerror="onMomentImageError"
+        ></moment-image-grid>
+
+        <moment-scorecard
+          wx:if="{{view.relatedGame}}"
+          scorecard="{{view.publicScorecard}}"
+          themeClass="{{themeClass}}"
+          bind:opentap="onTapScorecard"
+        ></moment-scorecard>
+
+        <view id="md-comments-anchor">
+          <moment-ix-panel
+            momentId="{{momentId}}"
+            themeClass="{{themeClass}}"
+            mode="detail"
+            actionOpen="{{ixActionOpen}}"
+            likedByCurrentUser="{{likedByCurrentUser}}"
+            likeBusy="{{likeBusy}}"
+            likeCount="{{likeCount}}"
+            likeAvatarPreview="{{likeAvatarPreview}}"
+            hiddenLikeCount="{{hiddenLikeCount}}"
+            comments="{{comments}}"
+            hasInteraction="{{hasInteraction}}"
+            canInteract="{{canInteract}}"
+            catch:toggleaction="onToggleIxAction"
+            catch:closeaction="onCloseIxAction"
+            catch:like="onIxLike"
+            catch:comment="onIxComment"
+            catch:tapuser="onIxTapUser"
+            catch:tapcomment="onIxTapComment"
+            catch:longpresscomment="onIxLongPressComment"
+            catch:togglethread="onToggleThread"
+          ></moment-ix-panel>
+        </view>
+
+        <view id="md-composer-anchor" class="md-composer-spacer"></view>
+      </view>
+    </scroll-view>
+
+    <view wx:if="{{canInteract}}" class="md-composer" catchtap="noop">
+      <view wx:if="{{replyToCommentId}}" class="md-composer__reply">
+        <text class="md-composer__reply-text">回复 @{{replyToDisplayName}}</text>
+        <text class="md-composer__reply-cancel" bindtap="onCancelReply">取消</text>
+      </view>
+      <view class="md-composer__row">
+        <input
+          class="md-composer__input"
+          value="{{commentDraft}}"
+          placeholder="{{replyToCommentId ? '回复 @' + replyToDisplayName : '评论'}}"
+          confirm-type="send"
+          adjust-position="{{false}}"
+          hold-keyboard
+          focus="{{inputFocus}}"
+          maxlength="{{-1}}"
+          bindinput="onCommentInput"
+          bindkeyboardheightchange="onKeyboardHeight"
+          bindconfirm="onSubmitComment"
+        />
+        <view
+          class="md-composer__send {{canSubmitComment ? '' : 'is-disabled'}}"
+          bindtap="onSubmitComment"
+        >发送</view>
+      </view>
+    </view>
+  </block>
+
+  <moment-report-sheet
+    id="momentReportSheet"
+    visible="{{reportSheetVisible}}"
+    themeClass="{{themeClass}}"
+    title="{{reportSheetTitle}}"
+    submitting="{{reportSubmitting}}"
+    bind:close="onCloseReportSheet"
+    bind:submit="onSubmitReport"
+  ></moment-report-sheet>
+</view>

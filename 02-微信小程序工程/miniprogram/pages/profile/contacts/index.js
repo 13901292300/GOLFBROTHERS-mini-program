@@ -7,6 +7,8 @@ const { createHeaderStyle } = require('../../../utils/headerEngine.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const contactNotifyStore = require('../../../utils/contactNotifyStore.js');
 const contactFollowAction = require('../../../utils/contactFollowAction.js');
+const playerDisplayName = require('../../../utils/playerDisplayName.js');
+const socialRelationStore = require('../../../utils/socialRelationStore.js');
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -364,19 +366,42 @@ function formatHandicap(n) {
   return v.toFixed(1);
 }
 
-/** 备注名优先 → 显示名 / 排序拼音 */
-function resolveDisplay(friend) {
-  const remark = String(friend.remark || '').trim();
-  if (remark) {
-    return {
-      displayName: remark,
-      sortPinyin: String(friend.remarkPinyin || remark).trim().toLowerCase()
-    };
-  }
+/** 统一 Resolver：私人备注名 → 公开昵称；排序拼音随展示名 */
+function resolveDisplay(friend, remarkNameMap, viewerUserId) {
   const nickname = String(friend.nickname || '').trim();
+  const targetId = String((friend && (friend.id || friend.userId || friend.playerId)) || '').trim();
+  const named = playerDisplayName.resolvePlayerDisplayNameForViewer({
+    viewerUserId: viewerUserId,
+    targetUserId: targetId,
+    publicName: nickname,
+    snapshotName: '',
+    remarkNameMap: remarkNameMap || {},
+    defaultName: nickname || targetId || '未知'
+  });
+  // 兼容 mock 行内 remark 字段（尚未写入 contactStore 时）
+  const legacyRemark = String(friend.remark || friend.remarkName || '').trim();
+  const displayName =
+    named.hasRemark || !legacyRemark
+      ? named.displayName
+      : playerDisplayName.resolvePlayerDisplayNameForViewer({
+          viewerUserId: viewerUserId,
+          targetUserId: targetId,
+          publicName: nickname,
+          snapshotName: '',
+          remarkNameMap: targetId ? { [targetId]: legacyRemark } : {},
+          defaultName: nickname || targetId || '未知'
+        }).displayName;
+  const hasRemark = named.hasRemark || (!!legacyRemark && displayName === legacyRemark);
   return {
-    displayName: nickname,
-    sortPinyin: String(friend.nicknamePinyin || nickname).trim().toLowerCase()
+    displayName: displayName,
+    sortPinyin: String(
+      hasRemark
+        ? friend.remarkPinyin || displayName
+        : friend.nicknamePinyin || nickname || displayName
+    )
+      .trim()
+      .toLowerCase(),
+    remark: hasRemark ? displayName : ''
   };
 }
 
@@ -386,13 +411,13 @@ function letterFromPinyin(pinyin) {
   return '#';
 }
 
-function mapContactRow(f) {
-  const resolved = resolveDisplay(f);
+function mapContactRow(f, remarkNameMap, viewerUserId) {
+  const resolved = resolveDisplay(f, remarkNameMap, viewerUserId);
   const letter = letterFromPinyin(resolved.sortPinyin);
   return {
     id: f.id,
     nickname: String(f.nickname || '').trim(),
-    remark: String(f.remark || '').trim(),
+    remark: resolved.remark || String(f.remark || '').trim(),
     displayName: resolved.displayName,
     sortPinyin: resolved.sortPinyin,
     letter: letter,
@@ -405,6 +430,14 @@ function mapContactRow(f) {
   };
 }
 
+function _contactsRemarkContext() {
+  const viewerUserId = socialRelationStore.resolveCurrentUserId();
+  return {
+    viewerUserId: viewerUserId,
+    remarkNameMap: playerDisplayName.buildRemarkNameMap(viewerUserId)
+  };
+}
+
 function sortByLetter(rows) {
   return rows.slice().sort((a, b) => {
     if (a.letter !== b.letter) return a.letter.localeCompare(b.letter);
@@ -414,14 +447,20 @@ function sortByLetter(rows) {
 
 /** 好友：仅互相关注 + 字母排序（既有逻辑） */
 function buildContactRows(rawList) {
+  const ctx = _contactsRemarkContext();
   return sortByLetter(
-    (rawList || []).filter((f) => f && f.mutual === true).map(mapContactRow)
+    (rawList || [])
+      .filter((f) => f && f.mutual === true)
+      .map((f) => mapContactRow(f, ctx.remarkNameMap, ctx.viewerUserId))
   );
 }
 
 /** 粉丝等：全量映射 + 备注优先字母排序 */
 function buildLetterSortedRows(rawList) {
-  return sortByLetter((rawList || []).map(mapContactRow));
+  const ctx = _contactsRemarkContext();
+  return sortByLetter(
+    (rawList || []).map((f) => mapContactRow(f, ctx.remarkNameMap, ctx.viewerUserId))
+  );
 }
 
 /**
@@ -429,10 +468,11 @@ function buildLetterSortedRows(rawList) {
  * following ∩ followers → 好友；仅 following → 已关注
  */
 function buildFollowingRows(followingList, followersList) {
+  const ctx = _contactsRemarkContext();
   const followerIds = idSet(followersList);
   return sortByLetter(
     (followingList || []).map((f) => {
-      const row = mapContactRow(f);
+      const row = mapContactRow(f, ctx.remarkNameMap, ctx.viewerUserId);
       const isFriend = !!(f && f.id && followerIds[f.id]);
       return Object.assign({}, row, {
         relationStatus: isFriend ? 'friend' : 'following',
@@ -447,10 +487,11 @@ function buildFollowingRows(followingList, followersList) {
  * following ∩ followers → 好友；仅 followers → 加关注
  */
 function buildFollowerRows(followersList, followingList) {
+  const ctx = _contactsRemarkContext();
   const followingIds = idSet(followingList);
   return sortByLetter(
     (followersList || []).map((f) => {
-      const row = mapContactRow(f);
+      const row = mapContactRow(f, ctx.remarkNameMap, ctx.viewerUserId);
       const isFriend = !!(f && f.id && followingIds[f.id]);
       if (isFriend) {
         return Object.assign({}, row, {
@@ -472,8 +513,9 @@ function buildFollowerRows(followersList, followingList) {
 
 /** 新粉丝区域：一律「加关注」 */
 function buildNewFollowerRows(rawList) {
+  const ctx = _contactsRemarkContext();
   return (rawList || []).map((f) =>
-    Object.assign({}, mapContactRow(f), {
+    Object.assign({}, mapContactRow(f, ctx.remarkNameMap, ctx.viewerUserId), {
       showFollowFromFanBtn: true,
       isNew: true,
       relationStatus: 'new_fan',
@@ -484,8 +526,9 @@ function buildNewFollowerRows(rawList) {
 
 /** 推荐：APP 关注迁移列表；列表仅「加关注」；弱来源提示 */
 function buildRecommendRows(rawList) {
+  const ctx = _contactsRemarkContext();
   return (rawList || []).map((f) =>
-    Object.assign({}, mapContactRow(f), {
+    Object.assign({}, mapContactRow(f, ctx.remarkNameMap, ctx.viewerUserId), {
       showFollowBtn: true,
       sourceHint: String(f.sourceHint || '来自APP关注').trim(),
       mpUserType: f.mpUserType || 'registered',
@@ -552,14 +595,19 @@ function syncMutualFriends(store) {
   store.friends = next;
 }
 
-/** 仅模糊匹配备注名 / 昵称 */
+/** 仅模糊匹配备注名 / 公开昵称 / 当前展示名 */
 function filterByKeyword(rows, keyword) {
   const q = String(keyword || '').trim().toLowerCase();
   if (!q) return rows.slice();
   return (rows || []).filter((row) => {
     const nickname = String(row.nickname || '').toLowerCase();
     const remark = String(row.remark || '').toLowerCase();
-    return nickname.indexOf(q) !== -1 || remark.indexOf(q) !== -1;
+    const displayName = String(row.displayName || '').toLowerCase();
+    return (
+      nickname.indexOf(q) !== -1 ||
+      remark.indexOf(q) !== -1 ||
+      displayName.indexOf(q) !== -1
+    );
   });
 }
 
@@ -663,29 +711,19 @@ Page({
     const seedNewFollowers = MOCK_NEW_FOLLOWERS.filter((u) => u && unreadSet[u.id]).map((u) =>
       Object.assign({}, cloneRaw(u), { isNew: true, relation: 'follower' })
     );
+    // 卡片资料仍用 mock 目录；关系边以 socialRelationStore 为唯一真相
     this._relationStore = {
       friends: friendsRaw,
       following: followingRaw,
       followers: mutualFriendsRaw()
         .map(cloneRaw)
-        .concat(MOCK_FOLLOWERS_EXTRA.map(cloneRaw)),
+        .concat(MOCK_FOLLOWERS_EXTRA.map(cloneRaw))
+        .concat([{ id: 'c-x01', nickname: '单向粉', nicknamePinyin: 'danxiangfen', gender: 'male', handicap: 10, floatCoef: 0, signature: '', avatarIndex: 2 }]),
       newFollowers: seedNewFollowers,
       recommendations: recommendationsRaw
     };
-    // 合并领先榜等入口已产生的关注，避免 bind 覆盖会话内关系
-    const prev = contactFollowAction.getStore();
-    if (prev && Array.isArray(prev.following)) {
-      const seen = {};
-      (this._relationStore.following || []).forEach((f) => {
-        if (f && f.id) seen[f.id] = true;
-      });
-      prev.following.forEach((u) => {
-        if (!u || !u.id || seen[u.id]) return;
-        contactFollowAction.applyFollow(this._relationStore, u);
-        seen[u.id] = true;
-      });
-    }
     contactFollowAction.bindStore(this._relationStore);
+    contactFollowAction.hydrateBoundStoreFromPersistence(this._relationStore);
     this.rebuildRowsFromStore();
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
@@ -745,6 +783,15 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    if (this._relationStore) {
+      contactFollowAction.bindStore(this._relationStore);
+      contactFollowAction.hydrateBoundStoreFromPersistence(this._relationStore);
+      this.rebuildRowsFromStore();
+      this.applyListState({
+        tab: this.data.activeTab || 'friends',
+        keyword: this.data.keyword || ''
+      });
+    }
   },
 
   initHeaderNav() {

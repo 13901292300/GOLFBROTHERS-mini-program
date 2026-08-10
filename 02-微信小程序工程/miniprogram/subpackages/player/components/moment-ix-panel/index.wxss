@@ -1,0 +1,276 @@
+.mix {
+  --mix-accent: #576b95;
+  --mix-text: #111827;
+  --mix-muted: #6b7280;
+  --mix-box: #f3f4f6;
+  --mix-sep: rgba(0, 0, 0, 0.06);
+  --mix-float-bg: rgba(76, 76, 76, 0.96);
+  margin-top: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.mix.dark-mode {
+  --mix-accent: #7dd3fc;
+  --mix-text: #e5eefc;
+  --mix-muted: #94a3b8;
+  --mix-box: #121a2b;
+  --mix-sep: rgba(255, 255, 255, 0.08);
+  --mix-float-bg: rgba(30, 41, 59, 0.98);
+}
+
+.mix__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 36px;
+  position: relative;
+  z-index: 3;
+}
+
+.mix__report {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--mix-muted);
+  padding: 4px 2px;
+}
+
+.mix__report.is-reported {
+  opacity: 0.75;
+}
+
+.mix__more-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mix__more {
+  width: 40px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--mix-box);
+  color: var(--mix-muted);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.mix__more.is-open {
+  background: rgba(87, 107, 149, 0.16);
+  color: var(--mix-accent);
+}
+
+.mix__float {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: stretch;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--mix-float-bg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.mix__float-item {
+  min-width: 72px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.mix__float-item.is-busy {
+  opacity: 0.55;
+}
+
+.mix__float-div {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.mix__box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--mix-box);
+  box-sizing: border-box;
+}
+
+.mix__likes {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mix__heart {
+  flex-shrink: 0;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mix-accent);
+  line-height: 1;
+}
+
+.mix__like-avatars {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.mix__like-avatars.is-wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.mix__like-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex: 0 0 36px;
+  background: rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+}
+
+.mix.dark-mode .mix__like-avatar {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mix__like-more {
+  flex-shrink: 0;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 18px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--mix-accent);
+  background: rgba(87, 107, 149, 0.12);
+}
+
+.mix.dark-mode .mix__like-more {
+  background: rgba(125, 211, 252, 0.12);
+}
+
+.mix__like-total {
+  flex-shrink: 0;
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mix-muted);
+  line-height: 36px;
+}
+
+.mix__name {
+  color: var(--mix-accent);
+  font-weight: 800;
+}
+
+.mix__sep {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--mix-sep);
+}
+
+.mix__cmt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  box-sizing: border-box;
+  border-left: 2px solid transparent;
+}
+
+.mix__cmt + .mix__cmt {
+  margin-top: 2px;
+}
+
+/* 视觉缩进最多 3 级；正文保底可读宽度 */
+.mix__cmt--d1 {
+  padding-left: 16px;
+  border-left-color: var(--mix-sep);
+  margin-left: 4px;
+}
+.mix__cmt--d2 {
+  padding-left: 28px;
+  border-left-color: var(--mix-sep);
+  margin-left: 4px;
+}
+.mix__cmt--d3 {
+  padding-left: 40px;
+  border-left-color: var(--mix-sep);
+  margin-left: 4px;
+}
+
+.mix__cmt.is-deleted .mix__cmt-deleted {
+  color: var(--mix-muted);
+  font-weight: 600;
+  font-style: normal;
+}
+
+.mix__cmt-line {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.mix__thread-toggle,
+.mix__reply-more {
+  padding: 4px 0 2px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--mix-accent);
+}
+
+.mix__cmt--d1 + .mix__thread-toggle,
+.mix__cmt--d2 + .mix__thread-toggle,
+.mix__cmt--d3 + .mix__thread-toggle {
+  padding-left: 16px;
+}
+
+.mix__cmt-plain {
+  color: var(--mix-text);
+  font-weight: 600;
+}
+
+.mix__cmt-text {
+  color: var(--mix-text);
+  font-weight: 600;
+}
+
+.mix__cmt-more {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--mix-muted);
+  padding-top: 2px;
+}
+
+.mix__cmt-more.is-muted {
+  opacity: 0.8;
+}

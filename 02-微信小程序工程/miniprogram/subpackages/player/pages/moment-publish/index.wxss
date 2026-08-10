@@ -1,0 +1,194 @@
+.mp-page {
+  --golf-blue: #002d62;
+  --champion-gold: #ce9224;
+  --text-on-dark: #ffffff;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.mp-page.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-muted: #6b7280;
+}
+.mp-page.dark-mode {
+  --bg-primary: #050816;
+  --bg-card: #0b1220;
+  --bg-subtle: #121a2b;
+  --border: rgba(148, 163, 184, 0.16);
+  --text-primary: #e5eefc;
+  --text-muted: #94a3b8;
+}
+page { height: 100%; background: var(--bg-primary); }
+
+.gb-header {
+  background: var(--golf-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: var(--text-on-dark);
+  flex-shrink: 0;
+}
+.gb-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+.gb-header__left { display: flex; align-items: center; gap: 20rpx; }
+.gb-header__back {
+  width: 56rpx; height: 56rpx;
+  display: flex; align-items: center; justify-content: center;
+}
+.gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
+.gb-header__eyebrow {
+  display: block; font-size: 17rpx; font-weight: 900;
+  letter-spacing: 0.24em; color: rgba(255,255,255,0.5); margin-bottom: 6rpx;
+}
+.gb-header__title {
+  display: block; color: #fff; font-size: 32rpx; font-weight: 900; font-style: italic;
+}
+
+.mp-publish-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--champion-gold);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+.mp-publish-btn.is-disabled { opacity: 0.45; }
+
+.mp-gate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+}
+.mp-gate__title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-align: center;
+}
+.mp-gate__text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+.mp-gate__btn {
+  margin-top: 8px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: var(--golf-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+.mp-card--related .mp-related__name {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.mp-card--related .mp-related__code {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.mp-body { flex: 1; min-height: 0; }
+.mp-main {
+  padding: 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mp-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--golf-blue);
+  border-radius: 12px;
+  padding: 14px;
+  box-sizing: border-box;
+}
+.mp-textarea {
+  width: 100%;
+  min-height: 140px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+.mp-count {
+  display: block;
+  margin-top: 8px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.mp-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.mp-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mp-grid__item,
+.mp-grid__add {
+  width: calc((100% - 16px) / 3);
+  padding-top: calc((100% - 16px) / 3);
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  box-sizing: border-box;
+}
+.mp-grid__img {
+  position: absolute;
+  left: 0; top: 0; width: 100%; height: 100%;
+}
+.mp-grid__del {
+  position: absolute;
+  right: 4px; top: 4px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+}
+.mp-grid__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 300;
+  color: var(--text-muted);
+}
+.mp-grid__add::after {
+  content: '+';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+}

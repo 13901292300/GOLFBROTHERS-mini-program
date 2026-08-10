@@ -1,0 +1,142 @@
+<view class="pk-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">BATTLE</text>
+          <text class="gb-header__title">战绩PK</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{pageState === 'loading'}}" class="pk-state">
+    <text class="pk-state__text">计算中…</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'private'}}" class="pk-state">
+    <text class="pk-state__title">该球员未开放战绩对比</text>
+    <text class="pk-state__text">对方历史战绩不可用于比较</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="pk-state">
+    <text class="pk-state__title">战绩对比加载失败</text>
+    <view class="pk-state__btn" bindtap="onRetry">重试</view>
+  </view>
+
+  <scroll-view wx:else scroll-y class="pk-body" enhanced show-scrollbar="{{false}}">
+    <view class="pk-main">
+      <view class="pk-card pk-vs">
+        <view class="pk-vs__side">
+          <text class="pk-vs__name">{{viewerLabel}}</text>
+          <text class="pk-vs__tag">我</text>
+        </view>
+        <text class="pk-vs__mid">VS</text>
+        <view class="pk-vs__side pk-vs__side--right">
+          <text class="pk-vs__name">{{targetLabel}}</text>
+          <text wx:if="{{showOriginName}}" class="pk-vs__origin">原昵称：{{targetOriginName}}</text>
+        </view>
+      </view>
+
+      <view class="pk-card">
+        <text class="pk-label">竞技范围</text>
+        <view class="pk-seg">
+          <view
+            class="pk-seg__item {{scope === 'sameGame' ? 'is-active' : ''}}"
+            data-scope="sameGame"
+            bindtap="onSelectScope"
+          >同场竞技</view>
+          <view
+            class="pk-seg__item {{scope === 'sameGroup' ? 'is-active' : ''}}"
+            data-scope="sameGroup"
+            bindtap="onSelectScope"
+          >同组竞技</view>
+        </view>
+        <text class="pk-label pk-label--gap">样本数量</text>
+        <view class="pk-seg">
+          <view
+            class="pk-seg__item {{sampleSize === 10 ? 'is-active' : ''}}"
+            data-size="10"
+            bindtap="onSelectSample"
+          >近10场</view>
+          <view
+            class="pk-seg__item {{sampleSize === 20 ? 'is-active' : ''}}"
+            data-size="20"
+            bindtap="onSelectSample"
+          >近20场</view>
+        </view>
+      </view>
+
+      <block wx:if="{{pageState === 'empty'}}">
+        <view class="pk-card pk-empty">
+          <text class="pk-empty__text">{{emptyText}}</text>
+        </view>
+      </block>
+
+      <block wx:else>
+        <view class="pk-card">
+          <text class="pk-label">战绩汇总 · 实际 {{actualCount}} 场</text>
+          <view class="pk-scoreline">
+            <text class="pk-scoreline__n">{{summary.viewerWins}}</text>
+            <text class="pk-scoreline__sep">胜</text>
+            <text class="pk-scoreline__n">{{summary.draws}}</text>
+            <text class="pk-scoreline__sep">平</text>
+            <text class="pk-scoreline__n">{{summary.targetWins}}</text>
+            <text class="pk-scoreline__sep">负</text>
+          </view>
+          <view class="pk-avg">
+            <view class="pk-avg__row">
+              <text>我的平均总杆</text>
+              <text class="pk-avg__v">{{summary.viewerAverageGrossText}}</text>
+            </view>
+            <view class="pk-avg__row">
+              <text>对方平均总杆</text>
+              <text class="pk-avg__v">{{summary.targetAverageGrossText}}</text>
+            </view>
+            <text wx:if="{{summary.averageDifferenceLabel}}" class="pk-avg__diff">{{summary.averageDifferenceLabel}}</text>
+            <view class="pk-avg__row">
+              <text>最佳总杆（我 / 对方）</text>
+              <text class="pk-avg__v">{{summary.viewerBestGrossText}} / {{summary.targetBestGrossText}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{trendText}}" class="pk-card">
+          <text class="pk-label">胜负趋势（旧 → 新）</text>
+          <text class="pk-trend">{{trendText}}</text>
+        </view>
+
+        <view class="pk-card">
+          <text class="pk-label">逐场明细</text>
+          <view class="pk-list">
+            <view
+              wx:for="{{matchCards}}"
+              wx:key="matchKey"
+              class="pk-match"
+              data-url="{{item.navUrl}}"
+              bindtap="onTapMatch"
+            >
+              <view class="pk-match__top">
+                <text class="pk-match__date">{{item.dateLabel}}</text>
+                <text class="pk-match__tag">{{item.scopeTag}}</text>
+              </view>
+              <text class="pk-match__title">{{item.matchName}}</text>
+              <text wx:if="{{item.courseName}}" class="pk-match__course">{{item.courseName}}</text>
+              <view class="pk-match__scores">
+                <text>我 {{item.viewerGrossText}}</text>
+                <text class="pk-match__vs">:</text>
+                <text>对方 {{item.targetGrossText}}</text>
+                <text class="pk-match__result {{item.resultClass}}">{{item.resultText}}</text>
+              </view>
+              <text class="pk-match__diff">{{item.diffText}}</text>
+              <text wx:if="{{item.hasNav}}" class="pk-match__nav">查看赛事详情 ›</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+</view>

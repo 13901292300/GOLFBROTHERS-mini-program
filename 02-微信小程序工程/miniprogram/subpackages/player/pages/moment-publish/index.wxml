@@ -1,0 +1,72 @@
+<view class="mp-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">MOMENT</text>
+          <text class="gb-header__title">发布动态</text>
+        </view>
+      </view>
+      <view
+        wx:if="{{gateReady}}"
+        class="mp-publish-btn {{canPublish ? '' : 'is-disabled'}}"
+        bindtap="onPublish"
+      >{{publishing ? '发布中…' : '发布'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{!gateReady}}" class="mp-gate">
+    <text class="mp-gate__title">{{gateError || '无法发布'}}</text>
+    <text class="mp-gate__text">发布入口仅在记分页「更多功能 → 发布到球友圈」</text>
+    <view class="mp-gate__btn" bindtap="onBack">返回</view>
+  </view>
+
+  <scroll-view wx:else scroll-y class="mp-body" enhanced show-scrollbar="{{false}}">
+    <view class="mp-main">
+      <view class="mp-card mp-card--related">
+        <text class="mp-label">关联本场成绩卡</text>
+        <text class="mp-related__name">{{relatedMatchName}}</text>
+        <text class="mp-related__code">成绩卡标识 {{relatedScorecardLabel}}</text>
+      </view>
+
+      <view class="mp-card">
+        <textarea
+          class="mp-textarea"
+          value="{{content}}"
+          maxlength="{{-1}}"
+          placeholder="分享你的球友动态…"
+          bindinput="onContentInput"
+          auto-height
+          show-confirm-bar="{{false}}"
+        />
+        <text class="mp-count">{{contentCount}}/{{contentMax}}</text>
+      </view>
+
+      <view class="mp-card">
+        <text class="mp-label">图片（最多{{imagesMax}}张）</text>
+        <view class="mp-grid">
+          <view
+            wx:for="{{images}}"
+            wx:key="tempFilePath"
+            class="mp-grid__item"
+          >
+            <image class="mp-grid__img" src="{{item.tempFilePath}}" mode="aspectFill"></image>
+            <view
+              class="mp-grid__del"
+              data-index="{{index}}"
+              catchtap="onRemoveImage"
+            >×</view>
+          </view>
+          <view
+            wx:if="{{images.length < imagesMax}}"
+            class="mp-grid__add"
+            bindtap="onChooseImages"
+          ></view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

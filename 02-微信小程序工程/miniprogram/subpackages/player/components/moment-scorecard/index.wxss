@@ -1,0 +1,605 @@
+.msc {
+  --tour-blue: #002d62;
+  --text-primary: #111827;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --red: #e31837;
+  --blue: #004b87;
+  margin-top: 16rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.msc.dark-mode {
+  --text-primary: #f3f4f6;
+  --text-muted: #9ca3af;
+  --border: rgba(255, 255, 255, 0.12);
+  background: #1a1a1a;
+}
+
+.msc__unavailable {
+  padding: 36rpx 24rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+
+/* ===== 比杆头：赛制｜球场｜进入GAME（右侧固定不被挤掉） ===== */
+.msc-stroke-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 20rpx 8rpx;
+  min-width: 0;
+}
+
+.msc-tag {
+  flex: 0 1 auto;
+  max-width: 38%;
+  min-width: 0;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #fff;
+  background: var(--tour-blue);
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msc-course {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.msc-enter {
+  flex: 0 0 auto;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--tour-blue);
+  white-space: nowrap;
+}
+
+.msc.dark-mode .msc-enter {
+  color: #93c5fd;
+}
+
+.msc__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx 20rpx;
+  padding: 0 20rpx 12rpx;
+}
+
+.msc__sum-item {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.msc-panel {
+  background: #111111;
+  color: #fff;
+  padding: 16rpx 12rpx 20rpx;
+}
+
+.msc.bright-mode .msc-panel {
+  background: #f3f4f6;
+  color: var(--text-primary);
+}
+
+.tour-scorecard {
+  margin: 0 0 12rpx;
+  border: 1px solid #333;
+  border-radius: 8rpx;
+  overflow: hidden;
+}
+
+.msc.bright-mode .tour-scorecard {
+  border-color: #d1d5db;
+}
+
+.tsc-row {
+  display: flex;
+}
+
+.tsc-cell {
+  flex: 1;
+  height: 52rpx;
+  line-height: 52rpx;
+  text-align: center;
+  font-size: 20rpx;
+  font-weight: 700;
+  background: #fff;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tour-scorecard .tsc-row:nth-child(1) .tsc-cell,
+.tour-scorecard .tsc-row:nth-child(2) .tsc-cell {
+  background: var(--tour-blue);
+  color: #fff;
+}
+
+.ld-scorecard {
+  --ld-score-font: 20rpx;
+  --ld-score-diff-font: 16rpx;
+  --ld-marker-size: 30rpx;
+}
+
+.ld-score-cell {
+  padding: 0;
+  overflow: visible;
+}
+
+.ld-score-marker {
+  width: var(--ld-marker-size);
+  height: var(--ld-marker-size);
+  min-width: var(--ld-marker-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.ld-score-marker.circle {
+  border-radius: 999rpx;
+}
+
+.ld-score-marker.square {
+  border-radius: 4rpx;
+}
+
+.ld-score-marker.score-eagle {
+  background: #ef4444;
+}
+
+.ld-score-marker.score-eagle .ld-score-value {
+  color: #fff;
+}
+
+.ld-score-marker.score-birdie {
+  background: transparent;
+  border: 2rpx solid #ef4444;
+}
+
+.ld-score-marker.score-birdie .ld-score-value {
+  color: #ef4444;
+}
+
+.ld-score-marker.score-bogey {
+  background: transparent;
+  border: 2rpx solid #111;
+}
+
+.ld-score-marker.score-bogey .ld-score-value {
+  color: #111;
+}
+
+.ld-score-marker.score-double-bogey {
+  background: #6b7280;
+  border: 0;
+}
+
+.ld-score-marker.score-double-bogey .ld-score-value {
+  color: #fff;
+}
+
+.ld-score-value {
+  font-size: var(--ld-score-font);
+  line-height: 1;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ld-score-value.diff-mode {
+  font-size: var(--ld-score-diff-font);
+}
+
+/* ===== 比洞头像行：状态箭头层（对齐得分榜 mp-sb-status，约 1/3 行宽） ===== */
+.msc-mp-head,
+.msc-mp-status {
+  position: relative;
+  min-height: 96rpx;
+  overflow: hidden;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.msc-mp-status-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.msc-mp-st-fill,
+.msc-mp-st-chevron,
+.msc-mp-st-edge {
+  display: none;
+}
+
+.msc-mp-st-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+}
+
+.msc-mp-st-chevron {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.msc-mp-st-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  z-index: 2;
+}
+
+/* 红方领先：左侧红填充 + 红三角朝右；右侧 3px 蓝边 */
+.msc-mp-status.winner-a .msc-mp-st-fill--a,
+.msc-mp-status.winner-a .msc-mp-st-chevron--a,
+.msc-mp-status.winner-a .msc-mp-st-edge--b {
+  display: block;
+}
+
+.msc-mp-st-fill--a {
+  left: 0;
+  width: 33.33%;
+  background: #e31837;
+}
+
+.msc-mp-st-chevron--a {
+  left: 33.33%;
+  border-top: 48rpx solid transparent;
+  border-bottom: 48rpx solid transparent;
+  border-left: 28rpx solid #e31837;
+}
+
+.msc-mp-st-edge--b {
+  right: 0;
+  background: #004b87;
+}
+
+/* 蓝方领先：右侧蓝填充 + 蓝三角朝左；左侧 3px 红边 */
+.msc-mp-status.winner-b .msc-mp-st-fill--b,
+.msc-mp-status.winner-b .msc-mp-st-chevron--b,
+.msc-mp-status.winner-b .msc-mp-st-edge--a {
+  display: block;
+}
+
+.msc-mp-st-fill--b {
+  right: 0;
+  width: 33.33%;
+  background: #004b87;
+}
+
+.msc-mp-st-chevron--b {
+  right: 33.33%;
+  border-top: 48rpx solid transparent;
+  border-bottom: 48rpx solid transparent;
+  border-right: 28rpx solid #004b87;
+}
+
+.msc-mp-st-edge--a {
+  left: 0;
+  background: #e31837;
+}
+
+/* AS：左右灰区 + 双向尖角 + 红蓝双边线 */
+.msc-mp-status.all-square .msc-mp-st-fill--as-l,
+.msc-mp-status.all-square .msc-mp-st-chevron--as-l,
+.msc-mp-status.all-square .msc-mp-st-fill--as-r,
+.msc-mp-status.all-square .msc-mp-st-chevron--as-r,
+.msc-mp-status.all-square .msc-mp-st-edge--a,
+.msc-mp-status.all-square .msc-mp-st-edge--b {
+  display: block;
+}
+
+/* 未开赛：仅红蓝双边线，无灰填充（与 AS 区分） */
+.msc-mp-status.not-started .msc-mp-st-edge--a,
+.msc-mp-status.not-started .msc-mp-st-edge--b {
+  display: block;
+}
+
+.msc-mp-st-fill--as-l {
+  left: 0;
+  width: 33.33%;
+  background: #9ca3af;
+}
+
+.msc-mp-st-chevron--as-l {
+  left: 33.33%;
+  border-top: 48rpx solid transparent;
+  border-bottom: 48rpx solid transparent;
+  border-left: 28rpx solid #9ca3af;
+}
+
+.msc-mp-st-fill--as-r {
+  right: 0;
+  width: 33.33%;
+  background: #9ca3af;
+}
+
+.msc-mp-st-chevron--as-r {
+  right: 33.33%;
+  border-top: 48rpx solid transparent;
+  border-bottom: 48rpx solid transparent;
+  border-right: 28rpx solid #9ca3af;
+}
+
+/* 内容层：与头像行同高，左中右共线垂直居中；状态层不参与 flex */
+.msc-mp-content-layer {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  min-width: 0;
+  min-height: 96rpx;
+  height: 100%;
+  padding: 0 16rpx;
+  box-sizing: border-box;
+}
+
+.msc-mp-side {
+  flex: 1 1 0;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.msc-mp-side--red {
+  justify-content: flex-start;
+}
+
+.msc-mp-side--blue {
+  justify-content: flex-end;
+}
+
+/* 固定盒：消除 image 基线/行高上偏；多头像堆叠不改变组垂直中心 */
+.msc-avatar-wrap {
+  width: 56rpx;
+  height: 56rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.msc-mp-side .msc-avatar-wrap + .msc-avatar-wrap {
+  margin-left: -16rpx;
+}
+
+.msc-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  background: #e5e7eb;
+  display: block;
+  flex-shrink: 0;
+  border: 2rpx solid #fff;
+  box-sizing: border-box;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.msc-mp-side--red .msc-avatar {
+  border-color: rgba(227, 24, 55, 0.35);
+}
+
+.msc-mp-side--blue .msc-avatar {
+  border-color: rgba(0, 75, 135, 0.35);
+}
+
+/* 中间比分块：固定宽度保证主数字变化时不挤头像；垂直水平居中 */
+.msc-mp-trend {
+  flex: 0 0 160rpx;
+  width: 160rpx;
+  max-width: 42%;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4rpx;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 4;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* 对齐 .mp-sb-center__phase */
+.msc-mp-trend__phase {
+  display: block;
+  font-size: 20rpx;
+  font-weight: 900;
+  line-height: 1;
+  color: #9ca3af;
+  text-transform: uppercase;
+  margin-bottom: 4rpx;
+  white-space: nowrap;
+}
+
+/* 对齐 .mp-sb-center__status：同视觉行 + baseline，主大后缀小 */
+.msc-mp-trend__status {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  font-style: italic;
+  font-weight: 900;
+  line-height: 1;
+  max-width: 100%;
+}
+
+.msc-mp-trend__main {
+  font-size: 56rpx;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.msc-mp-trend__sub {
+  font-size: 26rpx;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: 1;
+  margin-left: 8rpx;
+  white-space: nowrap;
+}
+
+/* 胜方色继承自 statusLeadClass（与得分榜一致，不靠字符串判色） */
+.mp-sb-lead--a {
+  color: #e31837;
+}
+.mp-sb-lead--b {
+  color: #004b87;
+}
+.mp-sb-lead--as {
+  color: #6b7280;
+}
+.mp-sb-lead--as .msc-mp-trend__main {
+  font-size: 32rpx;
+}
+.mp-sb-lead--vs {
+  color: #002244;
+}
+.mp-sb-lead--vs .msc-mp-trend__main {
+  font-size: 48rpx;
+  font-style: italic;
+  font-weight: 900;
+}
+
+.msc.dark-mode .msc-mp-trend__phase {
+  color: var(--text-muted);
+}
+.msc.dark-mode .mp-sb-lead--vs {
+  color: var(--text-primary);
+}
+.msc.dark-mode .mp-sb-lead--as {
+  color: var(--text-muted);
+}
+.msc.dark-mode .mp-sb-lead--a {
+  color: #e31837;
+}
+.msc.dark-mode .mp-sb-lead--b {
+  color: #004b87;
+}
+
+/* ===== 比洞 18 洞条：对齐 tournament 得分榜卡片底部 mp-sb-holes ===== */
+.mp-sb-holes {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rpx;
+  margin-bottom: 0;
+  padding: 0 4rpx;
+}
+
+.mp-sb-holes--summary {
+  padding: 16rpx 16rpx 20rpx;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.mp-sb-dot {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 999rpx;
+  font-size: 14rpx;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: #f3f4f6;
+  color: #111;
+}
+
+.mp-sb-dot.empty {
+  background: #f3f4f6;
+  color: #111;
+  border: 2rpx solid #6b7280;
+}
+
+.mp-sb-dot--a {
+  background: #e31837;
+  color: #fff;
+  border: none;
+}
+
+.mp-sb-dot--b {
+  background: #004b87;
+  color: #fff;
+  border: none;
+}
+
+.mp-sb-dot--as {
+  background: #6b7280;
+  color: #fff;
+  border: none;
+}
+
+/* Dark：未进行洞保持浅灰底黑字（与得分榜一致） */
+.msc.dark-mode .mp-sb-holes--summary {
+  border-top-color: var(--border);
+}
+
+.msc.dark-mode .mp-sb-dot.empty {
+  background: #f3f4f6;
+  color: #111;
+  border: 2rpx solid #6b7280;
+}
+
+.msc.dark-mode .mp-sb-dot--a {
+  background: #e31837;
+  color: #fff;
+  border: none;
+}
+
+.msc.dark-mode .mp-sb-dot--b {
+  background: #004b87;
+  color: #fff;
+  border: none;
+}
+
+.msc.dark-mode .mp-sb-dot--as {
+  background: #6b7280;
+  color: #fff;
+  border: none;
+}

@@ -483,6 +483,11 @@ function getTeamMembers(teamId) {
   return raw.map((m, index) => {
     const playerId = String(m.playerId || '').trim();
     const name = String(m.name || '').trim();
+    const roleCode = normalizeTeamMemberRole(m.role, null, playerId);
+    const memberStatus =
+      m.memberStatus != null && String(m.memberStatus).trim()
+        ? String(m.memberStatus).trim()
+        : 'active';
     return {
       playerId: playerId,
       userId: playerId,
@@ -493,10 +498,136 @@ function getTeamMembers(teamId) {
       gender: m.gender != null ? String(m.gender) : '',
       pinyin: m.pinyin != null ? String(m.pinyin) : name,
       teamId: id,
+      role: roleCode,
+      memberStatus: memberStatus,
+      joinedAt: m.joinedAt != null ? Number(m.joinedAt) || 0 : 0,
       source: 'team_member',
       pickChannel: 'team_members'
     };
   });
+}
+
+/**
+ * 成员角色码：owner / admin / member（不写回中文到球队对象）。
+ * MVP：可从成员字段或球队展示 role / adminUserIds 推导。
+ */
+function normalizeTeamMemberRole(rawRole, team, userId) {
+  const r = String(rawRole || '').trim();
+  const lower = r.toLowerCase();
+  if (
+    lower === 'owner' ||
+    lower === 'super_admin' ||
+    r === '超级管理员' ||
+    r === '创建者'
+  ) {
+    return 'owner';
+  }
+  if (lower === 'admin' || r === '管理员') return 'admin';
+  if (lower === 'member' || r === '成员') return 'member';
+  const uid = String(userId || '').trim();
+  if (team && uid) {
+    const admins = normalizeAdminUserIds(team.adminUserIds);
+    if (admins.indexOf(uid) >= 0) {
+      if (r.indexOf('超级') >= 0 || String(team.role || '').indexOf('超级') >= 0) {
+        return 'owner';
+      }
+      return 'admin';
+    }
+    if (team.isMine && isAdminRoleLabel(team.role)) {
+      return String(team.role || '').indexOf('超级') >= 0 ? 'owner' : 'admin';
+    }
+  }
+  return 'member';
+}
+
+/** 页面展示用中文角色（勿写回球队主数据） */
+function getTeamRoleLabel(roleCode) {
+  if (roleCode === 'owner') return '创建者';
+  if (roleCode === 'admin') return '管理员';
+  return '成员';
+}
+
+function _isCurrentUserAlias(userId) {
+  const uid = String(userId || '').trim();
+  if (!uid) return false;
+  if (uid === 'me') return true;
+  try {
+    const cur = _resolveCurrentUserId();
+    return !!(cur && cur === uid);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 按 userId 查询所属球队（MVP / mock 成员关系）。
+ * 来源：teamDirectory 成员集合 +（当前用户）isMine 演示兼容。
+ * 严禁从 teamGroups / matchTeamId / 报名 / 赛事代表队反推。
+ * 仅返回 organizationType===team 且 memberStatus===active。
+ * @param {string} userId
+ * @returns {Array<{teamId,name,shortName,logo,role,memberStatus,joinedAt,organizationType}>}
+ */
+function getTeamsByUserId(userId) {
+  const uid = String(userId || '').trim();
+  if (!uid) return [];
+  const out = [];
+  const seen = {};
+  const teams = allTeams();
+  const currentAlias = _isCurrentUserAlias(uid);
+
+  for (let i = 0; i < teams.length; i++) {
+    const team = teams[i];
+    if (!team || !isClubTeam(team)) continue;
+    const teamId = String(team.id || '').trim();
+    if (!teamId || seen[teamId]) continue;
+
+    let role = '';
+    let memberStatus = '';
+    let joinedAt = 0;
+    let matched = false;
+
+    const members = getTeamMembers(teamId);
+    for (let j = 0; j < members.length; j++) {
+      const m = members[j];
+      if (!m) continue;
+      const mid = String(m.userId || m.playerId || '').trim();
+      if (mid !== uid) continue;
+      const st = String(m.memberStatus || 'active').trim() || 'active';
+      if (st !== 'active') {
+        matched = true;
+        memberStatus = st;
+        break;
+      }
+      matched = true;
+      memberStatus = 'active';
+      role = normalizeTeamMemberRole(m.role, team, uid);
+      joinedAt = Number(m.joinedAt) || 0;
+      break;
+    }
+
+    // 演示兼容：当前用户且 isMine，且成员花名册未收录时补入（非长期唯一判断）
+    if (!matched && currentAlias && team.isMine) {
+      matched = true;
+      memberStatus = 'active';
+      role = normalizeTeamMemberRole(team.role, team, uid);
+      joinedAt = 0;
+    }
+
+    if (!matched || memberStatus !== 'active') continue;
+    seen[teamId] = true;
+    const enriched = enrichOrganization(team);
+    out.push({
+      teamId: teamId,
+      name: String((enriched && enriched.name) || team.name || '').trim(),
+      shortName: normalizeShortName((enriched && enriched.shortName) || team.shortName),
+      logo: resolveLogo(enriched || team),
+      role: role || 'member',
+      memberStatus: 'active',
+      joinedAt: joinedAt,
+      organizationType: ORGANIZATION_TYPES.TEAM
+    });
+  }
+  return out;
 }
 
 function isEventOrganization(orgOrType) {
@@ -543,5 +674,8 @@ module.exports = {
   listClubTeamsForSelect,
   rememberRecentEventOrg,
   addCreatedTeam,
-  getTeamMembers
+  getTeamMembers,
+  getTeamsByUserId,
+  normalizeTeamMemberRole,
+  getTeamRoleLabel
 };
