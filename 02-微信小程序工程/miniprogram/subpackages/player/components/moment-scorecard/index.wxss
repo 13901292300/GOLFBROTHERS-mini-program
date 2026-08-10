@@ -31,7 +31,8 @@
   display: flex;
   align-items: center;
   gap: 10rpx;
-  padding: 12rpx 12rpx 8rpx 20rpx;
+  /* 去掉顶部汇总行后略增底距，避免球场名与逐洞面板贴死 */
+  padding: 12rpx 12rpx 14rpx 20rpx;
   min-width: 0;
 }
 
@@ -93,23 +94,13 @@
   color: #93c5fd;
 }
 
-.msc__summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx 20rpx;
-  padding: 0 20rpx 12rpx;
-}
-
-.msc__sum-item {
-  font-size: 20rpx;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
+/* 比杆逐洞面板：左右与领先榜 .scorecard-dark-panel 一致为 0，表格占满 .msc 可用宽度 */
 .msc-panel {
+  width: 100%;
+  box-sizing: border-box;
   background: #111111;
   color: #fff;
-  padding: 16rpx 12rpx 20rpx;
+  padding: 16rpx 0 20rpx;
 }
 
 .msc.bright-mode .msc-panel {
@@ -118,6 +109,8 @@
 }
 
 .tour-scorecard {
+  width: 100%;
+  box-sizing: border-box;
   margin: 0 0 12rpx;
   border: 1px solid #333;
   border-radius: 8rpx;

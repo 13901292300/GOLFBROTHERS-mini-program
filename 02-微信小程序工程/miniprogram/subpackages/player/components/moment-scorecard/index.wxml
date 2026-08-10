@@ -21,12 +21,6 @@
         <text class="msc-enter__icon">›</text>
       </view>
     </view>
-    <view class="msc__summary">
-      <text class="msc__sum-item">OUT {{scorecard.stroke.summary.outText}}</text>
-      <text class="msc__sum-item">IN {{scorecard.stroke.summary.inText}}</text>
-      <text class="msc__sum-item">TOTAL {{scorecard.stroke.summary.totalText}}</text>
-      <text class="msc__sum-item">{{scorecard.stroke.summary.toParText}}</text>
-    </view>
     <view class="msc-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
       <view class="tour-scorecard">
         <view class="tsc-row tsc-head">
