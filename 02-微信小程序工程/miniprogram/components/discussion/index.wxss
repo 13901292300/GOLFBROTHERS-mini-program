@@ -8,7 +8,7 @@
   flex-direction: column;
   box-sizing: border-box;
   /* 品牌色（与主题无关，单一来源对齐 app.wxss） */
-  --tour-blue: #002d62;
+  --cloud-blue: #002d62;
   --data-blue: #00aeef;
   --champion-gold: #ce9224;
 }
@@ -88,7 +88,7 @@
 }
 .discussion-more-btn { flex: 0 0 auto; align-self: center; height: 64rpx; line-height: 64rpx; padding: 0 24rpx; border-radius: 9999rpx; border: 1px solid var(--border); background: var(--bg-subtle); font-size: 22rpx; font-weight: 500; white-space: nowrap; }
 .ds-dark .discussion-more-btn { color: var(--champion-gold); }
-.ds-bright .discussion-more-btn { color: var(--tour-blue); }
+.ds-bright .discussion-more-btn { color: var(--cloud-blue); }
 
 /* L2 聊天流：内部滚动区（flex:1，min-height:0 让其在面板内部独立滚动）
    必须铺 --ds-surface：微信 scroll-view 默认白底，空会话时会露出白块 */
@@ -154,7 +154,7 @@
 .chat-row.self .chat-bubble { background: #95ec69; }
 .ds-dark .chat-bubble { background: #1a1a1a; color: var(--text-primary); }
 .ds-dark .chat-row.self .chat-bubble { background: #2b5f24; color: #fff; }
-.mention-text { color: var(--tour-blue); font-weight: 700; }
+.mention-text { color: var(--cloud-blue); font-weight: 700; }
 .ds-dark .mention-text { color: var(--data-blue); }
 
 /* L3 输入栏：面板底部（flex 不收缩），底部对齐使 textarea 多行增高时按钮贴底。
@@ -178,8 +178,17 @@
 .discussion-send { flex: 0 0 auto; height: 72rpx; line-height: 72rpx; padding: 0 30rpx; border-radius: 12rpx; font-size: 26rpx; font-weight: 700; text-align: center; }
 .discussion-send.is-disabled { background: #c8ccd2; color: #f3f4f6; }
 .ds-dark .discussion-send.is-disabled { background: #2a2a2a; color: var(--text-muted); }
-.discussion-send.is-active { background: var(--tour-blue); color: #fff; }
-.discussion-emoji-btn.is-on { border-color: var(--tour-blue); color: var(--tour-blue); }
+.discussion-send.is-active { background: var(--cloud-blue); color: #fff; }
+.discussion-emoji-btn.is-on { border-color: var(--cloud-blue); color: var(--cloud-blue); }
+.discussion-emoji-btn.is-disabled { opacity: 0.45; }
+.discussion-input-bar.is-input-disabled .discussion-input-box { background: #eef0f2; }
+.ds-dark .discussion-input-bar.is-input-disabled .discussion-input-box { background: #1a1a1a; }
+.discussion-input-bar.is-input-disabled .discussion-input {
+  pointer-events: none !important;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 /* 表情面板（微信式底部 overlay，悬于输入栏正上方） */
 .emoji-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 126; background: transparent; }

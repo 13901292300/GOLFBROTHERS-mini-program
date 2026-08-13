@@ -7,7 +7,7 @@
       <view class="half-sheet-head">
         <view class="sheet-head-titles">
           <text class="fst-main">选择半场</text>
-          <text class="fst-sub">COURSE</text>
+          <text class="fst-sub">{{roundSubtitle || 'COURSE'}}</text>
         </view>
         <view bindtap="onClose" class="half-sheet-close">×</view>
       </view>

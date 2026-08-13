@@ -1,0 +1,18 @@
+<leaderboard-player-identity
+  player="{{player}}"
+  team-group-logo-by-id="{{teamGroupLogoById}}"
+  avatar-badge="{{avatarBadge}}"
+  meta-mode="{{metaMode}}"
+  show-name-gender="{{showNameGender}}"
+  gender="{{gender}}"
+  gender-symbol="{{genderSymbol}}"
+  gender-class="{{genderClass}}"
+  followed="{{followed}}"
+  relation-status="{{relationStatus}}"
+  relationship-label="{{relationshipLabel}}"
+  can-follow="{{canFollow}}"
+  follow-loading="{{followLoading}}"
+  is-self="{{isSelf}}"
+  bind:follow="onFollowTap"
+  bind:profiletap="onProfileTap"
+/>

@@ -85,10 +85,23 @@ function buildDisplayUser(rawUser, index) {
   const amount = hasAmount ? resolvePaidAmount(user) : '';
   const amountText = hasAmount ? formatAmount(amount) : '';
   const genderDisplay = playerManage.getGenderDisplay(user);
+  const displayName = resolveDisplayName(user);
+  const displayAvatar = mockAvatars.resolveAvatar(
+    user.avatar || user.avatarUrl || '',
+    stableUserId
+  );
   return Object.assign({}, user, {
     stableUserId: stableUserId,
-    displayName: resolveDisplayName(user),
-    displayAvatar: mockAvatars.resolveAvatar(user.avatar || user.avatarUrl || '', stableUserId),
+    userId: user.userId != null && String(user.userId).trim()
+      ? String(user.userId).trim()
+      : stableUserId,
+    playerId: user.playerId != null && String(user.playerId).trim()
+      ? String(user.playerId).trim()
+      : stableUserId,
+    name: displayName,
+    avatar: displayAvatar,
+    displayName: displayName,
+    displayAvatar: displayAvatar,
     genderIcon: genderDisplay.icon,
     genderClass: genderDisplay.className,
     paymentConfirmed: confirmed,
@@ -113,8 +126,13 @@ function buildDisplayUser(rawUser, index) {
   });
 }
 
+/** 统一 UI ViewModel：模板不感知 registration / grouped_players 来源 */
+function toPaymentUiViewModel(user, index) {
+  return buildDisplayUser(user || {}, index == null ? 0 : index);
+}
+
 function normalizePaymentUserForDisplay(user) {
-  return buildDisplayUser(user || {}, 0);
+  return toPaymentUiViewModel(user || {}, 0);
 }
 
 function buildPaymentDraftUsers(match) {
@@ -122,7 +140,7 @@ function buildPaymentDraftUsers(match) {
     match && match.registerInfo && Array.isArray(match.registerInfo.users)
       ? match.registerInfo.users
       : [];
-  return users.map(buildDisplayUser);
+  return users.map(toPaymentUiViewModel);
 }
 
 function calculatePaymentSummary(users) {
@@ -351,6 +369,7 @@ module.exports = {
   FILTER_PAID,
   FILTER_UNPAID,
   buildPaymentDraftUsers,
+  toPaymentUiViewModel,
   normalizePaymentUserForDisplay,
   calculatePaymentSummary,
   filterPaymentUsers,

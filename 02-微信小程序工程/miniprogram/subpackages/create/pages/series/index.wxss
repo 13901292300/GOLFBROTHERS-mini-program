@@ -1,1 +1,806 @@
 @import '/styles/create-team-common.wxss';
+
+.series-wizard .progress-rail {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8rpx;
+  margin-bottom: 28rpx;
+  overflow-x: auto;
+  padding-bottom: 4rpx;
+}
+
+.series-wizard .progress-item {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 4rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-sizing: border-box;
+}
+
+.series-wizard .progress-index {
+  font-size: 22rpx;
+  font-weight: 800;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.series-wizard .progress-label {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.series-wizard .progress-active {
+  border-color: var(--champion-gold);
+  background: rgba(206, 146, 36, 0.08);
+}
+
+.series-wizard .progress-active .progress-index,
+.series-wizard .progress-active .progress-label {
+  color: var(--text-primary);
+}
+
+.series-wizard .progress-done {
+  border-color: rgba(0, 45, 98, 0.35);
+}
+
+.series-wizard .progress-done .progress-index,
+.series-wizard .progress-done .progress-label {
+  color: var(--text-secondary);
+}
+
+.series-wizard .progress-locked {
+  opacity: 0.45;
+}
+
+.series-wizard .step-intro {
+  margin-bottom: 28rpx;
+}
+
+.series-wizard .step-intro .section-label__h2 {
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.series-wizard .step-hint,
+.series-wizard .hint-line {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 16rpx;
+}
+
+.series-wizard .choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.series-wizard .choice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  padding: 28rpx 28rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.series-wizard .choice-card .choice-dot {
+  margin-top: 6rpx;
+  position: relative;
+}
+
+.series-wizard .choice-card.active {
+  border-color: var(--tour-blue);
+  box-shadow: inset 0 0 0 1px rgba(0, 45, 98, 0.2);
+}
+
+.series-wizard .choice-card.active .choice-dot {
+  border-color: var(--tour-blue);
+  background: var(--tour-blue);
+}
+
+.series-wizard .choice-card.active .choice-dot::after {
+  content: "";
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.series-wizard .choice-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.series-wizard .choice-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 8rpx;
+}
+
+.series-wizard .choice-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.series-wizard .choice-desc {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.series-wizard .phase-badge {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1;
+  padding: 8rpx 12rpx;
+  border-radius: 999rpx;
+  white-space: nowrap;
+}
+
+.series-wizard .badge-focus {
+  color: var(--tour-blue);
+  background: rgba(0, 174, 239, 0.12);
+  border: 1px solid rgba(0, 174, 239, 0.28);
+}
+
+.series-wizard .badge-later {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+
+.series-wizard .m-block {
+  margin-top: 28rpx;
+}
+
+.series-wizard .m-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.series-wizard .m-step {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.series-wizard .m-input {
+  flex: 1;
+  min-width: 0;
+  height: 72rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.series-wizard .error-panel {
+  padding: 40rpx 32rpx;
+  border-radius: 16rpx;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.series-wizard .error-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--error);
+  margin-bottom: 16rpx;
+}
+
+.series-wizard .error-desc {
+  display: block;
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 12rpx;
+}
+
+.series-wizard .footer-split {
+  display: flex;
+  gap: 16rpx;
+  align-items: stretch;
+}
+
+.series-wizard .secondary-btn {
+  flex: 0 0 30%;
+  min-width: 0;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin: 0;
+  padding: 0 12rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.series-wizard .secondary-btn::after {
+  border: none;
+}
+
+.series-wizard .submit-btn.flex-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.series-wizard .submit-btn[disabled],
+.series-wizard .secondary-btn[disabled] {
+  opacity: 0.55;
+}
+
+.series-wizard .round-count-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.series-wizard .round-count-input {
+  flex: 1;
+}
+
+.series-wizard .apply-round-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 28rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border: 0;
+  border-radius: 12rpx;
+  background: var(--tour-blue);
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.series-wizard .apply-round-btn::after {
+  border: none;
+}
+
+.series-wizard .edit-round-banner {
+  margin: 8rpx 0 20rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 14rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated, var(--bg-subtle));
+  box-sizing: border-box;
+}
+
+.series-wizard .structure-lock-tip {
+  margin: 0 0 20rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background: rgba(180, 35, 24, 0.06);
+  box-sizing: border-box;
+}
+
+.series-wizard .structure-lock-tip__text {
+  display: block;
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: var(--danger, #b42318);
+}
+
+.series-wizard .edit-round-banner__text {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* 轮次卡片：水平内边距归零，内容统一使用与 .ds-field 相同的 32rpx 左边缘 */
+.series-wizard .series-round-card {
+  --series-round-content-x: 32rpx;
+  margin-top: 28rpx;
+  padding: 24rpx 0;
+  border-radius: 16rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  box-sizing: border-box;
+}
+
+.series-wizard .series-round-card--focus {
+  border-color: var(--accent, #1a7f4e);
+  box-shadow: 0 0 0 2rpx rgba(26, 127, 78, 0.18);
+}
+
+/* 第一行 ROUND 标题：与下方字段文字同一左边缘；右侧状态不挤占标题起点 */
+.series-wizard .series-round-title-row {
+  margin: 0 0 16rpx;
+  padding: 0 var(--series-round-content-x);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  box-sizing: border-box;
+}
+
+.series-wizard .series-round-index {
+  flex: 1;
+  min-width: 0;
+  font-size: 22rpx;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.series-wizard .series-round-status {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--accent, #1a7f4e);
+}
+
+.series-wizard .choice-card--locked {
+  opacity: 0.72;
+}
+
+.series-wizard .series-division-card--locked {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.series-wizard .ds-card--locked {
+  opacity: 0.72;
+}
+
+.series-wizard .field-lock-reason {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.35;
+  color: var(--danger, #b42318);
+}
+
+.series-wizard .m-step--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.series-wizard .series-round-card .ds-card {
+  margin: 0 0 16rpx;
+  box-sizing: border-box;
+}
+
+.series-wizard .series-round-card .ds-card:last-child {
+  margin-bottom: 0;
+}
+
+/* 名称卡：无 .ds-field，显式使用同一内容左边缘 */
+.series-wizard .series-round-name-card {
+  padding: 20rpx var(--series-round-content-x);
+}
+
+/* 覆盖公共 .ds-field / .time-card / .fee-card 水平 padding，统一到内容区基准 */
+.series-wizard .series-round-card .ds-field,
+.series-wizard .series-round-card .time-card,
+.series-wizard .series-round-card .series-fee-card,
+.series-wizard .series-round-card .fee-card {
+  padding-left: var(--series-round-content-x);
+  padding-right: var(--series-round-content-x);
+}
+
+.series-wizard .meta-label {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 8rpx;
+}
+
+.series-wizard .series-game-mode-label-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+
+.series-wizard .series-game-mode-label-row .meta-label {
+  margin-bottom: 0;
+}
+
+.series-wizard .series-game-mode-batch-hint {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.series-wizard .series-fee-card {
+  padding-top: 24rpx;
+  padding-bottom: 24rpx;
+}
+
+.series-wizard .series-fee-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.series-wizard .series-fee-prefix {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.series-wizard .series-fee-input {
+  flex: 1;
+  min-width: 0;
+  height: 64rpx;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.series-wizard .series-topn-block {
+  margin-top: 8rpx;
+  padding: 0 var(--series-round-content-x);
+  box-sizing: border-box;
+}
+
+.series-wizard .sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 8rpx 24rpx;
+}
+
+.series-wizard .sheet-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.series-wizard .sheet-close {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 8rpx 12rpx;
+}
+
+.series-wizard .mode-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+.series-wizard .mode-name {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.series-wizard .mode-desc {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ===== Step 5 主办单位与参赛主体 ===== */
+.series-wizard .series-host-main {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  min-width: 0;
+}
+
+.series-wizard .series-host-logo {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+}
+
+.series-wizard .series-host-logo--empty {
+  border: 1px dashed var(--border);
+}
+
+.series-wizard .participants-card .field-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.series-wizard .participant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  align-items: center;
+  width: 100%;
+}
+
+.series-wizard .participant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  max-width: 100%;
+  padding: 6rpx 10rpx 6rpx 6rpx;
+  border-radius: 999rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  box-sizing: border-box;
+}
+
+.series-wizard .participant-chip__logo {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+
+.series-wizard .participant-chip__logo--empty {
+  border: 1px dashed var(--border);
+}
+
+.series-wizard .participant-chip__name {
+  font-size: 24rpx;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 200rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.series-wizard .participant-chip__remove {
+  width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.series-wizard .warn-hint {
+  color: var(--error, #ef4444);
+  margin-top: 12rpx;
+}
+
+.series-wizard .series-division-card {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx;
+  margin-bottom: 16rpx;
+  border-radius: 16rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-sizing: border-box;
+}
+
+.series-wizard .series-division-swatch {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.series-wizard .series-division-initial {
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.series-wizard .series-division-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.series-wizard .series-division-remove {
+  flex-shrink: 0;
+  padding: 8rpx 12rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--error, #ef4444);
+}
+
+.series-wizard .series-color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  padding: 8rpx 0 24rpx;
+}
+
+.series-wizard .series-color-item {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 16rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.25);
+  box-sizing: border-box;
+}
+
+.series-wizard .series-access-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12rpx;
+  max-width: 62%;
+  justify-content: flex-end;
+}
+
+.series-wizard .series-access-input {
+  width: 140rpx;
+  height: 56rpx;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 10rpx;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+/* 本批锁定自定义上传：保留基准槽位结构，仅补提示样式 */
+.series-wizard .series-media-locked-hint {
+  display: block;
+  margin-top: 16rpx;
+  white-space: normal;
+}
+
+.series-wizard .partner-logo-slot.series-media-locked,
+.series-wizard .event-detail-image-box.series-media-locked {
+  opacity: 0.92;
+}
+
+.series-wizard .series-confirm-card,
+.series-wizard .series-confirm-round {
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
+}
+
+.series-wizard .series-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 10rpx 0;
+}
+
+.series-wizard .series-confirm-k {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.series-wizard .series-confirm-v {
+  flex: 1;
+  text-align: right;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Step6：主/副标题同为正式名称行，样式一致；空副标题不渲染 */
+.series-wizard .series-confirm-row--title {
+  align-items: flex-start;
+}
+
+.series-wizard .series-confirm-title-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4rpx;
+}
+
+.series-wizard .series-confirm-v--title-line {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.series-wizard .series-confirm-round__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+
+.series-wizard .series-jump-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.series-wizard .series-jump-chip {
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.series-wizard .series-sheet-scroll {
+  max-height: 70vh;
+  padding: 0 8rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.series-wizard .series-sheet-body {
+  padding: 8rpx 8rpx 28rpx;
+}
+
+.series-wizard .series-event-textarea {
+  width: 100%;
+  min-height: 220rpx;
+  margin-top: 16rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+  border-radius: 12rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 28rpx;
+}

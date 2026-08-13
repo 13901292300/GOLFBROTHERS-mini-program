@@ -1,18 +1,76 @@
-/* 组件内补强：与 tournament-common 展开身份卡省略链一致（apply-shared 下双保险） */
+/* 资料栏权威样式：本文件属于拥有真实 DOM 的组件，不依赖父 panel / 页面祖先。 */
 .scorecard-profile {
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #002d62);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding: 32rpx;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  box-sizing: border-box;
 }
 .sc-profile-left {
+  display: flex;
+  align-items: center;
+  gap: 32rpx;
   flex: 1 1 auto;
   min-width: 0;
+}
+.sc-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.sc-avatar {
+  width: 160rpx !important;
+  height: 160rpx !important;
+  border-radius: 50% !important;
+  border: 1px solid var(--border, #e5e7eb);
+  display: block;
+  overflow: hidden;
+}
+.sc-flag {
+  position: absolute;
+  bottom: -8rpx;
+  right: -8rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  border: 4rpx solid var(--bg-card, #ffffff);
+  overflow: hidden;
+  background: #fff;
+}
+.sc-flag image {
+  width: 100%;
+  height: 100%;
+}
+.sc-flag--team {
+  overflow: hidden;
+}
+.sc-flag--text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cloud-blue, #002d62);
+}
+.sc-flag__text {
+  font-size: 18rpx;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4rpx;
+  box-sizing: border-box;
 }
 .sc-profile-meta {
   flex: 1 1 auto;
   min-width: 0;
-  /* 勿 hidden：斜体昵称右上角外伸由 .sc-name 内 padding 消化 */
   overflow: visible;
 }
 .sc-name-line {
@@ -24,7 +82,6 @@
   max-width: 100%;
   box-sizing: border-box;
 }
-/* 昵称+性别：内容收缩；受行内剩余宽度约束；勿 space-between */
 .name-gender-group {
   display: flex;
   align-items: center;
@@ -38,21 +95,29 @@
 .sc-name {
   flex: 0 1 auto;
   min-width: 0;
+  font-size: 40rpx;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--text-primary, #002d62);
   line-height: 1.35;
   padding: 4rpx 4rpx 2rpx 0;
   box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* 继承页级主题 token；缺省回落 Bright 主色，避免组件内落成黑色 */
-  color: var(--text-primary, #002d62);
 }
+.sc-name-line .sc-name-gender,
 .sc-name-gender {
   flex-shrink: 0;
   margin-left: 4rpx;
   font-size: 22rpx;
-  line-height: 1;
   font-weight: 700;
+  line-height: 1;
+}
+.gender-icon {
+  font-size: 22rpx;
+  flex-shrink: 0;
 }
 .sc-chevron {
   flex-shrink: 0;
@@ -64,6 +129,9 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted, #6b7280);
+  font-size: 28rpx;
+  line-height: 1;
+  font-weight: 600;
   box-sizing: border-box;
 }
 .sc-chevron__glyph {
@@ -80,10 +148,16 @@
   opacity: 0.4;
 }
 .sc-sub {
+  font-size: 20rpx;
+  font-weight: 700;
   color: var(--text-muted, #6b7280);
+  margin-top: 8rpx;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 .sc-sub-strong {
   color: var(--text-primary, #002d62);
+  font-weight: 900;
 }
 .sc-rel-tag {
   flex-shrink: 0;
@@ -101,15 +175,16 @@
   color: var(--text-muted, #6b7280);
   box-sizing: border-box;
 }
-
 .sc-rel-tag--friend {
   border-color: rgba(206, 146, 36, 0.55);
   background: rgba(206, 146, 36, 0.12);
   color: var(--champion-gold, #ce9224);
 }
-
 .sc-rel-tag--following {
   border-color: var(--border, #e5e7eb);
   background: var(--bg-subtle, #f3f4f6);
   color: var(--text-muted, #6b7280);
+}
+.sc-follow-btn {
+  flex-shrink: 0;
 }

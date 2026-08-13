@@ -1,5 +1,6 @@
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const seriesStore = require('../../../../utils/seriesStore.js');
 const playerManage = require('../../../../utils/playerManage.js');
 const {
   isInterTeamMatch,
@@ -15,6 +16,7 @@ const {
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
 } = require('../../../../utils/strokeEntityValidator.js');
+const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
 
 const TEE_BLUE = 'BLUE_T';
 const TEE_RED = 'RED_T';
@@ -275,7 +277,24 @@ function normalizeUser(user) {
     groupId: user && user.groupId != null ? String(user.groupId) : '',
     matchTeamId: user && user.matchTeamId != null ? String(user.matchTeamId).trim() : '',
     matchTeamName: user && user.matchTeamName != null ? String(user.matchTeamName).trim() : '',
-    groupName: user && user.groupName != null ? String(user.groupName).trim() : ''
+    groupName: user && user.groupName != null ? String(user.groupName).trim() : '',
+    seriesParticipantId:
+      user && user.seriesParticipantId != null ? String(user.seriesParticipantId).trim() : '',
+    affiliationId:
+      user && user.affiliationId != null ? String(user.affiliationId).trim() : '',
+    participantNameSnapshot:
+      user && user.participantNameSnapshot != null
+        ? String(user.participantNameSnapshot).trim()
+        : '',
+    participantShortNameSnapshot:
+      user && user.participantShortNameSnapshot != null
+        ? String(user.participantShortNameSnapshot).trim()
+        : '',
+    participantColorSnapshot:
+      user && user.participantColorSnapshot != null
+        ? String(user.participantColorSnapshot).trim()
+        : '',
+    fromSeriesRoster: !!(user && (user.fromSeriesRoster || user.isSeriesRoster))
   };
 }
 
@@ -322,7 +341,23 @@ function hydrateSlotsFromPlayers(players, matchLike, registerInfo) {
       displayName: resolveRegisterDisplayName(p) || (p.displayName ? String(p.displayName) : ''),
       gender: p.gender ? String(p.gender) : '',
       handicap: p.handicap != null && p.handicap !== '' ? String(p.handicap) : '-',
-      teamLabel: resolveSlotTeamLabel(p, matchLike, registerLookup)
+      teamLabel: resolveSlotTeamLabel(p, matchLike, registerLookup),
+      matchTeamId: p.matchTeamId != null ? String(p.matchTeamId).trim() : '',
+      groupId: p.groupId != null ? String(p.groupId).trim() : '',
+      matchTeamName: p.matchTeamName != null ? String(p.matchTeamName).trim() : '',
+      groupName: p.groupName != null ? String(p.groupName).trim() : '',
+      seriesParticipantId:
+        p.seriesParticipantId != null ? String(p.seriesParticipantId).trim() : '',
+      affiliationId: p.affiliationId != null ? String(p.affiliationId).trim() : '',
+      participantNameSnapshot:
+        p.participantNameSnapshot != null ? String(p.participantNameSnapshot).trim() : '',
+      participantShortNameSnapshot:
+        p.participantShortNameSnapshot != null
+          ? String(p.participantShortNameSnapshot).trim()
+          : '',
+      participantColorSnapshot:
+        p.participantColorSnapshot != null ? String(p.participantColorSnapshot).trim() : '',
+      fromSeriesRoster: !!(p.fromSeriesRoster || p.isSeriesRoster)
     }, teeFields);
   });
   return slots;
@@ -357,7 +392,8 @@ Page({
     slots: createSlots(),
     registerSubTabs: [],
     activeSubTabId: '',
-    displayUsers: []
+    displayUsers: [],
+    emptyRosterText: '暂无可选球员'
   },
 
   onLoad(options) {
@@ -366,8 +402,20 @@ Page({
     const groupId = options && options.groupId ? decodeURIComponent(options.groupId) : '';
     const groupName = options && options.groupName ? decodeURIComponent(options.groupName) : '';
     const matchId = options && options.matchId ? decodeURIComponent(options.matchId) : '';
+    const fromSeriesRaw = options && options.fromSeries != null ? String(options.fromSeries) : '';
+    const seriesIdOpt =
+      options && options.seriesId != null ? decodeURIComponent(String(options.seriesId)) : '';
+    const roundIdOpt =
+      options && options.roundId != null ? decodeURIComponent(String(options.roundId)) : '';
     const payload = this._resolvePayload(matchId);
-    this._registerInfo = payload.registerInfo || { totalCount: 0, users: [] };
+    const fromSeries =
+      fromSeriesRaw === '1' ||
+      fromSeriesRaw === 'true' ||
+      !!(payload && payload.fromSeries);
+
+    this._fromSeries = fromSeries;
+    this._seriesId = seriesIdOpt || (payload && payload.seriesId) || '';
+    this._roundId = roundIdOpt || (payload && payload.roundId) || '';
     this._allGroups = payload.groups || [];
     this._match = payload.match || null;
     this._gameMode = String(
@@ -380,11 +428,43 @@ Page({
     this._showCompositionMode = !!payload.showCompositionMode;
     this._leavingConfirmed = false;
 
+    let registerInfo = payload.registerInfo || { totalCount: 0, users: [] };
+    let registerSubTabs = payload.registerSubTabs || [];
+    let emptyRosterText =
+      (payload && payload.emptyRosterText) || (fromSeries ? '暂无报名人员' : '暂无可选球员');
+
+    if (fromSeries) {
+      const loaded = seriesGroupPickRoster.loadSeriesPickRegisterSource({
+        fromSeries: 1,
+        seriesId: this._seriesId,
+        roundId: this._roundId,
+        matchId: matchId,
+        match: this._match,
+        series: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null
+      });
+      if (!loaded || !loaded.ok) {
+        wx.showToast({
+          title: (loaded && loaded.message) || '本轮比赛数据异常',
+          icon: 'none'
+        });
+        setTimeout(() => {
+          wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/home/index' }) });
+        }, 500);
+        return;
+      }
+      // Series 已报名名单只认 roster 投影，忽略 match.registerInfo
+      registerInfo = loaded.registerInfo || { totalCount: 0, users: [] };
+      registerSubTabs = loaded.registerSubTabs || [];
+      emptyRosterText = loaded.emptyText || '暂无报名人员';
+      this._seriesForPick = loaded.series;
+    }
+
+    this._registerInfo = registerInfo;
     const editingGroupIndex = (this._allGroups || []).findIndex(
       (g) => String((g && g.groupId) || '') === String(groupId)
     );
 
-    const tabs = this._resolveTabs(payload.match, payload.registerSubTabs, payload.registerInfo);
+    const tabs = this._resolveTabs(payload.match, registerSubTabs, registerInfo);
     const activeSubTabId = tabs.length ? tabs[0].id : '';
     this._registerLookup = buildPickRegisterLookup(this._registerInfo);
     const slots = hydrateSlotsFromPlayers(payload.players, this._match, this._registerInfo);
@@ -396,6 +476,7 @@ Page({
       slots: slots,
       registerSubTabs: tabs,
       activeSubTabId: activeSubTabId,
+      emptyRosterText: emptyRosterText,
       displayUsers: this._buildDisplayUsers(this._registerInfo, activeSubTabId, slots, groupId, editingGroupIndex)
     });
   },
@@ -426,6 +507,18 @@ Page({
       modeFromPayload === '2+2' || (!modeFromPayload && modeFromMatch === '2+2')
         ? '2+2'
         : '4+0';
+    const fromSeries = !!(payload && (payload.fromSeries === true || payload.fromSeries === 1 || String(payload.fromSeries) === '1'));
+    // 普通比赛：payload.registerInfo → match.registerInfo
+    // Series：此处不取 match.registerInfo；onLoad 会改读 series.roster
+    let registerInfo = { totalCount: 0, users: [] };
+    if (!fromSeries) {
+      registerInfo =
+        payload && payload.registerInfo
+          ? payload.registerInfo
+          : (match && match.registerInfo) || { totalCount: 0, users: [] };
+    } else if (payload && payload.registerInfo) {
+      registerInfo = payload.registerInfo;
+    }
     return {
       match: match,
       gameMode: payload && payload.gameMode != null
@@ -433,10 +526,14 @@ Page({
         : (match && (match.gameMode || match.selectedGameMode)) || '',
       strokeCompositionMode: strokeCompositionMode,
       showCompositionMode: !!(payload && payload.showCompositionMode),
-      registerInfo: payload && payload.registerInfo ? payload.registerInfo : (match && match.registerInfo) || { totalCount: 0, users: [] },
+      registerInfo: registerInfo,
       registerSubTabs: payload && Array.isArray(payload.registerSubTabs) ? payload.registerSubTabs : [],
       players: payload && Array.isArray(payload.players) ? payload.players : [],
-      groups: payload && Array.isArray(payload.groups) ? payload.groups : []
+      groups: payload && Array.isArray(payload.groups) ? payload.groups : [],
+      fromSeries: fromSeries,
+      seriesId: payload && payload.seriesId != null ? String(payload.seriesId) : '',
+      roundId: payload && payload.roundId != null ? String(payload.roundId) : '',
+      emptyRosterText: payload && payload.emptyRosterText ? String(payload.emptyRosterText) : ''
     };
   },
 
@@ -645,7 +742,23 @@ Page({
         displayName: s.displayName ? String(s.displayName) : '',
         avatar: s.avatar ? String(s.avatar) : '',
         gender: s.gender ? String(s.gender) : '',
-        tee: s.tee ? String(s.tee) : ''
+        tee: s.tee ? String(s.tee) : '',
+        matchTeamId: s.matchTeamId ? String(s.matchTeamId) : '',
+        groupId: s.groupId ? String(s.groupId) : '',
+        matchTeamName: s.matchTeamName ? String(s.matchTeamName) : '',
+        groupName: s.groupName ? String(s.groupName) : '',
+        seriesParticipantId: s.seriesParticipantId ? String(s.seriesParticipantId) : '',
+        affiliationId: s.affiliationId ? String(s.affiliationId) : '',
+        participantNameSnapshot: s.participantNameSnapshot
+          ? String(s.participantNameSnapshot)
+          : '',
+        participantShortNameSnapshot: s.participantShortNameSnapshot
+          ? String(s.participantShortNameSnapshot)
+          : '',
+        participantColorSnapshot: s.participantColorSnapshot
+          ? String(s.participantColorSnapshot)
+          : '',
+        fromSeriesRoster: !!s.fromSeriesRoster
       }))
     };
   },
@@ -855,13 +968,47 @@ Page({
 
     const gender = user.gender || '';
     const teeFields = teeDisplayFields(defaultTeeFromRegisterGender(gender));
+    // Series roster：直接沿用归属，不弹球队/分队选择、不默认第一支
+    if (
+      this._fromSeries &&
+      this._seriesForPick &&
+      seriesGroupPickRoster.needsAffiliationSelection(user, this._seriesForPick)
+    ) {
+      wx.showToast({ title: '请选择所属球队/分队', icon: 'none' });
+      return;
+    }
     slots[emptyIndex] = Object.assign({}, slots[emptyIndex], {
       userId: pickedUserId,
       avatar: user.avatar || '',
       displayName: user.displayName || '',
       gender: gender,
       handicap: user.handicap || '-',
-      teamLabel: resolveSlotTeamLabel(user, this._match, this._registerLookup || {})
+      teamLabel: resolveSlotTeamLabel(user, this._match, this._registerLookup || {}),
+      matchTeamId: user.matchTeamId ? String(user.matchTeamId) : '',
+      groupId: user.groupId != null ? String(user.groupId) : '',
+      matchTeamName: user.matchTeamName ? String(user.matchTeamName) : '',
+      groupName: user.groupName ? String(user.groupName) : '',
+      seriesParticipantId: user.seriesParticipantId ? String(user.seriesParticipantId) : '',
+      affiliationId: user.affiliationId || user.matchTeamId || '',
+      participantNameSnapshot:
+        user.participantNameSnapshot != null
+          ? String(user.participantNameSnapshot)
+          : user.nameSnapshot != null
+            ? String(user.nameSnapshot)
+            : '',
+      participantShortNameSnapshot:
+        user.participantShortNameSnapshot != null
+          ? String(user.participantShortNameSnapshot)
+          : user.shortNameSnapshot != null
+            ? String(user.shortNameSnapshot)
+            : '',
+      participantColorSnapshot:
+        user.participantColorSnapshot != null
+          ? String(user.participantColorSnapshot)
+          : user.colorSnapshot != null
+            ? String(user.colorSnapshot)
+            : '',
+      fromSeriesRoster: !!user.fromSeriesRoster
     }, teeFields);
 
     const displayUsers = this._buildDisplayUsers(

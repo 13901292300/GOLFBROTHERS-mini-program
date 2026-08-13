@@ -381,6 +381,16 @@ function normalizeStoredMatch(match) {
   if (!next.scoreData || typeof next.scoreData !== 'object' || Array.isArray(next.scoreData)) {
     next.scoreData = {};
   }
+  // Series 分组收费：保留 paymentByUserId；非法形状归一为空对象，不建第二 storage
+  if (Object.prototype.hasOwnProperty.call(next, 'paymentByUserId')) {
+    if (
+      !next.paymentByUserId ||
+      typeof next.paymentByUserId !== 'object' ||
+      Array.isArray(next.paymentByUserId)
+    ) {
+      next.paymentByUserId = {};
+    }
+  }
   // 队际赛最小字段：读路径补齐缺省，不静默裁剪 teamGroups / 不改存量 matchType
   if (next.organizationId == null) next.organizationId = '';
   else next.organizationId = String(next.organizationId);
@@ -1618,6 +1628,109 @@ function getMatchById(matchId) {
   return normalizeStoredMatch(_readAll().find((item) => item && item.matchId === matchId) || null);
 }
 
+/** Series 发布：是否存在 matchId（不改旧 API） */
+function existsMatchId(matchId) {
+  const mid = matchId != null ? String(matchId).trim() : '';
+  if (!mid) return false;
+  return _readAll().some((item) => item && String(item.matchId || '').trim() === mid);
+}
+
+/**
+ * Series 专用安全写入（不改变 saveMatch 语义）
+ * - 预分配 matchId 幂等：同 seriesId/roundId/publishToken 且 payload fingerprint 一致 → 成功
+ * - 同身份不同 payload → payload_conflict（禁止覆盖）
+ * - 异 Series / 无 seriesContext 占用 → conflict
+ * - 写后回读校验
+ *
+ * @param {object} match
+ * @param {{ getMatchById?: Function, writeMatch?: Function }} [hooks] 自测注入
+ * @returns {{ ok: boolean, reason?: string, match?: object }}
+ */
+function saveMatchChecked(match, hooks) {
+  const h = hooks || {};
+  if (!match || !match.matchId) {
+    return { ok: false, reason: 'match_id_required' };
+  }
+  const seriesStationMatch = require('./seriesStationMatch.js');
+  const mid = String(match.matchId).trim();
+  const incomingCanon = seriesStationMatch.extractStationPayloadForFingerprint(match);
+  const incomingFp = seriesStationMatch.fingerprintOf(incomingCanon);
+  const ctx = match.seriesContext || {};
+  if (ctx.managed !== true) {
+    return { ok: false, reason: 'series_context_required' };
+  }
+  const seriesId = ctx.seriesId != null ? String(ctx.seriesId).trim() : '';
+  const roundId = ctx.roundId != null ? String(ctx.roundId).trim() : '';
+  const publishToken = ctx.publishToken != null ? String(ctx.publishToken).trim() : '';
+  if (!seriesId || !roundId || !publishToken) {
+    return { ok: false, reason: 'series_context_incomplete' };
+  }
+
+  const getter = typeof h.getMatchById === 'function' ? h.getMatchById : getMatchById;
+  const existing = getter(mid);
+  if (existing) {
+    const ect = existing.seriesContext || {};
+    const sameIdentity =
+      ect.managed === true &&
+      String(ect.seriesId || '').trim() === seriesId &&
+      String(ect.roundId || '').trim() === roundId &&
+      String(ect.publishToken || '').trim() === publishToken;
+    if (!sameIdentity) {
+      return { ok: false, reason: 'conflict', matchId: mid };
+    }
+    // fingerprint 不同直接冲突；相同也须 canonical 字符串完全相等
+    const eq = seriesStationMatch.stationPayloadsEqual(existing, match);
+    if (!eq.equal) {
+      return {
+        ok: false,
+        reason: 'payload_conflict',
+        matchId: mid,
+        detail: eq.reason
+      };
+    }
+    const again = getter(mid);
+    if (!again) return { ok: false, reason: 'readback_missing' };
+    return { ok: true, reason: 'idempotent', match: again };
+  }
+
+  const toWrite = Object.assign({}, match, { matchId: mid });
+  toWrite.scoreData = normalizeScoreData(toWrite.scoreData);
+
+  if (typeof h.writeMatch === 'function') {
+    const wr = h.writeMatch(toWrite);
+    if (!wr || !wr.ok) {
+      return { ok: false, reason: (wr && wr.reason) || 'storage_write_failed' };
+    }
+  } else {
+    const list = _readAll();
+    const next = [toWrite].concat(list.filter((item) => item && item.matchId !== mid));
+    try {
+      wx.setStorageSync(STORAGE_KEY, next || []);
+    } catch (e) {
+      return { ok: false, reason: 'storage_write_failed' };
+    }
+  }
+
+  const readback = getter(mid);
+  if (!readback) {
+    return { ok: false, reason: 'readback_missing' };
+  }
+  const rbCtx = readback.seriesContext || {};
+  if (
+    rbCtx.managed !== true ||
+    String(rbCtx.seriesId || '').trim() !== seriesId ||
+    String(rbCtx.roundId || '').trim() !== roundId ||
+    String(rbCtx.publishToken || '').trim() !== publishToken
+  ) {
+    return { ok: false, reason: 'readback_identity_mismatch' };
+  }
+  const rbEq = seriesStationMatch.stationPayloadsEqual(readback, match);
+  if (!rbEq.equal) {
+    return { ok: false, reason: 'readback_payload_mismatch', detail: rbEq.reason };
+  }
+  return { ok: true, reason: 'created', match: readback, fingerprint: incomingFp };
+}
+
 /** 硬删除球队赛（与 gameStore.removeGame 对齐） */
 function removeMatch(matchId) {
   if (!matchId) return false;
@@ -1722,6 +1835,8 @@ module.exports = {
   updateMatchFromCreatePage,
   hydrateCreatePageFromMatch,
   saveMatch,
+  saveMatchChecked,
+  existsMatchId,
   listMatches,
   listInterTeamMatchesByParticipatingTeamId,
   getMatchById,

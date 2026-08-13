@@ -27,51 +27,105 @@
   <!-- L2：聊天内容（内部滚动） -->
   <scroll-view class="ds-chat-scroll" scroll-y scroll-into-view="{{toView}}" scroll-with-animation>
     <view class="discussion-chat">
-      <view class="discussion-time">今天</view>
-      <block wx:for="{{chat}}" wx:key="index">
-        <!-- 系统提示：居中灰字，无气泡（type=system；与普通评论分离） -->
-        <view wx:if="{{item.type === 'system'}}" id="ds-msg-{{index}}" class="chat-system">
-          <text class="chat-system__text">{{item.text}}</text>
-        </view>
-        <view wx:else id="ds-msg-{{index}}" class="chat-row {{item.self ? 'self' : ''}}">
-          <image
-            wx:if="{{!item.self}}"
-            id="ds-msg-avatar-{{index}}"
-            class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == index ? 'is-reaction-detached' : ''}}"
-            src="{{item.avatar}}"
-            mode="aspectFill"
-            data-role="chat"
-            data-userid="{{item.userId}}"
-            data-name="{{item.name}}"
-            data-avatar="{{item.avatar}}"
-            data-index="{{index}}"
-            catchtouchstart="onAvatarTouchStart"
-            catchtouchmove="onAvatarTouchMove"
-            catchtouchend="onAvatarTouchEnd"
-            catchtouchcancel="onAvatarTouchEnd"
-          ></image>
-          <view class="chat-col">
-            <text class="chat-meta">{{item.name}}</text>
-            <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
+      <!-- 历史路径：固定「今天」（含空列表）；enableTimeNodes 开启时不渲染 -->
+      <view wx:if="{{!enableTimeNodes}}" class="discussion-time">今天</view>
+
+      <!-- 时间节点投影路径：空列表无孤立时间；time 行非消息记录 -->
+      <block wx:if="{{enableTimeNodes}}">
+        <block wx:for="{{chatView}}" wx:key="key">
+          <view wx:if="{{item.rowType === 'time'}}" class="discussion-time">{{item.label}}</view>
+          <view wx:elif="{{item.rowType === 'message' && item.type === 'system'}}" id="ds-msg-{{item.msgIndex}}" class="chat-system">
+            <text class="chat-system__text">{{item.text}}</text>
           </view>
-          <image
-            wx:if="{{item.self}}"
-            id="ds-msg-avatar-{{index}}"
-            class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == index ? 'is-reaction-detached' : ''}}"
-            src="{{item.avatar}}"
-            mode="aspectFill"
-            data-role="chat"
-            data-userid="{{item.userId || 'me'}}"
-            data-name="{{item.name}}"
-            data-avatar="{{item.avatar}}"
-            data-index="{{index}}"
-            catchtouchstart="onAvatarTouchStart"
-            catchtouchmove="onAvatarTouchMove"
-            catchtouchend="onAvatarTouchEnd"
-            catchtouchcancel="onAvatarTouchEnd"
-          ></image>
-        </view>
+          <view wx:elif="{{item.rowType === 'message'}}" id="ds-msg-{{item.msgIndex}}" class="chat-row {{item.self ? 'self' : ''}}">
+            <image
+              wx:if="{{!item.self}}"
+              id="ds-msg-avatar-{{item.msgIndex}}"
+              class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == item.msgIndex ? 'is-reaction-detached' : ''}}"
+              src="{{item.avatar}}"
+              mode="aspectFill"
+              data-role="chat"
+              data-userid="{{item.userId}}"
+              data-name="{{item.name}}"
+              data-avatar="{{item.avatar}}"
+              data-index="{{item.msgIndex}}"
+              catchtouchstart="onAvatarTouchStart"
+              catchtouchmove="onAvatarTouchMove"
+              catchtouchend="onAvatarTouchEnd"
+              catchtouchcancel="onAvatarTouchEnd"
+            ></image>
+            <view class="chat-col">
+              <text class="chat-meta">{{item.name}}</text>
+              <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
+            </view>
+            <image
+              wx:if="{{item.self}}"
+              id="ds-msg-avatar-{{item.msgIndex}}"
+              class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == item.msgIndex ? 'is-reaction-detached' : ''}}"
+              src="{{item.avatar}}"
+              mode="aspectFill"
+              data-role="chat"
+              data-userid="{{item.userId || 'me'}}"
+              data-name="{{item.name}}"
+              data-avatar="{{item.avatar}}"
+              data-index="{{item.msgIndex}}"
+              catchtouchstart="onAvatarTouchStart"
+              catchtouchmove="onAvatarTouchMove"
+              catchtouchend="onAvatarTouchEnd"
+              catchtouchcancel="onAvatarTouchEnd"
+            ></image>
+          </view>
+        </block>
       </block>
+
+      <!-- 历史消息列表（未开启时间节点） -->
+      <block wx:else>
+        <block wx:for="{{chat}}" wx:key="index">
+          <!-- 系统提示：居中灰字，无气泡（type=system；与普通评论分离） -->
+          <view wx:if="{{item.type === 'system'}}" id="ds-msg-{{index}}" class="chat-system">
+            <text class="chat-system__text">{{item.text}}</text>
+          </view>
+          <view wx:else id="ds-msg-{{index}}" class="chat-row {{item.self ? 'self' : ''}}">
+            <image
+              wx:if="{{!item.self}}"
+              id="ds-msg-avatar-{{index}}"
+              class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == index ? 'is-reaction-detached' : ''}}"
+              src="{{item.avatar}}"
+              mode="aspectFill"
+              data-role="chat"
+              data-userid="{{item.userId}}"
+              data-name="{{item.name}}"
+              data-avatar="{{item.avatar}}"
+              data-index="{{index}}"
+              catchtouchstart="onAvatarTouchStart"
+              catchtouchmove="onAvatarTouchMove"
+              catchtouchend="onAvatarTouchEnd"
+              catchtouchcancel="onAvatarTouchEnd"
+            ></image>
+            <view class="chat-col">
+              <text class="chat-meta">{{item.name}}</text>
+              <view class="chat-bubble"><text wx:if="{{item.mention}}" class="mention-text">{{item.mention}} </text>{{item.text}}</view>
+            </view>
+            <image
+              wx:if="{{item.self}}"
+              id="ds-msg-avatar-{{index}}"
+              class="chat-avatar ds-player-avatar {{reactionDetachedMessageIndex >= 0 && reactionDetachedMessageIndex == index ? 'is-reaction-detached' : ''}}"
+              src="{{item.avatar}}"
+              mode="aspectFill"
+              data-role="chat"
+              data-userid="{{item.userId || 'me'}}"
+              data-name="{{item.name}}"
+              data-avatar="{{item.avatar}}"
+              data-index="{{index}}"
+              catchtouchstart="onAvatarTouchStart"
+              catchtouchmove="onAvatarTouchMove"
+              catchtouchend="onAvatarTouchEnd"
+              catchtouchcancel="onAvatarTouchEnd"
+            ></image>
+          </view>
+        </block>
+      </block>
+
       <view
         wx:if="{{bottomSpacerHeight > 0}}"
         class="discussion-content-spacer"
@@ -81,7 +135,7 @@
   </scroll-view>
 
   <!-- L3：输入栏（面板底部，含 safe area；微信式 textarea + 发送态） -->
-  <view wx:if="{{showInputBar}}" class="discussion-input-bar {{fixedInput ? 'discussion-input-bar--fixed' : ''}}">
+  <view wx:if="{{showInputBar}}" class="discussion-input-bar {{fixedInput ? 'discussion-input-bar--fixed' : ''}} {{inputDisabled ? 'is-input-disabled' : ''}}">
     <view class="discussion-plus-btn" bindtap="noop">＋</view>
     <view class="discussion-input-box">
       <textarea
@@ -89,21 +143,22 @@
         value="{{draft}}"
         cursor="{{cursor}}"
         focus="{{inputFocus}}"
+        disabled="{{inputDisabled}}"
         bindinput="onDraftInput"
         bindblur="onDraftBlur"
         bindconfirm="onSend"
         auto-height
-        placeholder="说点什么…"
+        placeholder="{{inputPlaceholder || '说点什么…'}}"
         placeholder-class="discussion-input__ph"
         confirm-type="send"
         confirm-hold="{{false}}"
         show-confirm-bar="{{false}}"
-        adjust-position="{{!emojiPanelOpen}}"
+        adjust-position="{{!emojiPanelOpen && !inputDisabled}}"
         cursor-spacing="24"
       ></textarea>
     </view>
-    <view class="discussion-emoji-btn {{emojiPanelOpen ? 'is-on' : ''}}" bindtap="toggleEmojiPanel">☺</view>
-    <view class="discussion-send {{canSend ? 'is-active' : 'is-disabled'}}" bindtap="onSend">发送</view>
+    <view class="discussion-emoji-btn {{emojiPanelOpen ? 'is-on' : ''}} {{inputDisabled ? 'is-disabled' : ''}}" bindtap="toggleEmojiPanel">☺</view>
+    <view class="discussion-send {{!inputDisabled && canSend ? 'is-active' : 'is-disabled'}}" bindtap="onSend">发送</view>
   </view>
 
   <!-- 表情面板 overlay（wx:if 挂载/卸载，与输入栏 DOM 互不复用） -->

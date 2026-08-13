@@ -3,7 +3,11 @@
  * 被「记分页 / 球队比赛 / Game Hub」等所有赛事页面复用，禁止任何页面单独实现聊天逻辑。
  * 自包含 flex 面板：围观行(顶) → 聊天流(中，内部滚动) → 输入栏(底) + 表情面板(overlay)。
  * 输入系统 = 微信式：草稿/发送态/光标 + emoji 定点插入/删除，与之前已完成的讨论区完全一致。
+ *
+ * enableTimeNodes（默认 false）：微信群聊式时间节点投影；关闭时保持历史「今天」硬编码行为。
  */
+
+var discussionTimeline = require('../../utils/discussionTimeline.js');
 
 const EMOJI_LIST = [
   '😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😜', '🤔', '😎',
@@ -38,10 +42,22 @@ Component({
     fixedInput: { type: Boolean, value: false },
     // 输入栏显隐控制（默认 true）
     showInputBar: { type: Boolean, value: true },
+    /**
+     * 输入栏只读禁用（默认 false，保持 detail/score/hub 可输入行为）。
+     * true 时：不可输入、不可发送、不可开表情/插入 @；placeholder 可定制。
+     */
+    inputDisabled: { type: Boolean, value: false },
+    // 输入框占位文案；空字符串时回退「说点什么…」
+    inputPlaceholder: { type: String, value: '' },
     // 内容不足时由宿主注入的底部补齐高度（px），渲染在聊天列表末尾
     bottomSpacerHeight: { type: Number, value: 0 },
     // 是否渲染组件内围观行（宿主页面可外置二级 sticky 层时设为 false）
     showWatchersStrip: { type: Boolean, value: true },
+    /**
+     * 微信群聊式时间节点（默认关闭，保持 detail/score/hub 现有行为）。
+     * 开启后：空列表不显示「今天」；时间节点仅存在于 chatView 投影。
+     */
+    enableTimeNodes: { type: Boolean, value: false },
     /**
      * reaction self 动画播放中：按消息 index 隐藏该条头像（占位，不删节点）。
      * -1 表示未隐藏；须与 reactionDetachedUserId 一并由宿主在 onSeatDetach 时写入。
@@ -52,6 +68,7 @@ Component({
 
   data: {
     chat: [],
+    chatView: [],
     toView: '',
     draft: '',
     canSend: false,
@@ -69,24 +86,67 @@ Component({
     // 外部 messages 变化时同步内部聊天流（用户已发言后不再被外部覆盖）
     messages(list) {
       if (this._userTouched) return;
-      const chat = (list || []).slice();
-      this.setData({ chat, toView: chat.length ? 'ds-msg-' + (chat.length - 1) : '' });
+      this._applyChat((list || []).slice(), true);
+    },
+    enableTimeNodes() {
+      this._applyChat(this.data.chat || [], false);
     },
     showInputBar(show) {
       if (!show && this.data.emojiPanelOpen) {
         this.setData({ emojiPanelOpen: false });
       }
+    },
+    inputDisabled(disabled) {
+      if (!disabled) return;
+      const patch = {
+        draft: '',
+        canSend: false,
+        mentions: [],
+        inputFocus: false
+      };
+      if (this.data.emojiPanelOpen) patch.emojiPanelOpen = false;
+      this.setData(patch);
     }
   },
 
   methods: {
+    _isInputDisabled() {
+      return !!this.properties.inputDisabled;
+    },
+
+    /**
+     * @param {Array} chat
+     * @param {boolean} scrollToEnd
+     */
+    _applyChat(chat, scrollToEnd) {
+      const list = Array.isArray(chat) ? chat : [];
+      const patch = { chat: list };
+      if (this.properties.enableTimeNodes) {
+        patch.chatView = discussionTimeline.projectDiscussionTimeline(list);
+      } else {
+        patch.chatView = [];
+      }
+      if (scrollToEnd) {
+        patch.toView = list.length ? 'ds-msg-' + (list.length - 1) : '';
+      }
+      this.setData(patch);
+    },
+
     /* ===== 输入：草稿 / 发送态 / 光标 ===== */
     onDraftInput(e) {
+      if (this._isInputDisabled()) {
+        this.setData({ draft: '', canSend: false, cursor: 0 });
+        return;
+      }
       const value = e.detail.value || '';
       const cursor = typeof e.detail.cursor === 'number' ? e.detail.cursor : value.length;
       this.setData({ draft: value, canSend: value.trim().length > 0, cursor });
     },
     onDraftBlur(e) {
+      if (this._isInputDisabled()) {
+        this.setData({ draft: '', canSend: false, cursor: 0, inputFocus: false });
+        return;
+      }
       const cursor = typeof e.detail.cursor === 'number' ? e.detail.cursor : (this.data.draft || '').length;
       // 失焦时记录光标位置并复位 focus 标志，确保后续 @插入能重新触发聚焦
       this.setData({ cursor, inputFocus: false });
@@ -106,41 +166,55 @@ Component({
         text: text,
         timestamp: p.timestamp != null ? p.timestamp : Date.now()
       });
-      this.setData({
-        chat: chat,
-        toView: 'ds-msg-' + (chat.length - 1)
-      });
+      this._applyChat(chat, true);
     },
 
     // 发送：空内容禁止；追加到聊天流，清空草稿/复位发送态/光标并关闭表情面板，滚动到底
     onSend() {
+      if (this._isInputDisabled()) return;
       const text = (this.data.draft || '').trim();
       if (!text) return;
       this._userTouched = true;
       const mentions = (this.data.mentions || []).slice();
-      const chat = this.data.chat.concat({
+      const createdAt = Date.now();
+      const message = {
         self: true,
         userId: 'me',
         name: '我',
         avatar: this.properties.selfAvatar,
         text,
         mention: '',
-        mentions
-      });
-      this.setData({
-        chat,
-        toView: 'ds-msg-' + (chat.length - 1),
+        mentions,
+        createdAt
+      };
+      const chat = this.data.chat.concat(message);
+      const patch = {
         draft: '',
         canSend: false,
         cursor: 0,
         emojiPanelOpen: false,
         mentions: []
-      });
-      this.triggerEvent('send', { text, mentions });
+      };
+      // _applyChat 会 setData chat/chatView/toView；合并一次减少闪烁
+      patch.chat = chat;
+      patch.toView = 'ds-msg-' + (chat.length - 1);
+      if (this.properties.enableTimeNodes) {
+        patch.chatView = discussionTimeline.projectDiscussionTimeline(chat);
+      }
+      this.setData(patch);
+      this.triggerEvent('send', { text, mentions, createdAt, message });
     },
 
     /* ===== @提及：长按头像（≥500ms）触发，与点击互不冲突 ===== */
     onAvatarTouchStart(e) {
+      if (this._isInputDisabled()) {
+        this._longPressed = false;
+        if (this._lpTimer) {
+          clearTimeout(this._lpTimer);
+          this._lpTimer = null;
+        }
+        return;
+      }
       const ds = e.currentTarget.dataset || {};
       this._longPressed = false;
       if (this._lpTimer) clearTimeout(this._lpTimer);
@@ -206,6 +280,7 @@ Component({
 
     // 在光标位置插入「@用户名 」，生成 mention 数据结构，保持输入框聚焦（支持多次 @）
     insertMention(userId, userName) {
+      if (this._isInputDisabled()) return;
       const name = userName || '';
       if (!name) return;
       const token = '@' + name + ' ';
@@ -228,6 +303,7 @@ Component({
 
     /* ===== 表情面板 ===== */
     toggleEmojiPanel() {
+      if (this._isInputDisabled()) return;
       if (this.data.emojiPanelOpen) {
         this.setData({ emojiPanelOpen: false });
         return;
@@ -247,6 +323,7 @@ Component({
 
     // 定点插入 emoji（不覆盖已有文本，连续插入），面板保持打开
     insertEmoji(e) {
+      if (this._isInputDisabled()) return;
       const emoji = e.currentTarget.dataset.emoji || '';
       if (!emoji) return;
       const draft = this.data.draft || '';
@@ -259,6 +336,7 @@ Component({
 
     // 删除光标前一个字符（兼容 emoji 代理对）
     deleteEmoji() {
+      if (this._isInputDisabled()) return;
       const draft = this.data.draft || '';
       const len = draft.length;
       let pos = typeof this.data.cursor === 'number' ? this.data.cursor : len;

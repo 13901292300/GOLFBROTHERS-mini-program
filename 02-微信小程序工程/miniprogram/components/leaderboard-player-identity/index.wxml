@@ -1,13 +1,28 @@
-<view class="scorecard-profile">
-  <view class="sc-profile-left">
-    <view class="sc-avatar-wrap">
-      <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
+<view
+  class="scorecard-profile"
+  style="display:flex;align-items:flex-start;justify-content:space-between;gap:24rpx;padding:32rpx;width:100%;max-width:100%;min-width:0;box-sizing:border-box;"
+>
+  <view class="sc-profile-left" style="display:flex;align-items:center;gap:32rpx;flex:1 1 auto;min-width:0;" catchtap="onProfileTap">
+    <view class="sc-avatar-wrap" style="position:relative;flex-shrink:0;width:160rpx;height:160rpx;">
+      <image
+        class="sc-avatar"
+        src="{{player.avatar}}"
+        mode="aspectFill"
+        style="width:160rpx;height:160rpx;border-radius:50%;display:block;overflow:hidden;"
+      ></image>
       <!-- 角标节点保留；显隐由 showAvatarBadge（avatarBadge 能力）控制 -->
       <view
         wx:if="{{showAvatarBadge}}"
-        class="sc-flag {{avatarBadgeIsTeam ? 'sc-flag--team' : ''}}"
+        class="sc-flag {{avatarBadgeIsTeam ? 'sc-flag--team' : ''}} {{avatarBadgeIsText ? 'sc-flag--text' : ''}}"
+        style="{{avatarBadgeStyle}}"
       >
-        <image src="{{avatarBadgeSrc}}" mode="aspectFill"></image>
+        <image
+          wx:if="{{!avatarBadgeIsText}}"
+          src="{{avatarBadgeSrc}}"
+          mode="aspectFill"
+          binderror="onAvatarBadgeError"
+        ></image>
+        <text wx:else class="sc-flag__text">{{avatarBadgeText}}</text>
       </view>
     </view>
     <view class="sc-profile-meta">

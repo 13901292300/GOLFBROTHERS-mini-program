@@ -1,0 +1,22 @@
+@import "/styles/tournament-common.wxss";
+
+.match-tee-management-host {
+  position: relative;
+  z-index: 220;
+}
+
+.match-tee-management-host__round {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

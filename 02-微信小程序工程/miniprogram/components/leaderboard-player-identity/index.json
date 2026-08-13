@@ -1,6 +1,6 @@
 {
   "component": true,
-  "styleIsolation": "apply-shared",
+  "styleIsolation": "isolated",
   "usingComponents": {
     "follow-action-btn": "/components/follow-action-btn/index"
   }

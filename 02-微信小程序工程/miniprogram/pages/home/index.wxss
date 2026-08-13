@@ -780,6 +780,17 @@ page {
   word-break: break-word;
   overflow: visible;
   text-overflow: clip;
+  text-align: left;
+}
+/* Series 可选副标题：与主标题同字号/字重/左对齐；无字段时不占位 */
+.ds-card-club__title-sub {
+  margin-top: 2px;
+}
+.ds-card-club__tagline,
+.ds-card-club__privacy {
+  min-width: 0;
+  width: 100%;
+  text-align: left;
 }
 .ds-card-club__date {
   flex-shrink: 0;

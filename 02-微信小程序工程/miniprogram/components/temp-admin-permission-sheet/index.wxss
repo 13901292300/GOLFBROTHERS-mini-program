@@ -1,0 +1,24 @@
+/* 复用赛事详情 sheet 视觉（register-sheet / temp-admin / caddie） */
+@import "/styles/tournament-common.wxss";
+
+.temp-admin-permission-host {
+  position: relative;
+  z-index: 220;
+}
+
+.temp-admin-permission-host__round {
+  display: block;
+  margin-top: 4rpx;
+  margin-bottom: 0;
+  color: var(--text-primary);
+  font-size: 26rpx;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.temp-admin-permission-host .register-sheet__confirm.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

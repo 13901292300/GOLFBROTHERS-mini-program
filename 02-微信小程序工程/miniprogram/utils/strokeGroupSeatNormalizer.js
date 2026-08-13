@@ -1,7 +1,8 @@
 /**
  * 正式分组座位规范化（报名保存）
  * position = 正式比赛座位，不是用户选择顺序。
- * 只改 groups.players 的 position / userId 占位；不碰 pairing / entity / score。
+ * 只改 groups.players 的座位序；重排时必须保留席位既有字段（含 Series 归属快照）。
+ * 不碰 pairing / entity / score。
  */
 
 const PLAYER_SLOTS = 4;
@@ -33,6 +34,23 @@ function buildRegisterTeamMap(match) {
   return map;
 }
 
+/**
+ * Series / 席位自带归属：registerInfo 为空时用席位 matchTeamId / affiliationId 分桶，
+ * 避免全部落入 __unknown__ 后重写席位。
+ */
+function resolveSeatTeamId(player, registerTeamMap) {
+  const uid = resolveUserId(player);
+  if (uid && registerTeamMap && registerTeamMap[uid]) return registerTeamMap[uid];
+  if (!player || typeof player !== 'object') return '__unknown__';
+  const fromSeat =
+    (player.matchTeamId != null && String(player.matchTeamId).trim()) ||
+    (player.affiliationId != null && String(player.affiliationId).trim()) ||
+    (player.seriesParticipantId != null && String(player.seriesParticipantId).trim()) ||
+    (player.groupId != null && String(player.groupId).trim()) ||
+    '';
+  return fromSeat || '__unknown__';
+}
+
 function listTeamOrder(match) {
   const list = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
   const order = [];
@@ -46,13 +64,27 @@ function listTeamOrder(match) {
   return order;
 }
 
-/** 四槽：position 1–4；空位 userId='' */
-function buildSlotPlayers(orderedUserIds) {
+/**
+ * 四槽：position 1–4；空位 userId=''。
+ * 有源席位时 Object.assign 保留全部字段（seriesParticipantId / 快照等）。
+ */
+function buildSlotPlayers(orderedUserIds, playerByUserId) {
   const ids = Array.isArray(orderedUserIds) ? orderedUserIds : [];
-  return Array.from({ length: PLAYER_SLOTS }, (_, i) => ({
-    position: i + 1,
-    userId: ids[i] ? String(ids[i]).trim() : ''
-  }));
+  const map = playerByUserId || {};
+  return Array.from({ length: PLAYER_SLOTS }, (_, i) => {
+    const userId = ids[i] ? String(ids[i]).trim() : '';
+    if (!userId) {
+      return { position: i + 1, userId: '' };
+    }
+    const prev = map[userId];
+    if (prev && typeof prev === 'object') {
+      return Object.assign({}, prev, {
+        position: i + 1,
+        userId: userId
+      });
+    }
+    return { position: i + 1, userId: userId };
+  });
 }
 
 /**
@@ -62,7 +94,7 @@ function buildSlotPlayers(orderedUserIds) {
  * - 其他（0 / 3+ 分队等）：原样返回
  *
  * @param {array} groups
- * @param {object} match 需 registerInfo / teamGroups
+ * @param {object} match 需 registerInfo / teamGroups（Series 可无 registerInfo）
  * @returns {array}
  */
 function normalizeFormalGroupSeats(groups, match) {
@@ -72,12 +104,20 @@ function normalizeFormalGroupSeats(groups, match) {
 
   return groups.map((group) => {
     const players = Array.isArray(group && group.players) ? group.players : [];
+    const playerByUserId = {};
     const filled = players
-      .map((p) => ({
-        userId: resolveUserId(p),
-        position: Number(p && (p.position != null ? p.position : p.slotIndex)) || 0
-      }))
-      .filter((p) => p.userId)
+      .map((p) => {
+        const userId = resolveUserId(p);
+        if (!userId) return null;
+        if (p && typeof p === 'object' && !playerByUserId[userId]) {
+          playerByUserId[userId] = p;
+        }
+        return {
+          userId: userId,
+          position: Number(p && (p.position != null ? p.position : p.slotIndex)) || 0
+        };
+      })
+      .filter(Boolean)
       .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
 
     if (!filled.length) {
@@ -86,7 +126,8 @@ function normalizeFormalGroupSeats(groups, match) {
 
     const buckets = {};
     filled.forEach((p) => {
-      const teamId = teamMap[p.userId] || '__unknown__';
+      const src = playerByUserId[p.userId] || { userId: p.userId };
+      const teamId = resolveSeatTeamId(src, teamMap);
       if (!buckets[teamId]) buckets[teamId] = [];
       buckets[teamId].push(p.userId);
     });
@@ -125,12 +166,14 @@ function normalizeFormalGroupSeats(groups, match) {
     }
 
     return Object.assign({}, group, {
-      players: buildSlotPlayers(nextUserIds)
+      players: buildSlotPlayers(nextUserIds, playerByUserId)
     });
   });
 }
 
 module.exports = {
   normalizeFormalGroupSeats,
-  PLAYER_SLOTS
+  PLAYER_SLOTS,
+  buildSlotPlayers,
+  resolveSeatTeamId
 };

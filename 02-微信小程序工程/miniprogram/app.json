@@ -54,7 +54,8 @@
         "pages/peoria/index",
         "pages/group-editor/index",
         "pages/group-pick/index",
-        "pages/detail/index"
+        "pages/detail/index",
+        "pages/series-detail/index"
       ]
     },
     {

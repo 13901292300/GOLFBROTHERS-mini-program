@@ -265,22 +265,51 @@ function resolveUserId(raw) {
   return id != null ? String(id).trim() : '';
 }
 
+function resolveAffiliationTeamId(raw) {
+  if (!raw || typeof raw !== 'object') return '';
+  const candidates = [
+    raw.matchTeamId,
+    raw.affiliationId,
+    raw.seriesParticipantId,
+    raw.groupId
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    const id = candidates[i] != null ? String(candidates[i]).trim() : '';
+    if (id) return id;
+  }
+  return '';
+}
+
+/**
+ * userId → 球队/分队 id
+ * 1) registerInfo.users（普通队际赛主路径）
+ * 2) groups[].players 席位快照（Series 常无 registerInfo，不得因此判缺归属）
+ */
 function buildRegisterTeamMap(match) {
+  const map = {};
   const users =
     match && match.registerInfo && Array.isArray(match.registerInfo.users)
       ? match.registerInfo.users
       : [];
-  const map = {};
   users.forEach((user) => {
     const uid = resolveUserId(user);
-    if (!uid) return;
-    const teamId =
-      user.matchTeamId != null && String(user.matchTeamId).trim() !== ''
-        ? String(user.matchTeamId).trim()
-        : user.groupId != null && String(user.groupId).trim() !== ''
-          ? String(user.groupId).trim()
-          : '';
+    if (!uid || map[uid]) return;
+    const teamId = resolveAffiliationTeamId(user);
     if (teamId) map[uid] = teamId;
+  });
+  const groups = Array.isArray(match && match.groups) ? match.groups : [];
+  groups.forEach((g) => {
+    const lists = [];
+    if (Array.isArray(g && g.players)) lists.push(g.players);
+    if (Array.isArray(g && g.playersSlots)) lists.push(g.playersSlots);
+    lists.forEach((list) => {
+      list.forEach((p) => {
+        const uid = resolveUserId(p);
+        if (!uid || map[uid]) return;
+        const teamId = resolveAffiliationTeamId(p);
+        if (teamId) map[uid] = teamId;
+      });
+    });
   });
   return map;
 }
@@ -388,8 +417,9 @@ function validateG2G3GroupWithResolver(match, group) {
   }
 
   const filled = listFilledPlayers(group);
+  // 空组：与 G4 一致，不参与非法判断（分组保存允许占位空组）
   if (!filled.length) {
-    return { ok: false, reason: 'empty_group' };
+    return { ok: true };
   }
 
   const teamMap = buildRegisterTeamMap(match);
@@ -416,7 +446,7 @@ function validateG2G3GroupWithResolver(match, group) {
     return { ok: true };
   }
 
-  // 2+2：按分队数量与各队人数判断
+  // 2+2：只约束「同组最多两队、每队最多 2 人」；单人队不构成整组非法
   if (teamCount === 1) {
     return { ok: true };
   }

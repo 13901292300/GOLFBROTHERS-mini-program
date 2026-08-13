@@ -1,3 +1,6 @@
 {
-  "navigationStyle": "custom"
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "tournament-group-editor-view": "/components/tournament-group-editor-view/index"
+  }
 }

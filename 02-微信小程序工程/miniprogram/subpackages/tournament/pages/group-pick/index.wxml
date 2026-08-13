@@ -78,7 +78,7 @@
         <view class="roster-col roster-col--handicap"><text>{{item.handicap}}</text></view>
       </view>
     </view>
-    <view wx:else class="pick-empty">暂无可选球员</view>
+    <view wx:else class="pick-empty">{{emptyRosterText || '暂无可选球员'}}</view>
   </scroll-view>
 
   <view class="group-pick-cta-bar">

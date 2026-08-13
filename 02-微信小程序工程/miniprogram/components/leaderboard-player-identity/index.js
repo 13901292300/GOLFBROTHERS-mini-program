@@ -10,8 +10,13 @@
  * - relationStatus / relationshipLabel / canFollow / followLoading / isSelf
  */
 const playerIdentityGuard = require('../../utils/playerIdentityGuard.js');
+const { DEFAULT_ORG_LOGO } = require('../../utils/teamMatchCapabilities.js');
 
 Component({
+  options: {
+    styleIsolation: 'isolated'
+  },
+
   properties: {
     player: {
       type: Object,
@@ -25,6 +30,7 @@ Component({
     /**
      * 头像右下角角标能力：auto | team | none | flag
      * 勿删节点；由 showAvatarBadge 控制显隐，避免误伤队际赛 LOGO。
+     * team：优先 teamGroupLogoById[badgeTeamId]；无 LOGO 时可读 player.badgeText / badgeColor（分队）。
      */
     avatarBadge: {
       type: String,
@@ -111,7 +117,10 @@ Component({
     displayGenderClass: '',
     showAvatarBadge: false,
     avatarBadgeSrc: '',
-    avatarBadgeIsTeam: false
+    avatarBadgeIsTeam: false,
+    avatarBadgeIsText: false,
+    avatarBadgeText: '',
+    avatarBadgeStyle: ''
   },
 
   observers: {
@@ -164,7 +173,7 @@ Component({
     _resolveProfileUserId(player) {
       if (!player || typeof player !== 'object') return '';
       const id = playerIdentityGuard.normalizePlayerUserId(
-        player.userId || player.playerUserId || player.playerId
+        player.profileUserId || player.userId || player.playerUserId || player.playerId
       );
       if (!playerIdentityGuard.isStablePublicUserId(id, { userType: player.userType })) {
         return '';
@@ -224,6 +233,8 @@ Component({
         badgeTeamId && logoMap[badgeTeamId]
           ? String(logoMap[badgeTeamId]).trim()
           : '';
+      const badgeText = String(player.badgeText || '').trim();
+      const badgeColor = String(player.badgeColor || '').trim();
       const flagCode = String(player.flag || '').trim();
       const flagSrc = flagCode
         ? 'https://flagcdn.com/w40/' + flagCode + '.png'
@@ -232,6 +243,9 @@ Component({
       let showAvatarBadge = false;
       let avatarBadgeSrc = '';
       let avatarBadgeIsTeam = false;
+      let avatarBadgeIsText = false;
+      let avatarBadgeText = '';
+      let avatarBadgeStyle = '';
 
       if (mode === 'none') {
         showAvatarBadge = false;
@@ -240,6 +254,13 @@ Component({
           showAvatarBadge = true;
           avatarBadgeSrc = teamLogo;
           avatarBadgeIsTeam = true;
+        } else if (badgeText) {
+          // 分队无 LOGO：同尺寸文字角标（队际有 LOGO 时不会走到此分支）
+          showAvatarBadge = true;
+          avatarBadgeIsTeam = true;
+          avatarBadgeIsText = true;
+          avatarBadgeText = badgeText.length > 2 ? badgeText.slice(0, 2) : badgeText;
+          avatarBadgeStyle = badgeColor ? 'background:' + badgeColor + ';' : '';
         }
       } else if (mode === 'flag') {
         if (flagSrc) {
@@ -248,7 +269,7 @@ Component({
           avatarBadgeIsTeam = false;
         }
       } else {
-        // auto
+        // auto：保持原契约（LOGO → 国旗）；分队文字仅 team 模式
         if (teamLogo) {
           showAvatarBadge = true;
           avatarBadgeSrc = teamLogo;
@@ -270,7 +291,24 @@ Component({
       if (this.data.avatarBadgeIsTeam !== avatarBadgeIsTeam) {
         patch.avatarBadgeIsTeam = avatarBadgeIsTeam;
       }
+      if (this.data.avatarBadgeIsText !== avatarBadgeIsText) {
+        patch.avatarBadgeIsText = avatarBadgeIsText;
+      }
+      if (this.data.avatarBadgeText !== avatarBadgeText) {
+        patch.avatarBadgeText = avatarBadgeText;
+      }
+      if (this.data.avatarBadgeStyle !== avatarBadgeStyle) {
+        patch.avatarBadgeStyle = avatarBadgeStyle;
+      }
       if (Object.keys(patch).length) this.setData(patch);
+    },
+
+    /** LOGO 加载失败：仅替换展示 URL 为默认图，不写 match/storage */
+    onAvatarBadgeError() {
+      if (this.data.avatarBadgeIsText) return;
+      const current = String(this.data.avatarBadgeSrc || '').trim();
+      if (!current || current === DEFAULT_ORG_LOGO) return;
+      this.setData({ avatarBadgeSrc: DEFAULT_ORG_LOGO });
     },
 
     onFollowTap(e) {

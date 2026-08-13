@@ -4,8 +4,12 @@
  * 本文件不写盘、不改 match
  */
 
-const playerManage = require('./playerManage.js');
-const mockAvatars = require('./mockAvatars.js');
+/**
+ * 延迟 require playerManage / mockAvatars：
+ * 打断 strokeEntityValidator → 本文件 → playerManage → teamMatchStore →
+ * teamMatchCapabilities → strokeEntityValidator 的顶层循环依赖。
+ * resolveCompositionMode 等纯函数不触发该链。
+ */
 
 const G2_G3_MODES = {
   最好成绩比杆赛: true,
@@ -41,27 +45,62 @@ function resolveUserId(raw) {
 }
 
 function buildRegisterUserMap(match) {
+  const playerManage = require('./playerManage.js');
+  const map = {};
+  const upsert = (uid, teamId, nickname, avatar) => {
+    if (!uid) return;
+    const prev = map[uid] || {};
+    map[uid] = {
+      teamId: teamId || prev.teamId || '',
+      nickname: nickname || prev.nickname || uid,
+      avatar: avatar != null && String(avatar) !== '' ? String(avatar) : prev.avatar || ''
+    };
+  };
   const users =
     match && match.registerInfo && Array.isArray(match.registerInfo.users)
       ? match.registerInfo.users
       : [];
-  const map = {};
   users.forEach((user) => {
     const uid = resolveUserId(user);
     if (!uid) return;
     const teamId =
       user.matchTeamId != null && String(user.matchTeamId).trim() !== ''
         ? String(user.matchTeamId).trim()
-        : user.groupId != null && String(user.groupId).trim() !== ''
-          ? String(user.groupId).trim()
-          : '';
-    map[uid] = {
-      teamId: teamId,
-      nickname: playerManage.resolveMatchNickname
+        : user.affiliationId != null && String(user.affiliationId).trim() !== ''
+          ? String(user.affiliationId).trim()
+          : user.seriesParticipantId != null && String(user.seriesParticipantId).trim() !== ''
+            ? String(user.seriesParticipantId).trim()
+            : user.groupId != null && String(user.groupId).trim() !== ''
+              ? String(user.groupId).trim()
+              : '';
+    upsert(
+      uid,
+      teamId,
+      playerManage.resolveMatchNickname
         ? playerManage.resolveMatchNickname(user)
         : String(user.competitionName || user.displayName || user.nickname || uid),
-      avatar: user.avatar != null ? String(user.avatar) : ''
-    };
+      user.avatar != null ? String(user.avatar) : ''
+    );
+  });
+  // Series：registerInfo 可能为空，用正式席位快照补齐 teamId（不跨队凑组合）
+  const groups = Array.isArray(match && match.groups) ? match.groups : [];
+  groups.forEach((g) => {
+    (Array.isArray(g && g.players) ? g.players : []).forEach((p) => {
+      const uid = resolveUserId(p);
+      if (!uid) return;
+      const teamId =
+        (p.matchTeamId != null && String(p.matchTeamId).trim()) ||
+        (p.affiliationId != null && String(p.affiliationId).trim()) ||
+        (p.seriesParticipantId != null && String(p.seriesParticipantId).trim()) ||
+        (p.groupId != null && String(p.groupId).trim()) ||
+        '';
+      const nick =
+        (p.displayName != null && String(p.displayName).trim()) ||
+        (p.competitionName != null && String(p.competitionName).trim()) ||
+        (p.name != null && String(p.name).trim()) ||
+        uid;
+      upsert(uid, teamId, nick, p.avatar != null ? String(p.avatar) : '');
+    });
   });
   return map;
 }
@@ -103,6 +142,7 @@ function listFilledGroupPlayers(group) {
 }
 
 function toMember(player, registerMap) {
+  const mockAvatars = require('./mockAvatars.js');
   const uid = player.userId;
   const src = registerMap[uid] || {};
   const nickname = src.nickname || uid;

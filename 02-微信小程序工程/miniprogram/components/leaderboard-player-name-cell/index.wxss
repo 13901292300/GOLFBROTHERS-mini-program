@@ -1,0 +1,35 @@
+/* 身份格：昵称+性别+标签从左紧邻；列宽仍吃页面 .lr-player */
+:host {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+view.lr-player {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  gap: 0;
+}
+
+.player-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gender-icon {
+  flex: none;
+  margin-left: 6rpx;
+}
+
+.series-standings-round-tag,
+.series-standings-pending-tag {
+  flex: none;
+  margin-left: 6rpx;
+}

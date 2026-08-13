@@ -1,0 +1,3 @@
+/* 个人榜权威样式在 tournament-common；apply-shared 下页面引入仍生效。
+   组件再显式引入，避免隔离后 class 丢失。不改尺寸。 */
+@import "/styles/tournament-common.wxss";

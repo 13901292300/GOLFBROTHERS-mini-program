@@ -1,0 +1,107 @@
+<view wx:if="{{visible && sheetReady}}" class="detail-page {{themeClass}} match-tee-management-host">
+  <!-- 出发管理 -->
+  <view bindtap="onCancel" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view class="bottom-sheet register-sheet tee-sheet-manage-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <view class="register-sheet__close" bindtap="onCancel">×</view>
+      <text class="register-sheet__overline">TEE SHEET</text>
+      <text class="register-sheet__title">出发管理</text>
+      <text wx:if="{{roundSubtitle}}" class="register-sheet__sub match-tee-management-host__round">{{roundSubtitle}}</text>
+      <text class="register-sheet__sub">为每个分组设置开球时间和出发洞号，选手可在出发表中查看自己的出发安排。</text>
+    </view>
+    <scroll-view scroll-y class="tee-sheet-manage-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <block wx:if="{{!hasGroups}}">
+        <view class="tee-sheet-manage-empty">请先完成分组后再设置出发表</view>
+      </block>
+      <block wx:else>
+        <view class="tee-sheet-manage-config">
+          <text class="tee-sheet-manage-config__title">时间配置</text>
+          <view class="tee-sheet-manage-radios">
+            <view
+              class="tee-sheet-manage-radio {{timeMode === 'uniform' ? 'is-active' : ''}}"
+              data-mode="uniform"
+              bindtap="onTimeModeTap"
+            >统一时间发球</view>
+            <view
+              class="tee-sheet-manage-radio {{timeMode === 'interval' ? 'is-active' : ''}}"
+              data-mode="interval"
+              bindtap="onTimeModeTap"
+            >每【{{intervalMinutes}}】分钟发一组</view>
+          </view>
+          <view wx:if="{{timeMode === 'uniform'}}" class="tee-sheet-manage-field">
+            <text class="tee-sheet-manage-field__label">统一出发时间</text>
+            <picker mode="selector" range="{{timeOptions}}" value="{{unifiedTimeIndex}}" bindchange="onUnifiedTimeChange">
+              <view class="tee-sheet-manage-picker">{{unifiedTime}} ›</view>
+            </picker>
+          </view>
+          <view wx:else class="tee-sheet-manage-field tee-sheet-manage-field--interval">
+            <text class="tee-sheet-manage-field__label">每</text>
+            <input
+              class="tee-sheet-manage-interval-input"
+              type="number"
+              value="{{intervalInput}}"
+              bindinput="onIntervalInput"
+              bindblur="onIntervalBlur"
+            />
+            <text class="tee-sheet-manage-field__label">分钟发一组</text>
+          </view>
+        </view>
+
+        <view class="tee-sheet-manage-config">
+          <text class="tee-sheet-manage-config__title">发球台配置</text>
+          <view class="tee-sheet-manage-radios">
+            <view
+              class="tee-sheet-manage-radio {{holeMode === 'manual' ? 'is-active' : ''}}"
+              data-mode="manual"
+              bindtap="onHoleModeTap"
+            >手工配置</view>
+            <view
+              class="tee-sheet-manage-radio {{holeMode === 'bilateral' ? 'is-active' : ''}}"
+              data-mode="bilateral"
+              bindtap="onHoleModeTap"
+            >双边逐组发球</view>
+          </view>
+        </view>
+
+        <view
+          wx:for="{{groups}}"
+          wx:key="groupId"
+          class="tee-sheet-manage-group"
+        >
+          <text class="tee-sheet-manage-group__name">{{item.groupName}}</text>
+          <text class="tee-sheet-manage-group__players">{{item.playersText}}</text>
+          <view class="tee-sheet-manage-field">
+            <text class="tee-sheet-manage-field__label">开球时间</text>
+            <picker
+              mode="selector"
+              range="{{timeOptions}}"
+              value="{{item.timeIndex}}"
+              data-index="{{item.index}}"
+              bindchange="onGroupTimeChange"
+            >
+              <view class="tee-sheet-manage-picker">{{item.teeTimeLabel}} ›</view>
+            </picker>
+          </view>
+          <view class="tee-sheet-manage-field">
+            <text class="tee-sheet-manage-field__label">出发洞号</text>
+            <picker
+              mode="selector"
+              range="{{holeLabels}}"
+              value="{{item.holeIndex}}"
+              data-index="{{item.index}}"
+              bindchange="onGroupHoleChange"
+            >
+              <view class="tee-sheet-manage-picker">{{item.startHoleLabel}} ›</view>
+            </picker>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+    <view class="register-sheet__actions tee-sheet-manage-sheet__footer">
+      <view bindtap="onCancel" class="register-sheet__cancel">取消</view>
+      <view bindtap="onSave" class="register-sheet__confirm {{saving ? 'is-disabled' : ''}}">保存</view>
+    </view>
+  </view>
+</view>

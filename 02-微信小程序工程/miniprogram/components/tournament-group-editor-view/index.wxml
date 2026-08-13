@@ -1,0 +1,207 @@
+<view class="tournament-group-editor-view {{themeClass}} tournament-group-editor-view--{{layout}} tournament-group-editor-view--{{mode}}">
+  <view class="editor-body">
+    <view wx:if="{{showCompositionMode}}" class="composition-mode-section">
+      <text class="composition-mode-section__label">组合模式</text>
+      <view class="composition-mode-options">
+        <view
+          class="composition-mode-option {{strokeCompositionMode === '2+2' ? 'is-active' : ''}}"
+          bindtap="onStrokeCompositionModeTap"
+          data-mode="2+2"
+        >2+2</view>
+        <view
+          class="composition-mode-option {{strokeCompositionMode === '4+0' ? 'is-active' : ''}}"
+          bindtap="onStrokeCompositionModeTap"
+          data-mode="4+0"
+        >4+0</view>
+      </view>
+    </view>
+
+    <block wx:if="{{draftCards.length > 0}}">
+      <view wx:for="{{draftCards}}" wx:key="groupId" class="group-block">
+        <view
+          class="tee-group-card"
+          bindtap="onGroupCardTap"
+          data-group-id="{{item.groupId}}"
+          data-group-name="{{item.badge}}"
+        >
+          <view
+            catchtap="onDeleteGroupTap"
+            data-group-id="{{item.groupId}}"
+            data-group-name="{{item.badge}}"
+            class="delete-group-btn"
+          >
+            <text>×</text>
+          </view>
+          <view class="tee-group-meta">
+            <text class="tee-group-badge">{{item.badge}}</text>
+          </view>
+            <view class="gb-group-player-grid">
+              <block wx:if="{{seatInteractive}}">
+                <view
+                  wx:for="{{item.players}}"
+                  wx:for-item="pl"
+                  wx:key="position"
+                  class="gb-group-player {{pl.teamLabel ? 'gb-group-player--with-team' : ''}} gb-group-player--interactive"
+                  catchtap="onSeatTap"
+                  data-group-id="{{item.groupId}}"
+                  data-position="{{pl.position}}"
+                  data-user-id="{{pl.userId}}"
+                >
+                  <view class="gb-group-player-main-row">
+                    <view class="gb-group-player-avatar-col">
+                      <view class="gb-group-player-avatar-wrap">
+                        <image
+                          wx:if="{{pl.avatar}}"
+                          class="gb-group-player-avatar"
+                          src="{{pl.avatar}}"
+                          mode="aspectFill"
+                        ></image>
+                        <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                      </view>
+                      <text wx:if="{{pl.teamLabel}}" class="gb-group-player-team-label">{{pl.teamLabel}}</text>
+                    </view>
+                    <view class="gb-group-player-meta">
+                      <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
+                      <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
+                        <view
+                          wx:if="{{pl.teeMarkerClass}}"
+                          class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"
+                        ></view>
+                        <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel}}</text>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+              </block>
+              <block wx:else>
+                <view
+                  wx:for="{{item.players}}"
+                  wx:for-item="pl"
+                  wx:key="position"
+                  class="gb-group-player {{pl.teamLabel ? 'gb-group-player--with-team' : ''}}"
+                >
+                  <view class="gb-group-player-main-row">
+                    <view class="gb-group-player-avatar-col">
+                      <view class="gb-group-player-avatar-wrap">
+                        <image
+                          wx:if="{{pl.avatar}}"
+                          class="gb-group-player-avatar"
+                          src="{{pl.avatar}}"
+                          mode="aspectFill"
+                        ></image>
+                        <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                      </view>
+                      <text wx:if="{{pl.teamLabel}}" class="gb-group-player-team-label">{{pl.teamLabel}}</text>
+                    </view>
+                    <view class="gb-group-player-meta">
+                      <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
+                      <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
+                        <view
+                          wx:if="{{pl.teeMarkerClass}}"
+                          class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"
+                        ></view>
+                        <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel}}</text>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+              </block>
+            </view>
+        </view>
+
+        <view
+          wx:if="{{item.matchPlayTeamPreview && item.matchPlayTeamPreview.length}}"
+          class="composition-preview"
+          catchtap="stopPropagation"
+        >
+          <view
+            wx:for="{{item.matchPlayTeamPreview}}"
+            wx:for-item="mpLine"
+            wx:key="teamName"
+            class="composition-preview__row"
+          >
+            <text class="composition-preview__label">{{mpLine.teamName}}：</text>
+            <text class="composition-preview__names">{{mpLine.namesText}}</text>
+          </view>
+        </view>
+
+        <view wx:if="{{item.compositionPreview}}" class="composition-preview" catchtap="stopPropagation">
+          <view wx:if="{{item.compositionPreview.showCombo1}}" class="composition-preview__row">
+            <text class="composition-preview__label">{{item.compositionPreview.combo1Label}}：</text>
+            <text class="composition-preview__names">{{item.compositionPreview.combo1Text}}</text>
+          </view>
+          <view wx:if="{{item.compositionPreview.showCombo2}}" class="composition-preview__row">
+            <text class="composition-preview__label">{{item.compositionPreview.combo2Label}}：</text>
+            <text class="composition-preview__names">{{item.compositionPreview.combo2Text}}</text>
+          </view>
+        </view>
+
+        <view
+          wx:if="{{showPairingSection && item.pairingBlock}}"
+          class="pairing-section"
+          catchtap="stopPropagation"
+        >
+          <view wx:if="{{item.pairingBlock.title}}" class="pairing-section__head">
+            <text class="pairing-section__title">{{item.pairingBlock.title}}</text>
+          </view>
+
+          <block wx:if="{{item.pairingBlock.pairings.length}}">
+            <view
+              wx:for="{{item.pairingBlock.pairings}}"
+              wx:for-item="pr"
+              wx:key="id"
+              class="pairing-card"
+            >
+              <view class="pairing-card__row">
+                <text class="pairing-card__label">{{pr.label}}</text>
+                <view class="pairing-card__actions">
+                  <text
+                    class="pairing-card__action"
+                    catchtap="onEditPairingTap"
+                    data-group-id="{{item.groupId}}"
+                    data-pairing-id="{{pr.id}}"
+                  >修改</text>
+                  <text
+                    class="pairing-card__action pairing-card__action--danger"
+                    catchtap="onDeletePairingTap"
+                    data-group-id="{{item.groupId}}"
+                    data-pairing-id="{{pr.id}}"
+                  >删除</text>
+                </view>
+              </view>
+              <text class="pairing-card__names">{{pr.namesText}}</text>
+            </view>
+          </block>
+
+          <view wx:if="{{item.pairingBlock.hasIncomplete}}" class="pairing-incomplete">
+            <text class="pairing-incomplete__label">未完成组合：</text>
+            <text class="pairing-incomplete__names">{{item.pairingBlock.incompleteNamesText}}</text>
+          </view>
+
+          <view wx:if="{{showPairingComposeTools}}" class="pairing-toolbar">
+            <view
+              class="pairing-tool-btn"
+              catchtap="onAutoPairTap"
+              data-group-id="{{item.groupId}}"
+            >自动组合</view>
+            <view
+              class="pairing-tool-btn pairing-tool-btn--ghost"
+              catchtap="onAddPairingTap"
+              data-group-id="{{item.groupId}}"
+            >添加组合</view>
+          </view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="editor-empty">
+      <text class="editor-empty__text">暂无分组</text>
+    </view>
+
+    <view wx:if="{{showAddGroup}}" class="groups-tab-toolbar">
+      <view class="add-group-btn" bindtap="onAddGroup">
+        <view class="add-group-icon"><text>+</text></view>
+        <text>添加分组</text>
+      </view>
+    </view>
+  </view>
+</view>

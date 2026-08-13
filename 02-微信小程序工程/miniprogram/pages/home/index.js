@@ -5,6 +5,9 @@ const gameProgress = require('../../utils/gameProgress.js');
 const quickCreate = require('../../utils/quickCreate.js');
 const mockAvatars = require('../../utils/mockAvatars.js');
 const teamMatchStore = require('../../utils/teamMatchStore.js');
+const seriesStore = require('../../utils/seriesStore.js');
+const seriesListCardAdapter = require('../../utils/seriesListCardAdapter.js');
+const seriesRegistration = require('../../utils/seriesRegistration.js');
 const userProfileStore = require('../../utils/userProfileStore.js');
 const geoCatalog = require('../../utils/geoCatalog.js');
 const bannerConfig = require('../../utils/bannerConfig.js');
@@ -873,27 +876,73 @@ Page({
     };
   },
 
-  /** 报名 TAB「所有报名」：仅 status === registering */
-  _buildAllRegisteringTournamentCards() {
-    return teamMatchStore.listMatches()
-      .filter((m) => String((m && m.status) || '').trim().toLowerCase() === 'registering')
-      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
-      .filter(Boolean);
+  /** Series roster 领域身份：无法解析则空串（不猜测） */
+  _resolveListPlayerId() {
+    try {
+      const user = gameStore.getCurrentUser() || {};
+      const resolved = seriesRegistration.resolveActorPlayerId(user);
+      if (resolved && resolved.ok && resolved.playerId) {
+        return String(resolved.playerId);
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    return '';
   },
 
-  /** 报名 TAB「我的报名」：registering 且 registerInfo.users 含当前 userId（不含 registeredBy） */
-  _buildMyRegisteredTournamentCards() {
+  _seriesListDeps() {
     const user = gameStore.getCurrentUser() || {};
-    const currentUserId = String(user.userId || 'me');
-    return teamMatchStore.listMatches()
-      .filter((m) => String((m && m.status) || '').trim().toLowerCase() === 'registering')
-      .filter((m) => {
-        const users =
-          m && m.registerInfo && Array.isArray(m.registerInfo.users) ? m.registerInfo.users : [];
-        return users.some((item) => item && String(item.userId) === currentUserId);
-      })
-      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
-      .filter(Boolean);
+    return {
+      listMatches: function () {
+        try {
+          return teamMatchStore.listMatches() || [];
+        } catch (e) {
+          return [];
+        }
+      },
+      listSeries: function () {
+        try {
+          return seriesStore.listSeries() || [];
+        } catch (e) {
+          return [];
+        }
+      },
+      getMatchById: function (id) {
+        try {
+          return teamMatchStore.getMatchById(id);
+        } catch (e) {
+          return null;
+        }
+      },
+      // 普通「我的报名」沿用既有 userId 口径
+      currentUserId: String(user.userId || 'me'),
+      // Series「我的报名」仅用可解析 playerId
+      currentPlayerId: this._resolveListPlayerId(),
+      toOrdinaryCard: function (m) {
+        return teamMatchStore.toTournamentCard(m);
+      },
+      decorateOrdinaryCard: function (m, card) {
+        return decorateTournamentCard(m, card);
+      }
+    };
+  },
+
+  /** 报名 TAB「所有报名」：只读 list/滤/投影；零写入 Series storage */
+  _buildAllRegisteringTournamentCards() {
+    try {
+      return seriesListCardAdapter.buildRegistrationAllCards(this._seriesListDeps());
+    } catch (e) {
+      return [];
+    }
+  },
+
+  /** 报名 TAB「我的报名」：只读；零写入 */
+  _buildMyRegisteredTournamentCards() {
+    try {
+      return seriesListCardAdapter.buildRegistrationMineCards(this._seriesListDeps());
+    } catch (e) {
+      return [];
+    }
   },
 
   refreshTeamMatchCards() {
@@ -984,15 +1033,13 @@ Page({
     });
   },
 
-  /** 广场「球队比赛」卡片（只读映射，不改 store）；仅 ongoing / finished，排除 registering */
+  /** 广场「团体比赛」：普通 ongoing/finished（滤托管分站）+ 聚合 Series LIVE/已结束 */
   _buildPlazaTournamentCards() {
-    return teamMatchStore.listMatches()
-      .filter((m) => {
-        const status = String((m && m.status) || '').trim().toLowerCase();
-        return status === 'ongoing' || status === 'finished';
-      })
-      .map((m) => decorateTournamentCard(m, teamMatchStore.toTournamentCard(m)))
-      .filter(Boolean);
+    try {
+      return seriesListCardAdapter.buildPlazaTournamentCards(this._seriesListDeps());
+    } catch (e) {
+      return [];
+    }
   },
 
   setHeroTabsVisible(visible) {

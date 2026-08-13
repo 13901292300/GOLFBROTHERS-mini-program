@@ -26,6 +26,11 @@ Component({
     themeClass: {
       type: String,
       value: ''
+    },
+    /** 可选副标题；空则展示 COURSE（Series 传入 R{n} · 轮名） */
+    roundSubtitle: {
+      type: String,
+      value: ''
     }
   },
 

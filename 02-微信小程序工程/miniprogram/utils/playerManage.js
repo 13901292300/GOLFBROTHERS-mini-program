@@ -1478,15 +1478,214 @@ function commitPlayerManageDraft(matchOrGame, draft) {
   return { ok: true, match: matchOrGame };
 }
 
+/**
+ * Series 选手管理：从正式分组席位去重构建 draft（不含未入组 roster）。
+ * 富化优先级：registerInfo → seat 字段 → rosterSnapshot（只读，永不写入）。
+ */
+function _rosterSnapshotToRaw(entry, userId) {
+  const e = entry && typeof entry === 'object' ? entry : {};
+  const name = String(
+    e.playerNameSnapshot ||
+      e.matchNickname ||
+      e.competitionName ||
+      e.nickname ||
+      e.displayName ||
+      e.name ||
+      ''
+  ).trim();
+  return {
+    userId: userId,
+    playerId: String(e.playerId || userId || '').trim(),
+    nickname: name,
+    displayName: name,
+    matchNickname: name,
+    competitionName: name,
+    avatar: e.playerAvatarSnapshot || e.avatar || e.avatarUrl || '',
+    gender: e.genderSnapshot || e.gender || e.matchGender || '',
+    matchGender: e.genderSnapshot || e.gender || e.matchGender || '',
+    phone: e.phoneSnapshot || e.phone || e.mobile || '',
+    handicap: e.handicapSnapshot != null && e.handicapSnapshot !== ''
+      ? e.handicapSnapshot
+      : e.handicap != null
+        ? e.handicap
+        : '',
+    source: e.registrationSource || e.source || 'self',
+    registeredBy: e.registeredByUserId || e.registeredBy || '',
+    registeredByName: e.registeredByNameSnapshot || e.registeredByName || '',
+    matchTeamId: e.matchTeamId || e.groupId || e.teamId || '',
+    matchTeamName: e.matchTeamName || e.groupName || e.teamName || ''
+  };
+}
+
+function _indexRosterSnapshot(rosterSnapshot) {
+  const map = {};
+  (Array.isArray(rosterSnapshot) ? rosterSnapshot : []).forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const keys = [entry.userId, entry.playerId, entry.id, entry.rosterEntryId];
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i] != null ? String(keys[i]).trim() : '';
+      if (key && !map[key]) map[key] = entry;
+    }
+  });
+  return map;
+}
+
+function _collectFormalSeatEntries(groups) {
+  const order = [];
+  const seatByUserId = {};
+  (Array.isArray(groups) ? groups : []).forEach((g) => {
+    if (!g) return;
+    const lists = [];
+    if (Array.isArray(g.players)) lists.push(g.players);
+    if (Array.isArray(g.playersSlots)) lists.push(g.playersSlots);
+    lists.forEach((list) => {
+      list.forEach((p) => {
+        const id = resolveFormalSlotUserId(p);
+        if (!id || seatByUserId[id]) return;
+        seatByUserId[id] = p;
+        order.push(id);
+      });
+    });
+  });
+  return { order: order, seatByUserId: seatByUserId };
+}
+
+function _resolveSeriesPlayerRaw(userId, registerById, seat, rosterById) {
+  const uid = String(userId || '').trim();
+  if (!uid) return null;
+  if (registerById[uid]) {
+    return Object.assign({}, registerById[uid], { userId: uid });
+  }
+  const seatObj =
+    seat && typeof seat === 'object'
+      ? Object.assign({}, seat, { userId: uid })
+      : null;
+  const roster = rosterById[uid] || null;
+  if (seatObj) {
+    const seatName = resolveMatchNickname(seatObj);
+    const seatPhone = resolvePhone(seatObj);
+    const seatAvatar = seatObj.avatar || seatObj.avatarUrl || '';
+    const seatGender = seatObj.matchGender || seatObj.gender || '';
+    const hasSeatFields = !!(seatName || seatPhone || seatAvatar || seatGender);
+    if (hasSeatFields) {
+      return seatObj;
+    }
+    if (roster) {
+      return Object.assign(_rosterSnapshotToRaw(roster, uid), {
+        matchTeamId:
+          resolveMatchTeamId(seatObj) ||
+          _rosterSnapshotToRaw(roster, uid).matchTeamId,
+        matchTeamName:
+          resolveMatchTeamName(seatObj) ||
+          _rosterSnapshotToRaw(roster, uid).matchTeamName
+      });
+    }
+    return seatObj;
+  }
+  if (roster) return _rosterSnapshotToRaw(roster, uid);
+  return { userId: uid };
+}
+
+function buildSeriesPlayerManageDraft(matchOrGame, rosterSnapshot) {
+  const m = matchOrGame || {};
+  const registerUsers =
+    m.registerInfo && Array.isArray(m.registerInfo.users)
+      ? m.registerInfo.users
+      : [];
+  const registerById = {};
+  registerUsers.forEach((u) => {
+    const id = resolveUserId(u);
+    if (id) registerById[id] = u;
+  });
+  const rosterById = _indexRosterSnapshot(rosterSnapshot);
+  const seatPack = _collectFormalSeatEntries(m.groups);
+  const enrichedUsers = [];
+  seatPack.order.forEach((uid) => {
+    const raw = _resolveSeriesPlayerRaw(
+      uid,
+      registerById,
+      seatPack.seatByUserId[uid],
+      rosterById
+    );
+    if (raw) enrichedUsers.push(raw);
+  });
+  const teamOptions = collectTeamOptions(m, enrichedUsers);
+  const list = [];
+  const seen = {};
+  enrichedUsers.forEach((u) => {
+    const row = buildPlayerManageRow(u, teamOptions);
+    if (!row || seen[row.userId]) return;
+    seen[row.userId] = true;
+    list.push(row);
+  });
+  return {
+    players: list,
+    teamOptions: teamOptions,
+    groupsDraft: _cloneJson(Array.isArray(m.groups) ? m.groups : []),
+    pairingsDraft: _cloneJson(
+      m.pairings && typeof m.pairings === 'object' ? m.pairings : {}
+    ),
+    scoreData: _cloneJson(
+      m.scoreData && typeof m.scoreData === 'object' ? m.scoreData : {}
+    ),
+    removedUserIds: [],
+    seriesMode: true
+  };
+}
+
+/**
+ * Series 选手管理落盘：只写 groups/pairings + 席位展示快照。
+ * 禁止写 registerInfo；Series.roster 不在 match 上，本函数亦不触碰。
+ */
+function commitSeriesPlayerManageDraft(matchOrGame, draft) {
+  if (!matchOrGame || typeof matchOrGame !== 'object') {
+    return { ok: false, reason: 'no_match' };
+  }
+  const d = draft || {};
+  const teamOptions =
+    (Array.isArray(d.teamOptions) && d.teamOptions.length
+      ? d.teamOptions
+      : null) ||
+    collectTeamOptions(matchOrGame, d.players);
+  const ensuredPlayers = ensurePlayersHaveTeams(d.players, teamOptions);
+  d.players = ensuredPlayers;
+
+  const users = [];
+  const seen = {};
+  ensuredPlayers.forEach((row) => {
+    const id = resolveUserId(row);
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    users.push(_rowToRegisterUser(row, teamOptions));
+  });
+
+  if (Array.isArray(d.groupsDraft)) {
+    matchOrGame.groups = _cloneJson(d.groupsDraft);
+  }
+  if (d.pairingsDraft && typeof d.pairingsDraft === 'object') {
+    matchOrGame.pairings = _cloneJson(d.pairingsDraft);
+    if (Object.prototype.hasOwnProperty.call(matchOrGame, 'pairingMap')) {
+      matchOrGame.pairingMap = _cloneJson(d.pairingsDraft);
+    }
+  }
+
+  _syncGroupPlayerSnapshots(matchOrGame, users);
+  return { ok: true, match: matchOrGame, users: users };
+}
+
 function _syncGroupPlayerSnapshots(matchOrGame, users) {
   const map = {};
   (Array.isArray(users) ? users : []).forEach((u) => {
     const id = resolveUserId(u);
     if (!id) return;
+    const teamId = resolveMatchTeamId(u);
+    const teamName = resolveMatchTeamName(u);
     map[id] = {
       name: resolveMatchNickname(u),
       gender: resolveMatchGender(u),
-      avatar: u.avatar || ''
+      avatar: u.avatar || '',
+      matchTeamId: teamId,
+      matchTeamName: teamName
     };
   });
   const patchPlayers = (list) => {
@@ -1507,6 +1706,15 @@ function _syncGroupPlayerSnapshots(matchOrGame, users) {
       }
       if (map[id].gender) next.gender = map[id].gender;
       if (map[id].avatar) next.avatar = map[id].avatar;
+      if (map[id].matchTeamId) {
+        next.matchTeamId = map[id].matchTeamId;
+        next.groupId = map[id].matchTeamId;
+      }
+      if (map[id].matchTeamName) {
+        next.matchTeamName = map[id].matchTeamName;
+        next.groupName = map[id].matchTeamName;
+        next.teamName = map[id].matchTeamName;
+      }
       return next;
     });
   };
@@ -1626,6 +1834,7 @@ module.exports = {
   isPlayerFormalGrouped,
   matchesGroupStatusFilter,
   buildPlayerManageDraft,
+  buildSeriesPlayerManageDraft,
   buildPlayerManageRow,
   applyExpandState,
   updatePlayerField,
@@ -1635,6 +1844,7 @@ module.exports = {
   verifySlotPlayerManageScenarios,
   verifySlotAddPlayerScenarios,
   commitPlayerManageDraft,
+  commitSeriesPlayerManageDraft,
   ensureRegisterUsersFromGroups,
   canManagePlayers,
   comparePlayerDisplayName,

@@ -1,0 +1,52 @@
+<!-- 领先榜查看方式：标准全屏 overlay + bottom sheet（L1 视觉权威，共享入口） -->
+<view
+  wx:if="{{visible}}"
+  bindtap="onMaskTap"
+  catchtouchmove="noop"
+  class="sheet-overlay"
+></view>
+<view
+  wx:if="{{visible}}"
+  class="bottom-sheet leaderboard-setting-sheet {{themeClass}}"
+  catchtap="noop"
+  catchtouchmove="noop"
+>
+  <view class="sheet-top-accent"></view>
+  <view class="sheet-handle"></view>
+  <view class="leaderboard-setting__head">
+    <view class="leaderboard-setting__head-main">
+      <text class="leaderboard-setting__overline">{{overline}}</text>
+      <text class="leaderboard-setting__title">{{title}}</text>
+      <text wx:if="{{subtitle}}" class="leaderboard-setting__subtitle">{{subtitle}}</text>
+    </view>
+    <view bindtap="onCloseTap" class="leaderboard-setting__close">×</view>
+  </view>
+
+  <block wx:for="{{sections}}" wx:key="key" wx:for-item="section">
+    <view class="leaderboard-setting__section">
+      <text class="leaderboard-setting__label">{{section.label}}</text>
+      <view class="leaderboard-setting__options">
+        <view
+          wx:for="{{section.options}}"
+          wx:for-item="opt"
+          wx:key="key"
+          bindtap="onOptionTap"
+          data-section="{{section.key}}"
+          data-key="{{opt.key}}"
+          data-disabled="{{opt.disabled}}"
+          class="leaderboard-setting-option {{draftValues[section.key] === opt.key ? 'is-active' : ''}} {{opt.disabled ? 'is-disabled' : ''}}"
+        >
+          <view class="leaderboard-setting-option__text">
+            <text class="leaderboard-setting-option__name">{{opt.name}}</text>
+            <text wx:if="{{opt.sub}}" class="leaderboard-setting-option__sub">{{opt.sub}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <view class="leaderboard-setting__footer">
+    <view bindtap="onCancelTap" class="leaderboard-setting__btn leaderboard-setting__btn--cancel">取消</view>
+    <view bindtap="onConfirmTap" class="leaderboard-setting__btn leaderboard-setting__btn--confirm">确认</view>
+  </view>
+</view>

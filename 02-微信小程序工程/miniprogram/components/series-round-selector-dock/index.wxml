@@ -1,0 +1,46 @@
+<view class="series-standings-round-dock-body series-standings-round-selector {{themeClass}}">
+  <view class="series-standings-round-bar">
+    <view
+      wx:if="{{showTot}}"
+      class="series-standings-round-chip series-standings-tot round-selector-item {{totalSelector.stateClass}} {{totalSelector.isSelected ? 'round-selector-item--selected' : ''}}"
+      data-key="{{totalSelector.key}}"
+      bindtap="onRoundTap"
+    >
+      <text class="series-standings-round-chip__label">{{totalSelector.label}}</text>
+      <view wx:if="{{totalSelector.isSelected}}" class="round-selector-item__selected-icon">✓</view>
+    </view>
+    <view class="srd-scroll-wrap">
+      <scroll-view
+        class="series-standings-round-scroll"
+        scroll-x="{{true}}"
+        enable-flex="{{true}}"
+        show-scrollbar="{{false}}"
+        scroll-left="{{scrollLeft}}"
+        scroll-with-animation="{{false}}"
+        bindscroll="onHScroll"
+      >
+        <view class="series-standings-round-row">
+          <view
+            wx:for="{{rounds}}"
+            wx:key="key"
+            class="series-standings-round-chip round-selector-item {{item.stateClass}} {{item.isSelected ? 'round-selector-item--selected' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="onRoundTap"
+          >
+            <text class="series-standings-round-chip__label">{{item.label}}</text>
+            <text wx:if="{{item.showLiveBadge}}" class="series-standings-round-chip__live">LIVE</text>
+            <view wx:if="{{item.isSelected}}" class="round-selector-item__selected-icon">✓</view>
+          </view>
+        </view>
+      </scroll-view>
+      <view wx:if="{{showLeftArrow}}" class="srd-overflow srd-overflow--left" aria-hidden="true">‹</view>
+      <view wx:if="{{showRightArrow}}" class="srd-overflow srd-overflow--right" aria-hidden="true">›</view>
+    </view>
+  </view>
+  <view
+    class="series-standings-round-meta {{roundInfoText ? '' : 'series-standings-round-meta--empty'}}"
+    aria-hidden="{{!roundInfoText}}"
+  >
+    <text class="series-standings-round-meta__text">{{roundInfoText}}</text>
+  </view>
+</view>

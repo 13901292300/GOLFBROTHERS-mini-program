@@ -4,6 +4,12 @@ const SHORT_NAME_MAX = 4;
 /** 历史键（无用户隔离）；读写时迁移到按用户隔离键 */
 const RECENT_EVENT_ORG_STORAGE_KEY = 'gb_recent_event_orgs_v1';
 const RECENT_EVENT_ORG_STORAGE_PREFIX = 'gb_recent_event_orgs_v1:';
+/**
+ * 用户创建的球队/机构持久化（扩展目录，非 Series 专属第二套库）。
+ * 冷启动后 listActiveClubTeamsForUser / getTeamById 可读到同一稳定 ID。
+ */
+const CREATED_TEAMS_STORAGE_KEY = 'gb_created_teams_v1';
+const CREATED_TEAMS_STORAGE_VERSION = 1;
 
 /** 组织管理员角色（展示用中文；判断时亦兼容英文） */
 const ORG_ADMIN_ROLES = {
@@ -123,8 +129,143 @@ const TEAMS = [
   }
 ];
 
-/** 用户在前端 mock 创建的组织（插入列表顶部） */
+/**
+ * 用户创建的组织（内存镜像；权威在 CREATED_TEAMS_STORAGE_KEY）
+ * 不得只存活于模块内存。
+ */
 let createdTeams = [];
+
+function _normalizePersistedMember(raw, teamId, index) {
+  const m = raw && typeof raw === 'object' ? raw : {};
+  const playerId = String(m.playerId || m.userId || '').trim();
+  const userId = String(m.userId || m.playerId || '').trim();
+  const name = String(m.name || '').trim();
+  const roleCode = normalizeTeamMemberRole(m.role, null, userId || playerId);
+  const memberStatus =
+    m.memberStatus != null && String(m.memberStatus).trim()
+      ? String(m.memberStatus).trim()
+      : 'active';
+  return {
+    playerId: playerId || userId,
+    userId: userId || playerId,
+    name: name,
+    competitionName: name,
+    avatar: m.avatar != null && String(m.avatar).trim()
+      ? String(m.avatar).trim()
+      : mockAvatars.pickMockAvatar(playerId || userId || name || index),
+    phone: m.phone != null ? String(m.phone) : '',
+    gender: m.gender != null ? String(m.gender) : '',
+    pinyin: m.pinyin != null ? String(m.pinyin) : name,
+    teamId: String(teamId || '').trim(),
+    role: roleCode,
+    memberStatus: memberStatus,
+    joinedAt: m.joinedAt != null ? Number(m.joinedAt) || 0 : 0,
+    source: 'team_member',
+    pickChannel: 'team_members'
+  };
+}
+
+function _serializeCreatedTeam(team) {
+  if (!team || typeof team !== 'object') return null;
+  const id = String(team.id || '').trim();
+  if (!id) return null;
+  const createdBy = String(team.createdBy || team.creatorId || '').trim();
+  const members = Array.isArray(team.members)
+    ? team.members
+        .map(function (m, i) {
+          return _normalizePersistedMember(m, id, i);
+        })
+        .filter(function (m) {
+          return m && (m.userId || m.playerId);
+        })
+    : [];
+  return {
+    id: id,
+    name: String(team.name || '').trim(),
+    shortName: normalizeShortName(team.shortName),
+    role: team.role != null ? String(team.role) : '超级管理员',
+    region: team.region != null ? String(team.region) : '',
+    memberCount:
+      team.memberCount != null && Number.isFinite(Number(team.memberCount))
+        ? Number(team.memberCount)
+        : members.length || 1,
+    isMine: team.isMine !== false,
+    logo: team.logo != null ? String(team.logo) : '',
+    slogan: team.slogan != null ? String(team.slogan) : '',
+    desc: team.desc != null ? String(team.desc) : '',
+    organizationType: normalizeOrganizationType(team.organizationType),
+    isPublicDefault: !!team.isPublicDefault,
+    isDefaultInterTeamOrganizer: !!team.isDefaultInterTeamOrganizer,
+    adminUserIds: normalizeAdminUserIds(team.adminUserIds),
+    createdBy: createdBy,
+    members: members
+  };
+}
+
+function _readCreatedTeamsFromStorage() {
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getStorageSync !== 'function') {
+      return [];
+    }
+    const raw = wx.getStorageSync(CREATED_TEAMS_STORAGE_KEY);
+    let list = null;
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (raw && typeof raw === 'object' && Array.isArray(raw.teams)) {
+      list = raw.teams;
+    }
+    if (!Array.isArray(list) || !list.length) return [];
+    const out = [];
+    const seen = {};
+    for (let i = 0; i < list.length; i++) {
+      const t = _serializeCreatedTeam(list[i]);
+      if (!t || !t.id || seen[t.id]) continue;
+      seen[t.id] = true;
+      out.push(t);
+    }
+    return out;
+  } catch (e) {
+    return [];
+  }
+}
+
+function _writeCreatedTeamsToStorage(list) {
+  const teams = Array.isArray(list)
+    ? list
+        .map(_serializeCreatedTeam)
+        .filter(function (t) {
+          return !!t;
+        })
+    : [];
+  try {
+    if (typeof wx === 'undefined' || typeof wx.setStorageSync !== 'function') {
+      return { ok: false, reason: 'storage_unavailable' };
+    }
+    wx.setStorageSync(CREATED_TEAMS_STORAGE_KEY, {
+      version: CREATED_TEAMS_STORAGE_VERSION,
+      teams: teams
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'storage_write_failed' };
+  }
+}
+
+let _createdTeamsReady = false;
+
+function _hydrateCreatedTeams() {
+  createdTeams = _readCreatedTeamsFromStorage();
+  _createdTeamsReady = true;
+}
+
+function _persistCreatedTeams() {
+  return _writeCreatedTeamsToStorage(createdTeams);
+}
+
+function _ensureCreatedTeams() {
+  if (_createdTeamsReady) return;
+  _hydrateCreatedTeams();
+}
 
 /**
  * Patch 7：球队成员 mock 花名册（按 teamId）
@@ -172,6 +313,7 @@ function buildListMeta(team) {
 }
 
 function allTeams() {
+  _ensureCreatedTeams();
   return createdTeams.concat(TEAMS);
 }
 
@@ -423,7 +565,7 @@ function listClubTeamsForSelect(searchTerm) {
 }
 
 /**
- * TODO：创建球队/机构接口 — 当前为前端 mock，创建成功后插入列表顶部
+ * 创建球队/机构并持久化到 gb_created_teams_v1（与 mock TEAMS 同一目录查询面）
  * @param {object} payload organizationType 缺省为 team，保证旧调用兼容
  */
 function addCreatedTeam(payload) {
@@ -449,13 +591,42 @@ function addCreatedTeam(payload) {
         : []
   );
 
+  const teamId = String((payload && payload.id) || Date.now()).trim();
+  let members = Array.isArray(payload && payload.members)
+    ? payload.members.map(function (m, i) {
+        return _normalizePersistedMember(m, teamId, i);
+      })
+    : [];
+  if (creatorId) {
+    const hasCreator = members.some(function (m) {
+      return String(m.userId || m.playerId || '').trim() === creatorId;
+    });
+    if (!hasCreator) {
+      members.unshift(
+        _normalizePersistedMember(
+          {
+            userId: creatorId,
+            playerId: creatorId,
+            name: name,
+            role: 'owner',
+            memberStatus: 'active',
+            joinedAt: Date.now()
+          },
+          teamId,
+          0
+        )
+      );
+    }
+  }
+
   const team = {
-    id: String((payload && payload.id) || Date.now()),
+    id: teamId,
     name,
     shortName: normalizeShortName(payload && payload.shortName),
     role: (payload && payload.role) || '超级管理员',
     region: (payload && payload.region) || '',
-    memberCount: (payload && payload.memberCount) != null ? payload.memberCount : 1,
+    memberCount:
+      (payload && payload.memberCount) != null ? payload.memberCount : members.length || 1,
     isMine: true,
     logo: (payload && payload.logo) || '',
     slogan: (payload && payload.slogan) || '',
@@ -463,21 +634,42 @@ function addCreatedTeam(payload) {
     organizationType: organizationType,
     isPublicDefault: !!(payload && payload.isPublicDefault),
     isDefaultInterTeamOrganizer: !!(payload && payload.isDefaultInterTeamOrganizer),
-    adminUserIds: adminUserIds
+    adminUserIds: adminUserIds,
+    createdBy: creatorId,
+    members: members
   };
 
+  _ensureCreatedTeams();
+  // 同 ID 覆盖更新，避免重复
+  createdTeams = createdTeams.filter(function (t) {
+    return String((t && t.id) || '').trim() !== teamId;
+  });
   createdTeams.unshift(team);
+  _persistCreatedTeams();
   return enrichOrganization(team);
 }
 
 /**
- * Patch 7：按 teamId 返回 mock 球队成员（稳定 id）
+ * 按 teamId 返回成员：优先持久化自定义球队花名册，否则 mock 花名册。
  * @param {string} teamId
  * @returns {Array<{playerId,userId,name,competitionName,avatar,phone,gender,teamId,source,pinyin}>}
  */
 function getTeamMembers(teamId) {
   const id = String(teamId || '').trim();
   if (!id) return [];
+  _ensureCreatedTeams();
+
+  for (let i = 0; i < createdTeams.length; i++) {
+    const ct = createdTeams[i];
+    if (!ct || String(ct.id || '').trim() !== id) continue;
+    if (Array.isArray(ct.members) && ct.members.length) {
+      return ct.members.map(function (m, index) {
+        return _normalizePersistedMember(m, id, index);
+      });
+    }
+    break;
+  }
+
   const raw = TEAM_MEMBERS_BY_TEAM_ID[id];
   if (!Array.isArray(raw) || !raw.length) return [];
   return raw.map((m, index) => {
@@ -505,6 +697,13 @@ function getTeamMembers(teamId) {
       pickChannel: 'team_members'
     };
   });
+}
+
+/** 测试/诊断：重新从 storage 灌入内存镜像（模拟冷启动） */
+function reloadCreatedTeamsFromStorage() {
+  _createdTeamsReady = false;
+  _hydrateCreatedTeams();
+  return createdTeams.slice();
 }
 
 /**
@@ -560,20 +759,23 @@ function _isCurrentUserAlias(userId) {
 }
 
 /**
- * 按 userId 查询所属球队（MVP / mock 成员关系）。
- * 来源：teamDirectory 成员集合 +（当前用户）isMine 演示兼容。
- * 严禁从 teamGroups / matchTeamId / 报名 / 赛事代表队反推。
- * 仅返回 organizationType===team 且 memberStatus===active。
+ * 按 userId 解析活跃俱乐部球队成员关系（只读）。
+ * 命中规则（队长/管理员/普通成员）：
+ * 1) getTeamMembers 花名册 active 命中 userId|playerId
+ * 2) team.adminUserIds 命中（队长/管理员）
+ * 不使用 isMine、不把固定字符串 me 当特殊身份、不从赛事/报名反推。
  * @param {string} userId
+ * @param {{ includeIsMineCompat?: boolean }} [options]
  * @returns {Array<{teamId,name,shortName,logo,role,memberStatus,joinedAt,organizationType}>}
  */
-function getTeamsByUserId(userId) {
+function listActiveClubTeamsForUser(userId, options) {
   const uid = String(userId || '').trim();
   if (!uid) return [];
+  const includeIsMineCompat = !!(options && options.includeIsMineCompat);
   const out = [];
   const seen = {};
   const teams = allTeams();
-  const currentAlias = _isCurrentUserAlias(uid);
+  const currentAlias = includeIsMineCompat ? _isCurrentUserAlias(uid) : false;
 
   for (let i = 0; i < teams.length; i++) {
     const team = teams[i];
@@ -605,8 +807,19 @@ function getTeamsByUserId(userId) {
       break;
     }
 
-    // 演示兼容：当前用户且 isMine，且成员花名册未收录时补入（非长期唯一判断）
-    if (!matched && currentAlias && team.isMine) {
+    // 队长/管理员：adminUserIds 命中即属队（不依赖花名册是否收录）
+    if (!matched) {
+      const admins = normalizeAdminUserIds(team.adminUserIds);
+      if (admins.indexOf(uid) >= 0) {
+        matched = true;
+        memberStatus = 'active';
+        role = normalizeTeamMemberRole(team.role, team, uid);
+        joinedAt = 0;
+      }
+    }
+
+    // 仅 getTeamsByUserId 兼容路径：当前用户 + isMine 演示补入
+    if (!matched && includeIsMineCompat && currentAlias && team.isMine) {
       matched = true;
       memberStatus = 'active';
       role = normalizeTeamMemberRole(team.role, team, uid);
@@ -628,6 +841,18 @@ function getTeamsByUserId(userId) {
     });
   }
   return out;
+}
+
+/**
+ * 按 userId 查询所属球队（MVP / mock 成员关系）。
+ * 来源：成员花名册 + adminUserIds +（当前用户）isMine 演示兼容。
+ * 系列赛报名资格请使用 listActiveClubTeamsForUser（不含 isMine）。
+ * 严禁从 teamGroups / matchTeamId / 报名 / 赛事代表队反推。
+ * @param {string} userId
+ * @returns {Array<{teamId,name,shortName,logo,role,memberStatus,joinedAt,organizationType}>}
+ */
+function getTeamsByUserId(userId) {
+  return listActiveClubTeamsForUser(userId, { includeIsMineCompat: true });
 }
 
 function isEventOrganization(orgOrType) {
@@ -656,6 +881,8 @@ module.exports = {
   SHORT_NAME_MAX,
   RECENT_EVENT_ORG_STORAGE_KEY,
   RECENT_EVENT_ORG_STORAGE_PREFIX,
+  CREATED_TEAMS_STORAGE_KEY,
+  CREATED_TEAMS_STORAGE_VERSION,
   ORG_ADMIN_ROLES,
   charLength,
   sliceChars,
@@ -675,7 +902,9 @@ module.exports = {
   rememberRecentEventOrg,
   addCreatedTeam,
   getTeamMembers,
+  listActiveClubTeamsForUser,
   getTeamsByUserId,
   normalizeTeamMemberRole,
-  getTeamRoleLabel
+  getTeamRoleLabel,
+  reloadCreatedTeamsFromStorage
 };

@@ -1,0 +1,1375 @@
+<view class="detail-page series-detail-page {{themeClass}}" bindtap="onPageTap">
+  <!-- 报名扩展区：流内/fixed 共用同一 template；子 TAB 横向 scroll-left 同步 -->
+  <template name="seriesRegisterExtensionStrip">
+    <view class="register-ext">
+      <view class="register-ext__summary">
+        <text class="register-ext__summary-text">报名总人数：<text class="register-ext__summary-count">{{register.registerTotalCount}}</text></text>
+      </view>
+      <view class="register-subtabs-wrap">
+        <scroll-view
+          class="register-subtabs"
+          scroll-x
+          enable-flex
+          scroll-left="{{registerSubTabScrollLeft}}"
+          scroll-with-animation="{{false}}"
+          bindscroll="onRegisterSubTabHScroll"
+        >
+          <view
+            wx:for="{{register.registerSubTabs}}"
+            wx:key="id"
+            bindtap="switchRegisterSubTab"
+            data-id="{{item.id}}"
+            class="register-subtab {{register.activeParticipantId === item.id ? 'register-subtab--active' : ''}}"
+          >
+            <text class="register-subtab__label">{{item.name}}（{{item.count}}）</text>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+  </template>
+
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">SERIES</text>
+          <text class="gb-header__title">系列赛详情</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{loadError}}" class="load-error">
+    <text class="load-error__text">{{loadError}}</text>
+  </view>
+
+  <!-- 访问码门闩：验证前仅 Header + 中性壳，禁止 Hero/TAB/业务闪现 -->
+  <view
+    wx:elif="{{!accessContentReady}}"
+    class="series-access-shell"
+  >
+    <text class="series-access-shell__text">{{accessGate === 'locked' ? '请输入访问码以继续' : '正在验证访问权限…'}}</text>
+  </view>
+
+  <block wx:elif="{{accessContentReady}}">
+    <scroll-view
+      class="detail-scroll series-detail-scroll"
+      scroll-y
+      scroll-top="{{scrollTop}}"
+      bindscroll="onScroll"
+    >
+      <view id="series-scroll-natural" class="series-scroll-natural">
+      <view wx:if="{{isDraftPreview}}" class="series-banner series-banner--draft">草稿预览</view>
+      <view wx:elif="{{isHistorical}}" class="series-banner series-banner--history">
+        历史只读 · {{lifecycleLabel}}
+      </view>
+
+      <!-- 标准 tournament detail 英雄区结构 -->
+      <view class="hero-wrap">
+        <view class="hero">
+          <image
+            wx:if="{{hero.bannerImage}}"
+            class="hero__img"
+            src="{{hero.bannerImage}}"
+            mode="aspectFill"
+            bindload="onScrollContentHeightChange"
+            binderror="onScrollContentHeightChange"
+          />
+          <view class="hero__overlay"></view>
+          <view
+            class="registered-chip {{hero.chipTone === 'live' ? 'registered-chip--live' : ''}} {{hero.chipTone === 'finished' ? 'registered-chip--finished' : ''}}"
+          >{{hero.chipText}}</view>
+        </view>
+        <view class="event-logo-wrap">
+          <view class="event-logo">
+            <image
+              wx:if="{{hero.logo}}"
+              src="{{hero.logo}}"
+              mode="aspectFill"
+              style="width:100%;height:100%;"
+            />
+          </view>
+        </view>
+      </view>
+
+      <view class="event-intro">
+        <text class="event-date {{hero.dateRangeSizeClass}}">{{hero.dateText}}</text>
+        <view class="event-title">
+          <text class="event-title__line event-title__line--main">{{hero.titleMain}}</text>
+          <text wx:if="{{hero.titleSub}}" class="event-title__line event-title__line--sub">{{hero.titleSub}}</text>
+        </view>
+        <view class="meta-chip-row">
+          <view wx:for="{{hero.metaChips}}" wx:key="text" class="meta-chip">{{item.text}}</view>
+        </view>
+        <view class="ds-card info-card">
+          <view class="series-hero-meta-list">
+          <block wx:for="{{hero.infoRows}}" wx:key="label">
+            <view wx:if="{{item.kind === 'courses'}}" class="series-hero-meta-row {{item.courseLines.length > 1 ? 'series-hero-meta-row--courses' : ''}}">
+              <text class="series-hero-meta-label">{{item.label}}</text>
+              <view class="series-hero-meta-content">
+                <view class="series-hero-course-list">
+                  <text wx:if="{{!item.courseLines.length}}" class="series-hero-course-item">球场待定</text>
+                  <text
+                    wx:for="{{item.courseLines}}"
+                    wx:for-item="courseName"
+                    wx:for-index="courseIndex"
+                    wx:key="courseIndex"
+                    class="series-hero-course-item"
+                  >{{courseName}}</text>
+                </view>
+              </view>
+            </view>
+            <view wx:elif="{{item.kind === 'team_logos'}}" class="series-hero-meta-row">
+              <text class="series-hero-meta-label">{{item.label}}</text>
+              <view id="hero-team-logo-value" class="series-hero-meta-content">
+                <text wx:if="{{hero.participantDisplay.emptyText}}" class="series-hero-meta-text">{{hero.participantDisplay.emptyText}}</text>
+                <view
+                  wx:elif="{{heroTeamLogoStack.visible}}"
+                  class="hero-logo-stack"
+                  style="width:{{heroTeamLogoStack.stackWidthPx}}px;height:{{heroTeamLogoStack.logoSizePx}}px;"
+                >
+                  <view
+                    wx:for="{{heroTeamLogoStack.items}}"
+                    wx:key="participantId"
+                    class="hero-logo-stack__item"
+                    style="left:{{item.leftPx}}px;width:{{heroTeamLogoStack.logoSizePx}}px;height:{{heroTeamLogoStack.logoSizePx}}px;z-index:{{item.zIndex}};"
+                  >
+                    <image
+                      wx:if="{{item.logo}}"
+                      class="hero-logo-stack__img"
+                      src="{{item.logo}}"
+                      mode="aspectFill"
+                    />
+                    <view wx:else class="hero-logo-stack__fallback">{{item.fallbackText}}</view>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view wx:elif="{{item.kind === 'division_tags'}}" class="series-hero-meta-row">
+              <text class="series-hero-meta-label">{{item.label}}</text>
+              <view class="series-hero-meta-content">
+                <text wx:if="{{hero.participantDisplay.emptyText}}" class="series-hero-meta-text">{{hero.participantDisplay.emptyText}}</text>
+                <view wx:else class="hero-division-tags">
+                  <view
+                    wx:for="{{hero.participantDisplay.divisionItems}}"
+                    wx:key="participantId"
+                    class="hero-division-tag"
+                  >
+                    <view
+                      wx:if="{{item.color}}"
+                      class="hero-division-tag__dot"
+                      style="background:{{item.color}};"
+                    ></view>
+                    <text class="hero-division-tag__name">{{item.name}}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view wx:else class="series-hero-meta-row">
+              <text class="series-hero-meta-label">{{item.label}}</text>
+              <view class="series-hero-meta-content">
+                <text class="series-hero-meta-text">{{item.value}}</text>
+              </view>
+            </view>
+          </block>
+          </view>
+        </view>
+      </view>
+
+      <view class="section-divider">
+        <text class="section-divider__text">{{hero.dividerText}}</text>
+      </view>
+
+      <!-- Tabs：流内占位；吸顶由页外固定克隆接管（对齐 detail） -->
+      <view class="tab-scroll-wrap tab-scroll-wrap--inflow">
+        <scroll-view
+          class="gb-tabs"
+          scroll-x
+          enable-flex
+          scroll-with-animation="{{false}}"
+          bindscroll="onTabHScroll"
+        >
+          <view
+            wx:for="{{tabs}}"
+            wx:key="id"
+            id="inflow-tab-{{item.id}}"
+            bindtap="switchTab"
+            data-tab="{{item.id}}"
+            class="tab-btn {{activeTab === item.id ? 'active' : ''}}"
+          >{{item.label}}</view>
+        </scroll-view>
+        <view wx:if="{{tabShowLeftIndicator}}" class="tab-overflow-hint tab-overflow-hint--left" aria-hidden="true"><text class="tab-overflow-hint__chev">‹</text></view>
+        <view wx:if="{{tabShowRightIndicator}}" class="tab-overflow-hint tab-overflow-hint--right" aria-hidden="true"><text class="tab-overflow-hint__chev">›</text></view>
+      </view>
+
+      <!-- 二级流内 round dock：文档流占位 + offset 测量；吸顶后 covered，不承担 fixed -->
+      <view
+        wx:if="{{activeTab === 'standings' && standings.available}}"
+        class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}}"
+      >
+        <view class="series-round-dock__inner">
+          <series-round-selector-dock
+            mode="inflow"
+            sticky="{{isStickyRoundSelector}}"
+            top="{{stickyRoundSelectorTop}}"
+            show-tot="{{true}}"
+            total-selector="{{standings.totalSelector}}"
+            rounds="{{standings.roundSelectorItems}}"
+            round-info-text="{{standings.roundInfoText}}"
+            scroll-left="{{roundSelectorScrollLeft}}"
+            theme-class="{{themeClass}}"
+            bind:roundtap="onStandingsRoundTap"
+            bind:hscroll="onRoundSelectorHScroll"
+          />
+        </view>
+      </view>
+
+      <!-- 报名扩展区流内：一级 TAB 后、detail-main 前；仍在 #series-scroll-natural 内 -->
+      <view
+        wx:if="{{activeTab === 'register'}}"
+        class="register-ext-wrap register-ext-wrap--inflow {{isStickyRegisterExt ? 'register-ext-wrap--covered' : ''}}"
+      >
+        <template
+          is="seriesRegisterExtensionStrip"
+          data="{{register: register, registerSubTabScrollLeft: registerSubTabScrollLeft}}"
+        />
+      </view>
+
+      <!-- 赛程二级流内 round dock：无 TOT，仅 R；与总榜同一组件 -->
+      <view
+        wx:if="{{activeTab === 'schedule' && schedule.roundSelector.length}}"
+        class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}}"
+      >
+        <view class="series-round-dock__inner">
+          <series-round-selector-dock
+            mode="inflow"
+            sticky="{{isStickyRoundSelector}}"
+            top="{{stickyRoundSelectorTop}}"
+            show-tot="{{false}}"
+            rounds="{{schedule.roundSelector}}"
+            round-info-text="{{schedule.roundInfoText}}"
+            scroll-left="{{scheduleRoundSelectorScrollLeft}}"
+            theme-class="{{themeClass}}"
+            bind:roundtap="onScheduleRoundTap"
+            bind:hscroll="onScheduleRoundHScroll"
+          />
+        </view>
+      </view>
+
+      <view
+        class="detail-main series-detail-main {{activeTab === 'discussion' ? 'detail-main--flush' : ''}}"
+        style="{{activeTab === 'discussion' && discussionPanelMinHeight ? 'min-height:' + discussionPanelMinHeight + 'px;' : ''}}"
+      >
+        <!-- 赛事信息：内容区仅用 detail-main 的 32rpx，与标准 detail 同宽（无额外横向缩进） -->
+        <block wx:if="{{activeTab === 'info'}}">
+          <view class="ds-card pad-card">
+            <view class="card-head">
+              <text class="card-title">{{participants.kindLabel}}</text>
+              <text class="card-kicker">{{participants.summaryText}}</text>
+            </view>
+            <view wx:if="{{!participants.items.length}}" class="series-empty__msg">暂无参赛主体</view>
+            <view
+              wx:for="{{participants.items}}"
+              wx:key="seriesParticipantId"
+              class="participant-row"
+            >
+              <image
+                wx:if="{{item.logo}}"
+                class="participant-row__logo"
+                src="{{item.logo}}"
+                mode="aspectFill"
+              />
+              <view wx:else class="participant-row__logo"></view>
+              <text class="participant-row__name">{{item.name}}</text>
+            </view>
+          </view>
+
+          <block wx:for="{{eventInfoList}}" wx:key="id">
+            <view wx:if="{{item.isImage}}" class="ad-image">
+              <image
+                class="ad-image__img"
+                src="{{item.imageData}}"
+                mode="widthFix"
+                data-id="{{item.id}}"
+                bindload="onScrollContentHeightChange"
+                binderror="onEventSponsorImageError"
+              />
+            </view>
+            <view
+              wx:elif="{{item.isPhotoLive && item.photoLiveValid}}"
+              class="ds-card pad-card photo-live-card"
+              bindtap="onCopyPhotoLiveLink"
+              data-url="{{item.content}}"
+            >
+              <view class="card-head"><text class="card-title">照片直播</text></view>
+              <text class="card-text event-info-card-desc photo-live-card__desc">点击复制链接</text>
+            </view>
+            <view wx:else class="ds-card pad-card">
+              <view class="card-head"><text class="card-title">{{item.title || '赛事信息'}}</text></view>
+              <text class="card-text event-info-card-desc">{{item.content || '—'}}</text>
+            </view>
+          </block>
+
+          <view wx:if="{{partner.configured && partner.hasLogos}}" class="partners-section">
+            <text class="partners-title">{{partner.partnerTitle}}</text>
+            <view class="partners-grid partners-grid--logos">
+              <view
+                wx:for="{{partner.partnerLogoRows}}"
+                wx:key="index"
+                class="partner-row"
+              >
+                <view class="partner-cell partner-cell--logo">
+                  <view wx:if="{{item.left.url}}" class="partner-item">
+                    <image
+                      class="partner-item__img"
+                      src="{{item.left.url}}"
+                      mode="aspectFit"
+                      data-row="{{index}}"
+                      data-side="left"
+                      bindload="onScrollContentHeightChange"
+                      binderror="onPartnerLogoError"
+                    />
+                  </view>
+                </view>
+                <view class="partner-cell partner-cell--logo partner-cell--with-divider">
+                  <view wx:if="{{item.right.url}}" class="partner-item">
+                    <image
+                      class="partner-item__img"
+                      src="{{item.right.url}}"
+                      mode="aspectFit"
+                      data-row="{{index}}"
+                      data-side="right"
+                      bindload="onScrollContentHeightChange"
+                      binderror="onPartnerLogoError"
+                    />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view
+            wx:elif="{{partner.configured && !partner.hasLogos}}"
+            class="partners-section partners-section--empty"
+          >
+            <text class="partners-title">{{partner.partnerTitle}}</text>
+          </view>
+        </block>
+
+        <block wx:if="{{activeTab === 'standings'}}">
+          <block wx:if="{{!standings.available}}">
+            <view class="series-empty">
+              <text class="series-empty__title">{{standings.unavailableTitle}}</text>
+              <text class="series-empty__msg">{{standings.unavailableMessage}}</text>
+            </view>
+          </block>
+          <block wx:else>
+            <view
+              id="series-standings-content-host"
+              class="series-standings-content-host"
+              style="{{contentHostMinHeight > 0 ? 'min-height:' + contentHostMinHeight + 'px;' : ''}}"
+            >
+            <view wx:if="{{!standings.teamRows.length}}" class="series-empty">
+              <text class="series-empty__title">暂无参赛主体</text>
+              <text class="series-empty__msg">创建参赛球队或分队后即可查看总榜结构</text>
+            </view>
+
+            <view wx:else class="leaderboard-table-wrap">
+              <view class="leaderboard-view-label">{{standings.leaderboardViewLabel}}</view>
+
+              <block wx:if="{{standings.showSharedPersonalBoard}}">
+                <personal-leaderboard-board
+                  leaderboard="{{standings.personalLeaderboard}}"
+                  leaderboard-score-type="{{standings.personalScoreType}}"
+                  show-leaderboard-team-column="{{standings.showLeaderboardTeamColumn}}"
+                  open-scorecard="{{openStandingsScorecard}}"
+                  scorecard-ad-image="{{standingsScorecardAdImage}}"
+                  scorecard-course-title="{{standingsScorecardCourseTitle}}"
+                  score-display-mode="{{standingsScoreDisplayMode}}"
+                  score-panel="{{standingsScorePanel}}"
+                  team-group-logo-by-id="{{standings.personalTeamGroupLogoById}}"
+                  leaderboard-avatar-badge="{{standings.personalAvatarBadge}}"
+                  leaderboard-meta-mode="{{standings.personalMetaMode}}"
+                  leaderboard-show-expand-gender="{{standings.personalShowExpandGender}}"
+                  leaderboard-follow-enabled="{{false}}"
+                  follow-map="{{standings.personalFollowMap}}"
+                  relation-map="{{standings.personalRelationMap}}"
+                  relation-label-map="{{standings.personalRelationLabelMap}}"
+                  leaderboard-followable-map="{{standings.personalFollowableMap}}"
+                  follow-loading-map="{{standings.personalFollowLoadingMap}}"
+                  leaderboard-profile-entry-map="{{standings.personalProfileEntryMap}}"
+                  empty-text="{{standings.personalEmptyText}}"
+                  prestart-expand-mode="{{standings.prestartExpandMode || 'none'}}"
+                  bind:rowtap="onStandingsPersonalLeaderboardRowTap"
+                  bind:profiletap="onStandingsScorecardProfileTap"
+                  bind:follow="onStandingsScorecardFollow"
+                  bind:aderror="onStandingsScorecardAdError"
+                />
+              </block>
+
+              <!-- 核验失败等非共享个人榜空态（未开赛已走共享组件） -->
+              <block wx:elif="{{standings.showTeamBoard === false}}">
+                <view class="leaderboard-head">
+                  <text class="lh-pos">POS</text>
+                  <text class="lh-player">{{standings.headPlayerLabel || 'PLAYER'}}</text>
+                  <text class="lh-thru">THRU</text>
+                  <text class="lh-total">TO PAR</text>
+                </view>
+                <view wx:if="{{!standings.listRows.length}}" class="series-standings-expand-empty">
+                  <text>{{standings.listEmptyText || '暂无榜单数据'}}</text>
+                </view>
+                <block
+                  wx:for="{{standings.listRows}}"
+                  wx:for-item="row"
+                  wx:key="rowId"
+                >
+                  <view
+                    class="leaderboard-row team-leaderboard-player-row {{row.canOpenScorecard ? 'is-scorecard-openable' : 'is-scorecard-disabled'}}"
+                    catchtap="onStandingsListRowTap"
+                    data-row="{{row}}"
+                    data-index="{{row.scorecardKey}}"
+                    hover-class="{{row.canOpenScorecard ? 'team-leaderboard-player-row--active' : 'none'}}"
+                    hover-stay-time="80"
+                  >
+                    <text class="lr-pos pos-cell">{{row.pos}}</text>
+                    <view class="lr-player">
+                      <text class="player-name">{{row.name}}</text>
+                      <text wx:if="{{row.statusLabel}}" class="series-standings-pending-tag">{{row.statusLabel}}</text>
+                    </view>
+                    <text class="lr-thru">{{row.thru}}</text>
+                    <text class="lr-total leaderboard-total {{row.scoreClass}}">{{row.scoreStr}}</text>
+                    <text
+                      wx:if="{{row.canOpenScorecard}}"
+                      class="series-standings-scorecard-chevron"
+                    >{{openStandingsScorecardKey === row.scorecardKey ? '⌃' : '›'}}</text>
+                  </view>
+                </block>
+              </block>
+
+              <!-- 球队榜：主榜固定序 + R/TOT 展开 -->
+              <block wx:else>
+              <view class="leaderboard-head">
+                <text class="lh-pos">POS</text>
+                <text class="lh-player">TEAM</text>
+                <text class="lh-thru">TOTAL</text>
+                <text class="lh-total">TO PAR</text>
+              </view>
+              <block
+                wx:for="{{standings.teamRows}}"
+                wx:for-item="team"
+                wx:key="teamId"
+              >
+                <view
+                  class="leaderboard-row team-leaderboard-row {{expandedStandingsTeamId === team.teamId ? 'is-expanded' : ''}}"
+                  data-participant-id="{{team.teamId}}"
+                  bindtap="onStandingsTeamTap"
+                >
+                  <text class="lr-pos pos-cell">{{team.pos}}</text>
+                  <view class="lr-player team-leaderboard-name-cell">
+                    <text class="player-name">{{team.teamName}}</text>
+                    <text class="team-leaderboard-chevron">{{expandedStandingsTeamId === team.teamId ? '⌃' : '⌄'}}</text>
+                  </view>
+                  <text class="lr-thru">{{team.grossTotal}}</text>
+                  <text class="lr-total leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
+                </view>
+                <view
+                  wx:if="{{expandedStandingsTeamId === team.teamId}}"
+                  class="team-leaderboard-players-wrap series-standings-expanded-panel"
+                  data-team-id="{{team.teamId}}"
+                >
+                  <view class="leaderboard-head team-leaderboard-player-head">
+                    <text class="lh-pos">POS</text>
+                    <text class="lh-player">PLAYER</text>
+                    <text class="lh-thru">THRU</text>
+                    <text class="lh-total">TO PAR</text>
+                  </view>
+                  <view wx:if="{{!team.players.length}}" class="series-standings-expand-empty">
+                    <text>{{team.expandEmptyHint}}</text>
+                  </view>
+                  <view
+                    wx:if="{{team.players.length && team.expandStatusHint}}"
+                    class="series-standings-expand-status"
+                  >
+                    <text>{{team.expandStatusHint}}</text>
+                  </view>
+                  <block
+                    wx:for="{{team.players}}"
+                    wx:for-item="player"
+                    wx:for-index="playerIndex"
+                    wx:key="scorecardKey"
+                  >
+                    <view
+                      wx:if="{{team.scoringPlayersCount > 0 && playerIndex === team.scoringPlayersCount}}"
+                      class="team-leaderboard-divider-strong"
+                    ></view>
+                    <view
+                      catchtap="onStandingsPlayerTap"
+                      data-mode="team"
+                      data-index="{{player.scorecardKey}}"
+                      data-player="{{player}}"
+                      class="leaderboard-row team-leaderboard-player-row {{player.isCounting ? '' : 'is-non-counting'}} {{player.canOpenScorecard ? 'is-scorecard-openable' : 'is-scorecard-disabled'}}"
+                      hover-class="{{player.canOpenScorecard ? 'team-leaderboard-player-row--active' : 'none'}}"
+                      hover-stay-time="80"
+                    >
+                      <text class="lr-pos pos-cell">{{player.pos}}</text>
+                      <leaderboard-player-name-cell
+                        name="{{player.name}}"
+                        gender-icon="{{player.genderIcon}}"
+                        gender-class="{{player.genderClass}}"
+                        show-round-tag="{{player.showRoundTag}}"
+                        round-label="{{player.roundLabel}}"
+                        pending-label="{{player.pendingLabel}}"
+                      />
+                      <text class="lr-thru">{{player.thru}}</text>
+                      <text class="lr-total leaderboard-total {{player.scoreClass}}">{{player.scoreStr}}</text>
+                      <text
+                        wx:if="{{player.canOpenScorecard}}"
+                        class="series-standings-scorecard-chevron"
+                      >{{openStandingsScorecardKey === player.scorecardKey ? '⌃' : '›'}}</text>
+                    </view>
+                    <!-- TOT/R 球队行展开：openStandingsScorecardKey === scorecardKey 即当前 occurrence 展开态（对齐个人榜 item.expanded） -->
+                    <view
+                      wx:if="{{openStandingsScorecardKey === player.scorecardKey}}"
+                      class="scorecard-row"
+                    >
+                      <leaderboard-player-profile-panel
+                        player="{{standingsScorecardPlayer || player}}"
+                        team-group-logo-by-id="{{standingsTeamGroupLogoById}}"
+                        avatar-badge="{{standingsScorecardAvatarBadge}}"
+                        meta-mode="{{standingsScorecardMetaMode}}"
+                        show-name-gender="{{standingsScorecardShowNameGender}}"
+                        gender="{{standingsScorecardPlayer.gender || player.gender}}"
+                        gender-symbol="{{standingsScorecardPlayer.genderSymbol || standingsScorecardPlayer.genderIcon || player.genderIcon}}"
+                        gender-class="{{standingsScorecardPlayer.genderClass || player.genderClass}}"
+                        followed="{{standingsScorecardFollowed}}"
+                        relation-status="{{standingsScorecardRelationStatus}}"
+                        relationship-label="{{standingsScorecardRelationLabel}}"
+                        can-follow="{{standingsScorecardCanFollow}}"
+                        follow-loading="{{standingsScorecardFollowLoading}}"
+                        is-self="{{standingsScorecardIsSelf}}"
+                        bind:profiletap="onStandingsScorecardProfileTap"
+                        bind:follow="onStandingsScorecardFollow"
+                      />
+
+                      <view class="scorecard-dark-panel ld-scorecard {{standingsScoreDisplayMode === 'diff' ? 'diff-mode' : ''}} {{standingsScorecardEmptyLabel ? 'is-empty-status' : ''}}">
+                        <text
+                          wx:if="{{standingsScorecardCourseTitle && openStandingsScorecard}}"
+                          class="sc-course course-name-title"
+                        >{{standingsScorecardCourseTitle}}</text>
+
+                        <!-- 空态：仅一行英文，无空表/无轮次标题 -->
+                        <view
+                          wx:if="{{standingsScorecardEmptyLabel}}"
+                          class="mp-sb-coming-soon series-standings-score-empty"
+                        >
+                          <text class="mp-sb-coming-soon__text series-standings-score-empty__text">{{standingsScorecardEmptyLabel}}</text>
+                        </view>
+
+                        <block wx:elif="{{openStandingsScorecard}}">
+                          <view class="tour-scorecard">
+                            <view class="tsc-row tsc-head">
+                              <text wx:for="{{openStandingsScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                            </view>
+                            <view class="tsc-row">
+                              <text wx:for="{{openStandingsScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                            </view>
+                            <view class="tsc-row">
+                              <view wx:for="{{openStandingsScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                                <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                                  <text class="ld-score-value {{standingsScoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                                </view>
+                                <text wx:else class="ld-score-value {{standingsScoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                              </view>
+                            </view>
+                          </view>
+
+                          <view class="tour-scorecard">
+                            <view class="tsc-row tsc-head">
+                              <text wx:for="{{openStandingsScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                            </view>
+                            <view class="tsc-row">
+                              <text wx:for="{{openStandingsScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                            </view>
+                            <view class="tsc-row">
+                              <view wx:for="{{openStandingsScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                                <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                                  <text class="ld-score-value {{standingsScoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                                </view>
+                                <text wx:else class="ld-score-value {{standingsScoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                              </view>
+                            </view>
+                          </view>
+
+                          <view class="score-legend-area">
+                            <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                            <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                            <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                            <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                          </view>
+                        </block>
+
+                        <!-- 与 detail/hub 同节点：.sc-ad + mode=widthFix；当前轮 match 广告 -->
+                        <image
+                          wx:if="{{standingsScorecardAdImage}}"
+                          class="sc-ad"
+                          src="{{standingsScorecardAdImage}}"
+                          mode="widthFix"
+                          binderror="onStandingsScorecardAdError"
+                        ></image>
+                      </view>
+                    </view>
+                  </block>
+                </view>
+              </block>
+              </block>
+            </view>
+            </view>
+          </block>
+        </block>
+
+        <block wx:if="{{activeTab === 'register'}}">
+          <view class="register-tab-panel">
+            <view
+              class="register-roster-card ds-card"
+              style="{{rosterMinHeight ? 'min-height:' + rosterMinHeight + 'px;' : ''}}"
+            >
+              <view class="roster-head">
+                <view class="roster-col roster-col--idx"><text>序号</text></view>
+                <text class="roster-col roster-col--player">球员</text>
+                <view class="roster-col roster-col--handicap"><text>江湖差点</text></view>
+              </view>
+              <view class="roster-content">
+                <view wx:if="{{register.registerDisplayUsers.length}}" class="roster-body">
+                  <view
+                    wx:for="{{register.registerDisplayUsers}}"
+                    wx:key="listKey"
+                    class="roster-row"
+                    hover-class="roster-row--active"
+                    hover-stay-time="80"
+                    bindtap="onRegisterRosterProfileTap"
+                    data-user-id="{{item.userId}}"
+                    data-player-id="{{item.playerId}}"
+                    data-profile-user-id="{{item.profileUserId}}"
+                    data-name="{{item.competitionName}}"
+                    data-avatar="{{item.avatar}}"
+                    data-user-type="{{item.userType}}"
+                    data-identity-source="{{item.identitySource}}"
+                  >
+                    <view class="roster-col roster-col--idx"><text>{{index + 1}}</text></view>
+                    <view class="roster-col roster-col--player">
+                      <image
+                        class="roster-avatar"
+                        src="{{item.avatar}}"
+                        mode="aspectFill"
+                        catchtap="onRegisterAvatarTap"
+                        data-user-id="{{item.userId}}"
+                        data-player-id="{{item.playerId}}"
+                        data-profile-user-id="{{item.profileUserId}}"
+                        data-name="{{item.competitionName}}"
+                        data-avatar="{{item.avatar}}"
+                        data-user-type="{{item.userType}}"
+                        data-identity-source="{{item.identitySource}}"
+                      ></image>
+                      <view class="roster-player-main">
+                        <view class="roster-player-name-line">
+                          <text class="roster-name">{{item.competitionName}}</text>
+                          <text wx:if="{{item.genderIcon}}" class="roster-gender {{item.genderClass}}">{{item.genderIcon}}</text>
+                        </view>
+                      </view>
+                    </view>
+                    <view class="roster-col roster-col--handicap">
+                      <text>{{item.handicap}}</text>
+                    </view>
+                  </view>
+                </view>
+                <view
+                  wx:else
+                  class="register-user-empty"
+                  style="{{rosterMinHeight ? 'min-height:calc(' + rosterMinHeight + 'px - 88rpx);' : ''}}"
+                >
+                  <text class="register-user-empty__text">{{register.emptyText}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </block>
+
+        <block wx:if="{{activeTab === 'schedule'}}">
+          <view wx:if="{{!schedule.roundSelectorItems.length}}" class="series-empty">
+            <text class="series-empty__title">暂无轮次</text>
+            <text class="series-empty__msg">该系列赛尚未配置轮次</text>
+          </view>
+          <block wx:elif="{{schedule.blockMessage && !schedule.canEnterRound}}">
+            <view class="series-empty">
+              <text class="series-empty__title">{{schedule.stationStatusLabel || '暂不可用'}}</text>
+              <text class="series-empty__msg">{{schedule.blockMessage}}</text>
+            </view>
+          </block>
+          <block wx:elif="{{schedule.panelMode === 'groups'}}">
+            <view class="schedule-groups-panel {{schedule.cta.showEditGroups ? 'schedule-groups-panel--with-cta' : ''}}">
+              <view wx:if="{{!schedule.groupCards.length}}" class="series-empty">
+                <text class="series-empty__title">暂无分组</text>
+                <text class="series-empty__msg">{{schedule.cta.blockMessage || '请开始本轮分组'}}</text>
+              </view>
+              <view
+                wx:for="{{schedule.groupCards}}"
+                wx:key="groupId"
+                class="tee-group-card"
+              >
+                <view class="tee-group-meta">
+                  <text class="tee-group-badge">{{item.badge || item.groupName}}</text>
+                  <view class="tee-start-info"><text class="tee-clock">🕘</text>{{item.teeMetaLine}}</view>
+                </view>
+                <view wx:if="{{item.hasDisplayPlayers}}" class="gb-group-player-grid">
+                  <view
+                    wx:for="{{item.displayPlayers}}"
+                    wx:for-item="pl"
+                    wx:key="userId"
+                    class="gb-group-player {{pl.teamLabel ? 'gb-group-player--with-team' : ''}}"
+                  >
+                    <view class="gb-group-player-main-row">
+                      <view class="gb-group-player-avatar-col">
+                        <view class="gb-group-player-avatar-wrap">
+                          <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                          <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                        </view>
+                        <text wx:if="{{pl.teamLabel}}" class="gb-group-player-team-label">{{pl.teamLabel}}</text>
+                      </view>
+                      <view class="gb-group-player-meta">
+                        <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                        <view wx:if="{{pl.teeText || pl.teeLabel || pl.tee || pl.teeMarkerClass}}" class="gb-group-player-tee">
+                          <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                          <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || pl.tee}}</text>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+                <view wx:else class="groups-tab-no-players">
+                  <text class="groups-tab-no-players__text">暂无球员</text>
+                </view>
+                <view wx:if="{{item.compositionPreview}}" class="schedule-composition-preview">
+                  <view wx:if="{{item.compositionPreview.showCombo1}}" class="schedule-composition-line">
+                    <text>{{item.compositionPreview.combo1Label}}：{{item.compositionPreview.combo1Text}}</text>
+                  </view>
+                  <view wx:if="{{item.compositionPreview.showCombo2}}" class="schedule-composition-line">
+                    <text>{{item.compositionPreview.combo2Label}}：{{item.compositionPreview.combo2Text}}</text>
+                  </view>
+                </view>
+                <view wx:if="{{item.matchPlayTeamPreview && item.matchPlayTeamPreview.length}}" class="schedule-composition-preview">
+                  <view wx:for="{{item.matchPlayTeamPreview}}" wx:for-item="line" wx:key="teamName" class="schedule-composition-line">
+                    <text>{{line.teamName}}：{{line.namesText}}</text>
+                  </view>
+                </view>
+                <text class="tee-status">{{item.statusBadge}}</text>
+              </view>
+            </view>
+          </block>
+          <block wx:elif="{{schedule.panelMode === 'tee'}}">
+            <view class="schedule-tee-panel {{schedule.cta.showEditGroups ? 'schedule-tee-panel--with-cta' : ''}}">
+              <view wx:if="{{!schedule.teeGroups.length}}" class="series-empty">
+                <text class="series-empty__title">暂无出发表</text>
+                <text class="series-empty__msg">本轮尚未生成分组</text>
+              </view>
+              <view
+                wx:for="{{schedule.teeGroups}}"
+                wx:key="groupId"
+                class="tee-group-card"
+                data-group-id="{{item.groupId || item.id}}"
+                bindtap="onScheduleTeeGroupTap"
+              >
+                <view class="tee-group-meta">
+                  <text class="tee-group-badge">{{item.badge || item.name}}</text>
+                  <view class="tee-start-info"><text class="tee-clock">🕘</text>{{item.teeMetaLine}}</view>
+                </view>
+                <view wx:if="{{item.hasDisplayPlayers}}" class="gb-group-player-grid">
+                  <view
+                    wx:for="{{item.displayPlayers}}"
+                    wx:for-item="pl"
+                    wx:key="userId"
+                    class="gb-group-player {{pl.teamLabel ? 'gb-group-player--with-team' : ''}}"
+                  >
+                    <view class="gb-group-player-main-row">
+                      <view class="gb-group-player-avatar-col">
+                        <view class="gb-group-player-avatar-wrap">
+                          <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                          <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
+                        </view>
+                        <text wx:if="{{pl.teamLabel}}" class="gb-group-player-team-label">{{pl.teamLabel}}</text>
+                      </view>
+                      <view class="gb-group-player-meta">
+                        <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                        <view wx:if="{{pl.teeText || pl.teeLabel || pl.tee || pl.teeMarkerClass}}" class="gb-group-player-tee">
+                          <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                          <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || pl.tee}}</text>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+                <text class="tee-status">{{item.statusBadge}}</text>
+              </view>
+            </view>
+          </block>
+        </block>
+
+        <!-- 讨论区：整 Series 共用页面会话（seriesId）；复用全局 discussion，不写分站 -->
+        <block wx:if="{{activeTab === 'discussion'}}">
+          <discussion
+            id="series-discussion"
+            class="discussion-inline"
+            watchers="{{discussionWatchers}}"
+            messages="{{discussionChat}}"
+            theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
+            fontScale="{{fontScale}}"
+            self-avatar="{{discussionSelfAvatar}}"
+            fixed-input="{{true}}"
+            show-input-bar="{{showDiscussionInput}}"
+            input-disabled="{{discussionInputDisabled}}"
+            input-placeholder="{{discussionInputPlaceholder}}"
+            show-watchers-strip="{{true}}"
+            enable-time-nodes="{{true}}"
+            bind:send="onDiscussionSend"
+          ></discussion>
+        </block>
+      </view>
+      </view>
+      <view
+        class="series-scroll-filler"
+        style="height:{{scrollFillerHeight}}px;"
+        aria-hidden="true"
+      ></view>
+    </scroll-view>
+
+    <!-- 一级 TAB 固定克隆：z-index 130（common）；流内节点始终占位 -->
+    <view
+      class="tab-scroll-wrap tab-scroll-wrap--fixed {{isStickyTab ? 'tab-scroll-wrap--show' : 'tab-scroll-wrap--hide'}}"
+      style="top:{{headerTotalHeight}}px;"
+    >
+      <scroll-view
+        class="gb-tabs"
+        scroll-x
+        enable-flex
+        scroll-left="{{tabHScrollLeft}}"
+        scroll-with-animation="{{false}}"
+        bindscroll="onTabHScroll"
+      >
+        <view
+          wx:for="{{tabs}}"
+          wx:key="id"
+          id="fixed-tab-{{item.id}}"
+          bindtap="switchTab"
+          data-tab="{{item.id}}"
+          class="tab-btn {{activeTab === item.id ? 'active' : ''}}"
+        >{{item.label}}</view>
+      </scroll-view>
+      <view wx:if="{{tabShowLeftIndicator}}" class="tab-overflow-hint tab-overflow-hint--left" aria-hidden="true"><text class="tab-overflow-hint__chev">‹</text></view>
+      <view wx:if="{{tabShowRightIndicator}}" class="tab-overflow-hint tab-overflow-hint--right" aria-hidden="true"><text class="tab-overflow-hint__chev">›</text></view>
+    </view>
+
+    <!-- 二级 fixed round dock：页根级、主 scroll-view 外；只负责纵向吸顶；常驻 + show/hide（不因 sticky 卸载） -->
+    <view
+      class="series-round-dock series-round-dock--fixed {{activeTab === 'standings' && standings.available && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}}"
+      style="top:{{stickyRoundSelectorTop}}px;"
+    >
+      <view class="series-round-dock__inner">
+        <series-round-selector-dock
+          mode="fixed"
+          sticky="{{isStickyRoundSelector}}"
+          top="{{stickyRoundSelectorTop}}"
+          show-tot="{{true}}"
+          total-selector="{{standings.totalSelector}}"
+          rounds="{{standings.roundSelectorItems}}"
+          round-info-text="{{standings.roundInfoText}}"
+          scroll-left="{{roundSelectorScrollLeft}}"
+          theme-class="{{themeClass}}"
+          bind:roundtap="onStandingsRoundTap"
+          bind:hscroll="onRoundSelectorHScroll"
+        />
+      </view>
+    </view>
+
+    <!-- 赛程 fixed dock：与总榜互斥 TAB；始终挂载，只 show/hide -->
+    <view
+      class="series-round-dock series-round-dock--fixed {{activeTab === 'schedule' && schedule.roundSelector.length && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}}"
+      style="top:{{stickyRoundSelectorTop}}px;"
+    >
+      <view class="series-round-dock__inner">
+        <series-round-selector-dock
+          mode="fixed"
+          sticky="{{isStickyRoundSelector}}"
+          top="{{stickyRoundSelectorTop}}"
+          show-tot="{{false}}"
+          rounds="{{schedule.roundSelector}}"
+          round-info-text="{{schedule.roundInfoText}}"
+          scroll-left="{{scheduleRoundSelectorScrollLeft}}"
+          theme-class="{{themeClass}}"
+          bind:roundtap="onScheduleRoundTap"
+          bind:hscroll="onScheduleRoundHScroll"
+        />
+      </view>
+    </view>
+
+    <!-- 报名扩展区 fixed：与总榜 dock 同 top（一级 TAB 底），互斥 TAB；show/hide 防闪 -->
+    <view
+      class="register-ext-wrap register-ext-wrap--fixed {{activeTab === 'register' && isStickyRegisterExt ? 'register-ext-wrap--show' : 'register-ext-wrap--hide'}}"
+      style="top:{{stickyRoundSelectorTop}}px;"
+    >
+      <template
+        is="seriesRegisterExtensionStrip"
+        data="{{register: register, registerSubTabScrollLeft: registerSubTabScrollLeft}}"
+      />
+    </view>
+
+    <!-- 报名 CTA：C3-D 几何门闩 + C3-Z M 弹层时强制隐藏/不可点 -->
+    <view
+      wx:if="{{showRegisterBottomAction && !isManageOverlayActive}}"
+      class="register-cta-bar series-layer-tab-cta {{(registerSheetVisible || registerForOtherSheetVisible || proxyMemberSourceSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || isManageOverlayActive) ? 'register-cta-bar--under-sheet' : ''}}"
+    >
+      <view
+        class="register-cta-btn {{register.cta.disabled ? 'register-cta-btn--disabled' : ''}} {{register.cta.action === 'cancel' ? 'register-cta-btn--cancel' : ''}}"
+        bindtap="onRegisterCtaTap"
+      >{{register.cta.label}}</view>
+    </view>
+
+    <!-- 赛程 CTA：C3-D + C3-Z -->
+    <view
+      wx:if="{{showScheduleBottomAction && !isManageOverlayActive}}"
+      class="register-cta-bar series-layer-tab-cta"
+    >
+      <view class="register-cta-btn" bindtap="openScheduleGroupEditor">{{schedule.cta.editGroupsLabel}}</view>
+    </view>
+
+    <!-- 本人报名 sheet（替他人报名复刻队际赛多步 sheet，见下方） -->
+    <view wx:if="{{registerSheetVisible}}" bindtap="closeRegisterSheet" class="sheet-overlay"></view>
+    <view wx:if="{{registerSheetVisible}}" class="bottom-sheet register-sheet" catchtap="stopPropagation">
+      <view class="sheet-top-accent"></view>
+      <view class="sheet-handle"></view>
+      <view class="register-sheet__head">
+        <text class="register-sheet__title">{{registerSheetTitle}}</text>
+        <text class="register-sheet__sub">{{registerSheetSub}}</text>
+      </view>
+
+      <view class="register-sheet__field">
+        <text class="register-sheet__label">{{registerSheetGroupLabel}}</text>
+        <view class="register-sheet__groups">
+          <view
+            wx:for="{{registerSheetOptions}}"
+            wx:key="id"
+            bindtap="selectRegisterSheetParticipant"
+            data-id="{{item.id}}"
+            class="register-sheet__group {{registerSheetParticipantId === item.id ? 'register-sheet__group--active' : ''}}"
+          >
+            <image wx:if="{{item.logo}}" class="register-sheet__group-logo" src="{{item.logo}}" mode="aspectFill" />
+            <text>{{item.name}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="register-sheet__field">
+        <text class="register-sheet__label">比赛名</text>
+        <input
+          class="register-sheet__input"
+          type="text"
+          value="{{registerCompetitionNameDraft}}"
+          bindinput="onRegisterCompetitionNameInput"
+          placeholder="请输入比赛名"
+          placeholder-class="register-sheet__placeholder"
+          maxlength="32"
+        />
+        <text class="register-sheet__hint">优先使用资料中的比赛名；未设置时默认取昵称</text>
+      </view>
+
+      <view class="register-sheet__field">
+        <text class="register-sheet__label">性别</text>
+        <view class="register-sheet__groups register-sheet__groups--readonly">
+          <view class="register-sheet__group {{registerGenderDraft === '男' ? 'register-sheet__group--active' : ''}}">男</view>
+          <view class="register-sheet__group {{registerGenderDraft === '女' ? 'register-sheet__group--active' : ''}}">女</view>
+        </view>
+        <text class="register-sheet__hint">性别来自个人资料，报名弹窗不可修改</text>
+      </view>
+
+      <view class="register-sheet__actions">
+        <view bindtap="closeRegisterSheet" class="register-sheet__cancel">取 消</view>
+        <view bindtap="confirmRegister" class="register-sheet__confirm {{registerSubmitting ? 'is-disabled' : ''}}">确认报名</view>
+      </view>
+    </view>
+
+    <!-- 替他人报名：人员来源（M 二级 host；保留组件 visible 生命周期） -->
+    <view class="series-layer-l2-host">
+      <player-source-sheet
+        class="series-layer-l2-component"
+        visible="{{registerForOtherSheetVisible}}"
+        theme-class="{{themeClass}}"
+        overline="ADD PLAYER"
+        title="选择添加方式"
+        options="{{registerForOtherSourceOptions}}"
+        bind:close="closeRegisterForOtherSheet"
+        bind:select="onRegisterForOtherSourceSelect"
+        bind:denied="onRegisterForOtherSourceDenied"
+      />
+    </view>
+
+    <!-- 替他人报名 · 手工添加（M 二级） -->
+    <view wx:if="{{registerForOtherManualVisible}}" class="manual-sheet-mask series-layer-l2-overlay" bindtap="closeRegisterForOtherManualSheet"></view>
+    <view wx:if="{{registerForOtherManualVisible}}" class="manual-sheet series-layer-l2-sheet {{themeClass}}" catchtap="stopPropagation">
+      <view class="manual-sheet__handle"></view>
+      <view class="manual-sheet__header">
+        <view>
+          <text class="manual-sheet__overline">Add Player</text>
+          <text class="manual-sheet__title">添加人员</text>
+        </view>
+        <view class="manual-sheet__close" bindtap="closeRegisterForOtherManualSheet"><text>×</text></view>
+      </view>
+      <view class="manual-sheet__body">
+        <view class="manual-field">
+          <text class="manual-field__label">选手姓名（必填）</text>
+          <input
+            class="manual-field__input"
+            type="text"
+            maxlength="20"
+            placeholder="请输入选手姓名"
+            placeholder-class="manual-field__placeholder"
+            value="{{registerForOtherManualName}}"
+            bindinput="onRegisterForOtherManualNameInput"
+          />
+        </view>
+        <view class="manual-field">
+          <text class="manual-field__label">手机号码（选填）</text>
+          <input
+            class="manual-field__input"
+            type="number"
+            maxlength="11"
+            placeholder="请输入手机号码"
+            placeholder-class="manual-field__placeholder"
+            value="{{registerForOtherManualPhone}}"
+            bindinput="onRegisterForOtherManualPhoneInput"
+          />
+        </view>
+        <view class="manual-field">
+          <text class="manual-field__label">性别</text>
+          <view class="manual-gender">
+            <view
+              class="manual-gender__tag {{registerForOtherManualGender === 'male' ? 'is-active' : ''}}"
+              data-gender="male"
+              bindtap="onRegisterForOtherManualGenderSelect"
+            >男</view>
+            <view
+              class="manual-gender__tag {{registerForOtherManualGender === 'female' ? 'is-active' : ''}}"
+              data-gender="female"
+              bindtap="onRegisterForOtherManualGenderSelect"
+            >女</view>
+          </view>
+        </view>
+      </view>
+      <view class="manual-sheet__footer">
+        <view class="manual-sheet__btn manual-sheet__btn--cancel" bindtap="closeRegisterForOtherManualSheet">取消</view>
+        <view class="manual-sheet__btn manual-sheet__btn--confirm" bindtap="confirmRegisterForOtherManualSheet">确定</view>
+      </view>
+    </view>
+
+    <!-- 替他人报名 · 选择成员来源球队（M 二级） -->
+    <view wx:if="{{proxyMemberSourceSheetVisible}}" bindtap="cancelProxyMemberSourceSheet" class="sheet-overlay series-layer-l2-overlay"></view>
+    <view wx:if="{{proxyMemberSourceSheetVisible}}" class="bottom-sheet register-sheet proxy-group-sheet series-layer-l2-sheet" catchtap="stopPropagation">
+      <view class="sheet-top-accent"></view>
+      <view class="sheet-handle"></view>
+      <view class="register-sheet__head">
+        <text class="register-sheet__overline">Member Source</text>
+        <text class="register-sheet__title">选择成员来源球队</text>
+        <text class="register-sheet__sub">从哪支参赛球队的成员列表中选人；之后仍可更换报名球队</text>
+      </view>
+      <view class="register-sheet__field">
+        <text class="register-sheet__label">成员来源</text>
+        <view class="register-sheet__groups">
+          <view
+            wx:for="{{proxyMemberSourceOptions}}"
+            wx:key="id"
+            bindtap="selectProxyMemberSource"
+            data-id="{{item.id}}"
+            class="register-sheet__group {{proxyMemberSourceGroupId === item.id ? 'register-sheet__group--active' : ''}}"
+          >
+            <image wx:if="{{item.logo}}" class="register-sheet__group-logo" src="{{item.logo}}" mode="aspectFill" />
+            <text>{{item.name}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="register-sheet__actions">
+        <view bindtap="cancelProxyMemberSourceSheet" class="register-sheet__cancel">取消</view>
+        <view bindtap="confirmProxyMemberSourceSheet" class="register-sheet__confirm">下一步</view>
+      </view>
+    </view>
+
+    <!-- 替他人报名 · 选择报名球队/分队（seriesParticipantId） -->
+    <view wx:if="{{proxyGroupSheetVisible}}" bindtap="cancelProxyGroupSheet" class="sheet-overlay series-layer-l2-overlay"></view>
+    <view wx:if="{{proxyGroupSheetVisible}}" class="bottom-sheet register-sheet proxy-group-sheet series-layer-l2-sheet" catchtap="stopPropagation">
+      <view class="sheet-top-accent"></view>
+      <view class="sheet-handle"></view>
+      <view class="register-sheet__head">
+        <text class="register-sheet__overline">Registration Team</text>
+        <text class="register-sheet__title">{{proxyGroupSheetTitle}}</text>
+        <text class="register-sheet__sub">{{proxyGroupSheetSub}}</text>
+      </view>
+      <view wx:if="{{proxyMemberSourceDisplayName}}" class="register-sheet__field">
+        <text class="register-sheet__label">成员来源</text>
+        <view class="register-sheet__readonly">{{proxyMemberSourceDisplayName}}</view>
+      </view>
+      <view class="register-sheet__field">
+        <text class="register-sheet__label">{{proxyRegistrationFieldLabel}}（可更换）</text>
+        <view class="register-sheet__groups">
+          <view
+            wx:for="{{proxyGroupOptions}}"
+            wx:key="id"
+            bindtap="selectProxyGroup"
+            data-id="{{item.id}}"
+            class="register-sheet__group {{proxyGroupId === item.id ? 'register-sheet__group--active' : ''}}"
+          >
+            <image wx:if="{{item.logo}}" class="register-sheet__group-logo" src="{{item.logo}}" mode="aspectFill" />
+            <text>{{item.name}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="register-sheet__actions">
+        <view bindtap="cancelProxyGroupSheet" class="register-sheet__cancel">取消</view>
+        <view bindtap="confirmProxyGroupSheet" class="register-sheet__confirm {{registerSubmitting ? 'is-disabled' : ''}}">确定</view>
+      </view>
+    </view>
+
+    <!-- Series M FAB（复刻 detail；discussion 隐藏；门闩前不渲染） -->
+    <view
+      wx:if="{{seriesManageFabVisible && activeTab !== 'discussion'}}"
+      catchtap="onMoreFabTap"
+      bindtouchstart="onMoreFabTouchStart"
+      bindtouchmove="onMoreFabTouchMove"
+      bindtouchend="onMoreFabTouchEnd"
+      bindtouchcancel="onMoreFabTouchEnd"
+      class="leaderboard-fab series-layer-m-fab {{moreFabExpanded ? 'leaderboard-fab--expanded' : ''}} {{moreFabDragging ? 'leaderboard-fab--dragging' : ''}} {{moreFabHitTarget ? 'leaderboard-fab--hit' : ''}}"
+      style="{{fabStyle}}"
+    >
+      <text class="fab-label">{{moreFabExpanded ? 'MORE' : 'M'}}</text>
+    </view>
+
+    <!-- Series M 统一面板：一级 overlay/sheet（C3-Z） -->
+    <view wx:if="{{showMoreSheet}}" bindtap="closeMoreSheet" class="sheet-overlay series-layer-l1-overlay"></view>
+    <view wx:if="{{showMoreSheet}}" class="bottom-sheet series-manage-unified-sheet series-layer-l1-sheet" catchtap="stopPropagation">
+      <view class="sheet-top-accent"></view>
+      <view class="sheet-handle"></view>
+      <scroll-view class="series-manage-unified-scroll" scroll-y="{{true}}" show-scrollbar="{{false}}">
+        <!-- M-GRID：唯一左右 padding 在 scroll；分区仅垂直间距，网格共用 series-manage-feature-grid -->
+        <view wx:if="{{seriesManageFeaturesCommon.length}}" class="series-manage-section">
+          <view class="feature-section-title">
+            <text class="fst-main">普通功能</text>
+            <text class="fst-sub">代报名与邀请（不依赖轮次）</text>
+          </view>
+          <view class="series-manage-feature-grid">
+            <view
+              wx:for="{{seriesManageFeaturesCommon}}"
+              wx:key="permission"
+              bindtap="onSeriesScopeFeatureTap"
+              data-permission="{{item.permission}}"
+              data-disabled="{{item.disabled}}"
+              class="series-manage-feature-item {{item.disabled ? 'is-disabled' : ''}}"
+            >
+              <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+              <text class="feature-label">{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{seriesManageCanManage && seriesManageFeaturesManage.length}}" class="series-manage-section">
+          <view class="feature-section-title">
+            <text class="fst-main">系列赛管理</text>
+            <text class="fst-sub">仅管理员</text>
+          </view>
+          <!-- 四列网格：第1取消系列赛，第2打开/关闭报名；不造第3/4位占位 -->
+          <view class="series-manage-feature-grid">
+            <view
+              wx:for="{{seriesManageFeaturesManage}}"
+              wx:key="permission"
+              bindtap="onSeriesScopeFeatureTap"
+              data-permission="{{item.permission}}"
+              data-disabled="{{item.disabled}}"
+              class="series-manage-feature-item {{item.disabled ? 'is-disabled' : ''}}"
+            >
+              <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+              <text class="feature-label">{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <block wx:if="{{seriesManageShowRound}}">
+          <view class="series-manage-section">
+            <view class="feature-section-title">
+              <text class="fst-main">选择轮次</text>
+              <text class="fst-sub">点选后显示本轮普通功能</text>
+            </view>
+            <view class="series-manage-round-wrap">
+              <view wx:if="{{manageRoundShowLeftIndicator}}" class="series-manage-round-overflow series-manage-round-overflow--left" aria-hidden="true">‹</view>
+              <view wx:if="{{manageRoundShowRightIndicator}}" class="series-manage-round-overflow series-manage-round-overflow--right" aria-hidden="true">›</view>
+              <scroll-view
+                class="series-manage-round-scroll"
+                scroll-x="{{true}}"
+                enable-flex="{{true}}"
+                show-scrollbar="{{false}}"
+                scroll-left="{{manageRoundPickerScrollLeft}}"
+                bindscroll="onManageRoundPickerHScroll"
+              >
+                <view class="series-manage-round-row">
+                  <view
+                    wx:for="{{manageRoundPicker.items}}"
+                    wx:key="key"
+                    class="series-manage-round-card round-selector-item {{item.stateClass}} {{item.isSuggested ? 'round-selector-item--suggested' : ''}} {{item.isSelected ? 'round-selector-item--selected' : ''}}"
+                    data-round-id="{{item.roundId}}"
+                    bindtap="onManageRoundPick"
+                  >
+                    <text wx:if="{{item.isSuggested}}" class="round-selector-item__suggest">建议</text>
+                    <text wx:if="{{item.showSelectedCheck}}" class="round-selector-item__check">✓</text>
+                    <text class="series-manage-round-card__r">{{item.label}}</text>
+                    <text wx:if="{{item.name}}" class="series-manage-round-card__name">{{item.name}}</text>
+                    <text wx:if="{{item.dateText}}" class="series-manage-round-card__date">{{item.dateText}}</text>
+                    <text class="series-manage-round-card__status">{{item.statusLabel}}</text>
+                  </view>
+                </view>
+              </scroll-view>
+            </view>
+            <view wx:if="{{manageRoundPicker.emptyText}}" class="series-manage-round-empty">{{manageRoundPicker.emptyText}}</view>
+          </view>
+
+          <!-- 本轮普通功能：领先榜 / 统计数据（查看权限，不要求管理员） -->
+          <view wx:if="{{roundViewSection.hasSelection}}" class="series-manage-section series-manage-round-view-section">
+            <view class="feature-section-title">
+              <text class="fst-main">{{roundViewSection.headline}}</text>
+              <text wx:if="{{roundViewSection.summaryLine}}" class="fst-sub">{{roundViewSection.summaryLine}}</text>
+            </view>
+            <view wx:if="{{!roundViewSection.gateOk}}" class="series-manage-round-placeholder series-manage-round-placeholder--error">
+              {{roundViewSection.gateMessage}}
+            </view>
+            <view wx:else class="series-manage-feature-grid">
+              <view
+                wx:for="{{roundViewSection.features}}"
+                wx:key="slotKey"
+                bindtap="onSeriesRoundViewFeatureTap"
+                data-permission="{{item.permission}}"
+                data-placeholder="{{item.placeholder}}"
+                data-disabled="{{item.disabled}}"
+                class="series-manage-feature-item {{item.placeholder || item.empty ? 'series-manage-feature-item--empty' : ''}} {{item.disabled && !item.placeholder && !item.empty ? 'is-disabled' : ''}}"
+              >
+                <block wx:if="{{!item.placeholder && !item.empty}}">
+                  <view class="feature-icon"><text>{{item.glyph}}</text></view>
+                  <text class="feature-label">{{item.label}}</text>
+                </block>
+              </view>
+            </view>
+          </view>
+
+          <!-- 本轮赛事管理：同一 series-manage-feature-grid；无「本轮管理」标题、无独立 lifecycle、无额外左右 padding -->
+          <view wx:if="{{seriesManageCanManage && roundManageSection.hasSelection}}" class="series-manage-section series-manage-round-section">
+            <view wx:if="{{!roundManageSection.gateOk}}" class="series-manage-round-placeholder series-manage-round-placeholder--error">
+              {{roundManageSection.gateMessage}}
+            </view>
+            <block wx:else>
+              <view wx:if="{{roundManageSection.featuresSectionPermissionMain}}" class="feature-section-title">
+                <text class="fst-main">{{roundManageSection.featuresSectionPermissionMain}}</text>
+                <text wx:if="{{roundManageSection.featuresSectionPermissionSub}}" class="fst-sub">{{roundManageSection.featuresSectionPermissionSub}}</text>
+              </view>
+              <view wx:if="{{roundManageSection.featuresPermission.length}}" class="series-manage-feature-grid">
+                <view
+                  wx:for="{{roundManageSection.featuresPermission}}"
+                  wx:key="slotKey"
+                  bindtap="onSeriesManageFeatureTap"
+                  data-permission="{{item.permission}}"
+                  data-placeholder="{{item.placeholder}}"
+                  data-disabled="{{item.disabled}}"
+                  class="series-manage-feature-item {{item.placeholder || item.empty ? 'series-manage-feature-item--empty' : ''}} {{item.disabled && !item.placeholder && !item.empty ? 'is-disabled' : ''}}"
+                >
+                  <block wx:if="{{!item.placeholder && !item.empty}}">
+                    <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+                    <text class="feature-label">{{item.label}}</text>
+                  </block>
+                </view>
+              </view>
+            </block>
+          </view>
+        </block>
+      </scroll-view>
+      <view class="sheet-cancel-wrap">
+        <view bindtap="closeMoreSheet" class="sheet-cancel-btn">关 闭</view>
+      </view>
+    </view>
+
+    <!-- M 二级 host：常驻栈上下文；组件仍用 visible 控制（不改共享组件 z-index，避免 detail 回归） -->
+    <view class="series-layer-l2-host">
+      <leaderboard-setting-sheet
+        class="series-layer-l2-component"
+        visible="{{showLeaderboardSettingSheet}}"
+        theme-class="{{themeClass}}"
+        overline="LEADERBOARD"
+        title="查看方式"
+        subtitle="{{leaderboardSettingSubtitle}}"
+        sections="{{leaderboardSettingSections}}"
+        draft-values="{{leaderboardSettingDraftValues}}"
+        bind:close="closeLeaderboardSettingSheet"
+        bind:cancel="closeLeaderboardSettingSheet"
+        bind:change="onLeaderboardSettingChange"
+        bind:confirm="confirmLeaderboardSettingSheet"
+      />
+      <temp-admin-permission-sheet
+        class="series-layer-l2-component"
+        id="tempAdminPermissionSheet"
+        visible="{{tempAdminSheetVisible}}"
+        match-id="{{tempAdminSheetMatchId}}"
+        round-subtitle="{{tempAdminSheetRoundSubtitle}}"
+        theme-class="{{themeClass}}"
+        bind:close="onTempAdminPermissionSheetClose"
+        bind:saved="onTempAdminPermissionSheetSaved"
+      />
+      <match-player-management-sheet
+        class="series-layer-l2-component"
+        id="matchPlayerManagementSheet"
+        visible="{{playerManageSheetVisible}}"
+        match-id="{{playerManageSheetMatchId}}"
+        round-subtitle="{{playerManageSheetRoundSubtitle}}"
+        theme-class="{{themeClass}}"
+        series-mode="{{true}}"
+        roster-snapshot="{{playerManageRosterSnapshot}}"
+        bind:close="onPlayerManageSheetClose"
+        bind:saved="onPlayerManageSheetSaved"
+      />
+      <match-tee-management-sheet
+        class="series-layer-l2-component"
+        id="matchTeeManagementSheet"
+        visible="{{teeSheetManageSheetVisible}}"
+        match-id="{{teeSheetManageSheetMatchId}}"
+        round-subtitle="{{teeSheetManageSheetRoundSubtitle}}"
+        theme-class="{{themeClass}}"
+        bind:close="onTeeSheetManageSheetClose"
+        bind:saved="onTeeSheetManageSheetSaved"
+      />
+      <match-payment-management-sheet
+        class="series-layer-l2-component"
+        id="matchPaymentManagementSheet"
+        visible="{{paymentManageSheetVisible}}"
+        match-id="{{paymentManageSheetMatchId}}"
+        round-subtitle="{{paymentManageSheetRoundSubtitle}}"
+        theme-class="{{themeClass}}"
+        data-mode="grouped_players"
+        series-id="{{paymentManageSheetSeriesId}}"
+        round-id="{{paymentManageSheetRoundId}}"
+        roster-snapshot="{{paymentManageRosterSnapshot}}"
+        bind:close="onPaymentManageSheetClose"
+        bind:changed="onPaymentManageSheetChanged"
+      />
+      <half-course-sheet
+        class="series-layer-l2-component"
+        visible="{{halfSheetVisible}}"
+        match-id="{{halfSheetMatchId}}"
+        source="team_match"
+        theme-class="{{themeClass}}"
+        round-subtitle="{{halfSheetRoundSubtitle}}"
+        bind:close="onHalfCourseSheetClose"
+        bind:confirm="onHalfCourseSheetConfirm"
+      />
+    </view>
+  </block>
+</view>

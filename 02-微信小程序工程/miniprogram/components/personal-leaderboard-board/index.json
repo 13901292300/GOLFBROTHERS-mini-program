@@ -1,0 +1,8 @@
+{
+  "component": true,
+  "styleIsolation": "apply-shared",
+  "usingComponents": {
+    "leaderboard-player-profile-panel": "/components/leaderboard-player-profile-panel/index",
+    "leaderboard-player-identity": "/components/leaderboard-player-identity/index"
+  }
+}

@@ -373,7 +373,7 @@ Page({
       sortField: 'total',
       sortOrder: 'asc',
       dataSource: loaded.dataSource,
-      subtitle: this._subtitleForDataSource(loaded.dataSource),
+      subtitle: this._resolveStatsSubtitle(opts, loaded.dataSource),
       rows: loaded.rows
     });
     this._applyPageBackground();
@@ -385,6 +385,26 @@ Page({
     if (dataSource === 'adapter') return '赛事统计 · 真实成绩';
     if (dataSource === 'mock') return '赛事统计 · Mock 预览';
     return '赛事统计 · 暂无数据';
+  },
+
+  /**
+   * Series 传入 roundSubtitle（如 R1 · 第一轮）时优先展示；
+   * 普通赛事仍走 dataSource 默认副标题。
+   */
+  _resolveStatsSubtitle(options, dataSource) {
+    const opts = options || {};
+    let roundSubtitle = '';
+    try {
+      roundSubtitle =
+        opts.roundSubtitle != null
+          ? decodeURIComponent(String(opts.roundSubtitle))
+          : '';
+    } catch (e) {
+      roundSubtitle = opts.roundSubtitle != null ? String(opts.roundSubtitle) : '';
+    }
+    roundSubtitle = String(roundSubtitle || '').trim();
+    if (roundSubtitle) return roundSubtitle;
+    return this._subtitleForDataSource(dataSource);
   },
 
   /**

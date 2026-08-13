@@ -189,10 +189,17 @@
                       </view>
                       <view class="ds-card-club__title-wrap">
                         <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                        <text wx:if="{{item.titleSub}}" class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-sub">{{item.titleSub}}</text>
                       </view>
                     </view>
                     <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
                       <text>{{item.teamName}}</text>
+                    </view>
+                    <view wx:if="{{item.tagLine}}" class="ds-card-club__tagline ds-text-muted text-9px">
+                      <text>{{item.tagLine}}</text>
+                    </view>
+                    <view wx:if="{{item.privacyLabel}}" class="ds-card-club__privacy ds-text-muted text-9px">
+                      <text>{{item.privacyLabel}}</text>
                     </view>
                     <view class="ds-card-club__meta-row ds-text-muted text-9px">
                       <view class="ds-card-club__meta-grow">
@@ -275,10 +282,17 @@
                       </view>
                       <view class="ds-card-club__title-wrap">
                         <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                        <text wx:if="{{item.titleSub}}" class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-sub">{{item.titleSub}}</text>
                       </view>
                     </view>
                     <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
                       <text>{{item.teamName}}</text>
+                    </view>
+                    <view wx:if="{{item.tagLine}}" class="ds-card-club__tagline ds-text-muted text-9px">
+                      <text>{{item.tagLine}}</text>
+                    </view>
+                    <view wx:if="{{item.privacyLabel}}" class="ds-card-club__privacy ds-text-muted text-9px">
+                      <text>{{item.privacyLabel}}</text>
                     </view>
                     <view class="ds-card-club__meta-row ds-text-muted text-9px">
                       <view class="ds-card-club__meta-grow">
