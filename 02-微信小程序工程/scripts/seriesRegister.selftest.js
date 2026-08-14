@@ -428,7 +428,7 @@ function fakeTeamsByUserId(map) {
       identityOk: true,
       isRegistered: false,
       eligibleCount: 1
-    }).label === '报名已关闭'
+    }).label === '报名通道已关闭'
   );
   assert(
     'published+open+无资格 CTA',
@@ -482,6 +482,42 @@ function fakeTeamsByUserId(map) {
       isRegistered: true,
       eligibleCount: 0
     }).action === 'cancel'
+  );
+  assert(
+    'live+open 仍可立即报名',
+    registerVm.resolveRegisterCta({
+      lifecycleAccess: { lifecycleStatus: 'published' },
+      registrationState: 'open',
+      identityOk: true,
+      isRegistered: false,
+      eligibleCount: 1,
+      competitionPhaseCache: 'live'
+    }).action === 'register'
+  );
+  assert(
+    'Series 整体 completed 隐藏可操作 CTA',
+    (function () {
+      var cta = registerVm.resolveRegisterCta({
+        lifecycleAccess: { lifecycleStatus: 'published' },
+        registrationState: 'open',
+        identityOk: true,
+        isRegistered: true,
+        eligibleCount: 1,
+        competitionPhaseCache: 'completed'
+      });
+      return cta.disabled && cta.action === 'none' && cta.label === '';
+    })()
+  );
+  assert(
+    'settlement_pending 不视为 Series 完赛',
+    registerVm.resolveRegisterCta({
+      lifecycleAccess: { lifecycleStatus: 'published' },
+      registrationState: 'open',
+      identityOk: true,
+      isRegistered: false,
+      eligibleCount: 1,
+      competitionPhaseCache: 'settlement_pending'
+    }).action === 'register'
   );
 })();
 
@@ -562,15 +598,15 @@ function fakeTeamsByUserId(map) {
   assert(
     'C3-U 报名名单：昵称+性别同 inline-flex 容器；昵称不得 flex:1 推开性别',
     (function () {
-      // 跳过表头「球员」列，取行内球员格
-      var avatarIdx = regPanelWxml.indexOf('class="roster-avatar"');
-      if (avatarIdx < 0) return false;
-      var block = regPanelWxml.slice(avatarIdx, avatarIdx + 600);
+      // 过期 600 字窗口会因头像 data-* 主页接线截断；直接锚定已验收的 name-line
+      var nameLineIdx = regPanelWxml.indexOf('roster-player-name-line');
+      if (nameLineIdx < 0) return false;
+      var block = regPanelWxml.slice(nameLineIdx, nameLineIdx + 400);
       var nameRule = pageWxss.match(/\.roster-name\s*\{[\s\S]*?\}/);
       var nameCss = nameRule ? nameRule[0] : '';
       return (
-        block.indexOf('roster-player-main') >= 0 &&
-        block.indexOf('roster-player-name-line') >= 0 &&
+        regPanelWxml.indexOf('roster-player-main') >= 0 &&
+        block.indexOf('roster-name') >= 0 &&
         /roster-name[\s\S]{0,200}roster-gender/.test(block) &&
         /wx:if="\{\{item\.genderIcon\}\}"/.test(block) &&
         block.indexOf('roster-name-wrap') < 0 &&
@@ -650,19 +686,19 @@ function fakeTeamsByUserId(map) {
         ctaBody.indexOf('openProxyRegisterSheet') < 0 &&
         /openRegisterSheet:[\s\S]{0,2500}_registerSheetMode = 'self'/.test(pageJs) &&
         /openRegisterSheet:[\s\S]{0,2500}registerSheetMode:\s*'self'/.test(pageJs) &&
-        /openProxyRegisterSheet:[\s\S]{0,1600}registerForOtherSheetVisible:\s*true/.test(
+        /openProxyRegisterSheet:[\s\S]{0,2200}registerForOtherSheetVisible:\s*true/.test(
           pageJs
         ) &&
-        // 对齐队际赛：入口点击 closed → toast「报名通道已关闭」，不进选人 sheet
-        /openProxyRegisterSheet:[\s\S]{0,900}报名通道已关闭/.test(pageJs) &&
-        /openProxyRegisterSheet:[\s\S]{0,700}registrationState[\s\S]{0,120}!==\s*'open'/.test(
+        // 对齐队际赛：入口点击 closed → 共享 Modal，不进选人 sheet
+        /openProxyRegisterSheet:[\s\S]{0,1200}_showRegistrationClosedModal/.test(pageJs) &&
+        /openProxyRegisterSheet:[\s\S]{0,900}registrationState[\s\S]{0,120}!==\s*'open'/.test(
           pageJs
         ) &&
-        /confirmProxyGroupSheet:[\s\S]{0,1400}报名通道已关闭/.test(pageJs) &&
+        /confirmProxyGroupSheet:[\s\S]{0,1800}_showRegistrationClosedModal/.test(pageJs) &&
         confirmBody.indexOf('registerForOther') < 0 &&
         confirmBody.indexOf('registerSelf') >= 0 &&
-        /confirmProxyGroupSheet:[\s\S]{0,2400}_applySeriesProxyAdds/.test(pageJs) &&
-        /_applySeriesProxyAdds:[\s\S]{0,2200}registerForOther/.test(pageJs)
+        /confirmProxyGroupSheet:[\s\S]{0,2400}_applySeriesProxyCommitPlan/.test(pageJs) &&
+        /_applySeriesProxyCommitPlan:[\s\S]{0,4500}applyProxyCommitPlan/.test(pageJs)
       );
     })()
   );
@@ -713,7 +749,7 @@ function fakeTeamsByUserId(map) {
       pageJs.indexOf("registrationStatus: 'closed'") < 0
   );
   assert(
-    'WXML 不传入 playerId；本人 sheet 无手机号；代报名手工含手机号',
+    '本人 sheet 只读手机号对齐普通字段序；代报名手工含手机号',
     (function () {
       var selfStart = pageWxml.indexOf('<!-- 本人报名');
       var sourceStart = pageWxml.indexOf('<!-- 替他人报名：人员来源');
@@ -724,11 +760,19 @@ function fakeTeamsByUserId(map) {
       var manualStart = pageWxml.indexOf('<!-- 替他人报名 · 手工添加');
       var manualChunk =
         manualStart >= 0 ? pageWxml.slice(manualStart, manualStart + 1800) : '';
+      var groupIdx = selfChunk.indexOf('registerSheetGroupLabel');
+      var nameIdx = selfChunk.indexOf('比赛名');
+      var genderIdx = selfChunk.indexOf('性别');
+      var phoneIdx = selfChunk.indexOf('手机号');
       return (
-        pageWxml.indexOf('data-player-id') < 0 &&
-        pageWxml.indexOf('data-playerId') < 0 &&
-        pageWxml.indexOf('registerPhone') < 0 &&
-        selfChunk.indexOf('手机号') < 0 &&
+        selfChunk.indexOf('registerPhone') >= 0 &&
+        selfChunk.indexOf('未绑定手机号') >= 0 &&
+        selfChunk.indexOf('register-sheet__readonly') >= 0 &&
+        groupIdx >= 0 &&
+        nameIdx > groupIdx &&
+        genderIdx > nameIdx &&
+        phoneIdx > genderIdx &&
+        !/绑定手机号/.test(selfChunk.replace(/未绑定手机号/g, '')) &&
         selfChunk.indexOf('registerSheetOptions') >= 0 &&
         manualChunk.indexOf('手机号码（选填）') >= 0 &&
         pageWxml.indexOf('selectRegisterSheetParticipant') >= 0 &&

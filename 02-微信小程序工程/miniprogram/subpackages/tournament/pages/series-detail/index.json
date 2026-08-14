@@ -27,7 +27,8 @@
 
     "personal-leaderboard-board": "/components/personal-leaderboard-board/index",
     "leaderboard-player-name-cell": "/components/leaderboard-player-name-cell/index",
-    "series-round-selector-dock": "/components/series-round-selector-dock/index"
+    "series-round-selector-dock": "/components/series-round-selector-dock/index",
+    "registration-cancel-dialog": "/components/registration-cancel-dialog/index"
 
   }
 

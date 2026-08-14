@@ -1,0 +1,13 @@
+<view wx:if="{{visible}}" bindtap="onMaskTap" class="register-cancel-modal">
+  <view catchtap="onNoop" class="register-cancel-dialog">
+    <text class="register-cancel-dialog__title">{{title}}</text>
+    <text class="register-cancel-dialog__desc">{{desc}}</text>
+    <view class="register-cancel-dialog__actions">
+      <view bindtap="onCancelTap" class="register-cancel-dialog__btn">{{cancelText}}</view>
+      <view
+        bindtap="onConfirmTap"
+        class="register-cancel-dialog__btn register-cancel-dialog__btn--danger {{submitting ? 'is-disabled' : ''}}"
+      >{{confirmText}}</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,57 @@
+/* 签名冻结自普通 detail.register-cancel-* ，组件自包含 */
+.register-cancel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  background: rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+.register-cancel-dialog {
+  width: 100%;
+  max-width: 600rpx;
+  padding: 40rpx 36rpx 32rpx;
+  border-radius: 24rpx;
+  background: var(--bg-primary, #ffffff);
+  box-sizing: border-box;
+}
+.register-cancel-dialog__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+  text-align: center;
+}
+.register-cancel-dialog__desc {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-align: center;
+}
+.register-cancel-dialog__actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+.register-cancel-dialog__btn {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.register-cancel-dialog__btn:not(.register-cancel-dialog__btn--danger) {
+  background: #f1f5f9;
+  color: #374151;
+}
+.register-cancel-dialog__btn--danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+.register-cancel-dialog__btn.is-disabled { opacity: 0.5; }

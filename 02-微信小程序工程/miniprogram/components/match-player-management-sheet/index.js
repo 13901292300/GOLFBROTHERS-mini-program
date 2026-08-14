@@ -30,7 +30,9 @@ Component({
     themeClass: { type: String, value: '' },
     seriesMode: { type: Boolean, value: false },
     /** Series 只读富化；永不写入 */
-    rosterSnapshot: { type: Array, value: [] }
+    rosterSnapshot: { type: Array, value: [] },
+    /** 父页面 Series 删除提交中 */
+    seriesRemoving: { type: Boolean, value: false }
   },
 
   data: {
@@ -85,6 +87,11 @@ Component({
       } else {
         this._resetLocalState(false);
       }
+    },
+    rosterSnapshot: function (list) {
+      if (!this.properties.visible || !this._seriesMode) return;
+      this._rosterSnapshot = Array.isArray(list) ? list.slice() : [];
+      if (this._draft) this._syncDisplay();
     }
   },
 
@@ -308,6 +315,9 @@ Component({
       var displayUsers = (view.list || []).map(function (item) {
         return Object.assign({}, item, { contactRemark: '' });
       });
+      if (this._seriesMode) {
+        displayUsers = this._attachSeriesRemovalLocks(displayUsers);
+      }
       var emptyText = view.emptyText;
       if (this._seriesMode && (view.totalCount || 0) === 0) {
         emptyText = SERIES_EMPTY_TEXT;
@@ -549,10 +559,109 @@ Component({
       this._patchDraft(userId, { matchTeamId: teamId });
     },
 
+    _indexSeriesRosterSnapshot: function () {
+      var map = Object.create(null);
+      var list = Array.isArray(this._rosterSnapshot) ? this._rosterSnapshot : [];
+      var i;
+      for (i = 0; i < list.length; i++) {
+        var entry = list[i];
+        if (!entry || typeof entry !== 'object') continue;
+        var keys = [entry.playerId, entry.userId, entry.rosterEntryId];
+        var k;
+        for (k = 0; k < keys.length; k++) {
+          var id = this._asId(keys[k]);
+          if (id && !map[id]) map[id] = entry;
+        }
+      }
+      return map;
+    },
+
+    _attachSeriesRemovalLocks: function (users) {
+      var map = this._indexSeriesRosterSnapshot();
+      var self = this;
+      return (Array.isArray(users) ? users : []).map(function (item) {
+        var uid = self._asId(item && (item.userId || item.playerId));
+        var snap = uid ? map[uid] : null;
+        var status = snap ? String(snap.registrationStatus || '').trim() : '';
+        var rosterEntryId = snap ? self._asId(snap.rosterEntryId) : '';
+        if (!snap || status !== 'registered' || !rosterEntryId) {
+          return Object.assign({}, item, {
+            seriesRemovalLocked: true,
+            seriesRemovalReason: 'not_registered',
+            seriesRemovalMessage: '报名状态已变化，请重新操作',
+            rosterEntryId: rosterEntryId
+          });
+        }
+        return Object.assign({}, item, {
+          seriesRemovalLocked: !!snap.seriesRemovalLocked,
+          seriesRemovalReason: snap.seriesRemovalReason || '',
+          seriesRemovalMessage: snap.seriesRemovalMessage || '',
+          rosterEntryId: rosterEntryId
+        });
+      });
+    },
+
+    _findSeriesDisplayRow: function (userId) {
+      var uid = this._asId(userId);
+      var list = Array.isArray(this.data.displayUsers) ? this.data.displayUsers : [];
+      var i;
+      for (i = 0; i < list.length; i++) {
+        if (this._asId(list[i] && list[i].userId) === uid) return list[i];
+      }
+      return null;
+    },
+
+    _onSeriesRemovePlayer: function (userId) {
+      if (!userId) return;
+      if (this._saving || this.data.saving || this.properties.seriesRemoving) return;
+      var row = this._findSeriesDisplayRow(userId);
+      if (!row) {
+        wx.showToast({ title: '选手不存在', icon: 'none' });
+        return;
+      }
+      if (row.seriesRemovalLocked) {
+        var msg = String(row.seriesRemovalMessage || '').trim() || '不可删除';
+        wx.showToast({ title: msg, icon: 'none' });
+        return;
+      }
+      var rosterEntryId = this._asId(row.rosterEntryId);
+      var playerId = this._asId(row.playerId || row.userId);
+      if (!rosterEntryId || !playerId) {
+        wx.showToast({ title: '报名状态已变化，请重新操作', icon: 'none' });
+        return;
+      }
+      var name = playerManage.resolveMatchNickname(row) || '该球员';
+      var seq = this._openSeq;
+      var self = this;
+      wx.showModal({
+        title: '删除系列赛报名',
+        content:
+          '确定将【' +
+          name +
+          '】从整个系列赛报名中删除吗？相关分站的分组与进行中成绩会一并清理。',
+        cancelText: '取消',
+        confirmText: '确认删除',
+        confirmColor: '#dc2626',
+        success: function (res) {
+          if (!res.confirm || !self._alive) return;
+          if (seq !== self._openSeq) return;
+          if (!self._seriesMode) return;
+          self.triggerEvent('series-remove-player', {
+            playerId: playerId,
+            rosterEntryId: rosterEntryId
+          });
+        }
+      });
+    },
+
     onRemovePlayer: function (e) {
       var userId = this._asId(
         e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.userid
       );
+      if (this._seriesMode) {
+        this._onSeriesRemovePlayer(userId);
+        return;
+      }
       if (!userId || !this._draft) return;
       var row = (this._draft.players || []).find(function (item) {
         return String((item && item.userId) || '') === userId;
@@ -773,7 +882,7 @@ Component({
     },
 
     onSave: function () {
-      if (!this._alive || this._saving) return;
+      if (!this._alive || this._saving || this.properties.seriesRemoving) return;
       var matchId = this._asId(this._targetMatchId);
       if (!matchId || !this._draft || demoJiaobeiMatch.isJiaobeiDemoMatchId(matchId)) {
         this.onCancel();

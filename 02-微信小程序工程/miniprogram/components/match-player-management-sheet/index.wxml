@@ -96,16 +96,16 @@
             <text class="player-manage-team-select__arrow">›</text>
           </view>
           <view
-            class="player-manage-row__remove"
+            class="player-manage-row__remove {{seriesMode && (item.seriesRemovalLocked || seriesRemoving || saving) ? 'is-disabled' : ''}}"
             data-userid="{{item.userId}}"
             bindtap="onRemovePlayer"
-          >{{seriesMode ? '移除本轮选手' : '移除报名表'}}</view>
+          >{{seriesMode ? (item.seriesRemovalLocked ? (item.seriesRemovalMessage || '不可删除') : '删除报名') : '移除报名表'}}</view>
         </view>
       </view>
     </scroll-view>
     <view class="register-sheet__actions player-manage-sheet__footer">
       <view bindtap="onCancel" class="register-sheet__cancel">取消</view>
-      <view bindtap="onSave" class="register-sheet__confirm {{saving ? 'is-disabled' : ''}}">保存</view>
+      <view bindtap="onSave" class="register-sheet__confirm {{saving || seriesRemoving ? 'is-disabled' : ''}}">保存</view>
     </view>
   </view>
 

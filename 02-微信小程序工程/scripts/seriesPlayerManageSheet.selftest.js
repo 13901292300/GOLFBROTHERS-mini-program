@@ -78,9 +78,10 @@ assert(
   ) && pageJs.indexOf("openSheet=players") < 0
 );
 assert(
-  'payment/half deep-link retained',
-  /_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs) &&
-    /_openSeriesDetailSheetDeepLink\('payment'\)/.test(pageJs)
+  'payment/tee 仍走原地 sheet',
+  pageJs.indexOf('_openSeriesTeeSheetManageSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesPaymentManageSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesDetailSheetDeepLink') >= 0
 );
 assert(
   'detail still has shared player sheet',
@@ -393,6 +394,9 @@ function makeHost() {
   };
   host.onPlayerManageSheetClose = methods.onPlayerManageSheetClose;
   host.onPlayerManageSheetSaved = methods.onPlayerManageSheetSaved;
+  host._closeManageSecondaryPatch = function (patch, cb) {
+    this.setData(patch || {}, cb);
+  };
   return host;
 }
 

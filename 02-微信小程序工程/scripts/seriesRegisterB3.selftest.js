@@ -282,9 +282,9 @@ function baseOrgSeries(overrides) {
     }
   });
   assert(
-    'published+closed 本人 CTA 仍禁用「报名已关闭」',
+    'published+closed 本人 CTA 仍禁用「报名通道已关闭」',
     vmClosed.cta.disabled &&
-      vmClosed.cta.label === '报名已关闭' &&
+      vmClosed.cta.label === '报名通道已关闭' &&
       vmClosed.cta.action === 'none'
   );
 

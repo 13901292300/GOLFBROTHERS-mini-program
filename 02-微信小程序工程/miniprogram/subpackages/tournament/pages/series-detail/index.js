@@ -16,6 +16,7 @@ var eventSponsorConfig = require('../../../../utils/eventSponsorConfig.js');
 var gameStore = require('../../../../utils/gameStore.js');
 var userProfileStore = require('../../../../utils/userProfileStore.js');
 var seriesRegistration = require('../../../../utils/seriesRegistration.js');
+var seriesSelfCancellationOrchestrator = require('../../../../utils/seriesSelfCancellationOrchestrator.js');
 var seriesIds = require('../../../../utils/seriesIds.js');
 var viewModel = require('./seriesDetailViewModel.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
@@ -25,7 +26,15 @@ var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsEx
 var openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
 var contactFollowAction = require('../../../../utils/contactFollowAction.js');
 var registerViewModel = require('./seriesRegisterViewModel.js');
+var registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
 var seriesRegisterEligibility = require('./seriesRegisterEligibility.js');
+
+var REG_SELF_CANCEL_UNGROUPED = registrationInteractionModel.buildSelfCancelDialogModel({
+  grouped: false
+});
+var REG_SELF_CANCEL_GROUPED = registrationInteractionModel.buildSelfCancelDialogModel({
+  grouped: true
+});
 var scheduleViewModel = require('./seriesScheduleViewModel.js');
 var seriesScheduleGroupWrite = require('./seriesScheduleGroupWrite.js');
 var discussionViewModel = require('./seriesDiscussionViewModel.js');
@@ -368,6 +377,190 @@ function calcIsStickyRegisterExt(opts) {
   return scrollTop >= threshold;
 }
 
+var SELF_CANCEL_CTA_FINALIZED = '已有完赛成绩，不可取消报名';
+var SERIES_ADMIN_REMOVE_FINALIZED = '已有完赛成绩，不可删除';
+
+function bumpAdminPlayerRemoveToken(current) {
+  var n = Number(current);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  return n + 1;
+}
+
+function canApplyAdminPlayerRemoveResult(currentToken, applyToken) {
+  return Number(currentToken) === Number(applyToken);
+}
+
+function projectSeriesAdminRemovalInspect(inspect) {
+  var blocked = inspect && inspect.blockedReason != null
+    ? String(inspect.blockedReason)
+    : '';
+  if (inspect && inspect.ok && !blocked) {
+    return {
+      seriesRemovalLocked: false,
+      seriesRemovalReason: '',
+      seriesRemovalMessage: ''
+    };
+  }
+  if (blocked === 'finalized_score') {
+    return {
+      seriesRemovalLocked: true,
+      seriesRemovalReason: 'finalized_score',
+      seriesRemovalMessage: SERIES_ADMIN_REMOVE_FINALIZED
+    };
+  }
+  if (blocked === 'managed_station_invalid') {
+    return {
+      seriesRemovalLocked: true,
+      seriesRemovalReason: 'managed_station_invalid',
+      seriesRemovalMessage: seriesStationManageGate.GATE_FAIL_MESSAGE
+    };
+  }
+  return {
+    seriesRemovalLocked: true,
+    seriesRemovalReason: blocked || 'inspect_failed',
+    seriesRemovalMessage:
+      blocked === 'permission_denied'
+        ? '暂无管理权限'
+        : '报名状态已变化，请重新操作'
+  };
+}
+
+function buildSeriesPlayerManageRosterSnapshot(roster, seriesId, actorUserId, inspectFn) {
+  var list = Array.isArray(roster) ? roster : [];
+  var out = [];
+  var i;
+  for (i = 0; i < list.length; i++) {
+    var entry = list[i];
+    if (!entry || typeof entry !== 'object') continue;
+    var playerId = String(entry.playerId || entry.userId || '').trim();
+    var rosterEntryId = String(entry.rosterEntryId || '').trim();
+    var status = String(entry.registrationStatus || '').trim();
+    if (status !== 'registered' || !playerId || !rosterEntryId) {
+      out.push(
+        Object.assign({}, entry, {
+          seriesRemovalLocked: true,
+          seriesRemovalReason: 'not_registered',
+          seriesRemovalMessage: '报名状态已变化，请重新操作'
+        })
+      );
+      continue;
+    }
+    var inspect =
+      typeof inspectFn === 'function'
+        ? inspectFn({
+            seriesId: String(seriesId || ''),
+            playerId: playerId,
+            rosterEntryId: rosterEntryId,
+            actorUserId: String(actorUserId || '')
+          })
+        : { ok: false, blockedReason: 'inspect_failed' };
+    out.push(Object.assign({}, entry, projectSeriesAdminRemovalInspect(inspect)));
+  }
+  return out;
+}
+
+function hasActiveSelfRegistration(register) {
+  var cur = register && register.currentUserRegistration;
+  if (!cur || typeof cur !== 'object') return false;
+  var pid = cur.playerId != null ? String(cur.playerId).trim() : '';
+  return !!(cur.isRegistered && pid);
+}
+
+function bumpSelfCancelInspectToken(current) {
+  var n = Number(current);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  return n + 1;
+}
+
+function canApplySelfCancelInspect(currentToken, applyToken) {
+  return Number(currentToken) === Number(applyToken);
+}
+
+function isActiveProxyRegistrationByActor(user, actorUserId) {
+  if (!user || typeof user !== 'object') return false;
+  if (String(user.registrationStatus || '').trim() !== 'registered') return false;
+  var source = String(user.registrationSource || user.source || '').trim();
+  if (source !== 'proxy') return false;
+  var by = String(user.registeredBy || user.registeredByUserId || '').trim();
+  if (!by || by !== String(actorUserId || '').trim()) return false;
+  if (String(user.registrationState || '').trim() === 'registered_locked') return false;
+  return true;
+}
+
+function projectProxyCancelLockUser(user, inspect) {
+  var blocked = inspect && inspect.blockedReason != null
+    ? String(inspect.blockedReason)
+    : '';
+  if (blocked !== 'finalized_score' && blocked !== 'managed_station_invalid') {
+    return user;
+  }
+  var message =
+    blocked === 'finalized_score'
+      ? SELF_CANCEL_CTA_FINALIZED
+      : seriesStationManageGate.GATE_FAIL_MESSAGE;
+  return Object.assign({}, user, {
+    selected: true,
+    locked: true,
+    disabled: true,
+    canSelfCancel: false,
+    registrationState: 'registered_locked',
+    source: 'self',
+    registrationSource: 'self',
+    lockReason: blocked,
+    lockMessage: message
+  });
+}
+
+function projectProxyRegisterUsersWithCancelLocks(users, actorUserId, seriesId, inspectFn) {
+  var list = Array.isArray(users) ? users : [];
+  if (typeof inspectFn !== 'function') return list;
+  var out = [];
+  var i;
+  for (i = 0; i < list.length; i++) {
+    var user = list[i];
+    if (!isActiveProxyRegistrationByActor(user, actorUserId)) {
+      out.push(user);
+      continue;
+    }
+    var inspect = inspectFn({
+      seriesId: String(seriesId || ''),
+      playerId: String((user && (user.playerId || user.userId)) || ''),
+      rosterEntryId: String((user && user.rosterEntryId) || ''),
+      actorUserId: String(actorUserId || '')
+    });
+    out.push(projectProxyCancelLockUser(user, inspect));
+  }
+  return out;
+}
+
+function resolveSelfCancelLockCta(currentCta, inspect) {
+  var cta = currentCta && typeof currentCta === 'object' ? currentCta : {};
+  var blocked = inspect && inspect.blockedReason != null
+    ? String(inspect.blockedReason)
+    : '';
+  if (blocked === 'finalized_score') {
+    return {
+      label: SELF_CANCEL_CTA_FINALIZED,
+      disabled: true,
+      action: 'none'
+    };
+  }
+  if (blocked === 'managed_station_invalid') {
+    return {
+      label: registrationInteractionModel.resolveRegistrationCtaCopy('cancel'),
+      disabled: true,
+      action: 'none',
+      reason: 'managed_station_invalid',
+      message: seriesStationManageGate.GATE_FAIL_MESSAGE
+    };
+  }
+  return {
+    label: cta.label,
+    disabled: !!cta.disabled,
+    action: cta.action || ''
+  };
+}
+
 Page({
   data: {
     themeClass: 'bright-mode',
@@ -442,6 +635,7 @@ Page({
     playerManageSheetMatchId: '',
     playerManageSheetRoundSubtitle: '',
     playerManageRosterSnapshot: [],
+    playerManageRemoving: false,
     // 出发管理共享组件（冻结 matchId / 轮次副标题）
     teeSheetManageSheetVisible: false,
     teeSheetManageSheetMatchId: '',
@@ -499,8 +693,8 @@ Page({
     leaderboardNetScoreAvailable: false,
     _leaderboardSettingRoundId: '',
     registerSheetMode: 'self',
-    registerSheetTitle: '系列赛报名',
-    registerSheetSub: '比赛名将用于报名名单与成绩展示',
+    registerSheetTitle: registerViewModel.SERIES_SELF_REGISTER_SHEET_TITLE,
+    registerSheetSub: registerViewModel.SERIES_SELF_REGISTER_SHEET_SUB,
     activeTab: DEFAULT_TAB,
     scrollTop: 0,
     tabs: viewModel.SERIES_TABS.slice(),
@@ -580,7 +774,14 @@ Page({
     registerSheetGroupLabel: '选择球队',
     registerCompetitionNameDraft: '',
     registerGenderDraft: '',
+    registerPhone: '',
     registerSubmitting: false,
+    registerCancelModalVisible: false,
+    registerCancelModalTitle: REG_SELF_CANCEL_UNGROUPED.title,
+    registerCancelModalDesc: REG_SELF_CANCEL_UNGROUPED.desc,
+    registerCancelModalCancelText: REG_SELF_CANCEL_UNGROUPED.cancelText,
+    registerCancelModalConfirmText: REG_SELF_CANCEL_UNGROUPED.confirmText,
+    registerCancelSubmitting: false,
     // 替他人报名（复刻队际赛多步 sheet；只写 Series.roster）
     registerForOtherSheetVisible: false,
     registerForOtherSourceOptions: seriesProxyRegisterViewModel.SERIES_REGISTER_FOR_OTHER_SOURCE_OPTIONS.slice(),
@@ -612,6 +813,9 @@ Page({
   _onWindowResize: null,
   _heroLogoLayoutTimer: null,
   _heroLogoFitKey: '',
+  _heroLogoLayoutRevision: 0,
+  _heroLogoContainerWidth: 0,
+  _heroTeamLogosRaw: null,
   _fillerMeasureTimer: null,
   _fillerMeasureToken: 0,
   _pageAlive: true,
@@ -654,6 +858,7 @@ Page({
   _lastViewportHeight: 0,
   _registerWriteLock: false,
   _registrationService: null,
+  _selfCancelOrchestrator: null,
   _lastEligibility: null,
   _resolvedPlayerId: '',
   _proxyPickChannel: '',
@@ -661,10 +866,15 @@ Page({
   _proxyMemberSourceTeamId: '',
   _proxyMemberSourceTeamName: '',
   _pendingProxyPlayers: null,
+  _seriesProxyCommitPlan: null,
 
   onLoad: function (query) {
     var q = query || {};
     this._pageAlive = true;
+    this._heroLogoLayoutRevision = 0;
+    this._heroLogoContainerWidth = 0;
+    this._heroLogoFitKey = '';
+    this._heroTeamLogosRaw = [];
     this._fillerMeasureToken = 0;
     this._standingsHostHoldToken = 0;
     this._lastStandingsContentHostHeight = 0;
@@ -719,6 +929,8 @@ Page({
     this._tempAdminSheetOpening = false;
     this._playerManageFrozen = null;
     this._playerManageSheetOpening = false;
+    this._adminPlayerRemoveLock = false;
+    this._adminPlayerRemoveToken = 0;
     this._teeSheetManageFrozen = null;
     this._teeSheetManageSheetOpening = false;
     this._paymentManageFrozen = null;
@@ -754,6 +966,17 @@ Page({
         };
       }
     });
+    this._selfCancelOrchestrator =
+      seriesSelfCancellationOrchestrator.createSeriesSelfCancellationOrchestrator({
+        seriesStore: seriesStore,
+        teamMatchStore: teamMatchStore,
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        },
+        registrationService: this._registrationService
+      });
+    this._selfCancelInspectToken = 0;
+    this._recoverInterruptedSelfCancellationOnce();
     this._pendingShareInvite = false;
     this._registerSheetMode = 'self';
     this.initHeaderNav();
@@ -776,12 +999,17 @@ Page({
 
   onUnload: function () {
     this._pageAlive = false;
+    this._heroLogoLayoutRevision = (this._heroLogoLayoutRevision || 0) + 1;
     this._manageSelectedRoundId = '';
     this._manageSelectedMatchId = '';
     this._tempAdminFrozen = null;
     this._tempAdminSheetOpening = false;
     this._playerManageFrozen = null;
     this._playerManageSheetOpening = false;
+    this._adminPlayerRemoveLock = false;
+    this._adminPlayerRemoveToken = bumpAdminPlayerRemoveToken(
+      this._adminPlayerRemoveToken
+    );
     this._teeSheetManageFrozen = null;
     this._teeSheetManageSheetOpening = false;
     this._paymentManageFrozen = null;
@@ -797,6 +1025,8 @@ Page({
     this._standingsCollapseScrollGuard = null;
     this._fillerByTab = createEmptyFillerByTab();
     this._registerWriteLock = false;
+    this._selfCancelInspectToken = bumpSelfCancelInspectToken(this._selfCancelInspectToken);
+    this._seriesProxyCommitPlan = null;
     this._scheduleWriteLock = false;
     this._unbindWindowResize();
     if (this._heroLogoLayoutTimer) {
@@ -1159,9 +1389,10 @@ Page({
       clearTimeout(this._heroLogoLayoutTimer);
       this._heroLogoLayoutTimer = null;
     }
+    var token = this._heroLogoLayoutRevision;
     var run = function () {
       self._heroLogoLayoutTimer = null;
-      self._layoutHeroTeamLogoStack();
+      self._layoutHeroTeamLogoStack({ token: token });
     };
     if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
       wx.nextTick(run);
@@ -1170,87 +1401,88 @@ Page({
     }
   },
 
-  /** 测量球队值区真实宽度后投影全部 Logo 位置（不改 Series/participants） */
-  _layoutHeroTeamLogoStack: function () {
+  _resolveHeroTeamLogosRaw: function () {
     var hero = this.data.hero || {};
     var display = hero.participantDisplay || {};
-    if (display.mode !== 'team_logos') {
-      if (this._heroLogoFitKey !== 'hidden') {
-        this._heroLogoFitKey = 'hidden';
-        this.setData({
-          heroTeamLogoStack: { visible: false, stackWidthPx: 0, logoSizePx: 0, items: [] }
-        });
-      }
-      return;
+    if (Array.isArray(display.teamItems) && display.teamItems.length) {
+      return display.teamItems;
     }
-    var teamItems = Array.isArray(display.teamItems) ? display.teamItems : [];
-    if (!teamItems.length || display.emptyText) {
-      if (this._heroLogoFitKey !== 'hidden') {
-        this._heroLogoFitKey = 'hidden';
-        this.setData({
-          heroTeamLogoStack: { visible: false, stackWidthPx: 0, logoSizePx: 0, items: [] }
-        });
-      }
-      return;
-    }
-    if (typeof wx === 'undefined' || typeof wx.createSelectorQuery !== 'function') {
-      return;
-    }
+    return Array.isArray(this._heroTeamLogosRaw) ? this._heroTeamLogosRaw : [];
+  },
+
+  /** 测量球队值区真实宽度后只更新布局字段（不改 Series/participants） */
+  _layoutHeroTeamLogoStack: function (options) {
+    var opts = options || {};
+    var token = opts.token != null ? opts.token : this._heroLogoLayoutRevision;
+    var retryUsed = !!opts.retryUsed;
+    var hero = this.data.hero || {};
+    var display = hero.participantDisplay || {};
+    var teamItems = this._resolveHeroTeamLogosRaw();
+    var seriesId = String(this._seriesId || '');
     var self = this;
     var logoSizePx = this._rpxToPx(HERO_LOGO_SIZE_RPX);
     var normalGapPx = this._rpxToPx(HERO_LOGO_GAP_RPX);
+
+    var applyDecision = function (measuredWidth) {
+      var decision = viewModel.resolveHeroTeamLogoReturnRestore({
+        pageAlive: self._pageAlive,
+        token: token,
+        currentToken: self._heroLogoLayoutRevision,
+        seriesId: seriesId,
+        currentSeriesId: self._seriesId,
+        mode: display.mode,
+        emptyText: display.emptyText,
+        teamItems: teamItems,
+        measuredWidth: measuredWidth,
+        retryUsed: retryUsed,
+        logoDiameter: logoSizePx,
+        normalGap: normalGapPx,
+        cacheKey: self._heroLogoFitKey,
+        currentStack: self.data.heroTeamLogoStack
+      });
+      if (decision.retry) {
+        if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
+          wx.nextTick(function () {
+            if (!self._pageAlive) return;
+            self._layoutHeroTeamLogoStack({ token: token, retryUsed: true });
+          });
+        } else {
+          self._layoutHeroTeamLogoStack({ token: token, retryUsed: true });
+        }
+        return;
+      }
+      if (!decision.apply) return;
+      if (decision.clearLogos) {
+        self._heroLogoFitKey = 'hidden';
+        self._heroTeamLogosRaw = [];
+        self._safeSetData({
+          heroTeamLogoStack: viewModel.emptyHeroTeamLogoStack()
+        });
+        return;
+      }
+      if (Number(measuredWidth) > 0) {
+        self._heroLogoContainerWidth = measuredWidth;
+      }
+      self._heroLogoFitKey = decision.cacheKey || '';
+      self._safeSetData({ heroTeamLogoStack: decision.stack }, function () {
+        if (self._pageAlive) self.scheduleScrollFillerMeasure();
+      });
+    };
+
+    if (display.mode !== 'team_logos' || !teamItems.length || display.emptyText) {
+      applyDecision(0);
+      return;
+    }
+    if (typeof wx === 'undefined' || typeof wx.createSelectorQuery !== 'function') {
+      applyDecision(this._heroLogoContainerWidth || 0);
+      return;
+    }
     wx.createSelectorQuery()
       .in(this)
       .select('#hero-team-logo-value')
       .boundingClientRect(function (rect) {
         var availableWidth = rect && Number.isFinite(rect.width) ? rect.width : 0;
-        var layout = viewModel.resolveTeamLogoLayout({
-          containerWidth: availableWidth,
-          logoDiameter: logoSizePx,
-          normalGap: normalGapPx,
-          count: teamItems.length
-        });
-        var items = teamItems.map(function (t, index) {
-          var slot = layout.items[index] || { left: 0, zIndex: 1 };
-          return {
-            participantId: t.participantId || 'team-' + index,
-            logo: t.logo || '',
-            fallbackText: t.fallbackText || '队',
-            leftPx: slot.left,
-            zIndex: slot.zIndex
-          };
-        });
-        var fitKey =
-          String(availableWidth) +
-          '|' +
-          String(logoSizePx) +
-          '|' +
-          String(normalGapPx) +
-          '|' +
-          layout.mode +
-          '|' +
-          items
-            .map(function (it) {
-              return it.participantId + ':' + it.logo + ':' + it.leftPx + ':' + it.zIndex;
-            })
-            .join(',');
-        if (self._heroLogoFitKey === fitKey) {
-          return;
-        }
-        self._heroLogoFitKey = fitKey;
-        self.setData(
-          {
-            heroTeamLogoStack: {
-              visible: true,
-              stackWidthPx: layout.groupWidth,
-              logoSizePx: logoSizePx,
-              items: items
-            }
-          },
-          function () {
-            self.scheduleScrollFillerMeasure();
-          }
-        );
+        applyDecision(availableWidth);
       })
       .exec();
   },
@@ -2165,7 +2397,8 @@ Page({
     var eligibilityMsg =
       (this._lastEligibility && this._lastEligibility.ineligibleMessage) || '';
     var map = {
-      registration_closed: '报名已关闭',
+      registration_closed: registrationInteractionModel.resolveRegistrationCtaCopy('closed'),
+      series_completed: '赛事已完赛',
       series_not_published: '赛事未发布',
       lifecycle_readonly: '赛事不可报名',
       affiliation_denied:
@@ -2182,10 +2415,21 @@ Page({
       player_id_required: seriesRegisterEligibility.MSG_IDENTITY,
       identity_unresolved: seriesRegisterEligibility.MSG_IDENTITY,
       storage_write_failed: '保存失败，请重试',
+      storage_failed: '保存失败，请重试',
+      recovery_required: '保存失败，请重试',
+      player_has_real_score: '该球员已有比赛成绩，暂不可取消报名',
+      finalized_score: SELF_CANCEL_CTA_FINALIZED,
+      managed_station_invalid: seriesStationManageGate.GATE_FAIL_MESSAGE,
+      not_self_registered: '报名状态已变化，请重新操作',
       series_not_found: '系列赛不存在',
       expected_revision_invalid: '报名状态已变化，请重新操作',
       permission_denied: '暂无管理权限',
-      proxy_target_is_self: '代报名请填写他人信息'
+      proxy_target_is_self: '代报名请填写他人信息',
+      not_proxy: '无法取消该报名',
+      not_registered_by_me: '无法取消该报名',
+      not_registered: '报名状态已变化，请重新操作',
+      roster_entry_not_found: '报名状态已变化，请重新操作',
+      player_id_mismatch: '报名状态已变化，请重新操作'
     };
     var title = map[reason] || '操作失败，请重试';
     if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
@@ -2294,6 +2538,8 @@ Page({
 
   reloadViewModel: function (options) {
     var opts = options || {};
+    this._selfCancelInspectToken = bumpSelfCancelInspectToken(this._selfCancelInspectToken);
+    var inspectToken = this._selfCancelInspectToken;
     if (!this._pageAlive) return;
     // 门闩未放行：禁止任何业务 VM setData（含短暂闪现）
     if (!this._canLoadBusinessContent()) {
@@ -2372,7 +2618,8 @@ Page({
       ok: true,
       lifecycleStatus: vm.lifecycleStatus,
       isDraftPreview: !!vm.isDraftPreview,
-      isHistorical: !!vm.isHistorical
+      isHistorical: !!vm.isHistorical,
+      competitionPhaseCache: vm.competitionPhaseCache || ''
     };
     if (vm.standings && vm.standings.selectedKey) {
       this._standingsSelectedKey = vm.standings.selectedKey;
@@ -2393,6 +2640,21 @@ Page({
     var schedule = this._buildScheduleViewModel(series);
     var discussionPatch = this._buildDiscussionDataPatch(series, this._lastRegisterAccess);
 
+    this._heroLogoLayoutRevision = (this._heroLogoLayoutRevision || 0) + 1;
+    var heroDisplay = (vm.hero && vm.hero.participantDisplay) || {};
+    this._heroTeamLogosRaw = Array.isArray(heroDisplay.teamItems)
+      ? heroDisplay.teamItems.slice()
+      : [];
+    this._heroLogoFitKey = '';
+    var heroTeamLogoStack = viewModel.buildHeroTeamLogoStackState({
+      mode: heroDisplay.mode,
+      emptyText: heroDisplay.emptyText,
+      teamItems: this._heroTeamLogosRaw,
+      containerWidth: this._heroLogoContainerWidth || 0,
+      logoDiameter: this._rpxToPx(HERO_LOGO_SIZE_RPX),
+      normalGap: this._rpxToPx(HERO_LOGO_GAP_RPX)
+    });
+
     var patch = {
       loadError: '',
       seriesName: vm.seriesName,
@@ -2403,8 +2665,7 @@ Page({
       templateLabel: vm.templateLabel,
       host: vm.host,
       hero: vm.hero || {},
-      // 测量前先隐藏 Logo 栈，避免未布局铺开闪烁/溢出
-      heroTeamLogoStack: { visible: false, stackWidthPx: 0, logoSizePx: 0, items: [] },
+      heroTeamLogoStack: heroTeamLogoStack,
       participants: vm.participants,
       scoring: vm.scoring,
       visibility: vm.visibility,
@@ -2451,6 +2712,7 @@ Page({
       if (!self._pageAlive) return;
       self._skipScrollReset = false;
       self._refreshSeriesManageFab();
+      self._applySelfCancelCtaInspectAfterReload(inspectToken, register);
       if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
         wx.nextTick(function () {
           if (!self._pageAlive) return;
@@ -3083,7 +3345,9 @@ Page({
           register: register,
           registerSheetVisible: false,
           registerSheetParticipantId: '',
-          registerSubmitting: false
+          registerSubmitting: false,
+          registerCancelModalVisible: false,
+          registerCancelSubmitting: false
         },
         dockPatch
       ),
@@ -3112,6 +3376,8 @@ Page({
         registerSheetParticipantId: '',
         registerSheetOptions: [],
         registerSubmitting: false,
+        registerCancelModalVisible: false,
+        registerCancelSubmitting: false,
         registerForOtherSheetVisible: false,
         proxyGroupSheetVisible: false,
         proxyMemberSourceSheetVisible: false,
@@ -3244,14 +3510,18 @@ Page({
     this._safeSetData({
       registerSheetVisible: true,
       registerSheetMode: 'self',
-      registerSheetTitle: '系列赛报名',
-      registerSheetSub: '比赛名将用于报名名单与成绩展示',
+      registerSheetTitle: registerViewModel.SERIES_SELF_REGISTER_SHEET_TITLE,
+      registerSheetSub: registerViewModel.SERIES_SELF_REGISTER_SHEET_SUB,
       registerSheetParticipantId: defaultId,
       registerSheetOptions: eligibility.options || [],
       registerSheetGroupLabel: groupLabel,
       registerCompetitionNameDraft:
         userProfileStore.getRegisterCompetitionNameDefault(profile),
       registerGenderDraft: profile.gender || '',
+      registerPhone: registerViewModel.resolveSelfRegisterPhone(
+        resolved.currentUser,
+        profile
+      ),
       registerSubmitting: false
     });
   },
@@ -3264,8 +3534,8 @@ Page({
       registerSheetVisible: false,
       registerSheetParticipantId: '',
       registerSheetMode: 'self',
-      registerSheetTitle: '系列赛报名',
-      registerSheetSub: '比赛名将用于报名名单与成绩展示'
+      registerSheetTitle: registerViewModel.SERIES_SELF_REGISTER_SHEET_TITLE,
+      registerSheetSub: registerViewModel.SERIES_SELF_REGISTER_SHEET_SUB
     });
   },
 
@@ -3364,7 +3634,15 @@ Page({
           handicap: profile.handicap,
           handicapSnapshot: profile.handicap,
           floatCoef: profile.floatCoef,
-          floatCoefSnapshot: profile.floatCoef
+          floatCoefSnapshot: profile.floatCoef,
+          phone: registerViewModel.resolveSelfRegisterPhone(
+            resolved.currentUser,
+            profile
+          ),
+          phoneSnapshot: registerViewModel.resolveSelfRegisterPhone(
+            resolved.currentUser,
+            profile
+          )
         }
       });
     } catch (eWrite) {
@@ -3397,43 +3675,112 @@ Page({
     }
   },
 
+  _recoverInterruptedSelfCancellationOnce: function () {
+    if (!this._selfCancelOrchestrator) return;
+    try {
+      this._selfCancelOrchestrator.recoverInterruptedSelfCancellation();
+    } catch (eRecover) {
+      /* 恢复失败不阻断首次加载 */
+    }
+  },
+
+  _applySelfCancelCtaInspectAfterReload: function (inspectToken, register) {
+    if (!this._pageAlive) return;
+    if (!canApplySelfCancelInspect(this._selfCancelInspectToken, inspectToken)) return;
+    if (!hasActiveSelfRegistration(register)) return;
+    var playerId = String(register.currentUserRegistration.playerId).trim();
+    var inspect = this._inspectSelfCancelImpact(playerId);
+    this._commitSelfCancelCtaLock(inspectToken, inspect);
+  },
+
+  _commitSelfCancelCtaLock: function (inspectToken, inspect) {
+    if (!this._pageAlive) return;
+    if (!canApplySelfCancelInspect(this._selfCancelInspectToken, inspectToken)) return;
+    var register = this.data.register;
+    if (!hasActiveSelfRegistration(register)) return;
+    var nextCta = resolveSelfCancelLockCta(register.cta, inspect);
+    this._safeSetData({ 'register.cta': nextCta });
+  },
+
+  _inspectSelfCancelImpact: function (playerId) {
+    if (!this._selfCancelOrchestrator) {
+      return { ok: false, grouped: false, blockedReason: 'storage_failed' };
+    }
+    try {
+      return this._selfCancelOrchestrator.inspectSelfCancellationImpact({
+        seriesId: this._seriesId,
+        playerId: playerId,
+        actorUserId: playerId
+      });
+    } catch (eInspect) {
+      return { ok: false, grouped: false, blockedReason: 'storage_failed' };
+    }
+  },
+
   openCancelRegisterModal: function () {
     if (!this._pageAlive) return;
     if (this._registerWriteLock || this.data.registerSubmitting) return;
     var cta = (this.data.register && this.data.register.cta) || {};
     if (cta.action !== 'cancel' || cta.disabled) return;
-    var self = this;
-    if (typeof wx === 'undefined' || typeof wx.showModal !== 'function') {
-      this.confirmCancelRegistration();
+    var resolved = this._resolveRegisterIdentity();
+    if (!resolved.identity.ok) {
+      this._toastRegisterFailure('identity_unresolved');
       return;
     }
-    wx.showModal({
-      title: '取消报名',
-      content: '确认取消本场系列赛报名？',
-      confirmText: '取消报名',
-      cancelText: '再想想',
-      success: function (res) {
-        if (!self._pageAlive) return;
-        if (res && res.confirm) {
-          self.confirmCancelRegistration();
-        }
-      }
+    var inspect = this._inspectSelfCancelImpact(resolved.identity.playerId);
+    var blocked = inspect && inspect.blockedReason ? String(inspect.blockedReason) : '';
+    if (blocked === 'player_has_real_score' || blocked === 'managed_station_invalid') {
+      this._toastRegisterFailure(blocked);
+      return;
+    }
+    if (inspect && inspect.ok === false && blocked) {
+      this._toastRegisterFailure(blocked);
+      return;
+    }
+    var copy = inspect && inspect.grouped ? REG_SELF_CANCEL_GROUPED : REG_SELF_CANCEL_UNGROUPED;
+    this._safeSetData({
+      registerCancelModalVisible: true,
+      registerCancelModalTitle: copy.title,
+      registerCancelModalDesc: copy.desc,
+      registerCancelModalCancelText: copy.cancelText,
+      registerCancelModalConfirmText: copy.confirmText,
+      registerCancelSubmitting: false
+    });
+  },
+
+  closeCancelRegisterModal: function () {
+    if (!this._pageAlive) return;
+    this._safeSetData({
+      registerCancelModalVisible: false,
+      registerCancelSubmitting: false
     });
   },
 
   confirmCancelRegistration: function () {
     if (!this._pageAlive) return;
     if (this._registerWriteLock || this.data.registerSubmitting) return;
-    if (!this._registrationService) return;
+    if (this.data.registerCancelSubmitting) return;
+    if (!this._selfCancelOrchestrator) return;
+    var cta = (this.data.register && this.data.register.cta) || {};
+    if (cta.action !== 'cancel' || cta.disabled) {
+      this.closeCancelRegisterModal();
+      return;
+    }
+    this._safeSetData({
+      registerCancelModalVisible: false,
+      registerCancelSubmitting: true
+    });
 
     var resolved = this._resolveRegisterIdentity();
     if (!resolved.identity.ok) {
+      this._safeSetData({ registerCancelSubmitting: false });
       this._toastRegisterFailure('identity_unresolved');
       return;
     }
     var playerId = resolved.identity.playerId;
     var series = seriesStore.getSeriesById(this._seriesId);
     if (!series) {
+      this._safeSetData({ registerCancelSubmitting: false });
       this._toastRegisterFailure('series_not_found');
       return;
     }
@@ -3444,24 +3791,21 @@ Page({
     this._safeSetData({ registerSubmitting: true });
     var result = null;
     try {
-      result = this._registrationService.cancelSelfRegistration({
+      result = this._selfCancelOrchestrator.cancelSelfRegistrationWithStationCleanup({
         seriesId: this._seriesId,
         playerId: playerId,
-        expectedRegistrationRevision: expectedRevision,
-        actor: {
-          playerId: playerId,
-          userId: playerId,
-          name:
-            userProfileStore.getRegisterCompetitionNameDefault(resolved.profile) ||
-            playerId
-        }
+        actorUserId: playerId,
+        expectedRegistrationRevision: expectedRevision
       });
     } catch (eCancel) {
       result = { ok: false, reason: 'storage_write_failed' };
     } finally {
       this._registerWriteLock = false;
       if (this._pageAlive) {
-        this._safeSetData({ registerSubmitting: false });
+        this._safeSetData({
+          registerSubmitting: false,
+          registerCancelSubmitting: false
+        });
       }
     }
 
@@ -3476,10 +3820,10 @@ Page({
       return;
     }
 
-    this._applyRegisterWriteSuccess(result.series, this._registerActiveParticipantId);
     if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
-      wx.showToast({ title: '已取消报名', icon: 'none' });
+      wx.showToast({ title: '已取消报名', icon: 'success' });
     }
+    this.reloadViewModel({ resetScroll: false });
   },
 
   /**
@@ -5272,7 +5616,48 @@ Page({
   },
 
   _buildSeriesProxyRegisterUsers: function (series) {
-    return seriesProxyRegisterViewModel.buildProxyRegisterUsersFromRoster(series);
+    var operator = gameStore.getCurrentUser() || {};
+    var operatorUserId = String(operator.userId || operator.playerId || '');
+    var users = seriesProxyRegisterViewModel.buildProxyRegisterUsersFromRoster(
+      series,
+      operatorUserId
+    );
+    var orch = this._selfCancelOrchestrator;
+    var inspectFn =
+      orch && typeof orch.inspectProxyCancellationImpact === 'function'
+        ? function (args) {
+            return orch.inspectProxyCancellationImpact(args);
+          }
+        : null;
+    return projectProxyRegisterUsersWithCancelLocks(
+      users,
+      operatorUserId,
+      (series && (series.seriesId || series.id)) || this._seriesId || '',
+      inspectFn
+    );
+  },
+
+  _isSeriesOverallCompleted: function (series) {
+    return registerViewModel.isSeriesCompetitionPhaseCompleted(
+      series && series.competitionPhaseCache
+    );
+  },
+
+  _showRegistrationClosedModal: function () {
+    var closed = registrationInteractionModel.buildRegistrationClosedModal();
+    if (typeof wx === 'undefined' || typeof wx.showModal !== 'function') return;
+    wx.showModal({
+      title: closed.title,
+      content: closed.content,
+      showCancel: closed.showCancel,
+      confirmText: closed.confirmText
+    });
+  },
+
+  _showOrdinaryFinishedUnavailable: function () {
+    if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+      wx.showToast({ title: '功能开发中', icon: 'none' });
+    }
   },
 
   /** M 入口：打开与队际赛一致的人员来源 sheet（不默认参赛主体） */
@@ -5287,11 +5672,13 @@ Page({
       this._toastRegisterFailure('series_not_found');
       return;
     }
-    // 对齐队际赛：菜单不置灰；点击后检查报名是否开放，closed 则 toast 并中断
+    if (this._isSeriesOverallCompleted(series)) {
+      this._showOrdinaryFinishedUnavailable();
+      return;
+    }
+    // 对齐队际赛：菜单不置灰；closed 走共享 Modal，不进选人 sheet
     if (String(series.registrationState || '').trim() !== 'open') {
-      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
-        wx.showToast({ title: '报名通道已关闭', icon: 'none' });
-      }
+      this._showRegistrationClosedModal();
       return;
     }
     var aff = seriesProxyRegisterViewModel.buildProxyAffiliationOptions(
@@ -5389,6 +5776,14 @@ Page({
       this._toastRegisterFailure('series_not_found');
       return;
     }
+    if (this._isSeriesOverallCompleted(series)) {
+      this._showOrdinaryFinishedUnavailable();
+      return;
+    }
+    if (String(series.registrationState || '').trim() !== 'open') {
+      this._showRegistrationClosedModal();
+      return;
+    }
     var operator = gameStore.getCurrentUser() || {};
     var operatorUserId = String(operator.userId || operator.playerId || '');
     var registerUsers = this._buildSeriesProxyRegisterUsers(series);
@@ -5453,6 +5848,7 @@ Page({
     this._proxyMemberSourceTeamId = '';
     this._proxyMemberSourceTeamName = '';
     this._pendingProxyPlayers = null;
+    this._seriesProxyCommitPlan = null;
     if (skipSetData || !this._pageAlive) return;
     this._closeManageSecondaryPatch({
       proxyGroupSheetVisible: false,
@@ -5647,19 +6043,60 @@ Page({
     var mode =
       data.mode === 'proxy_register_team' ? 'proxy_register_team' : 'proxy_register';
     var pickChannel = mode === 'proxy_register_team' ? 'team_members' : 'friends';
+    var removePlan = this._buildSeriesProxyRemovePlan(removedPlayers);
+    this._seriesProxyCommitPlan = {
+      removals: removePlan.removable.slice(),
+      additions: [],
+      pickChannel: pickChannel,
+      seriesParticipantId: ''
+    };
     if (addedPlayers.length > 0) {
       this._openProxyGroupSheet(addedPlayers, pickChannel);
       return;
     }
-    if (removedPlayers.length > 0) {
-      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
-        wx.showToast({ title: '系列赛暂不支持在此取消代报名', icon: 'none' });
+    this._applySeriesProxyCommitPlan();
+  },
+
+  _buildSeriesProxyRemovePlan: function (removedPlayers) {
+    var series = seriesStore.getSeriesById(this._seriesId);
+    var roster = Array.isArray(series && series.roster) ? series.roster : [];
+    var operator = gameStore.getCurrentUser() || {};
+    var operatorUserId = String(operator.userId || operator.playerId || '');
+    var byPlayer = Object.create(null);
+    var byEntry = Object.create(null);
+    var i;
+    for (i = 0; i < roster.length; i++) {
+      var e = roster[i];
+      if (!e) continue;
+      var pid = String(e.playerId || '').trim();
+      if (pid) byPlayer[pid] = e;
+      var eid = String(e.rosterEntryId || '').trim();
+      if (eid) byEntry[eid] = e;
+    }
+    var list = Array.isArray(removedPlayers) ? removedPlayers : [];
+    var removable = [];
+    var skipped = [];
+    for (i = 0; i < list.length; i++) {
+      var player = list[i];
+      var userId = String((player && (player.userId || player.playerId)) || '').trim();
+      var rosterEntryId = String((player && player.rosterEntryId) || '').trim();
+      var registration = (rosterEntryId && byEntry[rosterEntryId]) || (userId && byPlayer[userId]);
+      if (
+        !seriesProxyRegisterViewModel.isProxyRemovableByActor(registration, operatorUserId)
+      ) {
+        skipped.push({
+          player: player,
+          reason: 'not_registered_by_me'
+        });
+        continue;
       }
-      return;
+      removable.push({
+        rosterEntryId: String(registration.rosterEntryId || ''),
+        playerId: String(registration.playerId || userId),
+        userId: String(registration.playerId || userId)
+      });
     }
-    if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
-      wx.showToast({ title: '没有可更新的报名', icon: 'none' });
-    }
+    return { removable: removable, skipped: skipped };
   },
 
   openRegisterForOtherManualSheet: function () {
@@ -5756,6 +6193,12 @@ Page({
       pickChannel: 'manual',
       source: 'proxy'
     };
+    this._seriesProxyCommitPlan = {
+      removals: [],
+      additions: [],
+      pickChannel: 'manual',
+      seriesParticipantId: ''
+    };
     this.closeRegisterForOtherManualSheet();
     this._openProxyGroupSheet([player], 'manual');
   },
@@ -5850,11 +6293,14 @@ Page({
       this._toastRegisterFailure('series_not_found');
       return;
     }
+    if (this._isSeriesOverallCompleted(series)) {
+      this._clearProxyRegistrationTempState();
+      this._showOrdinaryFinishedUnavailable();
+      return;
+    }
     if (String(series.registrationState || '').trim() !== 'open') {
       this._clearProxyRegistrationTempState();
-      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
-        wx.showToast({ title: '报名通道已关闭', icon: 'none' });
-      }
+      this._showRegistrationClosedModal();
       return;
     }
     var players =
@@ -5862,17 +6308,27 @@ Page({
       (Array.isArray(this.data.pendingProxyPlayers)
         ? this.data.pendingProxyPlayers
         : []);
-    this._applySeriesProxyAdds(players, groupId);
+    var plan = this._seriesProxyCommitPlan || {
+      removals: [],
+      additions: [],
+      pickChannel: this._proxyPickChannel || 'friends',
+      seriesParticipantId: ''
+    };
+    plan.seriesParticipantId = groupId;
+    plan.additions = players.slice();
+    plan.pickChannel = this._proxyPickChannel || plan.pickChannel || 'friends';
+    this._seriesProxyCommitPlan = plan;
+    this._applySeriesProxyCommitPlan();
   },
 
   /**
-   * 连续调用 registerForOther；只写 Series.roster；失败保留归属 sheet。
+   * 单次 applyProxyCommitPlan：removals 经编排器闸门，与 additions 同一事务。
    */
-  _applySeriesProxyAdds: function (players, seriesParticipantId) {
-    if (!this._pageAlive || !this._registrationService) return;
-    var list = Array.isArray(players) ? players : [];
-    var targetPid = String(seriesParticipantId || '').trim();
-    if (!list.length || !targetPid) {
+  _applySeriesProxyCommitPlan: function () {
+    if (!this._pageAlive || !this._registrationService || !this._selfCancelOrchestrator) return;
+    if (this._registerWriteLock || this.data.registerSubmitting) return;
+    var plan = this._seriesProxyCommitPlan;
+    if (!plan) {
       if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
         wx.showToast({ title: '没有可更新的报名', icon: 'none' });
       }
@@ -5881,6 +6337,16 @@ Page({
     var series = seriesStore.getSeriesById(this._seriesId);
     if (!series) {
       this._toastRegisterFailure('series_not_found');
+      return;
+    }
+    if (this._isSeriesOverallCompleted(series)) {
+      this._clearProxyRegistrationTempState();
+      this._showOrdinaryFinishedUnavailable();
+      return;
+    }
+    if (String(series.registrationState || '').trim() !== 'open') {
+      this._clearProxyRegistrationTempState();
+      this._showRegistrationClosedModal();
       return;
     }
     var resolved = this._resolveRegisterIdentity();
@@ -5897,80 +6363,95 @@ Page({
       actorPlayerId;
     var expectedRevision = Number(series.registrationRevision);
     if (!Number.isFinite(expectedRevision) || expectedRevision < 0) expectedRevision = 0;
-    var channel = this._proxyPickChannel || 'friends';
-    var addedCount = 0;
-    var lastSeries = series;
+    var channel = plan.pickChannel || this._proxyPickChannel || 'friends';
+    var targetPid = String(plan.seriesParticipantId || '').trim();
+    var additions = [];
+    var rawAdds = Array.isArray(plan.additions) ? plan.additions : [];
+    var i;
+    for (i = 0; i < rawAdds.length; i++) {
+      var payload = seriesProxyRegisterViewModel.mapPickerPlayerToProxyPayload(
+        rawAdds[i],
+        channel
+      );
+      if (!payload.playerId) continue;
+      additions.push(
+        Object.assign({}, payload, {
+          seriesParticipantId: targetPid || payload.seriesParticipantId || ''
+        })
+      );
+    }
+    var removals = Array.isArray(plan.removals) ? plan.removals : [];
+    if (!removals.length && !additions.length) {
+      this._clearProxyRegistrationTempState();
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: '没有可更新的报名', icon: 'none' });
+      }
+      return;
+    }
 
     this._registerWriteLock = true;
     this._safeSetData({ registerSubmitting: true });
-    var failReason = '';
+    var result = null;
     try {
-      for (var i = 0; i < list.length; i++) {
-        var payload = seriesProxyRegisterViewModel.mapPickerPlayerToProxyPayload(
-          list[i],
-          channel
-        );
-        if (!payload.playerId) continue;
-        var result = this._registrationService.registerForOther({
-          seriesId: this._seriesId,
-          seriesParticipantId: targetPid,
-          expectedRegistrationRevision: expectedRevision,
-          actor: {
-            playerId: actorPlayerId,
-            userId: actorPlayerId,
-            name: actorName
-          },
-          player: payload
-        });
-        if (!result || !result.ok) {
-          failReason = (result && result.reason) || 'storage_write_failed';
-          if (failReason === 'registration_conflict') {
-            this._clearProxyRegistrationTempState();
-            this._handleRegistrationConflict();
-            return;
-          }
-          break;
-        }
-        lastSeries = result.series || lastSeries;
-        expectedRevision = Number(
-          lastSeries && lastSeries.registrationRevision != null
-            ? lastSeries.registrationRevision
-            : expectedRevision + 1
-        );
-        if (!Number.isFinite(expectedRevision) || expectedRevision < 0) {
-          expectedRevision = 0;
-        }
-        if (!result.idempotent) addedCount += 1;
-        else if (result.reason === 'already_registered') addedCount += 0;
-        else addedCount += 1;
-      }
+      result = this._selfCancelOrchestrator.applyProxyCommitPlanWithStationCleanup({
+        seriesId: this._seriesId,
+        expectedRegistrationRevision: expectedRevision,
+        actor: {
+          playerId: actorPlayerId,
+          userId: actorPlayerId,
+          name: actorName
+        },
+        actorUserId: actorPlayerId,
+        seriesParticipantId: targetPid,
+        removals: removals,
+        additions: additions
+      });
     } catch (eWrite) {
-      failReason = 'storage_write_failed';
+      result = { ok: false, reason: 'storage_write_failed' };
     } finally {
       this._registerWriteLock = false;
-      if (this._pageAlive && failReason) {
+      if (this._pageAlive && !(result && result.ok && !result.idempotent)) {
         this._safeSetData({ registerSubmitting: false });
       }
     }
 
     if (!this._pageAlive) return;
 
-    if (failReason) {
-      if (failReason === 'already_registered' || failReason === 'already_registered_elsewhere') {
+    if (result && result.reason === 'registration_conflict') {
+      this._clearProxyRegistrationTempState();
+      this._handleRegistrationConflict();
+      return;
+    }
+    if (!result || !result.ok) {
+      if (result && result.reason === 'series_completed') {
+        this._clearProxyRegistrationTempState();
+        this._showOrdinaryFinishedUnavailable();
+        return;
+      }
+      if (result && result.reason === 'registration_closed') {
+        this._clearProxyRegistrationTempState();
+        this._showRegistrationClosedModal();
+        return;
+      }
+      if (
+        result &&
+        (result.reason === 'already_registered' ||
+          result.reason === 'already_registered_elsewhere')
+      ) {
         if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
           wx.showToast({ title: '已报名', icon: 'none' });
         }
         return;
       }
-      this._toastRegisterFailure(failReason);
+      this._toastRegisterFailure((result && result.reason) || 'storage_write_failed');
       return;
     }
 
+    var changed =
+      Number(result.addedCount) > 0 || Number(result.removedCount) > 0;
+    var lastSeries = result.series || series;
     this._clearProxyRegistrationTempState(true);
-    if (this._activeTab !== 'register' && typeof this._performSwitchTab === 'function') {
-      this._performSwitchTab('register');
-    }
-    this._applyRegisterWriteSuccess(lastSeries, targetPid);
+    this._applyRegisterWriteSuccess(lastSeries, targetPid || this._registerActiveParticipantId);
     this._closeManageSecondaryPatch({
       proxyGroupSheetVisible: false,
       pendingProxyPlayers: [],
@@ -5982,8 +6463,8 @@ Page({
     });
     if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
       wx.showToast({
-        title: addedCount > 0 ? '代报名已更新' : '没有可更新的报名',
-        icon: addedCount > 0 ? 'success' : 'none'
+        title: changed ? '代报名已更新' : '没有可更新的报名',
+        icon: changed ? 'success' : 'none'
       });
     }
   },
@@ -6833,9 +7314,11 @@ Page({
       return;
     }
 
-    var rosterSnapshot = Array.isArray(series && series.roster)
-      ? series.roster.slice()
-      : [];
+    this._adminPlayerRemoveLock = false;
+    this._adminPlayerRemoveToken = bumpAdminPlayerRemoveToken(
+      this._adminPlayerRemoveToken
+    );
+    var rosterSnapshot = this._buildSeriesPlayerManageRosterSnapshot(series);
 
     this._playerManageSheetOpening = true;
     var self = this;
@@ -6844,7 +7327,8 @@ Page({
         playerManageSheetVisible: true,
         playerManageSheetMatchId: frozenMatchId,
         playerManageSheetRoundSubtitle: subtitle,
-        playerManageRosterSnapshot: rosterSnapshot
+        playerManageRosterSnapshot: rosterSnapshot,
+        playerManageRemoving: false
       },
       function () {
         self._playerManageSheetOpening = false;
@@ -6852,20 +7336,162 @@ Page({
     );
   },
 
+  _buildSeriesPlayerManageRosterSnapshot: function (series) {
+    var latest =
+      (this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null) ||
+      series ||
+      this._lastSeriesForSchedule;
+    var operator = gameStore.getCurrentUser() || {};
+    var actorUserId = String(operator.userId || operator.playerId || '');
+    var orch = this._selfCancelOrchestrator;
+    var inspectFn =
+      orch && typeof orch.inspectAdminPlayerRemovalImpact === 'function'
+        ? function (args) {
+            return orch.inspectAdminPlayerRemovalImpact(args);
+          }
+        : null;
+    return buildSeriesPlayerManageRosterSnapshot(
+      latest && latest.roster,
+      (latest && (latest.seriesId || latest.id)) || this._seriesId || '',
+      actorUserId,
+      inspectFn
+    );
+  },
+
+  _refreshPlayerManageRemovalLocks: function () {
+    if (!this._pageAlive || !this.data.playerManageSheetVisible) return;
+    var series =
+      (this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null) ||
+      this._lastSeriesForSchedule;
+    this._safeSetData({
+      playerManageRosterSnapshot: this._buildSeriesPlayerManageRosterSnapshot(series)
+    });
+  },
+
+  _clearAdminPlayerRemoveSession: function () {
+    this._adminPlayerRemoveLock = false;
+    this._adminPlayerRemoveToken = bumpAdminPlayerRemoveToken(
+      this._adminPlayerRemoveToken
+    );
+    this._playerManageFrozen = null;
+    this._playerManageSheetOpening = false;
+  },
+
+  _toastAdminPlayerRemoveFailure: function (reason) {
+    if (String(reason || '') === 'finalized_score') {
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: SERIES_ADMIN_REMOVE_FINALIZED, icon: 'none' });
+      }
+      return;
+    }
+    this._toastRegisterFailure(reason);
+  },
+
+  onSeriesRemovePlayer: function (e) {
+    if (!this._pageAlive) return;
+    if (this._adminPlayerRemoveLock || this.data.playerManageRemoving) return;
+    if (!this._selfCancelOrchestrator) return;
+    var detail = (e && e.detail) || {};
+    var playerId = String(detail.playerId || '').trim();
+    var rosterEntryId = String(detail.rosterEntryId || '').trim();
+    if (!playerId || !rosterEntryId) return;
+
+    var series =
+      (this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null) ||
+      this._lastSeriesForSchedule;
+    if (!series) {
+      this._toastAdminPlayerRemoveFailure('series_not_found');
+      return;
+    }
+    var operator = gameStore.getCurrentUser() || {};
+    var actorUserId = String(operator.userId || operator.playerId || '');
+    var actorName = String(operator.name || '').trim() || actorUserId;
+    var expectedRevision = Number(series.registrationRevision);
+    if (!Number.isFinite(expectedRevision) || expectedRevision < 0) expectedRevision = 0;
+
+    var token = this._adminPlayerRemoveToken;
+    this._adminPlayerRemoveLock = true;
+    this._safeSetData({ playerManageRemoving: true });
+    var result = null;
+    try {
+      result = this._selfCancelOrchestrator.removePlayerByAdminWithStationCleanup({
+        seriesId: this._seriesId || String(series.seriesId || ''),
+        playerId: playerId,
+        rosterEntryId: rosterEntryId,
+        actor: {
+          playerId: actorUserId,
+          userId: actorUserId,
+          name: actorName
+        },
+        actorUserId: actorUserId,
+        expectedRegistrationRevision: expectedRevision
+      });
+    } catch (eWrite) {
+      result = { ok: false, reason: 'storage_failed' };
+    } finally {
+      this._adminPlayerRemoveLock = false;
+      if (
+        this._pageAlive &&
+        canApplyAdminPlayerRemoveResult(this._adminPlayerRemoveToken, token)
+      ) {
+        this._safeSetData({ playerManageRemoving: false });
+      }
+    }
+
+    if (!this._pageAlive) return;
+    if (!canApplyAdminPlayerRemoveResult(this._adminPlayerRemoveToken, token)) return;
+
+    if (!result || !result.ok) {
+      this._toastAdminPlayerRemoveFailure((result && result.reason) || 'storage_failed');
+      this._refreshPlayerManageRemovalLocks();
+      return;
+    }
+
+    if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+      wx.showToast({ title: '已删除选手', icon: 'success' });
+    }
+    this._clearAdminPlayerRemoveSession();
+    var self = this;
+    this._closeManageSecondaryPatch(
+      {
+        playerManageSheetVisible: false,
+        playerManageSheetMatchId: '',
+        playerManageSheetRoundSubtitle: '',
+        playerManageRosterSnapshot: [],
+        playerManageRemoving: false
+      },
+      function () {
+        if (!self._pageAlive) return;
+        if (self._canLoadBusinessContent()) {
+          self.reloadViewModel({ resetScroll: false });
+        }
+      }
+    );
+  },
+
   onPlayerManageSheetClose: function () {
     if (!this._pageAlive) return;
+    this._adminPlayerRemoveLock = false;
+    this._adminPlayerRemoveToken = bumpAdminPlayerRemoveToken(
+      this._adminPlayerRemoveToken
+    );
     this._playerManageFrozen = null;
     this._playerManageSheetOpening = false;
     this._closeManageSecondaryPatch({
       playerManageSheetVisible: false,
       playerManageSheetMatchId: '',
       playerManageSheetRoundSubtitle: '',
-      playerManageRosterSnapshot: []
+      playerManageRosterSnapshot: [],
+      playerManageRemoving: false
     });
   },
 
   onPlayerManageSheetSaved: function () {
     if (!this._pageAlive) return;
+    this._adminPlayerRemoveLock = false;
+    this._adminPlayerRemoveToken = bumpAdminPlayerRemoveToken(
+      this._adminPlayerRemoveToken
+    );
     this._playerManageFrozen = null;
     this._playerManageSheetOpening = false;
     // toast 由共享组件标准链路展示，此处不重复
@@ -6875,7 +7501,8 @@ Page({
         playerManageSheetVisible: false,
         playerManageSheetMatchId: '',
         playerManageSheetRoundSubtitle: '',
-        playerManageRosterSnapshot: []
+        playerManageRosterSnapshot: [],
+        playerManageRemoving: false
       },
       function () {
         if (!self._pageAlive) return;
@@ -7392,6 +8019,19 @@ Page({
 });
 
 module.exports = {
+  hasActiveSelfRegistration: hasActiveSelfRegistration,
+  bumpSelfCancelInspectToken: bumpSelfCancelInspectToken,
+  canApplySelfCancelInspect: canApplySelfCancelInspect,
+  resolveSelfCancelLockCta: resolveSelfCancelLockCta,
+  SELF_CANCEL_CTA_FINALIZED: SELF_CANCEL_CTA_FINALIZED,
+  isActiveProxyRegistrationByActor: isActiveProxyRegistrationByActor,
+  projectProxyCancelLockUser: projectProxyCancelLockUser,
+  projectProxyRegisterUsersWithCancelLocks: projectProxyRegisterUsersWithCancelLocks,
+  projectSeriesAdminRemovalInspect: projectSeriesAdminRemovalInspect,
+  buildSeriesPlayerManageRosterSnapshot: buildSeriesPlayerManageRosterSnapshot,
+  bumpAdminPlayerRemoveToken: bumpAdminPlayerRemoveToken,
+  canApplyAdminPlayerRemoveResult: canApplyAdminPlayerRemoveResult,
+  SERIES_ADMIN_REMOVE_FINALIZED: SERIES_ADMIN_REMOVE_FINALIZED,
   computeStickyFiller: computeStickyFiller,
   computeFillerCorrection: computeFillerCorrection,
   computeScrollHeightWithoutFiller: computeScrollHeightWithoutFiller,

@@ -1224,17 +1224,17 @@
     <view
       wx:if="{{!registerPermission.isOpen}}"
       class="register-cta-btn register-cta-btn--disabled"
-    >报名通道已关闭</view>
+    >{{registerCtaCopy.closed}}</view>
     <view
       wx:elif="{{currentUserRegisterStatus.isRegistered}}"
       bindtap="openCancelRegisterModal"
       class="register-cta-btn register-cta-btn--cancel"
-    >取消报名</view>
+    >{{registerCtaCopy.cancel}}</view>
     <view
       wx:else
       bindtap="openRegisterSheet"
       class="register-cta-btn"
-    >立即报名</view>
+    >{{registerCtaCopy.register}}</view>
   </view>
 
   <!-- 分组 TAB 底部操作：与报名 CTA 同层；弹层打开时降层，避免挡住替他人报名 -->
@@ -1372,20 +1372,16 @@
     </view>
   </view>
 
-  <!-- 取消报名确认弹窗 -->
-  <view wx:if="{{registerCancelModalVisible}}" bindtap="closeCancelRegisterModal" class="register-cancel-modal">
-    <view catchtap="stopPropagation" class="register-cancel-dialog">
-      <text class="register-cancel-dialog__title">{{registerCancelModalTitle}}</text>
-      <text class="register-cancel-dialog__desc">{{registerCancelModalDesc}}</text>
-      <view class="register-cancel-dialog__actions">
-        <view bindtap="closeCancelRegisterModal" class="register-cancel-dialog__btn">取消</view>
-        <view
-          bindtap="confirmCancelRegister"
-          class="register-cancel-dialog__btn register-cancel-dialog__btn--danger {{registerCancelSubmitting ? 'is-disabled' : ''}}"
-        >确认取消</view>
-      </view>
-    </view>
-  </view>
+  <registration-cancel-dialog
+    visible="{{registerCancelModalVisible}}"
+    title="{{registerCancelModalTitle}}"
+    desc="{{registerCancelModalDesc}}"
+    cancel-text="{{registerCancelModalCancelText}}"
+    confirm-text="{{registerCancelModalConfirmText}}"
+    submitting="{{registerCancelSubmitting}}"
+    bind:cancel="closeCancelRegisterModal"
+    bind:confirm="confirmCancelRegister"
+  />
 
   <!-- 权限管理：共享组件（临时管理员二维码 + 球童记分员） -->
   <temp-admin-permission-sheet

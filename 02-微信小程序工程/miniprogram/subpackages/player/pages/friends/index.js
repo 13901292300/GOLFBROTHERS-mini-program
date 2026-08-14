@@ -16,6 +16,7 @@ const contactStore = require('../../../../utils/contactStore.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
+const proxyRegistrationState = require('../../../../utils/proxyRegistrationState.js');
 
 const MAX_GROUP_SIZE = 4;
 const PROXY_MODE = 'proxy_register';
@@ -241,16 +242,13 @@ function buildSections(list) {
     .map((letter) => ({ letter, items: map[letter] }));
 }
 
-/** 代报名：按 registration 判定好友状态 */
+/** 代报名三态：好友页与球队成员页共用同一纯函数 */
 function resolveProxyRegistrationState(friendId, registrationMap, operatorId) {
-  const reg = registrationMap[friendId];
-  if (!reg) return 'unregistered';
-  const source = String(reg.source || 'self');
-  const registeredBy = String(reg.registeredBy || '');
-  if (source === 'proxy' && registeredBy && registeredBy === String(operatorId || '')) {
-    return 'registered_by_me';
-  }
-  return 'registered_locked';
+  return proxyRegistrationState.resolveProxyRegistrationState(
+    friendId,
+    registrationMap,
+    operatorId
+  );
 }
 
 function attachProxyStateToFriends(list, registrationMap, operatorId) {
@@ -845,7 +843,16 @@ Page({
       if (initialState[id] !== 'registered_by_me') return;
       if (initial[id] && !current[id]) {
         const friend = this._findFriendById(id);
-        if (friend) removedPlayers.push(friend);
+        if (friend) {
+          const reg = (this._registrationMap && this._registrationMap[id]) || {};
+          removedPlayers.push(
+            Object.assign({}, friend, {
+              rosterEntryId: reg.rosterEntryId || '',
+              userId: friend.userId || friend.playerId,
+              playerId: friend.playerId || friend.userId
+            })
+          );
+        }
       }
     });
 

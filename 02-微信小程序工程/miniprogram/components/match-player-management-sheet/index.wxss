@@ -23,6 +23,11 @@
   pointer-events: none;
 }
 
+.match-player-management-host .player-manage-row__remove.is-disabled {
+  opacity: 0.45;
+  color: var(--text-muted);
+}
+
 .match-player-management-host .player-team-pick-item__main {
   display: flex;
   align-items: center;

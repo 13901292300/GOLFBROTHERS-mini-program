@@ -7,6 +7,23 @@
  */
 
 var openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+var registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
+
+var SERIES_SELF_REGISTER_SHEET_TITLE = '赛事报名';
+var SERIES_SELF_REGISTER_SHEET_SUB = '比赛名将用于报名名单与成绩展示';
+
+function isSeriesCompetitionPhaseCompleted(phase) {
+  return asString(phase) === 'completed';
+}
+
+/** 只读权威手机号：gameStore.phone / profile.phone；不猜昵称、不用 phoneMasked */
+function resolveSelfRegisterPhone(currentUser, profile) {
+  var user = currentUser && typeof currentUser === 'object' ? currentUser : {};
+  var p = profile && typeof profile === 'object' ? profile : {};
+  var phone = asString(user.phone);
+  if (phone) return phone;
+  return asString(p.phone);
+}
 
 function asString(v) {
   if (v == null) return '';
@@ -54,6 +71,7 @@ function findSelfRegisteredEntry(roster, playerId) {
  * @param {boolean} input.isRegistered
  * @param {number} input.eligibleCount
  * @param {string} [input.ineligibleMessage] 身份/归属失败时展示的具体文案
+ * @param {string} [input.competitionPhaseCache] Series 整体 phase；仅 completed 视为完赛
  */
 function resolveRegisterCta(input) {
   var src = input && typeof input === 'object' ? input : {};
@@ -75,13 +93,26 @@ function resolveRegisterCta(input) {
     return { disabled: true, label: '发布后开放报名', action: 'none' };
   }
 
+  var phase = asString(src.competitionPhaseCache || access.competitionPhaseCache);
+  if (isSeriesCompetitionPhaseCompleted(phase)) {
+    return { disabled: true, label: '', action: 'none' };
+  }
+
   var regState = asString(src.registrationState) === 'open' ? 'open' : 'closed';
   if (regState === 'closed') {
-    return { disabled: true, label: '报名已关闭', action: 'none' };
+    return {
+      disabled: true,
+      label: registrationInteractionModel.resolveRegistrationCtaCopy('closed'),
+      action: 'none'
+    };
   }
 
   if (src.isRegistered) {
-    return { disabled: false, label: '取消报名', action: 'cancel' };
+    return {
+      disabled: false,
+      label: registrationInteractionModel.resolveRegistrationCtaCopy('cancel'),
+      action: 'cancel'
+    };
   }
 
   if (!src.identityOk) {
@@ -99,7 +130,11 @@ function resolveRegisterCta(input) {
     };
   }
 
-  return { disabled: false, label: '立即报名', action: 'register' };
+  return {
+    disabled: false,
+    label: registrationInteractionModel.resolveRegistrationCtaCopy('register'),
+    action: 'register'
+  };
 }
 
 function resolveGenderDisplay(entry) {
@@ -320,23 +355,20 @@ function buildSeriesRegisterViewModel(input) {
       identityOk: identityOk,
       isRegistered: isRegistered,
       eligibleCount: eligibleIds.length,
-      ineligibleMessage: ineligibleMessage
+      ineligibleMessage: ineligibleMessage,
+      competitionPhaseCache: series.competitionPhaseCache
     });
   } else {
     // 未装配身份上下文：仅生命周期/开关门控；交互 CTA 由页面 reload 覆盖
-    if (access.isDraftPreview) {
-      cta = { disabled: true, label: '发布后开放报名', action: 'none' };
-    } else if (asString(access.lifecycleStatus) === 'cancelled') {
-      cta = { disabled: true, label: '赛事已取消', action: 'none' };
-    } else if (asString(access.lifecycleStatus) === 'archived') {
-      cta = { disabled: true, label: '赛事已归档', action: 'none' };
-    } else if (asString(access.lifecycleStatus) !== 'published') {
-      cta = { disabled: true, label: '发布后开放报名', action: 'none' };
-    } else if (registrationState === 'closed') {
-      cta = { disabled: true, label: '报名已关闭', action: 'none' };
-    } else {
-      cta = { disabled: true, label: '无法确认当前用户身份', action: 'none' };
-    }
+    cta = resolveRegisterCta({
+      lifecycleAccess: access,
+      registrationState: registrationState,
+      identityOk: false,
+      isRegistered: false,
+      eligibleCount: 0,
+      ineligibleMessage: '无法确认当前用户身份',
+      competitionPhaseCache: series.competitionPhaseCache
+    });
   }
 
   return {
@@ -390,10 +422,14 @@ function emptyRegisterViewModel() {
 }
 
 module.exports = {
+  SERIES_SELF_REGISTER_SHEET_TITLE: SERIES_SELF_REGISTER_SHEET_TITLE,
+  SERIES_SELF_REGISTER_SHEET_SUB: SERIES_SELF_REGISTER_SHEET_SUB,
   buildSeriesRegisterViewModel: buildSeriesRegisterViewModel,
   emptyRegisterViewModel: emptyRegisterViewModel,
   resolveParticipantMode: resolveParticipantMode,
   resolveRegisterCta: resolveRegisterCta,
+  isSeriesCompetitionPhaseCompleted: isSeriesCompetitionPhaseCompleted,
+  resolveSelfRegisterPhone: resolveSelfRegisterPhone,
   isCountableRosterEntry: isCountableRosterEntry,
   findSelfRegisteredEntry: findSelfRegisteredEntry,
   projectDisplayUser: projectDisplayUser,

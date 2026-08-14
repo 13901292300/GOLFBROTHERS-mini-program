@@ -39,6 +39,15 @@ const qrAccessAuth = require('../../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../../utils/playerManage.js');
 const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const paymentManage = require('../../../../utils/paymentManage.js');
+const registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
+const REG_CTA_COPY = {
+  register: registrationInteractionModel.resolveRegistrationCtaCopy('register'),
+  cancel: registrationInteractionModel.resolveRegistrationCtaCopy('cancel'),
+  closed: registrationInteractionModel.resolveRegistrationCtaCopy('closed')
+};
+const REG_SELF_CANCEL_UNGROUPED = registrationInteractionModel.buildSelfCancelDialogModel({
+  grouped: false
+});
 const {
   resolveStrokeCompositions,
   resolveCompositionMode
@@ -888,10 +897,13 @@ Page({
     registerSheetGroupId: '',
     registerPhone: '',
     registerSubmitting: false,
+    registerCtaCopy: REG_CTA_COPY,
     registerCancelModalVisible: false,
     registerCancelSubmitting: false,
-    registerCancelModalTitle: '确认取消报名？',
-    registerCancelModalDesc: '取消后，你将从本场赛事报名名单中移除。',
+    registerCancelModalTitle: REG_SELF_CANCEL_UNGROUPED.title,
+    registerCancelModalDesc: REG_SELF_CANCEL_UNGROUPED.desc,
+    registerCancelModalCancelText: REG_SELF_CANCEL_UNGROUPED.cancelText,
+    registerCancelModalConfirmText: REG_SELF_CANCEL_UNGROUPED.confirmText,
     // 权限管理（共享组件 temp-admin-permission-sheet）
     tempAdminSheetVisible: false,
     // 二维码入口：手机号绑定闸门
@@ -3869,22 +3881,45 @@ Page({
 
   _resolveRegisterPermission(match) {
     if (!match) {
-      return { registrationStatus: 'closed', isOpen: false, reason: '报名通道已关闭' };
+      return {
+        registrationStatus: 'closed',
+        isOpen: false,
+        reason: registrationInteractionModel.resolveRegistrationCtaCopy('closed')
+      };
     }
     const registrationStatus = this._normalizeRegistrationStatus(match);
     if (registrationStatus === 'closed') {
-      return { registrationStatus: 'closed', isOpen: false, reason: '报名通道已关闭' };
+      return {
+        registrationStatus: 'closed',
+        isOpen: false,
+        reason: registrationInteractionModel.resolveRegistrationCtaCopy('closed')
+      };
     }
     return { registrationStatus: 'open', isOpen: true, reason: '' };
   },
 
   _showRegistrationClosedModal() {
+    const closed = registrationInteractionModel.buildRegistrationClosedModal();
     wx.showModal({
-      title: '报名通道已关闭',
-      content: '报名通道已关闭，请联系组织者',
-      showCancel: false,
-      confirmText: '知道了'
+      title: closed.title,
+      content: closed.content,
+      showCancel: closed.showCancel,
+      confirmText: closed.confirmText
     });
+  },
+
+  _buildSelfCancelDialogPatch(grouped) {
+    const model = registrationInteractionModel.buildSelfCancelDialogModel({
+      grouped: !!grouped
+    });
+    return {
+      registerCancelModalVisible: true,
+      registerCancelModalTitle: model.title,
+      registerCancelModalDesc: model.desc,
+      registerCancelModalCancelText: model.cancelText,
+      registerCancelModalConfirmText: model.confirmText,
+      registerCancelSubmitting: false
+    };
   },
 
   _buildRegistrationLog(options) {
@@ -4254,13 +4289,7 @@ Page({
     const user = gameStore.getCurrentUser() || {};
     const userId = String(user.userId || '');
     const grouped = !!(match && userId && teamMatchStore.isUserInFormalGroups(match, userId));
-    this.setData({
-      registerCancelModalVisible: true,
-      registerCancelModalTitle: grouped ? '取消报名' : '确认取消报名？',
-      registerCancelModalDesc: grouped
-        ? '已经被分组，是否确认取消'
-        : '取消后，你将从本场赛事报名名单中移除。'
-    });
+    this.setData(this._buildSelfCancelDialogPatch(grouped));
   },
 
   closeCancelRegisterModal() {
@@ -4317,11 +4346,12 @@ Page({
         registerCancelModalVisible: false,
         registerCancelSubmitting: false
       });
+      const paid = registrationInteractionModel.buildPaidCancellationWarningModel();
       wx.showModal({
-        title: '已收款提醒',
-        content: '你已完成本场费用登记。取消报名后，请务必联系赛事组织方协商费用退还。',
-        cancelText: '我再想想',
-        confirmText: '继续取消',
+        title: paid.title,
+        content: paid.content,
+        cancelText: paid.cancelText,
+        confirmText: paid.confirmText,
         success: (res) => {
           if (!res.confirm) {
             const log = paymentManage.createPaymentLog({
@@ -9280,12 +9310,7 @@ Page({
       return;
     }
     this._pendingProxyCommitAfterConfirm = true;
-    this.setData({
-      registerCancelModalVisible: true,
-      registerCancelModalTitle: '取消报名',
-      registerCancelModalDesc: '已经被分组，是否确认取消',
-      registerCancelSubmitting: false
-    });
+    this.setData(this._buildSelfCancelDialogPatch(true));
   },
 
   /**

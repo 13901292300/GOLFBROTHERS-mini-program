@@ -182,7 +182,7 @@ function baseSeries(over) {
 // ===== CTA 几何门闩（C3-D，非仅 isStickyTab）=====
 (function ctaGeomGate() {
   var reg = {
-    cta: { label: '报名已关闭', disabled: true, action: 'none' }
+    cta: { label: '报名通道已关闭', disabled: true, action: 'none' }
   };
   var geo = {
     tabOffsetTop: 500,
@@ -296,8 +296,8 @@ assert(
     eligibleCount: 1
   });
   assert(
-    '本人 closed CTA=报名已关闭',
-    closedCta.disabled && closedCta.label === '报名已关闭' && closedCta.action === 'none'
+    '本人 closed CTA=报名通道已关闭',
+    closedCta.disabled && closedCta.label === '报名通道已关闭' && closedCta.action === 'none'
   );
 
   assert(
@@ -312,10 +312,10 @@ assert(
   );
 
   assert(
-    '页面代报名 closed toast 报名通道已关闭',
-    pageJs.indexOf("title: '报名通道已关闭'") >= 0 &&
+    '页面代报名 closed 走共享 Modal',
+    pageJs.indexOf('buildRegistrationClosedModal') >= 0 &&
       pageJs.indexOf('openProxyRegisterSheet') >= 0 &&
-      /openProxyRegisterSheet:[\s\S]{0,800}报名通道已关闭/.test(pageJs)
+      /openProxyRegisterSheet:[\s\S]{0,1200}_showRegistrationClosedModal/.test(pageJs)
   );
   assert(
     'M 代报名不在 VM 因 closed 置灰',

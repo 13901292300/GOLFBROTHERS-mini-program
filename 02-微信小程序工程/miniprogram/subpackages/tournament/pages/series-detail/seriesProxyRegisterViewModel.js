@@ -4,6 +4,8 @@
  * - 不依赖 matchId；归属键为 seriesParticipantId
  */
 
+var proxyRegistrationState = require('../../../../utils/proxyRegistrationState.js');
+
 var SERIES_REGISTER_FOR_OTHER_SOURCE_OPTIONS = [
   { key: 'friends', glyph: '👥', label: '从好友列表选择', desc: '选择微信好友或历史联系人' },
   {
@@ -47,9 +49,13 @@ function buildRegisterForOtherSourceOptions(canTeamMembers) {
 
 /**
  * Series.roster → 好友/成员页所需 registerUsers 形态（只读投影）
+ * 仅投影 active registered；cancelled 历史不得显示为已报名锁定。
+ * @param {object} series
+ * @param {string} [operatorUserId] 用于 locked / canSelfCancel；选人页仍会再判一次
  */
-function buildProxyRegisterUsersFromRoster(series) {
+function buildProxyRegisterUsersFromRoster(series, operatorUserId) {
   var roster = Array.isArray(series && series.roster) ? series.roster : [];
+  var actorId = asString(operatorUserId);
   var out = [];
   for (var i = 0; i < roster.length; i++) {
     var e = roster[i];
@@ -57,6 +63,8 @@ function buildProxyRegisterUsersFromRoster(series) {
     if (asString(e.registrationStatus) !== 'registered') continue;
     var userId = asString(e.playerId);
     if (!userId) continue;
+    var state = proxyRegistrationState.resolveProxyRegistrationStateFromEntry(e, actorId);
+    var locked = state === 'registered_locked';
     var genderNorm = normalizeGenderSnapshot(e.genderSnapshot);
     var genderIcon = '';
     var genderClass = '';
@@ -68,6 +76,7 @@ function buildProxyRegisterUsersFromRoster(series) {
       genderClass = 'gender-female';
     }
     out.push({
+      rosterEntryId: asString(e.rosterEntryId),
       userId: userId,
       playerId: userId,
       competitionName: asString(e.playerNameSnapshot),
@@ -97,8 +106,9 @@ function buildProxyRegisterUsersFromRoster(series) {
       registeredByName: asString(e.registeredByNameSnapshot),
       subjectType: 'other',
       pickChannel: asString(e.registrationSource) === 'proxy' ? 'friends' : '',
-      canSelfCancel: true,
-      locked: false
+      canSelfCancel: state === 'registered_by_me',
+      locked: locked,
+      registrationState: state
     });
   }
   return out;
@@ -219,6 +229,10 @@ module.exports = {
   normalizeGenderSnapshot: normalizeGenderSnapshot,
   buildRegisterForOtherSourceOptions: buildRegisterForOtherSourceOptions,
   buildProxyRegisterUsersFromRoster: buildProxyRegisterUsersFromRoster,
+  resolveProxyRegistrationState: proxyRegistrationState.resolveProxyRegistrationState,
+  resolveProxyRegistrationStateFromEntry:
+    proxyRegistrationState.resolveProxyRegistrationStateFromEntry,
+  isProxyRemovableByActor: proxyRegistrationState.isProxyRemovableByActor,
   buildProxyAffiliationOptions: buildProxyAffiliationOptions,
   buildProxyMemberSourceOptions: buildProxyMemberSourceOptions,
   resolveSeriesHostTeamId: resolveSeriesHostTeamId,

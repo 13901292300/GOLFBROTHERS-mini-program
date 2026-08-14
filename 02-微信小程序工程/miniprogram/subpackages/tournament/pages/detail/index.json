@@ -8,6 +8,7 @@
     "match-tee-management-sheet": "/components/match-tee-management-sheet/index",
     "match-payment-management-sheet": "/components/match-payment-management-sheet/index",
     "player-source-sheet": "/components/player-source-sheet/index",
+    "registration-cancel-dialog": "/components/registration-cancel-dialog/index",
     "leaderboard-setting-sheet": "/components/leaderboard-setting-sheet/index",
     "personal-leaderboard-board": "/components/personal-leaderboard-board/index",
     "leaderboard-player-name-cell": "/components/leaderboard-player-name-cell/index",

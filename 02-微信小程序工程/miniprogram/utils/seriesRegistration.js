@@ -169,6 +169,77 @@ function createSeriesRegistrationService(deps) {
     return { ok: true };
   }
 
+  /** 仅 Series 整体 completed 禁止报名域写入；单轮结束不关闭 */
+  function assertCompetitionPhaseAllowsSelfMutation(series) {
+    if (asString(series.competitionPhaseCache) === 'completed') {
+      return { ok: false, reason: 'series_completed' };
+    }
+    return { ok: true };
+  }
+
+  function locateActiveProxyOwnedByActor(roster, input, actorId) {
+    var list = Array.isArray(roster) ? roster : [];
+    var entryId = asString(input && input.rosterEntryId);
+    var playerId = asString(
+      input && (input.playerId || input.userId || (input.player && input.player.playerId))
+    );
+    var found = null;
+    var i;
+    if (entryId) {
+      for (i = 0; i < list.length; i++) {
+        if (asString(list[i] && list[i].rosterEntryId) === entryId) {
+          found = list[i];
+          break;
+        }
+      }
+      if (!found) return { ok: false, reason: 'roster_entry_not_found' };
+      if (playerId && asString(found.playerId) !== playerId) {
+        return { ok: false, reason: 'player_id_mismatch' };
+      }
+    } else {
+      if (!playerId) return { ok: false, reason: 'player_id_required' };
+      for (i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (!e) continue;
+        if (asString(e.playerId) !== playerId) continue;
+        if (asString(e.registrationStatus) !== 'registered') continue;
+        if (asString(e.registrationSource) !== 'proxy') continue;
+        if (asString(e.registeredByUserId) !== actorId) continue;
+        found = e;
+        break;
+      }
+      if (!found) {
+        var active = findRegisteredEntry(list, playerId);
+        if (!active) return { ok: false, reason: 'not_registered' };
+        if (asString(active.registrationSource) !== 'proxy') {
+          return { ok: false, reason: 'not_proxy' };
+        }
+        if (asString(active.registeredByUserId) !== actorId) {
+          return { ok: false, reason: 'not_registered_by_me' };
+        }
+        return { ok: false, reason: 'forbidden' };
+      }
+    }
+    if (asString(found.registrationStatus) !== 'registered') {
+      return { ok: false, reason: 'not_registered' };
+    }
+    if (asString(found.registrationSource) !== 'proxy') {
+      return { ok: false, reason: 'not_proxy' };
+    }
+    if (!asString(found.registeredByUserId) || asString(found.registeredByUserId) !== actorId) {
+      return { ok: false, reason: 'not_registered_by_me' };
+    }
+    return { ok: true, entry: found };
+  }
+
+  function softCancelRosterEntry(entry, ts) {
+    return Object.assign({}, entry, {
+      registrationStatus: 'cancelled',
+      updatedAt: ts,
+      cancelledAt: ts
+    });
+  }
+
   /**
    * 调用方 expectedRegistrationRevision：
    * - 已传且与 current 不同 → registration_conflict（不调 resolver、不写）
@@ -284,6 +355,8 @@ function createSeriesRegistrationService(deps) {
 
     var lifeGate = assertLifecycleAllowsMutation(series);
     if (!lifeGate.ok) return lifeGate;
+    var phaseGate = assertCompetitionPhaseAllowsSelfMutation(series);
+    if (!phaseGate.ok) return phaseGate;
 
     var revGate = assertExpectedRevision(series, src.expectedRegistrationRevision);
     if (!revGate.ok) return revGate;
@@ -434,6 +507,9 @@ function createSeriesRegistrationService(deps) {
     var perm = resolveRegisterForOtherPermission(series, src.actor);
     if (!perm.ok) return perm;
 
+    var phaseGate = assertCompetitionPhaseAllowsSelfMutation(series);
+    if (!phaseGate.ok) return phaseGate;
+
     var openGate = assertRegistrationOpen(series);
     if (!openGate.ok) return openGate;
 
@@ -547,6 +623,8 @@ function createSeriesRegistrationService(deps) {
 
     var lifeGate = assertLifecycleAllowsMutation(series);
     if (!lifeGate.ok) return lifeGate;
+    var phaseGate = assertCompetitionPhaseAllowsSelfMutation(series);
+    if (!phaseGate.ok) return phaseGate;
 
     var revGate = assertExpectedRevision(series, src.expectedRegistrationRevision);
     if (!revGate.ok) return revGate;
@@ -603,6 +681,302 @@ function createSeriesRegistrationService(deps) {
     };
   }
 
+  function cancelRegistrationForOther(input) {
+    var src = input && typeof input === 'object' ? input : {};
+    var loaded = loadSeries(src.seriesId);
+    if (!loaded.ok) return loaded;
+    var series = loaded.series;
+
+    var lifeGate = assertLifecycleAllowsMutation(series);
+    if (!lifeGate.ok) return lifeGate;
+    var phaseGate = assertCompetitionPhaseAllowsSelfMutation(series);
+    if (!phaseGate.ok) return phaseGate;
+
+    var revGate = assertExpectedRevision(series, src.expectedRegistrationRevision);
+    if (!revGate.ok) return revGate;
+    var currentRevision = revGate.currentRevision;
+
+    var actorId = resolveActorPlayerId(src.actor);
+    if (!actorId.ok) return actorId;
+
+    var perm = resolveRegisterForOtherPermission(series, src.actor);
+    if (!perm.ok) return perm;
+
+    var openGate = assertRegistrationOpen(series);
+    if (!openGate.ok) return openGate;
+
+    var located = locateActiveProxyOwnedByActor(
+      series.roster,
+      src,
+      actorId.playerId
+    );
+    if (!located.ok) return located;
+
+    var ts = nowFn();
+    var nextRoster = (Array.isArray(series.roster) ? series.roster : []).map(function (e) {
+      if (asString(e && e.rosterEntryId) !== asString(located.entry.rosterEntryId)) {
+        return e;
+      }
+      return softCancelRosterEntry(e, ts);
+    });
+
+    var next = deepClone(series);
+    next.roster = nextRoster;
+    next.registrationRevision = currentRevision + 1;
+    var wrote = store.upsertSeriesChecked(next, currentRevision);
+    if (!wrote.ok) {
+      return {
+        ok: false,
+        reason: wrote.reason || 'storage_write_failed',
+        currentRevision: wrote.currentRevision
+      };
+    }
+    return {
+      ok: true,
+      idempotent: false,
+      series: wrote.series,
+      reason: 'cancelled_proxy'
+    };
+  }
+
+  function applyProxyAddOntoRoster(roster, series, player, actor, targetPid, ts) {
+    var snaps = buildPlayerSnapshots(player, actor);
+    var playerId = snaps.playerId;
+    if (!playerId) return { ok: false, reason: 'player_id_required' };
+    var actorPid = resolveActorPlayerId(actor);
+    if (!actorPid.ok) return actorPid;
+    if (actorPid.playerId === playerId) {
+      return { ok: false, reason: 'proxy_target_is_self' };
+    }
+    if (!targetPid) return { ok: false, reason: 'participant_id_required' };
+    if (!participantExists(series, targetPid)) {
+      return { ok: false, reason: 'participant_not_found' };
+    }
+
+    var active = findRegisteredEntry(roster, playerId);
+    if (active) {
+      if (asString(active.seriesParticipantId) === targetPid) {
+        return { ok: true, changed: false, reason: 'already_registered', roster: roster };
+      }
+      return { ok: false, reason: 'already_registered_elsewhere' };
+    }
+
+    var existingSame = findEntryByPlayerParticipant(roster, playerId, targetPid);
+    var nextRoster;
+    if (existingSame) {
+      nextRoster = roster.map(function (e) {
+        if (
+          e !== existingSame &&
+          asString(e.rosterEntryId) !== asString(existingSame.rosterEntryId)
+        ) {
+          return e;
+        }
+        return Object.assign({}, e, {
+          playerNameSnapshot: snaps.playerNameSnapshot || e.playerNameSnapshot,
+          playerAvatarSnapshot: snaps.playerAvatarSnapshot || e.playerAvatarSnapshot,
+          genderSnapshot: snaps.genderSnapshot || e.genderSnapshot,
+          handicapSnapshot:
+            snaps.handicapSnapshot !== '' ? snaps.handicapSnapshot : e.handicapSnapshot,
+          floatCoefSnapshot:
+            snaps.floatCoefSnapshot !== '' ? snaps.floatCoefSnapshot : e.floatCoefSnapshot,
+          phoneSnapshot: snaps.phoneSnapshot !== '' ? snaps.phoneSnapshot : e.phoneSnapshot,
+          registrationStatus: 'registered',
+          registrationSource: 'proxy',
+          registeredByUserId: actorPid.playerId,
+          registeredByNameSnapshot:
+            asString(actor && actor.name) || snaps.registeredByNameSnapshot,
+          updatedAt: ts,
+          cancelledAt: ''
+        });
+      });
+    } else {
+      var entry = seriesModel.normalizeRosterEntry(
+        {
+          rosterEntryId: seriesIds.generateRosterEntryId(),
+          seriesId: series.seriesId,
+          seriesParticipantId: targetPid,
+          playerId: playerId,
+          playerNameSnapshot: snaps.playerNameSnapshot,
+          playerAvatarSnapshot: snaps.playerAvatarSnapshot,
+          genderSnapshot: snaps.genderSnapshot,
+          handicapSnapshot: snaps.handicapSnapshot,
+          floatCoefSnapshot: snaps.floatCoefSnapshot,
+          phoneSnapshot: snaps.phoneSnapshot,
+          registrationStatus: 'registered',
+          registrationSource: 'proxy',
+          registeredByUserId: actorPid.playerId,
+          registeredByNameSnapshot:
+            asString(actor && actor.name) || snaps.registeredByNameSnapshot,
+          createdAt: ts,
+          updatedAt: ts,
+          cancelledAt: ''
+        },
+        series.seriesId
+      );
+      nextRoster = roster.concat([entry]);
+    }
+    return { ok: true, changed: true, reason: existingSame ? 'restored' : 'registered_proxy', roster: nextRoster };
+  }
+
+  /**
+   * 单次 checked upsert 的代报名增删计划，避免新增成功、取消失败的半写。
+   */
+  function applyProxyCommitPlan(input) {
+    var src = input && typeof input === 'object' ? input : {};
+    var loaded = loadSeries(src.seriesId);
+    if (!loaded.ok) return loaded;
+    var series = loaded.series;
+
+    var lifeGate = assertLifecycleAllowsMutation(series);
+    if (!lifeGate.ok) return lifeGate;
+    var phaseGate = assertCompetitionPhaseAllowsSelfMutation(series);
+    if (!phaseGate.ok) return phaseGate;
+
+    var revGate = assertExpectedRevision(series, src.expectedRegistrationRevision);
+    if (!revGate.ok) return revGate;
+    var currentRevision = revGate.currentRevision;
+
+    var actorId = resolveActorPlayerId(src.actor);
+    if (!actorId.ok) return actorId;
+
+    var perm = resolveRegisterForOtherPermission(series, src.actor);
+    if (!perm.ok) return perm;
+
+    var openGate = assertRegistrationOpen(series);
+    if (!openGate.ok) return openGate;
+
+    var removals = Array.isArray(src.removals) ? src.removals : [];
+    var additions = Array.isArray(src.additions) ? src.additions : [];
+    var defaultPid = asString(src.seriesParticipantId);
+    var roster = Array.isArray(series.roster) ? series.roster.slice() : [];
+    var removeIds = Object.create(null);
+    var i;
+
+    for (i = 0; i < removals.length; i++) {
+      var located = locateActiveProxyOwnedByActor(roster, removals[i], actorId.playerId);
+      if (!located.ok) return located;
+      var rid = asString(located.entry.rosterEntryId);
+      if (removeIds[rid]) continue;
+      removeIds[rid] = located.entry;
+    }
+
+    var addJobs = [];
+    for (i = 0; i < additions.length; i++) {
+      var rawAdd = additions[i] && typeof additions[i] === 'object' ? additions[i] : {};
+      var player = rawAdd.player && typeof rawAdd.player === 'object' ? rawAdd.player : rawAdd;
+      var targetPid = asString(rawAdd.seriesParticipantId) || defaultPid;
+      var previewId = resolveDomainPlayerId(player);
+      if (!previewId) continue;
+      addJobs.push({ player: player, seriesParticipantId: targetPid });
+    }
+
+    if (!Object.keys(removeIds).length && !addJobs.length) {
+      return {
+        ok: true,
+        idempotent: true,
+        series: series,
+        reason: 'no_change',
+        addedCount: 0,
+        removedCount: 0
+      };
+    }
+
+    var ts = nowFn();
+    var nextRoster = roster.map(function (e) {
+      if (!e) return e;
+      if (!removeIds[asString(e.rosterEntryId)]) return e;
+      return softCancelRosterEntry(e, ts);
+    });
+    var removedCount = Object.keys(removeIds).length;
+    var addedCount = 0;
+
+    for (i = 0; i < addJobs.length; i++) {
+      var job = addJobs[i];
+      var applied = applyProxyAddOntoRoster(
+        nextRoster,
+        series,
+        job.player,
+        src.actor,
+        job.seriesParticipantId,
+        ts
+      );
+      if (!applied.ok) return applied;
+      nextRoster = applied.roster;
+      if (applied.changed) addedCount += 1;
+    }
+
+    if (!removedCount && !addedCount) {
+      return {
+        ok: true,
+        idempotent: true,
+        series: series,
+        reason: 'no_change',
+        addedCount: 0,
+        removedCount: 0
+      };
+    }
+
+    var next = deepClone(series);
+    next.roster = nextRoster;
+    next.registrationRevision = currentRevision + 1;
+    var wrote = store.upsertSeriesChecked(next, currentRevision);
+    if (!wrote.ok) {
+      return {
+        ok: false,
+        reason: wrote.reason || 'storage_write_failed',
+        currentRevision: wrote.currentRevision
+      };
+    }
+    return {
+      ok: true,
+      idempotent: false,
+      series: wrote.series,
+      reason: 'proxy_updated',
+      addedCount: addedCount,
+      removedCount: removedCount
+    };
+  }
+
+  /**
+   * 只读预演：克隆 Series 到临时 store，复用同一权限/资格 resolver，不写外部 store。
+   */
+  function previewProxyCommitPlan(input) {
+    var src = input && typeof input === 'object' ? input : {};
+    var loaded = loadSeries(src.seriesId);
+    if (!loaded.ok) return loaded;
+    var sid = asString(loaded.series.seriesId);
+    var bag = Object.create(null);
+    bag[sid] = deepClone(loaded.series);
+    var previewStore = {
+      getSeriesById: function (id) {
+        var key = asString(id);
+        return bag[key] ? deepClone(bag[key]) : null;
+      },
+      upsertSeriesChecked: function (next, expected) {
+        var key = asString(next && next.seriesId);
+        var cur = bag[key];
+        var curRev = cur ? Number(cur.registrationRevision) || 0 : 0;
+        if (cur && Number(expected) !== curRev) {
+          return {
+            ok: false,
+            reason: 'registration_conflict',
+            currentRevision: curRev
+          };
+        }
+        bag[key] = deepClone(next);
+        return { ok: true, series: deepClone(next) };
+      }
+    };
+    var previewSvc = createSeriesRegistrationService({
+      seriesStore: previewStore,
+      resolveEligibleParticipantIds: resolveEligible,
+      canManageRegistration: canManage,
+      canRegisterForOther: canRegisterForOtherFn,
+      now: nowFn
+    });
+    return previewSvc.applyProxyCommitPlan(src);
+  }
+
   function setRegistrationState(input) {
     var src = input && typeof input === 'object' ? input : {};
     var loaded = loadSeries(src.seriesId);
@@ -656,6 +1030,9 @@ function createSeriesRegistrationService(deps) {
     registerSelf: registerSelf,
     registerForOther: registerForOther,
     cancelSelfRegistration: cancelSelfRegistration,
+    cancelRegistrationForOther: cancelRegistrationForOther,
+    applyProxyCommitPlan: applyProxyCommitPlan,
+    previewProxyCommitPlan: previewProxyCommitPlan,
     setRegistrationState: setRegistrationState
   };
 }

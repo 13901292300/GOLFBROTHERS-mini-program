@@ -75,21 +75,25 @@ function buildSeriesScopeFeatures(input) {
   var life = asString(series && series.lifecycleStatus);
   var published = life === 'published';
   var historical = life === 'cancelled' || life === 'archived';
+  var seriesCompleted = asString(series && series.competitionPhaseCache) === 'completed';
 
   // 对齐队际赛：邀请/代报名在 published 均可见且不因 closed 置灰；
-  // closed 拦截放在点击入口（toast「报名通道已关闭」），不在 ViewModel 置灰。
+  // closed 拦截放在点击入口（共享 Modal），不在 ViewModel 置灰。
+  // Series 整体 completed 对齐普通 finished：不展示替他人报名入口。
   var featuresCommon = [];
   if (published && !historical) {
-    featuresCommon.push({
-      scope: 'series',
-      tier: 'common',
-      permission: 'register_for_other',
-      glyph: '📝',
-      label: '替他人报名',
-      tone: '',
-      disabled: !canProxy,
-      disabledReason: !canProxy ? 'permission_denied' : ''
-    });
+    if (!seriesCompleted) {
+      featuresCommon.push({
+        scope: 'series',
+        tier: 'common',
+        permission: 'register_for_other',
+        glyph: '📝',
+        label: '替他人报名',
+        tone: '',
+        disabled: !canProxy,
+        disabledReason: !canProxy ? 'permission_denied' : ''
+      });
+    }
     featuresCommon.push({
       scope: 'series',
       tier: 'common',
