@@ -16,6 +16,7 @@ const {
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
 } = require('../../../../utils/strokeEntityValidator.js');
+const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
 
 const TEE_BLUE = 'BLUE_T';
@@ -440,7 +441,13 @@ Page({
         roundId: this._roundId,
         matchId: matchId,
         match: this._match,
-        series: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null
+        series: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null,
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        }
       });
       if (!loaded || !loaded.ok) {
         wx.showToast({
@@ -631,6 +638,24 @@ Page({
     return isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode);
   },
 
+  _collectNoRepeatLock() {
+    if (!this._fromSeries) {
+      return { ok: true, enabled: false, playerIds: {} };
+    }
+    return seriesGroupPickRoster.collectPriorPlayedPlayerIds({
+      fromSeries: true,
+      seriesId: this._seriesId,
+      series: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : this._seriesForPick,
+      currentRoundId: this._roundId,
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
+      },
+      getIndexByMatchId: function (id) {
+        return seriesStationIndex.getByMatchId(id);
+      }
+    });
+  },
+
   /** G5 个人比洞：每分队最多 1 人（勿与 G6-G8 cap2 混用） */
   _isG5MatchPlayTeamCap1Mode() {
     return isG5MatchPlayMode(String(this._gameMode || ''));
@@ -639,7 +664,7 @@ Page({
   /**
    * 弹窗列表状态：
    * checked  = 是否在当前 slots（临时选中）
-   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人
+   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人 / 前序轮 no-repeat
    */
   _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
@@ -665,6 +690,7 @@ Page({
       applyMatchPlayTeamCap2 || applyG5Cap1
         ? this._countSelectedByTeam(slots, teamMap)
         : {};
+    const noRepeatLock = this._collectNoRepeatLock();
 
     return users
       .map(normalizeUser)
@@ -700,14 +726,17 @@ Page({
             isDisabled = true;
           }
         }
-        return Object.assign({}, u, {
-          isSelected: checked,
-          checked: checked,
-          selectedSlot: selectedMap[uid] || 0,
-          isOccupied: isOccupied,
-          occupiedGroupName: occupiedGroupName,
-          isDisabled: isDisabled
-        });
+        return seriesGroupPickRoster.mergeNoRepeatLockFields(
+          Object.assign({}, u, {
+            isSelected: checked,
+            checked: checked,
+            selectedSlot: selectedMap[uid] || 0,
+            isOccupied: isOccupied,
+            occupiedGroupName: occupiedGroupName,
+            isDisabled: isDisabled
+          }),
+          noRepeatLock
+        );
       })
       .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en', { sensitivity: 'base' }));
   },
@@ -772,6 +801,19 @@ Page({
       registerInfo: this._registerInfo || { users: [] }
     });
     const gameMode = String(this._gameMode || '');
+
+    if (this._fromSeries) {
+      const lock = this._collectNoRepeatLock();
+      const ids = seriesGroupPickRoster.collectPlayerIdsFromSlots(this.data.slots);
+      const check = seriesGroupPickRoster.assertPlayersNotPlayedPriorRound(ids, lock);
+      if (!check.ok) {
+        wx.showToast({
+          title: check.message || seriesGroupPickRoster.NO_REPEAT_SAVE_MSG,
+          icon: 'none'
+        });
+        return false;
+      }
+    }
 
     // G5：跨分队恰好 1v1
     if (isG5MatchPlayMode(gameMode)) {
@@ -880,7 +922,7 @@ Page({
 
   /**
    * 勾选/取消：只改 slots（临时选中），再重建列表。
-   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 / G6-G8 分队上限判断。
+   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 / G6-G8 分队上限 / 最新 no-repeat 判断。
    */
   onTogglePlayer(e) {
     const user = e.currentTarget.dataset.user || null;
@@ -899,6 +941,7 @@ Page({
     const selectedIndex = slots.findIndex((s) => String((s && s.userId) || '') === pickedUserId);
 
     // 取消勾选：清空该位置（含删光后恢复全部分队可选）
+    // 当前 slot 历史违规球员必须能取消；取消后再选走下面的 no-repeat 核验
     if (selectedIndex >= 0) {
       slots[selectedIndex] = createEmptySlot(slots[selectedIndex].position || (selectedIndex + 1));
       const displayUsers = this._buildDisplayUsers(
@@ -910,6 +953,18 @@ Page({
       );
       this.setData({ slots: slots, displayUsers: displayUsers });
       return;
+    }
+
+    if (this._fromSeries) {
+      const lock = this._collectNoRepeatLock();
+      const blocked = seriesGroupPickRoster.shouldBlockNoRepeatAdd(pickedUserId, lock);
+      if (blocked && blocked.blocked) {
+        wx.showToast({
+          title: blocked.message || seriesGroupPickRoster.NO_REPEAT_TOGGLE_MSG,
+          icon: 'none'
+        });
+        return;
+      }
     }
 
     // 4+0：已有球员时禁止跨分队入座

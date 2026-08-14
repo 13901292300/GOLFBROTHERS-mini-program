@@ -31,6 +31,7 @@ const { normalizeFormalGroupSeats } = require('../../../../utils/strokeGroupSeat
 
 const tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js');
 const seriesStore = require('../../../../utils/seriesStore.js');
+const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
 const {
   PLAYER_SLOTS,
@@ -240,7 +241,13 @@ Page({
       roundId: roundId,
       matchId: mid,
       match: match || (mid ? teamMatchStore.getMatchById(mid) : null),
-      series: seriesId ? seriesStore.getSeriesById(seriesId) : null
+      series: seriesId ? seriesStore.getSeriesById(seriesId) : null,
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
+      },
+      getIndexByMatchId: function (id) {
+        return seriesStationIndex.getByMatchId(id);
+      }
     });
     if (!loaded || !loaded.ok) {
       if (!opts.silentFail) {
@@ -1431,6 +1438,30 @@ Page({
     if (!match) {
       wx.showToast({ title: '未找到比赛信息', icon: 'none' });
       return;
+    }
+    if (this._fromSeries) {
+      const sanitizedForLock = this._sanitizeGroupDraft(rawDraft);
+      const ids = seriesGroupPickRoster.collectPlayerIdsFromGroups(sanitizedForLock);
+      const seriesId = (this._seriesReturnMeta && this._seriesReturnMeta.seriesId) || '';
+      const check = seriesGroupPickRoster.assertPlayersNotPlayedPriorRound(ids, {
+        fromSeries: true,
+        seriesId: seriesId,
+        series: (seriesId ? seriesStore.getSeriesById(seriesId) : null) || this._seriesForPick,
+        currentRoundId: (this._seriesReturnMeta && this._seriesReturnMeta.roundId) || '',
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        }
+      });
+      if (!check.ok) {
+        wx.showToast({
+          title: check.message || seriesGroupPickRoster.NO_REPEAT_SAVE_MSG,
+          icon: 'none'
+        });
+        return;
+      }
     }
     this.setData({ saving: true });
     if (this.data.mode === 'live') {

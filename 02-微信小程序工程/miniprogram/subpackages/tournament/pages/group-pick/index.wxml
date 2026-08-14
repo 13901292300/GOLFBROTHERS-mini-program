@@ -73,6 +73,7 @@
               <text wx:if="{{item.genderIcon}}" class="roster-gender {{item.genderClass}}">{{item.genderIcon}}</text>
             </view>
             <text wx:if="{{item.isOccupied}}" class="roster-occupied-tip">已加入{{item.occupiedGroupName}}</text>
+            <text wx:elif="{{item.noRepeatLocked}}" class="roster-occupied-tip">已在前序轮次上场</text>
           </view>
         </view>
         <view class="roster-col roster-col--handicap"><text>{{item.handicap}}</text></view>

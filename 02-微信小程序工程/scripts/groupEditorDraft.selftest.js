@@ -154,10 +154,38 @@ assert(
   editorSrc.indexOf('/subpackages/tournament/pages/group-pick/index') >= 0
 );
 assert(
-  'group-editor does not navigate to series-detail',
-  editorSrc.indexOf('series-detail') < 0 &&
-    editorSrc.indexOf('seriesSchedule') < 0
+  'group-editor may require seriesGroupPickRoster',
+  /require\(['"]\.\.\/series-detail\/seriesGroupPickRoster\.js['"]\)/.test(editorSrc)
 );
+
+function wxNavUrlHitsSeriesDetail(src) {
+  return /wx\.(navigateTo|redirectTo|reLaunch)\s*\(\s*\{[\s\S]{0,400}?url\s*:[\s\S]{0,300}?series-detail/.test(
+    src
+  );
+}
+
+assert(
+  'group-editor does not navigateTo/redirectTo/reLaunch series-detail',
+  !wxNavUrlHitsSeriesDetail(editorSrc)
+);
+
+(function assertSaveDoesNotJumpSeriesDetail() {
+  var key = 'teamMatchStore.saveMatch';
+  var idx = 0;
+  var ok = true;
+  while ((idx = editorSrc.indexOf(key, idx)) >= 0) {
+    var window = editorSrc.slice(idx, idx + 900);
+    if (
+      wxNavUrlHitsSeriesDetail(window) ||
+      /wx\.(navigateTo|redirectTo|reLaunch)\s*\([\s\S]{0,400}series-detail/.test(window)
+    ) {
+      ok = false;
+      break;
+    }
+    idx += key.length;
+  }
+  assert('save success does not jump to Series detail', ok);
+})();
 assert(
   'group-editor does not introduce plaza redirect for save',
   editorSrc.indexOf('section=plaza&tab=tournament') < 0
