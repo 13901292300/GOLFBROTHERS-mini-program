@@ -1208,6 +1208,11 @@ Page({
   },
 
   openNormalCreate() {
+    this.setData({
+      createOverlayVisible: false,
+      createOverlayOpen: false,
+      moreCreateVisible: false
+    });
     wx.navigateTo({
       url: '/subpackages/create/pages/normal/index',
       fail: () => {

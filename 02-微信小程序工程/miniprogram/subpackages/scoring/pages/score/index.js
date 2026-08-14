@@ -6965,6 +6965,14 @@ Page({
     return !prevGid || !gid || prevGid !== gid;
   },
 
+  _isOrdinaryCreatePrevPage(pages) {
+    const list = pages || [];
+    if (list.length < 2) return false;
+    const prev = list[list.length - 2];
+    const route = (prev && (prev.route || prev.__route__)) || '';
+    return route === 'subpackages/create/pages/normal/index';
+  },
+
   /**
    * 回到栈内已有同 gameId Game Hub（仅 navigateBack）。
    * 找不到则返回 false，禁止 redirectTo/reLaunch 补建 Hub。
@@ -7121,8 +7129,31 @@ Page({
         return;
       }
 
+      if (matchState.shouldRelaunchCleanHomeFromScore(matchStateForBack)) {
+        scoreDebugLog('[SCORE_BACK_ACTION]', {
+          action: 'relaunch_clean_home',
+          fromFlow: matchStateForBack && matchStateForBack.fromFlow,
+          fromPage: matchStateForBack && matchStateForBack.fromPage
+        });
+        wx.reLaunch({
+          url: matchState.CLEAN_HOME_URL,
+          complete: releaseBackLock
+        });
+        return;
+      }
+
       const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
-      // 2) 无同 gameId Hub，但有上一页 → navigateBack（球友圈/首页单组直达等）
+      // 2) 无同 gameId Hub，但上一页是普通创建页 → 不得返回创建页，回首页
+      if (this._isOrdinaryCreatePrevPage(pages)) {
+        scoreDebugLog('[SCORE_BACK_ACTION]', {
+          action: 'home_skip_create',
+          gameId: gameId,
+          stack: this._scoreNavStackRoutes()
+        });
+        wx.reLaunch({ url: '/pages/home/index?tab=my', complete: releaseBackLock });
+        return;
+      }
+      // 3) 无同 gameId Hub，但有上一页 → navigateBack（球友圈/首页单组直达等）
       if (pages && pages.length > 1) {
         // 上一页若是其它 gameId 的 Hub：不得当作当前中间页
         if (this._isForeignGameHubPrevPage(pages, gameId)) {
@@ -7157,7 +7188,7 @@ Page({
         return;
       }
 
-      // 3) 冷启动根页：reLaunch 首页，不凭空创建 Hub
+      // 4) 冷启动根页：reLaunch 首页，不凭空创建 Hub
       scoreDebugLog('[SCORE_BACK_ACTION]', {
         action: 'home_cold_start',
         gameId: gameId

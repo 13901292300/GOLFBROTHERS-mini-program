@@ -1400,6 +1400,8 @@ Page({
       wx.showToast({ title: err, icon: 'none' });
       return;
     }
+    if (this._startNavLock) return;
+    this._startNavLock = true;
     const courseId = this.data.courseId;
     const courseName = (this.data.courseName || '').trim();
     // 四人两球：提交时自动写入与 G2/G3 2+2 同构的 composition（本阶段不改记分路由）
@@ -1481,16 +1483,25 @@ Page({
     };
     gameStore.saveGame(game);
 
-    // 多组且创建者未参赛 → Game Hub 分组表 TAB（不进入记分页、不回到创建页）
-    if (isMulti && !creatorInGame) {
-      wx.redirectTo({
-        url: '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId) + '&activeTab=group'
-      });
-      return;
-    }
+    const navPlan = matchStateUtil.planNormalCreateSuccessNav({
+      isMulti: isMulti,
+      creatorInGame: creatorInGame
+    });
+    const releaseStartNavLock = () => {
+      this._startNavLock = false;
+    };
 
     // 单组：始终 group 0；多组且创建者在赛中：定位到创建者所在组
     const startGroupIndex = isMulti && creatorInGame ? creatorGroupIndex : 0;
+    const hubUrl = matchStateUtil.buildNormalCreateHubUrl(gameId, startGroupIndex, creatorInGame);
+
+    if (navPlan.kind === 'replace_hub') {
+      wx.redirectTo({
+        url: hubUrl,
+        fail: releaseStartNavLock
+      });
+      return;
+    }
 
     // 模板映射：最好成绩 / 最佳球位 / 四人两球 → 统一记分引擎 fourball_best；
     // formatType 四人两球仍为 fourball_2ball；groups 来自 groupCompositionMap（2+2 / 单 pair）。
@@ -1530,24 +1541,28 @@ Page({
       scores: matchStateUtil.emptyScores(),
       // 组数：记分页返回逻辑依赖（1=单组→重启回首页；>1→返回上一页）
       groupCount: groups.length,
-      fromFlow: isMulti ? 'multiGroupGame' : '',
-      fromPage: isMulti ? 'gameHub' : ''
+      fromFlow: navPlan.fromFlow,
+      fromPage: navPlan.fromPage
     };
     matchStateUtil.setMatchState(matchState);
 
-    // 多组且创建者在赛中：先压入 Game Hub，再进入记分页，保证栈 Create → Hub → Score
-    if (isMulti && creatorInGame) {
-      wx.navigateTo({
-        url:
-          '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId) +
-          '&activeTab=group&currentGroup=' + startGroupIndex,
+    // 多组且创建者在赛中：redirect Hub 替换创建页，再进入记分页 → Home → Hub → Score
+    if (navPlan.kind === 'replace_hub_then_score') {
+      wx.redirectTo({
+        url: hubUrl,
         success: () => matchStateUtil.enterScorePage(),
-        fail: () => matchStateUtil.enterScorePage()
+        fail: () => {
+          releaseStartNavLock();
+          matchStateUtil.enterScorePage({ replace: true });
+        }
       });
       return;
     }
 
-    // 单组：直接进入记分页
-    matchStateUtil.enterScorePage();
+    // 单组：redirect 记分页，替换创建页 → Home → Score，返回首页
+    matchStateUtil.enterScorePage({
+      replace: true,
+      onFail: releaseStartNavLock
+    });
   }
 });

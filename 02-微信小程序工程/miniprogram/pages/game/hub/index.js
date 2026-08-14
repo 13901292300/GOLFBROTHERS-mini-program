@@ -373,6 +373,7 @@ Page({
     const opt = options || {};
     this._loadOptions = opt;
     this._entryFrom = opt.from || '';
+    this._fromNormalCreateSuccess = matchStateUtil.isHubOpenedFromNormalCreate(opt);
 
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
@@ -2366,6 +2367,20 @@ Page({
         self._backNavLock = false;
       }, 500);
     };
+    if (this._fromNormalCreateSuccess) {
+      hubNavDebug('[HUB_NAV]', {
+        op: 'hubBack',
+        gameId: this._gameId || this.data.gameId,
+        nav: 'relaunch_clean_home',
+        fromFlow: 'normalCreate'
+      });
+      wx.reLaunch({
+        url: matchStateUtil.CLEAN_HOME_URL,
+        complete: release,
+        fail: release
+      });
+      return;
+    }
     const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
     hubNavDebug('[HUB_NAV]', {
       op: 'hubBack',
@@ -2382,7 +2397,7 @@ Page({
       return;
     }
     wx.reLaunch({
-      url: '/pages/home/index?tab=my',
+      url: matchStateUtil.CLEAN_HOME_URL,
       complete: release,
       fail: release
     });

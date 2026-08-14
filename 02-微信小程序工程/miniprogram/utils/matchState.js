@@ -23,6 +23,8 @@
 
 const MATCH_STATE_KEY = 'matchState';
 const SCORE_PAGE_URL = '/subpackages/scoring/pages/score/index';
+const CLEAN_HOME_URL = '/pages/home/index?tab=my';
+const FROM_FLOW_NORMAL_CREATE = 'normalCreate';
 const gameStore = require('./gameStore.js');
 
 function getMatchState() {
@@ -175,13 +177,84 @@ function _safeEnterScoreCallback(fn, args, label) {
 }
 
 /**
+ * 普通创建成功后的导航与返回计划（明确来源标记，不按栈长度猜测）。
+ * - 单组：redirect 记分页；Score 返回 reLaunch 干净首页
+ * - 多组参赛：redirect Hub（带 fromFlow）再进记分；Score 回 Hub；Hub 返回 reLaunch 干净首页
+ * - 多组未参赛：只 redirect Hub（带 fromFlow）；Hub 返回干净首页
+ */
+function planNormalCreateSuccessNav(input) {
+  const src = input && typeof input === 'object' ? input : {};
+  const isMulti = !!src.isMulti;
+  const creatorInGame = !!src.creatorInGame;
+  if (isMulti && !creatorInGame) {
+    return {
+      kind: 'replace_hub',
+      fromFlow: FROM_FLOW_NORMAL_CREATE,
+      fromPage: 'gameHub',
+      enterScore: false,
+      scoreReplace: false,
+      scoreBack: 'hub',
+      hubBack: 'relaunch_clean_home'
+    };
+  }
+  if (isMulti && creatorInGame) {
+    return {
+      kind: 'replace_hub_then_score',
+      fromFlow: FROM_FLOW_NORMAL_CREATE,
+      fromPage: 'gameHub',
+      enterScore: true,
+      scoreReplace: false,
+      scoreBack: 'hub',
+      hubBack: 'relaunch_clean_home'
+    };
+  }
+  return {
+    kind: 'replace_score',
+    fromFlow: FROM_FLOW_NORMAL_CREATE,
+    fromPage: 'home',
+    enterScore: true,
+    scoreReplace: true,
+    scoreBack: 'relaunch_clean_home',
+    hubBack: null
+  };
+}
+
+function buildNormalCreateHubUrl(gameId, startGroupIndex, creatorInGame) {
+  const gid = gameId != null ? encodeURIComponent(String(gameId)) : '';
+  const base =
+    '/pages/game/hub/index?gameId=' +
+    gid +
+    '&activeTab=group&fromFlow=' +
+    FROM_FLOW_NORMAL_CREATE;
+  if (creatorInGame) {
+    return base + '&currentGroup=' + (Number(startGroupIndex) || 0);
+  }
+  return base;
+}
+
+function isNormalCreateSuccessFlow(ms) {
+  return !!(ms && ms.fromFlow === FROM_FLOW_NORMAL_CREATE);
+}
+
+function shouldRelaunchCleanHomeFromScore(ms) {
+  return isNormalCreateSuccessFlow(ms) && ms && ms.fromPage === 'home';
+}
+
+function isHubOpenedFromNormalCreate(query) {
+  const src = query && typeof query === 'object' ? query : {};
+  return src.fromFlow === FROM_FLOW_NORMAL_CREATE;
+}
+
+/**
  * 统一进入记分页面：
  * - 读取 matchState；不存在（或无 formatType）→ 提示「暂无比赛数据」，不跳转。
  * - 存在 → 进入记分页（不携带任何赛制参数，记分页只认 matchState）。
+ * - 默认 navigateTo；options.replace=true 时 redirectTo（用于普通单组创建成功，清掉创建页）。
  * @param {object} [options]
  * @param {function} [options.onFail] 失败回调（reason）；传入后可由调用方统一提示/回滚
  * @param {function} [options.onSuccess] 导航成功回调
  * @param {boolean} [options.silentToast] 为 true 时不弹默认 toast（需配合 onFail）
+ * @param {boolean} [options.replace] 为 true 时 redirectTo，替换当前页
  */
 function enterScorePage(options) {
   const opts = options && typeof options === 'object' ? options : {};
@@ -194,7 +267,7 @@ function enterScorePage(options) {
     }
     return false;
   }
-  wx.navigateTo({
+  const navOpts = {
     url: SCORE_PAGE_URL,
     success: function () {
       _safeEnterScoreCallback(opts.onSuccess, [], 'onSuccess');
@@ -209,17 +282,30 @@ function enterScorePage(options) {
         });
       }
     }
-  });
+  };
+  if (opts.replace === true && typeof wx.redirectTo === 'function') {
+    wx.redirectTo(navOpts);
+  } else {
+    wx.navigateTo(navOpts);
+  }
   return true;
 }
 
 module.exports = {
   MATCH_STATE_KEY,
+  SCORE_PAGE_URL,
+  CLEAN_HOME_URL,
+  FROM_FLOW_NORMAL_CREATE,
   getMatchState,
   setMatchState,
   clearMatchState,
   emptyScores,
   resolveFormatTypeFromGame,
   buildFromGame,
+  planNormalCreateSuccessNav,
+  buildNormalCreateHubUrl,
+  isNormalCreateSuccessFlow,
+  shouldRelaunchCleanHomeFromScore,
+  isHubOpenedFromNormalCreate,
   enterScorePage
 };
