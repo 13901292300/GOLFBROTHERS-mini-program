@@ -33,3 +33,32 @@ view.lr-player {
   flex: none;
   margin-left: 6rpx;
 }
+
+.name-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.series-standings-combo-sub {
+  margin-top: 2rpx;
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

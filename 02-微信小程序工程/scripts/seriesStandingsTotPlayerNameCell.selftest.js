@@ -53,14 +53,15 @@ function sliceBetween(src, beginToken, endToken) {
   return end < 0 ? src.slice(from, from + 1800) : src.slice(from, end);
 }
 
+var liveWxml = read('components/live-leaderboard-board/index.wxml');
 var totRow = sliceBetween(
   seriesWxml,
   'catchtap="onStandingsPlayerTap"',
   '<!-- TOT/R 球队行展开'
 );
 var detailRow = sliceBetween(
-  detailWxml,
-  'catchtap="toggleScorecard"',
+  liveWxml,
+  'catchtap="onTeamPlayerTap"',
   'class="scorecard-row"'
 );
 

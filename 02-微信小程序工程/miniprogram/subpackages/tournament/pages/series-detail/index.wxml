@@ -371,85 +371,46 @@
               class="series-standings-content-host"
               style="{{contentHostMinHeight > 0 ? 'min-height:' + contentHostMinHeight + 'px;' : ''}}"
             >
-            <view wx:if="{{!standings.teamRows.length}}" class="series-empty">
-              <text class="series-empty__title">暂无参赛主体</text>
-              <text class="series-empty__msg">创建参赛球队或分队后即可查看总榜结构</text>
+            <block wx:if="{{standings.useLiveLeaderboard}}">
+              <live-leaderboard-board
+                view="{{standings.liveView}}"
+                score-type="{{standings.liveScoreType}}"
+                view-label="{{standings.leaderboardViewLabel}}"
+                team-leaderboard="{{standings.liveTeamLeaderboard}}"
+                leaderboard="{{standings.liveLeaderboard}}"
+                expanded-team-id="{{expandedStandingsTeamId}}"
+                open-index="{{openStandingsScorecardKey}}"
+                open-scorecard="{{openStandingsScorecard}}"
+                scorecard-ad-image="{{standingsScorecardAdImage}}"
+                scorecard-course-title="{{standingsScorecardCourseTitle}}"
+                score-display-mode="{{standingsScoreDisplayMode}}"
+                score-panel="{{standings.liveScorePanel || standingsScorePanel || 'technical'}}"
+                show-leaderboard-team-column="{{standings.showLeaderboardTeamColumn}}"
+                team-group-logo-by-id="{{standings.liveTeamGroupLogoById}}"
+                leaderboard-avatar-badge="{{standings.liveAvatarBadge}}"
+                leaderboard-meta-mode="{{standings.liveMetaMode}}"
+                leaderboard-show-expand-gender="{{standings.liveShowExpandGender}}"
+                leaderboard-follow-enabled="{{false}}"
+                empty-text="{{standings.liveEmptyText}}"
+                prestart-expand-mode="{{standings.prestartExpandMode || 'none'}}"
+                bind:teamtap="onLiveLeaderboardTeamTap"
+                bind:scorecardtap="onLiveLeaderboardScorecardTap"
+                bind:rowtap="onStandingsPersonalLeaderboardRowTap"
+                bind:profiletap="onStandingsScorecardProfileTap"
+                bind:follow="onStandingsScorecardFollow"
+                bind:aderror="onStandingsScorecardAdError"
+              />
+            </block>
+            <view wx:elif="{{!standings.teamRows.length}}" class="series-empty">
+              <text class="series-empty__title">{{standings.listEmptyTitle || '暂无参赛主体'}}</text>
+              <text class="series-empty__msg">{{standings.listEmptyText || '创建参赛球队或分队后即可查看总榜结构'}}</text>
             </view>
 
             <view wx:else class="leaderboard-table-wrap">
               <view class="leaderboard-view-label">{{standings.leaderboardViewLabel}}</view>
 
-              <block wx:if="{{standings.showSharedPersonalBoard}}">
-                <personal-leaderboard-board
-                  leaderboard="{{standings.personalLeaderboard}}"
-                  leaderboard-score-type="{{standings.personalScoreType}}"
-                  show-leaderboard-team-column="{{standings.showLeaderboardTeamColumn}}"
-                  open-scorecard="{{openStandingsScorecard}}"
-                  scorecard-ad-image="{{standingsScorecardAdImage}}"
-                  scorecard-course-title="{{standingsScorecardCourseTitle}}"
-                  score-display-mode="{{standingsScoreDisplayMode}}"
-                  score-panel="{{standingsScorePanel}}"
-                  team-group-logo-by-id="{{standings.personalTeamGroupLogoById}}"
-                  leaderboard-avatar-badge="{{standings.personalAvatarBadge}}"
-                  leaderboard-meta-mode="{{standings.personalMetaMode}}"
-                  leaderboard-show-expand-gender="{{standings.personalShowExpandGender}}"
-                  leaderboard-follow-enabled="{{false}}"
-                  follow-map="{{standings.personalFollowMap}}"
-                  relation-map="{{standings.personalRelationMap}}"
-                  relation-label-map="{{standings.personalRelationLabelMap}}"
-                  leaderboard-followable-map="{{standings.personalFollowableMap}}"
-                  follow-loading-map="{{standings.personalFollowLoadingMap}}"
-                  leaderboard-profile-entry-map="{{standings.personalProfileEntryMap}}"
-                  empty-text="{{standings.personalEmptyText}}"
-                  prestart-expand-mode="{{standings.prestartExpandMode || 'none'}}"
-                  bind:rowtap="onStandingsPersonalLeaderboardRowTap"
-                  bind:profiletap="onStandingsScorecardProfileTap"
-                  bind:follow="onStandingsScorecardFollow"
-                  bind:aderror="onStandingsScorecardAdError"
-                />
-              </block>
-
-              <!-- 核验失败等非共享个人榜空态（未开赛已走共享组件） -->
-              <block wx:elif="{{standings.showTeamBoard === false}}">
-                <view class="leaderboard-head">
-                  <text class="lh-pos">POS</text>
-                  <text class="lh-player">{{standings.headPlayerLabel || 'PLAYER'}}</text>
-                  <text class="lh-thru">THRU</text>
-                  <text class="lh-total">TO PAR</text>
-                </view>
-                <view wx:if="{{!standings.listRows.length}}" class="series-standings-expand-empty">
-                  <text>{{standings.listEmptyText || '暂无榜单数据'}}</text>
-                </view>
-                <block
-                  wx:for="{{standings.listRows}}"
-                  wx:for-item="row"
-                  wx:key="rowId"
-                >
-                  <view
-                    class="leaderboard-row team-leaderboard-player-row {{row.canOpenScorecard ? 'is-scorecard-openable' : 'is-scorecard-disabled'}}"
-                    catchtap="onStandingsListRowTap"
-                    data-row="{{row}}"
-                    data-index="{{row.scorecardKey}}"
-                    hover-class="{{row.canOpenScorecard ? 'team-leaderboard-player-row--active' : 'none'}}"
-                    hover-stay-time="80"
-                  >
-                    <text class="lr-pos pos-cell">{{row.pos}}</text>
-                    <view class="lr-player">
-                      <text class="player-name">{{row.name}}</text>
-                      <text wx:if="{{row.statusLabel}}" class="series-standings-pending-tag">{{row.statusLabel}}</text>
-                    </view>
-                    <text class="lr-thru">{{row.thru}}</text>
-                    <text class="lr-total leaderboard-total {{row.scoreClass}}">{{row.scoreStr}}</text>
-                    <text
-                      wx:if="{{row.canOpenScorecard}}"
-                      class="series-standings-scorecard-chevron"
-                    >{{openStandingsScorecardKey === row.scorecardKey ? '⌃' : '›'}}</text>
-                  </view>
-                </block>
-              </block>
-
               <!-- 球队榜：主榜固定序 + R/TOT 展开 -->
-              <block wx:else>
+
               <view class="leaderboard-head">
                 <text class="lh-pos">POS</text>
                 <text class="lh-player">TEAM</text>
@@ -471,7 +432,7 @@
                     <text class="player-name">{{team.teamName}}</text>
                     <text class="team-leaderboard-chevron">{{expandedStandingsTeamId === team.teamId ? '⌃' : '⌄'}}</text>
                   </view>
-                  <text class="lr-thru">{{team.grossTotal}}</text>
+                  <text class="lr-thru">{{team.grossTotalDisplay}}</text>
                   <text class="lr-total leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
                 </view>
                 <view
@@ -521,20 +482,41 @@
                         show-round-tag="{{player.showRoundTag}}"
                         round-label="{{player.roundLabel}}"
                         pending-label="{{player.pendingLabel}}"
+                        sub-label="{{player.subLabel}}"
                       />
                       <text class="lr-thru">{{player.thru}}</text>
                       <text class="lr-total leaderboard-total {{player.scoreClass}}">{{player.scoreStr}}</text>
-                      <text
-                        wx:if="{{player.canOpenScorecard}}"
-                        class="series-standings-scorecard-chevron"
-                      >{{openStandingsScorecardKey === player.scorecardKey ? '⌃' : '›'}}</text>
                     </view>
                     <!-- TOT/R 球队行展开：openStandingsScorecardKey === scorecardKey 即当前 occurrence 展开态（对齐个人榜 item.expanded） -->
                     <view
                       wx:if="{{openStandingsScorecardKey === player.scorecardKey}}"
                       class="scorecard-row"
                     >
+                      <view wx:if="{{player.isEntity && player.members && player.members.length}}" class="sc-team-stack-wrap">
+                        <leaderboard-player-identity
+                          wx:for="{{player.members}}"
+                          wx:for-item="mem"
+                          wx:key="playerId"
+                          player="{{mem}}"
+                          team-group-logo-by-id="{{standingsTeamGroupLogoById}}"
+                          avatar-badge="{{standingsScorecardAvatarBadge}}"
+                          meta-mode="{{standingsScorecardMetaMode}}"
+                          show-name-gender="{{standingsScorecardShowNameGender}}"
+                          gender="{{mem.gender}}"
+                          gender-symbol="{{mem.genderSymbol || mem.genderIcon}}"
+                          gender-class="{{mem.genderClass}}"
+                          followed="{{false}}"
+                          relation-status="none"
+                          relationship-label=""
+                          can-follow="{{true}}"
+                          follow-loading="{{false}}"
+                          is-self="{{false}}"
+                          bind:profiletap="onStandingsScorecardProfileTap"
+                          bind:follow="onStandingsScorecardFollow"
+                        />
+                      </view>
                       <leaderboard-player-profile-panel
+                        wx:else
                         player="{{standingsScorecardPlayer || player}}"
                         team-group-logo-by-id="{{standingsTeamGroupLogoById}}"
                         avatar-badge="{{standingsScorecardAvatarBadge}}"
@@ -622,7 +604,6 @@
                     </view>
                   </block>
                 </view>
-              </block>
               </block>
             </view>
             </view>

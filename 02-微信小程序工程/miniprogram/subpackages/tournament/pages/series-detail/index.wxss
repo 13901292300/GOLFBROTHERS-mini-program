@@ -769,15 +769,6 @@
 .team-leaderboard-player-row.is-scorecard-disabled:active {
   background: inherit;
 }
-.series-standings-scorecard-chevron {
-  flex-shrink: 0;
-  width: 28rpx;
-  text-align: center;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: var(--text-muted);
-  line-height: 1;
-}
 /* 空态：对齐 detail .mp-sb-coming-soon，压缩高度（明显低于有逐洞表面板） */
 .mp-sb-coming-soon {
   display: flex;

@@ -1,0 +1,2 @@
+/* LIVE 领先榜权威样式在 tournament-common；apply-shared 下页面引入仍生效。 */
+@import "/styles/tournament-common.wxss";

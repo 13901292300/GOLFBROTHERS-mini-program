@@ -17,7 +17,10 @@ var {
   isInterTeamMatch,
   DEFAULT_ORG_LOGO
 } = require('./teamMatchCapabilities.js');
-var { isG5MatchPlayMode } = require('./strokeEntityValidator.js');
+var {
+  isG5MatchPlayMode,
+  resolveStrokeKind
+} = require('./strokeEntityValidator.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -384,6 +387,8 @@ function scoreEntitiesHaveEntries(match) {
 function shouldBuildEntityLeaderboard(match) {
   var gameMode = asString(match && (match.gameMode || match.selectedGameMode));
   if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) return false;
+  var kind = typeof resolveStrokeKind === 'function' ? resolveStrokeKind(gameMode) : '';
+  if (kind === 'g2g3' || kind === 'g4') return true;
   return scoreEntitiesHaveEntries(match);
 }
 

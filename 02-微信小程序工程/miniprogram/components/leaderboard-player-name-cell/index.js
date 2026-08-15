@@ -13,6 +13,7 @@ Component({
     genderClass: { type: String, value: '' },
     roundLabel: { type: String, value: '' },
     showRoundTag: { type: Boolean, value: false },
-    pendingLabel: { type: String, value: '' }
+    pendingLabel: { type: String, value: '' },
+    subLabel: { type: String, value: '' }
   }
 });

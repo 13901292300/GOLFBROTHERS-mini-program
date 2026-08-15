@@ -584,7 +584,8 @@ assert(
 
 assert(
   'personal board DOM still present (page component or inline)',
-  detailWxml.indexOf('personal-leaderboard-board') >= 0 ||
+  detailWxml.indexOf('live-leaderboard-board') >= 0 ||
+    detailWxml.indexOf('personal-leaderboard-board') >= 0 ||
     (detailWxml.indexOf('leaderboard-row--personal') >= 0 && /item\.pos/.test(detailWxml))
 );
 

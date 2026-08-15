@@ -211,6 +211,39 @@ function fixtureG3() {
   return m;
 }
 
+function fixtureG4() {
+  var m = fixtureG2();
+  m.matchId = 'm-g4';
+  m.gameMode = '四人两球比杆赛';
+  m.scoreEntities = {
+    g1: [
+      {
+        entityId: 'e-red',
+        entityType: 'pair',
+        compositionMode: '2+2',
+        teamGroupId: 'red',
+        members: ['u-m1', 'u-m3']
+      },
+      {
+        entityId: 'e-blue',
+        entityType: 'pair',
+        compositionMode: '2+2',
+        teamGroupId: 'blue',
+        members: ['u-f1', 'u-m2']
+      }
+    ]
+  };
+  m.scoreData = {
+    g1: {
+      teamScoresByEntity: [
+        { teamId: 'e-red', scores: fillScores(18, 4) },
+        { teamId: 'e-blue', scores: fillScores(9, 5) }
+      ]
+    }
+  };
+  return m;
+}
+
 function headerSig(teams) {
   return (Array.isArray(teams) ? teams : [])
     .map(function (t) {
@@ -338,7 +371,8 @@ var cases = [
   { name: 'G1-ties', match: fixtureG1Ties() },
   { name: 'G1-empty', match: fixtureG1Empty() },
   { name: 'G2', match: fixtureG2() },
-  { name: 'G3', match: fixtureG3() }
+  { name: 'G3', match: fixtureG3() },
+  { name: 'G4', match: fixtureG4() }
 ];
 
 cases.forEach(function (c) {
@@ -491,6 +525,27 @@ assert(
     return t.players.some(function (p) { return p.isEntity === true && p.entityId; });
   })
 );
+var g1Rn = seriesTeams(fixtureG1Live(), 'r1');
+assert(
+  'G1 Rn expand is player not entity',
+  g1Rn.some(function (t) {
+    return t.players.some(function (p) {
+      return p.isEntity !== true && !!p.playerId;
+    });
+  }) &&
+    g1Rn.every(function (t) {
+      return t.players.every(function (p) { return p.isEntity !== true; });
+    })
+);
+var g4Rn = seriesTeams(fixtureG4(), 'r1');
+assert(
+  'G4 Rn expand is entity/pair from shared builder',
+  g4Rn.some(function (t) {
+    return t.players.some(function (p) {
+      return p.isEntity === true && p.entityId;
+    });
+  })
+);
 
 var seriesJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var seriesWxml = fs.readFileSync(path.join(seriesDir, 'index.wxml'), 'utf8');
@@ -503,8 +558,9 @@ var rebuildFn = (function () {
 })();
 
 assert(
-  'overlay wires adapter for R team',
-  seriesJs.indexOf('seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard') >= 0 &&
+  'overlay wires live board for R; adapter remains for TOT',
+  seriesJs.indexOf('seriesLiveLeaderboardAdapter.projectSeriesRnLiveLeaderboard') >= 0 &&
+    seriesJs.indexOf('seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard') >= 0 &&
     /selectedKey === standingsViewModel.CUMULATIVE_KEY\)/.test(seriesJs)
 );
 assert(
@@ -520,10 +576,11 @@ assert(
     rebuildFn.indexOf('scheduleStandingsBoardSwitchMeasure') < 0
 );
 assert(
-  'team card WXML unchanged skeleton',
+  'TOT team card WXML unchanged skeleton',
   seriesWxml.indexOf('team.teamName') >= 0 &&
     seriesWxml.indexOf('team.grossTotal') >= 0 &&
-    seriesWxml.indexOf('team.scoreStr') >= 0
+    seriesWxml.indexOf('team.scoreStr') >= 0 &&
+    seriesWxml.indexOf('standings.useLiveLeaderboard') >= 0
 );
 assert(
   'VM still owns TOT teamRows',

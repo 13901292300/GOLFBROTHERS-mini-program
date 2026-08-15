@@ -44,6 +44,7 @@ var detailJs = read(path.join(detailDir, 'index.js'));
 var detailJson = read(path.join(detailDir, 'index.json'));
 var detailWxml = read(path.join(detailDir, 'index.wxml'));
 var detailWxss = read(path.join(detailDir, 'index.wxss'));
+var liveWxml = read(path.join(mini, 'components', 'live-leaderboard-board', 'index.wxml'));
 var seriesWxml = exists(path.join(seriesDir, 'index.wxml'))
   ? read(path.join(seriesDir, 'index.wxml'))
   : '';
@@ -147,26 +148,28 @@ assert(
 );
 
 assert(
-  '11 detail 注册并仅在非球队榜挂载组件',
-  /personal-leaderboard-board/.test(detailJson) &&
-    /<personal-leaderboard-board/.test(detailWxml) &&
-    /leaderboardView === 'team'[\s\S]*personal-leaderboard-board/.test(detailWxml)
+  '11 detail 注册并挂载 live-leaderboard-board',
+  /live-leaderboard-board/.test(detailJson) &&
+    /<live-leaderboard-board/.test(detailWxml) &&
+    liveWxml.indexOf('<personal-leaderboard-board') >= 0 &&
+    liveWxml.indexOf("view === 'team'") >= 0
 );
 
 assert(
   '12 detail 个人榜内联 DOM 已迁出',
   !/leaderboard-head--personal/.test(detailWxml) &&
     !/leaderboard-row--personal/.test(detailWxml) &&
-    (detailWxml.split('<personal-leaderboard-board').length - 1) === 1
+    detailWxml.indexOf('<personal-leaderboard-board') < 0 &&
+    liveWxml.indexOf('<personal-leaderboard-board') >= 0
 );
 
 assert(
-  '13 球队榜 DOM/事件未改',
-  /toggleTeamLeaderboardRow/.test(detailWxml) &&
-    /team-leaderboard-row/.test(detailWxml) &&
+  '13 球队榜 DOM/事件在共享 LIVE 组件',
+  /onLiveLeaderboardTeamTap/.test(detailWxml) &&
+    /team-leaderboard-row/.test(liveWxml) &&
     /teamLeaderboard/.test(detailWxml) &&
-    /catchtap="toggleScorecard"/.test(detailWxml) &&
-    /data-mode="team"/.test(detailWxml)
+    /onTeamPlayerTap/.test(liveWxml) &&
+    /data-mode="team"/.test(liveWxml)
 );
 
 assert(
@@ -196,14 +199,16 @@ assert(
 );
 
 assert(
-  '17 Series 未接入该组件',
-  seriesWxml.indexOf('personal-leaderboard-board') < 0 &&
-    seriesJson.indexOf('personal-leaderboard-board') < 0
+  '17 Series Rn 与 detail 共用 live-leaderboard-board',
+  seriesJson.indexOf('live-leaderboard-board') >= 0 &&
+    seriesWxml.indexOf('<live-leaderboard-board') >= 0 &&
+    seriesWxml.indexOf('standings.useLiveLeaderboard') >= 0 &&
+    seriesWxml.indexOf('standings.showEntityAllBoard') < 0
 );
 
 assert(
   '18 G1–G4 / gross-net / all-male-female 仍由页面 data 驱动',
-  /leaderboard-score-type="\{\{leaderboardScoreType\}\}"/.test(detailWxml) &&
+  /score-type="\{\{leaderboardScoreType\}\}"/.test(detailWxml) &&
     /leaderboard="\{\{leaderboard\}\}"/.test(detailWxml) &&
     /item\.expanded/.test(compWxml)
 );

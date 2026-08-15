@@ -419,6 +419,33 @@ function resolveStandingsExpandPanel(match, playerRow, mode) {
   };
 }
 
+/**
+ * 普通 LIVE 领先榜展开记分卡（对齐 detail._resolveTeamMatchScorecard）
+ * - 无杆数仍返回空表（scorecardStatus=not_started），保证 openScorecard 为真、行内可展开
+ * - 不改变 TOT 使用的 resolveStandingsExpandPanel / buildTeamMatchScorecardView(not_started→null)
+ */
+function buildLeaderboardExpandScorecard(match, row, mode) {
+  var resolved = resolveTeamMatchScoreRecord(match, row);
+  if (!resolved.ok) {
+    return { ok: false, scorecard: null, reason: resolved.reason || 'resolve_failed', started: false };
+  }
+  var scorecard = publicScorecardView.buildStrokeScorecardFromScores(
+    resolved.started ? resolved.scores : [],
+    resolveMatchHolePars(match),
+    mode === 'diff' ? 'diff' : 'gross'
+  );
+  if (!scorecard) {
+    return { ok: false, scorecard: null, reason: 'build_failed', started: resolved.started };
+  }
+  return {
+    ok: true,
+    scorecard: scorecard,
+    kind: resolved.kind,
+    started: resolved.started,
+    reason: resolved.started ? '' : 'not_started'
+  };
+}
+
 module.exports = {
   isFilledScore: isFilledScore,
   resolveTeamMatchScoreRecord: resolveTeamMatchScoreRecord,
@@ -430,5 +457,6 @@ module.exports = {
   isStationStartedForScorecard: isStationStartedForScorecard,
   findEntityIdForPlayer: findEntityIdForPlayer,
   resolveStrokeScoringRow: resolveStrokeScoringRow,
-  resolveStandingsExpandPanel: resolveStandingsExpandPanel
+  resolveStandingsExpandPanel: resolveStandingsExpandPanel,
+  buildLeaderboardExpandScorecard: buildLeaderboardExpandScorecard
 };

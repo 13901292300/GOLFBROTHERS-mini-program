@@ -77,6 +77,7 @@ const scoreReactionAccess = require('../../../../utils/scoreReactionAccess.js');
 const leaderboardSettingViewModel = require('../../../../utils/leaderboardSettingViewModel.js');
 const personalLeaderboardBoard = require('../../../../utils/personalLeaderboardBoard.js');
 const teamLeaderboardView = require('../../../../utils/teamLeaderboardView.js');
+const liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScorecard.js');
 
 /**
  * reaction 重逻辑分包：仅在用户选择具体动画后 require.async。
@@ -7234,6 +7235,38 @@ Page({
       expandedTeamId: next,
       openIndex: -1,
       openScorecard: null
+    });
+  },
+
+  onLiveLeaderboardTeamTap(e) {
+    const teamId =
+      e && e.detail && e.detail.teamId != null ? String(e.detail.teamId) : '';
+    this.toggleTeamLeaderboardRow({
+      currentTarget: { dataset: { teamId: teamId } }
+    });
+  },
+
+  onLiveLeaderboardScorecardTap(e) {
+    const d = (e && e.detail) || {};
+    const matchId = this.data.matchId || '';
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const result = liveLeaderboardScorecard.applyLiveScorecardTap(
+      {
+        view: 'team',
+        openIndex: this.data.openIndex,
+        teamLeaderboard: this.data.teamLeaderboard,
+        leaderboard: this.data.leaderboard,
+        match: match,
+        scoreDisplayMode: this.data.scoreDisplayMode
+      },
+      d
+    );
+    this._activeTeamLeaderboardPlayer = result.activeRow || null;
+    this.setData({
+      openIndex: result.openIndex,
+      openScorecard: result.openScorecard,
+      scorecardCourseTitle: result.scorecardCourseTitle || this.data.scorecardCourseTitle,
+      scorePanel: result.scorePanel || this.data.scorePanel || 'technical'
     });
   },
 

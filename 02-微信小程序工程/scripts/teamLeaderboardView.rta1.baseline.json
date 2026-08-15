@@ -667,11 +667,11 @@
         "teamName": "深圳湾高尔夫红队",
         "grossTotal": 90,
         "toPar": -15,
-        "total": 0,
-        "hasScore": false,
-        "scoreStr": "-",
-        "scoreClass": "score-even",
-        "scoringPlayersCount": 0,
+        "total": -15,
+        "hasScore": true,
+        "scoreStr": "-15",
+        "scoreClass": "score-under",
+        "scoringPlayersCount": 2,
         "expandRoster": [
           {
             "pos": "1",
@@ -745,11 +745,11 @@
         "teamName": "前海国际蓝队",
         "grossTotal": 132,
         "toPar": 15,
-        "total": 0,
-        "hasScore": false,
-        "scoreStr": "-",
-        "scoreClass": "score-even",
-        "scoringPlayersCount": 0,
+        "total": 15,
+        "hasScore": true,
+        "scoreStr": "+15",
+        "scoreClass": "score-over",
+        "scoringPlayersCount": 2,
         "expandRoster": [
           {
             "pos": "1",

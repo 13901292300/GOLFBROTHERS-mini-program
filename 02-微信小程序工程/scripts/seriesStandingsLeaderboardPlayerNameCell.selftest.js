@@ -61,9 +61,11 @@ function sliceBetween(src, beginToken, endToken) {
   return end < 0 ? src.slice(from, from + 1800) : src.slice(from, end);
 }
 
+var liveWxml = read('components/live-leaderboard-board/index.wxml');
+var liveJson = read('components/live-leaderboard-board/index.json');
 var detailRow = sliceBetween(
-  detailWxml,
-  'catchtap="toggleScorecard"',
+  liveWxml,
+  'catchtap="onTeamPlayerTap"',
   'class="scorecard-row"'
 );
 var seriesRow = sliceBetween(
@@ -116,8 +118,9 @@ assert(
 assert(
   '普通 detail 球队展开改用共享组件，点击/成绩列签名不变',
   detailJson.indexOf('leaderboard-player-name-cell') >= 0 &&
+    liveJson.indexOf('leaderboard-player-name-cell') >= 0 &&
     detailRow.indexOf('<leaderboard-player-name-cell') >= 0 &&
-    detailRow.indexOf('catchtap="toggleScorecard"') >= 0 &&
+    detailRow.indexOf('catchtap="onTeamPlayerTap"') >= 0 &&
     detailRow.indexOf('data-mode="team"') >= 0 &&
     detailRow.indexOf('class="lr-thru"') >= 0 &&
     detailRow.indexOf('class="lr-total') >= 0 &&

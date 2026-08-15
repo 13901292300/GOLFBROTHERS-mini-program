@@ -80,7 +80,7 @@ function keysOf(opts) {
       return (
         packed.sections[0].key === 'scoreType' &&
         packed.sections[1].key === 'view' &&
-        packed.draftValues.view === 'all'
+        packed.draftValues.view === 'team'
       );
     })()
   );
@@ -220,7 +220,7 @@ function keysOf(opts) {
     seriesJs.indexOf('_goSeriesManageStandingsRound(roundId, selection)') >= 0 &&
       seriesJs.indexOf('_standingsSelectionByRoundId') >= 0 &&
       seriesJs.indexOf('_openSeriesRoundLeaderboardSettingSheet') >= 0 &&
-      seriesWxml.indexOf('standings.showTeamBoard === false') >= 0
+      seriesWxml.indexOf('standings.useLiveLeaderboard') >= 0
   );
   assert(
     'TOT 强制球队榜',

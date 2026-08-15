@@ -1,0 +1,245 @@
+<view class="leaderboard-table-wrap">
+  <view class="leaderboard-view-label">{{viewLabel}}</view>
+  <block wx:if="{{view === 'team'}}">
+    <view wx:if="{{scoreType === 'net'}}" class="leaderboard-head leaderboard-head--team-net">
+      <text class="lh-pos">POS</text>
+      <text class="lh-player">TEAM</text>
+      <text class="lh-team">PLAYER</text>
+      <text class="lh-thru">THRU</text>
+      <text class="lh-total">NET SCORE</text>
+    </view>
+    <view wx:else class="leaderboard-head">
+      <text class="lh-pos">POS</text>
+      <text class="lh-player">TEAM</text>
+      <text class="lh-thru">TOTAL</text>
+      <text class="lh-total">TO PAR</text>
+    </view>
+    <view wx:if="{{emptyText && (!teamLeaderboard || !teamLeaderboard.length)}}" class="hub-empty">{{emptyText}}</view>
+    <block wx:for="{{teamLeaderboard}}" wx:for-item="team" wx:for-index="teamIndex" wx:key="teamId">
+      <view
+        bindtap="onTeamRowTap"
+        data-team-id="{{team.teamId}}"
+        class="leaderboard-row team-leaderboard-row {{scoreType === 'net' ? 'team-leaderboard-row--net' : ''}} {{expandedTeamId === team.teamId ? 'is-expanded' : ''}}"
+      >
+        <text class="lr-pos pos-cell">{{team.pos}}</text>
+        <view class="lr-player team-leaderboard-name-cell">
+          <text class="player-name">{{team.teamName}}</text>
+          <text class="team-leaderboard-chevron">{{expandedTeamId === team.teamId ? '⌃' : '⌄'}}</text>
+        </view>
+        <block wx:if="{{scoreType === 'net'}}">
+          <text class="lr-team">{{team.playerCountLabel || '-'}}</text>
+          <text class="lr-thru">{{team.thru || '-'}}</text>
+          <text class="lr-total leaderboard-total score-even">{{team.netScoreDisplay || team.scoreStr}}</text>
+        </block>
+        <block wx:else>
+          <text class="lr-thru">{{team.grossTotalDisplay}}</text>
+          <text class="lr-total leaderboard-total {{team.scoreClass}}">{{team.scoreStr}}</text>
+        </block>
+      </view>
+      <view
+        wx:if="{{expandedTeamId === team.teamId}}"
+        class="team-leaderboard-players-wrap"
+        data-team-id="{{team.teamId}}"
+      >
+        <view class="leaderboard-head team-leaderboard-player-head">
+          <text class="lh-pos">POS</text>
+          <text class="lh-player">PLAYER</text>
+          <text class="lh-thru">THRU</text>
+          <text class="lh-total">{{scoreType === 'net' ? 'NET SCORE' : 'TO PAR'}}</text>
+        </view>
+        <block wx:for="{{team.players}}" wx:for-item="player" wx:for-index="playerIndex" wx:key="scorecardKey">
+          <view
+            wx:if="{{team.scoringPlayersCount > 0 && playerIndex === team.scoringPlayersCount}}"
+            class="team-leaderboard-divider-strong"
+          ></view>
+          <view
+            catchtap="onTeamPlayerTap"
+            data-mode="team"
+            data-index="{{player.scorecardKey}}"
+            data-player="{{player}}"
+            class="leaderboard-row team-leaderboard-player-row {{player.isCounting ? '' : 'is-non-counting'}}"
+          >
+            <text class="lr-pos pos-cell">{{player.pos}}</text>
+            <leaderboard-player-name-cell
+              name="{{player.name}}"
+              gender-icon="{{player.genderIcon}}"
+              gender-class="{{player.genderClass}}"
+            />
+            <text class="lr-thru">{{player.thru}}</text>
+            <text class="lr-total leaderboard-total {{scoreType === 'net' ? 'score-even' : player.scoreClass}}">{{scoreType === 'net' ? (player.netScoreDisplay || player.scoreStr) : player.scoreStr}}</text>
+          </view>
+          <view wx:if="{{openIndex === player.scorecardKey && openScorecard}}" class="scorecard-row {{scorePanel === 'quick' ? 'score-panel-quick' : ''}}">
+            <view wx:if="{{player.isEntity && player.members && player.members.length}}" class="sc-team-stack-wrap">
+              <leaderboard-player-identity
+                wx:for="{{player.members}}"
+                wx:for-item="mem"
+                wx:key="playerId"
+                player="{{mem}}"
+                team-group-logo-by-id="{{teamGroupLogoById}}"
+                avatar-badge="{{leaderboardAvatarBadge}}"
+                meta-mode="{{leaderboardMetaMode}}"
+                show-name-gender="{{leaderboardShowExpandGender}}"
+                gender="{{mem.gender}}"
+                gender-symbol="{{mem.genderSymbol || mem.genderIcon}}"
+                gender-class="{{mem.genderClass}}"
+                followed="{{leaderboardFollowEnabled ? followMap[mem.playerId] : false}}"
+                relation-status="{{leaderboardFollowEnabled ? (relationMap[mem.playerId] || (followMap[mem.playerId] ? 'following' : 'none')) : 'none'}}"
+                relationship-label="{{leaderboardFollowEnabled ? (relationLabelMap[mem.playerId] || '') : ''}}"
+                can-follow="{{leaderboardFollowEnabled ? !!leaderboardFollowableMap[mem.playerId] : true}}"
+                follow-loading="{{leaderboardFollowEnabled ? !!followLoadingMap[mem.playerId] : false}}"
+                is-self="{{leaderboardFollowEnabled ? !leaderboardFollowableMap[mem.playerId] : false}}"
+                bind:follow="onFollowTap"
+                bind:profiletap="onProfileTap"
+              />
+            </view>
+            <view wx:else class="scorecard-profile">
+              <view class="sc-profile-left">
+                <view class="sc-avatar-wrap">
+                  <image class="sc-avatar" src="{{player.avatar}}" mode="aspectFill"></image>
+                  <view
+                    wx:if="{{leaderboardAvatarBadge !== 'none' && teamGroupLogoById[player.badgeTeamId]}}"
+                    class="sc-flag sc-flag--team"
+                  >
+                    <image
+                      src="{{teamGroupLogoById[player.badgeTeamId]}}"
+                      mode="aspectFill"
+                    ></image>
+                  </view>
+                  <view
+                    wx:elif="{{leaderboardAvatarBadge === 'auto' && player.flag}}"
+                    class="sc-flag"
+                  >
+                    <image
+                      src="https://flagcdn.com/w40/{{player.flag}}.png"
+                      mode="aspectFill"
+                    ></image>
+                  </view>
+                </view>
+                <view class="sc-profile-meta">
+                  <view class="sc-name-line">
+                    <view class="name-gender-group">
+                      <text class="sc-name">{{player.name}}</text>
+                      <text
+                        wx:if="{{leaderboardShowExpandGender && player.genderIcon}}"
+                        class="gender-icon sc-name-gender {{player.genderClass}}"
+                      >{{player.genderIcon}}</text>
+                    </view>
+                    <view
+                      class="sc-chevron {{leaderboardProfileEntryMap[player.playerId] ? '' : 'sc-chevron--disabled'}}"
+                      catchtap="onProfileTap"
+                      data-user-id="{{player.playerId}}"
+                      data-name="{{player.name}}"
+                      data-avatar="{{player.avatar}}"
+                      aria-label="进入球员主页"
+                    >›</view>
+                  </view>
+                  <view wx:if="{{leaderboardMetaMode === 'handicapFloat'}}" class="sc-sub">
+                    江湖差点 <text class="sc-sub-strong">{{player.handicapText}}</text>　浮动系数 <text class="sc-sub-strong">{{player.floatCoefText}}</text>
+                  </view>
+                  <view wx:else class="sc-sub">COUNTRY: <text class="sc-sub-strong">{{player.country}}</text>　AGE: <text class="sc-sub-strong">{{player.age}}</text></view>
+                </view>
+              </view>
+              <block wx:if="{{leaderboardFollowEnabled}}">
+                <block wx:if="{{leaderboardFollowableMap[player.playerId]}}">
+                  <follow-action-btn
+                    wx:if="{{!relationLabelMap[player.playerId]}}"
+                    user-id="{{player.playerId}}"
+                    loading="{{!!followLoadingMap[player.playerId]}}"
+                    disabled="{{!!followLoadingMap[player.playerId]}}"
+                    bind:follow="onFollowTap"
+                  />
+                  <text
+                    wx:elif="{{relationMap[player.playerId] === 'friend'}}"
+                    class="sc-rel-tag sc-rel-tag--friend"
+                  >{{relationLabelMap[player.playerId]}}</text>
+                  <text
+                    wx:else
+                    class="sc-rel-tag sc-rel-tag--following"
+                  >{{relationLabelMap[player.playerId]}}</text>
+                </block>
+              </block>
+              <follow-action-btn
+                wx:else
+                user-id="{{player.playerId || ''}}"
+                bind:follow="onFollowTap"
+              />
+            </view>
+
+            <view class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+              <text class="sc-course course-name-title">{{scorecardCourseTitle}}</text>
+              <view class="tour-scorecard">
+                <view class="tsc-row tsc-head">
+                  <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                </view>
+                <view class="tsc-row">
+                  <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                </view>
+                <view class="tsc-row">
+                  <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                    <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                      <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                    <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                  </view>
+                </view>
+              </view>
+              <view class="tour-scorecard">
+                <view class="tsc-row tsc-head">
+                  <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                </view>
+                <view class="tsc-row">
+                  <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                </view>
+                <view class="tsc-row">
+                  <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                    <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                      <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                    <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                  </view>
+                </view>
+              </view>
+              <view class="score-legend-area">
+                <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+              </view>
+              <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix" binderror="onAdError"></image>
+            </view>
+          </view>
+        </block>
+      </view>
+    </block>
+  </block>
+
+  <block wx:else>
+    <personal-leaderboard-board
+      leaderboard="{{leaderboard}}"
+      leaderboard-score-type="{{scoreType}}"
+      show-leaderboard-team-column="{{showLeaderboardTeamColumn}}"
+      open-scorecard="{{openScorecard}}"
+      scorecard-ad-image="{{scorecardAdImage}}"
+      scorecard-course-title="{{scorecardCourseTitle}}"
+      score-display-mode="{{scoreDisplayMode}}"
+      score-panel="{{scorePanel}}"
+      team-group-logo-by-id="{{teamGroupLogoById}}"
+      leaderboard-avatar-badge="{{leaderboardAvatarBadge}}"
+      leaderboard-meta-mode="{{leaderboardMetaMode}}"
+      leaderboard-show-expand-gender="{{leaderboardShowExpandGender}}"
+      leaderboard-follow-enabled="{{leaderboardFollowEnabled}}"
+      follow-map="{{followMap}}"
+      relation-map="{{relationMap}}"
+      relation-label-map="{{relationLabelMap}}"
+      leaderboard-followable-map="{{leaderboardFollowableMap}}"
+      follow-loading-map="{{followLoadingMap}}"
+      leaderboard-profile-entry-map="{{leaderboardProfileEntryMap}}"
+      empty-text="{{emptyText}}"
+      prestart-expand-mode="{{prestartExpandMode || 'none'}}"
+      bind:rowtap="onPersonalRowTap"
+      bind:profiletap="onProfileTap"
+      bind:follow="onFollowTap"
+      bind:aderror="onAdError"
+    />
+  </block>
+</view>

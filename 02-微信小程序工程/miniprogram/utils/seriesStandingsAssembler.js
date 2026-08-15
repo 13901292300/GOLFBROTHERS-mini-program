@@ -104,7 +104,7 @@ function sumFinite(values) {
 
 function projectDisplayEntry(entry, counting) {
   var e = entry || {};
-  return {
+  var disp = {
     entryId: asString(e.entryId).trim(),
     roundId: asString(e.roundId).trim(),
     roundIndex: e.roundIndex != null ? e.roundIndex : null,
@@ -121,6 +121,13 @@ function projectDisplayEntry(entry, counting) {
     stationStarted: e.stationStarted === true,
     fromLineup: e.fromLineup === true
   };
+  var gid = asString(e.groupId).trim();
+  if (gid) disp.groupId = gid;
+  var glabel = asString(e.groupLabel).trim();
+  if (glabel) disp.groupLabel = glabel;
+  var mid = asString(e.matchId).trim();
+  if (mid) disp.matchId = mid;
+  return disp;
 }
 
 function resolveSeatPlayerId(seat) {
@@ -313,7 +320,12 @@ function listFilledSeatsFromMatch(match) {
         var seat = list[i];
         var playerId = resolveSeatPlayerId(seat);
         if (!playerId) continue;
-        out.push({ seat: seat, playerId: playerId, groupId: groupId });
+        out.push({
+          seat: seat,
+          playerId: playerId,
+          groupId: groupId,
+          groupLabel: asString(group.groupName).trim()
+        });
       }
     }
   }
@@ -398,6 +410,7 @@ function extractRoundLineupFromStation(input) {
       roundIndex: roundIndex,
       matchId: matchId,
       groupId: groupId,
+      groupLabel: asString(item.groupLabel).trim(),
       seriesParticipantId: seriesParticipantId,
       resultUnitType: provisionalType,
       unitId: playerId,

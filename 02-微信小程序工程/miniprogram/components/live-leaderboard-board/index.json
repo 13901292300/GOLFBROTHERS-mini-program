@@ -1,0 +1,10 @@
+{
+  "component": true,
+  "styleIsolation": "apply-shared",
+  "usingComponents": {
+    "personal-leaderboard-board": "/components/personal-leaderboard-board/index",
+    "leaderboard-player-name-cell": "/components/leaderboard-player-name-cell/index",
+    "leaderboard-player-identity": "/components/leaderboard-player-identity/index",
+    "follow-action-btn": "/components/follow-action-btn/index"
+  }
+}

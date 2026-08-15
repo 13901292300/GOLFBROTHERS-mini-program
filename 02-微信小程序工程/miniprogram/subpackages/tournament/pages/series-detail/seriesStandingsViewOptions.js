@@ -96,7 +96,36 @@ function shouldBuildEntityList(match) {
   return kind === 'g2g3' || kind === 'g4';
 }
 
+function hasExplicitView(selection) {
+  if (selection == null) return false;
+  if (typeof selection === 'string') return !!asString(selection);
+  if (typeof selection === 'object' && !Array.isArray(selection)) {
+    return !!asString(selection.view);
+  }
+  return false;
+}
+
+/**
+ * Series 轮次榜：队际分站默认球队榜。
+ * 分站 global_m 会关掉 teamCompetition，不能因此把 Rn 默认成全部/个人榜。
+ */
+function resolveSeriesStandingsDefaultView(match) {
+  var options = leaderboardSettingViewModel.resolveLeaderboardViewOptions(match);
+  if (options.indexOf(VIEW.team) >= 0) return VIEW.team;
+  return leaderboardSettingViewModel.resolveLeaderboardDefaultView(match);
+}
+
 function normalizeSeriesStandingsSelection(match, selection) {
+  if (!hasExplicitView(selection)) {
+    var scoreType =
+      selection && typeof selection === 'object' && !Array.isArray(selection)
+        ? selection.scoreType
+        : '';
+    return leaderboardSettingViewModel.normalizeLeaderboardSelection(match, {
+      view: resolveSeriesStandingsDefaultView(match),
+      scoreType: scoreType
+    });
+  }
   return leaderboardSettingViewModel.normalizeLeaderboardSelection(match, selection);
 }
 
@@ -112,7 +141,7 @@ function buildSeriesLeaderboardSettingSections(match, draftSelection, opts) {
   var o = opts && typeof opts === 'object' ? opts : {};
   var packed = leaderboardSettingViewModel.buildLeaderboardSettingViewModel(
     match,
-    draftSelection,
+    normalizeSeriesStandingsSelection(match, draftSelection),
     { sideLabel: asString(o.sideLabel) || '球队' }
   );
   return {
@@ -174,10 +203,12 @@ function resolveSeriesStandingsViewOptions(match) {
 module.exports = {
   VIEW: VIEW,
   UNIT: UNIT,
+  BOARD_LABEL: BOARD_LABEL,
   resolveGameMode: resolveGameMode,
   resolveKind: resolveKind,
   resolveListUnit: resolveListUnit,
   shouldBuildEntityList: shouldBuildEntityList,
+  resolveSeriesStandingsDefaultView: resolveSeriesStandingsDefaultView,
   normalizeSeriesStandingsSelection: normalizeSeriesStandingsSelection,
   normalizeSeriesStandingsView: normalizeSeriesStandingsView,
   buildSeriesLeaderboardSettingSections: buildSeriesLeaderboardSettingSections,

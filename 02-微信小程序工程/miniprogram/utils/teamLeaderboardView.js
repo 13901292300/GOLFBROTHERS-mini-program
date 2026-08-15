@@ -26,6 +26,22 @@ function formatLeaderboardDiff(diff) {
   return String(diff);
 }
 
+/** TOTAL 展示：无有效正式成绩为 '-'；有成绩立刻显示累计总杆（含 LIVE）。 */
+function formatGrossTotalDisplay(hasScore, grossTotal) {
+  if (hasScore !== true) return '-';
+  var n = Number(grossTotal);
+  if (!Number.isFinite(n)) return '-';
+  return String(n);
+}
+
+function attachTeamScoreDisplay(row) {
+  var src = row && typeof row === 'object' ? row : {};
+  var hasScore = src.hasScore === true;
+  src.grossTotalDisplay = formatGrossTotalDisplay(hasScore, src.grossTotal);
+  if (!hasScore) src.scoreStr = '-';
+  return src;
+}
+
 function resolveLeaderboardTotalClass(diff) {
   if (diff < 0) return 'score-under';
   if (diff === 0) return 'score-even';
@@ -118,8 +134,16 @@ function sortExpandRows(rows) {
   });
 }
 
-function assembleGrossTeams(match, teamMap, teamGroups) {
-  var competition = readTeamCompetition(match);
+function assembleGrossTeams(match, teamMap, teamGroups, competitionOverride) {
+  var competition =
+    competitionOverride && typeof competitionOverride === 'object'
+      ? {
+          enabled: competitionOverride.enabled === true,
+          topN: competitionOverride.enabled === true
+            ? Math.max(1, parseInt(competitionOverride.topN, 10) || 1)
+            : 0
+        }
+      : readTeamCompetition(match);
   var teamOrder = teamGroups
     .map(function (team) {
       return team && team.id != null ? String(team.id).trim() : '';
@@ -141,34 +165,48 @@ function assembleGrossTeams(match, teamMap, teamGroups) {
   if (!teams.length) return [];
 
   if (!competition.enabled) {
-    return teams.map(function (team, teamIndex) {
+    var sortedTeamsOff = teams.map(function (team, teamIndex) {
       var rankedPlayers = buildCompetitionRanking(sortExpandRows(team.players), function (player) {
         return player && player.hasScore === true ? player.toPar : null;
       });
       var grossTotal = 0;
       var toPar = 0;
+      var scoringPlayersCount = 0;
       rankedPlayers.forEach(function (player) {
         if (!(player && player.hasScore === true)) return;
+        scoringPlayersCount += 1;
         grossTotal += Number(player.grossTotal || 0);
         toPar += Number(player.toPar || 0);
       });
-      return {
-        pos: String(teamIndex + 1),
+      var hasScore = scoringPlayersCount > 0;
+      return attachTeamScoreDisplay({
         teamId: team.teamId,
         teamName: team.teamName || unnamedSideLabel(match),
         grossTotal: grossTotal,
         toPar: toPar,
-        total: 0,
-        hasScore: false,
-        scoreStr: '-',
-        scoreClass: 'score-even',
-        scoringPlayersCount: 0,
+        total: toPar,
+        hasScore: hasScore,
+        scoreStr: hasScore ? formatLeaderboardDiff(toPar) : '-',
+        scoreClass: hasScore ? resolveLeaderboardTotalClass(toPar) : 'score-even',
+        scoringPlayersCount: scoringPlayersCount,
         players: rankedPlayers.map(function (player) {
           var out = Object.assign({}, player, { isCounting: false });
           delete out._thruValue;
           return out;
-        })
-      };
+        }),
+        _sortIndex: teamIndex
+      });
+    }).sort(function (a, b) {
+      if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
+      if (a.toPar !== b.toPar) return a.toPar - b.toPar;
+      return a._sortIndex - b._sortIndex;
+    });
+    return buildCompetitionRanking(sortedTeamsOff, function (team) {
+      return team && team.hasScore === true ? team.toPar : null;
+    }).map(function (team) {
+      var out = Object.assign({}, team);
+      delete out._sortIndex;
+      return out;
     });
   }
 
@@ -195,7 +233,7 @@ function assembleGrossTeams(match, teamMap, teamGroups) {
     var rankedPlayers = buildCompetitionRanking(players, function (player) {
       return player && player.hasScore === true ? player.toPar : null;
     });
-    return {
+    return attachTeamScoreDisplay({
       teamId: team.teamId,
       teamName: team.teamName || unnamedSideLabel(match),
       grossTotal: grossTotal,
@@ -207,7 +245,7 @@ function assembleGrossTeams(match, teamMap, teamGroups) {
       scoringPlayersCount: scoringPlayersCount,
       players: rankedPlayers,
       _sortIndex: teamIndex
-    };
+    });
   }).sort(function (a, b) {
     if (a.hasScore !== b.hasScore) return a.hasScore ? -1 : 1;
     if (a.toPar !== b.toPar) return a.toPar - b.toPar;
@@ -318,13 +356,22 @@ function buildPlayerTeamLeaderboardView(match, host) {
   return assembleGrossTeams(match, teamMap, teamGroups);
 }
 
-function buildEntityTeamLeaderboardView(match, host) {
+function collectEntityTeamMap(match, host) {
   var teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
-  if (teamGroups.length < 2) return [];
   var teamMap = buildTeamLeaderboardTeamMap(match);
-  var teamNameMap = host._buildLeaderboardTeamNameMap(match);
-  var teamLogoMap = host._buildTeamGroupLogoMap(match);
-  var entityRows = host._buildEntityLeaderboardRows(match, -1) || [];
+  if (teamGroups.length < 2 || !host || typeof host !== 'object') {
+    return { teamMap: teamMap, teamGroups: teamGroups };
+  }
+  var teamNameMap =
+    typeof host._buildLeaderboardTeamNameMap === 'function'
+      ? host._buildLeaderboardTeamNameMap(match)
+      : {};
+  var teamLogoMap =
+    typeof host._buildTeamGroupLogoMap === 'function' ? host._buildTeamGroupLogoMap(match) : {};
+  var entityRows =
+    typeof host._buildEntityLeaderboardRows === 'function'
+      ? host._buildEntityLeaderboardRows(match, -1) || []
+      : [];
 
   entityRows.forEach(function (row) {
     if (!row || !row.entityId) return;
@@ -353,6 +400,7 @@ function buildEntityTeamLeaderboardView(match, host) {
       playerId: '',
       userId: '',
       groupId: row.groupId ? String(row.groupId) : '',
+      groupLabel: row.group ? String(row.group) : '',
       scorecardKey: teamId + ':' + String(row.entityId),
       name: row.name || '组合',
       nickname: row.name || '组合',
@@ -384,7 +432,13 @@ function buildEntityTeamLeaderboardView(match, host) {
     });
   });
 
-  return assembleGrossTeams(match, teamMap, teamGroups);
+  return { teamMap: teamMap, teamGroups: teamGroups };
+}
+
+function buildEntityTeamLeaderboardView(match, host) {
+  var collected = collectEntityTeamMap(match, host);
+  if (!collected.teamGroups || collected.teamGroups.length < 2) return [];
+  return assembleGrossTeams(match, collected.teamMap, collected.teamGroups);
 }
 
 /**
@@ -408,6 +462,7 @@ function teamLeaderboardSignature(teams) {
       asString(team && team.pos),
       asString(team && team.teamName),
       String(team && team.grossTotal),
+      asString(team && team.grossTotalDisplay),
       asString(team && team.scoreStr),
       asString(team && team.scoreClass),
       String(!!(team && team.hasScore)),
@@ -431,10 +486,14 @@ function teamLeaderboardSignature(teams) {
 module.exports = {
   unnamedSideLabel: unnamedSideLabel,
   formatLeaderboardDiff: formatLeaderboardDiff,
+  formatGrossTotalDisplay: formatGrossTotalDisplay,
   resolveLeaderboardTotalClass: resolveLeaderboardTotalClass,
   resolveLeaderboardThruLabel: resolveLeaderboardThruLabel,
   buildCompetitionRanking: buildCompetitionRanking,
   buildTeamLeaderboardTeamMap: buildTeamLeaderboardTeamMap,
+  readTeamCompetition: readTeamCompetition,
+  collectEntityTeamMap: collectEntityTeamMap,
+  assembleGrossTeams: assembleGrossTeams,
   buildGrossTeamLeaderboardView: buildGrossTeamLeaderboardView,
   teamLeaderboardSignature: teamLeaderboardSignature
 };

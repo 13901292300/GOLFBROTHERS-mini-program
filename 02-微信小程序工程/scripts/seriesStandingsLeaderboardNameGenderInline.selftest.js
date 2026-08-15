@@ -19,8 +19,8 @@ var wxss = read('index.wxss');
 var wxml = read('index.wxml');
 var json = read('index.json');
 var js = read('index.js');
-var detailWxml = fs.readFileSync(
-  path.join(root, 'subpackages', 'tournament', 'pages', 'detail', 'index.wxml'),
+var liveWxml = fs.readFileSync(
+  path.join(root, 'components', 'live-leaderboard-board', 'index.wxml'),
   'utf8'
 );
 var seriesWxml = fs.readFileSync(
@@ -93,7 +93,7 @@ assert(
     json.indexOf('apply-shared') >= 0 &&
     detailWxss.indexOf('leaderboard-player-name-cell') < 0 &&
     seriesWxss.indexOf('leaderboard-player-name-cell') < 0 &&
-    detailWxml.indexOf('<leaderboard-player-name-cell') >= 0 &&
+    liveWxml.indexOf('<leaderboard-player-name-cell') >= 0 &&
     seriesWxml.indexOf('<leaderboard-player-name-cell') >= 0
 );
 

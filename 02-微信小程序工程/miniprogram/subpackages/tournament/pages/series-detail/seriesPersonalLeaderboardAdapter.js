@@ -13,6 +13,7 @@ var standingsViewModel = require('./seriesStandingsViewModel.js');
 var playerManage = require('../../../../utils/playerManage.js');
 var mockAvatars = require('../../../../utils/mockAvatars.js');
 var leaderboardSettingViewModel = require('../../../../utils/leaderboardSettingViewModel.js');
+var seriesStandingsViewOptions = require('./seriesStandingsViewOptions.js');
 var {
   isTeamMatchFamily,
   isTeamInternalMatch,
@@ -97,7 +98,9 @@ function isRoundReadyForSharedPersonalBoard(match) {
 
 function emptySharedPersonalBoardFields() {
   return {
+    useLiveLeaderboard: false,
     showSharedPersonalBoard: false,
+    showEntityAllBoard: false,
     personalLeaderboard: [],
     personalScoreType: 'gross',
     showLeaderboardTeamColumn: false,
@@ -336,6 +339,60 @@ function buildPrestartPersonalRows(match, view) {
   return filterByGenderView(rows, view);
 }
 
+function shouldProjectEntityAllBoard(match, view, scoreType) {
+  if (asString(view) === 'team') return false;
+  if (asString(scoreType) === 'net') return false;
+  return personalLeaderboardBoard.shouldBuildEntityLeaderboard(match) === true;
+}
+
+function mapEntityAllRow(row, roundId, matchId) {
+  var src = row && typeof row === 'object' ? row : {};
+  var entityId = asString(src.entityId);
+  var members = Array.isArray(src.members) ? src.members : [];
+  var scorecardKey =
+    asString(src.scorecardKey) ||
+    (entityId ? 'entity:' + entityId : asString(src.rowId));
+  return Object.assign({}, src, {
+    roundId: asString(roundId),
+    matchId: asString(matchId),
+    stationMatchId: asString(matchId),
+    playerId: '',
+    userId: '',
+    isEntity: true,
+    canOpenScorecard: true,
+    scorecardKey: scorecardKey,
+    occurrenceKey: asString(roundId) + ':' + (entityId || scorecardKey),
+    resultUnitType: asString(src.kind) === 'pair' ? 'pair' : 'entity',
+    members: members,
+    expanded: false
+  });
+}
+
+function packEntityAllOverlay(match, view, scoreType, rows, chrome, viewLabel, roundId) {
+  var matchId = match && match.matchId != null ? String(match.matchId).trim() : '';
+  var listRows = (Array.isArray(rows) ? rows : []).map(function (row) {
+    return mapEntityAllRow(row, roundId, matchId);
+  });
+  var unit = seriesStandingsViewOptions.resolveListUnit(match, scoreType);
+  var headPlayerLabel = unit === 'pair' ? 'PAIR' : 'COMBO';
+  return Object.assign({}, emptySharedPersonalBoardFields(), {
+    boardView: view,
+    selection: { view: view, scoreType: scoreType },
+    showTeamBoard: false,
+    showSharedPersonalBoard: false,
+    showEntityAllBoard: true,
+    listRows: listRows,
+    listEmptyText: listRows.length ? '' : '暂无榜单数据',
+    leaderboardViewLabel: viewLabel || '',
+    headPlayerLabel: headPlayerLabel,
+    showLeaderboardTeamColumn: !!(chrome && chrome.showTeamColumn),
+    personalTeamGroupLogoById: (chrome && chrome.teamGroupLogoById) || {},
+    personalAvatarBadge: (chrome && chrome.avatarBadge) || 'auto',
+    personalMetaMode: (chrome && chrome.metaMode) || 'countryAge',
+    personalShowExpandGender: !!(chrome && chrome.showExpandGender)
+  });
+}
+
 function packSharedOverlay(match, view, scoreType, rows, chrome, viewLabel, prestartExpandMode) {
   return Object.assign({}, emptySharedPersonalBoardFields(), {
     boardView: view,
@@ -428,6 +485,38 @@ function projectSeriesStandingsPersonalBoard(input) {
     view,
     sideLabel
   );
+
+  if (shouldProjectEntityAllBoard(match, view, scoreType)) {
+    var entityBoard = personalLeaderboardBoard.buildPersonalLeaderboardBoard(match, {
+      view: view,
+      scoreType: scoreType,
+      openIndex: -1
+    });
+    var entityRows = (entityBoard && entityBoard.leaderboard) || [];
+    return {
+      useShared: false,
+      reason: 'entity_all',
+      calledShared: true,
+      verifiedOk: true,
+      openIndex: -1,
+      board: entityBoard,
+      overlay: packEntityAllOverlay(
+        match,
+        view,
+        (entityBoard && entityBoard.scoreType) || scoreType,
+        entityRows,
+        {
+          showTeamColumn: entityBoard && entityBoard.showTeamColumn,
+          teamGroupLogoById: entityBoard && entityBoard.teamGroupLogoById,
+          avatarBadge: entityBoard && entityBoard.avatarBadge,
+          metaMode: entityBoard && entityBoard.metaMode,
+          showExpandGender: entityBoard && entityBoard.showExpandGender
+        },
+        entityBoard && entityBoard.viewLabel ? entityBoard.viewLabel : viewLabel,
+        selectedKey
+      )
+    };
+  }
 
   if (!isRoundReadyForSharedPersonalBoard(match)) {
     var chrome = resolvePrestartChrome(match);

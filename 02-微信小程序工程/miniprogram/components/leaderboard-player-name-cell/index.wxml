@@ -1,6 +1,15 @@
 <view class="lr-player">
-  <text class="player-name">{{name}}</text>
-  <text wx:if="{{genderIcon}}" class="gender-icon {{genderClass}}">{{genderIcon}}</text>
-  <text wx:if="{{showRoundTag && roundLabel}}" class="series-standings-round-tag">{{roundLabel}}</text>
-  <text wx:if="{{pendingLabel}}" class="series-standings-pending-tag">{{pendingLabel}}</text>
+  <view wx:if="{{subLabel}}" class="name-stack">
+    <view class="name-line">
+      <text class="player-name">{{name}}</text>
+      <text wx:if="{{genderIcon}}" class="gender-icon {{genderClass}}">{{genderIcon}}</text>
+    </view>
+    <text class="series-standings-combo-sub">{{subLabel}}</text>
+  </view>
+  <block wx:else>
+    <text class="player-name">{{name}}</text>
+    <text wx:if="{{genderIcon}}" class="gender-icon {{genderClass}}">{{genderIcon}}</text>
+    <text wx:if="{{showRoundTag && roundLabel}}" class="series-standings-round-tag">{{roundLabel}}</text>
+    <text wx:if="{{pendingLabel}}" class="series-standings-pending-tag">{{pendingLabel}}</text>
+  </block>
 </view>

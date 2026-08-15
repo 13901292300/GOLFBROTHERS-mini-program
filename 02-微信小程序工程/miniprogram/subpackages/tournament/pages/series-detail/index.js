@@ -53,6 +53,8 @@ var seriesStandingsViewOptions = require('./seriesStandingsViewOptions.js');
 var seriesStandingsRoundBoard = require('./seriesStandingsRoundBoard.js');
 var seriesPersonalLeaderboardAdapter = require('./seriesPersonalLeaderboardAdapter.js');
 var seriesTeamLeaderboardAdapter = require('./seriesTeamLeaderboardAdapter.js');
+var seriesLiveLeaderboardAdapter = require('./seriesLiveLeaderboardAdapter.js');
+var liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScorecard.js');
 var seriesBottomDockVisibility = require('./seriesBottomDockVisibility.js');
 var seriesLayerStack = require('./seriesLayerStack.js');
 var matchStateUtil = require('../../../../utils/matchState.js');
@@ -3005,78 +3007,54 @@ Page({
     var sharedEmpty = seriesPersonalLeaderboardAdapter.emptySharedPersonalBoardFields();
     if (selectedKey === standingsViewModel.CUMULATIVE_KEY) {
       this._frozenPersonalBoardMatch = null;
-      return Object.assign({}, vm, sharedEmpty, {
-        boardView: 'team',
-        selection: { view: 'team', scoreType: 'gross' },
-        showTeamBoard: true,
-        listRows: [],
-        listEmptyText: '',
-        leaderboardViewLabel: standingsViewModel.buildTotTopMDescription(
-          this._lastSeriesForStandings
-        ),
-        headPlayerLabel: 'TEAM'
-      });
-    }
-    if (selection.view === 'team') {
-      var teamCtx = this._resolveStandingsRoundContext(selectedKey);
-      var teamProjected = seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard({
+      var totLabel = standingsViewModel.buildTotTopMDescription(
+        this._lastSeriesForStandings
+      );
+      var totProjected = seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard({
         selectedKey: selectedKey,
-        series: teamCtx.series,
-        round: teamCtx.round,
-        match: teamCtx.match,
-        indexLink: teamCtx.indexLink,
+        series: this._lastSeriesForStandings,
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        },
         viewerRemarkCtx: this._viewerRemarkCtx
       });
-      this._frozenPersonalBoardMatch =
-        teamProjected && teamProjected.verifiedOk ? teamCtx.match : null;
-      return Object.assign({}, vm, sharedEmpty, (teamProjected && teamProjected.overlay) || {}, {
-        roundHeadline: teamCtx.roundHeadline
-      });
+      var totOverlay = seriesTeamLeaderboardAdapter.applySeriesTotTeamBoardOverlay(
+        vm,
+        totProjected,
+        totLabel
+      );
+      return Object.assign(
+        {},
+        seriesTeamLeaderboardAdapter.guardTotOverlayAgainstStaleEmpty(
+          this.data && this.data.standings,
+          totOverlay,
+          totProjected
+        ),
+        { useLiveLeaderboard: false }
+      );
     }
     var ctx = this._resolveStandingsRoundContext(selectedKey);
-    var projected = seriesPersonalLeaderboardAdapter.projectSeriesStandingsPersonalBoard({
+    var liveProjected = seriesLiveLeaderboardAdapter.projectSeriesRnLiveLeaderboard({
       selectedKey: selectedKey,
       selection: selection,
       series: ctx.series,
       round: ctx.round,
       match: ctx.match,
       indexLink: ctx.indexLink,
-      openIndex: this._standingsPersonalOpenIndex
+      openIndex:
+        selection.view === 'team'
+          ? this.data.openStandingsScorecardKey
+          : this._standingsPersonalOpenIndex,
+      viewerRemarkCtx: this._viewerRemarkCtx
     });
-    if (projected && projected.useShared) {
-      this._frozenPersonalBoardMatch = ctx.match;
-      if (projected.openIndex !== this._standingsPersonalOpenIndex) {
-        this._standingsPersonalOpenIndex = projected.openIndex;
-      }
-      return Object.assign({}, vm, projected.overlay, {
-        roundHeadline: ctx.roundHeadline
-      });
-    }
-    this._frozenPersonalBoardMatch = null;
-    if (projected && projected.reason === 'managed_fail') {
-      return Object.assign({}, vm, projected.overlay, {
-        leaderboardViewLabel: seriesStandingsViewOptions.boardViewLabel(
-          selection.view,
-          selection.scoreType,
-          ctx.match
-        ),
-        roundHeadline: ctx.roundHeadline
-      });
-    }
-    var board = seriesStandingsRoundBoard.buildSeriesRoundBoardViewModel({
-      match: ctx.match,
-      selection: selection,
-      roundId: selectedKey,
-      roundHeadline: ctx.roundHeadline
-    });
-    return Object.assign({}, vm, sharedEmpty, {
-      boardView: board.boardView,
-      selection: board.selection || selection,
-      showTeamBoard: board.showTeamBoard,
-      listRows: board.listRows,
-      listEmptyText: board.listEmptyText,
-      leaderboardViewLabel: board.leaderboardViewLabel,
-      headPlayerLabel: board.headPlayerLabel
+    this._frozenPersonalBoardMatch =
+      liveProjected && liveProjected.verifiedOk ? ctx.match : null;
+    return Object.assign({}, vm, sharedEmpty, (liveProjected && liveProjected.overlay) || {}, {
+      roundHeadline: ctx.roundHeadline,
+      useLiveLeaderboard: true
     });
   },
 
@@ -3187,7 +3165,8 @@ Page({
     // 不清零 filler；不写 scrollTop / roundSelectorScrollLeft
     var patch = extraPatch && typeof extraPatch === 'object' ? Object.assign({}, extraPatch) : {};
     var st = standings && typeof standings === 'object' ? standings : {};
-    if (!st.showSharedPersonalBoard) return patch;
+    var livePersonal = !!(st.useLiveLeaderboard && st.selection && st.selection.view !== 'team');
+    if (!st.showSharedPersonalBoard && !livePersonal) return patch;
     var idx = this._standingsPersonalOpenIndex;
     var match = this._frozenPersonalBoardMatch;
     if (st.prestartExpandMode === 'teeing_off_soon') {
@@ -3201,7 +3180,11 @@ Page({
       return patch;
     }
     if (idx >= 0 && patch.openStandingsScorecard === undefined && match) {
-      var rows = Array.isArray(st.personalLeaderboard) ? st.personalLeaderboard : [];
+      var rows = Array.isArray(st.liveLeaderboard)
+        ? st.liveLeaderboard
+        : Array.isArray(st.personalLeaderboard)
+          ? st.personalLeaderboard
+          : [];
       var row = rows[idx];
       if (row) {
         var built = teamMatchScorecard.buildTeamMatchScorecardView(
@@ -3941,6 +3924,49 @@ Page({
     });
   },
 
+  onLiveLeaderboardTeamTap: function (e) {
+    var teamId = e && e.detail && e.detail.teamId != null ? String(e.detail.teamId).trim() : '';
+    this.onStandingsTeamTap({
+      currentTarget: { dataset: { participantId: teamId } }
+    });
+  },
+
+  onLiveLeaderboardScorecardTap: function (e) {
+    var standings = this.data.standings || {};
+    if (!standings.useLiveLeaderboard) return;
+    var selectedKey =
+      this._standingsSelectedKey != null ? String(this._standingsSelectedKey).trim() : '';
+    if (!selectedKey || selectedKey === standingsViewModel.CUMULATIVE_KEY) return;
+    var ctx = this._resolveStandingsRoundContext(selectedKey);
+    var match = this._frozenPersonalBoardMatch || ctx.match;
+    var result = liveLeaderboardScorecard.applyLiveScorecardTap(
+      {
+        view: 'team',
+        openIndex: this.data.openStandingsScorecardKey,
+        teamLeaderboard: standings.liveTeamLeaderboard,
+        leaderboard: standings.liveLeaderboard,
+        match: match,
+        scoreDisplayMode: this.data.standingsScoreDisplayMode
+      },
+      (e && e.detail) || {}
+    );
+    var self = this;
+    this.setData(
+      {
+        openStandingsScorecardKey: result.openIndex,
+        openStandingsScorecard: result.openScorecard,
+        standingsScorecardCourseTitle: result.scorecardCourseTitle || '',
+        standingsScorecardEmptyLabel: '',
+        standingsScorePanel: result.scorePanel || 'technical',
+        standingsScorecardAdImage: match ? this._resolveStandingsScorecardAdImage(match) : ''
+      },
+      function () {
+        if (!self._pageAlive) return;
+        self.scheduleStandingsContentFillerMeasure();
+      }
+    );
+  },
+
   /**
    * 轻量展开/收起（不重建 standings）
    * - 无展开→开 A：仅改 id
@@ -4051,9 +4077,36 @@ Page({
         : '';
     if (!selectedKey || selectedKey === standingsViewModel.CUMULATIVE_KEY) return;
     var standings = this.data.standings || {};
-    if (!standings.showSharedPersonalBoard) return;
+    if (!standings.useLiveLeaderboard && !standings.showSharedPersonalBoard) return;
     var selection = standings.selection || {};
     if (selection.view === 'team') return;
+
+    if (standings.useLiveLeaderboard) {
+      var liveCtx = this._resolveStandingsRoundContext(selectedKey);
+      var liveMatch = this._frozenPersonalBoardMatch || liveCtx.match;
+      var liveResult = liveLeaderboardScorecard.applyLiveScorecardTap(
+        {
+          view: 'all',
+          openIndex: this._standingsPersonalOpenIndex,
+          teamLeaderboard: standings.liveTeamLeaderboard,
+          leaderboard: standings.liveLeaderboard,
+          match: liveMatch,
+          scoreDisplayMode: this.data.standingsScoreDisplayMode
+        },
+        (e && e.detail) || {}
+      );
+      this._standingsPersonalOpenIndex = liveResult.openIndex;
+      this._reprojectStandingsBoardOverlay({
+        openStandingsScorecard: liveResult.openScorecard,
+        standingsScorecardCourseTitle: liveResult.scorecardCourseTitle || '',
+        standingsScorecardEmptyLabel: '',
+        standingsScorePanel: liveResult.scorePanel || 'technical',
+        standingsScorecardAdImage: liveMatch
+          ? this._resolveStandingsScorecardAdImage(liveMatch)
+          : ''
+      });
+      return;
+    }
 
     var current = this._standingsPersonalOpenIndex;
     if (current === idx) {
@@ -4063,9 +4116,11 @@ Page({
       return;
     }
 
-    var rows = Array.isArray(standings.personalLeaderboard)
-      ? standings.personalLeaderboard
-      : [];
+    var rows = Array.isArray(standings.liveLeaderboard)
+      ? standings.liveLeaderboard
+      : Array.isArray(standings.personalLeaderboard)
+        ? standings.personalLeaderboard
+        : [];
     var row = rows[idx];
     if (!row) return;
 

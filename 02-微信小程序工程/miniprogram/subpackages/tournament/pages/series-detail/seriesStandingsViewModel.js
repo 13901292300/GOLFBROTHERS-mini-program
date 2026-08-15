@@ -24,6 +24,14 @@ function asString(v) {
   return v == null ? '' : String(v);
 }
 
+/** TOT 展开行来源副信息：有轮次+组号 → `R1 · A组`；只有轮次 → `R1`。不编造组号。 */
+function formatTotRowSubLabel(roundLabel, groupLabel) {
+  var round = asString(roundLabel).trim();
+  var group = asString(groupLabel).trim();
+  if (round && group) return round + ' · ' + group;
+  return round || group;
+}
+
 /**
  * 只读 scoringRule.globalM 作文案；不计算 Top M，不改成绩。
  * 合法 M：有限整数且 >= 1。
@@ -517,6 +525,7 @@ function fillScoredIdentityFromLineup(entry, seat) {
   }
   if (!asString(out.matchId).trim()) out.matchId = asString(seat.matchId).trim();
   if (!asString(out.groupId).trim()) out.groupId = asString(seat.groupId).trim();
+  if (!asString(out.groupLabel).trim()) out.groupLabel = asString(seat.groupLabel).trim();
   if (!asString(out.entityId).trim() && asString(seat.entityId).trim()) {
     out.entityId = asString(seat.entityId).trim();
     if (seat.isEntity === true) out.isEntity = true;
@@ -623,6 +632,7 @@ function buildTotLineupPlaceholder(base, playerId) {
     badgeTeamId: asString(base && base.badgeTeamId).trim(),
     seriesParticipantId: asString(base && base.seriesParticipantId).trim(),
     groupId: asString(base && base.groupId).trim(),
+    groupLabel: asString(base && base.groupLabel).trim(),
     matchId: asString(base && base.matchId).trim(),
     entityId: asString(base && base.entityId).trim(),
     isEntity: base && base.isEntity === true,
@@ -669,6 +679,7 @@ function mergeTotTeamExpandSource(
       filled = Object.assign({}, filled);
       if (!asString(filled.matchId).trim()) filled.matchId = asString(seat.matchId).trim();
       if (!asString(filled.groupId).trim()) filled.groupId = asString(seat.groupId).trim();
+      if (!asString(filled.groupLabel).trim()) filled.groupLabel = asString(seat.groupLabel).trim();
       if (!asString(filled.entityId).trim()) filled.entityId = asString(filled.unitId).trim();
     }
     out.push(filled);
@@ -843,7 +854,7 @@ function buildTotOccurrenceScorecardTitle(input) {
   return [roundLabel, dateTimeText, courseTitle].filter(Boolean).join(' · ');
 }
 
-function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaById, allowRepeat) {
+function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaById, allowRepeat, errorSink) {
   var source = Array.isArray(entries) ? entries : [];
   var filtered = [];
   for (var i = 0; i < source.length; i++) {
@@ -947,6 +958,10 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
     }
     if (realPlayerId && entityId && realPlayerId === entityId) realPlayerId = '';
     var roundId = asString(entry.roundId).trim();
+    var roundLabel = roundLabelForEntry(entry, roundStateById);
+    var groupId = asString(entry.groupId).trim();
+    var groupLabel = asString(entry.groupLabel).trim();
+    var stationMatchId = asString(entry.matchId).trim();
     var occurrenceKey = buildOccurrenceKey(roundId, realPlayerId);
     if (!occurrenceKey && entityId) occurrenceKey = buildOccurrenceKey(roundId, entityId);
     var playerId = realPlayerId;
@@ -961,6 +976,22 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
         : asString(entry.entryId).trim() || occurrenceKey || 'entry-' + j;
 
     var genderPack = resolveRowGenderDisplay(entry);
+    var isTot = selectedKey === CUMULATIVE_KEY;
+    var subLabel = isTot ? formatTotRowSubLabel(roundLabel, groupLabel) : '';
+    if (
+      isTot &&
+      hasScore &&
+      isPlayerResultUnit(entry) &&
+      !groupId
+    ) {
+      var sink = Array.isArray(errorSink) ? errorSink : [];
+      sink.push({
+        playerId: playerId,
+        roundId: roundId,
+        matchId: stationMatchId,
+        reason: 'missing_group'
+      });
+    }
     players.push({
       entryId: asString(entry.entryId).trim() || 'entry-' + j,
       scorecardKey: scorecardKey,
@@ -984,10 +1015,14 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
       entityId: entityId,
       isEntity: isEntity,
       memberUserIds: members.slice(),
-      groupId: asString(entry.groupId).trim(),
-      matchId: asString(entry.matchId).trim(),
+      groupId: groupId,
+      groupLabel: groupLabel,
+      matchId: stationMatchId,
+      stationMatchId: stationMatchId,
       roundId: roundId,
-      roundLabel: roundLabelForEntry(entry, roundStateById),
+      roundIndex: entry.roundIndex != null ? entry.roundIndex : null,
+      roundLabel: roundLabel,
+      subLabel: subLabel,
       showRoundTag: showRoundTag,
       fromLineup: entry.fromLineup === true,
       thru: thruRaw || formatDash(),
@@ -1121,7 +1156,8 @@ function buildSeriesStandingsViewModel(input) {
       effectiveKey,
       roundStateById,
       roundMetaById,
-      !!(series.scoringRule && series.scoringRule.allowRepeat)
+      !!(series.scoringRule && series.scoringRule.allowRepeat),
+      totExpandErrors
     );
 
     teamRows.push({
@@ -1130,8 +1166,9 @@ function buildSeriesStandingsViewModel(input) {
       seriesParticipantId: pid,
       pos: hasScore ? formatPos(resultRow.rank) : formatDash(),
       teamName: resolveParticipantName(p),
-      // TOTAL ← grossTotalValue（非 gap）
+      // TOTAL ← grossTotalValue（非 gap）；展示列用 grossTotalDisplay
       grossTotal: hasScore && gross != null ? formatGrossTotal(gross) : formatDash(),
+      grossTotalDisplay: hasScore && gross != null ? formatGrossTotal(gross) : formatDash(),
       // TO PAR ← toParValue（禁止 gapValue）
       scoreStr: hasScore && toPar != null ? formatToParDiff(toPar) : formatDash(),
       scoreClass: hasScore && toPar != null ? resolveToParScoreClass(toPar) : 'score-even',
@@ -1192,5 +1229,6 @@ module.exports = {
   buildTotOccurrenceScorecardTitle: buildTotOccurrenceScorecardTitle,
   resolveRowGenderDisplay: resolveRowGenderDisplay,
   resolveTotDisplayGlobalM: resolveTotDisplayGlobalM,
-  buildTotTopMDescription: buildTotTopMDescription
+  buildTotTopMDescription: buildTotTopMDescription,
+  formatTotRowSubLabel: formatTotRowSubLabel
 };

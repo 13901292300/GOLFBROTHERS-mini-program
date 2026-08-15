@@ -272,7 +272,12 @@ function extractG1Entries(ctx, match, participantMap, playerLookup, teamMap, par
         net: net,
         thru: summary.thru
       });
-      if (entry) out.push(entry);
+      if (entry) {
+        entry.groupId = groupId;
+        var groupLabel = asString(group.groupName).trim();
+        if (groupLabel) entry.groupLabel = groupLabel;
+        out.push(entry);
+      }
     }
   }
   return out;

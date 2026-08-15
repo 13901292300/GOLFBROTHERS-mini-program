@@ -574,6 +574,10 @@ Object.keys(baseline).forEach(function (key) {
 var detailJs = fs.readFileSync(path.join(detailDir, 'index.js'), 'utf8');
 var detailWxml = fs.readFileSync(path.join(detailDir, 'index.wxml'), 'utf8');
 var detailWxss = fs.readFileSync(path.join(detailDir, 'index.wxss'), 'utf8');
+var liveWxml = fs.readFileSync(
+  path.join(__dirname, '..', 'miniprogram', 'components', 'live-leaderboard-board', 'index.wxml'),
+  'utf8'
+);
 var sharedSrc = fs.readFileSync(path.join(utilsDir, 'teamLeaderboardView.js'), 'utf8');
 var seriesVm = fs.readFileSync(path.join(seriesDir, 'seriesStandingsViewModel.js'), 'utf8');
 
@@ -605,10 +609,12 @@ assert(
 );
 
 assert(
-  'team card WXML still page-owned',
-  detailWxml.indexOf('team.teamName') >= 0 &&
-    detailWxml.indexOf('team.grossTotal') >= 0 &&
-    detailWxml.indexOf('team.scoreStr') >= 0
+  'team card WXML extracted to live-leaderboard-board',
+  liveWxml.indexOf('team.teamName') >= 0 &&
+    liveWxml.indexOf('team.grossTotal') >= 0 &&
+    liveWxml.indexOf('team.scoreStr') >= 0 &&
+    detailWxml.indexOf('<live-leaderboard-board') >= 0 &&
+    detailWxml.indexOf('team.grossTotal') < 0
 );
 
 assert(
