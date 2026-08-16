@@ -124,11 +124,10 @@ assert(
 
 assert(
   '数据顺序不反转、尺寸不变',
-  pageJs.indexOf('teamItems.map') >= 0 &&
+  pageJs.indexOf('buildHeroTeamLogoStackState') >= 0 &&
     !/teamItems\.reverse\s*\(/.test(pageJs) &&
     pageJs.indexOf('HERO_LOGO_SIZE_RPX = 56') >= 0 &&
     pageJs.indexOf('HERO_LOGO_GAP_RPX = 12') >= 0 &&
-    pageJs.indexOf('resolveTeamLogoLayout') >= 0 &&
     pageJs.indexOf('_heroLogoFitKey') >= 0 &&
     !/margin-left:\s*-/.test(extractRule(pageWxss, '.hero-logo-stack')) &&
     !/(?:^|[^-])width:\s*100%/.test(extractRule(pageWxss, '.hero-logo-stack')) &&

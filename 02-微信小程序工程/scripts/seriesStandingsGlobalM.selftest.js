@@ -616,9 +616,9 @@ function makeManagedMatch(opts) {
     }
   });
   assert(
-    'per_round_n 不装配成绩',
-    built.meta.error === 'mode_not_global_m' &&
-      built.standingsResult.participantRows.length === 0
+    'per_round_n 装配成绩',
+    built.meta.mode === 'per_round_n' &&
+      built.meta.error !== 'mode_not_global_m'
   );
 })();
 

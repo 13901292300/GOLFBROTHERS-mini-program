@@ -889,6 +889,12 @@
   height: 56rpx;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .participant-row__name {
   font-size: 26rpx;

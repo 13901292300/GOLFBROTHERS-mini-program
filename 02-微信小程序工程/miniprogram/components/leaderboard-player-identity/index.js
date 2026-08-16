@@ -255,12 +255,14 @@ Component({
           avatarBadgeSrc = teamLogo;
           avatarBadgeIsTeam = true;
         } else if (badgeText) {
-          // 分队无 LOGO：同尺寸文字角标（队际有 LOGO 时不会走到此分支）
+          // 分队无 LOGO：同尺寸文字角标；文案由投影给出完整 grapheme，禁止 UTF-16 slice
           showAvatarBadge = true;
           avatarBadgeIsTeam = true;
           avatarBadgeIsText = true;
-          avatarBadgeText = badgeText.length > 2 ? badgeText.slice(0, 2) : badgeText;
-          avatarBadgeStyle = badgeColor ? 'background:' + badgeColor + ';' : '';
+          avatarBadgeText = badgeText;
+          avatarBadgeStyle = badgeColor
+            ? 'background:' + badgeColor + ';'
+            : 'background:#fff;';
         }
       } else if (mode === 'flag') {
         if (flagSrc) {

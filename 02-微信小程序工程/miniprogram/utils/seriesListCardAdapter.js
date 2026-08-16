@@ -4,6 +4,9 @@
  * - 聚合为单张 Series 卡；不删 storage；不 require 分包 VM / publish
  */
 
+var clubDateFormat = require('./clubDateFormat.js');
+var seriesGameModeLabel = require('./seriesGameModeLabel.js');
+
 function asString(v) {
   return v == null ? '' : String(v).trim();
 }
@@ -53,25 +56,6 @@ function findRegisteredRosterEntry(roster, playerId) {
   return null;
 }
 
-var CLUB_MONTH_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec'
-];
-
-function pad2(n) {
-  return n < 10 ? '0' + n : '' + n;
-}
-
 function parseLocalDateTimeParts(raw) {
   var s = asString(raw);
   if (!s) return null;
@@ -113,15 +97,7 @@ function parseLocalDateTimeParts(raw) {
   };
 }
 
-function formatClubMonthDay(parts) {
-  return CLUB_MONTH_LABELS[parts.month - 1] + '/' + pad2(parts.day);
-}
-
-function formatClubDateFromParts(parts) {
-  return formatClubMonthDay(parts) + '/' + parts.year;
-}
-
-/** 对齐 series detail Hero 日期范围口径 */
+/** 对齐 series detail Hero 日期范围口径（月份走 clubDateFormat） */
 function formatSeriesDateRange(roundsInput) {
   var rounds = Array.isArray(roundsInput) ? roundsInput : [];
   var minP = null;
@@ -132,61 +108,11 @@ function formatSeriesDateRange(roundsInput) {
     if (!minP || p.sortKey < minP.sortKey) minP = p;
     if (!maxP || p.sortKey > maxP.sortKey) maxP = p;
   }
-  if (!minP || !maxP) return '比赛时间待定';
-  var sameDay =
-    minP.year === maxP.year &&
-    minP.month === maxP.month &&
-    minP.day === maxP.day;
-  if (sameDay) return formatClubDateFromParts(minP);
-  if (minP.year === maxP.year) {
-    return (
-      formatClubMonthDay(minP) +
-      '-' +
-      formatClubMonthDay(maxP) +
-      '  (' +
-      minP.year +
-      ')'
-    );
-  }
-  return (
-    formatClubMonthDay(minP) +
-    ' (' +
-    minP.year +
-    ')-' +
-    formatClubMonthDay(maxP) +
-    ' (' +
-    maxP.year +
-    ')'
-  );
+  return clubDateFormat.formatDateRangeFromParts(minP, maxP, '比赛时间待定');
 }
 
-var GAME_MODE_DISPLAY_LABELS = {
-  个人比杆赛: '个人比杆赛',
-  四人四球比杆赛: '四人四球比杆赛',
-  最佳球位比杆赛: '最佳球位比杆赛',
-  四人两球比杆赛: '四人两球比杆赛',
-  最好成绩比杆赛: '四人四球比杆赛',
-  个人比洞赛: '个人比洞赛',
-  四人四球比洞赛: '四人四球比洞赛',
-  最佳球位比洞赛: '最佳球位比洞赛',
-  四人两球比洞赛: '四人两球比洞赛',
-  最好成绩比洞赛: '四人四球比洞赛',
-  individual_stroke: '个人比杆赛',
-  fourball: '四人四球比杆赛',
-  best_ball: '最佳球位比杆赛',
-  'best-ball': '最佳球位比杆赛',
-  foursomes: '四人两球比杆赛',
-  foursome: '四人两球比杆赛',
-  fourball_2ball: '四人两球比杆赛',
-  'match-play': '个人比洞赛',
-  match_play: '个人比洞赛'
-};
-
 function resolveSeriesGameModeLabel(rawMode) {
-  var mode = asString(rawMode);
-  if (!mode) return '';
-  if (GAME_MODE_DISPLAY_LABELS[mode]) return GAME_MODE_DISPLAY_LABELS[mode];
-  return '';
+  return seriesGameModeLabel.resolveSeriesGameModeLabel(rawMode);
 }
 
 /** 赛制去重 + 末尾「系列赛」 */

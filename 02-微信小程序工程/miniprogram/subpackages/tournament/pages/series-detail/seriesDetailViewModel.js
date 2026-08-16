@@ -6,6 +6,10 @@
 
 var seriesStationMatch = require('../../../../utils/seriesStationMatch.js');
 var bannerConfig = require('../../../../utils/bannerConfig.js');
+var clubDateFormat = require('../../../../utils/clubDateFormat.js');
+var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
+var seriesCourseIdentity = require('../../../../utils/seriesCourseIdentity.js');
+var seriesColorMark = require('../../../../utils/seriesColorMark.js');
 var seriesStandingsViewModel = require('./seriesStandingsViewModel.js');
 var seriesRegisterViewModel = require('./seriesRegisterViewModel.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
@@ -259,26 +263,33 @@ function buildParticipantsView(series) {
   var kindLabel = hostMode === 'team' ? '参赛分队' : '参赛球队';
   var unit = hostMode === 'team' ? '个' : '支';
   var count = parts.length;
+  var showDivisionColorMark = isDivisionSeriesHero(series);
   return {
     kindLabel: kindLabel,
     count: count,
     summaryText: count + ' ' + unit,
     items: parts.map(function (p) {
-      return {
+      var kind = asString(p && p.kind).trim();
+      var item = {
         seriesParticipantId: asString(p && p.seriesParticipantId).trim(),
         name: resolveParticipantDetailDisplayName(p),
         fullNameSnapshot: asString(p && p.fullNameSnapshot).trim(),
         shortNameSnapshot: asString(p && p.shortNameSnapshot).trim(),
         nameSnapshot: asString(p && p.nameSnapshot).trim(),
         logo: asString(p && p.logoSnapshot).trim(),
-        kind: asString(p && p.kind).trim()
+        kind: kind
       };
+      if (showDivisionColorMark && kind === 'division') {
+        item.colorMark = seriesColorMark.buildColorMark({
+          name: p && p.nameSnapshot,
+          color: p && p.colorSnapshot,
+          emptyNamePlaceholder: '未命名分队'
+        });
+        item.logo = '';
+      }
+      return item;
     })
   };
-}
-
-function pad2(n) {
-  return n < 10 ? '0' + n : String(n);
 }
 
 function isLeapYear(year) {
@@ -332,36 +343,8 @@ function parseLocalDateTimeParts(input) {
   };
 }
 
-/** 对齐 teamMatchStore.formatClubDate / detail match.dateText：英文月缩写 + Mon/DD */
-var CLUB_MONTH_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec'
-];
-
-function formatClubMonthDay(parts) {
-  return CLUB_MONTH_LABELS[parts.month - 1] + '/' + pad2(parts.day);
-}
-
-/** 单日：与 formatClubDate 同款 Mon/DD/YYYY */
-function formatClubDateFromParts(parts) {
-  return formatClubMonthDay(parts) + '/' + parts.year;
-}
-
 /**
- * 系列赛 Hero 日期范围（仅日期，不展示开球时刻）
- * - 同日：队内赛 formatClubDate 口径 Mon/DD/YYYY
- * - 同年跨日/跨月：Mon/DD-Mon/DD  (YYYY)（年份前双空格）
- * - 跨年：详情页无现成范围口径 → Mon/DD (YYYY)-Mon/DD (YYYY)
+ * 系列赛 Hero 日期范围（仅日期，不展示开球时刻；月份走 clubDateFormat）
  */
 function formatSeriesDateRange(roundsInput) {
   var rounds = Array.isArray(roundsInput) ? roundsInput : [];
@@ -373,37 +356,14 @@ function formatSeriesDateRange(roundsInput) {
     if (!minP || p.sortKey < minP.sortKey) minP = p;
     if (!maxP || p.sortKey > maxP.sortKey) maxP = p;
   }
-  if (!minP || !maxP) return '比赛时间待定';
-  var sameDay =
-    minP.year === maxP.year && minP.month === maxP.month && minP.day === maxP.day;
-  if (sameDay) return formatClubDateFromParts(minP);
-  if (minP.year === maxP.year) {
-    return (
-      formatClubMonthDay(minP) +
-      '-' +
-      formatClubMonthDay(maxP) +
-      '  (' +
-      minP.year +
-      ')'
-    );
-  }
-  return (
-    formatClubMonthDay(minP) +
-    ' (' +
-    minP.year +
-    ')-' +
-    formatClubMonthDay(maxP) +
-    ' (' +
-    maxP.year +
-    ')'
-  );
+  return clubDateFormat.formatDateRangeFromParts(minP, maxP, '比赛时间待定');
 }
 
 /**
  * Hero 周期字号档位：按最终 dateText 长度，不改格式化逻辑。
- * 短（默认 60rpx）：同日 Aug/11/2026、同年 Aug/11-Aug/13  (2026)、待定
+ * 短（默认 60rpx）：同日 AUG/11/2026、同年同月 AUG/11-13  (2026)、待定
  * 中（略缩小）：介于同年与跨年之间的长度
- * 长（再缩小）：跨年 Dec/31 (2026)-Jan/02 (2027)
+ * 长（再缩小）：跨年 DEC/31 (2026)-JAN/02 (2027)
  */
 var HERO_DATE_RANGE_MD_MIN = 23;
 var HERO_DATE_RANGE_LG_MIN = 27;
@@ -417,95 +377,28 @@ function resolveHeroDateRangeSizeClass(dateText) {
   return '';
 }
 
-function normalizeCourseNameKey(name) {
-  return asString(name)
-    .trim()
-    .replace(/\s+/g, ' ');
+function resolveSeriesRoundHalves(round) {
+  return seriesCourseIdentity.resolveSeriesRoundHalves(round);
 }
 
-/**
- * 系列赛球场去重（混合规则；不修改 rounds）
- * - 双方都有 courseId：同 ID 合并，异 ID 保留（即使同名）
- * - 至少一方缺 courseId：规范化名称相同则合并
- * - 同 ID 名称快照差异：保留首次非空名称
- */
+function formatSeriesCourseDisplayName(round) {
+  return seriesCourseIdentity.formatSeriesCourseDisplayName(round);
+}
+
+function buildSeriesCourseIdentityKey(round) {
+  return seriesCourseIdentity.buildSeriesCourseIdentityKey(round);
+}
+
 function buildSeriesCourseLines(roundsInput) {
-  var rounds = Array.isArray(roundsInput) ? roundsInput : [];
-  var lines = [];
-  for (var i = 0; i < rounds.length; i++) {
-    var r = rounds[i] || {};
-    var name = asString(r.courseName).trim();
-    if (!name) continue;
-    var courseId = asString(r.courseId).trim();
-    var normName = normalizeCourseNameKey(name);
-    var mergeIdx = -1;
-    for (var j = 0; j < lines.length; j++) {
-      var e = lines[j];
-      var bothHaveId = !!(courseId && e.courseId);
-      if (bothHaveId) {
-        if (courseId === e.courseId) {
-          mergeIdx = j;
-          break;
-        }
-        continue;
-      }
-      if (normName && e.normName && normName === e.normName) {
-        mergeIdx = j;
-        break;
-      }
-    }
-    if (mergeIdx >= 0) {
-      if (!lines[mergeIdx].courseId && courseId) {
-        lines[mergeIdx].courseId = courseId;
-      }
-      // 名称保留首次非空，不再覆盖
-      continue;
-    }
-    lines.push({
-      courseId: courseId,
-      name: name,
-      normName: normName
-    });
-  }
-  return {
-    pending: lines.length === 0,
-    lines: lines.map(function (x) {
-      return x.name;
-    })
-  };
+  return seriesCourseIdentity.buildSeriesCourseLines(roundsInput);
 }
 
 /**
  * 队内/队际创建页中文赛制口径 + 常见内部枚举映射。
  * 未知/非法值返回 ''（由调用方跳过，不伪造默认赛制）。
  */
-var GAME_MODE_DISPLAY_LABELS = {
-  个人比杆赛: '个人比杆赛',
-  四人四球比杆赛: '四人四球比杆赛',
-  最佳球位比杆赛: '最佳球位比杆赛',
-  四人两球比杆赛: '四人两球比杆赛',
-  最好成绩比杆赛: '四人四球比杆赛',
-  个人比洞赛: '个人比洞赛',
-  四人四球比洞赛: '四人四球比洞赛',
-  最佳球位比洞赛: '最佳球位比洞赛',
-  四人两球比洞赛: '四人两球比洞赛',
-  最好成绩比洞赛: '四人四球比洞赛',
-  individual_stroke: '个人比杆赛',
-  fourball: '四人四球比杆赛',
-  best_ball: '最佳球位比杆赛',
-  'best-ball': '最佳球位比杆赛',
-  foursomes: '四人两球比杆赛',
-  foursome: '四人两球比杆赛',
-  fourball_2ball: '四人两球比杆赛',
-  'match-play': '个人比洞赛',
-  match_play: '个人比洞赛'
-};
-
 function resolveSeriesGameModeLabel(rawMode) {
-  var mode = asString(rawMode).trim();
-  if (!mode) return '';
-  if (GAME_MODE_DISPLAY_LABELS[mode]) return GAME_MODE_DISPLAY_LABELS[mode];
-  return '';
+  return seriesGameModeLabel.resolveSeriesGameModeLabel(rawMode);
 }
 
 /**
@@ -530,14 +423,59 @@ function firstCharFallback(name) {
   return s ? s.charAt(0) : '';
 }
 
+function firstDisplayGrapheme(name, emptyPlaceholder) {
+  return seriesColorMark.firstDisplayGrapheme(name, emptyPlaceholder);
+}
+
+function takeFirstGrapheme(str) {
+  return seriesColorMark.takeFirstGrapheme(str);
+}
+
+function isDivisionSeriesHero(series) {
+  return (
+    asString(series && series.hostMode).trim() === 'team' &&
+    asString(series && series.templateId).trim() === 'division_series'
+  );
+}
+
 /**
- * Hero 参赛主体展示：organization→全部球队 Logo；team→全部分队标签
+ * Hero 参赛主体展示：
+ * - organization → 球队 Logo 栈
+ * - team + division_series → 复用同一 Logo 栈（圆形色块 + 首字符）
+ * - 其它队内系列 → 分队标签（保持现状）
  * 不截断、无 +N；布局步进由页面测量后 calculateLogoStackLayout 计算
  */
 function buildHeroParticipantDisplay(series) {
   var hostMode = asString(series && series.hostMode).trim();
   var parts = Array.isArray(series && series.participants) ? series.participants : [];
   if (hostMode === 'team') {
+    if (isDivisionSeriesHero(series)) {
+      var teamItemsFromDivisions = [];
+      for (var d = 0; d < parts.length; d++) {
+        var div = parts[d];
+        if (!div || asString(div.kind).trim() !== 'division') continue;
+        var divName = asString(div.nameSnapshot).trim() || '未命名分队';
+        var mark = seriesColorMark.buildColorMark({
+          name: div.nameSnapshot,
+          color: div.colorSnapshot,
+          emptyNamePlaceholder: '未命名分队'
+        });
+        teamItemsFromDivisions.push({
+          participantId: asString(div.seriesParticipantId).trim(),
+          logo: '',
+          fallbackText: mark.fallbackText,
+          color: mark.color,
+          name: divName
+        });
+      }
+      return {
+        mode: 'team_logos',
+        label: '分队',
+        teamItems: teamItemsFromDivisions,
+        divisionItems: [],
+        emptyText: teamItemsFromDivisions.length ? '' : '待创建分队'
+      };
+    }
     var divisionItems = [];
     for (var i = 0; i < parts.length; i++) {
       var p = parts[i];
@@ -674,6 +612,184 @@ function calculateLogoStackLayout(opts) {
     stackWidth: resolved.groupWidth,
     mode: mode,
     zIndexes: zIndexes
+  };
+}
+
+function emptyHeroTeamLogoStack() {
+  return { visible: false, stackWidthPx: 0, logoSizePx: 0, items: [] };
+}
+
+/** 按顺序的稳定 Logo 身份签名：participantId + url，不依赖测量宽度 */
+function buildHeroTeamLogoIdentitySignature(teamItems) {
+  var items = Array.isArray(teamItems) ? teamItems : [];
+  var parts = [];
+  for (var i = 0; i < items.length; i++) {
+    var t = items[i] || {};
+    var id = t.participantId != null ? String(t.participantId).trim() : '';
+    var logo = t.logo != null ? String(t.logo).trim() : '';
+    var color = t.color != null ? String(t.color).trim() : '';
+    var fallback = t.fallbackText != null ? String(t.fallbackText).trim() : '';
+    parts.push((id || 'team-' + i) + ':' + logo + ':' + color + ':' + fallback);
+  }
+  return parts.join(',');
+}
+
+/** 缓存键 = 容器宽度 + 数量 + 身份签名（+ 尺寸/间距，避免 rpx 换算变化误命中） */
+function buildHeroTeamLogoLayoutCacheKey(opts) {
+  var o = opts || {};
+  var width = Number(o.containerWidth);
+  if (!Number.isFinite(width) || width < 0) width = 0;
+  var items = Array.isArray(o.teamItems) ? o.teamItems : [];
+  var diameter = Number(o.logoDiameter);
+  var gap = Number(o.normalGap);
+  return [
+    String(width),
+    String(items.length),
+    buildHeroTeamLogoIdentitySignature(items),
+    Number.isFinite(diameter) ? String(diameter) : '0',
+    Number.isFinite(gap) ? String(gap) : '0'
+  ].join('|');
+}
+
+function projectHeroTeamLogoStackItems(teamItems, layout) {
+  var items = Array.isArray(teamItems) ? teamItems : [];
+  var slots = layout && Array.isArray(layout.items) ? layout.items : [];
+  return items.map(function (t, index) {
+    var src = t || {};
+    var slot = slots[index] || { left: 0, zIndex: items.length - index };
+    var color = src.color != null ? String(src.color).trim() : '';
+    return {
+      participantId: src.participantId || 'team-' + index,
+      logo: src.logo || '',
+      fallbackText: src.fallbackText || '队',
+      color: color,
+      backgroundStyle: color ? 'background:' + color + ';' : '',
+      leftPx: slot.left,
+      zIndex: slot.zIndex
+    };
+  });
+}
+
+function heroTeamLogoStackHasValidLayout(stack, teamItems) {
+  var items = stack && Array.isArray(stack.items) ? stack.items : [];
+  var raw = Array.isArray(teamItems) ? teamItems : [];
+  if (!items.length || items.length !== raw.length) return false;
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    if (!it) return false;
+    if (!Number.isFinite(Number(it.leftPx)) || !Number.isFinite(Number(it.zIndex))) return false;
+    var rawId = raw[i] && raw[i].participantId != null ? String(raw[i].participantId).trim() : '';
+    var itemId = it.participantId != null ? String(it.participantId).trim() : '';
+    if ((rawId || 'team-' + i) !== (itemId || 'team-' + i)) return false;
+  }
+  return true;
+}
+
+function shouldReuseHeroTeamLogoLayout(opts) {
+  var o = opts || {};
+  if (!o.cacheKey || o.cacheKey !== o.currentKey) return false;
+  return heroTeamLogoStackHasValidLayout(o.currentStack, o.teamItems);
+}
+
+function shouldApplyHeroTeamLogoMeasure(opts) {
+  var o = opts || {};
+  if (!o.pageAlive) return false;
+  if (o.token !== o.currentToken) return false;
+  var a = o.seriesId != null ? String(o.seriesId).trim() : '';
+  var b = o.currentSeriesId != null ? String(o.currentSeriesId).trim() : '';
+  if (a && b && a !== b) return false;
+  return true;
+}
+
+/**
+ * 用当前容器宽度（或 0）把原始 Logo 投影为可渲染栈。
+ * 宽度 0 走 resolveTeamLogoLayout 的 normal 靠左降级，绝不清空数组。
+ */
+function buildHeroTeamLogoStackState(opts) {
+  var o = opts || {};
+  var teamItems = Array.isArray(o.teamItems) ? o.teamItems : [];
+  var emptyText = o.emptyText != null ? String(o.emptyText).trim() : '';
+  var mode = o.mode != null ? String(o.mode) : 'team_logos';
+  if (mode !== 'team_logos' || !teamItems.length || emptyText) {
+    return emptyHeroTeamLogoStack();
+  }
+  var layout = resolveTeamLogoLayout({
+    containerWidth: o.containerWidth,
+    logoDiameter: o.logoDiameter,
+    normalGap: o.normalGap,
+    count: teamItems.length
+  });
+  return {
+    visible: true,
+    stackWidthPx: layout.groupWidth,
+    logoSizePx: o.logoDiameter,
+    items: projectHeroTeamLogoStackItems(teamItems, layout)
+  };
+}
+
+/**
+ * 返回后测量回调决策：过期丢弃、宽度 0 重试一次、永不因宽度 0 清空 Logo。
+ */
+function resolveHeroTeamLogoReturnRestore(opts) {
+  var o = opts || {};
+  var teamItems = Array.isArray(o.teamItems) ? o.teamItems : [];
+  if (!shouldApplyHeroTeamLogoMeasure(o)) {
+    return { apply: false, reason: 'stale', clearLogos: false, retry: false };
+  }
+  var emptyText = o.emptyText != null ? String(o.emptyText).trim() : '';
+  if (o.mode !== 'team_logos' || !teamItems.length || emptyText) {
+    return {
+      apply: true,
+      reason: 'empty',
+      clearLogos: true,
+      retry: false,
+      cacheKey: 'hidden',
+      stack: emptyHeroTeamLogoStack()
+    };
+  }
+  var measuredWidth = Number(o.measuredWidth);
+  if (!Number.isFinite(measuredWidth) || measuredWidth < 0) measuredWidth = 0;
+  if (!(measuredWidth > 0) && !o.retryUsed) {
+    return { apply: false, reason: 'retry-width', clearLogos: false, retry: true };
+  }
+  var stack = buildHeroTeamLogoStackState({
+    mode: 'team_logos',
+    emptyText: '',
+    teamItems: teamItems,
+    containerWidth: measuredWidth,
+    logoDiameter: o.logoDiameter,
+    normalGap: o.normalGap
+  });
+  var cacheKey = buildHeroTeamLogoLayoutCacheKey({
+    containerWidth: measuredWidth,
+    logoDiameter: o.logoDiameter,
+    normalGap: o.normalGap,
+    teamItems: teamItems
+  });
+  if (
+    shouldReuseHeroTeamLogoLayout({
+      cacheKey: o.cacheKey,
+      currentKey: cacheKey,
+      currentStack: o.currentStack,
+      teamItems: teamItems
+    })
+  ) {
+    return {
+      apply: false,
+      reason: 'reuse',
+      clearLogos: false,
+      retry: false,
+      cacheKey: cacheKey,
+      stack: o.currentStack
+    };
+  }
+  return {
+    apply: true,
+    reason: 'project',
+    clearLogos: false,
+    retry: false,
+    cacheKey: cacheKey,
+    stack: stack
   };
 }
 
@@ -1087,6 +1203,9 @@ function buildRoundCard(series, round, deps, indexHint) {
     dateTime: asString(r.dateTime).trim(),
     courseName: asString(r.courseName).trim(),
     courseHalfText: asString(r.courseHalfText).trim(),
+    courseId: asString(r.courseId).trim(),
+    front9Course: r.front9Course,
+    back9Course: r.back9Course,
     venueText: venue || '球场待定',
     gameMode: asString(r.gameMode).trim() || '—',
     feeText: formatFeeDisplay(r.fee),
@@ -1225,10 +1344,24 @@ module.exports = {
   parseLocalDateTimeParts: parseLocalDateTimeParts,
   formatSeriesDateRange: formatSeriesDateRange,
   resolveHeroDateRangeSizeClass: resolveHeroDateRangeSizeClass,
+  firstDisplayGrapheme: firstDisplayGrapheme,
+  takeFirstGrapheme: takeFirstGrapheme,
   buildHeroParticipantDisplay: buildHeroParticipantDisplay,
   calculateLogoStackLayout: calculateLogoStackLayout,
   resolveTeamLogoLayout: resolveTeamLogoLayout,
   resolveLogoStackZIndexes: resolveLogoStackZIndexes,
+  emptyHeroTeamLogoStack: emptyHeroTeamLogoStack,
+  buildHeroTeamLogoIdentitySignature: buildHeroTeamLogoIdentitySignature,
+  buildHeroTeamLogoLayoutCacheKey: buildHeroTeamLogoLayoutCacheKey,
+  projectHeroTeamLogoStackItems: projectHeroTeamLogoStackItems,
+  heroTeamLogoStackHasValidLayout: heroTeamLogoStackHasValidLayout,
+  shouldReuseHeroTeamLogoLayout: shouldReuseHeroTeamLogoLayout,
+  shouldApplyHeroTeamLogoMeasure: shouldApplyHeroTeamLogoMeasure,
+  buildHeroTeamLogoStackState: buildHeroTeamLogoStackState,
+  resolveHeroTeamLogoReturnRestore: resolveHeroTeamLogoReturnRestore,
+  resolveSeriesRoundHalves: resolveSeriesRoundHalves,
+  formatSeriesCourseDisplayName: formatSeriesCourseDisplayName,
+  buildSeriesCourseIdentityKey: buildSeriesCourseIdentityKey,
   buildSeriesCourseLines: buildSeriesCourseLines,
   resolveSeriesHeroBannerDisplay: resolveSeriesHeroBannerDisplay,
   buildEventInfoView: buildEventInfoView,

@@ -102,7 +102,7 @@
       <!-- Step 3 -->
       <view class="section" wx:if="{{!draftInitError && currentStep === 3}}">
         <view class="section-label"><text class="section-label__h2">计分模式</text></view>
-        <view class="hint-line">按计分结果取最好 N/M 份；每轮 N 在轮次步骤逐轮设置。</view>
+        <view class="hint-line">按计分结果取最好 N/M 份；默认 N 会同步到未单独修改的轮次。</view>
         <view class="choice-list">
           <view
             class="choice-card {{scoringMode === 'per_round_n' ? 'active' : ''}}"
@@ -144,6 +144,24 @@
             <view class="m-step" data-delta="1" bindtap="onGlobalMStep">+</view>
           </view>
           <text class="hint-line">须为不小于 1 的整数；输入过程可暂时为空，失焦后校验。</text>
+        </view>
+
+        <view class="m-block" wx:if="{{showPerRoundN}}">
+          <view class="section-label"><text class="section-label__h2">默认 N</text></view>
+          <view class="m-row">
+            <view class="m-step" data-delta="-1" bindtap="onDefaultTopNStep">−</view>
+            <input
+              class="m-input"
+              type="digit"
+              value="{{defaultTopNInput}}"
+              bindfocus="onDefaultTopNFocus"
+              bindinput="onDefaultTopNInput"
+              bindblur="onDefaultTopNBlur"
+              disabled="{{isSaving}}"
+            />
+            <view class="m-step" data-delta="1" bindtap="onDefaultTopNStep">+</view>
+          </view>
+          <text class="hint-line">须为不小于 1 的整数；同步到尚未单独修改的轮次，单轮仍可再改。</text>
         </view>
 
         <view class="section-label" style="margin-top: 36rpx;"><text class="section-label__h2">是否允许重复上场</text></view>

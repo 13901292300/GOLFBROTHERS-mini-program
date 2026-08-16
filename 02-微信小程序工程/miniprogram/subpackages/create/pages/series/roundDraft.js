@@ -20,6 +20,7 @@ var KNOWN_ROUND_KEYS = {
   fee: true,
   gameMode: true,
   topN: true,
+  topNUserEdited: true,
   courseId: true,
   courseName: true,
   courseLocation: true,
@@ -254,6 +255,63 @@ function parseStrictTopN(raw) {
   return value;
 }
 
+function isTopNUserEdited(round) {
+  return !!(round && round.topNUserEdited === true);
+}
+
+/**
+ * 规则区默认 N：缺省视为 3；已有非法值失败（不猜测）。
+ * @returns {{ ok: boolean, value: number|null, present: boolean }}
+ */
+function resolveDefaultTopNForRule(rule) {
+  if (!rule || rule.defaultTopN == null || String(rule.defaultTopN).trim() === '') {
+    return { ok: true, value: DEFAULT_TOP_N, present: false };
+  }
+  var n = parseStrictTopN(rule.defaultTopN);
+  if (n == null) return { ok: false, value: null, present: true };
+  return { ok: true, value: n, present: true };
+}
+
+/**
+ * 将合法默认 N 写入未独立编辑的轮次。不改输入数组/原对象。
+ * @returns {{ ok: boolean, rounds: object[]|null, changedRoundIds: string[], reason?: string }}
+ */
+function applyDefaultTopNToRounds(rounds, nextDefaultN, options) {
+  var n = parseStrictTopN(nextDefaultN);
+  if (n == null) {
+    return {
+      ok: false,
+      reason: 'invalid_top_n',
+      rounds: null,
+      changedRoundIds: []
+    };
+  }
+  var opts = options && typeof options === 'object' ? options : {};
+  var list = Array.isArray(rounds) ? rounds : [];
+  var changedRoundIds = [];
+  var now = typeof seriesModel.nowIso === 'function' ? seriesModel.nowIso() : '';
+  var nextRounds = list.map(function (r) {
+    var round = deepClone(r) || {};
+    if (isTopNUserEdited(round) && opts.forceAll !== true) {
+      return round;
+    }
+    var cur = parseStrictTopN(round.topN);
+    if (cur === n) {
+      return round;
+    }
+    round.topN = n;
+    round.topNUserEdited = false;
+    if (now) round.updatedAt = now;
+    if (round.roundId) changedRoundIds.push(String(round.roundId));
+    return round;
+  });
+  return {
+    ok: true,
+    rounds: nextRounds,
+    changedRoundIds: changedRoundIds
+  };
+}
+
 /**
  * @returns {{ ok: boolean, value: string|null, reason?: string }}
  */
@@ -270,6 +328,7 @@ function roundHasUserData(round) {
   if (!round || typeof round !== 'object') return false;
   if (!isDefaultRoundName(round)) return true;
   if (round.dateTimeUserEdited === true) return true;
+  if (round.topNUserEdited === true) return true;
   if (isNonEmptyString(round.dateTime)) return true;
   if (hasCourseSnapshot(round)) return true;
   if (round.fee != null && String(round.fee).trim() !== '') return true;
@@ -309,11 +368,13 @@ function addLocalHours(dateTimeStr, hours) {
  *   reason?: string
  * }}
  */
-function resizeRounds(rounds, targetCount) {
+function resizeRounds(rounds, targetCount, options) {
   var target = parseStrictRoundCount(targetCount);
   if (target == null) {
     return { ok: false, reason: 'invalid_count', rounds: null };
   }
+  var opts = options && typeof options === 'object' ? options : {};
+  var inheritTopN = parseStrictTopN(opts.defaultTopN);
   var cur = deepClone(Array.isArray(rounds) ? rounds : []);
   if (target === cur.length) {
     return {
@@ -337,6 +398,10 @@ function resizeRounds(rounds, targetCount) {
     while (cur.length < target) {
       var prev = cur.length ? cur[cur.length - 1] : null;
       var blank = seriesModel.createBlankRound(cur.length + 1, null);
+      blank.topNUserEdited = false;
+      if (inheritTopN != null) {
+        blank.topN = inheritTopN;
+      }
       if (prev && hasCourseSnapshot(prev)) {
         blank = copyCourseSnapshot(prev, blank);
       }
@@ -576,6 +641,9 @@ module.exports = {
   deepClone: deepClone,
   parseStrictRoundCount: parseStrictRoundCount,
   parseStrictTopN: parseStrictTopN,
+  isTopNUserEdited: isTopNUserEdited,
+  resolveDefaultTopNForRule: resolveDefaultTopNForRule,
+  applyDefaultTopNToRounds: applyDefaultTopNToRounds,
   parseFeeInput: parseFeeInput,
   roundHasUserData: roundHasUserData,
   roundsHaveUserData: roundsHaveUserData,

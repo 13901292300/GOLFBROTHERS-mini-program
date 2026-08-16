@@ -625,7 +625,7 @@
 .series-wizard .series-division-swatch {
   width: 72rpx;
   height: 72rpx;
-  border-radius: 16rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;

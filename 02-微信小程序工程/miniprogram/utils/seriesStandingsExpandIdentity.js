@@ -12,6 +12,7 @@ var seriesResultAdapter = require('./seriesResultAdapter.js');
 var playerManage = require('./playerManage.js');
 var mockAvatars = require('./mockAvatars.js');
 var openPlayerProfileUtil = require('./openPlayerProfile.js');
+var seriesColorMark = require('./seriesColorMark.js');
 var { DEFAULT_ORG_LOGO, isTeamMatchFamily } = require('./teamMatchCapabilities.js');
 
 function asString(v) {
@@ -72,6 +73,57 @@ function indexParticipants(series) {
   return byId;
 }
 
+function isDivisionSeriesStandings(series) {
+  return (
+    asString(series && series.hostMode) === 'team' &&
+    asString(series && series.templateId) === 'division_series'
+  );
+}
+
+function findRosterSeriesParticipantId(series, playerId) {
+  var pid = asString(playerId);
+  if (!pid) return '';
+  var roster = Array.isArray(series && series.roster) ? series.roster : [];
+  for (var i = 0; i < roster.length; i++) {
+    var row = roster[i];
+    if (!row || typeof row !== 'object') continue;
+    var rid = asString(row.userId || row.playerId || row.id);
+    if (rid !== pid) continue;
+    return asString(row.seriesParticipantId || row.divisionId || row.matchTeamId);
+  }
+  return '';
+}
+
+function resolveDivisionColorMarkFromParticipant(series, seriesParticipantId) {
+  var sid = asString(seriesParticipantId);
+  if (!sid || !isDivisionSeriesStandings(series)) return null;
+  var partById = indexParticipants(series);
+  var part = partById[sid] || null;
+  if (!part) {
+    var map = {};
+    try {
+      map = seriesResultAdapter.buildParticipantResolveMap(series) || {};
+    } catch (eMap) {
+      map = {};
+    }
+    var mapped = asString(map[sid]);
+    if (mapped) part = partById[mapped] || null;
+  }
+  if (!part || asString(part.kind) !== 'division') return null;
+  var mark = seriesColorMark.buildColorMark({
+    name: part.nameSnapshot,
+    color: part.colorSnapshot,
+    emptyNamePlaceholder: '未命名分队'
+  });
+  return {
+    seriesParticipantId: asString(part.seriesParticipantId) || sid,
+    badgeTeamId: asString(part.divisionId) || sid.replace(/^division:/, ''),
+    badgeText: mark.fallbackText,
+    badgeColor: mark.color,
+    avatarBadge: mark.fallbackText ? 'team' : 'none'
+  };
+}
+
 function listTeamGroups(match) {
   return Array.isArray(match && match.teamGroups) ? match.teamGroups : [];
 }
@@ -120,7 +172,7 @@ function resolveTeamGroupId(match, series, seat, seriesParticipantId) {
  *   seriesParticipantId: string
  * }}
  */
-function resolveExpandAffiliationBadge(match, series, playerId) {
+function resolveExpandAffiliationBadge(match, series, playerId, hintRow) {
   var empty = {
     badgeTeamId: '',
     badgeText: '',
@@ -129,11 +181,21 @@ function resolveExpandAffiliationBadge(match, series, playerId) {
     hostMode: asString(series && series.hostMode) || '',
     seriesParticipantId: ''
   };
+  var hostMode = asString(series && series.hostMode) || '';
+  var hint = hintRow && typeof hintRow === 'object' ? hintRow : {};
   var found = findFormalSeat(match, playerId);
-  if (!found || !found.seat) return empty;
+  if (!found || !found.seat) {
+    var hintedId = asString(hint.seriesParticipantId) || asString(hint.matchTeamId);
+    var fromPart = resolveDivisionColorMarkFromParticipant(series, hintedId);
+    if (!fromPart && asString(playerId)) {
+      var rosterPid = findRosterSeriesParticipantId(series, playerId);
+      fromPart = resolveDivisionColorMarkFromParticipant(series, rosterPid);
+    }
+    if (fromPart) return Object.assign({}, empty, fromPart, { hostMode: hostMode });
+    return empty;
+  }
 
   var seat = found.seat;
-  var hostMode = asString(series && series.hostMode) || '';
   var participantMap = seriesResultAdapter.buildParticipantResolveMap(series);
   var partById = indexParticipants(series);
 
@@ -176,40 +238,32 @@ function resolveExpandAffiliationBadge(match, series, playerId) {
     return empty;
   }
 
-  var shortName =
-    (part && (asString(part.shortNameSnapshot) || asString(part.nameSnapshot) || asString(part.fullNameSnapshot))) ||
-    asString(seat.participantShortNameSnapshot) ||
-    asString(seat.participantNameSnapshot) ||
-    asString(seat.matchTeamName) ||
-    '';
-  if (!shortName && badgeTeamId) {
-    var tgs = listTeamGroups(match);
-    for (var i = 0; i < tgs.length; i++) {
-      if (asString(tgs[i] && tgs[i].id) === badgeTeamId) {
-        shortName = asString(tgs[i].name);
-        break;
-      }
-    }
-  }
-  var color =
-    (part && asString(part.colorSnapshot)) ||
-    (function () {
-      var tgs2 = listTeamGroups(match);
-      for (var j = 0; j < tgs2.length; j++) {
-        if (asString(tgs2[j] && tgs2[j].id) === badgeTeamId) {
-          return asString(tgs2[j].colorSnapshot || tgs2[j].color);
-        }
-      }
-      return '';
-    })();
-
   if (hostMode === 'team') {
-    // 分队：优先 LOGO（若有）；否则文字/颜色角标
+    if (!isDivisionSeriesStandings(series)) {
+      return {
+        badgeTeamId: badgeTeamId,
+        badgeText: '',
+        badgeColor: '',
+        avatarBadge: 'none',
+        hostMode: hostMode,
+        seriesParticipantId: seriesParticipantId || ''
+      };
+    }
+    var fromResolved = resolveDivisionColorMarkFromParticipant(
+      series,
+      seriesParticipantId || (part && part.seriesParticipantId) || ''
+    );
+    if (fromResolved) {
+      return Object.assign({}, fromResolved, {
+        badgeTeamId: badgeTeamId || fromResolved.badgeTeamId,
+        hostMode: hostMode
+      });
+    }
     return {
       badgeTeamId: badgeTeamId,
-      badgeText: playerManage.formatTeamTagName(shortName) || '',
-      badgeColor: color,
-      avatarBadge: badgeTeamId || shortName ? 'team' : 'none',
+      badgeText: '',
+      badgeColor: '',
+      avatarBadge: 'none',
       hostMode: hostMode,
       seriesParticipantId: seriesParticipantId || ''
     };
@@ -224,6 +278,78 @@ function resolveExpandAffiliationBadge(match, series, playerId) {
     hostMode: hostMode || 'organization',
     seriesParticipantId: seriesParticipantId || ''
   };
+}
+
+function stampEntityMemberList(player, match, series) {
+  var existing = Array.isArray(player && player.members) ? player.members : [];
+  if (existing.length) {
+    return existing.map(function (m) {
+      return stampPlayerDivisionAvatarMark(m, match, series);
+    });
+  }
+  var ids = Array.isArray(player && player.memberUserIds) ? player.memberUserIds : [];
+  var out = [];
+  for (var i = 0; i < ids.length; i++) {
+    var mid = asString(ids[i]);
+    if (!mid) continue;
+    var pack = projectStandingsScorecardIdentity(match, series, {
+      playerId: mid,
+      userId: mid
+    });
+    var row = pack && pack.player ? pack.player : { playerId: mid, userId: mid };
+    out.push(stampPlayerDivisionAvatarMark(row, match, series));
+  }
+  return out;
+}
+
+function stampPlayerDivisionAvatarMark(player, match, series) {
+  if (!player || typeof player !== 'object') return player;
+  if (!isDivisionSeriesStandings(series)) return player;
+  var isEntity = player.isEntity === true;
+  if (isEntity) {
+    var members = stampEntityMemberList(player, match, series);
+    var cleared = Object.assign({}, player, {
+      badgeText: '',
+      badgeColor: '',
+      members: members
+    });
+    if (Array.isArray(player.pairMembers)) {
+      cleared.pairMembers =
+        player.pairMembers === player.members
+          ? members
+          : player.pairMembers.map(function (m) {
+              return stampPlayerDivisionAvatarMark(m, match, series);
+            });
+    }
+    return cleared;
+  }
+  var pid = asString(player.playerId || player.userId);
+  var aff = resolveExpandAffiliationBadge(match, series, pid, player);
+  var next = Object.assign({}, player);
+  if (aff && aff.avatarBadge === 'team' && aff.badgeText) {
+    next.badgeText = aff.badgeText;
+    next.badgeColor = aff.badgeColor;
+    if (aff.badgeTeamId) next.badgeTeamId = aff.badgeTeamId;
+    if (aff.seriesParticipantId) next.seriesParticipantId = aff.seriesParticipantId;
+  } else {
+    next.badgeText = '';
+    next.badgeColor = '';
+  }
+  return next;
+}
+
+function stampTeamBoardDivisionAvatarMarks(teams, match, series) {
+  var list = Array.isArray(teams) ? teams : [];
+  if (!isDivisionSeriesStandings(series)) return list;
+  return list.map(function (team) {
+    if (!team || typeof team !== 'object') return team;
+    var players = Array.isArray(team.players)
+      ? team.players.map(function (p) {
+          return stampPlayerDivisionAvatarMark(p, match, series);
+        })
+      : [];
+    return Object.assign({}, team, { players: players });
+  });
 }
 
 /**
@@ -475,7 +601,7 @@ function projectStandingsScorecardIdentity(match, series, playerRow) {
     )
   );
 
-  var aff = resolveExpandAffiliationBadge(match, series, playerId);
+  var aff = resolveExpandAffiliationBadge(match, series, playerId, src);
   var badgeTeamId = (aff && aff.badgeTeamId) || asString(src.badgeTeamId);
   var profileUserId = '';
   try {
@@ -530,6 +656,10 @@ module.exports = {
   DEFAULT_ORG_LOGO: DEFAULT_ORG_LOGO,
   findFormalSeat: findFormalSeat,
   resolveExpandAffiliationBadge: resolveExpandAffiliationBadge,
+  isDivisionSeriesStandings: isDivisionSeriesStandings,
+  stampPlayerDivisionAvatarMark: stampPlayerDivisionAvatarMark,
+  stampTeamBoardDivisionAvatarMarks: stampTeamBoardDivisionAvatarMarks,
+  resolveDivisionColorMarkFromParticipant: resolveDivisionColorMarkFromParticipant,
   buildStandingsTeamGroupLogoById: buildStandingsTeamGroupLogoById,
   resolveTeamGroupId: resolveTeamGroupId,
   resolveClickedPlayerId: resolveClickedPlayerId,

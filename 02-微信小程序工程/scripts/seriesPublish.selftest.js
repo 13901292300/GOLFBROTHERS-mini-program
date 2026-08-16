@@ -118,10 +118,10 @@ function createHarness(extra) {
   if (extra) Object.assign(deps, extra(deps, { seriesAdapter: seriesAdapter, journalAdapter: journalAdapter, indexAdapter: indexAdapter }));
   var publisher = seriesPublish.createSeriesPublisher(deps);
   return {
-    seriesStore: seriesStore,
-    stationIndex: stationIndex,
-    journal: journal,
-    matchRepo: matchRepo,
+    seriesStore: deps.seriesStore,
+    stationIndex: deps.stationIndex,
+    journal: deps.journal,
+    matchRepo: deps.matchRepo,
     publisher: publisher,
     fixedNow: fixedNow,
     journalAdapter: journalAdapter,
@@ -270,6 +270,10 @@ function wrapJournalFailOnce(baseJournal, predicate) {
   assert('首次 planPublish 成功', planned.ok === true, planned.reason);
   assert('journal 含 planFingerprint', !!(planned.journal && planned.journal.planFingerprint));
   assert('journal planVersion', planned.journal.planVersion === 1);
+  assert(
+    '新 journal 使用新版本指纹',
+    planned.journal.fingerprintVersion === seriesStationMatch.FINGERPRINT_VERSION
+  );
   assert('每轮有冻结 payload', planned.journal.rounds.every(function (r) {
     return r.matchPayload && r.payloadFingerprint;
   }));
@@ -1209,6 +1213,282 @@ function wrapJournalFailOnce(baseJournal, predicate) {
   ];
   var fpB = seriesStationMatch.computeSeriesPlanSourceFingerprint(base);
   assert('报名发布-fingerprint 忽略 roster/state/revision', fpA === fpB);
+})();
+
+(function testDivisionFourballReadbackAndResume() {
+  var participantDraft = require(path.join(
+    __dirname,
+    '..',
+    'miniprogram',
+    'subpackages',
+    'create',
+    'pages',
+    'series',
+    'participantDraft.js'
+  ));
+
+  function buildDivisionFourballSeries() {
+    var s = seriesModel.createEmptySeriesDraft({
+      hostMode: 'team',
+      templateId: 'division_series',
+      seriesName: '星途俱乐部2026队内对抗赛',
+      createdBy: 'u-creator-1',
+      hostTeam: { teamId: 'team-host-1', teamName: '星途俱乐部', teamLogo: '' }
+    });
+    s = participantDraft.ensureDefaultDivisionsIfNeeded(s);
+    s.visibility = 'public';
+    s.scoringRule = seriesModel.createDefaultScoringRule({
+      mode: 'per_round_n',
+      scoreBasis: 'gross',
+      allowRepeat: false
+    });
+    s.rounds = s.rounds.map(function (r, idx) {
+      var next = Object.assign({}, r);
+      next.dateTime = '2030-08-0' + (idx + 1) + ' 08:00';
+      next.gameMode = '四人四球比杆赛';
+      next.courseId = 'c' + (idx + 1);
+      next.courseName = '球场' + (idx + 1);
+      next.fee = '';
+      next.topN = 2;
+      return next;
+    });
+    return s;
+  }
+
+  var combo = buildDivisionFourballSeries();
+  assert(
+    '组合：队内/分队/2 轮/allowRepeat=false/topN=2',
+    combo.templateId === 'division_series' &&
+      combo.hostMode === 'team' &&
+      combo.rounds.length === 2 &&
+      combo.scoringRule.allowRepeat === false &&
+      combo.rounds[0].topN === 2 &&
+      combo.rounds[1].topN === 2
+  );
+
+  function createNormalizingMatchRepo() {
+    return seriesPublish.createMemoryMatchRepo({ normalizeOnGet: true });
+  }
+
+  var series = buildDivisionFourballSeries();
+  series.publishToken = 'tok-div-4ball';
+  var built = seriesStationMatch.buildMatchFromSeriesRound(series, series.rounds[0], {
+    matchId: 'team-match-div-r1',
+    publishToken: series.publishToken,
+    creatorId: series.createdBy
+  });
+  assert('分队四人四球 builder ok', built.ok === true, built.reason);
+  assert(
+    '冻结 payload 含 colorSnapshot',
+    !!(built.match.teamGroups[0] && built.match.teamGroups[0].colorSnapshot)
+  );
+  var stripped = JSON.parse(JSON.stringify(built.match));
+  stripped.teamGroups = teamMatchStore.cloneTeamGroups(stripped.teamGroups);
+  assert(
+    'getMatchById 丢掉 colorSnapshot 后指纹仍相等',
+    seriesStationMatch.stationPayloadsEqual(built.match, stripped).equal === true
+  );
+  assert(
+    'teamCompetition.topN 为 2',
+    built.match.scoringRules.teamCompetition.topN === 2
+  );
+
+  var extra = function (deps) {
+    return { matchRepo: createNormalizingMatchRepo() };
+  };
+  var h = createHarness(extra);
+  var saved = h.seriesStore.saveDraft(series);
+  assert('分队草稿可存', saved.ok === true);
+  var pub = h.publisher.publishSeries(series.seriesId, { now: h.fixedNow });
+  assert(
+    '分队四人四球 topN=2 首发成功（模拟 getMatchById 规范化）',
+    pub.ok === true && pub.reason === 'published',
+    pub.reason
+  );
+
+  var h2 = createHarness(extra);
+  var s2 = buildDivisionFourballSeries();
+  h2.seriesStore.saveDraft(s2);
+  var planned = h2.publisher.planPublish(s2, { now: h2.fixedNow });
+  assert('分队计划冻结', planned.ok === true);
+  var writes = 0;
+  var innerSave = h2.matchRepo.saveMatchChecked.bind(h2.matchRepo);
+  h2.matchRepo.saveMatchChecked = function (m) {
+    writes += 1;
+    if (writes === 2) return { ok: false, reason: 'match_write_failed' };
+    return innerSave(m);
+  };
+  var first = h2.publisher.publishSeries(s2.seriesId, { now: h2.fixedNow });
+  assert(
+    'R2 失败后 journal failed',
+    first.ok === false && first.reason === 'match_write_failed'
+  );
+  var ids1 = (h2.journal.getJournal(s2.seriesId).journal.rounds || []).map(function (r) {
+    return r.matchId;
+  });
+  h2.matchRepo.saveMatchChecked = innerSave;
+  var resumed = h2.publisher.resumePublish(s2.seriesId, { now: h2.fixedNow });
+  var ids2 = (h2.journal.getJournal(s2.seriesId).journal.rounds || []).map(function (r) {
+    return r.matchId;
+  });
+  assert(
+    '分队四人四球 resume 成功且不换 matchId',
+    resumed.ok === true && JSON.stringify(ids1) === JSON.stringify(ids2),
+    resumed.reason
+  );
+
+  function saveJournalRaw(h, seriesId, journal) {
+    var key = seriesPublishJournalMod.STORAGE_KEY;
+    var map = h.journalAdapter._bag[key] || {};
+    map[seriesId] = JSON.parse(JSON.stringify(journal));
+    h.journalAdapter._bag[key] = map;
+  }
+
+  function toUnversionedLegacyJournal(journal) {
+    var next = JSON.parse(JSON.stringify(journal));
+    delete next.fingerprintVersion;
+    next.rounds = (next.rounds || []).map(function (rp) {
+      var row = Object.assign({}, rp);
+      row.payloadFingerprint = seriesStationMatch.fingerprintOf(
+        seriesStationMatch.extractStationPayloadForFingerprint(rp.matchPayload, {
+          legacyRawTeamGroups: true
+        })
+      );
+      return row;
+    });
+    next.planFingerprint = seriesStationMatch.computePlanFingerprint(next.rounds);
+    return next;
+  }
+
+  var currentFp = seriesStationMatch.computeStationPayloadFingerprint(built.match);
+  var legacyColorFp = seriesStationMatch.fingerprintOf(
+    seriesStationMatch.extractStationPayloadForFingerprint(built.match, {
+      legacyRawTeamGroups: true
+    })
+  );
+  assert(
+    'colorSnapshot 使新旧 payloadFingerprint 不一致',
+    currentFp !== legacyColorFp
+  );
+
+  var h3 = createHarness(extra);
+  var s3 = buildDivisionFourballSeries();
+  h3.seriesStore.saveDraft(s3);
+  var planned3 = h3.publisher.planPublish(s3, { now: h3.fixedNow });
+  assert('legacy 兼容-计划冻结', planned3.ok === true);
+  var legacyJ = toUnversionedLegacyJournal(planned3.journal);
+  saveJournalRaw(h3, s3.seriesId, legacyJ);
+  var vLegacy = seriesStationMatch.validateFrozenJournal(
+    h3.journal.getJournal(s3.seriesId).journal
+  );
+  assert(
+    '无 version 且含 colorSnapshot 的旧 journal 可通过校验',
+    vLegacy.ok === true,
+    vLegacy.detail
+  );
+  var writes3 = 0;
+  var innerSave3 = h3.matchRepo.saveMatchChecked.bind(h3.matchRepo);
+  h3.matchRepo.saveMatchChecked = function (m) {
+    writes3 += 1;
+    if (writes3 === 2) return { ok: false, reason: 'match_write_failed' };
+    return innerSave3(m);
+  };
+  var first3 = h3.publisher.publishSeries(s3.seriesId, { now: h3.fixedNow });
+  assert(
+    '旧 journal 首发 R2 失败',
+    first3.ok === false && first3.reason === 'match_write_failed',
+    first3.reason
+  );
+  var ids3a = (h3.journal.getJournal(s3.seriesId).journal.rounds || []).map(function (r) {
+    return r.matchId;
+  });
+  var frozenPayload3 = h3.journal.getJournal(s3.seriesId).journal.rounds[0].matchPayload;
+  h3.matchRepo.saveMatchChecked = innerSave3;
+  var resumed3 = h3.publisher.resumePublish(s3.seriesId, { now: h3.fixedNow });
+  var j3 = h3.journal.getJournal(s3.seriesId).journal;
+  var ids3b = (j3.rounds || []).map(function (r) {
+    return r.matchId;
+  });
+  assert(
+    '旧 journal resume 成功且不换 matchId',
+    resumed3.ok === true && JSON.stringify(ids3a) === JSON.stringify(ids3b),
+    resumed3.reason
+  );
+  assert('旧 journal resume 后 done', j3.phase === 'done');
+  assert(
+    '恢复不回写 fingerprintVersion / 不重算旧指纹',
+    j3.fingerprintVersion == null &&
+      j3.rounds[0].payloadFingerprint === legacyJ.rounds[0].payloadFingerprint &&
+      JSON.stringify(j3.rounds[0].matchPayload.teamGroups) ===
+        JSON.stringify(frozenPayload3.teamGroups)
+  );
+  assert('旧 journal R2 已写入', !!h3.matchRepo.getMatchById(ids3b[1]));
+  assert(
+    '旧 journal index 完成',
+    !!h3.stationIndex.getByMatchId(ids3b[0]) && !!h3.stationIndex.getByMatchId(ids3b[1])
+  );
+
+  var h4 = createHarness(extra);
+  var s4 = buildDivisionFourballSeries();
+  h4.seriesStore.saveDraft(s4);
+  var planned4 = h4.publisher.planPublish(s4, { now: h4.fixedNow });
+  var tampered = toUnversionedLegacyJournal(planned4.journal);
+  tampered.rounds[0].matchPayload = Object.assign({}, tampered.rounds[0].matchPayload, {
+    courseName: '被篡改球场'
+  });
+  saveJournalRaw(h4, s4.seriesId, tampered);
+  var vTamper = seriesStationMatch.validateFrozenJournal(
+    h4.journal.getJournal(s4.seriesId).journal
+  );
+  assert(
+    '篡改 matchPayload 的旧 journal 仍 journal_corrupt',
+    vTamper.ok === false &&
+      vTamper.reason === 'journal_corrupt' &&
+      vTamper.detail === 'payload_fingerprint_mismatch',
+    vTamper.detail
+  );
+  var resumeTamper = h4.publisher.resumePublish(s4.seriesId, { now: h4.fixedNow });
+  assert(
+    '篡改旧 journal 禁止 resume',
+    resumeTamper.ok === false && resumeTamper.reason === 'journal_corrupt'
+  );
+
+  var h5 = createHarness(extra);
+  var s5 = buildDivisionFourballSeries();
+  h5.seriesStore.saveDraft(s5);
+  var planned5 = h5.publisher.planPublish(s5, { now: h5.fixedNow });
+  var legacy5 = toUnversionedLegacyJournal(planned5.journal);
+  saveJournalRaw(h5, s5.seriesId, legacy5);
+  var r1 = legacy5.rounds[0];
+  var conflictMatch = Object.assign({}, r1.matchPayload, { courseName: '真实业务差异球场' });
+  h5.matchRepo._inject(conflictMatch);
+  var storedBefore = h5.matchRepo.getMatchById(r1.matchId).courseName;
+  var resumeConflict = h5.publisher.resumePublish(s5.seriesId, { now: h5.fixedNow });
+  assert(
+    '已存 match 业务字段差异仍 payload_conflict',
+    resumeConflict.ok === false && resumeConflict.reason === 'payload_conflict',
+    resumeConflict.reason
+  );
+  assert(
+    'payload_conflict 不覆盖已有 match',
+    h5.matchRepo.getMatchById(r1.matchId).courseName === storedBefore
+  );
+
+  var h6 = createHarness(extra);
+  var s6 = buildDivisionFourballSeries();
+  h6.seriesStore.saveDraft(s6);
+  var planned6 = h6.publisher.planPublish(s6, { now: h6.fixedNow });
+  var mixed = toUnversionedLegacyJournal(planned6.journal);
+  mixed.fingerprintVersion = seriesStationMatch.FINGERPRINT_VERSION;
+  saveJournalRaw(h6, s6.seriesId, mixed);
+  var vMixed = seriesStationMatch.validateFrozenJournal(
+    h6.journal.getJournal(s6.seriesId).journal
+  );
+  assert(
+    '带 version 的 journal 不得走旧算法',
+    vMixed.ok === false && vMixed.detail === 'payload_fingerprint_mismatch',
+    vMixed.detail
+  );
 })();
 
 console.log('');

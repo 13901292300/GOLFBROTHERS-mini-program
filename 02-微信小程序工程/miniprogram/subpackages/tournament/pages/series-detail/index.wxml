@@ -135,7 +135,7 @@
                     wx:for="{{heroTeamLogoStack.items}}"
                     wx:key="participantId"
                     class="hero-logo-stack__item"
-                    style="left:{{item.leftPx}}px;width:{{heroTeamLogoStack.logoSizePx}}px;height:{{heroTeamLogoStack.logoSizePx}}px;z-index:{{item.zIndex}};"
+                    style="left:{{item.leftPx}}px;width:{{heroTeamLogoStack.logoSizePx}}px;height:{{heroTeamLogoStack.logoSizePx}}px;z-index:{{item.zIndex}};{{item.backgroundStyle}}"
                   >
                     <image
                       wx:if="{{item.logo}}"
@@ -143,7 +143,7 @@
                       src="{{item.logo}}"
                       mode="aspectFill"
                     />
-                    <view wx:else class="hero-logo-stack__fallback">{{item.fallbackText}}</view>
+                    <view wx:else class="hero-logo-stack__fallback {{item.color ? 'series-division-logo-glyph' : ''}}">{{item.fallbackText}}</view>
                   </view>
                 </view>
               </view>
@@ -215,7 +215,7 @@
             mode="inflow"
             sticky="{{isStickyRoundSelector}}"
             top="{{stickyRoundSelectorTop}}"
-            show-tot="{{true}}"
+            show-tot="{{standings.showTot}}"
             total-selector="{{standings.totalSelector}}"
             rounds="{{standings.roundSelectorItems}}"
             round-info-text="{{standings.roundInfoText}}"
@@ -282,6 +282,13 @@
                 src="{{item.logo}}"
                 mode="aspectFill"
               />
+              <view
+                wx:elif="{{item.colorMark}}"
+                class="participant-row__logo"
+                style="{{item.colorMark.backgroundStyle}}"
+              >
+                <view class="hero-logo-stack__fallback series-division-logo-glyph">{{item.colorMark.fallbackText}}</view>
+              </view>
               <view wx:else class="participant-row__logo"></view>
               <text class="participant-row__name">{{item.name}}</text>
             </view>
@@ -414,8 +421,8 @@
               <view class="leaderboard-head">
                 <text class="lh-pos">POS</text>
                 <text class="lh-player">TEAM</text>
-                <text class="lh-thru">TOTAL</text>
-                <text class="lh-total">TO PAR</text>
+                <text class="lh-thru">{{standings.headThruLabel || 'TOTAL'}}</text>
+                <text class="lh-total">{{standings.headScoreLabel || 'TO PAR'}}</text>
               </view>
               <block
                 wx:for="{{standings.teamRows}}"
@@ -860,7 +867,7 @@
           mode="fixed"
           sticky="{{isStickyRoundSelector}}"
           top="{{stickyRoundSelectorTop}}"
-          show-tot="{{true}}"
+          show-tot="{{standings.showTot}}"
           total-selector="{{standings.totalSelector}}"
           rounds="{{standings.roundSelectorItems}}"
           round-info-text="{{standings.roundInfoText}}"

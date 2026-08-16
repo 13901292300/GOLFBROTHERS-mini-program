@@ -8,6 +8,7 @@
 var seriesDetailViewModel = require('./seriesDetailViewModel.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
+var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
 var tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js');
 var tournamentGroupCardView = require('../../../../utils/tournamentGroupCardView.js');
 var {
@@ -38,14 +39,33 @@ function indexRoundStates(roundStates) {
   return map;
 }
 
+function isDivisionSeriesSchedule(series) {
+  return (
+    asString(series && series.hostMode) === 'team' &&
+    asString(series && series.templateId) === 'division_series'
+  );
+}
+
+function resolveScheduleDisplayLabels(series, roundStates) {
+  if (!isDivisionSeriesSchedule(series)) return null;
+  return seriesRoundDisplayLabels.buildSeriesRoundDisplayLabels(series, roundStates);
+}
+
+function labeledStatesForScheduleDock(series, roundStates) {
+  var labels = resolveScheduleDisplayLabels(series, roundStates);
+  if (!labels) return roundStates;
+  return seriesRoundDisplayLabels.applySeriesRoundDisplayLabelsToStates(roundStates, labels);
+}
+
 /**
- * 赛程轮次选择器：仅 R1/R2…，无 TOT
+ * 赛程轮次选择器：仅 R1/R2…（队内多分队同日多场地复用总榜 Cx），无 TOT
  * R-STATE：优先 getMatchById 权威投影；否则回落 roundStates 行
  * @returns {{ roundSelectorItems: Array, selectedKey: string }}
  */
 function buildScheduleRoundSelector(series, roundStates, getMatchById) {
   var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
   var stateById = indexRoundStates(roundStates);
+  var displayLabels = resolveScheduleDisplayLabels(series, roundStates);
   var getMatch =
     typeof getMatchById === 'function' ? getMatchById : function () {
       return null;
@@ -69,7 +89,10 @@ function buildScheduleRoundSelector(series, roundStates, getMatchById) {
       : seriesRoundVisualState.normalizeRoundVisualFromStateRow(st);
     items.push({
       key: rid,
-      label: asString(st.label) || 'R' + index,
+      label:
+        (displayLabels && displayLabels[rid]) ||
+        asString(st.label) ||
+        'R' + index,
       state: visual.state,
       stateClass: visual.stateClass,
       statusLabel: visual.statusLabel,
@@ -370,7 +393,7 @@ function attachRoundDock(vm, roundStates, series) {
   out.roundSelector = items;
   out.roundInfoText = seriesRoundInfoText.buildSeriesRoundInfoText(
     out.selectedKey,
-    roundStates,
+    labeledStatesForScheduleDock(series, roundStates),
     series
   );
   return out;

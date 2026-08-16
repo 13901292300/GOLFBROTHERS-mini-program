@@ -36,6 +36,7 @@
   position: absolute;
   bottom: -8rpx;
   right: -8rpx;
+  z-index: 1;
   width: 48rpx;
   height: 48rpx;
   border-radius: 50%;
@@ -60,7 +61,7 @@
   font-size: 18rpx;
   font-weight: 800;
   line-height: 1;
-  color: #fff;
+  color: #FFFFFF;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

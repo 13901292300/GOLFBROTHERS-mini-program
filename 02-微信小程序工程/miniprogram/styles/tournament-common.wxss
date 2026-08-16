@@ -534,8 +534,13 @@ page {
 .sc-profile-left { display: flex; align-items: center; gap: 32rpx; flex: 1 1 auto; min-width: 0; }
 .sc-avatar-wrap { position: relative; flex-shrink: 0; }
 .sc-avatar { width: 160rpx; height: 160rpx; border-radius: 999rpx; border: 1px solid var(--border); }
-.sc-flag { position: absolute; bottom: -8rpx; right: -8rpx; width: 48rpx; height: 48rpx; border-radius: 999rpx; border: 4rpx solid var(--bg-card); overflow: hidden; background: #fff; }
+.sc-flag { position: absolute; bottom: -8rpx; right: -8rpx; z-index: 1; width: 48rpx; height: 48rpx; border-radius: 999rpx; border: 4rpx solid var(--bg-card); overflow: hidden; background: #fff; }
 .sc-flag image { width: 100%; height: 100%; }
+/* 队内多分队圆形 LOGO 首字符：固定纯白；双类选择器高于队际无图 fallback 的次级灰字 */
+.hero-logo-stack__fallback.series-division-logo-glyph,
+.sc-flag__text {
+  color: #FFFFFF;
+}
 /* 省略链放在 .sc-name；meta 勿 overflow:hidden，避免斜体字重右上角被父级裁切 */
 .sc-profile-meta { flex: 1 1 auto; min-width: 0; overflow: visible; }
 .sc-name-line {

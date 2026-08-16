@@ -256,11 +256,39 @@ function overlayEditingNumberInputs(projected, editing) {
   if (ed.globalMEditing) {
     ui.globalMInput = ed.globalMBuffer != null ? String(ed.globalMBuffer) : ui.globalMInput;
   }
+  if (ed.defaultTopNEditing) {
+    ui.defaultTopNInput =
+      ed.defaultTopNBuffer != null ? String(ed.defaultTopNBuffer) : ui.defaultTopNInput;
+  }
   if (ed.roundCountEditing) {
     ui.roundCountInput =
       ed.roundCountBuffer != null ? String(ed.roundCountBuffer) : ui.roundCountInput;
   }
   return ui;
+}
+
+function overlayRoundCardTransientInputs(projectedCards, currentCards, exceptRoundId) {
+  var projected = Array.isArray(projectedCards) ? projectedCards : [];
+  var current = Array.isArray(currentCards) ? currentCards : [];
+  var exceptId = exceptRoundId != null ? String(exceptRoundId) : '';
+  var byId = Object.create(null);
+  var i;
+  for (i = 0; i < current.length; i++) {
+    if (current[i] && current[i].roundId) {
+      byId[String(current[i].roundId)] = current[i];
+    }
+  }
+  return projected.map(function (card) {
+    if (!card || !card.roundId) return card;
+    if (String(card.roundId) === exceptId) return card;
+    var prev = byId[String(card.roundId)];
+    if (!prev) return card;
+    var next = Object.assign({}, card);
+    if (prev.topNInput != null) next.topNInput = prev.topNInput;
+    if (prev.feeInput != null) next.feeInput = prev.feeInput;
+    if (prev.name != null) next.name = prev.name;
+    return next;
+  });
 }
 
 function buildRoundCards(draft, scoringMode, editOpts) {
@@ -369,6 +397,8 @@ Page({
     scoringMode: 'per_round_n',
     globalM: 10,
     globalMInput: '10',
+    defaultTopN: 3,
+    defaultTopNInput: '3',
     allowRepeat: false,
     scoreBasis: 'gross',
     showGlobalM: false,
@@ -496,10 +526,14 @@ Page({
     this._pendingCourseRoundId = '';
     this._pendingTimeRoundId = '';
     this._pendingResizeRounds = null;
-    // 全局 M / 轮次数：原生 input 编辑缓冲（bindinput 不 setData）
+    // 全局 M / 默认 N / 轮次数：原生 input 编辑缓冲（bindinput 不 setData）
     this._focusedGlobalM = false;
     this._dirtyGlobalM = false;
     this._editingGlobalMInput = null;
+    this._focusedDefaultTopN = false;
+    this._dirtyDefaultTopN = false;
+    this._editingDefaultTopNInput = null;
+    this._preserveRoundInputsExceptId = null;
     this._focusedRoundCount = false;
     this._dirtyRoundCount = false;
     this._editingRoundCountInput = null;
@@ -582,6 +616,9 @@ Page({
     this._focusedGlobalM = false;
     this._dirtyGlobalM = false;
     this._editingGlobalMInput = null;
+    this._focusedDefaultTopN = false;
+    this._dirtyDefaultTopN = false;
+    this._editingDefaultTopNInput = null;
     this._focusedRoundCount = false;
     this._dirtyRoundCount = false;
     this._editingRoundCountInput = null;
@@ -593,6 +630,10 @@ Page({
 
   _isEditingGlobalM() {
     return !!(this._focusedGlobalM || this._dirtyGlobalM);
+  },
+
+  _isEditingDefaultTopN() {
+    return !!(this._focusedDefaultTopN || this._dirtyDefaultTopN);
   },
 
   _isEditingRoundCount() {
@@ -613,9 +654,18 @@ Page({
     projected = overlayEditingNumberInputs(projected, {
       globalMEditing: this._isEditingGlobalM(),
       globalMBuffer: this._editingGlobalMInput,
+      defaultTopNEditing: this._isEditingDefaultTopN(),
+      defaultTopNBuffer: this._editingDefaultTopNInput,
       roundCountEditing: this._isEditingRoundCount(),
       roundCountBuffer: this._editingRoundCountInput
     });
+    if (this._preserveRoundInputsExceptId != null) {
+      projected.roundCards = overlayRoundCardTransientInputs(
+        projected.roundCards,
+        this.data.roundCards,
+        this._preserveRoundInputsExceptId
+      );
+    }
     if (this._isEditingSeriesName()) {
       projected.seriesNameInput =
         this._editingSeriesNameInput != null
@@ -715,6 +765,14 @@ Page({
     return this.data.globalMInput;
   },
 
+  _getDefaultTopNRawFromBuffer(e) {
+    if (e && e.detail && e.detail.value != null) return e.detail.value;
+    if (this._isEditingDefaultTopN() && this._editingDefaultTopNInput != null) {
+      return this._editingDefaultTopNInput;
+    }
+    return this.data.defaultTopNInput;
+  },
+
   _projectUiFromDraft(draft, stepOverride) {
     var d = draft || {};
     var rule = scoringRuleOf(d);
@@ -783,9 +841,7 @@ Page({
         partnerLogos: []
       };
     var sortUi = this._buildEventInfoSortUi(eventInfoList);
-    var confirmRounds = rounds.map(function (r) {
-      return basicInfoDraft.summarizeRoundForConfirm(r, scoringMode);
-    });
+    var confirmRounds = basicInfoDraft.summarizeRoundsForConfirm(rounds, scoringMode);
     var scoringText =
       (scoringMode === 'global_m' ? '全局最好 M=' + (rule.globalM != null ? rule.globalM : 10) : '每轮 Top N') +
       ' · ' +
@@ -854,6 +910,14 @@ Page({
         scoringMode: scoringMode,
         globalM: rule.globalM != null ? rule.globalM : 10,
         globalMInput: String(rule.globalM != null ? rule.globalM : 10),
+        defaultTopN: (function () {
+          var resolved = roundDraft.resolveDefaultTopNForRule(rule);
+          return resolved.ok ? resolved.value : roundDraft.DEFAULT_TOP_N;
+        })(),
+        defaultTopNInput: (function () {
+          var resolved = roundDraft.resolveDefaultTopNForRule(rule);
+          return String(resolved.ok ? resolved.value : rule.defaultTopN != null ? rule.defaultTopN : roundDraft.DEFAULT_TOP_N);
+        })(),
         allowRepeat: !!rule.allowRepeat,
         scoreBasis: rule.scoreBasis || 'gross',
         showGlobalM: scoringMode === 'global_m',
@@ -1587,6 +1651,12 @@ Page({
       if (draft.scoringRule.globalM == null || draft.scoringRule.globalM < 1) {
         draft.scoringRule.globalM = 10;
       }
+      if (value === 'per_round_n') {
+        var resolved = roundDraft.resolveDefaultTopNForRule(draft.scoringRule);
+        if (!resolved.ok) return;
+        var applied = roundDraft.applyDefaultTopNToRounds(draft.rounds, resolved.value);
+        if (applied.ok) draft.rounds = applied.rounds;
+      }
     }, { keepStep: true });
   },
 
@@ -1672,6 +1742,70 @@ Page({
     return savedOk;
   },
 
+  onDefaultTopNFocus() {
+    if (this._editSeriesMode) return;
+    this._focusedDefaultTopN = true;
+    this._dirtyDefaultTopN = true;
+    this._editingDefaultTopNInput =
+      this.data.defaultTopNInput != null ? String(this.data.defaultTopNInput) : '';
+  },
+
+  onDefaultTopNInput(e) {
+    var value = readInputDetailValue(e);
+    this._dirtyDefaultTopN = true;
+    this._editingDefaultTopNInput = value;
+    return value;
+  },
+
+  onDefaultTopNBlur(e) {
+    this._commitDefaultTopNInput(this._getDefaultTopNRawFromBuffer(e));
+  },
+
+  onDefaultTopNStep(e) {
+    var delta = Number(e.currentTarget.dataset.delta) || 0;
+    var baseRaw = this._isEditingDefaultTopN()
+      ? this._editingDefaultTopNInput
+      : this.data.defaultTopNInput;
+    var base = roundDraft.parseStrictTopN(baseRaw);
+    if (base == null) {
+      var saved = scoringRuleOf(this.lastSavedDraft).defaultTopN;
+      var resolved = roundDraft.resolveDefaultTopNForRule({ defaultTopN: saved });
+      base = resolved.ok ? resolved.value : roundDraft.DEFAULT_TOP_N;
+    }
+    var next = Math.max(1, base + delta);
+    this._commitDefaultTopNInput(String(next));
+  },
+
+  _commitDefaultTopNInput(rawOverride) {
+    var raw =
+      rawOverride != null
+        ? rawOverride
+        : this._isEditingDefaultTopN()
+          ? this._editingDefaultTopNInput
+          : this.data.defaultTopNInput;
+    var n = roundDraft.parseStrictTopN(raw);
+    var resolvedSaved = roundDraft.resolveDefaultTopNForRule(scoringRuleOf(this.lastSavedDraft));
+    var fallback = resolvedSaved.ok ? resolvedSaved.value : roundDraft.DEFAULT_TOP_N;
+    this._focusedDefaultTopN = false;
+    this._dirtyDefaultTopN = false;
+    this._editingDefaultTopNInput = null;
+    if (n == null) {
+      this._safeSetData({ defaultTopNInput: String(fallback) });
+      wx.showToast({ title: 'N 必须为不小于 1 的整数', icon: 'none' });
+      return false;
+    }
+    var savedOk = this._persistNextDraft(function (draft) {
+      draft.scoringRule = scoringRuleOf(draft);
+      draft.scoringRule.defaultTopN = n;
+      var applied = roundDraft.applyDefaultTopNToRounds(draft.rounds, n);
+      if (applied.ok) draft.rounds = applied.rounds;
+    }, { keepStep: true });
+    if (savedOk) {
+      this._safeSetData({ defaultTopNInput: String(n), defaultTopN: n });
+    }
+    return savedOk;
+  },
+
   onRoundCountFocus() {
     if (this._editRoundMode || this._editSeriesMode) return;
     this._focusedRoundCount = true;
@@ -1738,7 +1872,14 @@ Page({
       return 'invalid';
     }
 
-    var resized = roundDraft.resizeRounds(this.lastSavedDraft.rounds, target);
+    var resized = roundDraft.resizeRounds(this.lastSavedDraft.rounds, target, {
+      defaultTopN: (function () {
+        var resolved = roundDraft.resolveDefaultTopNForRule(
+          scoringRuleOf(this.lastSavedDraft)
+        );
+        return resolved.ok ? resolved.value : roundDraft.DEFAULT_TOP_N;
+      }.call(this))
+    });
     if (!resized.ok) {
       this._focusedRoundCount = false;
       this._dirtyRoundCount = false;
@@ -1830,7 +1971,20 @@ Page({
     this._applyRoundCountInternal({ advanceOnSuccess: false });
   },
 
+  _commitPendingRoundTopNInputs() {
+    if (scoringRuleOf(this.lastSavedDraft).mode !== 'per_round_n') return;
+    var cards = this.data.roundCards || [];
+    var i;
+    for (i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      if (!card || !card.roundId) continue;
+      if (card.topNInput == null) continue;
+      this._commitRoundTopN(card.roundId, card.topNInput);
+    }
+  },
+
   _enterStep5FromStep4() {
+    this._commitPendingRoundTopNInputs();
     var draft = this.lastSavedDraft;
     if (!draft) return;
     var gate = canAdvanceFromStep4(draft);
@@ -2215,14 +2369,22 @@ Page({
       wx.showToast({ title: 'N 必须为不小于 1 的整数', icon: 'none' });
       return false;
     }
-    return this._persistNextDraft(function (draft) {
-      draft.rounds = (draft.rounds || []).map(function (r) {
-        if (!r || r.roundId !== roundId) return r;
-        var next = deepClone(r);
-        next.topN = n;
-        return next;
-      });
-    }, { keepStep: true });
+    this._preserveRoundInputsExceptId = roundId;
+    var savedOk = false;
+    try {
+      savedOk = this._persistNextDraft(function (draft) {
+        draft.rounds = (draft.rounds || []).map(function (r) {
+          if (!r || r.roundId !== roundId) return r;
+          var next = deepClone(r);
+          next.topN = n;
+          next.topNUserEdited = true;
+          return next;
+        });
+      }, { keepStep: true });
+    } finally {
+      this._preserveRoundInputsExceptId = null;
+    }
+    return savedOk;
   },
 
   _buildEditRoundPatch: function (round) {
@@ -2237,6 +2399,7 @@ Page({
       dateTime: round.dateTime,
       gameMode: round.gameMode,
       topN: round.topN,
+      topNUserEdited: round.topNUserEdited === true,
       fee: round.fee
     };
     var locks = this._editLocks || {};
@@ -2251,7 +2414,10 @@ Page({
     }
     if (locks.dateTime && !locks.dateTime.enabled) delete patch.dateTime;
     if (locks.gameMode && !locks.gameMode.enabled) delete patch.gameMode;
-    if (locks.topN && !locks.topN.enabled) delete patch.topN;
+    if (locks.topN && !locks.topN.enabled) {
+      delete patch.topN;
+      delete patch.topNUserEdited;
+    }
     if (locks.fee && !locks.fee.enabled) delete patch.fee;
     return patch;
   },
@@ -2632,10 +2798,21 @@ Page({
           wx.showToast({ title: GLOBAL_M_INVALID_TOAST, icon: 'none' });
           return;
         }
+        this._focusedDefaultTopN = false;
+        this._dirtyDefaultTopN = false;
+        this._editingDefaultTopNInput = null;
       } else {
         this._focusedGlobalM = false;
         this._dirtyGlobalM = false;
         this._editingGlobalMInput = null;
+        if (!this._commitDefaultTopNInput()) return;
+        draft = this.lastSavedDraft;
+        rule = scoringRuleOf(draft);
+        var resolvedN = roundDraft.resolveDefaultTopNForRule(rule);
+        if (!resolvedN.ok) {
+          wx.showToast({ title: 'N 必须为不小于 1 的整数', icon: 'none' });
+          return;
+        }
       }
       var check = seriesValidators.validateDraftStructure(draft);
       if (!check.ok) {
@@ -2712,6 +2889,7 @@ Page({
       this._isEditingSeriesName() ||
       this._isEditingSeriesSubtitle() ||
       this._isEditingGlobalM() ||
+      this._isEditingDefaultTopN() ||
       this._isEditingRoundCount() ||
       this._editingAccessCode != null
     );
@@ -4011,5 +4189,6 @@ module.exports = {
   readInputDetailValue: readInputDetailValue,
   createNativeNumberInputSession: createNativeNumberInputSession,
   overlayEditingNumberInputs: overlayEditingNumberInputs,
+  overlayRoundCardTransientInputs: overlayRoundCardTransientInputs,
   basicInfoDraft: basicInfoDraft
 };

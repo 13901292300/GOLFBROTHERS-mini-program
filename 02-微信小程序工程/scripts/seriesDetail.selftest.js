@@ -545,12 +545,14 @@ function freeze(obj) {
       .join('|') === '主办|分队|球场'
   );
   assert(
-    'team Hero 分队标签全输出',
+    'team Hero 分队圆形栈全输出',
     teamVm.hero.participantDisplay &&
-      teamVm.hero.participantDisplay.mode === 'division_tags' &&
-      teamVm.hero.participantDisplay.divisionItems.length === 2 &&
-      teamVm.hero.participantDisplay.divisionItems[0].name === '一队' &&
-      teamVm.hero.participantDisplay.teamItems.length === 0
+      teamVm.hero.participantDisplay.mode === 'team_logos' &&
+      teamVm.hero.participantDisplay.teamItems.length === 2 &&
+      teamVm.hero.participantDisplay.teamItems[0].fallbackText === '一' &&
+      teamVm.hero.participantDisplay.teamItems[0].name === '一队' &&
+      teamVm.hero.participantDisplay.divisionItems.length === 0 &&
+      teamVm.hero.infoRows[1].kind === 'team_logos'
   );
 
   var heroLabels = (orgVm.hero.infoRows || []).map(function (r) {
@@ -699,28 +701,28 @@ function freeze(obj) {
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-08-11 14:30' }
-    ]) === 'Aug/11/2026'
+    ]) === 'AUG/11/2026'
   );
   assert(
     '同年跨日',
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-08-13 09:00' }
-    ]) === 'Aug/11-Aug/13  (2026)'
+    ]) === 'AUG/11-13  (2026)'
   );
   assert(
     '跨月',
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-09-16 08:00' }
-    ]) === 'Aug/11-Sep/16  (2026)'
+    ]) === 'AUG/11-SEP/16  (2026)'
   );
   assert(
     '跨年',
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-12-31 08:00' },
       { dateTime: '2027-01-02 08:00' }
-    ]) === 'Dec/31 (2026)-Jan/02 (2027)'
+    ]) === 'DEC/31 (2026)-JAN/02 (2027)'
   );
   assert(
     'rounds 无序仍取最早最晚',
@@ -728,7 +730,7 @@ function freeze(obj) {
       { dateTime: '2026-08-13 09:00' },
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-08-12 10:00' }
-    ]) === 'Aug/11-Aug/13  (2026)'
+    ]) === 'AUG/11-13  (2026)'
   );
   assert(
     '非法与缺失时间 → 比赛时间待定',
@@ -744,8 +746,10 @@ function freeze(obj) {
     { courseId: 'c1', courseName: '阳光球场·东场', courseHalfText: '（C+D）' }
   ]);
   assert(
-    '同 courseId 不同半场只显示一次且保留首次名',
-    sameIdHalf.lines.length === 1 && sameIdHalf.lines[0] === '阳光球场'
+    '同 courseId 不同半场按半场身份分成两条',
+    sameIdHalf.lines.length === 2 &&
+      sameIdHalf.lines[0] === '阳光球场（A/B）' &&
+      sameIdHalf.lines[1] === '阳光球场·东场（C/D）'
   );
 
   var nameDedup = viewModel.buildSeriesCourseLines([
@@ -828,7 +832,7 @@ function freeze(obj) {
   );
   assert(
     'Hero dateText 无序跨日',
-    heroVm.ok && heroVm.hero.dateText === 'Aug/11-Aug/13  (2026)'
+    heroVm.ok && heroVm.hero.dateText === 'AUG/11-13  (2026)'
   );
   assert(
     'Hero 不再展示报名信息',

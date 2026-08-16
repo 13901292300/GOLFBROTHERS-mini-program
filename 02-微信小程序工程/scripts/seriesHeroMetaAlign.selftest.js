@@ -204,7 +204,7 @@ assert(
     collapsed8.mode === 'collapsed' &&
     collapsed8.step < 28 &&
     collapsed8.zIndexes[0] > collapsed8.zIndexes[7] &&
-    pageJs.indexOf('teamItems.map') >= 0 &&
+    pageJs.indexOf('buildHeroTeamLogoStackState') >= 0 &&
     !/teamItems\.reverse\s*\(/.test(pageJs) &&
     pageJs.indexOf('HERO_LOGO_SIZE_RPX = 56') >= 0 &&
     pageJs.indexOf('HERO_LOGO_GAP_RPX = 12') >= 0 &&

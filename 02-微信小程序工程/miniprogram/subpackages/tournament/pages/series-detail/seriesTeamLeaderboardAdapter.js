@@ -18,6 +18,7 @@ var seriesPersonalLeaderboardAdapter = require('./seriesPersonalLeaderboardAdapt
 var leaderboardSettingViewModel = require('../../../../utils/leaderboardSettingViewModel.js');
 var strokeEntityValidator = require('../../../../utils/strokeEntityValidator.js');
 var { isInterTeamMatch } = require('../../../../utils/teamMatchCapabilities.js');
+var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -353,6 +354,11 @@ function projectSeriesStandingsTeamBoard(input) {
   var teamRows = teams.map(function (team) {
     return mapTeam(team, selectedKey, matchId, match);
   });
+  teamRows = seriesStandingsExpandIdentity.stampTeamBoardDivisionAvatarMarks(
+    teamRows,
+    match,
+    src.series
+  );
 
   return {
     useShared: true,
@@ -901,6 +907,11 @@ function projectSeriesTotG2G3TeamBoard(src) {
     mapped.expandStatusHint = '';
     return mapped;
   });
+  teamRows = seriesStandingsExpandIdentity.stampTeamBoardDivisionAvatarMarks(
+    teamRows,
+    src.match || null,
+    series
+  );
 
   var successReason =
     declaredFamily === 'g1'

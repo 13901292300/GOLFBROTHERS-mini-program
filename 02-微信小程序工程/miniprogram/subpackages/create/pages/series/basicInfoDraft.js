@@ -10,6 +10,7 @@ var partnerConfigUtil = require('../../../../utils/partnerConfig.js');
 var eventInfoDefaults = require('../../../../utils/eventInfoDefaults.js');
 var bannerConfig = require('../../../../utils/bannerConfig.js');
 var participantDraft = require('./participantDraft.js');
+var seriesSameDayMultiCourse = require('../../../../utils/seriesSameDayMultiCourse.js');
 
 var SERIES_NAME_MAX = 40;
 // 副标题：对照主标题 40 与 375px Hero 第二行可视宽度，取 28（单行省略，独立校验）
@@ -594,8 +595,16 @@ function hostDisplayName(draft) {
   return '';
 }
 
-function summarizeRoundForConfirm(round, scoringMode) {
+function displayConfirmRoundName(rawName, index, isSameDayMultiCourse) {
+  var idx = index != null && String(index) !== '' ? String(index) : '';
+  var name = rawName != null && String(rawName) !== '' ? String(rawName) : 'ROUND ' + idx;
+  if (!isSameDayMultiCourse) return name;
+  return name.replace(/\bROUND\b/g, 'COURSE');
+}
+
+function summarizeRoundForConfirm(round, scoringMode, opts) {
   var r = round || {};
+  var flags = opts && typeof opts === 'object' ? opts : {};
   var hasCourse = !!(asString(r.courseId).trim() && asString(r.courseName).trim());
   var hasTime = !!asString(r.dateTime).trim();
   var hasMode = !!seriesModel.GAME_MODE[r.gameMode];
@@ -603,10 +612,15 @@ function summarizeRoundForConfirm(round, scoringMode) {
   var topNSet =
     scoringMode !== 'per_round_n' ||
     (r.topN != null && Number.isFinite(Number(r.topN)) && Math.floor(Number(r.topN)) >= 1);
+  var storedName = r.name != null && String(r.name) !== '' ? String(r.name) : '';
   return {
     roundId: r.roundId || '',
     index: r.index || 0,
-    name: r.name || 'ROUND ' + (r.index || ''),
+    name: displayConfirmRoundName(
+      storedName || 'ROUND ' + (r.index || ''),
+      r.index,
+      !!flags.sameDayMultiCourse
+    ),
     courseDisplay: hasCourse ? String(r.courseName) + (r.courseHalfText || '') : '未设置球场',
     dateTimeText: hasTime ? String(r.dateTime) : '未设置开球时间',
     gameModeText: hasMode ? String(r.gameMode) : '未设置赛制',
@@ -623,6 +637,17 @@ function summarizeRoundForConfirm(round, scoringMode) {
     feeSet: hasFee,
     topNSet: topNSet
   };
+}
+
+function summarizeRoundsForConfirm(roundsInput, scoringMode) {
+  var rounds = Array.isArray(roundsInput) ? roundsInput : [];
+  var multi = seriesSameDayMultiCourse.collectSameDayMultiCourseRoundIds(rounds);
+  return rounds.map(function (r) {
+    var id = asString(r && r.roundId).trim();
+    return summarizeRoundForConfirm(r, scoringMode, {
+      sameDayMultiCourse: !!(id && multi[id])
+    });
+  });
 }
 
 module.exports = {
@@ -667,5 +692,7 @@ module.exports = {
   canEnterStep6: canEnterStep6,
   deriveWizardStep: deriveWizardStep,
   hostDisplayName: hostDisplayName,
-  summarizeRoundForConfirm: summarizeRoundForConfirm
+  displayConfirmRoundName: displayConfirmRoundName,
+  summarizeRoundForConfirm: summarizeRoundForConfirm,
+  summarizeRoundsForConfirm: summarizeRoundsForConfirm
 };

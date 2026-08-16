@@ -131,21 +131,21 @@ var startOnlyText = viewModel.formatSeriesDateRange(startOnly);
 var endOnlyText = viewModel.formatSeriesDateRange(endOnly);
 var pendingText = viewModel.formatSeriesDateRange([]);
 
-assert('同日日期输出锁定', sameDayText === 'Aug/11/2026');
-assert('同年跨日输出锁定', sameYearText === 'Aug/11-Aug/13  (2026)');
-assert('跨年输出锁定', crossYearText === 'Dec/31 (2026)-Jan/02 (2027)');
+assert('同日日期输出锁定', sameDayText === 'AUG/11/2026');
+assert('同年跨日输出锁定', sameYearText === 'AUG/11-13  (2026)');
+assert('跨年输出锁定', crossYearText === 'DEC/31 (2026)-JAN/02 (2027)');
 assert(
   '极端月份跨年输出锁定',
-  extremeText === 'Sep/28 (2026)-Sep/30 (2027)'
+  extremeText === 'SEP/28 (2026)-SEP/30 (2027)'
 );
 assert('无日期 → 比赛时间待定', pendingText === '比赛时间待定');
 assert(
   '仅开始日期无多余分隔符',
-  startOnlyText === 'Aug/20/2026' && startOnlyText.indexOf('-') < 0
+  startOnlyText === 'AUG/20/2026' && startOnlyText.indexOf('-') < 0
 );
 assert(
   '仅结束日期无多余分隔符',
-  endOnlyText === 'May/18/2026' && endOnlyText.indexOf('-') < 0
+  endOnlyText === 'MAY/18/2026' && endOnlyText.indexOf('-') < 0
 );
 
 assert(
@@ -219,8 +219,10 @@ assert(
 );
 
 assert(
-  '不复制 formatSeriesDateRange',
+  '不复制 formatSeriesDateRange；月份走 clubDateFormat',
   (vmSrc.match(/function formatSeriesDateRange\s*\(/g) || []).length === 1 &&
+    vmSrc.indexOf("require('../../../../utils/clubDateFormat.js')") >= 0 &&
+    vmSrc.indexOf('clubDateFormat.formatDateRangeFromParts') >= 0 &&
     vmSrc.indexOf('function resolveHeroDateRangeSizeClass') >= 0 &&
     vmSrc.indexOf('dateRangeSizeClass: resolveHeroDateRangeSizeClass(dateText)') >= 0
 );

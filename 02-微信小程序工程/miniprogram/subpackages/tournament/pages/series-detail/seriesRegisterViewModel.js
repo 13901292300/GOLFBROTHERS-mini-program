@@ -47,6 +47,28 @@ function normalizeRegistrationRevision(series) {
 }
 
 /**
+ * 报名 Tab 刷新必须以 storage 最新 Series 为准。
+ * 编排器成功结果可能不带 series，页面不得回退到提交前快照。
+ */
+function pickAuthoritativeSeriesForRegisterRefresh(input) {
+  var src = input && typeof input === 'object' ? input : {};
+  if (src.storeSeries && typeof src.storeSeries === 'object') return src.storeSeries;
+  if (src.resultSeries && typeof src.resultSeries === 'object') return src.resultSeries;
+  if (src.fallbackSeries && typeof src.fallbackSeries === 'object') return src.fallbackSeries;
+  return null;
+}
+
+function bumpRegisterRenderEpoch(current) {
+  var n = Number(current);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  return n + 1;
+}
+
+function canApplyRegisterRender(currentEpoch, startedEpoch) {
+  return Number(currentEpoch) === Number(startedEpoch);
+}
+
+/**
  * 查找本人有效报名（registered）
  */
 function findSelfRegisteredEntry(roster, playerId) {
@@ -430,6 +452,9 @@ module.exports = {
   resolveRegisterCta: resolveRegisterCta,
   isSeriesCompetitionPhaseCompleted: isSeriesCompetitionPhaseCompleted,
   resolveSelfRegisterPhone: resolveSelfRegisterPhone,
+  pickAuthoritativeSeriesForRegisterRefresh: pickAuthoritativeSeriesForRegisterRefresh,
+  bumpRegisterRenderEpoch: bumpRegisterRenderEpoch,
+  canApplyRegisterRender: canApplyRegisterRender,
   isCountableRosterEntry: isCountableRosterEntry,
   findSelfRegisteredEntry: findSelfRegisteredEntry,
   projectDisplayUser: projectDisplayUser,

@@ -106,6 +106,13 @@
                     ></image>
                   </view>
                   <view
+                    wx:elif="{{leaderboardAvatarBadge === 'team' && player.badgeText}}"
+                    class="sc-flag sc-flag--team sc-flag--text"
+                    style="{{player.badgeColor ? 'background:' + player.badgeColor + ';' : 'background:#fff;'}}"
+                  >
+                    <text class="sc-flag__text">{{player.badgeText}}</text>
+                  </view>
+                  <view
                     wx:elif="{{leaderboardAvatarBadge === 'auto' && player.flag}}"
                     class="sc-flag"
                   >

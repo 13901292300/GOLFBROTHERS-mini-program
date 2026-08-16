@@ -10,6 +10,8 @@
  */
 
 var PLAN_VERSION = 1;
+/** 当前 station payload / plan 指纹算法版本。缺省该字段的旧 journal 才允许旧算法复核。 */
+var FINGERPRINT_VERSION = 2;
 
 /** 严格费用：空 / 0或正数最多两位小数；禁止宽松 Number 吞格式 */
 var STRICT_FEE_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
@@ -233,14 +235,57 @@ function buildStationRoundName(seriesName, roundName) {
 }
 
 /**
+ * 与 teamMatchStore.cloneTeamGroups 身份字段对齐。
+ * getMatchById → normalizeStoredMatch 会丢掉 colorSnapshot 等展示字段；
+ * 发布写后核验 / resume 指纹必须忽略这些字段，否则分队系列赛会误报
+ * readback_payload_mismatch → payload_conflict。
+ */
+function canonicalizeTeamGroupsForFingerprint(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(function (item, index) {
+    var src = item && typeof item === 'object' ? item : {};
+    var id = src.id != null ? src.id : index + 1;
+    var sourceTeamShortName =
+      src.sourceTeamShortName != null && String(src.sourceTeamShortName).trim() !== ''
+        ? String(src.sourceTeamShortName).trim()
+        : '';
+    return {
+      id: id,
+      renderKey: src.renderKey ? String(src.renderKey) : 'team-group-' + id,
+      name: src.name ? String(src.name).trim() : '',
+      sourceTeamId:
+        src.sourceTeamId != null && String(src.sourceTeamId).trim() !== ''
+          ? String(src.sourceTeamId).trim()
+          : '',
+      sourceTeamName:
+        src.sourceTeamName != null && String(src.sourceTeamName).trim() !== ''
+          ? String(src.sourceTeamName).trim()
+          : '',
+      sourceTeamShortName: sourceTeamShortName,
+      sourceTeamLogo:
+        src.sourceTeamLogo != null && String(src.sourceTeamLogo).trim() !== ''
+          ? String(src.sourceTeamLogo).trim()
+          : ''
+    };
+  });
+}
+
+/**
  * 参与 fingerprint / 精确相等的规范化载荷（排除 createdAt 等易变运行时字段）
  * @param {object} match
- * @param {{ legacyOmitCreator?: boolean }} [options]
+ * @param {{ legacyOmitCreator?: boolean, legacyRawTeamGroups?: boolean }} [options]
  *   legacyOmitCreator：旧 journal 冻结时未纳入创建者字段；校验时允许回退，避免旧 fingerprint 漂移。
+ *   legacyRawTeamGroups：修复前 teamGroups 原样进指纹（含 colorSnapshot）；仅无 fingerprintVersion 的旧 journal 复核。
  */
 function extractStationPayloadForFingerprint(match, options) {
   var m = match || {};
   var ctx = m.seriesContext && typeof m.seriesContext === 'object' ? m.seriesContext : {};
+  var teamGroups =
+    options && options.legacyRawTeamGroups
+      ? Array.isArray(m.teamGroups)
+        ? m.teamGroups
+        : []
+      : canonicalizeTeamGroupsForFingerprint(m.teamGroups);
   var out = {
     matchId: asString(m.matchId).trim(),
     matchType: asString(m.matchType).trim(),
@@ -254,7 +299,7 @@ function extractStationPayloadForFingerprint(match, options) {
     teamLogo: asString(m.teamLogo).trim(),
     feeList: Array.isArray(m.feeList) ? m.feeList : [],
     eventInfoList: Array.isArray(m.eventInfoList) ? m.eventInfoList : [],
-    teamGroups: Array.isArray(m.teamGroups) ? m.teamGroups : [],
+    teamGroups: teamGroups,
     courseId: asString(m.courseId).trim(),
     courseName: asString(m.courseName).trim(),
     courseLocation: asString(m.courseLocation).trim(),
@@ -365,6 +410,37 @@ function computeSeriesPlanSourceFingerprint(series) {
   });
 }
 
+function journalHasFingerprintVersion(journal) {
+  var v = journal && journal.fingerprintVersion;
+  return v != null && String(v).trim() !== '';
+}
+
+/**
+ * 当前算法优先；仅缺少 fingerprintVersion 的旧 journal 才用旧算法复核。
+ * 不改写 stored fingerprint，不把任意 journal 重算成合法。
+ */
+function storedPayloadFingerprintAgrees(payload, storedFp, journal) {
+  var expected = asString(storedFp).trim();
+  if (!expected) return false;
+  if (computeStationPayloadFingerprint(payload) === expected) return true;
+  if (journalHasFingerprintVersion(journal)) return false;
+  var legacyOpts = [
+    { legacyOmitCreator: true },
+    { legacyRawTeamGroups: true },
+    { legacyRawTeamGroups: true, legacyOmitCreator: true }
+  ];
+  var i;
+  for (i = 0; i < legacyOpts.length; i++) {
+    if (
+      fingerprintOfExported(extractStationPayloadForFingerprint(payload, legacyOpts[i])) ===
+      expected
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function computePlanFingerprint(roundPlans) {
   var list = Array.isArray(roundPlans) ? roundPlans : [];
   return fingerprintOf(
@@ -385,6 +461,7 @@ var LEGAL_JOURNAL_PHASES = {
   writing_index: true,
   finalizing: true,
   failed: true,
+  discarding: true,
   done: true
 };
 
@@ -492,20 +569,13 @@ function validateFrozenJournal(journal) {
     if (asString(payload.matchId).trim() !== mid) {
       return { ok: false, reason: 'journal_corrupt', detail: 'payload_matchId_mismatch', index: i };
     }
-    var recomputedPayloadFp = computeStationPayloadFingerprint(payload);
-    if (recomputedPayloadFp !== pfp) {
-      // 旧 journal：冻结时 payload 指纹未含 createdBy；仅允许 legacy 回退匹配，不改写 payload
-      var legacyFp = fingerprintOfExported(
-        extractStationPayloadForFingerprint(payload, { legacyOmitCreator: true })
-      );
-      if (legacyFp !== pfp) {
-        return {
-          ok: false,
-          reason: 'journal_corrupt',
-          detail: 'payload_fingerprint_mismatch',
-          index: i
-        };
-      }
+    if (!storedPayloadFingerprintAgrees(payload, pfp, journal)) {
+      return {
+        ok: false,
+        reason: 'journal_corrupt',
+        detail: 'payload_fingerprint_mismatch',
+        index: i
+      };
     }
   }
 
@@ -664,6 +734,7 @@ function freezeRoundPlan(series, round, matchId, options) {
 
 module.exports = {
   PLAN_VERSION: PLAN_VERSION,
+  FINGERPRINT_VERSION: FINGERPRINT_VERSION,
   STRICT_FEE_PATTERN: STRICT_FEE_PATTERN,
   stableStringify: stableStringify,
   fingerprintOf: fingerprintOf,
@@ -676,11 +747,14 @@ module.exports = {
   validateRoundsFees: validateRoundsFees,
   buildTeamCompetitionForStation: buildTeamCompetitionForStation,
   buildStationRoundName: buildStationRoundName,
+  canonicalizeTeamGroupsForFingerprint: canonicalizeTeamGroupsForFingerprint,
   extractStationPayloadForFingerprint: extractStationPayloadForFingerprint,
   computeStationPayloadFingerprint: computeStationPayloadFingerprint,
   stationPayloadsEqual: stationPayloadsEqual,
   computeSeriesPlanSourceFingerprint: computeSeriesPlanSourceFingerprint,
   computePlanFingerprint: computePlanFingerprint,
+  journalHasFingerprintVersion: journalHasFingerprintVersion,
+  storedPayloadFingerprintAgrees: storedPayloadFingerprintAgrees,
   LEGAL_JOURNAL_PHASES: LEGAL_JOURNAL_PHASES,
   LEGAL_ROUND_STATUSES: LEGAL_ROUND_STATUSES,
   validateFrozenJournal: validateFrozenJournal,

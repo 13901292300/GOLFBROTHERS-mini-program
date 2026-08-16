@@ -184,7 +184,9 @@ function createDefaultScoringRule(partial) {
     scoreBasis:
       src.scoreBasis === 'net' || src.scoreBasis === 'to_par' ? src.scoreBasis : 'gross',
     ruleVersion:
-      asFiniteNumberOrNull(src.ruleVersion) != null ? Math.floor(Number(src.ruleVersion)) : 1
+      asFiniteNumberOrNull(src.ruleVersion) != null ? Math.floor(Number(src.ruleVersion)) : 1,
+    defaultTopN:
+      asFiniteNumberOrNull(src.defaultTopN) != null ? Math.floor(Number(src.defaultTopN)) : 3
   };
 }
 
@@ -215,12 +217,19 @@ function normalizeScoringRule(raw) {
       : asFiniteNumberOrNull(raw.ruleVersion) != null
         ? Math.floor(Number(raw.ruleVersion))
         : raw.ruleVersion;
+  var defaultTopN =
+    raw.defaultTopN === undefined || raw.defaultTopN === null || raw.defaultTopN === ''
+      ? 3
+      : asFiniteNumberOrNull(raw.defaultTopN) != null
+        ? Math.floor(Number(raw.defaultTopN))
+        : raw.defaultTopN;
   return {
     mode: mode,
     globalM: globalM,
     allowRepeat: asBool(raw.allowRepeat, false),
     scoreBasis: scoreBasis,
-    ruleVersion: ruleVersion
+    ruleVersion: ruleVersion,
+    defaultTopN: defaultTopN
   };
 }
 
@@ -248,6 +257,7 @@ function createBlankRound(index, partial) {
     fee: asString(src.fee, ''),
     gameMode: asString(src.gameMode, ''),
     topN: asFiniteNumberOrNull(src.topN) != null ? Math.floor(Number(src.topN)) : 3,
+    topNUserEdited: asBool(src.topNUserEdited, false),
     courseId: asString(src.courseId, ''),
     courseName: asString(src.courseName, ''),
     courseLocation: asString(src.courseLocation, ''),
@@ -560,6 +570,7 @@ function normalizeRound(raw, fallbackIndex) {
     fee: asString(src.fee, ''),
     gameMode: asString(src.gameMode, ''),
     topN: asFiniteNumberOrNull(src.topN) != null ? Math.floor(Number(src.topN)) : 3,
+    topNUserEdited: asBool(src.topNUserEdited, false),
     courseId: asString(src.courseId, ''),
     courseName: asString(src.courseName, ''),
     courseLocation: asString(src.courseLocation, ''),

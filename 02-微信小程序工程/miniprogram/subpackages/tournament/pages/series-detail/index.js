@@ -859,6 +859,7 @@ Page({
   _fillerByTab: null,
   _lastViewportHeight: 0,
   _registerWriteLock: false,
+  _registerRenderEpoch: 0,
   _registrationService: null,
   _selfCancelOrchestrator: null,
   _lastEligibility: null,
@@ -978,6 +979,7 @@ Page({
         registrationService: this._registrationService
       });
     this._selfCancelInspectToken = 0;
+    this._registerRenderEpoch = 0;
     this._recoverInterruptedSelfCancellationOnce();
     this._pendingShareInvite = false;
     this._registerSheetMode = 'self';
@@ -1915,7 +1917,6 @@ Page({
       if (isStale()) return;
       self._cacheFillerForActiveTab(self.data.scrollFillerHeight || 0);
       self._restoreScrollLayoutAnchorIfNeeded();
-      self._restoreStandingsCollapseScrollIfNeeded();
     }
 
     function runPhaseTwo(viewportHeight, nextFiller, target) {
@@ -2540,6 +2541,10 @@ Page({
 
   reloadViewModel: function (options) {
     var opts = options || {};
+    this._registerRenderEpoch = registerViewModel.bumpRegisterRenderEpoch(
+      this._registerRenderEpoch
+    );
+    var renderEpoch = this._registerRenderEpoch;
     this._selfCancelInspectToken = bumpSelfCancelInspectToken(this._selfCancelInspectToken);
     var inspectToken = this._selfCancelInspectToken;
     if (!this._pageAlive) return;
@@ -2558,7 +2563,7 @@ Page({
     }
 
     var self = this;
-    // global_m：只读装配真实分站成绩；失败/非 global_m → 空结构。不写 storage。
+    // global_m / per_round_n：只读装配真实分站成绩；其它 mode → 空结构。不写 storage。
     var assembled = seriesStandingsAssembler.buildStandingsResult({
       series: series,
       getMatchById: function (id) {
@@ -2631,8 +2636,16 @@ Page({
       vm.standings = this._applyStandingsBoardViewOverlay(vm.standings);
     }
 
+    var latestForRegister =
+      registerViewModel.pickAuthoritativeSeriesForRegisterRefresh({
+        storeSeries: seriesStore.getSeriesById(this._seriesId),
+        resultSeries: series,
+        fallbackSeries: this._lastSeriesForRegister
+      }) || series;
+    this._lastSeriesForRegister = latestForRegister;
+    this._lastSeriesForSchedule = latestForRegister;
     var register = this._buildEnrichedRegisterViewModel(
-      series,
+      latestForRegister,
       this._registerActiveParticipantId
     );
     if (register && register.activeParticipantId) {
@@ -2710,8 +2723,15 @@ Page({
       })
     );
 
+    if (!registerViewModel.canApplyRegisterRender(this._registerRenderEpoch, renderEpoch)) {
+      return;
+    }
+
     this._safeSetData(patch, function () {
       if (!self._pageAlive) return;
+      if (!registerViewModel.canApplyRegisterRender(self._registerRenderEpoch, renderEpoch)) {
+        return;
+      }
       self._skipScrollReset = false;
       self._refreshSeriesManageFab();
       self._applySelfCancelCtaInspectAfterReload(inspectToken, register);
@@ -2971,7 +2991,12 @@ Page({
         round = r;
         var matchId = String(r.matchId || '').trim();
         if (matchId) match = teamMatchStore.getMatchById(matchId);
-        var label = 'R' + (i + 1);
+        var displayLabel = standingsViewModel.resolveStandingsRoundDisplayLabel(
+          series,
+          this._lastStandingsRoundStates || [],
+          key
+        );
+        var label = displayLabel || 'R' + (i + 1);
         var name = String(r.roundName || r.name || '').trim();
         roundHeadline = label + (name ? ' · ' + name : '');
         break;
@@ -3005,6 +3030,43 @@ Page({
         : standingsViewModel.CUMULATIVE_KEY;
     var selection = this._resolveStandingsSelectionForKey(selectedKey);
     var sharedEmpty = seriesPersonalLeaderboardAdapter.emptySharedPersonalBoardFields();
+    if (vm.mode === 'per_round_n') {
+      var perRoundCtx = this._resolveStandingsRoundContext(selectedKey);
+      var perRoundView = selection && selection.view ? String(selection.view) : 'team';
+      var perRoundLiveSel =
+        perRoundView === 'team'
+          ? { view: 'team', scoreType: 'gross' }
+          : selection;
+      var perRoundLive = seriesLiveLeaderboardAdapter.projectSeriesRnLiveLeaderboard({
+        selectedKey: selectedKey,
+        selection: perRoundLiveSel,
+        series: perRoundCtx.series || this._lastSeriesForStandings,
+        round: perRoundCtx.round,
+        match: perRoundCtx.match,
+        indexLink: perRoundCtx.indexLink,
+        openIndex:
+          perRoundView === 'team'
+            ? this.data.openStandingsScorecardKey
+            : this._standingsPersonalOpenIndex,
+        viewerRemarkCtx: this._viewerRemarkCtx
+      });
+      if (perRoundView !== 'team') {
+        this._frozenPersonalBoardMatch =
+          perRoundLive && perRoundLive.verifiedOk ? perRoundCtx.match : null;
+      }
+      return seriesLiveLeaderboardAdapter.applyPerRoundNStandingsOverlay(
+        vm,
+        selection,
+        perRoundLive,
+        {
+          series: perRoundCtx.series || this._lastSeriesForStandings,
+          roundId: selectedKey,
+          matchId: perRoundCtx.match && perRoundCtx.match.matchId,
+          match: perRoundCtx.match,
+          roundHeadline: perRoundCtx.roundHeadline
+        }
+      );
+    }
     if (selectedKey === standingsViewModel.CUMULATIVE_KEY) {
       this._frozenPersonalBoardMatch = null;
       var totLabel = standingsViewModel.buildTotTopMDescription(
@@ -3052,10 +3114,20 @@ Page({
     });
     this._frozenPersonalBoardMatch =
       liveProjected && liveProjected.verifiedOk ? ctx.match : null;
-    return Object.assign({}, vm, sharedEmpty, (liveProjected && liveProjected.overlay) || {}, {
-      roundHeadline: ctx.roundHeadline,
-      useLiveLeaderboard: true
-    });
+    return seriesLiveLeaderboardAdapter.applyGlobalMRnStandingsOverlay(
+      vm,
+      selection,
+      liveProjected,
+      {
+        series: ctx.series || this._lastSeriesForStandings,
+        selectedKey: selectedKey,
+        roundHeadline: ctx.roundHeadline,
+        teamViewLabel: standingsViewModel.resolveRoundGameModeLabel(
+          ctx.series || this._lastSeriesForStandings,
+          selectedKey
+        )
+      }
+    );
   },
 
   _releaseStandingsContentHostHold: function (patch) {
@@ -3238,8 +3310,11 @@ Page({
     // 切换轮次轻量重投影；不改写 roundSelectorScrollLeft；不 capture/restore scrollTop
     var tot = standingsViewModel.CUMULATIVE_KEY;
     var nextView = this._resolveStandingsBoardViewForKey(key);
+    var perRoundN = !!(this.data.standings && this.data.standings.mode === 'per_round_n');
     var clearExpand =
-      key === tot || nextView !== 'team' ? { expandedStandingsTeamId: '' } : {};
+      !perRoundN && (key === tot || nextView !== 'team')
+        ? { expandedStandingsTeamId: '' }
+        : {};
     var extraBase = Object.assign({}, this._emptyStandingsScorecardPatch(), clearExpand);
     var self = this;
     var applyRebuild = function (extra) {
@@ -3267,9 +3342,15 @@ Page({
 
   /** 报名子 TAB：只改 activeParticipantId，整包重建 register 投影（不写 storage） */
   _rebuildRegisterProjection: function () {
-    if (!this._pageAlive || !this._lastSeriesForRegister) return;
+    if (!this._pageAlive) return;
+    var series = registerViewModel.pickAuthoritativeSeriesForRegisterRefresh({
+      storeSeries: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null,
+      fallbackSeries: this._lastSeriesForRegister
+    });
+    if (!series) return;
+    this._lastSeriesForRegister = series;
     var register = this._buildEnrichedRegisterViewModel(
-      this._lastSeriesForRegister,
+      series,
       this._registerActiveParticipantId
     );
     if (register && register.activeParticipantId) {
@@ -3290,63 +3371,80 @@ Page({
   },
 
   /**
-   * 写成功后：用最新 Series 同帧更新 register，切到本人主体，nextTick 无损重测
+   * 写成功后：从最新 Series roster 同帧重建 register。
    * 不重置 registerSubTabScrollLeft；不清零 rosterMinHeight/filler
    */
-  _applyRegisterWriteSuccess: function (series, preferredParticipantId) {
+  _applyRegisterWriteSuccess: function (series, preferredParticipantId, extraPatch) {
     if (!this._pageAlive) return;
-    var nextSeries = series && typeof series === 'object' ? series : null;
-    if (!nextSeries && this._seriesId) {
-      nextSeries = seriesStore.getSeriesById(this._seriesId);
-    }
+    this._registerRenderEpoch = registerViewModel.bumpRegisterRenderEpoch(this._registerRenderEpoch);
+    var renderEpoch = this._registerRenderEpoch;
+    var nextSeries = registerViewModel.pickAuthoritativeSeriesForRegisterRefresh({
+      storeSeries: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null,
+      resultSeries: series && typeof series === 'object' ? series : null,
+      fallbackSeries: this._lastSeriesForRegister
+    });
     if (!nextSeries) {
       this.reloadViewModel({ resetScroll: false });
       return;
     }
     this._lastSeriesForRegister = nextSeries;
-    var prefer = preferredParticipantId != null ? String(preferredParticipantId).trim() : '';
-    if (prefer) {
-      this._registerActiveParticipantId = prefer;
-    }
-    var register = this._buildEnrichedRegisterViewModel(
-      nextSeries,
-      this._registerActiveParticipantId
-    );
+    if (preferredParticipantId) this._registerActiveParticipantId = String(preferredParticipantId).trim();
+    var register = this._buildEnrichedRegisterViewModel(nextSeries, this._registerActiveParticipantId);
     if (register && register.activeParticipantId) {
       this._registerActiveParticipantId = register.activeParticipantId;
     }
     var self = this;
     var stickyTab = !!(this.data.isStickyTab);
-    var dockPatch = this._resolveBottomDockVisibilityPatch(
-      this._scrollTop || 0,
-      stickyTab,
-      { register: register }
+    var patch = Object.assign(
+      {
+        register: register,
+        registerSheetVisible: false,
+        registerSheetParticipantId: '',
+        registerSubmitting: false,
+        registerCancelModalVisible: false,
+        registerCancelSubmitting: false
+      },
+      extraPatch && typeof extraPatch === 'object' ? extraPatch : {}
     );
-    this._safeSetData(
-      Object.assign(
-        {
-          register: register,
-          registerSheetVisible: false,
-          registerSheetParticipantId: '',
-          registerSubmitting: false,
-          registerCancelModalVisible: false,
-          registerCancelSubmitting: false
-        },
-        dockPatch
-      ),
-      function () {
-        if (!self._pageAlive || self._activeTab !== 'register') return;
-        var run = function () {
-          if (!self._pageAlive || self._activeTab !== 'register') return;
-          self.measureRegisterExtTop();
-        };
-        if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
-          wx.nextTick(run);
-        } else {
-          setTimeout(run, 0);
-        }
+    var overlayActive = seriesLayerStack.resolveIsManageOverlayActiveFromData(
+      this.data,
+      patch
+    );
+    patch.isManageOverlayActive = overlayActive;
+    Object.assign(
+      patch,
+      this._resolveBottomDockVisibilityPatch(this._scrollTop || 0, stickyTab, {
+        register: register,
+        isManageOverlayActive: overlayActive
+      })
+    );
+    if (!registerViewModel.canApplyRegisterRender(this._registerRenderEpoch, renderEpoch)) {
+      return;
+    }
+    this._safeSetData(patch, function () {
+      if (!self._pageAlive) return;
+      if (!registerViewModel.canApplyRegisterRender(self._registerRenderEpoch, renderEpoch)) {
+        return;
       }
-    );
+      if (!self.data.isManageOverlayActive) {
+        self._syncStickyByScroll(
+          self._scrollTop != null ? self._scrollTop : self.data.scrollYState || 0
+        );
+      }
+      if (self._activeTab !== 'register') return;
+      var run = function () {
+        if (!self._pageAlive || self._activeTab !== 'register') return;
+        if (!registerViewModel.canApplyRegisterRender(self._registerRenderEpoch, renderEpoch)) {
+          return;
+        }
+        self.measureRegisterExtTop();
+      };
+      if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
+        wx.nextTick(run);
+      } else {
+        setTimeout(run, 0);
+      }
+    });
   },
 
   _handleRegistrationConflict: function () {
@@ -3809,10 +3907,6 @@ Page({
     this.reloadViewModel({ resetScroll: false });
   },
 
-  /**
-   * 测量当前展开面板真实高度（仅一个手风琴面板）
-   * 失败返回 0，不阻塞收起
-   */
   _measureStandingsExpandedPanelHeight: function (teamId, cb) {
     var done = typeof cb === 'function' ? cb : function () {};
     var tid = teamId != null ? String(teamId).trim() : '';
@@ -4462,6 +4556,9 @@ Page({
     var identityPlayer = identityPack && identityPack.player ? identityPack.player : null;
     var avatarBadgeMode =
       identityPack && identityPack.avatarBadge ? String(identityPack.avatarBadge) : 'none';
+    if (seriesStandingsExpandIdentity.isDivisionSeriesStandings(series)) {
+      avatarBadgeMode = 'team';
+    }
     var profileUserId =
       (identityPack && identityPack.profileUserId) ||
       (identityPlayer && identityPlayer.profileUserId) ||
@@ -6504,7 +6601,7 @@ Page({
 
     var changed =
       Number(result.addedCount) > 0 || Number(result.removedCount) > 0;
-    var lastSeries = result.series || series;
+    var lastSeries = seriesStore.getSeriesById(this._seriesId) || result.series || series;
     this._clearProxyRegistrationTempState(true);
     this._applyRegisterWriteSuccess(lastSeries, targetPid || this._registerActiveParticipantId);
     this._closeManageSecondaryPatch({

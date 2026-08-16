@@ -302,6 +302,12 @@ assert(
     !/_isPublishing = true;\s*this\._isSaving = true/.test(pageJs)
 );
 
+assert(
+  '离开第 4 步时提交未 blur 的 topNInput',
+  pageJs.indexOf('_commitPendingRoundTopNInputs') >= 0 &&
+    /_enterStep5FromStep4\(\) \{[\s\S]{0,80}_commitPendingRoundTopNInputs\(\)/.test(pageJs)
+);
+
 console.log('');
 console.log('seriesCreatePublish.selftest: ' + passed + ' passed, ' + failed + ' failed');
 if (failed) {

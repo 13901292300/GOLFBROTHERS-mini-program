@@ -10,6 +10,9 @@
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
 var playerManage = require('../../../../utils/playerManage.js');
+var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
+var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
+var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
 
 var CUMULATIVE_KEY = 'cumulative';
 
@@ -58,6 +61,29 @@ function buildTotTopMDescription(series) {
   var m = resolveTotDisplayGlobalM(series);
   if (m == null) return '本榜按全队最好成绩进行排行';
   return '本榜取全队前 ' + m + ' 名最好成绩进行排行';
+}
+
+/**
+ * 当前 selectedKey 对应 round.gameMode 的标准显示名。
+ * TOT / 空 key / 未知赛制 → ''。
+ */
+function resolveRoundGameModeLabel(series, selectedKey) {
+  var key = asString(selectedKey).trim();
+  if (!key || key === CUMULATIVE_KEY) return '';
+  var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+  var raw = '';
+  for (var i = 0; i < rounds.length; i++) {
+    var r = rounds[i];
+    if (!r || asString(r.roundId).trim() !== key) continue;
+    raw = r.gameMode;
+    break;
+  }
+  return seriesGameModeLabel.resolveSeriesGameModeLabel(raw);
+}
+
+/** @deprecated 兼容旧自测名；请用 resolveRoundGameModeLabel */
+function resolvePerRoundNTeamGameModeLabel(series, selectedKey) {
+  return resolveRoundGameModeLabel(series, selectedKey);
 }
 
 function pad2(n) {
@@ -160,6 +186,9 @@ function projectRoundStatesFromRoundCards(roundCards) {
       dateTime: asString(c.dateTime).trim(),
       courseName: asString(c.courseName).trim(),
       courseHalfText: asString(c.courseHalfText).trim(),
+      courseId: asString(c.courseId).trim(),
+      front9Course: c.front9Course,
+      back9Course: c.back9Course,
       state: visual.state,
       stateClass: visual.stateClass,
       statusLabel: visual.statusLabel,
@@ -221,18 +250,74 @@ function buildTotalSelectorChip(isSelected) {
  * roundSelector 保留完整列表以兼容旧读法，禁止页面直接 splice
  * R-STATE：stateClass 只来自状态投影；isSelected 不改写 stateClass
  */
-function buildRoundSelectorParts(roundStates, selectedKey) {
-  var key = asString(selectedKey).trim() || CUMULATIVE_KEY;
-  var roundSelectorItems = [];
+/**
+ * per_round_n 默认 Rx：LIVE → 已分组即将开始 → 最近完成 → 首个未取消。
+ * 多 LIVE 时沿用 roundStates 既有顺序，不另做时间比较。取消轮永不默认。
+ */
+function resolveDefaultPerRoundSelectedKey(roundStates) {
   var list = Array.isArray(roundStates) ? roundStates : [];
-  var valid = Object.create(null);
-  valid[CUMULATIVE_KEY] = true;
+  var firstLive = '';
+  var firstGrouped = '';
+  var lastCompleted = '';
+  var firstAvailable = '';
   for (var i = 0; i < list.length; i++) {
     var r = list[i] || {};
     var rid = asString(r.roundId).trim();
     if (!rid) continue;
     var visual = seriesRoundVisualState.normalizeRoundVisualFromStateRow(r);
-    var label = asString(r.label).trim() || 'R' + (r.index != null ? r.index : i + 1);
+    if (visual.state === 'cancelled') continue;
+    if (!firstAvailable) firstAvailable = rid;
+    if (visual.state === 'live' && !firstLive) firstLive = rid;
+    if (visual.state === 'grouped' && !firstGrouped) firstGrouped = rid;
+    if (visual.state === 'completed') lastCompleted = rid;
+  }
+  return firstLive || firstGrouped || lastCompleted || firstAvailable;
+}
+
+function rxFallbackLabel(round, state, orderIndex) {
+  return seriesRoundDisplayLabels.rxFallbackLabel(round, state, orderIndex);
+}
+
+/**
+ * 总榜显示别名：同日多场地 → Cx（按系列原顺序连续编号）；其余 Rx。
+ * 不改 roundId / selectedKey。取消轮、无效日期/场地不参与判断与 C 编号。
+ */
+function buildStandingsRoundDisplayLabels(series, roundStates) {
+  return seriesRoundDisplayLabels.buildSeriesRoundDisplayLabels(series, roundStates);
+}
+
+function resolveStandingsRoundDisplayLabel(series, roundStates, roundId) {
+  var rid = asString(roundId).trim();
+  if (!rid || rid === CUMULATIVE_KEY) return rid === CUMULATIVE_KEY ? 'TOT' : '';
+  var map = buildStandingsRoundDisplayLabels(series, roundStates);
+  return map[rid] || '';
+}
+
+function applyStandingsDisplayLabelsToStates(roundStates, displayLabels) {
+  return seriesRoundDisplayLabels.applySeriesRoundDisplayLabelsToStates(
+    roundStates,
+    displayLabels
+  );
+}
+
+function buildRoundSelectorParts(roundStates, selectedKey, options) {
+  var opts = options && typeof options === 'object' ? options : {};
+  var includeTot = opts.includeTot !== false;
+  var displayLabels = opts.displayLabels && typeof opts.displayLabels === 'object' ? opts.displayLabels : null;
+  var key = asString(selectedKey).trim() || (includeTot ? CUMULATIVE_KEY : '');
+  var roundSelectorItems = [];
+  var list = Array.isArray(roundStates) ? roundStates : [];
+  var valid = Object.create(null);
+  if (includeTot) valid[CUMULATIVE_KEY] = true;
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i] || {};
+    var rid = asString(r.roundId).trim();
+    if (!rid) continue;
+    var visual = seriesRoundVisualState.normalizeRoundVisualFromStateRow(r);
+    var label =
+      (displayLabels && displayLabels[rid]) ||
+      asString(r.label).trim() ||
+      'R' + (r.index != null ? r.index : i + 1);
     valid[rid] = true;
     roundSelectorItems.push({
       key: rid,
@@ -247,14 +332,26 @@ function buildRoundSelectorParts(roundStates, selectedKey) {
       showSelectedCheck: false
     });
   }
-  var effectiveKey = valid[key] ? key : CUMULATIVE_KEY;
-  var totalSelector = buildTotalSelectorChip(effectiveKey === CUMULATIVE_KEY);
+  var fallbackKey = includeTot
+    ? CUMULATIVE_KEY
+    : resolveDefaultPerRoundSelectedKey(roundStates);
+  var effectiveKey = valid[key] ? key : fallbackKey;
+  if (!includeTot && (!effectiveKey || !valid[effectiveKey])) {
+    effectiveKey = fallbackKey;
+  }
+  var totalSelector = includeTot
+    ? buildTotalSelectorChip(effectiveKey === CUMULATIVE_KEY)
+    : null;
   for (var k = 0; k < roundSelectorItems.length; k++) {
-    var selected = roundSelectorItems[k].key === effectiveKey && effectiveKey !== CUMULATIVE_KEY;
+    var selected =
+      roundSelectorItems[k].key === effectiveKey &&
+      (includeTot ? effectiveKey !== CUMULATIVE_KEY : true);
     roundSelectorItems[k].isSelected = selected;
     roundSelectorItems[k].showSelectedCheck = selected;
   }
-  var roundSelector = [totalSelector].concat(roundSelectorItems);
+  var roundSelector = includeTot
+    ? [totalSelector].concat(roundSelectorItems)
+    : roundSelectorItems.slice();
   return {
     totalSelector: totalSelector,
     roundSelectorItems: roundSelectorItems,
@@ -821,6 +918,8 @@ function parseRoundInfoClock(input) {
 }
 
 function occurrenceRoundSeqLabel(round, series, roundId) {
+  var mapped = resolveStandingsRoundDisplayLabel(series, null, roundId);
+  if (mapped && mapped !== 'TOT') return mapped;
   var idx = round && round.index != null ? Number(round.index) : null;
   if (idx != null && Number.isFinite(idx) && idx > 0) return 'R' + Math.floor(idx);
   var rid = asString(roundId).trim();
@@ -1062,6 +1161,43 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
   };
 }
 
+function resolveRoundChipLabel(roundStates, roundId, displayLabels) {
+  var rid = asString(roundId).trim();
+  if (displayLabels && displayLabels[rid]) return displayLabels[rid];
+  var list = Array.isArray(roundStates) ? roundStates : [];
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i] || {};
+    if (asString(r.roundId).trim() !== rid) continue;
+    return asString(r.label).trim() || 'R' + (r.index != null ? r.index : i + 1);
+  }
+  return rid;
+}
+
+function sumEntryToParList(entries) {
+  var list = Array.isArray(entries) ? entries : [];
+  var sum = 0;
+  var has = false;
+  for (var i = 0; i < list.length; i++) {
+    var t = readEntryToPar(list[i]);
+    if (t == null) continue;
+    sum += t;
+    has = true;
+  }
+  return has ? sum : null;
+}
+
+function readSelectedRoundToPar(resultRow, roundId) {
+  var rid = asString(roundId).trim();
+  if (!rid || !resultRow) return null;
+  var breakdown = Array.isArray(resultRow.roundBreakdown) ? resultRow.roundBreakdown : [];
+  for (var i = 0; i < breakdown.length; i++) {
+    var b = breakdown[i];
+    if (!b || asString(b.roundId).trim() !== rid) continue;
+    return sumEntryToParList(b.selectedEntries);
+  }
+  return null;
+}
+
 function buildUnavailableStandings(mode) {
   var tot = buildTotalSelectorChip(true);
   return {
@@ -1096,18 +1232,24 @@ function buildSeriesStandingsViewModel(input) {
   var src = input && typeof input === 'object' ? input : {};
   var series = src.series && typeof src.series === 'object' ? src.series : {};
   var scoringMode = asString(series.scoringRule && series.scoringRule.mode).trim() || 'per_round_n';
-  if (scoringMode !== 'global_m') {
+  if (scoringMode !== 'global_m' && scoringMode !== 'per_round_n') {
     return buildUnavailableStandings(scoringMode);
   }
 
+  var isPerRoundN = scoringMode === 'per_round_n';
   var roundStates = Array.isArray(src.roundStates) ? src.roundStates.slice() : [];
-  var selectedKey = asString(src.selectedKey).trim() || CUMULATIVE_KEY;
+  var selectedKey = asString(src.selectedKey).trim() || (isPerRoundN ? '' : CUMULATIVE_KEY);
   var standingsResult =
     src.standingsResult && typeof src.standingsResult === 'object'
       ? src.standingsResult
       : emptyStandingsResult();
 
-  var parts = buildRoundSelectorParts(roundStates, selectedKey);
+  var displayLabels = buildStandingsRoundDisplayLabels(series, roundStates);
+  var labeledStates = applyStandingsDisplayLabelsToStates(roundStates, displayLabels);
+  var parts = buildRoundSelectorParts(roundStates, selectedKey, {
+    includeTot: !isPerRoundN,
+    displayLabels: displayLabels
+  });
   var effectiveKey = parts.selectedKey;
   var totalSelector = parts.totalSelector;
   var roundSelectorItems = parts.roundSelectorItems;
@@ -1115,7 +1257,7 @@ function buildSeriesStandingsViewModel(input) {
 
   var resultIndex = indexResultRows(standingsResult);
   var mainParticipants = resolveMainBoardParticipants(series, resultIndex);
-  var roundStateById = buildRoundStateById(roundStates);
+  var roundStateById = buildRoundStateById(labeledStates);
   var roundMetaById =
     standingsResult &&
     standingsResult.roundMeta &&
@@ -1132,6 +1274,19 @@ function buildSeriesStandingsViewModel(input) {
     var hasScore = participantHasDisplayableScore(resultRow);
     var gross = readGrossTotalValue(resultRow);
     var toPar = readToParValue(resultRow);
+    var totalDisplay;
+    var scoreDisplay;
+    var scoreClass;
+    if (isPerRoundN) {
+      totalDisplay = toPar != null ? formatToParDiff(toPar) : formatDash();
+      var rxToPar = readSelectedRoundToPar(resultRow, effectiveKey);
+      scoreDisplay = rxToPar != null ? formatToParDiff(rxToPar) : formatDash();
+      scoreClass = rxToPar != null ? resolveToParScoreClass(rxToPar) : 'score-even';
+    } else {
+      totalDisplay = hasScore && gross != null ? formatGrossTotal(gross) : formatDash();
+      scoreDisplay = hasScore && toPar != null ? formatToParDiff(toPar) : formatDash();
+      scoreClass = hasScore && toPar != null ? resolveToParScoreClass(toPar) : 'score-even';
+    }
     // TOT ← allEntries ∪ roundLineups；R ← roundLineups（阵容⊕成绩）
     var expandSource =
       effectiveKey === CUMULATIVE_KEY
@@ -1159,6 +1314,9 @@ function buildSeriesStandingsViewModel(input) {
       !!(series.scoringRule && series.scoringRule.allowRepeat),
       totExpandErrors
     );
+    expand.players = expand.players.map(function (pl) {
+      return seriesStandingsExpandIdentity.stampPlayerDivisionAvatarMark(pl, src.match, series);
+    });
 
     teamRows.push({
       // 对齐队际赛 teamLeaderboard 行
@@ -1166,12 +1324,11 @@ function buildSeriesStandingsViewModel(input) {
       seriesParticipantId: pid,
       pos: hasScore ? formatPos(resultRow.rank) : formatDash(),
       teamName: resolveParticipantName(p),
-      // TOTAL ← grossTotalValue（非 gap）；展示列用 grossTotalDisplay
-      grossTotal: hasScore && gross != null ? formatGrossTotal(gross) : formatDash(),
-      grossTotalDisplay: hasScore && gross != null ? formatGrossTotal(gross) : formatDash(),
-      // TO PAR ← toParValue（禁止 gapValue）
-      scoreStr: hasScore && toPar != null ? formatToParDiff(toPar) : formatDash(),
-      scoreClass: hasScore && toPar != null ? resolveToParScoreClass(toPar) : 'score-even',
+      grossTotal: totalDisplay,
+      grossTotalDisplay: totalDisplay,
+      scoreStr: scoreDisplay,
+      scoreClass: scoreClass,
+      roundScore: isPerRoundN ? scoreDisplay : '',
       hasScore: hasScore,
       scoringPlayersCount: expand.scoringPlayersCount,
       players: expand.players,
@@ -1180,24 +1337,48 @@ function buildSeriesStandingsViewModel(input) {
     });
   }
 
+  var roundScoreHeader = isPerRoundN
+    ? resolveRoundChipLabel(roundStates, effectiveKey, displayLabels)
+    : 'TO PAR';
+  var selectedRoundDisplayLabel =
+    effectiveKey === CUMULATIVE_KEY
+      ? 'TOT'
+      : displayLabels[effectiveKey] || resolveRoundChipLabel(roundStates, effectiveKey);
+
   return {
     ok: true,
-    mode: 'global_m',
+    mode: scoringMode,
     available: true,
     unavailableTitle: '',
     unavailableMessage: '',
     selectedKey: effectiveKey,
+    selectedRoundDisplayLabel: selectedRoundDisplayLabel,
+    showTot: !isPerRoundN,
+    headThruLabel: 'TOTAL',
+    headScoreLabel: roundScoreHeader,
+    roundScoreHeader: roundScoreHeader,
     totalSelector: totalSelector,
     roundSelectorItems: roundSelectorItems,
     roundSelector: roundSelector,
-    roundInfoText: buildStandingsRoundInfoText(effectiveKey, roundStates, series),
+    roundInfoText: buildStandingsRoundInfoText(effectiveKey, labeledStates, series),
     leaderboardViewLabel:
-      effectiveKey === CUMULATIVE_KEY ? buildTotTopMDescription(series) : '',
+      !isPerRoundN && effectiveKey === CUMULATIVE_KEY
+        ? buildTotTopMDescription(series)
+        : resolveRoundGameModeLabel(series, effectiveKey),
     teamRows: teamRows,
     totExpandErrors: totExpandErrors,
     mainBoardInvariant: true,
     scrollRoundSelector: true
   };
+}
+
+function cumulativeBoardSignature(standingsVm) {
+  var rows = (standingsVm && standingsVm.teamRows) || [];
+  return rows
+    .map(function (r) {
+      return [r.teamId || r.seriesParticipantId, r.pos, r.grossTotal].join('|');
+    })
+    .join(';;');
 }
 
 /** 主榜签名：顺序 + POS + TOTAL + TO PAR（与 selectedKey 无关） */
@@ -1222,6 +1403,7 @@ module.exports = {
   buildStandingsRoundInfoText: buildStandingsRoundInfoText,
   buildSeriesStandingsViewModel: buildSeriesStandingsViewModel,
   mainBoardSignature: mainBoardSignature,
+  cumulativeBoardSignature: cumulativeBoardSignature,
   mergeTotTeamExpandSource: mergeTotTeamExpandSource,
   buildOccurrenceKey: buildOccurrenceKey,
   resolveStandingsScorecardRoundId: resolveStandingsScorecardRoundId,
@@ -1230,5 +1412,11 @@ module.exports = {
   resolveRowGenderDisplay: resolveRowGenderDisplay,
   resolveTotDisplayGlobalM: resolveTotDisplayGlobalM,
   buildTotTopMDescription: buildTotTopMDescription,
-  formatTotRowSubLabel: formatTotRowSubLabel
+  resolveRoundGameModeLabel: resolveRoundGameModeLabel,
+  resolvePerRoundNTeamGameModeLabel: resolvePerRoundNTeamGameModeLabel,
+  formatTotRowSubLabel: formatTotRowSubLabel,
+  resolveDefaultPerRoundSelectedKey: resolveDefaultPerRoundSelectedKey,
+  buildStandingsRoundDisplayLabels: buildStandingsRoundDisplayLabels,
+  resolveStandingsRoundDisplayLabel: resolveStandingsRoundDisplayLabel,
+  resolveRoundChipLabel: resolveRoundChipLabel
 };

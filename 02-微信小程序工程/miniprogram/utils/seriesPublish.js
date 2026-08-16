@@ -74,13 +74,18 @@ function validateFutureRoundDateTimes(series, nowMs) {
   return { ok: errors.length === 0, errors: errors };
 }
 
-function createMemoryMatchRepo() {
+function createMemoryMatchRepo(options) {
   var map = Object.create(null);
+  var normalizeOnGet = !!(options && options.normalizeOnGet);
 
   function getMatchById(matchId) {
     var mid = asString(matchId).trim();
     if (!mid || !map[mid]) return null;
-    return deepClone(map[mid]);
+    var next = deepClone(map[mid]);
+    if (normalizeOnGet && Array.isArray(next.teamGroups)) {
+      next.teamGroups = teamMatchStore.cloneTeamGroups(next.teamGroups);
+    }
+    return next;
   }
 
   function existsMatchId(matchId) {
@@ -134,7 +139,7 @@ function createSeriesPublisher(deps) {
     },
     saveMatchChecked: function (match) {
       return teamMatchStore.saveMatchChecked(match);
-    }
+    },
   };
   var nowFn =
     typeof d.now === 'function'
@@ -433,6 +438,7 @@ function createSeriesPublisher(deps) {
       seriesId: sid,
       publishToken: asString(series.publishToken).trim(),
       planVersion: seriesStationMatch.PLAN_VERSION,
+      fingerprintVersion: seriesStationMatch.FINGERPRINT_VERSION,
       planFingerprint: planFingerprint,
       sourceFingerprint: sourceFingerprint,
       phase: 'planned',

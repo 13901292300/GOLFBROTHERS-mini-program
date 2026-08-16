@@ -887,7 +887,8 @@ assert(
     perRoundTot.reason === 'tot' &&
     perRoundTot.useShared === false &&
     perRoundVm &&
-    perRoundVm.available === false
+    perRoundVm.available === true &&
+    perRoundVm.showTot === false
 );
 
 var r2Only = adapter.projectSeriesStandingsTeamBoard({

@@ -1,7 +1,8 @@
 /**
  * Series global_m 总榜装配：标准化 entry → standingsResult（页面投影输入）
  * - 只读：不写 Series / match / storage
- * - 仅处理 scoringRule.mode === 'global_m'
+ * - global_m：computeGlobalTopM；per_round_n：computePerRoundTopN（各轮 round.topN）
+ * - 其它 mode 仍返回 mode_not_global_m 空结构
  * - 成绩投影：仅已开始轮进入累计计算
  * - 阵容投影：合法 managed + 正式 groups（不要求已开赛）→ 供 R 轮展开
  */
@@ -551,7 +552,7 @@ function buildStandingsResult(input) {
   }
 
   var mode = asString(series.scoringRule && series.scoringRule.mode).trim();
-  if (mode !== 'global_m') {
+  if (mode !== 'global_m' && mode !== 'per_round_n') {
     return {
       standingsResult: emptyStandingsResult(),
       meta: { error: 'mode_not_global_m', startedRoundCount: 0, stationErrors: [] }
@@ -683,7 +684,8 @@ function buildStandingsResult(input) {
         round.index != null && Number.isFinite(Number(round.index))
           ? Math.floor(Number(round.index))
           : i + 1,
-      roundStatus: asString(round.roundStatus).trim() || 'scheduled'
+      roundStatus: asString(round.roundStatus).trim() || 'scheduled',
+      topN: round.topN
     });
     stations.push({ round: round, match: match });
   }
@@ -723,13 +725,30 @@ function buildStandingsResult(input) {
     });
   }
 
-  var scored = seriesScoring.computeGlobalTopM({
-    entries: entries,
-    rounds: scoringRounds,
-    globalM: globalM,
-    allowRepeat: allowRepeat,
-    participantIds: participantIds
-  });
+  var topNByRoundId = Object.create(null);
+  for (var tn = 0; tn < scoringRounds.length; tn++) {
+    var tnr = scoringRounds[tn];
+    if (!tnr || tnr.roundStatus === 'cancelled') continue;
+    var tid = asString(tnr.roundId).trim();
+    if (!tid || tnr.topN == null || tnr.topN === '') continue;
+    topNByRoundId[tid] = tnr.topN;
+  }
+
+  var scored =
+    mode === 'per_round_n'
+      ? seriesScoring.computePerRoundTopN({
+          entries: entries,
+          rounds: scoringRounds,
+          topNByRoundId: topNByRoundId,
+          participantIds: participantIds
+        })
+      : seriesScoring.computeGlobalTopM({
+          entries: entries,
+          rounds: scoringRounds,
+          globalM: globalM,
+          allowRepeat: allowRepeat,
+          participantIds: participantIds
+        });
 
   var byPidEntries = Object.create(null);
   for (var ei = 0; ei < entries.length; ei++) {
@@ -835,6 +854,14 @@ function buildStandingsResult(input) {
       totalRankingValue:
         scoredRow && scoredRow.totalRankingValue != null ? scoredRow.totalRankingValue : null,
       selectedCount: scoredRow ? scoredRow.selectedCount || 0 : 0,
+      incompleteRoundIds:
+        scoredRow && Array.isArray(scoredRow.incompleteRoundIds)
+          ? scoredRow.incompleteRoundIds.slice()
+          : [],
+      roundBreakdown:
+        scoredRow && Array.isArray(scoredRow.roundBreakdown)
+          ? scoredRow.roundBreakdown
+          : [],
       grossTotalValue: sumFinite(grossVals),
       toParValue: sumFinite(toParVals),
       allEntries: allEntries,
@@ -845,8 +872,8 @@ function buildStandingsResult(input) {
   return {
     standingsResult: { participantRows: participantRows, roundMeta: roundMeta },
     meta: {
-      mode: 'global_m',
-      globalM: globalM,
+      mode: mode,
+      globalM: mode === 'global_m' ? globalM : undefined,
       allowRepeat: allowRepeat,
       startedRoundCount: startedRoundMeta.length,
       eligibleEntryCount: entries.length,

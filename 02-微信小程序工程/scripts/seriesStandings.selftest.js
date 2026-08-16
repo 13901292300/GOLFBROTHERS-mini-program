@@ -292,10 +292,12 @@ function fixtureStandingsResult() {
     roundStates: roundStatesFixture(),
     standingsResult: fixtureStandingsResult()
   });
-  assert('per_round_n 不进入 global_m 总榜', vm.available === false);
+  assert('per_round_n 进入总榜且无 TOT', vm.available === true && vm.showTot === false);
   assert(
-    'per_round_n 文案正确',
-    vm.unavailableTitle === '每轮前 N 名总榜将在后续开放' && vm.teamRows.length === 0
+    'per_round_n 选择器不含 TOT',
+    vm.roundSelector.every(function (c) {
+      return c.key !== 'cumulative' && c.label !== 'TOT';
+    }) && vm.teamRows.length === 4
   );
 })();
 
@@ -620,7 +622,8 @@ function fixtureStandingsResult() {
     'WXML 复刻 POS/TEAM/TOTAL/TO PAR',
     pageWxml.indexOf('>POS<') >= 0 &&
       pageWxml.indexOf('>TEAM<') >= 0 &&
-      pageWxml.indexOf('>TOTAL<') >= 0 &&
+      pageWxml.indexOf("headThruLabel || 'TOTAL'") >= 0 &&
+      pageWxml.indexOf("headScoreLabel || 'TO PAR'") >= 0 &&
       pageWxml.indexOf('>TO PAR<') >= 0 &&
       pageWxml.indexOf('leaderboard-view-label') >= 0 &&
       pageWxmlNoComments.indexOf('排名') < 0 &&

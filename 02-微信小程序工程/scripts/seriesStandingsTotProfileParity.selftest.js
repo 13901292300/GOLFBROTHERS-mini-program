@@ -106,6 +106,7 @@ function makeTeamSeries() {
   return {
     seriesId: 's-team-parity',
     hostMode: 'team',
+    templateId: 'division_series',
     roster: [],
     participants: [
       {
@@ -190,7 +191,8 @@ assert(
     /leaderboard-player-profile-panel/.test(personalJson) &&
     totIdentity.indexOf('<leaderboard-player-profile-panel') >= 0 &&
     personalWxml.indexOf('<leaderboard-player-profile-panel') >= 0 &&
-    pageWxml.indexOf('<leaderboard-player-identity') < 0 &&
+    /sc-team-stack-wrap[\s\S]*<leaderboard-player-identity/.test(teamWrap) &&
+    totIdentity.indexOf('<leaderboard-player-identity') < 0 &&
     personalWxml.indexOf('<leaderboard-player-identity') < 0 &&
     personalWxml.indexOf('class="scorecard-profile"') < 0 &&
     teamWrap.indexOf('class="scorecard-profile"') < 0
@@ -399,7 +401,7 @@ assert(
   var tot = expandId.projectStandingsScorecardIdentity(match, series, { playerId: 'u-d1' });
   assert(
     'team 分队文字角标，差点 0 显示 0',
-    tot.player.badgeText === '一队' &&
+    tot.player.badgeText === '一' &&
       tot.player.badgeColor === '#ef4444' &&
       tot.avatarBadge === 'team' &&
       tot.player.handicapText === '0'

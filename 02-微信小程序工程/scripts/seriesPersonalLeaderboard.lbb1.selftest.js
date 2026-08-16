@@ -347,21 +347,28 @@ assert(
 );
 
 var g2 = fixtureG2();
+var g2All = project(g2, 'all', 'gross');
 assert(
-  '8 G1 结果一致 / G2 结果一致',
+  '8 G1 结果一致 / G2 all 走组合实体且与共享 builder 一致',
   sameSig(project(g1, 'all', 'gross').overlay.personalLeaderboard, sharedRows(g1, 'all', 'gross')) &&
-    sameSig(project(g2, 'all', 'gross').overlay.personalLeaderboard, sharedRows(g2, 'all', 'gross'))
+    g2All.reason === 'entity_all' &&
+    g2All.useShared === false &&
+    g2All.overlay.showSharedPersonalBoard === false &&
+    g2All.overlay.showEntityAllBoard === true &&
+    sameSig(g2All.overlay.listRows, sharedRows(g2, 'all', 'gross'))
 );
 
 var g3 = fixtureG3();
 var g4 = fixtureG4();
 assert(
-  '9 G3 结果一致',
-  sameSig(project(g3, 'all', 'gross').overlay.personalLeaderboard, sharedRows(g3, 'all', 'gross'))
+  '9 G3 all 为组合实体',
+  project(g3, 'all', 'gross').reason === 'entity_all' &&
+    sameSig(project(g3, 'all', 'gross').overlay.listRows, sharedRows(g3, 'all', 'gross'))
 );
 assert(
-  '10 G4 结果一致',
-  sameSig(project(g4, 'all', 'gross').overlay.personalLeaderboard, sharedRows(g4, 'all', 'gross'))
+  '10 G4 all 为 pair/entity',
+  project(g4, 'all', 'gross').reason === 'entity_all' &&
+    sameSig(project(g4, 'all', 'gross').overlay.listRows, sharedRows(g4, 'all', 'gross'))
 );
 
 var maleIds = rMale.overlay.personalLeaderboard.map(function (r) {
@@ -379,24 +386,24 @@ assert(
 );
 
 assert(
-  '13 Series 使用同一个 personal-leaderboard-board',
-  seriesJson.indexOf('personal-leaderboard-board') >= 0 &&
-    (seriesWxml.split('<personal-leaderboard-board').length - 1) === 1 &&
-    (detailWxml.split('<personal-leaderboard-board').length - 1) === 1 &&
-    seriesJson.indexOf('/components/personal-leaderboard-board/index') >= 0
+  '13 Series 与 detail 共用 live-leaderboard-board（个人榜嵌在其中）',
+  seriesJson.indexOf('live-leaderboard-board') >= 0 &&
+    (seriesWxml.split('<live-leaderboard-board').length - 1) === 1 &&
+    (detailWxml.split('<live-leaderboard-board').length - 1) === 1 &&
+    seriesJson.indexOf('/components/live-leaderboard-board/index') >= 0
 );
 
 var sharedMount = seriesWxml.slice(
-  seriesWxml.indexOf('standings.showSharedPersonalBoard'),
-  seriesWxml.indexOf('standings.showTeamBoard === false')
+  seriesWxml.indexOf('standings.useLiveLeaderboard'),
+  seriesWxml.indexOf('standings.teamRows.length')
 );
 assert(
   '14 行 DOM 不在 Series 手写复制',
-  sharedMount.indexOf('<personal-leaderboard-board') >= 0 &&
+  sharedMount.indexOf('<live-leaderboard-board') >= 0 &&
     sharedMount.indexOf('leaderboard-row--personal') < 0 &&
     sharedMount.indexOf('item.genderIcon') < 0 &&
-    sharedMount.indexOf('netScoreDisplay') < 0 &&
-    seriesWxml.indexOf('class="leaderboard-row leaderboard-row--personal') < 0
+    seriesWxml.indexOf('class="leaderboard-row leaderboard-row--personal') < 0 &&
+    seriesWxml.indexOf('standings.showEntityAllBoard') < 0
 );
 
 assert(
@@ -405,8 +412,8 @@ assert(
     /leaderboard-player-profile-panel/.test(compWxml) &&
     /openScorecard\.frontScore/.test(compWxml) &&
     /bind:rowtap="onStandingsPersonalLeaderboardRowTap"/.test(seriesWxml) &&
-    /showSharedPersonalBoard/.test(seriesWxml) &&
-    /<personal-leaderboard-board/.test(seriesWxml) &&
+    /useLiveLeaderboard/.test(seriesWxml) &&
+    /<live-leaderboard-board/.test(seriesWxml) &&
     /onStandingsPersonalLeaderboardRowTap[\s\S]{0,4000}buildTeamMatchScorecardView/.test(seriesJs)
 );
 
@@ -435,11 +442,14 @@ assert(
 );
 
 assert(
-  '11 G1–G4 均走共享而非 roundBoard 个人生成',
+  '11 G1–G4 all 由共享 LIVE 模块决定；adapter 仍可投影',
   /buildPersonalLeaderboardBoard\(match/.test(adapterSrc) &&
     !/buildSeriesRoundBoardViewModel/.test(adapterSrc) &&
-    /projected && projected.useShared/.test(seriesJs) &&
-    /selection.view === 'team'\) \{[\s\S]{0,500}projectSeriesStandingsTeamBoard/.test(seriesJs)
+    /projectSeriesRnLiveLeaderboard/.test(seriesJs) &&
+    /useLiveLeaderboard/.test(seriesWxml) &&
+    /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,800}projectSeriesStandingsTeamBoard/.test(
+      seriesJs
+    )
 );
 
 assert(
@@ -506,10 +516,11 @@ assert(
 );
 
 assert(
-  '页面 overlay 不在 TOT/team 调用共享个人投影',
-  /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,500}sharedEmpty/.test(seriesJs) &&
-    /selection.view === 'team'\) \{[\s\S]{0,400}projectSeriesStandingsTeamBoard/.test(seriesJs) &&
-    !/selection.view === 'team'[\s\S]{0,400}projectSeriesStandingsPersonalBoard/.test(seriesJs)
+  '页面 overlay 不在 TOT 调用共享个人投影；Rn 走 LIVE',
+  /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,900}sharedEmpty/.test(seriesJs) &&
+    /projectSeriesRnLiveLeaderboard/.test(seriesJs) &&
+    /useLiveLeaderboard: false/.test(seriesJs) &&
+    !/selection.view === 'team'\) \{[\s\S]{0,400}projectSeriesStandingsPersonalBoard/.test(seriesJs)
 );
 
 if (fs.existsSync(baselinePath)) {

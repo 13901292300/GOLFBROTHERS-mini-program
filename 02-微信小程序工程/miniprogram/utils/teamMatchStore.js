@@ -3,7 +3,7 @@
  */
 
 const STORAGE_KEY = 'gb_team_matches_v1';
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const clubDateFormat = require('./clubDateFormat.js');
 
 function _readAll() {
   try {
@@ -23,10 +23,7 @@ function _writeAll(list) {
 }
 
 function formatClubDate(timeString) {
-  const m = String(timeString || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return '';
-  const month = parseInt(m[2], 10);
-  return MONTH_LABELS[month - 1] + '/' + m[3] + '/' + m[1];
+  return clubDateFormat.formatClubDate(timeString);
 }
 
 function buildVenueLabel(courseName, courseHalfText) {

@@ -379,10 +379,10 @@ assert(
 );
 
 assert(
-  '24 普通 detail 文件和行为无回归',
+  '24 普通 detail LIVE 榜迁入共享组件',
   /_buildLeaderboardViewForView[\s\S]{0,280}buildPersonalLeaderboardBoard/.test(detailJs) &&
-    /<personal-leaderboard-board/.test(detailWxml) &&
-    /personal-leaderboard-board/.test(detailJson) &&
+    /<live-leaderboard-board/.test(detailWxml) &&
+    /live-leaderboard-board/.test(detailJson) &&
     detailWxml.indexOf('teeing_off_soon') < 0 &&
     !/prestartExpandMode|teeing_off_soon/.test(sharedSrc) &&
     !/seriesId|fromSeries/.test(compJs)

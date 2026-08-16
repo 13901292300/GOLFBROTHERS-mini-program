@@ -135,7 +135,7 @@ function simulateBadgeRender(player, logoMap, mode) {
       return {
         show: true,
         kind: 'text',
-        text: badgeText.length > 2 ? badgeText.slice(0, 2) : badgeText,
+        text: badgeText,
         color: badgeColor,
         wxmlCond: true
       };
@@ -173,6 +173,7 @@ function makeTeamSeries() {
   return {
     seriesId: 's-team',
     hostMode: 'team',
+    templateId: 'division_series',
     participants: [
       {
         kind: 'division',

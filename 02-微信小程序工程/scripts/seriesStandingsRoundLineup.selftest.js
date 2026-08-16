@@ -691,14 +691,14 @@ function teamPlayers(vm, pid) {
     }
   });
   var built = buildWith(series, {}, {});
-  assert('17 per_round_n 未开放', built.meta.error === 'mode_not_global_m');
+  assert('17 per_round_n 可装配', built.meta.mode === 'per_round_n');
   var vm = standingsVm.buildSeriesStandingsViewModel({
     series: series,
     selectedKey: 'cumulative',
     roundStates: [],
     standingsResult: built.standingsResult
   });
-  assert('17 VM available=false', vm.available === false);
+  assert('17 VM available=true 且无 TOT', vm.available === true && vm.showTot === false);
 })();
 
 console.log('');

@@ -78,12 +78,12 @@ assert(
 );
 
 assert(
-  '3 赛程无 TOT，总榜有 TOT',
+  '3 赛程无 TOT，总榜 TOT 由 standings.showTot 控制',
   scheduleDocks.every(function (s) {
     return /show-tot="\{\{false\}\}"/.test(s);
   }) &&
     standingsDocks.every(function (s) {
-      return /show-tot="\{\{true\}\}"/.test(s);
+      return /show-tot="\{\{standings.showTot\}\}"/.test(s);
     }) &&
     /wx:if="\{\{showTot\}\}"/.test(dockWxml)
 );
