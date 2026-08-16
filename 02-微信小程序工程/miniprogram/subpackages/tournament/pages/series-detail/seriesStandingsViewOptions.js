@@ -106,27 +106,62 @@ function hasExplicitView(selection) {
 }
 
 /**
- * Series 轮次榜：队际分站默认球队榜。
- * 分站 global_m 会关掉 teamCompetition，不能因此把 Rn 默认成全部/个人榜。
+ * Series 轮次榜默认视角：
+ * - TOT：始终球队
+ * - global_m 单轮首次：查看全部（复用普通 LIVE 榜）
+ * - per_round_n / 未标明赛制：队际分站仍默认球队榜
  */
-function resolveSeriesStandingsDefaultView(match) {
+function resolveSeriesStandingsDefaultView(match, context) {
+  var ctx = context && typeof context === 'object' ? context : {};
+  var selectedKey = asString(ctx.selectedKey);
+  var scoringMode = asString(ctx.scoringMode || ctx.mode);
+  if (!selectedKey || selectedKey === 'cumulative') {
+    return VIEW.team;
+  }
+  if (scoringMode === 'global_m') {
+    return VIEW.all;
+  }
   var options = leaderboardSettingViewModel.resolveLeaderboardViewOptions(match);
   if (options.indexOf(VIEW.team) >= 0) return VIEW.team;
   return leaderboardSettingViewModel.resolveLeaderboardDefaultView(match);
 }
 
-function normalizeSeriesStandingsSelection(match, selection) {
+function normalizeSeriesStandingsSelection(match, selection, context) {
   if (!hasExplicitView(selection)) {
     var scoreType =
       selection && typeof selection === 'object' && !Array.isArray(selection)
         ? selection.scoreType
         : '';
     return leaderboardSettingViewModel.normalizeLeaderboardSelection(match, {
-      view: resolveSeriesStandingsDefaultView(match),
+      view: resolveSeriesStandingsDefaultView(match, context),
       scoreType: scoreType
     });
   }
   return leaderboardSettingViewModel.normalizeLeaderboardSelection(match, selection);
+}
+
+/**
+ * 会话选择：TOT 强制球队且不读单轮记忆；单轮按 roundId 恢复，未访问则走默认。
+ */
+function resolveStandingsSessionSelection(input) {
+  var src = input && typeof input === 'object' ? input : {};
+  var selectedKey = asString(src.selectedKey);
+  var scoringMode = asString(src.scoringMode || src.mode);
+  var rememberedByRoundId =
+    src.rememberedByRoundId && typeof src.rememberedByRoundId === 'object'
+      ? src.rememberedByRoundId
+      : {};
+  if (!selectedKey || selectedKey === 'cumulative') {
+    return normalizeSeriesStandingsSelection(
+      src.match,
+      { view: VIEW.team, scoreType: 'gross' },
+      { scoringMode: scoringMode, selectedKey: 'cumulative' }
+    );
+  }
+  return normalizeSeriesStandingsSelection(src.match, rememberedByRoundId[selectedKey], {
+    scoringMode: scoringMode,
+    selectedKey: selectedKey
+  });
 }
 
 /** @deprecated 兼容：仅返回 view 字符串 */
@@ -210,6 +245,7 @@ module.exports = {
   shouldBuildEntityList: shouldBuildEntityList,
   resolveSeriesStandingsDefaultView: resolveSeriesStandingsDefaultView,
   normalizeSeriesStandingsSelection: normalizeSeriesStandingsSelection,
+  resolveStandingsSessionSelection: resolveStandingsSessionSelection,
   normalizeSeriesStandingsView: normalizeSeriesStandingsView,
   buildSeriesLeaderboardSettingSections: buildSeriesLeaderboardSettingSections,
   boardViewLabel: boardViewLabel,

@@ -7,6 +7,7 @@
  */
 const gameStore = require('./gameStore.js');
 const matchStatus = require('./matchStatus.js');
+const scoreCompleteness = require('./scoreCompleteness.js');
 
 const TOTAL_HOLES = 18;
 // 与首页 .ds-progress-marker 宽度一致；用于 left 计算避免第18洞溢出
@@ -159,7 +160,7 @@ function countCompletedHoles(game, groupIndex) {
 }
 
 function isScoringCompleted(game, groupIndex) {
-  return countCompletedHoles(game, groupIndex) >= TOTAL_HOLES;
+  return scoreCompleteness.isGameGroupComplete(game, groupIndex);
 }
 
 /** 首页 GAME 卡片进度条字段 */

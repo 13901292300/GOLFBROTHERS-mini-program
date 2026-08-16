@@ -452,13 +452,15 @@ function makeMatch(overrides) {
   assert(
     '管理员：普通区+管理区+轮次区',
     adminSheet.seriesScope.featuresCommon.length === 2 &&
-      adminSheet.seriesScope.featuresManage.length === 3 &&
+      adminSheet.seriesScope.featuresManage.length === 4 &&
       adminSheet.seriesScope.featuresManage[0].permission === 'edit_series' &&
       adminSheet.seriesScope.featuresManage[1].permission === 'cancel_series' &&
       adminSheet.seriesScope.featuresManage[1].disabled === true &&
       adminSheet.seriesScope.featuresManage[2].permission ===
         'toggle_registration' &&
       !adminSheet.seriesScope.featuresManage[2].disabled &&
+      adminSheet.seriesScope.featuresManage[3].permission === 'finish_series' &&
+      !adminSheet.seriesScope.featuresManage[3].disabled &&
       adminSheet.seriesScope.featuresDanger.length === 1 &&
       adminSheet.seriesScope.featuresDanger[0].permission === 'cancel_series' &&
       adminSheet.showRoundManage === true &&
@@ -466,13 +468,14 @@ function makeMatch(overrides) {
       adminSheet.roundSection.hasSelection === false
   );
   assert(
-    '管理四列网格顺序：修改系列赛第1、取消第2、报名开关第3、无占位项',
-    adminSheet.seriesScope.featuresManage.length === 3 &&
+    '管理四列网格顺序：修改系列赛第1、取消第2、报名开关第3、结束系列赛第4',
+    adminSheet.seriesScope.featuresManage.length === 4 &&
       adminSheet.seriesScope.featuresManage[0].permission === 'edit_series' &&
       adminSheet.seriesScope.featuresManage[0].label === '修改系列赛' &&
       adminSheet.seriesScope.featuresManage[1].permission === 'cancel_series' &&
       adminSheet.seriesScope.featuresManage[2].permission ===
         'toggle_registration' &&
+      adminSheet.seriesScope.featuresManage[3].permission === 'finish_series' &&
       !adminSheet.seriesScope.featuresManage.some(function (f) {
         return !f || !f.permission || f.permission === 'pad';
       })
@@ -553,7 +556,7 @@ function makeMatch(overrides) {
   assert(
     '未选轮：管理员按钮可见且本轮仅提示',
     empty.seriesScope.featuresCommon.length === 2 &&
-      empty.seriesScope.featuresManage.length === 3 &&
+      empty.seriesScope.featuresManage.length === 4 &&
       empty.roundSection.hasSelection === false &&
       !!empty.roundSection.placeholder &&
       empty.roundSection.featuresCommon.length === 0 &&
@@ -872,7 +875,7 @@ function makeMatch(overrides) {
   assert(
     '坏分站只影响本轮容器，Series 区仍可渲染',
     badSheet.seriesScope.featuresCommon.length === 2 &&
-      badSheet.seriesScope.featuresManage.length === 3 &&
+      badSheet.seriesScope.featuresManage.length === 4 &&
       badSheet.seriesScope.featuresManage[0].permission === 'edit_series' &&
       badSheet.roundViewSection.hasSelection &&
       !badSheet.roundViewSection.gateOk &&

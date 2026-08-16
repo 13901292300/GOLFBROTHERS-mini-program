@@ -62,6 +62,7 @@
                     </view>
                     <view class="gb-group-player-meta">
                       <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
+                      <text wx:if="{{pl.noRepeatHint}}" class="gb-group-player-conflict">{{pl.noRepeatHint}}</text>
                       <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
                         <view
                           wx:if="{{pl.teeMarkerClass}}"
@@ -95,6 +96,7 @@
                     </view>
                     <view class="gb-group-player-meta">
                       <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || ''}}</text>
+                      <text wx:if="{{pl.noRepeatHint}}" class="gb-group-player-conflict">{{pl.noRepeatHint}}</text>
                       <view wx:if="{{pl.teeText || pl.teeLabel}}" class="gb-group-player-tee">
                         <view
                           wx:if="{{pl.teeMarkerClass}}"

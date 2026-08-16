@@ -33,6 +33,8 @@ const tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js'
 const seriesStore = require('../../../../utils/seriesStore.js');
 const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
+const seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
+const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 const {
   PLAYER_SLOTS,
   DEFAULT_REGISTER_GROUPS,
@@ -138,6 +140,23 @@ Page({
         : ''
     };
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    if (match && teamMatchFinish.isMatchCompleted(match)) {
+      wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
+      setTimeout(() => {
+        wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/home/index' }) });
+      }, 500);
+      return;
+    }
+    if (match) {
+      var seriesEnterGuard = teamMatchFinish.assertWritable(match);
+      if (!seriesEnterGuard.ok && seriesEnterGuard.reason === 'series_completed') {
+        wx.showToast({ title: seriesEnterGuard.message, icon: 'none' });
+        setTimeout(() => {
+          wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/home/index' }) });
+        }, 500);
+        return;
+      }
+    }
     if (match) {
       const user = gameStore.getCurrentUser() || {};
       const canEdit =
@@ -221,6 +240,16 @@ Page({
     this.applyTheme(getApp().getTheme());
     if (this._fromSeries) {
       this._loadSeriesPickRegisterSource(this.data.matchId, this._matchSnapshot, { silentFail: true });
+      this.setData({
+        draftCards: this._buildDraftCards(
+          this.data.groupDraft,
+          this.data.pairingDraft,
+          this.data.showPairingSection,
+          this.data.gameMode,
+          this.data.showCompositionPreview,
+          this.data.strokeCompositionMode
+        )
+      });
     }
     this._applyGroupPickResultIfAny();
   },
@@ -268,7 +297,19 @@ Page({
       ? loaded.registerSubTabs
       : resolveRegisterSubTabs(match || loaded.match, this._registerInfo);
     this._seriesPickEmptyText = loaded.emptyText || '暂无报名人员';
+    this._noRepeatLock = loaded.noRepeat || { ok: true, enabled: false, playerIds: {} };
     return true;
+  },
+
+  _withNoRepeatSeatHint(player) {
+    const pl = player && typeof player === 'object' ? player : {};
+    const lock = this._noRepeatLock;
+    if (!this._fromSeries || !lock || !lock.enabled) return pl;
+    const occ = seriesNoRepeatLineup.lookupOccupancy(pl.userId || pl.playerId, lock);
+    if (!occ) return pl;
+    return Object.assign({}, pl, {
+      noRepeatHint: seriesNoRepeatLineup.formatOccupiedHint(occ.label)
+    });
   },
 
   applyTheme(theme) {
@@ -337,7 +378,7 @@ Page({
         teamGroups: teamGroups,
         registerLookup: registerLookup,
         showTeamLabel: showTeamLabel
-      });
+      }).map((pl) => this._withNoRepeatSeatHint(pl));
       const card = {
         groupId: g.groupId,
         badge: g.groupName,
@@ -1439,11 +1480,16 @@ Page({
       wx.showToast({ title: '未找到比赛信息', icon: 'none' });
       return;
     }
+    var finishedGuard = teamMatchFinish.assertWritable(match);
+    if (!finishedGuard.ok) {
+      wx.showToast({ title: finishedGuard.message, icon: 'none' });
+      return;
+    }
     if (this._fromSeries) {
       const sanitizedForLock = this._sanitizeGroupDraft(rawDraft);
-      const ids = seriesGroupPickRoster.collectPlayerIdsFromGroups(sanitizedForLock);
+      const ids = seriesNoRepeatLineup.collectDraftMemberIds(sanitizedForLock, pairingDraft);
       const seriesId = (this._seriesReturnMeta && this._seriesReturnMeta.seriesId) || '';
-      const check = seriesGroupPickRoster.assertPlayersNotPlayedPriorRound(ids, {
+      const check = seriesNoRepeatLineup.assertPlayersNotOccupied(ids, {
         fromSeries: true,
         seriesId: seriesId,
         series: (seriesId ? seriesStore.getSeriesById(seriesId) : null) || this._seriesForPick,

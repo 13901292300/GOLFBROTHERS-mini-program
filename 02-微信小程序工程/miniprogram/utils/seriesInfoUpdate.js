@@ -10,6 +10,7 @@ var seriesModel = require('./seriesModel.js');
 var seriesStationMatch = require('./seriesStationMatch.js');
 var seriesStationIndex = require('./seriesStationIndex.js');
 var seriesManageAccess = require('./seriesManageAccess.js');
+var seriesFinishLock = require('./seriesFinishLock.js');
 
 var JOURNAL_KEY = 'gb_series_info_edit_journal_v1';
 var PUBLISHED_STRUCTURE_LOCKED_MSG = '系列赛发布后暂不支持修改此项';
@@ -309,6 +310,10 @@ function createSeriesInfoUpdateService(deps) {
     if (!series) return { ok: false, reason: 'series_not_found' };
     if (asString(series.lifecycleStatus) !== 'published') {
       return { ok: false, reason: 'series_not_published' };
+    }
+    var seriesLock = seriesFinishLock.assertSeriesWritable(series);
+    if (!seriesLock.ok) {
+      return { ok: false, reason: 'series_completed', message: seriesLock.message };
     }
 
     var expectedUpdatedAt = asString(src.expectedUpdatedAt || src.expectedSeriesUpdatedAt);

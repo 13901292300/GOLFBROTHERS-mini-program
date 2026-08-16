@@ -1641,6 +1641,14 @@ function commitSeriesPlayerManageDraft(matchOrGame, draft) {
   if (!matchOrGame || typeof matchOrGame !== 'object') {
     return { ok: false, reason: 'no_match' };
   }
+  var playerSeriesGuard = require('./teamMatchFinish.js').assertWritable(matchOrGame);
+  if (!playerSeriesGuard.ok) {
+    return {
+      ok: false,
+      reason: playerSeriesGuard.reason,
+      message: playerSeriesGuard.message
+    };
+  }
   const d = draft || {};
   const teamOptions =
     (Array.isArray(d.teamOptions) && d.teamOptions.length

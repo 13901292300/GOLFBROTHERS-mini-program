@@ -244,10 +244,9 @@ var schedule = scheduleVm.buildSeriesScheduleViewModel({
   }
 });
 assert(
-  '赛程 TAB 非多分队仍为 Rx / ROUND',
-  schedule.roundSelectorItems[0].label === 'R1' &&
-    schedule.roundSelectorItems[1].label === 'R2' &&
-    schedule.roundInfoText.indexOf('C1') < 0 &&
+  '出发表 TAB 与总榜 Cx 一致',
+  schedule.roundSelectorItems[0].label === 'C1' &&
+    schedule.roundSelectorItems[1].label === 'C2' &&
     schedule.roundSelectorItems[0].key === 'r1'
 );
 

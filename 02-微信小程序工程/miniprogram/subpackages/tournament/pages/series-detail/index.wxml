@@ -220,6 +220,7 @@
             rounds="{{standings.roundSelectorItems}}"
             round-info-text="{{standings.roundInfoText}}"
             scroll-left="{{roundSelectorScrollLeft}}"
+            into-view="{{standingsDockIntoView}}"
             theme-class="{{themeClass}}"
             bind:roundtap="onStandingsRoundTap"
             bind:hscroll="onRoundSelectorHScroll"
@@ -238,7 +239,7 @@
         />
       </view>
 
-      <!-- 赛程二级流内 round dock：无 TOT，仅 R；与总榜同一组件 -->
+      <!-- 出发表二级流内 round dock：无 TOT，仅 R/C；与总榜同一组件 -->
       <view
         wx:if="{{activeTab === 'schedule' && schedule.roundSelector.length}}"
         class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}}"
@@ -252,6 +253,7 @@
             rounds="{{schedule.roundSelector}}"
             round-info-text="{{schedule.roundInfoText}}"
             scroll-left="{{scheduleRoundSelectorScrollLeft}}"
+            into-view="{{scheduleDockIntoView}}"
             theme-class="{{themeClass}}"
             bind:roundtap="onScheduleRoundTap"
             bind:hscroll="onScheduleRoundHScroll"
@@ -695,10 +697,16 @@
               <text class="series-empty__msg">{{schedule.blockMessage}}</text>
             </view>
           </block>
-          <block wx:elif="{{schedule.panelMode === 'groups'}}">
+          <block wx:else>
+            <view
+              wx:if="{{schedule.showViewLeaderboard}}"
+              class="schedule-leaderboard-entry"
+              bindtap="onScheduleViewLeaderboard"
+            >查看领先榜</view>
+          <block wx:if="{{schedule.panelMode === 'groups'}}">
             <view class="schedule-groups-panel {{schedule.cta.showEditGroups ? 'schedule-groups-panel--with-cta' : ''}}">
               <view wx:if="{{!schedule.groupCards.length}}" class="series-empty">
-                <text class="series-empty__title">暂无分组</text>
+                <text class="series-empty__title">{{schedule.emptyGroupsTitle || '暂无分组'}}</text>
                 <text class="series-empty__msg">{{schedule.cta.blockMessage || '请开始本轮分组'}}</text>
               </view>
               <view
@@ -756,15 +764,15 @@
             </view>
           </block>
           <block wx:elif="{{schedule.panelMode === 'tee'}}">
-            <view class="schedule-tee-panel {{schedule.cta.showEditGroups ? 'schedule-tee-panel--with-cta' : ''}}">
+            <view class="schedule-tee-panel {{schedule.cta.showEditGroups ? 'schedule-tee-panel--with-cta' : ''}} {{schedule.cta.showEnterMyGroupEligible ? 'tee-sheet-list' : ''}}">
               <view wx:if="{{!schedule.teeGroups.length}}" class="series-empty">
-                <text class="series-empty__title">暂无出发表</text>
+                <text class="series-empty__title">{{schedule.emptyTeeTitle || '暂无出发表'}}</text>
                 <text class="series-empty__msg">本轮尚未生成分组</text>
               </view>
               <view
                 wx:for="{{schedule.teeGroups}}"
                 wx:key="groupId"
-                class="tee-group-card"
+                class="tee-group-card {{index === 0 ? 'js-first-tee-group' : ''}}"
                 data-group-id="{{item.groupId || item.id}}"
                 bindtap="onScheduleTeeGroupTap"
               >
@@ -800,6 +808,7 @@
                 <text class="tee-status">{{item.statusBadge}}</text>
               </view>
             </view>
+          </block>
           </block>
         </block>
 
@@ -872,6 +881,7 @@
           rounds="{{standings.roundSelectorItems}}"
           round-info-text="{{standings.roundInfoText}}"
           scroll-left="{{roundSelectorScrollLeft}}"
+          into-view="{{standingsDockIntoView}}"
           theme-class="{{themeClass}}"
           bind:roundtap="onStandingsRoundTap"
           bind:hscroll="onRoundSelectorHScroll"
@@ -879,7 +889,7 @@
       </view>
     </view>
 
-    <!-- 赛程 fixed dock：与总榜互斥 TAB；始终挂载，只 show/hide -->
+    <!-- 出发表 fixed dock：与总榜互斥 TAB；始终挂载，只 show/hide -->
     <view
       class="series-round-dock series-round-dock--fixed {{activeTab === 'schedule' && schedule.roundSelector.length && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}}"
       style="top:{{stickyRoundSelectorTop}}px;"
@@ -893,6 +903,7 @@
           rounds="{{schedule.roundSelector}}"
           round-info-text="{{schedule.roundInfoText}}"
           scroll-left="{{scheduleRoundSelectorScrollLeft}}"
+          into-view="{{scheduleDockIntoView}}"
           theme-class="{{themeClass}}"
           bind:roundtap="onScheduleRoundTap"
           bind:hscroll="onScheduleRoundHScroll"
@@ -913,7 +924,7 @@
 
     <!-- 报名 CTA：C3-D 几何门闩 + C3-Z M 弹层时强制隐藏/不可点 -->
     <view
-      wx:if="{{showRegisterBottomAction && !isManageOverlayActive}}"
+      wx:if="{{showRegisterBottomAction}}"
       class="register-cta-bar series-layer-tab-cta {{(registerSheetVisible || registerForOtherSheetVisible || proxyMemberSourceSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || isManageOverlayActive) ? 'register-cta-bar--under-sheet' : ''}}"
     >
       <view
@@ -922,13 +933,19 @@
       >{{register.cta.label}}</view>
     </view>
 
-    <!-- 赛程 CTA：C3-D + C3-Z -->
+    <!-- 赛程 CTA：未开始轮复用普通单场分组操作区；LIVE 进入小组走 tee-quick-entry-float -->
     <view
-      wx:if="{{showScheduleBottomAction && !isManageOverlayActive}}"
+      wx:if="{{showScheduleBottomAction}}"
       class="register-cta-bar series-layer-tab-cta"
     >
       <view class="register-cta-btn" bindtap="openScheduleGroupEditor">{{schedule.cta.editGroupsLabel}}</view>
     </view>
+
+    <view
+      wx:if="{{activeTab === 'schedule' && schedule.cta.showEnterMyGroupEligible && scheduleQuickEntryVisible && !isManageOverlayActive}}"
+      bindtap="onEnterMyGroup"
+      class="tee-quick-entry-float"
+    >{{schedule.cta.enterMyGroupLabel}}</view>
 
     <!-- 本人报名 sheet（替他人报名复刻队际赛多步 sheet，见下方） -->
     <view wx:if="{{registerSheetVisible}}" bindtap="closeRegisterSheet" class="sheet-overlay"></view>
@@ -1187,7 +1204,7 @@
             <text class="fst-main">系列赛管理</text>
             <text class="fst-sub">仅管理员</text>
           </view>
-          <!-- 四列网格：第1取消系列赛，第2打开/关闭报名；不造第3/4位占位 -->
+          <!-- 四列网格：修改系列赛 / 取消 / 报名开关 / 结束系列赛 -->
           <view class="series-manage-feature-grid">
             <view
               wx:for="{{seriesManageFeaturesManage}}"

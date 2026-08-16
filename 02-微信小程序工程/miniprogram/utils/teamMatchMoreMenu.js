@@ -8,6 +8,7 @@ var matchManageAccess = require('./matchManageAccess.js');
 var tempAdminPermission = require('./tempAdminPermission.js');
 var { isTeamMatchFamily } = require('./teamMatchCapabilities.js');
 var strokeEntityValidator = require('./strokeEntityValidator.js');
+var teamMatchFinish = require('./teamMatchFinish.js');
 var isMatchPlayBoardMode = strokeEntityValidator.isMatchPlayBoardMode;
 var resolveGameMode = strokeEntityValidator.resolveGameMode;
 
@@ -92,7 +93,8 @@ var SERIES_SCOPE_PERMISSIONS = {
   register_for_other: true,
   invite_friends_register: true,
   toggle_registration: true,
-  cancel_series: true
+  cancel_series: true,
+  finish_series: true
 };
 
 function asString(v) {
@@ -199,13 +201,14 @@ function splitPermissionFeatures(list) {
   };
 }
 
-function getMoreFeatureDisabledState(match, feature) {
+function getMoreFeatureDisabledState(match, feature, seriesCompleted) {
   if (!feature || feature.empty) return false;
   var permission = feature.permission != null ? String(feature.permission) : '';
   if (!permission || FEATURES_VIEW_PERMISSION_SET[permission]) return false;
 
-  var status = asString(match && match.status).toLowerCase();
-  if (status !== 'finished') return false;
+  var locked =
+    !!seriesCompleted || teamMatchFinish.isMatchCompleted(match);
+  if (!locked) return false;
 
   if (permission === 'manage_payment') return false;
 
@@ -218,15 +221,17 @@ function getMoreFeatureDisabledState(match, feature) {
   return true;
 }
 
-function withMoreFeatureDisabledState(list, match) {
+function withMoreFeatureDisabledState(list, match, seriesCompleted) {
   return (Array.isArray(list) ? list : []).map(function (f) {
     if (!f || f.empty) return f;
     var next = Object.assign({}, f, {
-      disabled: getMoreFeatureDisabledState(match, f)
+      disabled: getMoreFeatureDisabledState(match, f, seriesCompleted)
     });
     if (String(f.permission || '') === 'finish_match') {
-      var status = asString(match && match.status).toLowerCase();
-      next.label = status === 'finished' ? '已结束' : '结束比赛';
+      next.label =
+        !!seriesCompleted || teamMatchFinish.isMatchCompleted(match)
+          ? '已结束'
+          : '结束比赛';
     }
     return next;
   });
@@ -280,6 +285,7 @@ function buildMoreMenuViewModel(input) {
   var user = src.user && typeof src.user === 'object' ? src.user : {};
   var opts = src.options && typeof src.options === 'object' ? src.options : {};
   var managedSeriesMode = opts.managedSeriesMode === true;
+  var seriesCompleted = opts.seriesCompleted === true;
   var userId = asString(user.userId || user.id);
   var lifecycle = resolveMatchLifecycle(match);
   var access = matchManageAccess.resolveMatchManageAccess(match, user);
@@ -346,14 +352,15 @@ function buildMoreMenuViewModel(input) {
       commonR = filterSeriesManagedPermissions(commonR);
     }
     return {
-      featuresCommon: withMoreFeatureDisabledState(commonR, match),
-      featuresPermission: withMoreFeatureDisabledState(splitR.featuresPermission, match),
+      featuresCommon: withMoreFeatureDisabledState(commonR, match, seriesCompleted),
+      featuresPermission: withMoreFeatureDisabledState(splitR.featuresPermission, match, seriesCompleted),
       featuresPermissionFooterPad: splitR.featuresPermissionFooterPad,
       featuresPermissionFooter: withMoreFeatureDisabledState(
         splitR.featuresPermissionFooter,
-        match
+        match,
+        seriesCompleted
       ),
-      lifecycleActions: withMoreFeatureDisabledState(lifecycleActions, match),
+      lifecycleActions: withMoreFeatureDisabledState(lifecycleActions, match, seriesCompleted),
       featuresSectionCommonMain: sectionR.commonMain,
       featuresSectionCommonSub: sectionR.commonSub,
       featuresSectionPermissionMain: sectionR.permissionMain,
@@ -427,10 +434,10 @@ function buildMoreMenuViewModel(input) {
   }
 
   return {
-    featuresCommon: withMoreFeatureDisabledState(commonFeatures, match),
-    featuresPermission: withMoreFeatureDisabledState(split.featuresPermission, match),
+    featuresCommon: withMoreFeatureDisabledState(commonFeatures, match, seriesCompleted),
+    featuresPermission: withMoreFeatureDisabledState(split.featuresPermission, match, seriesCompleted),
     featuresPermissionFooterPad: footerPad,
-    featuresPermissionFooter: withMoreFeatureDisabledState(footer, match),
+    featuresPermissionFooter: withMoreFeatureDisabledState(footer, match, seriesCompleted),
     lifecycleActions: [],
     featuresSectionCommonMain: section.commonMain,
     featuresSectionCommonSub: section.commonSub,

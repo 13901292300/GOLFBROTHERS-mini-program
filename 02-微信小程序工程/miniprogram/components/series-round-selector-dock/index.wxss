@@ -78,9 +78,9 @@
   border-color: rgba(15, 23, 42, 0.08);
 }
 .round-selector-state--grouped {
-  background: var(--cloud-blue, #002d62);
+  background: var(--champion-gold);
   color: #ffffff;
-  border-color: var(--cloud-blue, #002d62);
+  border-color: var(--champion-gold);
 }
 .round-selector-state--live {
   background: var(--data-blue, #00aeef);

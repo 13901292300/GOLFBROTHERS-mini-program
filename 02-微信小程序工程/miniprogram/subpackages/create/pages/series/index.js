@@ -16,6 +16,7 @@ const seriesInfoUpdate = require('../../../../utils/seriesInfoUpdate.js');
 const seriesParticipantsUpdate = require('../../../../utils/seriesParticipantsUpdate.js');
 const seriesStationMatch = require('../../../../utils/seriesStationMatch.js');
 const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
+const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 const seriesStoreDefault = require('../../../../utils/seriesStore.js');
 
 var PUBLISHED_STRUCTURE_LOCKED_MSG =
@@ -1274,6 +1275,10 @@ Page({
       this._enterInitError('系列赛数据异常', false);
       return;
     }
+    if (seriesFinishLock.isSeriesCompleted(series)) {
+      this._enterInitError(seriesFinishLock.SERIES_COMPLETED_TOAST, false);
+      return;
+    }
     try {
       this._getInfoUpdateService().recoverInterruptedEdit();
     } catch (eRec) {
@@ -1326,6 +1331,10 @@ Page({
     }
     if (!series || String(series.lifecycleStatus || '').trim() !== 'published') {
       this._enterInitError('本轮比赛数据异常', false);
+      return;
+    }
+    if (seriesFinishLock.isSeriesCompleted(series)) {
+      this._enterInitError(seriesFinishLock.SERIES_COMPLETED_TOAST, false);
       return;
     }
     var round = null;

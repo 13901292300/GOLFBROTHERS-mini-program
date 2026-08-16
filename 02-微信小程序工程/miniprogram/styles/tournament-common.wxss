@@ -2013,3 +2013,32 @@ page {
 .detail-page.font-large .info-row-label {
   font-size: 26rpx;
 }
+
+/* 状态标签：复用首页 LIVE / 报名中金色 / 已结束灰，供系列赛出发表与轮次 LIVE 文案 */
+.badge-gold {
+  background: var(--champion-gold);
+  color: #ffffff;
+  font-style: italic;
+}
+.badge-live {
+  background: var(--data-blue, #00aeef);
+  color: #ffffff;
+  font-style: italic;
+}
+.badge-finished {
+  background: #6b7280;
+  color: #ffffff;
+  font-style: italic;
+}
+.live-badge-pulse {
+  animation: flash-live 1.5s ease-in-out infinite;
+}
+@keyframes flash-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}

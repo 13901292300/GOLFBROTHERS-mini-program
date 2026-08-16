@@ -772,10 +772,10 @@
 
   <!-- 出发表 TAB：透明悬浮快捷按钮（仅当"第一组卡片完全进入视口"时显示，固定底部，不参与布局流） -->
   <view
-    wx:if="{{activeTab === 'tee-sheet' && quickEntryVisible}}"
+    wx:if="{{activeTab === 'tee-sheet' && quickEntryVisible && teeSheetBottomCta.showEnterMyGroupEligible}}"
     bindtap="onEnterMyGroup"
     class="tee-quick-entry-float"
-  >快速进入自己的小组 ›</view>
+  >{{teeSheetBottomCta.enterMyGroupLabel}}</view>
 
   <!-- MORE FAB（讨论区为聚焦聊天全屏层，隐藏 FAB，避免遮挡输入栏） -->
   <view
@@ -1028,7 +1028,7 @@
     wx:if="{{activeTab === 'groups' && canManageGroups && !hideRegisterCTA}}"
     class="register-cta-bar {{(registerForOtherSheetVisible || proxyMemberSourceSheetVisible || proxyGroupSheetVisible || registerForOtherManualVisible || registerSheetVisible) ? 'register-cta-bar--under-sheet' : ''}}"
   >
-    <view bindtap="onOpenGroupEditor" class="register-cta-btn">{{hasFormalGroups ? '修改分组' : '开始分组'}}</view>
+    <view bindtap="onOpenGroupEditor" class="register-cta-btn">{{groupsBottomCtaLabel}}</view>
   </view>
 
   <!-- 报名弹窗：分组选择 + 比赛名 + 手机号 + 确认报名 -->

@@ -99,6 +99,12 @@ var REGISTRATION_STATE = {
   closed: true
 };
 
+var COMPLETION_SOURCE = {
+  auto: true,
+  manual: true,
+  backend: true
+};
+
 var ROSTER_REGISTRATION_STATUS = {
   registered: true,
   cancelled: true
@@ -300,6 +306,17 @@ function resolveCreatedByField(src) {
   return alt;
 }
 
+function coerceCompletionFields(src) {
+  var lifeRaw = asString(src && src.lifecycleStatus, '');
+  var phaseRaw = asString(src && src.competitionPhaseCache, '');
+  if (phaseRaw === 'finished') phaseRaw = 'completed';
+  if (lifeRaw === 'finished' || lifeRaw === 'completed') {
+    phaseRaw = 'completed';
+    lifeRaw = 'published';
+  }
+  return { lifecycleStatus: lifeRaw, competitionPhaseCache: phaseRaw };
+}
+
 function createEmptySeriesDraft(partial) {
   var src = isPlainObject(partial) ? partial : {};
   var ts = nowIso();
@@ -316,17 +333,27 @@ function createEmptySeriesDraft(partial) {
     src.seriesId != null && String(src.seriesId).trim() !== ''
       ? String(src.seriesId).trim()
       : seriesIds.generateSeriesId();
+  var coerced = coerceCompletionFields(src);
+  var life =
+    LIFECYCLE_STATUS[coerced.lifecycleStatus]
+      ? coerced.lifecycleStatus
+      : src.lifecycleStatus
+        ? coerced.lifecycleStatus
+        : 'draft';
+  var phase = COMPETITION_PHASE[coerced.competitionPhaseCache]
+    ? coerced.competitionPhaseCache
+    : COMPETITION_PHASE[src.competitionPhaseCache]
+      ? src.competitionPhaseCache
+      : 'scheduled';
 
   return {
     schemaVersion: SCHEMA_VERSION,
     seriesId: seriesId,
     // 归属/审计；公开展示勿用；空串表示未知（不伪造）
     createdBy: resolveCreatedByField(src),
-    lifecycleStatus: LIFECYCLE_STATUS[src.lifecycleStatus] ? src.lifecycleStatus : 'draft',
+    lifecycleStatus: LIFECYCLE_STATUS[life] ? life : 'draft',
     // 缓存相位，非分站状态权威；由轮次/分站聚合推导后可写入（报名状态机留 4C-4）
-    competitionPhaseCache: COMPETITION_PHASE[src.competitionPhaseCache]
-      ? src.competitionPhaseCache
-      : 'scheduled',
+    competitionPhaseCache: phase,
     hostMode: HOST_MODE[src.hostMode] ? src.hostMode : '',
     templateId: TEMPLATE_ID[src.templateId] ? src.templateId : '',
     seriesName: asString(src.seriesName, ''),
@@ -375,7 +402,10 @@ function createEmptySeriesDraft(partial) {
         ? Math.floor(Number(src.ruleVersion))
         : createDefaultScoringRule(src.scoringRule).ruleVersion,
     createdAt: asString(src.createdAt, ts),
-    updatedAt: asString(src.updatedAt, ts)
+    updatedAt: asString(src.updatedAt, ts),
+    completedAt: asString(src.completedAt, ''),
+    completedBy: asString(src.completedBy, ''),
+    completionSource: COMPLETION_SOURCE[src.completionSource] ? src.completionSource : ''
   };
 }
 
@@ -663,6 +693,8 @@ function normalizeSeries(raw) {
       ? Math.floor(Number(scoringRule.ruleVersion))
       : 1;
 
+  var coerced = coerceCompletionFields(src);
+
   return {
     schemaVersion:
       asFiniteNumberOrNull(src.schemaVersion) != null
@@ -671,8 +703,14 @@ function normalizeSeries(raw) {
     seriesId: src.seriesId != null ? String(src.seriesId).trim() : '',
     // 保留已有非空 createdBy；缺失/空不伪造当前用户；不写出 creatorId/ownerUserId
     createdBy: resolveCreatedByField(src),
-    lifecycleStatus: normalizeEnumField(src.lifecycleStatus, 'draft'),
-    competitionPhaseCache: normalizeEnumField(src.competitionPhaseCache, 'scheduled'),
+    lifecycleStatus: normalizeEnumField(
+      coerced.lifecycleStatus || src.lifecycleStatus,
+      'draft'
+    ),
+    competitionPhaseCache: normalizeEnumField(
+      coerced.competitionPhaseCache || src.competitionPhaseCache,
+      'scheduled'
+    ),
     hostMode: asString(src.hostMode, ''),
     templateId: asString(src.templateId, ''),
     seriesName: asString(src.seriesName, ''),
@@ -716,7 +754,10 @@ function normalizeSeries(raw) {
         ? Math.floor(Number(src.ruleVersion))
         : ruleVersionDefault,
     createdAt: asString(src.createdAt, ts),
-    updatedAt: asString(src.updatedAt, ts)
+    updatedAt: asString(src.updatedAt, ts),
+    completedAt: asString(src.completedAt, ''),
+    completedBy: asString(src.completedBy, ''),
+    completionSource: COMPLETION_SOURCE[src.completionSource] ? src.completionSource : ''
   };
 }
 
@@ -754,6 +795,7 @@ module.exports = {
   PARTICIPANT_KIND: PARTICIPANT_KIND,
   PUBLISH_STATE: PUBLISH_STATE,
   REGISTRATION_STATE: REGISTRATION_STATE,
+  COMPLETION_SOURCE: COMPLETION_SOURCE,
   ROSTER_REGISTRATION_STATUS: ROSTER_REGISTRATION_STATUS,
   nowIso: nowIso,
   deepClone: deepClone,

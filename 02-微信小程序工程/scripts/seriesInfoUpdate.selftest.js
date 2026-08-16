@@ -390,12 +390,13 @@ function createHarness(opts) {
     }
   });
   assert(
-    '管理区顺序：修改系列赛/取消/报名',
-    adminSheet.seriesScope.featuresManage.length === 3 &&
+    '管理区顺序：修改系列赛/取消/报名/结束',
+    adminSheet.seriesScope.featuresManage.length === 4 &&
       adminSheet.seriesScope.featuresManage[0].permission === 'edit_series' &&
       adminSheet.seriesScope.featuresManage[0].label === '修改系列赛' &&
       adminSheet.seriesScope.featuresManage[1].permission === 'cancel_series' &&
-      adminSheet.seriesScope.featuresManage[2].permission === 'toggle_registration'
+      adminSheet.seriesScope.featuresManage[2].permission === 'toggle_registration' &&
+      adminSheet.seriesScope.featuresManage[3].permission === 'finish_series'
   );
   var normalSheet = sheetVm.buildSeriesManageSheetViewModel({
     series: seriesForSheet,

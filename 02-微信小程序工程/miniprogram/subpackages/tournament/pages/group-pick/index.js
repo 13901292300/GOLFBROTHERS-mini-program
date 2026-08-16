@@ -664,7 +664,7 @@ Page({
   /**
    * 弹窗列表状态：
    * checked  = 是否在当前 slots（临时选中）
-   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人 / 前序轮 no-repeat
+   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人 / 其他轮次 no-repeat
    */
   _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];

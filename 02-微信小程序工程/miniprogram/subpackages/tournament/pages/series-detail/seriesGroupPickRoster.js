@@ -6,17 +6,18 @@
 
 var seriesStore = require('../../../../utils/seriesStore.js');
 var seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
-var seriesStationManageGate = require('../../../../utils/seriesStationManageGate.js');
-var teamMatchStore = require('../../../../utils/teamMatchStore.js');
+var seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
 var seriesScheduleGroupWrite = require('./seriesScheduleGroupWrite.js');
 
 var STATION_DATA_INVALID_MSG =
-  seriesScheduleGroupWrite.STATION_DATA_INVALID_MSG || '本轮比赛数据异常';
-var NO_REPEAT_TOGGLE_MSG = '该球员已在前序轮次上场';
-var NO_REPEAT_SAVE_MSG = '存在已在前序轮次上场的球员';
-var NO_REPEAT_HINT = '已在前序轮次上场';
-var NO_REPEAT_REASON = 'player_already_played_prior_round';
-var NO_REPEAT_DISABLED_REASON = 'no_repeat_prior_round';
+  seriesScheduleGroupWrite.STATION_DATA_INVALID_MSG ||
+  seriesNoRepeatLineup.STATION_DATA_INVALID_MSG ||
+  '本轮比赛数据异常';
+var NO_REPEAT_REASON = seriesNoRepeatLineup.NO_REPEAT_REASON;
+var NO_REPEAT_DISABLED_REASON = seriesNoRepeatLineup.NO_REPEAT_DISABLED_REASON;
+var NO_REPEAT_HINT = '已在其他轮次上场';
+var NO_REPEAT_TOGGLE_MSG = NO_REPEAT_HINT;
+var NO_REPEAT_SAVE_MSG = NO_REPEAT_HINT;
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -85,258 +86,32 @@ function resolveRosterPlayerId(entry) {
   return asString(entry && entry.playerId) || asString(entry && entry.userId);
 }
 
-function isFromSeriesFlag(v) {
-  return v === true || v === 1 || String(v) === '1';
-}
-
 function isNoRepeatRuleActive(series, fromSeries) {
-  if (!isFromSeriesFlag(fromSeries)) return false;
-  var rule = series && series.scoringRule;
-  return !!(rule && rule.allowRepeat === false);
-}
-
-function hasNumericRoundIndex(round) {
-  if (!round || round.index == null || round.index === '') return false;
-  return isFinite(Number(round.index));
-}
-
-function locateRoundAndPriors(series, currentRoundId) {
-  var rid = asString(currentRoundId);
-  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
-  var foundIdx = -1;
-  var i;
-  for (i = 0; i < rounds.length; i++) {
-    if (asString(rounds[i] && rounds[i].roundId) === rid) {
-      foundIdx = i;
-      break;
-    }
-  }
-  if (!rid || foundIdx < 0) {
-    return { ok: false, reason: 'round_not_located', message: STATION_DATA_INVALID_MSG };
-  }
-  var current = rounds[foundIdx];
-  var currentHasIndex = hasNumericRoundIndex(current);
-  var currentIndex = currentHasIndex ? Number(current.index) : foundIdx;
-  var priorRounds = [];
-  for (i = 0; i < rounds.length; i++) {
-    if (i === foundIdx) continue;
-    var round = rounds[i];
-    if (!round || !asString(round.roundId)) continue;
-    var isPrior;
-    if (currentHasIndex && hasNumericRoundIndex(round)) {
-      isPrior = Number(round.index) < currentIndex;
-    } else {
-      isPrior = i < foundIdx;
-    }
-    if (isPrior) priorRounds.push(round);
-  }
-  return {
-    ok: true,
-    current: current,
-    currentIndex: foundIdx,
-    priorRounds: priorRounds
-  };
+  return seriesNoRepeatLineup.isNoRepeatRuleActive(series, fromSeries);
 }
 
 function collectPlayerIdsFromGroups(groups) {
-  var ids = Object.create(null);
-  var list = Array.isArray(groups) ? groups : [];
-  for (var gi = 0; gi < list.length; gi++) {
-    var players = list[gi] && Array.isArray(list[gi].players) ? list[gi].players : [];
-    for (var pi = 0; pi < players.length; pi++) {
-      var p = players[pi];
-      var pid = asString(p && p.playerId);
-      var uid = asString(p && p.userId);
-      if (pid) ids[pid] = true;
-      if (uid) ids[uid] = true;
-    }
-  }
-  return ids;
+  return seriesNoRepeatLineup.collectPlayerIdsFromGroups(groups);
 }
 
 function collectPlayerIdsFromSlots(slots) {
-  var ids = Object.create(null);
-  var list = Array.isArray(slots) ? slots : [];
-  for (var i = 0; i < list.length; i++) {
-    var s = list[i];
-    var pid = asString(s && s.playerId) || asString(s && s.userId);
-    if (pid) ids[pid] = true;
-  }
-  return ids;
+  return seriesNoRepeatLineup.collectPlayerIdsFromSlots(slots);
 }
 
-function defaultGetMatchById(matchId) {
-  return typeof teamMatchStore.getMatchById === 'function'
-    ? teamMatchStore.getMatchById(matchId)
-    : null;
-}
-
-function defaultGetIndexByMatchId(matchId) {
-  return typeof seriesStationIndex.getByMatchId === 'function'
-    ? seriesStationIndex.getByMatchId(matchId)
-    : null;
-}
-
-/**
- * 前序 managed 分站正式 groups[].players 上场集合。
- * allowRepeat===false 且 fromSeries 时启用；任一前序分站核验失败则 fail closed。
- */
 function collectPriorPlayedPlayerIds(input) {
-  var src = input && typeof input === 'object' ? input : {};
-  var empty = function (extra) {
-    return Object.assign(
-      {
-        ok: true,
-        enabled: false,
-        playerIds: Object.create(null),
-        priorRoundIds: []
-      },
-      extra || {}
-    );
-  };
-  if (!isFromSeriesFlag(src.fromSeries)) {
-    return empty({ reason: 'not_from_series' });
-  }
-  var series =
-    src.series && typeof src.series === 'object'
-      ? src.series
-      : asString(src.seriesId) && typeof seriesStore.getSeriesById === 'function'
-        ? seriesStore.getSeriesById(src.seriesId)
-        : null;
-  if (!series) {
-    return {
-      ok: false,
-      enabled: false,
-      reason: 'series_required',
-      message: STATION_DATA_INVALID_MSG,
-      playerIds: Object.create(null),
-      priorRoundIds: []
-    };
-  }
-  if (!isNoRepeatRuleActive(series, src.fromSeries)) {
-    return empty({ reason: 'allow_repeat' });
-  }
-  var located = locateRoundAndPriors(series, src.currentRoundId || src.roundId);
-  if (!located.ok) {
-    return {
-      ok: false,
-      enabled: false,
-      reason: located.reason,
-      message: STATION_DATA_INVALID_MSG,
-      playerIds: Object.create(null),
-      priorRoundIds: []
-    };
-  }
-  var getMatchById =
-    typeof src.getMatchById === 'function' ? src.getMatchById : defaultGetMatchById;
-  var getIndexByMatchId =
-    typeof src.getIndexByMatchId === 'function'
-      ? src.getIndexByMatchId
-      : defaultGetIndexByMatchId;
-  var playerIds = Object.create(null);
-  var priorRoundIds = [];
-  for (var i = 0; i < located.priorRounds.length; i++) {
-    var round = located.priorRounds[i];
-    var roundId = asString(round.roundId);
-    var gate = seriesStationManageGate.verifyManagedStationForManage({
-      series: series,
-      roundId: roundId,
-      getMatchById: getMatchById,
-      getIndexByMatchId: getIndexByMatchId
-    });
-    if (!gate || !gate.ok) {
-      return {
-        ok: false,
-        enabled: true,
-        reason: (gate && gate.reason) || 'managed_station_invalid',
-        message: STATION_DATA_INVALID_MSG,
-        playerIds: Object.create(null),
-        priorRoundIds: priorRoundIds
-      };
-    }
-    priorRoundIds.push(roundId);
-    var fromMatch = collectPlayerIdsFromGroups(gate.match && gate.match.groups);
-    var keys = Object.keys(fromMatch);
-    for (var k = 0; k < keys.length; k++) {
-      playerIds[keys[k]] = true;
-    }
-  }
-  return {
-    ok: true,
-    enabled: true,
-    playerIds: playerIds,
-    priorRoundIds: priorRoundIds,
-    currentRoundId: asString(src.currentRoundId || src.roundId)
-  };
+  return seriesNoRepeatLineup.collectOtherRoundOccupancy(input);
 }
 
 function mergeNoRepeatLockFields(user, lockResult) {
-  var next = user && typeof user === 'object' ? Object.assign({}, user) : {};
-  var uid = asString(next.userId) || asString(next.playerId);
-  var checked = !!(next.isSelected || next.checked);
-  if (!lockResult || !lockResult.ok) {
-    if (!checked) next.isDisabled = true;
-    return next;
-  }
-  if (!lockResult.enabled) return next;
-  if (!uid || !lockResult.playerIds[uid]) return next;
-  next.noRepeatLocked = true;
-  next.disabledReason = NO_REPEAT_DISABLED_REASON;
-  next.isDisabled = true;
-  next.noRepeatHint = NO_REPEAT_HINT;
-  return next;
+  return seriesNoRepeatLineup.mergeNoRepeatLockFields(user, lockResult);
 }
 
 function shouldBlockNoRepeatAdd(playerId, lockResult) {
-  var uid = asString(playerId);
-  if (!lockResult || !lockResult.ok) {
-    return {
-      blocked: true,
-      reason: (lockResult && lockResult.reason) || 'managed_station_invalid',
-      message: (lockResult && lockResult.message) || STATION_DATA_INVALID_MSG
-    };
-  }
-  if (!lockResult.enabled || !uid || !lockResult.playerIds[uid]) {
-    return { blocked: false };
-  }
-  return {
-    blocked: true,
-    reason: NO_REPEAT_REASON,
-    message: NO_REPEAT_TOGGLE_MSG
-  };
+  return seriesNoRepeatLineup.shouldBlockNoRepeatAdd(playerId, lockResult);
 }
 
 function assertPlayersNotPlayedPriorRound(playerIds, inputOrLock) {
-  var lock =
-    inputOrLock && inputOrLock.playerIds && Object.prototype.hasOwnProperty.call(inputOrLock, 'ok')
-      ? inputOrLock
-      : collectPriorPlayedPlayerIds(inputOrLock);
-  if (!lock || !lock.ok) {
-    return {
-      ok: false,
-      reason: (lock && lock.reason) || 'managed_station_invalid',
-      message: (lock && lock.message) || STATION_DATA_INVALID_MSG
-    };
-  }
-  if (!lock.enabled) return { ok: true, enabled: false };
-  var ids = playerIds;
-  if (ids && typeof ids === 'object' && !Array.isArray(ids)) {
-    ids = Object.keys(ids).filter(function (k) {
-      return !!ids[k];
-    });
-  }
-  var list = Array.isArray(ids) ? ids : [];
-  for (var i = 0; i < list.length; i++) {
-    var uid = asString(list[i]);
-    if (uid && lock.playerIds[uid]) {
-      return {
-        ok: false,
-        reason: NO_REPEAT_REASON,
-        message: NO_REPEAT_SAVE_MSG
-      };
-    }
-  }
-  return { ok: true, enabled: true };
+  return seriesNoRepeatLineup.assertPlayersNotOccupied(playerIds, inputOrLock);
 }
 
 function resolveRosterDisplayName(entry) {
@@ -582,7 +357,6 @@ module.exports = {
   resolveRosterPlayerId: resolveRosterPlayerId,
   resolveRosterDisplayName: resolveRosterDisplayName,
   isNoRepeatRuleActive: isNoRepeatRuleActive,
-  locateRoundAndPriors: locateRoundAndPriors,
   collectPlayerIdsFromGroups: collectPlayerIdsFromGroups,
   collectPlayerIdsFromSlots: collectPlayerIdsFromSlots,
   collectPriorPlayedPlayerIds: collectPriorPlayedPlayerIds,

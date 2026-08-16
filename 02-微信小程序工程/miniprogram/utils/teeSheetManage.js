@@ -5,6 +5,7 @@
 
 const mockAvatars = require('./mockAvatars.js');
 const playerManage = require('./playerManage.js');
+const teamMatchFinish = require('./teamMatchFinish.js');
 
 const TIME_MODE_UNIFORM = 'uniform';
 const TIME_MODE_INTERVAL = 'interval';
@@ -542,6 +543,21 @@ function commitTeeSheetDraft(matchOrGame, draft) {
   if (!matchOrGame || !draft || !Array.isArray(draft.groups)) {
     return { ok: false, reason: 'invalid' };
   }
+  if (teamMatchFinish.isMatchCompleted(matchOrGame)) {
+    return {
+      ok: false,
+      reason: 'match_finished',
+      message: teamMatchFinish.MATCH_FINISHED_TOAST
+    };
+  }
+  var seriesTeeGuard = teamMatchFinish.assertWritable(matchOrGame);
+  if (!seriesTeeGuard.ok) {
+    return {
+      ok: false,
+      reason: seriesTeeGuard.reason,
+      message: seriesTeeGuard.message
+    };
+  }
   const byId = {};
   draft.groups.forEach((g) => {
     if (g && g.groupId) byId[String(g.groupId)] = g;
@@ -662,6 +678,71 @@ function buildTeeSheetTabView(matchOrGame, options) {
   });
 }
 
+function _resolveTeeCardPlayerId(player) {
+  if (!player || typeof player !== 'object') return '';
+  const id = player.userId || player.playerId || player.id || player.uid || player.openid;
+  return id != null ? String(id).trim() : '';
+}
+
+function _resolveTeeSheetLiveHoleCount(match, group) {
+  if (!match || !group) return 0;
+  const personalLeaderboardBoard = require('./personalLeaderboardBoard.js');
+  const players = Array.isArray(group.players) ? group.players.filter(Boolean) : [];
+  let maxThru = 0;
+  players.forEach((p) => {
+    const pid = _resolveTeeCardPlayerId(p);
+    const thru =
+      (personalLeaderboardBoard.computePlayerStats(match, group, p, pid) || {}).thru || 0;
+    if (thru > maxThru) maxThru = thru;
+  });
+  return maxThru;
+}
+
+/**
+ * 出发表 LIVE 角标：洞数 + 可选用时（如 3H 45'）。
+ * 与赛事详情出发表同一投影：仅覆盖 statusKey==='live' 的组；不改 statusKey / matchStatus。
+ */
+function applyLiveHoleStatusBadgeToTeeGroups(match, teeGroups) {
+  const list = Array.isArray(teeGroups) ? teeGroups : [];
+  if (!list.length) return list;
+  const gameProgress = require('./gameProgress.js');
+  const groups = match && Array.isArray(match.groups) ? match.groups : [];
+  const groupById = {};
+  groups.forEach((g) => {
+    if (!g || g.groupId == null) return;
+    groupById[String(g.groupId)] = g;
+  });
+  const scoreData =
+    match && match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : null;
+  return list.map((card) => {
+    if (!card || card.statusKey !== 'live') return card;
+    const groupId =
+      card.groupId != null || card.id != null ? String(card.groupId || card.id) : '';
+    let holeCount = 0;
+    if (match) {
+      holeCount = _resolveTeeSheetLiveHoleCount(match, groupById[groupId] || null);
+    }
+    let statusBadge = String(holeCount) + 'H';
+    const bucket =
+      scoreData && groupId && scoreData[groupId] && typeof scoreData[groupId] === 'object'
+        ? scoreData[groupId]
+        : null;
+    const firstScoreAt = bucket ? Number(bucket.firstScoreAt) : NaN;
+    if (Number.isFinite(firstScoreAt) && firstScoreAt > 0) {
+      const finishedScoreAt = bucket ? Number(bucket.finishedScoreAt) : NaN;
+      const endMs =
+        Number.isFinite(finishedScoreAt) && finishedScoreAt > 0
+          ? finishedScoreAt
+          : Date.now();
+      statusBadge =
+        statusBadge + gameProgress.formatLiveDurationBadgeSuffix(firstScoreAt, endMs);
+    }
+    return Object.assign({}, card, { statusBadge: statusBadge });
+  });
+}
+
 function canManageTeeSheet(matchOrGame, userId, isPrivileged) {
   if (isPrivileged) return true;
   const uid = String(userId || '').trim();
@@ -707,6 +788,7 @@ module.exports = {
   commitTeeSheetDraft,
   mergeTeeFieldsByGroupId,
   buildTeeSheetTabView,
+  applyLiveHoleStatusBadgeToTeeGroups,
   resolveGroupDisplayPlayers,
   inferStartHoleIfNeededForGameGroup,
   inferStartHoleIfNeededForGroupsStoreGroup,

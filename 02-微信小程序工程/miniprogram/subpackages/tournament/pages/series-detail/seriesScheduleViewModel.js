@@ -1,16 +1,19 @@
 /**
  * Series 赛程 TAB ViewModel（纯投影）
- * - 分组卡：复用 utils/tournamentGroupCardView（对齐 detail 出发表/分组表权威口径）
+ * - 分组卡：复用 utils/tournamentGroupCardView + teeSheetManage.applyLiveHoleStatusBadgeToTeeGroups
  * - 无 TOT；轮次选择独立于总榜
  * - 不写 storage；不产出进入旧 detail 的 navUrl
  */
 
 var seriesDetailViewModel = require('./seriesDetailViewModel.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
+var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
 var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
 var tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js');
 var tournamentGroupCardView = require('../../../../utils/tournamentGroupCardView.js');
+var teeSheetManage = require('../../../../utils/teeSheetManage.js');
+var teamMatchBottomCta = require('../../../../utils/teamMatchBottomCta.js');
 var {
   isG2G3FamilyMode,
   isG4FamilyMode,
@@ -39,15 +42,7 @@ function indexRoundStates(roundStates) {
   return map;
 }
 
-function isDivisionSeriesSchedule(series) {
-  return (
-    asString(series && series.hostMode) === 'team' &&
-    asString(series && series.templateId) === 'division_series'
-  );
-}
-
 function resolveScheduleDisplayLabels(series, roundStates) {
-  if (!isDivisionSeriesSchedule(series)) return null;
   return seriesRoundDisplayLabels.buildSeriesRoundDisplayLabels(series, roundStates);
 }
 
@@ -104,7 +99,17 @@ function buildScheduleRoundSelector(series, roundStates, getMatchById) {
       index: index
     });
   }
-  var selectedKey = items.length ? items[0].key : '';
+  var selectedKey = seriesLiveSession.resolveDefaultTargetRoundId(
+    items.map(function (it) {
+      return {
+        roundId: it.key,
+        state: it.state,
+        stateClass: it.stateClass,
+        statusLabel: it.statusLabel
+      };
+    })
+  );
+  if (!selectedKey && items.length) selectedKey = items[0].key;
   if (selectedKey) {
     for (var j = 0; j < items.length; j++) {
       var sel = items[j].key === selectedKey;
@@ -345,6 +350,7 @@ function projectGroupCards(match, series) {
   var cards = tournamentGroupCardView.buildReadonlyGroupCards(match, {
     series: series || null
   });
+  cards = teeSheetManage.applyLiveHoleStatusBadgeToTeeGroups(match, cards);
   return attachCompositionPreviews(cards, match, series);
 }
 
@@ -354,12 +360,9 @@ function projectTeeGroups(match, series) {
 }
 
 function emptyCta() {
-  return {
-    showEditGroups: false,
-    /** 无正式分组：开始分组；有正式分组：修改分组（对齐队际赛底部 CTA） */
-    editGroupsLabel: '开始分组',
-    blockMessage: ''
-  };
+  var cta = teamMatchBottomCta.emptyCta();
+  cta.blockMessage = '';
+  return cta;
 }
 
 function emptyScheduleViewModel() {
@@ -369,6 +372,12 @@ function emptyScheduleViewModel() {
     roundSelectorItems: [],
     roundSelector: [],
     roundInfoText: '',
+    roundVisualState: '',
+    roundStatusBadge: '',
+    roundStatusBadgeClass: '',
+    showViewLeaderboard: false,
+    emptyGroupsTitle: '暂无分组',
+    emptyTeeTitle: '暂无出发表',
     panelMode: 'groups',
     matchId: '',
     gameMode: '',
@@ -386,6 +395,27 @@ function emptyScheduleViewModel() {
   };
 }
 
+function applySelectedRoundStatus(out) {
+  var vm = out && typeof out === 'object' ? out : emptyScheduleViewModel();
+  var items = Array.isArray(vm.roundSelectorItems) ? vm.roundSelectorItems : [];
+  var visualState = '';
+  var selected = asString(vm.selectedKey);
+  for (var i = 0; i < items.length; i++) {
+    if (items[i] && items[i].key === selected) {
+      visualState = asString(items[i].state);
+      break;
+    }
+  }
+  var roundStatus = seriesLiveSession.resolveScheduleCardStatus(visualState);
+  vm.roundVisualState = visualState;
+  vm.roundStatusBadge = roundStatus.text;
+  vm.roundStatusBadgeClass = roundStatus.badgeClass;
+  vm.showViewLeaderboard = visualState === 'live';
+  vm.emptyGroupsTitle = visualState === 'unassigned' ? '等待分组' : '暂无分组';
+  vm.emptyTeeTitle = '暂无出发表';
+  return vm;
+}
+
 function attachRoundDock(vm, roundStates, series) {
   var out = vm && typeof vm === 'object' ? vm : emptyScheduleViewModel();
   var items = Array.isArray(out.roundSelectorItems) ? out.roundSelectorItems : [];
@@ -396,7 +426,7 @@ function attachRoundDock(vm, roundStates, series) {
     labeledStatesForScheduleDock(series, roundStates),
     series
   );
-  return out;
+  return applySelectedRoundStatus(out);
 }
 
 /**
@@ -527,14 +557,16 @@ function buildSeriesScheduleViewModel(input) {
     panelMode === 'tee' ? projectTeeGroups(match, seriesRef) : [];
   var hasGroups = hasNonEmptyGroup(match && match.groups);
   var isRegistering = !!life.isRegistering;
-
-  // 对齐队际赛 detail：有管理权限即可进入独立 group-editor（含进行中 live）
-  // 开赛不在赛程 CTA；唯一入口为 M 面板本轮管理
-  var showEditGroups = flags.canManageGroups;
-  var editGroupsLabel = hasGroups ? '修改分组' : '开始分组';
-  var blockMessage = '';
+  var cta = teamMatchBottomCta.project({
+    match: match,
+    series: series,
+    surface: panelMode === 'tee' ? 'tee' : 'groups',
+    canManageGroups: flags.canManageGroups,
+    viewerUserId: src.viewerUserId
+  });
+  cta.blockMessage = '';
   if (isRegistering && !hasGroups) {
-    blockMessage = '请先完成本轮分组';
+    cta.blockMessage = '请先完成本轮分组';
   }
 
   return attachRoundDock(
@@ -558,11 +590,7 @@ function buildSeriesScheduleViewModel(input) {
       strokeCompositionMode: strokeCompositionMode,
       showCompositionMode: showCompositionMode,
       showCompositionPreview: showCompositionPreview,
-      cta: {
-        showEditGroups: showEditGroups,
-        editGroupsLabel: editGroupsLabel,
-        blockMessage: blockMessage
-      }
+      cta: cta
     },
     src.roundStates,
     series

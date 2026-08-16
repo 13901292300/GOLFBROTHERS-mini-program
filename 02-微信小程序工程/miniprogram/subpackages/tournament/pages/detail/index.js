@@ -25,6 +25,11 @@ const {
 } = require('../../../../utils/teamMatchCapabilities.js');
 const matchManageAccess = require('../../../../utils/matchManageAccess.js');
 const teamMatchMoreMenu = require('../../../../utils/teamMatchMoreMenu.js');
+const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
+const teamMatchBottomCta = require('../../../../utils/teamMatchBottomCta.js');
+const teamMatchEnterGroupScore = require('../../../../utils/teamMatchEnterGroupScore.js');
+const teamMatchViewerGroup = require('../../../../utils/teamMatchViewerGroup.js');
+const seriesFinalize = require('../../../../utils/seriesFinalize.js');
 const demoJiaobeiMatch = require('../../../../utils/demoJiaobeiMatch.js');
 const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const gameStore = require('../../../../utils/gameStore.js');
@@ -693,32 +698,7 @@ function createEmptyGroupPlayer(position) {
  * 4) 否则 individual_stroke
  */
 function resolveTournamentScorePageMode(match, groupId) {
-  const gameMode = String(
-    (match && (match.gameMode || match.selectedGameMode)) || ''
-  ).trim();
-  // G1 / G5：个人记分路径；禁止因残留 scoreEntities 落入 stroke_entity
-  if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) {
-    return 'individual_stroke';
-  }
-  // G6/G7/G8：比洞复用 G5 记分看板；禁止落入 stroke_entity / G2–G4 比杆页
-  if (isG6G7MatchPlayMode(gameMode) || isG8MatchPlayMode(gameMode)) {
-    return 'individual_stroke';
-  }
-  const gid = groupId != null ? String(groupId) : '';
-  const scoreEntities = match && match.scoreEntities;
-  if (scoreEntities && typeof scoreEntities === 'object' && !Array.isArray(scoreEntities)) {
-    const list = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
-    if (list.length > 0) return 'stroke_entity';
-  }
-  if (
-    gameMode === '最好成绩比杆赛' ||
-    gameMode === '四人四球比杆赛' ||
-    gameMode === '最佳球位比杆赛' ||
-    gameMode === '四人两球比杆赛'
-  ) {
-    return 'stroke_entity';
-  }
-  return 'individual_stroke';
+  return teamMatchEnterGroupScore.resolveTeamMatchScorePageMode(match, groupId);
 }
 
 /** 只读展示用：从正式 groups 规范化克隆（详情页不持有 groupDraft；正式位只保留 userId/position） */
@@ -887,7 +867,9 @@ Page({
     groups: [],
     groupsTabCards: [],
     hasFormalGroups: false,
+    groupsBottomCtaLabel: teamMatchBottomCta.START_GROUPS_LABEL,
     canManageGroups: false,
+    teeSheetBottomCta: teamMatchBottomCta.emptyCta(),
     // 报名但未进入正式分组：未安排出场（展示用，不阻止操作）
     unscheduledPlayerCount: 0,
     showGroupPairings: false,
@@ -1818,9 +1800,10 @@ Page({
     const leaderboardViewOptions = this._resolveLeaderboardViewOptions(match);
     const leaderboardDefaultView = this._resolveLeaderboardDefaultView(match);
     const currentView = this.data.leaderboardView || this._leaderboardModeToView(this.data.leaderboardMode);
-    const leaderboardView = leaderboardViewOptions.indexOf(currentView) >= 0
-      ? currentView
-      : leaderboardDefaultView;
+    const leaderboardView = leaderboardSettingViewModel.normalizeLeaderboardSelection(match, {
+      view: currentView,
+      scoreType: this.data.leaderboardScoreType
+    }).view;
     const leaderboardMode = this._leaderboardViewToMode(leaderboardView);
     const leaderboardTeamCompetitionEnabled = this._isTeamCompetitionEnabled(match);
     const showLeaderboardTeamColumn = this._shouldShowTeeSheetTeamLabel(match);
@@ -1958,14 +1941,23 @@ Page({
       playerLookup: playerLookup,
       matchTeeTime: teeSheetManage.resolveMatchTeeTime(match)
     });
+    const canManageGroups =
+      this._resolveCanManageGroups(match) && !teamMatchFinish.isMatchCompleted(match);
+    const groupsCta = teamMatchBottomCta.project({
+      match: match,
+      surface: 'groups',
+      canManageGroups: canManageGroups
+    });
     return {
       groups: formal,
       groupsTabCards: groupsTabCards,
       hasFormalGroups: formal.length > 0,
-      canManageGroups: this._resolveCanManageGroups(match),
+      groupsBottomCtaLabel: groupsCta.editGroupsLabel,
+      canManageGroups: canManageGroups,
       unscheduledPlayerCount: unscheduled.length,
       showGroupPairings: showPairings,
-      showGroupMatchPlayTeams: useG5MatchPlayDisplay
+      showGroupMatchPlayTeams: useG5MatchPlayDisplay,
+      teeSheetBottomCta: this._projectTeeSheetBottomCta(match)
     };
   },
 
@@ -3313,6 +3305,11 @@ Page({
       wx.showToast({ title: '未找到比赛信息', icon: 'none' });
       return;
     }
+    const liveMatch = teamMatchStore.getMatchById(matchId);
+    if (teamMatchFinish.isMatchCompleted(liveMatch)) {
+      wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
+      return;
+    }
     const mode = this.data.matchStatus && this.data.matchStatus.isOngoing
       ? 'live'
       : (this.data.hasFormalGroups ? 'edit' : 'create');
@@ -3344,7 +3341,7 @@ Page({
   /** 英雄区状态芯片：finished → 已结束；其余未结束（进行中）→ LIVE */
   _resolveCardStatusDisplay(match) {
     const status = String((match && match.status) || '').trim().toLowerCase();
-    if (status === 'finished') {
+    if (teamMatchFinish.isMatchCompleted(match)) {
       return { cardStatusText: '已结束', cardStatusTone: 'finished' };
     }
     if (status === 'registering') {
@@ -5222,25 +5219,36 @@ Page({
     }
   },
 
-  _resolveCurrentUserTournamentGroupId(match) {
-    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '').trim();
-    if (!currentUserId || !match || !Array.isArray(match.groups)) return '';
-    const group = match.groups.find((g) => {
-      const players = Array.isArray(g && g.players) ? g.players : [];
-      return players.some((player) => String((player && player.userId) || '').trim() === currentUserId);
+  _projectTeeSheetBottomCta(match) {
+    const user = gameStore.getCurrentUser() || {};
+    return teamMatchBottomCta.project({
+      match: match,
+      surface: 'tee',
+      canManageGroups: !!(this.data && this.data.canManageGroups),
+      viewerUserId: user,
+      firstGroupFullyVisible: !!(this.data && this.data.quickEntryVisible)
     });
-    return group && group.groupId != null ? String(group.groupId) : '';
+  },
+
+  _resolveCurrentUserTournamentGroupId(match) {
+    const currentUser = gameStore.getCurrentUser() || {};
+    return teamMatchViewerGroup.resolveViewerGroupId(match, currentUser);
   },
 
   onEnterMyGroup() {
     const matchId = this.data.matchId || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
-    const groupId = this._resolveCurrentUserTournamentGroupId(match);
-    if (!groupId) {
-      wx.showToast({ title: '当前未加入任何小组', icon: 'none' });
-      return;
-    }
-    this._enterTournamentGroupScore(groupId);
+    const user = gameStore.getCurrentUser() || {};
+    teamMatchEnterGroupScore.enterViewerGroupScore(match, user, {
+      mapPlayers: (group) => {
+        const lookup = this._buildGroupPlayerLookup(match);
+        return this.hydrateGroupDisplayPlayers(group, lookup).map((p) => ({
+          playerId: p.userId || p.playerId,
+          name: p.displayName || p.name,
+          avatar: p.avatar || ''
+        }));
+      }
+    });
   },
 
   // 出发表：点击任意组 → 个人比杆赛记分页。先写好该组 matchState，再统一 enterScorePage。
@@ -5252,73 +5260,15 @@ Page({
   _enterTournamentGroupScore(groupId) {
     const matchId = this.data.matchId || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
-    groupsStore.ensureInitialized();
-    const group = match && Array.isArray(match.groups)
-      ? match.groups.find((g) => String(g && g.groupId) === String(groupId))
-      : null;
     const lookup = this._buildGroupPlayerLookup(match);
-    let players = group
-      ? this.hydrateGroupDisplayPlayers(group, lookup).map((p) => ({
+    teamMatchEnterGroupScore.enterTeamMatchGroupScore(match, groupId, {
+      mapPlayers: (group) =>
+        this.hydrateGroupDisplayPlayers(group, lookup).map((p) => ({
           playerId: p.userId || p.playerId,
           name: p.displayName || p.name,
           avatar: p.avatar || ''
         }))
-      : [];
-    if (!players.length) {
-      players = groupsStore.loadGroupForScoring(groupId).map((p) => ({
-        playerId: p.playerId,
-        name: p.name,
-        avatar: p.avatar || ''
-      }));
-    }
-    const groupCount =
-      match && Array.isArray(match.groups) && match.groups.length
-        ? match.groups.length
-        : (groupsStore.getGroups() || []).length || 1;
-    const courseMeta = match
-      ? {
-          courseId: match.courseId || '',
-          courseName: match.courseName || match.venueName || '',
-          courseLocation: match.courseLocation || '',
-          courseHalfText: match.courseHalfText || '',
-          front9Course: match.front9Course || null,
-          back9Course: match.back9Course || null,
-          roundName: match.roundName || match.name || match.eventName || match.tournamentName || match.teamName || '',
-          gameMode: match.gameMode || match.selectedGameMode || '个人比杆赛',
-          teeTime: match.teeTime || match.date || '',
-          teeTimeText: match.teeTimeText || '',
-          visibility: match.visibility || '',
-          accessCode: match.accessCode || ''
-        }
-      : {};
-    const mode = resolveTournamentScorePageMode(match, groupId);
-    matchStateUtil.setMatchState({
-      mode: mode,
-      formatType: 'individual_stroke',
-      gameId: '',
-      matchId: matchId,
-      groupIndex: 0,
-      groupId: groupId,
-      players: players,
-      course: {
-        courseId: courseMeta.courseId || '',
-        courseName: courseMeta.courseName || '',
-        courseLocation: courseMeta.courseLocation || '',
-        halfText: courseMeta.courseHalfText || '',
-        roundName: courseMeta.roundName || '',
-        gameMode: courseMeta.gameMode || '个人比杆赛',
-        teeTime: courseMeta.teeTime || '',
-        teeTimeText: courseMeta.teeTimeText || '',
-        visibility: courseMeta.visibility || '',
-        accessCode: courseMeta.accessCode || '',
-        front9Course: courseMeta.front9Course || null,
-        back9Course: courseMeta.back9Course || null
-      },
-      scores: matchStateUtil.emptyScores(),
-      // 赛事出发表为多组场景：返回回到赛事详情（>1 → navigateBack）
-      groupCount: groupCount
     });
-    matchStateUtil.enterScorePage();
   },
 
   /* ===== 出发表 + 领先榜 ===== */
@@ -6941,7 +6891,8 @@ Page({
     }
     this.setData({
       teeGroups: teeGroups,
-      showLeaderboardTeamColumn: this._shouldShowTeeSheetTeamLabel(match)
+      showLeaderboardTeamColumn: this._shouldShowTeeSheetTeamLabel(match),
+      teeSheetBottomCta: this._projectTeeSheetBottomCta(match)
     });
   },
 
@@ -7204,12 +7155,16 @@ Page({
       (e && e.detail && e.detail.values) || this.data.leaderboardSettingDraftValues || {};
     const draftView = values.view || this.data.draftLeaderboardView;
     const draftScore = values.scoreType || this.data.draftLeaderboardScoreType;
-    const view = this.data.leaderboardViewOptions.indexOf(draftView) >= 0
-      ? draftView
-      : (this.data.leaderboardDefaultView || 'all');
-    const scoreType = draftScore === 'net' && this.data.leaderboardNetScoreAvailable
-      ? 'net'
-      : 'gross';
+    const match =
+      (this.data.matchId && teamMatchStore.getMatchById(this.data.matchId)) ||
+      this.data.match ||
+      null;
+    const normalized = leaderboardSettingViewModel.normalizeLeaderboardSelection(match, {
+      view: draftView,
+      scoreType: draftScore
+    });
+    const view = normalized.view;
+    const scoreType = normalized.scoreType;
     this.setData({
       showLeaderboardSettingSheet: false,
       activeTab: 'leaderboard',
@@ -8613,8 +8568,8 @@ Page({
       wx.showToast({ title: '未找到比赛信息', icon: 'none' });
       return;
     }
-    if (String(match.status || '').trim().toLowerCase() === 'finished') {
-      wx.showToast({ title: '比赛已经结束。', icon: 'none' });
+    if (teamMatchFinish.isMatchCompleted(match)) {
+      wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
       return;
     }
     // 动作层：弹窗前校验，避免无权限仍出现确认框（真正写入仍由 _confirmFinishMatch 再检）
@@ -8628,12 +8583,10 @@ Page({
       wx.showToast({ title: '暂无该管理权限', icon: 'none' });
       return;
     }
-    const isMatchPlay = isMatchPlayBoardMode(resolveGameMode(match));
+    const finishModal = teamMatchFinish.getFinishMatchModalContent(match);
     wx.showModal({
-      title: '结束比赛',
-      content: isMatchPlay
-        ? '比赛结束后，将锁定当前比赛结果。'
-        : '确认结束本场比赛？\n\n结束后：\n- 比赛进入最终状态\n- 可生成净杆成绩\n- 领先榜作为最终成绩展示',
+      title: finishModal.title,
+      content: finishModal.content,
       cancelText: '取消',
       confirmText: '确认',
       confirmColor: '#ce9224',
@@ -8651,11 +8604,6 @@ Page({
       wx.showToast({ title: '未找到比赛信息', icon: 'none' });
       return;
     }
-    if (String(match.status || '').trim().toLowerCase() === 'finished') {
-      wx.showToast({ title: '比赛已经结束。', icon: 'none' });
-      return;
-    }
-    // 动作层写入门：创建者/发起主体管理员全权，联合管理员须显式拥有 finish_match
     if (
       !matchManageAccess.hasMatchManagePermission(
         match,
@@ -8666,26 +8614,29 @@ Page({
       wx.showToast({ title: '暂无该管理权限', icon: 'none' });
       return;
     }
-    match.scoreData =
-      match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
-        ? match.scoreData
-        : {};
-    (Array.isArray(match.groups) ? match.groups : []).forEach((g) => {
-      const groupId = g && g.groupId != null ? String(g.groupId) : '';
-      if (!groupId) return;
-      const bucket =
-        match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
-          ? match.scoreData[groupId]
-          : null;
-      if (!bucket) return;
-      teamMatchStore.forceGroupScoreBucketFinishedScoreAt(bucket);
-      match.scoreData[groupId] = bucket;
-    });
-    match.status = 'finished';
-    match.statusLabel = '已结束';
-    match.finishedAt = Date.now();
-    match.updatedAt = Date.now();
-    teamMatchStore.saveMatch(match);
+    const confirmed = teamMatchFinish.confirmFinishWholeTeamMatch(match);
+    if (!confirmed.ok) {
+      wx.showToast({
+        title: confirmed.message || teamMatchFinish.MATCH_FINISHED_TOAST,
+        icon: 'none'
+      });
+      return;
+    }
+    const saved = teamMatchFinish.saveMatchIfWritable(match);
+    if (!saved.ok) {
+      wx.showToast({
+        title: saved.message || teamMatchFinish.MATCH_FINISHED_TOAST,
+        icon: 'none'
+      });
+      return;
+    }
+    try {
+      seriesFinalize.maybeFinalizeAfterStationPersisted(match, {
+        actor: gameStore.getCurrentUser() || {}
+      });
+    } catch (eFin) {
+      /* ignore */
+    }
     this.refreshMatchData(matchId);
     this.applyMoreAccess();
     wx.showToast({ title: '比赛已结束', icon: 'success' });

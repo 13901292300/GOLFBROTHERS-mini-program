@@ -12,6 +12,11 @@ const weatherService = require('../../../../utils/weatherService.js');
 const matchState = require('../../../../utils/matchState.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const matchStatus = require('../../../../utils/matchStatus.js');
+const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
+const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
+const scoreCompleteness = require('../../../../utils/scoreCompleteness.js');
+const scoreGroupCompletePrompt = require('../../../../utils/scoreGroupCompletePrompt.js');
+const scoreGroupFinish = require('../../../../utils/scoreGroupFinish.js');
 const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
@@ -617,9 +622,23 @@ function isTeamMatchFamilyScoreContext(matchState) {
   return isTeamMatchFamily(match);
 }
 
-/** 整场比赛已结束：match.status === 'finished' */
+/** 整场比赛已结束：match.status finished/completed */
 function isMatchStatusFinished(match) {
-  return String((match && match.status) || '').trim().toLowerCase() === 'finished';
+  return teamMatchFinish.isMatchCompleted(match);
+}
+
+function saveWritableTeamMatch(match) {
+  var result = teamMatchFinish.saveMatchIfWritable(match);
+  if (!result.ok) {
+    if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+      wx.showToast({
+        title: result.message || teamMatchFinish.MATCH_FINISHED_TOAST,
+        icon: 'none'
+      });
+    }
+    return false;
+  }
+  return true;
 }
 
 function isFinishMatchMenuItem(item) {
@@ -4053,7 +4072,7 @@ Page({
     const next = syncStrokeEntities(match);
     if (!this._scoreEntitiesMetaEqual(prev, next)) {
       match.scoreEntities = next;
-      teamMatchStore.saveMatch(match);
+      saveWritableTeamMatch(match);
       scoreDebugLog('[stroke_entity] resync scoreEntities', {
         matchId: match.matchId,
         compositionMode: resolveCompositionMode(match)
@@ -4846,7 +4865,7 @@ Page({
     teamMatchStore.ensureGroupScoreBucketFirstScoreAt(next);
     teamMatchStore.ensureGroupScoreBucketFinishedScoreAt(next);
     match.scoreData[groupId] = next;
-    teamMatchStore.saveMatch(match);
+    if (!saveWritableTeamMatch(match)) return false;
     scoreDebugLog('[stroke_entity] persist', {
       matchId: match.matchId || '',
       groupId: groupId,
@@ -5014,13 +5033,14 @@ Page({
       this._refreshScorePageFromGame();
     } else if (this.data.gameId) {
       this._syncGameFinishedState();
-      this._maybeShowEndGroupPrompt();
+      this._snapshotScoreCompleteness();
       if (remarkChanged) {
         this.refreshPlayers();
       }
     } else {
       this._maybeRefreshTeamMatchScoreMode();
       this._syncScoreFinishedUiState();
+      this._snapshotScoreCompleteness();
       // 队内/队际：主流程未必重建展示名；备注变更时只刷新 View Model
       if (remarkChanged) {
         this.refreshPlayers();
@@ -5124,7 +5144,7 @@ Page({
 
     this.hydrateFromSession();
     this._syncGameFinishedState();
-    this._maybeShowEndGroupPrompt();
+    this._snapshotScoreCompleteness();
     this._syncMoreMenuItems();
   },
 
@@ -6041,7 +6061,7 @@ Page({
       this._playersSource
     );
     if (result && result.updated) {
-      teamMatchStore.saveMatch(match);
+      saveWritableTeamMatch(match);
     }
   },
 
@@ -6098,7 +6118,7 @@ Page({
     teamMatchStore.ensureGroupScoreBucketFirstScoreAt(next);
     teamMatchStore.ensureGroupScoreBucketFinishedScoreAt(next);
     match.scoreData[groupId] = next;
-    teamMatchStore.saveMatch(match);
+    if (!saveWritableTeamMatch(match)) return false;
     return true;
   },
 
@@ -6255,7 +6275,7 @@ Page({
     teamMatchStore.ensureGroupScoreBucketFirstScoreAt(next);
     teamMatchStore.ensureGroupScoreBucketFinishedScoreAt(next);
     match.scoreData[groupId] = next;
-    teamMatchStore.saveMatch(match);
+    if (!saveWritableTeamMatch(match)) return false;
     return true;
   },
 
@@ -6378,7 +6398,7 @@ Page({
       if (this.data.mode === 'fourball_best') {
         this._persistTeamScores();
       }
-      return;
+      return !!gameStore.getGame(this.data.gameId);
     }
     if (this.data.mode === 'stroke_entity' && this.data.groupId) {
       const ms = this._matchState || this._readMatchState() || {};
@@ -6392,8 +6412,9 @@ Page({
           groupId: groupId,
           entityCount: (this._entitiesSource || []).length
         });
+        return true;
       }
-      return;
+      return false;
     }
     if (this.data.mode === 'individual_stroke' && this.data.groupId) {
       const ms = this._matchState || this._readMatchState() || {};
@@ -6410,8 +6431,9 @@ Page({
             sideCount: (this._matchSidesSource || []).length
           });
           this._inferFormalMatchStartHoleFromScores();
+          return true;
         }
-        return;
+        return false;
       }
       if (match && this._persistTeamMatchIndividualScores(match, groupId)) {
         scoreDebugLog('[score-save-source]', {
@@ -6421,8 +6443,9 @@ Page({
           playerCount: (this._playersSource || []).length
         });
         this._inferFormalMatchStartHoleFromScores();
-        return;
+        return true;
       }
+      if (match) return false;
       groupsStore.syncGroupFromScoring(this.data.groupId, this._playersSource);
       scoreDebugLog('[score-save-source]', {
         matchId: matchId,
@@ -6431,7 +6454,7 @@ Page({
         playerCount: (this._playersSource || []).length
       });
       this._inferFormalMatchStartHoleFromScores();
-      return;
+      return true;
     }
     const app = getApp();
     app.globalData = app.globalData || {};
@@ -6443,6 +6466,7 @@ Page({
       penalties: slicePenalties(p.penalties),
       sands: sliceSands(p.sands)
     }));
+    return true;
   },
 
   // 回灌：个人比杆赛从 groups 读取；其他模式从 scoreSessions
@@ -9591,7 +9615,7 @@ Page({
         });
         return Object.assign({}, g, { players: players });
       });
-      teamMatchStore.saveMatch(match);
+      if (!saveWritableTeamMatch(match)) return { ok: false, reason: 'match_finished' };
       this._syncLocalPlayersTeeFromMap(teeMap);
       return { ok: true, path: 'teamMatch' };
     }
@@ -9766,7 +9790,7 @@ Page({
       return;
     }
     if (typeof this._scoreEditBlocked === 'function' && this._scoreEditBlocked()) {
-      wx.showToast({ title: '比赛已结束，无法修改', icon: 'none' });
+      wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_EDIT_TOAST, icon: 'none' });
       return;
     }
     const current =
@@ -9803,7 +9827,7 @@ Page({
       return;
     }
     if (typeof this._scoreEditBlocked === 'function' && this._scoreEditBlocked()) {
-      wx.showToast({ title: '比赛已结束，无法修改', icon: 'none' });
+      wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_EDIT_TOAST, icon: 'none' });
       return;
     }
     match.scoreData =
@@ -9827,7 +9851,7 @@ Page({
     if (preserved.firstScoreAt != null) nextBucket.firstScoreAt = preserved.firstScoreAt;
     if (preserved.finishedScoreAt != null) nextBucket.finishedScoreAt = preserved.finishedScoreAt;
     match.scoreData[groupId] = nextBucket;
-    teamMatchStore.saveMatch(match);
+    if (!saveWritableTeamMatch(match)) return;
     this.setData({ startHoleSheetVisible: false }, () => {
       this.refreshPlayers();
     });
@@ -10223,54 +10247,60 @@ Page({
     this._syncScoreFinishedUiState();
   },
 
-  _isAllScoresCompleted() {
-    if (this.data.mode === 'fourball_best') {
-      const groups = this._engineGroups || [];
-      if (!groups.length) return false;
-      for (let h = 0; h < 18; h++) {
-        if (!groups.every((g) => isFilledScore((g.scores || [])[h]))) return false;
-      }
-      return true;
+  _scoreCompletenessContext() {
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+    if (match && group) {
+      const loaded = seriesFinishLock.loadSeriesForMatch(match);
+      return {
+        kind: 'teamMatch',
+        match: match,
+        group: group,
+        matchId: match.matchId,
+        groupId: group.groupId,
+        editable: !this._scoreEditBlocked(),
+        readOnly: !!(this.data.isReadOnlyScore || this._resolveIsReadOnlyScore()),
+        groupFinished: matchStatus.isGroupConfirmedFinished(group.status),
+        matchFinished: teamMatchFinish.isMatchCompleted(match),
+        roundFinished: scoreGroupFinish.isRoundFinished(match),
+        seriesFinished: !!(loaded.series && seriesFinishLock.isSeriesCompleted(loaded.series)),
+        exempt: scoreCompleteness.isExemptGroup(group)
+      };
     }
-    if (this.data.mode === 'game') {
-      const players = this._playersSource || [];
-      if (!players.length) return false;
-      for (let h = 0; h < 18; h++) {
-        if (!players.every((p) => isFilledScore((p.scores || [])[h]))) return false;
-      }
-      return true;
-    }
-    return false;
-  },
-
-  _completionSignature() {
-    if (this.data.mode === 'fourball_best') {
-      return (this._engineGroups || []).map((g) => (g.scores || []).join(',')).join('|');
-    }
-    if (this.data.mode === 'game') {
-      return (this._playersSource || []).map((p) => (p.scores || []).join(',')).join('|');
-    }
-    return '';
-  },
-
-  _getDismissedCompletionSig() {
-    if (!this.data.gameId) return '';
-    const group = gameStore.getGroup(this.data.gameId, this._gameGroupIndex || 0) || {};
-    return group.endPromptDismissedSig || '';
-  },
-
-  _saveDismissedCompletionSig(sig) {
-    if (!this.data.gameId) return;
-    const game = gameStore.getGame(this.data.gameId);
-    if (!game) return;
+    const gameId = this.data.gameId;
+    const game = gameId ? gameStore.getGame(gameId) : null;
+    if (!game) return null;
     const gi = this._gameGroupIndex || 0;
-    if (Array.isArray(game.groups) && game.groups[gi]) {
-      const groups = game.groups.slice();
-      groups[gi] = Object.assign({}, groups[gi], { endPromptDismissedSig: sig });
-      gameStore.saveGame(Object.assign({}, game, { groups }));
-      return;
-    }
-    gameStore.saveGame(Object.assign({}, game, { endPromptDismissedSig: sig }));
+    const grp = gameStore.getGroup(gameId, gi) || {};
+    return {
+      kind: 'game',
+      game: game,
+      group: grp,
+      matchId: game.gameId,
+      groupId: grp.groupId || game.gameId,
+      groupIndex: gi,
+      editable: !this._scoreEditBlocked(),
+      readOnly: !!(this.data.isReadOnlyScore || this._resolveIsReadOnlyScore()),
+      groupFinished:
+        matchStatus.isGroupConfirmedFinished(grp.status) || gameProgress.isGameEnded(game),
+      matchFinished: gameProgress.isGameEnded(game),
+      roundFinished: false,
+      seriesFinished: false,
+      exempt: scoreCompleteness.isExemptGroup(grp)
+    };
+  },
+
+  _isAllScoresCompleted() {
+    const ctx = this._scoreCompletenessContext();
+    return !!(ctx && scoreCompleteness.isComplete(ctx));
+  },
+
+  _snapshotScoreCompleteness() {
+    const ctx = this._scoreCompletenessContext();
+    if (!ctx) return;
+    const complete = scoreCompleteness.isComplete(ctx);
+    scoreGroupCompletePrompt.snapshotCompleteness(ctx, complete);
+    this.setData({ scoresCompleted: complete });
   },
 
   _scoreEditBlocked() {
@@ -10374,87 +10404,71 @@ Page({
     );
   },
 
-  _afterScoresPersisted() {
-    const scoresCompleted = this._isAllScoresCompleted();
-    this.setData({ scoresCompleted });
+  _afterScoresPersisted(persistedOk) {
+    const ctx = this._scoreCompletenessContext();
+    const scoresCompleted = !!(ctx && scoreCompleteness.isComplete(ctx));
+    this.setData({ scoresCompleted: scoresCompleted });
     this._syncGameFinishedState();
-    this._maybeShowEndGroupPrompt();
-  },
-
-  _maybeShowEndGroupPrompt() {
-    if (!this._isNormalGameContext()) return;
-    if (this.data.gameFinished) return;
-    if (!this._isAllScoresCompleted()) return;
-    if (this._endPromptShowing) return;
-
-    const sig = this._completionSignature();
-    if (sig && sig === this._getDismissedCompletionSig()) return;
-
-    this._endPromptShowing = true;
-    wx.showModal({
-      title: '结束本组比赛？',
-      content: '本组所有球员的所有球洞成绩均已记录完成。确认结束比赛后，所有成绩将不可再修改。',
-      cancelText: '暂不结束',
-      confirmText: '确认结束',
-      confirmColor: '#ce9224',
-      success: (res) => {
-        this._endPromptShowing = false;
-        if (res.confirm) {
-          this._confirmEndGroupGame();
-        } else {
-          this._saveDismissedCompletionSig(sig);
-        }
-      },
-      fail: () => {
-        this._endPromptShowing = false;
-      }
-    });
+    if (persistedOk === false || !ctx) return;
+    const projection = scoreCompleteness.projectGroupCompleteness(ctx);
+    scoreGroupCompletePrompt.noteAfterPersist(
+      Object.assign({}, ctx, {
+        persistedOk: true,
+        projection: projection,
+        onConfirm: () => this._confirmEndGroupGame()
+      })
+    );
   },
 
   _finishScoreTeamMatchGroup() {
     const match = this._readScoreTeamMatch();
     const group = this._findScoreTeamMatchGroup(match);
-    if (!match || !group || !Array.isArray(match.groups)) return false;
-    const oldStatus = group.status || '';
-    const newStatus = matchStatus.FINISHED_STORAGE_STATUS;
-    const groupId = group.groupId != null ? String(group.groupId) : '';
-    if (groupId) {
-      match.scoreData =
-        match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
-          ? match.scoreData
-          : {};
-      const bucket =
-        match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
-          ? match.scoreData[groupId]
-          : null;
-      if (bucket) {
-        teamMatchStore.forceGroupScoreBucketFinishedScoreAt(bucket);
-        match.scoreData[groupId] = bucket;
+    if (!match || !group) return false;
+    const result = scoreGroupFinish.finishTeamMatchGroup(match, group.groupId, {
+      editable: !this._scoreEditBlocked()
+    });
+    if (!result.ok) {
+      if (result.message && typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: result.message, icon: 'none' });
       }
+      return false;
     }
-    match.groups = match.groups.map((item) =>
-      String(item && item.groupId) === String(group.groupId)
-        ? Object.assign({}, item, {
-            status: newStatus,
-            statusLabel: '已结束',
-            updatedAt: Date.now()
-          })
-        : item
-    );
-    match.updatedAt = Date.now();
-    teamMatchStore.saveMatch(match);
     scoreDebugLog('[score-group-status-migration]', {
       source: 'teamMatchStore',
       matchId: match.matchId || '',
       groupId: group.groupId || this.data.groupId || '',
-      oldStatus: oldStatus,
-      newStatus: newStatus
+      oldStatus: result.oldStatus,
+      newStatus: result.newStatus
     });
     return true;
   },
 
   _confirmEndGroupGame() {
-    if (this._finishScoreTeamMatchGroup()) {
+    const ctx = this._scoreCompletenessContext();
+    if (ctx && ctx.kind === 'teamMatch') {
+      if (!this._finishScoreTeamMatchGroup()) return;
+      this.data.gameFinished = true;
+      this.setData({ gameFinished: true, scoresCompleted: true });
+      this._syncScoreFinishedUiState();
+      wx.showToast({ title: '比赛已结束', icon: 'success' });
+      return;
+    }
+    if (ctx && ctx.kind === 'game') {
+      const gate = scoreGroupFinish.assertCanFinishGroup(ctx);
+      if (!gate.ok) {
+        wx.showToast({ title: gate.message || '无法结束本组比赛', icon: 'none' });
+        return;
+      }
+      if (this._isGameSingleScoreContext()) {
+        this._flushGameSingleOccupiedScoresToStore();
+      }
+      const finished = scoreGroupFinish.finishGameGroup(this.data.gameId, this._gameGroupIndex || 0, {
+        editable: !this._scoreEditBlocked()
+      });
+      if (!finished.ok) {
+        wx.showToast({ title: finished.message || '无法结束本组比赛', icon: 'none' });
+        return;
+      }
       this.data.gameFinished = true;
       this.setData({ gameFinished: true, scoresCompleted: true });
       this._syncScoreFinishedUiState();
@@ -10476,18 +10490,7 @@ Page({
       this.setData({ gameFinished: true, scoresCompleted: true });
       this._syncScoreFinishedUiState();
       wx.showToast({ title: '比赛已结束', icon: 'success' });
-      return;
     }
-    if (!this.data.gameId) return;
-    // game-single：结束前把运行时最新分刷入 scoresBySlot，再由 confirmFinish 做归属结算
-    if (this._isGameSingleScoreContext()) {
-      this._flushGameSingleOccupiedScoresToStore();
-    }
-    gameProgress.confirmFinishGame(this.data.gameId, this._gameGroupIndex || 0);
-    this.data.gameFinished = true;
-    this.setData({ gameFinished: true, scoresCompleted: true });
-    this._syncScoreFinishedUiState();
-    wx.showToast({ title: '比赛已结束', icon: 'success' });
   },
 
   _confirmCancelGame() {
@@ -10777,7 +10780,7 @@ Page({
       : rawUser;
     match.registerInfo.users.push(normalized);
     match.registerInfo.totalCount = match.registerInfo.users.length;
-    teamMatchStore.saveMatch(match);
+    if (!saveWritableTeamMatch(match)) return;
 
     scoreDebugLog('[join-match-before-slot]', {
       playerId: playerId,
@@ -12195,7 +12198,7 @@ Page({
     }
     // 与 group-editor LIVE 一致：groups 变更后 merge members，保留 entityId / 不碰 teamScoresByEntity
     match.scoreEntities = syncStrokeEntities(match);
-    teamMatchStore.saveMatch(match);
+    if (!saveWritableTeamMatch(match)) return false;
     this._logScoreSlotMigration('teamMatch-sync-after', {
       draftSlots: this._summarizeScoreSlots(this._draftSlots)
     });
@@ -16204,7 +16207,7 @@ Page({
           ? Object.assign({}, user, { matchNickname: player.matchNickname })
           : user;
       });
-      teamMatchStore.saveMatch(match);
+      saveWritableTeamMatch(match);
     }
     const slots = this._draftSlots || [];
     let idx = target != null && target >= 0 ? target : this._firstDraftEmptySlotIndex();
@@ -16545,9 +16548,10 @@ Page({
         const holeIndex = this.data.sheetHoleIndex;
         this._clearHoleScoresInMatchSidesSource(holeIndex);
         this.setData({ quickScoreClearDraft: false });
-        this.persistSession();
+        const ok = this.persistSession();
         this.refreshPlayers();
         this._hideScoreSheet();
+        this._afterScoresPersisted(ok);
         return;
       }
       return this.confirmMatchSideQuickScore();
@@ -16569,9 +16573,10 @@ Page({
     if (scoreClearDraft) {
       this._clearHoleScoresInMatchSidesSource(sheetHoleIndex);
       this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
-      this.persistSession();
+      const ok = this.persistSession();
       this.refreshPlayers();
       this._hideScoreSheet();
+      this._afterScoresPersisted(ok);
       return;
     }
 
@@ -16600,7 +16605,7 @@ Page({
     side.sands[sheetHoleIndex] = normalizeSandValue(panelBunker);
 
     this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
-    this.persistSession();
+    const ok = this.persistSession();
     this.refreshPlayers();
 
     const next = (this._matchSidesSource || []).findIndex(
@@ -16611,6 +16616,7 @@ Page({
     } else {
       this._hideScoreSheet();
     }
+    this._afterScoresPersisted(ok);
   },
 
   /** G6/G7/G8 快捷：本洞一次写满 Side A / Side B */
@@ -16642,9 +16648,10 @@ Page({
     });
 
     this.setData({ quickScoreClearDraft: false, quickScoreFreshDraft: false });
-    this.persistSession();
+    const ok = this.persistSession();
     this.refreshPlayers();
     this._hideScoreSheet();
+    this._afterScoresPersisted(ok);
   },
 
   onScoreCellTap(e) {
@@ -17331,9 +17338,9 @@ Page({
         this._clearHoleScoresInPlayersSource(holeIndex);
         this.setData({ quickScoreClearDraft: false });
         this.refreshPlayers();
-        this.persistSession();
+        const ok = this.persistSession();
         this._hideScoreSheet();
-        this._afterScoresPersisted();
+        this._afterScoresPersisted(ok);
         return;
       }
       this.confirmQuickScore();
@@ -17359,9 +17366,9 @@ Page({
       this._clearHoleScoresInPlayersSource(sheetHoleIndex);
       this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
       this.refreshPlayers();
-      this.persistSession();
+      const ok = this.persistSession();
       this._hideScoreSheet();
-      this._afterScoresPersisted();
+      this._afterScoresPersisted(ok);
       return;
     }
 
@@ -17395,7 +17402,7 @@ Page({
     // 2) 由本地 state 即时派生 UI（OUT / IN / TOT / 杆差）
     this.refreshPlayers();
     // 3) 会话内本地留存，离开再进入不丢失
-    this.persistSession();
+    const ok = this.persistSession();
 
     // 4) 查找本洞是否还有未记录成绩的球员
     const next = this._playersSource.findIndex(
@@ -17407,8 +17414,8 @@ Page({
     } else {
       // 全部球员均已记录：才允许关闭
       this._hideScoreSheet();
-      this._afterScoresPersisted();
     }
+    this._afterScoresPersisted(ok);
   },
 
   /**
@@ -17425,8 +17432,9 @@ Page({
         this._clearHoleScoresInEntitiesSource(holeIndex);
         this.setData({ quickScoreClearDraft: false });
         this.refreshEntities();
-        this.persistSession();
+        const ok = this.persistSession();
         this._hideScoreSheet();
+        this._afterScoresPersisted(ok);
         return;
       }
       return this.confirmEntityQuickScore();
@@ -17449,8 +17457,9 @@ Page({
       this._clearHoleScoresInEntitiesSource(sheetHoleIndex);
       this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
       this.refreshEntities();
-      this.persistSession();
+      const ok = this.persistSession();
       this._hideScoreSheet();
+      this._afterScoresPersisted(ok);
       return;
     }
 
@@ -17486,7 +17495,7 @@ Page({
 
     this.setData({ scoreHoleClearPending: false, scoreClearDraft: false });
     this.refreshEntities();
-    this.persistSession();
+    const ok = this.persistSession();
 
     // 技术面板：对齐 G1 — 本洞还有未填 entity 则切换并保持面板；全部填完才关闭
     const next = (this._entitiesSource || []).findIndex(
@@ -17497,6 +17506,7 @@ Page({
     } else {
       this._hideScoreSheet();
     }
+    this._afterScoresPersisted(ok);
   },
 
   /**
@@ -17540,8 +17550,9 @@ Page({
 
     this.setData({ quickScoreClearDraft: false, quickScoreFreshDraft: false });
     this.refreshEntities();
-    this.persistSession();
+    const ok = this.persistSession();
     this._hideScoreSheet();
+    this._afterScoresPersisted(ok);
   },
 
   // 四人最佳球位 / 最好成绩：每个记分实体（组）写入一个成绩；不拆分球员、不生成多值数组。
@@ -17564,7 +17575,7 @@ Page({
         this.setData({ quickScoreClearDraft: false, quickScoreFreshDraft: false });
         this._persistAndRefreshTeamBoard();
         this.closeScoreInput();
-        this._afterScoresPersisted();
+        this._afterScoresPersisted(true);
         return;
       }
       // 快捷面板：按组数一次写入各组本洞成绩
@@ -17588,7 +17599,7 @@ Page({
       this.setData({ scoreClearDraft: false, scoreHoleClearPending: false });
       this._persistAndRefreshTeamBoard();
       this.closeScoreInput();
-      this._afterScoresPersisted();
+      this._afterScoresPersisted(true);
       return;
     }
 
@@ -17624,15 +17635,15 @@ Page({
       this._focusSheetGroup(next);
     } else {
       this.closeScoreInput();
-      this._afterScoresPersisted();
     }
+    this._afterScoresPersisted(true);
   },
 
   // 各组本洞成绩写完后：派生球队记分行 + 持久化
   _finalizeTeamHole() {
     this._persistAndRefreshTeamBoard();
     this.closeScoreInput();
-    this._afterScoresPersisted();
+    this._afterScoresPersisted(true);
   },
 
   /**
@@ -17827,9 +17838,9 @@ Page({
     });
     // 本洞 score/putts 写入后由 score engine 统一派生 diff 与 OUT/IN/TOT
     this.refreshPlayers();
-    this.persistSession();
+    const ok = this.persistSession();
     this._hideScoreSheet();
-    this._afterScoresPersisted();
+    this._afterScoresPersisted(ok);
   },
 
   sheetPrevHole() {

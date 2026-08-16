@@ -8,12 +8,18 @@
 
 var openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
 var registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
+var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 
 var SERIES_SELF_REGISTER_SHEET_TITLE = '赛事报名';
 var SERIES_SELF_REGISTER_SHEET_SUB = '比赛名将用于报名名单与成绩展示';
 
-function isSeriesCompetitionPhaseCompleted(phase) {
-  return asString(phase) === 'completed';
+function isSeriesCompetitionPhaseCompleted(phaseOrSeries) {
+  if (phaseOrSeries && typeof phaseOrSeries === 'object') {
+    return seriesFinishLock.isSeriesCompleted(phaseOrSeries);
+  }
+  return seriesFinishLock.isSeriesCompleted({
+    competitionPhaseCache: phaseOrSeries
+  });
 }
 
 /** 只读权威手机号：gameStore.phone / profile.phone；不猜昵称、不用 phoneMasked */

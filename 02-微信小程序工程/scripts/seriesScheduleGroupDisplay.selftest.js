@@ -452,7 +452,15 @@ function draftSeat(pos, userId, name, gender, tee, sid, teamId, teamName) {
   assert(
     'Series VM 复用权威 tournamentGroupCardView',
     seriesVmSrc.indexOf('tournamentGroupCardView') >= 0 &&
-      seriesVmSrc.indexOf('buildReadonlyGroupCards') >= 0
+      seriesVmSrc.indexOf('buildReadonlyGroupCards') >= 0 &&
+      seriesVmSrc.indexOf('applyLiveHoleStatusBadgeToTeeGroups') >= 0 &&
+      seriesVmSrc.indexOf('stampRoundCardStatus') < 0
+  );
+  assert(
+    '分组卡右上角与普通单场同 class、无 Series LIVE 分支',
+    /class="tee-status"/.test(seriesWxml) &&
+      seriesWxml.indexOf('statusBadgeClass') < 0 &&
+      /class="tee-status"/.test(detailWxml)
   );
   assert(
     '队际赛分组表仍含 teeMetaLine / tee / teamLabel（无回归结构）',

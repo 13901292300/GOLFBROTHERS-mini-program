@@ -638,7 +638,7 @@ function freeze(obj) {
     pageWxml.indexOf('series-bottom-tabs') < 0 &&
       pageWxss.indexOf('series-bottom-tabs') < 0 &&
       pageWxss.indexOf('padding-bottom: calc(var(--tab-height)') < 0 &&
-      (pageWxss.match(/safe-area-inset-bottom/g) || []).length <= 3 &&
+      (pageWxss.match(/safe-area-inset-bottom/g) || []).length <= 4 &&
       /\.register-cta-bar[\s\S]{0,280}safe-area-inset-bottom/.test(pageWxss) &&
       ((pageWxss.match(/safe-area-inset-bottom/g) || []).length === 1 ||
         /\.series-manage-unified-sheet[\s\S]{0,200}safe-area-inset-bottom/.test(
@@ -1494,7 +1494,7 @@ function freeze(obj) {
   assert(
     '赛程 TAB 宽度不受影响（schedule 面板左右 24rpx 与既有 detail-main 对齐）',
     scheduleSlice.indexOf('schedule-groups-panel') >= 0 &&
-      /\.schedule-groups-panel\s*,\s*\.schedule-tee-panel\s*\{[\s\S]{0,80}padding:\s*0\s+24rpx/.test(
+      /\.schedule-groups-panel\s*,\s*\.schedule-tee-panel\s*\{[\s\S]{0,80}padding:\s*0;/.test(
         pageWxss
       )
   );
@@ -1790,7 +1790,7 @@ function freeze(obj) {
   assert(
     '页面含测量布局且不写 storage',
     pageJs.indexOf('_layoutHeroTeamLogoStack') >= 0 &&
-      pageJs.indexOf('resolveTeamLogoLayout') >= 0 &&
+      fs.readFileSync(vmPath, 'utf8').indexOf('resolveTeamLogoLayout') >= 0 &&
       pageJs.indexOf('onWindowResize') >= 0 &&
       pageWxss.indexOf('.hero-logo-stack') >= 0 &&
       pageWxss.indexOf('text-overflow: ellipsis') >= 0

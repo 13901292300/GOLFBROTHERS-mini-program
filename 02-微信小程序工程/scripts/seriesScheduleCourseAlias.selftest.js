@@ -243,12 +243,11 @@ var orgSched = scheduleOf(orgSeries, sameDayTwo);
 var plainSeries = seriesOf({ templateId: 'individual_tour' }, sameDayTwo);
 var plainSched = scheduleOf(plainSeries, sameDayTwo);
 assert(
-  '普通系列赛和其他类型系列赛赛程标签不受影响',
-  selectorMap(orgSched).r1 === 'R1' &&
-    selectorMap(orgSched).r2 === 'R2' &&
-    orgSched.roundInfoText.indexOf('C1') < 0 &&
-    selectorMap(plainSched).r1 === 'R1' &&
-    selectorMap(plainSched).r2 === 'R2' &&
+  '普通系列赛出发表 Cx 与总榜一致；管理页仍为 R',
+  selectorMap(orgSched).r1 === 'C1' &&
+    selectorMap(orgSched).r2 === 'C2' &&
+    selectorMap(plainSched).r1 === 'C1' &&
+    selectorMap(plainSched).r2 === 'C2' &&
     manageSrc.indexOf("label: 'R' + index") >= 0
 );
 

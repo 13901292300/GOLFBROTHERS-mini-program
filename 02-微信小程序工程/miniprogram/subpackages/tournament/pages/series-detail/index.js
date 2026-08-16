@@ -36,6 +36,7 @@ var REG_SELF_CANCEL_GROUPED = registrationInteractionModel.buildSelfCancelDialog
   grouped: true
 });
 var scheduleViewModel = require('./seriesScheduleViewModel.js');
+var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesScheduleGroupWrite = require('./seriesScheduleGroupWrite.js');
 var discussionViewModel = require('./seriesDiscussionViewModel.js');
 var matchManageAccess = require('../../../../utils/matchManageAccess.js');
@@ -44,6 +45,9 @@ var teeSheetManage = require('../../../../utils/teeSheetManage.js');
 var paymentManage = require('../../../../utils/paymentManage.js');
 var seriesGroupedPaymentManage = require('../../../../utils/seriesGroupedPaymentManage.js');
 var teamMatchMoreMenu = require('../../../../utils/teamMatchMoreMenu.js');
+var teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
+var seriesFinalize = require('../../../../utils/seriesFinalize.js');
+var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 var seriesStationManageGate = require('../../../../utils/seriesStationManageGate.js');
 var seriesManageAccess = require('../../../../utils/seriesManageAccess.js');
 var seriesManageRoundPicker = require('./seriesManageRoundPicker.js');
@@ -57,9 +61,8 @@ var seriesLiveLeaderboardAdapter = require('./seriesLiveLeaderboardAdapter.js');
 var liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScorecard.js');
 var seriesBottomDockVisibility = require('./seriesBottomDockVisibility.js');
 var seriesLayerStack = require('./seriesLayerStack.js');
-var matchStateUtil = require('../../../../utils/matchState.js');
+var teamMatchEnterGroupScore = require('../../../../utils/teamMatchEnterGroupScore.js');
 var manageRoundOverflowArrows = require('../../../../components/series-round-selector-dock/overflowArrows.js');
-var groupsStore = require('../../../../utils/groupsStore.js');
 var teamDirectory = require('../../../../utils/teamDirectory.js');
 var mockAvatars = require('../../../../utils/mockAvatars.js');
 var { DEFAULT_ORG_LOGO } = require('../../../../utils/teamMatchCapabilities.js');
@@ -72,11 +75,6 @@ var FAB_SIZE_RPX = 60;
 var FAB_EDGE_GAP_RPX = 10;
 var socialRelationStore = require('../../../../utils/socialRelationStore.js');
 var playerDirectory = require('../../../../utils/playerDirectory.js');
-var {
-  isG5MatchPlayMode,
-  isG6G7MatchPlayMode,
-  isG8MatchPlayMode
-} = require('../../../../utils/strokeEntityValidator.js');
 
 var DEFAULT_TAB = 'info';
 var ALLOWED_TABS = {
@@ -326,33 +324,6 @@ function readRoundDockEventKey(e) {
   return ds.key != null ? String(ds.key).trim() : '';
 }
 
-function resolveScheduleScorePageMode(match, groupId) {
-  var gameMode = String(
-    (match && (match.gameMode || match.selectedGameMode)) || ''
-  ).trim();
-  if (gameMode === '个人比杆赛' || isG5MatchPlayMode(gameMode)) {
-    return 'individual_stroke';
-  }
-  if (isG6G7MatchPlayMode(gameMode) || isG8MatchPlayMode(gameMode)) {
-    return 'individual_stroke';
-  }
-  var gid = groupId != null ? String(groupId) : '';
-  var scoreEntities = match && match.scoreEntities;
-  if (scoreEntities && typeof scoreEntities === 'object' && !Array.isArray(scoreEntities)) {
-    var list = Array.isArray(scoreEntities[gid]) ? scoreEntities[gid] : [];
-    if (list.length > 0) return 'stroke_entity';
-  }
-  if (
-    gameMode === '最好成绩比杆赛' ||
-    gameMode === '四人四球比杆赛' ||
-    gameMode === '最佳球位比杆赛' ||
-    gameMode === '四人两球比杆赛'
-  ) {
-    return 'stroke_entity';
-  }
-  return 'individual_stroke';
-}
-
 function deepCloneJson(value) {
   if (value == null) return value;
   return JSON.parse(JSON.stringify(value));
@@ -575,6 +546,7 @@ Page({
     // 底部固定控件：复刻 detail._calcHideRegisterCTA + wx:if（C3-D）
     showRegisterBottomAction: false,
     showScheduleBottomAction: false,
+    scheduleQuickEntryVisible: false,
     showDiscussionInput: false,
     hideBottomCta: false,
     tabShowLeftIndicator: false,
@@ -700,6 +672,8 @@ Page({
     activeTab: DEFAULT_TAB,
     scrollTop: 0,
     tabs: viewModel.SERIES_TABS.slice(),
+    standingsDockIntoView: '',
+    scheduleDockIntoView: '',
     seriesName: '',
     lifecycleLabel: '',
     isDraftPreview: false,
@@ -898,19 +872,25 @@ Page({
     this._registerWriteLock = false;
     this._scheduleWriteLock = false;
     this._scheduleSelectedKey = '';
+    this._scheduleVisited = false;
+    this._scheduleUserPicked = false;
+    this._standingsVisited = false;
+    this._standingsUserPicked = false;
     this._lastEligibility = null;
     this._resolvedPlayerId = '';
     this._seriesId = q.seriesId != null ? String(q.seriesId).trim() : '';
     this._preview = q.preview === '1' || q.preview === 1 || q.preview === true;
     var tabQ = q.tab != null ? String(q.tab).trim() : '';
     this._activeTab = ALLOWED_TABS[tabQ] ? tabQ : DEFAULT_TAB;
+    if (this._activeTab === 'standings') this._standingsVisited = true;
+    if (this._activeTab === 'schedule') this._scheduleVisited = true;
     this._accessUnlocked = false;
     this._expectedAccessCode = null;
     this._accessPromptOpen = false;
     this._scrollTop = 0;
     this._scrollLayoutAnchor = null;
     this._roundNavById = Object.create(null);
-    this._standingsSelectedKey = standingsViewModel.CUMULATIVE_KEY;
+    this._standingsSelectedKey = '';
     this._standingsViewByRoundId = Object.create(null);
     this._standingsSelectionByRoundId = Object.create(null);
     this._leaderboardSettingRoundId = '';
@@ -1084,10 +1064,14 @@ Page({
     var scheduleKey = String(ctx.scheduleSelectedKey || '').trim();
     if (scheduleKey) {
       this._scheduleSelectedKey = scheduleKey;
+      this._scheduleVisited = true;
+      this._scheduleUserPicked = true;
     }
     var standingsKey = String(ctx.standingsSelectedKey || '').trim();
     if (standingsKey) {
       this._standingsSelectedKey = standingsKey;
+      this._standingsVisited = true;
+      this._standingsUserPicked = true;
     }
     var scrollTop = Number(ctx.scrollTop);
     if (Number.isFinite(scrollTop) && scrollTop >= 0) {
@@ -2592,6 +2576,8 @@ Page({
         return seriesStationIndex.getByMatchId(id);
       },
       standingsSelectedKey: this._standingsSelectedKey,
+      standingsUserPicked: this._standingsUserPicked,
+      standingsVisited: this._standingsVisited,
       standingsResult: standingsResult,
       registerActiveParticipantId: this._registerActiveParticipantId
     });
@@ -2812,6 +2798,12 @@ Page({
     // 作废进行中的旧测量，防止写回（含名单高度）
     this._fillerMeasureToken = (this._fillerMeasureToken || 0) + 1;
     this._rosterMeasureToken = (this._rosterMeasureToken || 0) + 1;
+
+    var firstStandingsOpen = tab === 'standings' && !this._standingsVisited;
+    var firstScheduleOpen = tab === 'schedule' && !this._scheduleVisited;
+    if (firstStandingsOpen) this._standingsVisited = true;
+    if (firstScheduleOpen) this._scheduleVisited = true;
+
     this._activeTab = tab;
 
     var standings = this.data.standings || {};
@@ -2888,6 +2880,12 @@ Page({
     if (prevTab === 'standings' && tab !== 'standings') {
       patch.contentHostMinHeight = 0;
     }
+    if (firstStandingsOpen) {
+      patch.standingsDockIntoView = this._dockIntoViewId(this._standingsSelectedKey);
+    }
+    if (firstScheduleOpen) {
+      patch.scheduleDockIntoView = this._dockIntoViewId(this._scheduleSelectedKey);
+    }
     if (tab === 'discussion') {
       var minH = this._computeDiscussionPanelMinHeight();
       if (minH > 0) patch.discussionPanelMinHeight = minH;
@@ -2895,6 +2893,15 @@ Page({
 
     this.setData(patch, function () {
       if (!self._pageAlive) return;
+      if (firstStandingsOpen || firstScheduleOpen) {
+        setTimeout(function () {
+          if (!self._pageAlive) return;
+          var clearPatch = {};
+          if (firstStandingsOpen) clearPatch.standingsDockIntoView = '';
+          if (firstScheduleOpen) clearPatch.scheduleDockIntoView = '';
+          self.setData(clearPatch);
+        }, 400);
+      }
       var run = function () {
         if (!self._pageAlive || self._activeTab !== tab) return;
         if (
@@ -2914,7 +2921,14 @@ Page({
       } else {
         setTimeout(run, 0);
       }
+      self._syncScheduleTeeObserver();
     });
+  },
+
+  _dockIntoViewId: function (roundId) {
+    var key = roundId != null ? String(roundId).trim() : '';
+    if (!key || key === standingsViewModel.CUMULATIVE_KEY) return '';
+    return 'srd-' + key.replace(/[^A-Za-z0-9_-]/g, '');
   },
 
   _resolveMatchForStandingsRound: function (roundId) {
@@ -2935,23 +2949,38 @@ Page({
     return null;
   },
 
-  /** 每轮会话选择；兼容旧 _standingsViewByRoundId 字符串 */
+  /** 每轮会话选择；兼容旧 _standingsViewByRoundId 字符串。TOT 始终球队，不读单轮记忆。 */
   _resolveStandingsSelectionForKey: function (selectedKey) {
     var key = selectedKey != null ? String(selectedKey).trim() : '';
-    if (!key || key === standingsViewModel.CUMULATIVE_KEY) {
-      return { view: 'team', scoreType: 'gross' };
+    var scoringMode = '';
+    try {
+      var series = this._lastSeriesForStandings;
+      scoringMode =
+        series && series.scoringRule && series.scoringRule.mode
+          ? String(series.scoringRule.mode).trim()
+          : '';
+    } catch (eMode) {
+      scoringMode = '';
     }
+    var rememberedByRoundId = Object.create(null);
     var selMap = this._standingsSelectionByRoundId || Object.create(null);
-    var remembered = selMap[key];
-    if (remembered == null) {
-      var legacy = (this._standingsViewByRoundId || Object.create(null))[key];
-      remembered = legacy;
-    }
-    var match = this._resolveMatchForStandingsRound(key);
-    return seriesStandingsViewOptions.normalizeSeriesStandingsSelection(
-      match,
-      remembered
-    );
+    var legacy = this._standingsViewByRoundId || Object.create(null);
+    Object.keys(selMap).forEach(function (rid) {
+      rememberedByRoundId[rid] = selMap[rid];
+    });
+    Object.keys(legacy).forEach(function (rid) {
+      if (rememberedByRoundId[rid] == null) rememberedByRoundId[rid] = legacy[rid];
+    });
+    var match =
+      key && key !== standingsViewModel.CUMULATIVE_KEY
+        ? this._resolveMatchForStandingsRound(key)
+        : null;
+    return seriesStandingsViewOptions.resolveStandingsSessionSelection({
+      selectedKey: key,
+      scoringMode: scoringMode,
+      match: match,
+      rememberedByRoundId: rememberedByRoundId
+    });
   },
 
   _resolveStandingsBoardViewForKey: function (selectedKey) {
@@ -2960,7 +2989,7 @@ Page({
 
   _rememberStandingsSelection: function (roundId, selection) {
     var rid = roundId != null ? String(roundId).trim() : '';
-    if (!rid) return;
+    if (!rid || rid === standingsViewModel.CUMULATIVE_KEY) return;
     var match = this._resolveMatchForStandingsRound(rid);
     var sel = seriesStandingsViewOptions.normalizeSeriesStandingsSelection(
       match,
@@ -3319,6 +3348,8 @@ Page({
     var self = this;
     var applyRebuild = function (extra) {
       self._standingsSelectedKey = key;
+      self._standingsVisited = true;
+      self._standingsUserPicked = true;
       self._frozenStandingsScorecard = null;
       self._standingsPersonalOpenIndex = -1;
       self._frozenPersonalBoardMatch = null;
@@ -4956,6 +4987,12 @@ Page({
   _buildScheduleViewModel: function (series) {
     var access = this._lastRegisterAccess || {};
     var peek = this._peekScheduleStationMatch(series, this._scheduleSelectedKey);
+    var sessionKey = seriesLiveSession.resolveSessionSelectedRoundId({
+      currentKey: this._scheduleSelectedKey || peek.selectedKey,
+      userPicked: this._scheduleUserPicked,
+      visited: this._scheduleVisited,
+      roundStates: this._lastStandingsRoundStates || []
+    });
     var user = this._resolveScheduleCurrentUser();
     var canManageGroups = false;
     var canStartMatch = false;
@@ -4973,7 +5010,7 @@ Page({
     }
     var schedule = scheduleViewModel.buildSeriesScheduleViewModel({
       series: series,
-      selectedRoundId: this._scheduleSelectedKey || peek.selectedKey,
+      selectedRoundId: sessionKey || this._scheduleSelectedKey || peek.selectedKey,
       roundStates: this._lastStandingsRoundStates || [],
       getMatchById: function (id) {
         return teamMatchStore.getMatchById(id);
@@ -4983,6 +5020,7 @@ Page({
       },
       canManageGroups: canManageGroups,
       canStartMatch: canStartMatch,
+      viewerUserId: user,
       lifecycleAccess: {
         lifecycleStatus: access.lifecycleStatus || series.lifecycleStatus || '',
         isDraftPreview: !!access.isDraftPreview,
@@ -5003,7 +5041,7 @@ Page({
     if (!series) return;
     this._lastSeriesForSchedule = series;
     var schedule = this._buildScheduleViewModel(series);
-    var patch = { schedule: schedule };
+    var patch = { schedule: schedule, scheduleQuickEntryVisible: false };
     delete patch.scrollTop;
     delete patch.scheduleRoundSelectorScrollLeft;
     delete patch.scrollFillerHeight;
@@ -5014,6 +5052,7 @@ Page({
     delete patch.roundSelectorOffsetTop;
     // ROUND-DOCK-B1：切轮只更新赛程内容；不写 scrollTop / filler / sticky；不重测 dock
     this._safeSetData(patch);
+    this._syncScheduleTeeObserver();
   },
 
   onScheduleRoundTap: function (e) {
@@ -5021,6 +5060,8 @@ Page({
     if (!key) return;
     if (key === this._scheduleSelectedKey) return;
     this._scheduleSelectedKey = key;
+    this._scheduleVisited = true;
+    this._scheduleUserPicked = true;
     this._rebuildScheduleProjection();
   },
 
@@ -5070,6 +5111,62 @@ Page({
     return hasGroups ? 'edit' : 'create';
   },
 
+  _disconnectScheduleTeeObserver: function () {
+    if (this._scheduleTeeObserver) {
+      this._scheduleTeeObserver.disconnect();
+      this._scheduleTeeObserver = null;
+    }
+  },
+
+  _setupScheduleTeeObserver: function () {
+    this._disconnectScheduleTeeObserver();
+    if ((this._activeTab || this.data.activeTab) !== 'schedule') return;
+    var schedule = this.data.schedule || {};
+    if (!(schedule.cta && schedule.cta.showEnterMyGroupEligible)) return;
+    if (typeof this.createIntersectionObserver !== 'function') return;
+    var self = this;
+    var observer = this.createIntersectionObserver({ thresholds: [0, 0.5, 0.99, 1] });
+    observer.relativeToViewport().observe('.js-first-tee-group', function (res) {
+      var fullyVisible = res && res.intersectionRatio >= 0.99;
+      if (fullyVisible !== self.data.scheduleQuickEntryVisible) {
+        self.setData({ scheduleQuickEntryVisible: fullyVisible });
+      }
+    });
+    this._scheduleTeeObserver = observer;
+  },
+
+  _syncScheduleTeeObserver: function () {
+    var schedule = this.data.schedule || {};
+    var eligible =
+      (this._activeTab || this.data.activeTab) === 'schedule' &&
+      !!(schedule.cta && schedule.cta.showEnterMyGroupEligible);
+    if (!eligible) {
+      this._disconnectScheduleTeeObserver();
+      if (this.data.scheduleQuickEntryVisible) {
+        this.setData({ scheduleQuickEntryVisible: false });
+      }
+      return;
+    }
+    var self = this;
+    var run = function () {
+      if (!self._pageAlive) return;
+      self._setupScheduleTeeObserver();
+    };
+    if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
+      wx.nextTick(run);
+    } else {
+      setTimeout(run, 0);
+    }
+  },
+
+  onEnterMyGroup: function () {
+    var schedule = this.data.schedule || {};
+    var matchId = schedule.matchId ? String(schedule.matchId) : '';
+    var match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    var user = this._resolveScheduleCurrentUser();
+    teamMatchEnterGroupScore.enterViewerGroupScore(match, user);
+  },
+
   /**
    * Series 赛程：跳转独立 group-editor（G2-R）
    * 前序轮未分组时先确认；确认后仍进用户点击的当前轮。
@@ -5087,6 +5184,13 @@ Page({
     if (!series || !roundId || !matchId) {
       if (typeof wx !== 'undefined' && wx.showToast) {
         wx.showToast({ title: '本轮比赛数据异常', icon: 'none' });
+      }
+      return;
+    }
+    var liveMatch = teamMatchStore.getMatchById(matchId);
+    if (teamMatchFinish.isMatchCompleted(liveMatch)) {
+      if (typeof wx !== 'undefined' && wx.showToast) {
+        wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
       }
       return;
     }
@@ -5205,6 +5309,21 @@ Page({
     });
   },
 
+  onScheduleViewLeaderboard: function () {
+    var schedule = this.data.schedule || {};
+    var rid = String(
+      this._scheduleSelectedKey || schedule.selectedKey || ''
+    ).trim();
+    if (!rid) return;
+    this._standingsSelectedKey = rid;
+    this._standingsVisited = true;
+    this._standingsUserPicked = true;
+    this._rebuildStandingsProjection({
+      standingsDockIntoView: this._dockIntoViewId(rid)
+    });
+    this._performSwitchTab('standings');
+  },
+
   onScheduleTeeGroupTap: function (e) {
     var groupId =
       e && e.currentTarget && e.currentTarget.dataset
@@ -5220,72 +5339,7 @@ Page({
       }
       return;
     }
-    groupsStore.ensureInitialized();
-    var group = Array.isArray(match.groups)
-      ? match.groups.find(function (g) {
-          return String(g && g.groupId) === groupId;
-        })
-      : null;
-    var players = [];
-    if (group && Array.isArray(group.players)) {
-      players = group.players
-        .filter(function (p) {
-          return p && p.userId;
-        })
-        .map(function (p) {
-          return {
-            playerId: p.userId || p.playerId,
-            name: p.displayName || p.competitionName || p.nickname || p.name || '',
-            avatar: p.avatar || ''
-          };
-        });
-    }
-    if (!players.length) {
-      players = (groupsStore.loadGroupForScoring(groupId) || []).map(function (p) {
-        return {
-          playerId: p.playerId,
-          name: p.name,
-          avatar: p.avatar || ''
-        };
-      });
-    }
-    var groupCount =
-      match && Array.isArray(match.groups) && match.groups.length
-        ? match.groups.length
-        : (groupsStore.getGroups() || []).length || 1;
-    var mode = resolveScheduleScorePageMode(match, groupId);
-    matchStateUtil.setMatchState({
-      mode: mode,
-      formatType: 'individual_stroke',
-      gameId: '',
-      matchId: matchId,
-      groupIndex: 0,
-      groupId: groupId,
-      players: players,
-      course: {
-        courseId: match.courseId || '',
-        courseName: match.courseName || match.venueName || '',
-        courseLocation: match.courseLocation || '',
-        halfText: match.courseHalfText || '',
-        roundName:
-          match.roundName ||
-          match.name ||
-          match.eventName ||
-          match.tournamentName ||
-          match.teamName ||
-          '',
-        gameMode: match.gameMode || match.selectedGameMode || '个人比杆赛',
-        teeTime: match.teeTime || match.date || '',
-        teeTimeText: match.teeTimeText || '',
-        visibility: match.visibility || '',
-        accessCode: match.accessCode || '',
-        front9Course: match.front9Course || null,
-        back9Course: match.back9Course || null
-      },
-      scores: matchStateUtil.emptyScores(),
-      groupCount: groupCount
-    });
-    matchStateUtil.enterScorePage();
+    teamMatchEnterGroupScore.enterTeamMatchGroupScore(match, groupId);
   },
 
   onBack: function () {
@@ -5299,6 +5353,25 @@ Page({
   },
 
   /* ===== Series M：轮次选择 → 同构菜单 ===== */
+  _onSeriesStationRoundStartSuccess: function (result, roundId) {
+    if (!result || !result.ok || result.startedLive !== true) return;
+    this._scheduleSelectedKey = roundId || result.roundId || this._scheduleSelectedKey;
+    this._rebuildScheduleProjection();
+    this._refreshSeriesManageFab();
+    this._showSeriesRoundEnteredLiveNotice(result.liveNotice);
+  },
+
+  _showSeriesRoundEnteredLiveNotice: function (message) {
+    var content = message != null ? String(message).trim() : '';
+    if (!content) return;
+    if (typeof wx === 'undefined' || typeof wx.showModal !== 'function') return;
+    wx.showModal({
+      content: content,
+      showCancel: false,
+      confirmText: '我知道了'
+    });
+  },
+
   _refreshSeriesManageFab: function () {
     if (!this._pageAlive) return;
     var series =
@@ -5488,6 +5561,8 @@ Page({
       suggestedRoundId: this._resolveManageSuggestedRoundId(),
       selectedRoundId: selected,
       gate: gate,
+      seriesFinishBusy: !!this._seriesFinishBusy,
+      stationFinishBusy: !!this._stationFinishBusy,
       getMatchById: function (id) {
         return teamMatchStore.getMatchById(id);
       }
@@ -5790,9 +5865,7 @@ Page({
   },
 
   _isSeriesOverallCompleted: function (series) {
-    return registerViewModel.isSeriesCompetitionPhaseCompleted(
-      series && series.competitionPhaseCache
-    );
+    return seriesFinishLock.isSeriesCompleted(series);
   },
 
   _showRegistrationClosedModal: function () {
@@ -6693,6 +6766,15 @@ Page({
       }
       return;
     }
+    if (seriesFinishLock.isSeriesCompleted(series)) {
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({
+          title: seriesFinishLock.SERIES_COMPLETED_TOAST,
+          icon: 'none'
+        });
+      }
+      return;
+    }
     var current = String(series.registrationState || '').trim() === 'open' ? 'open' : 'closed';
     var next = current === 'open' ? 'closed' : 'open';
     var expectedRevision = Number(series.registrationRevision);
@@ -6731,6 +6813,156 @@ Page({
     }
   },
 
+  _confirmFinishSeries: function () {
+    if (!this._pageAlive) return;
+    if (this._seriesFinishBusy) return;
+    var series = seriesStore.getSeriesById(this._seriesId);
+    if (!series) {
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: '系列赛数据异常', icon: 'none' });
+      }
+      return;
+    }
+    var actor = gameStore.getCurrentUser() || {};
+    if (!seriesManageAccess.isSeriesHostPrivileged(series, actor)) {
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: '暂无管理权限', icon: 'none' });
+      }
+      return;
+    }
+    if (seriesFinishLock.isSeriesCompleted(series)) {
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({
+          title: seriesFinishLock.SERIES_COMPLETED_TOAST,
+          icon: 'none'
+        });
+      }
+      return;
+    }
+    this._seriesFinishBusy = true;
+    this._refreshSeriesManageSheet();
+    var self = this;
+    var getter = function (id) {
+      return teamMatchStore.getMatchById(id);
+    };
+    var first = seriesFinalize.getManualFinishFirstConfirm(series, getter);
+    var release = function () {
+      self._seriesFinishBusy = false;
+      if (self._pageAlive) self._refreshSeriesManageSheet();
+    };
+    var showModal =
+      typeof wx !== 'undefined' && typeof wx.showModal === 'function' ? wx.showModal : null;
+    if (!showModal) {
+      release();
+      return;
+    }
+    showModal({
+      title: first.title,
+      content: first.content,
+      cancelText: first.cancelText,
+      confirmText: first.confirmText,
+      success: function (res) {
+        if (!self._pageAlive) return;
+        if (!res || !res.confirm) {
+          release();
+          return;
+        }
+        self._promptFinishSeriesDanger(actor, getter);
+      },
+      fail: function () {
+        release();
+      }
+    });
+  },
+
+  _promptFinishSeriesDanger: function (actor, getter) {
+    var self = this;
+    var release = function () {
+      self._seriesFinishBusy = false;
+      if (self._pageAlive) self._refreshSeriesManageSheet();
+    };
+    var latest = seriesStore.getSeriesById(this._seriesId);
+    if (!latest) {
+      release();
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: '系列赛数据异常', icon: 'none' });
+      }
+      return;
+    }
+    if (seriesFinishLock.isSeriesCompleted(latest)) {
+      release();
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({
+          title: seriesFinishLock.SERIES_COMPLETED_TOAST,
+          icon: 'none'
+        });
+      }
+      return;
+    }
+    var second = seriesFinalize.getManualFinishSecondConfirm(latest, getter);
+    var showModal =
+      typeof wx !== 'undefined' && typeof wx.showModal === 'function' ? wx.showModal : null;
+    if (!showModal) {
+      release();
+      return;
+    }
+    showModal({
+      title: second.title,
+      content: second.content,
+      cancelText: second.cancelText,
+      confirmText: second.confirmText,
+      confirmColor: second.confirmColor || seriesFinalize.DANGER_CONFIRM_COLOR,
+      success: function (res) {
+        if (!self._pageAlive) return;
+        if (!res || !res.confirm) {
+          release();
+          return;
+        }
+        self._runManualFinishSeries(actor, getter, second.unfinishedRoundIds);
+      },
+      fail: function () {
+        release();
+      }
+    });
+  },
+
+  _runManualFinishSeries: function (actor, getter, expectedUnfinishedRoundIds) {
+    var self = this;
+    var result = seriesFinalize.finalizeSeries({
+      seriesId: self._seriesId,
+      source: 'manual',
+      actor: actor,
+      getMatchById: getter,
+      expectedUnfinishedRoundIds: expectedUnfinishedRoundIds
+    });
+    self._seriesFinishBusy = false;
+    if (!result || !result.ok) {
+      if (self._pageAlive) self._refreshSeriesManageSheet();
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({
+          title:
+            (result && result.message) ||
+            (result && result.reason === 'permission_denied'
+              ? '暂无管理权限'
+              : '操作失败'),
+          icon: 'none'
+        });
+      }
+      return;
+    }
+    self._lastSeriesForSchedule = result.series || seriesStore.getSeriesById(self._seriesId);
+    self._rebuildRegisterProjection();
+    self._rebuildScheduleProjection();
+    self._refreshSeriesManageSheet();
+    self.reloadViewModel({ resetScroll: false });
+    if (result.idempotent) {
+      return;
+    }
+    if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+      wx.showToast({ title: '系列赛已结束', icon: 'success' });
+    }
+  },
+
   onSeriesScopeFeatureTap: function (e) {
     if (!this._pageAlive) return;
     var permission =
@@ -6760,6 +6992,15 @@ Page({
       if (!isManage) {
         if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
           wx.showToast({ title: '暂无管理权限', icon: 'none' });
+        }
+        return;
+      }
+      if (seriesFinishLock.isSeriesCompleted(series)) {
+        if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+          wx.showToast({
+            title: seriesFinishLock.SERIES_COMPLETED_TOAST,
+            icon: 'none'
+          });
         }
         return;
       }
@@ -6812,8 +7053,29 @@ Page({
         }
         return;
       }
+      if (seriesFinishLock.isSeriesCompleted(series)) {
+        if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+          wx.showToast({
+            title: seriesFinishLock.SERIES_COMPLETED_TOAST,
+            icon: 'none'
+          });
+        }
+        return;
+      }
       if (disabledFromUi) return;
       this.toggleSeriesRegistrationState();
+      return;
+    }
+    if (permission === 'finish_series') {
+      if (!isManage) {
+        if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+          wx.showToast({ title: '暂无管理权限', icon: 'none' });
+        }
+        return;
+      }
+      if (this._seriesFinishBusy) return;
+      if (disabledFromUi) return;
+      this._confirmFinishSeries();
       return;
     }
     if (disabledFromUi) return;
@@ -7965,7 +8227,14 @@ Page({
     var user = gameStore.getCurrentUser() || {};
     if (
       disabledFromUi ||
-      teamMatchMoreMenu.getMoreFeatureDisabledState(match, { permission: permission })
+      teamMatchMoreMenu.getMoreFeatureDisabledState(
+        match,
+        { permission: permission },
+        seriesFinishLock.isSeriesCompleted(
+          this._lastSeriesForSchedule ||
+            (this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null)
+        )
+      )
     ) {
       return;
     }
@@ -8094,7 +8363,8 @@ Page({
       var runStart = function () {
         var result = seriesScheduleGroupWrite.startStationRound({
           matchId: matchId,
-          series: series
+          series: series,
+          roundId: gate.roundId
         });
         if (!result || !result.ok) {
           wx.showToast({
@@ -8103,10 +8373,7 @@ Page({
           });
           return;
         }
-        self._scheduleSelectedKey = gate.roundId;
-        self._rebuildScheduleProjection();
-        self._refreshSeriesManageFab();
-        wx.showToast({ title: '已开赛', icon: 'success' });
+        self._onSeriesStationRoundStartSuccess(result, gate.roundId);
       };
       if (typeof wx.showModal === 'function') {
         wx.showModal({
@@ -8122,17 +8389,53 @@ Page({
       return;
     }
     if (permission === 'finish_match') {
-      this.closeMoreSheetFully();
       var selfFinish = this;
+      if (selfFinish._stationFinishBusy) return;
+      var gPrompt = selfFinish._verifyCurrentManageStation();
+      if (!gPrompt.ok) {
+        selfFinish._toastGateFail(gPrompt);
+        return;
+      }
+      if (teamMatchFinish.isMatchCompleted(gPrompt.match)) {
+        wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
+        return;
+      }
+      var seriesForLabel =
+        selfFinish._lastSeriesForSchedule ||
+        (selfFinish._seriesId ? seriesStore.getSeriesById(selfFinish._seriesId) : null);
+      var finishModal = seriesFinalize.getStationFinishModalContent(
+        seriesForLabel,
+        gPrompt.roundId
+      );
+      selfFinish._stationFinishBusy = true;
+      selfFinish._refreshSeriesManageSheet();
+      var releaseStation = function () {
+        selfFinish._stationFinishBusy = false;
+        if (selfFinish._pageAlive) selfFinish._refreshSeriesManageSheet();
+      };
+      if (typeof wx.showModal !== 'function') {
+        releaseStation();
+        return;
+      }
       wx.showModal({
-        title: '结束比赛',
-        content: '确认结束本轮比赛？',
-        confirmColor: '#ce9224',
+        title: finishModal.title,
+        content: finishModal.content,
+        cancelText: finishModal.cancelText || '取消',
+        confirmText: finishModal.confirmText || '确定结束',
         success: function (res) {
-          if (!res || !res.confirm) return;
+          if (!res || !res.confirm) {
+            releaseStation();
+            return;
+          }
           var g2 = selfFinish._verifyCurrentManageStation();
           if (!g2.ok) {
+            releaseStation();
             selfFinish._toastGateFail(g2);
+            return;
+          }
+          if (teamMatchFinish.isMatchCompleted(g2.match)) {
+            releaseStation();
+            wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
             return;
           }
           if (
@@ -8142,26 +8445,45 @@ Page({
               'finish_match'
             )
           ) {
+            releaseStation();
             wx.showToast({ title: '暂无该管理权限', icon: 'none' });
             return;
           }
           var m = teamMatchStore.getMatchById(g2.matchId);
           if (!m) {
+            releaseStation();
             wx.showToast({ title: '未找到比赛信息', icon: 'none' });
             return;
           }
-          if (String(m.status || '').trim().toLowerCase() === 'finished') {
-            wx.showToast({ title: '比赛已经结束。', icon: 'none' });
+          var confirmed = teamMatchFinish.confirmFinishWholeTeamMatch(m);
+          if (!confirmed.ok) {
+            releaseStation();
+            wx.showToast({
+              title: confirmed.message || teamMatchFinish.MATCH_FINISHED_TOAST,
+              icon: 'none'
+            });
             return;
           }
-          m.status = 'finished';
-          m.statusLabel = '已结束';
-          m.finishedAt = Date.now();
-          m.updatedAt = Date.now();
-          teamMatchStore.saveMatch(m);
+          var saved = teamMatchFinish.saveMatchIfWritable(m);
+          if (!saved.ok) {
+            releaseStation();
+            wx.showToast({
+              title: saved.message || '操作失败',
+              icon: 'none'
+            });
+            return;
+          }
+          seriesFinalize.maybeFinalizeAfterStationPersisted(m, {
+            actor: gameStore.getCurrentUser() || {}
+          });
+          selfFinish._stationFinishBusy = false;
           selfFinish._rebuildScheduleProjection();
           selfFinish._refreshSeriesManageFab();
+          selfFinish._refreshSeriesManageSheet();
           wx.showToast({ title: '比赛已结束', icon: 'success' });
+        },
+        fail: function () {
+          releaseStation();
         }
       });
       return;

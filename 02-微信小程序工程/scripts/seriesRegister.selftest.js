@@ -706,7 +706,8 @@ function fakeTeamsByUserId(map) {
     '报名写路径禁止改分站 registerInfo / 同步各轮；代报名复用好友页',
     pageJs.indexOf('match.registrationStatus') < 0 &&
       pageJs.indexOf('registerInfo.users') < 0 &&
-      pageJs.indexOf('teamMatchStore.saveMatch') >= 0 &&
+      (pageJs.indexOf('teamMatchStore.saveMatch') >= 0 ||
+        pageJs.indexOf('saveMatchIfWritable') >= 0) &&
       !/teamMatchStore\.saveMatch\([\s\S]{0,200}register/.test(pageJs) &&
       pageJs.indexOf('syncProxy') < 0 &&
       pageJs.indexOf('proxyToStations') < 0 &&

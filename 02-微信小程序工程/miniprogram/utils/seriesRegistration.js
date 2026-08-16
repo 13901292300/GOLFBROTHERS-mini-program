@@ -8,6 +8,7 @@
 
 var seriesIds = require('./seriesIds.js');
 var seriesModel = require('./seriesModel.js');
+var seriesFinishLock = require('./seriesFinishLock.js');
 
 function deepClone(value) {
   if (value == null) return value;
@@ -171,7 +172,8 @@ function createSeriesRegistrationService(deps) {
 
   /** 仅 Series 整体 completed 禁止报名域写入；单轮结束不关闭 */
   function assertCompetitionPhaseAllowsSelfMutation(series) {
-    if (asString(series.competitionPhaseCache) === 'completed') {
+    var gate = seriesFinishLock.assertSeriesWritable(series);
+    if (!gate.ok) {
       return { ok: false, reason: 'series_completed' };
     }
     return { ok: true };
@@ -985,6 +987,9 @@ function createSeriesRegistrationService(deps) {
 
     var lifeGate = assertLifecycleAllowsMutation(series);
     if (!lifeGate.ok) return lifeGate;
+
+    var phaseGate = assertCompetitionPhaseAllowsSelfMutation(series);
+    if (!phaseGate.ok) return phaseGate;
 
     var revGate = assertExpectedRevision(series, src.expectedRegistrationRevision);
     if (!revGate.ok) return revGate;

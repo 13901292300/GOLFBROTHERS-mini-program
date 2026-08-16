@@ -6,6 +6,9 @@
 
 var clubDateFormat = require('./clubDateFormat.js');
 var seriesGameModeLabel = require('./seriesGameModeLabel.js');
+var seriesPlazaLiveSubtitle = require('./seriesPlazaLiveSubtitle.js');
+var seriesRoundPhaseAggregate = require('./seriesRoundPhaseAggregate.js');
+var seriesFinishLock = require('./seriesFinishLock.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -189,6 +192,7 @@ function listValidStationStatuses(series, deps) {
 function deriveSeriesListPhase(series, stationStatuses) {
   var life = asString(series && series.lifecycleStatus);
   if (life !== 'published') return 'none';
+  if (seriesFinishLock.isSeriesCompleted(series)) return 'finished';
 
   var statuses = Array.isArray(stationStatuses) ? stationStatuses : [];
   var hasOngoing = false;
@@ -214,8 +218,9 @@ function deriveSeriesListPhase(series, stationStatuses) {
 
 /**
  * @param {'registration'|'live'|'finished'} listPhase
+ * @param {{ getMatchById?: Function }} [options]
  */
-function toSeriesClubCard(series, listPhase) {
+function toSeriesClubCard(series, listPhase, options) {
   if (!series || typeof series !== 'object') return null;
   var sid = asString(series.seriesId);
   if (!sid) return null;
@@ -225,6 +230,12 @@ function toSeriesClubCard(series, listPhase) {
     /[\r\n\u2028\u2029]+/g,
     ''
   );
+  if (listPhase === 'live') {
+    titleSub = seriesPlazaLiveSubtitle.projectPlazaSeriesTitleSub(
+      series,
+      options && options.getMatchById
+    );
+  }
   var statusLabel = '报名中';
   var statusTone = 'default';
   var tab = '';
@@ -406,7 +417,8 @@ function _buildList(deps, mode) {
           if (phase !== 'live' && phase !== 'finished') continue;
           var plazaCard = toSeriesClubCard(
             series,
-            phase === 'live' ? 'live' : 'finished'
+            phase === 'live' ? 'live' : 'finished',
+            { getMatchById: d.getMatchById }
           );
           if (!plazaCard) continue;
           seen[sid] = 1;
@@ -414,12 +426,20 @@ function _buildList(deps, mode) {
           continue;
         }
 
-        // 报名列表：published 即出卡（open/closed）；registrationState 只投影文案
+        // 报名列表：published 且尚未整体进入 LIVE/已结束；registrationState 只投影文案
         // lifecycleStatus 已互斥排除 cancelled/archived/draft
         if (mode === 'registration_mine') {
           if (!playerId) continue;
           var entry = findRegisteredRosterEntry(series.roster, playerId);
           if (!entry) continue;
+        }
+        if (
+          seriesRoundPhaseAggregate.shouldHideSeriesFromPlazaRegistration(
+            series,
+            d.getMatchById
+          )
+        ) {
+          continue;
         }
         var regCard = toSeriesClubCard(series, 'registration');
         if (!regCard) continue;
@@ -449,5 +469,10 @@ module.exports = {
   sortCardsByStableTime: sortCardsByStableTime,
   buildRegistrationAllCards: buildRegistrationAllCards,
   buildRegistrationMineCards: buildRegistrationMineCards,
-  buildPlazaTournamentCards: buildPlazaTournamentCards
+  buildPlazaTournamentCards: buildPlazaTournamentCards,
+  shouldHideSeriesFromPlazaRegistration:
+    seriesRoundPhaseAggregate.shouldHideSeriesFromPlazaRegistration,
+  hasValidRounds: seriesRoundPhaseAggregate.hasValidRounds,
+  allValidRoundsStartedOrCompleted:
+    seriesRoundPhaseAggregate.allValidRoundsStartedOrCompleted
 };

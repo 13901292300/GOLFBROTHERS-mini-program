@@ -7,6 +7,7 @@ const halfCourse = require('./halfCourse.js');
 const gameStore = require('./gameStore.js');
 const groupsStore = require('./groupsStore.js');
 const teamMatchStore = require('./teamMatchStore.js');
+const teamMatchFinish = require('./teamMatchFinish.js');
 const matchState = require('./matchState.js');
 const holeLayout = require('./holeLayout.js');
 
@@ -145,6 +146,10 @@ function apply(ctx, front9, back9) {
   if (ctx.matchId) {
     const match = teamMatchStore.getMatchById(ctx.matchId);
     if (match) {
+      var halfGuard = teamMatchFinish.assertWritable(match);
+      if (!halfGuard.ok) {
+        return { ok: false, message: halfGuard.message };
+      }
       teamMatchStore.saveMatch(
         Object.assign({}, match, {
           front9Course: front9 || null,

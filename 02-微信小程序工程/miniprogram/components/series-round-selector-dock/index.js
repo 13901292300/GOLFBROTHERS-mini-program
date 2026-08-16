@@ -8,7 +8,7 @@ var overflowArrows = require('./overflowArrows.js');
 
 Component({
   options: {
-    styleIsolation: 'isolated'
+    styleIsolation: 'apply-shared'
   },
 
   properties: {
@@ -17,6 +17,7 @@ Component({
     rounds: { type: Array, value: [] },
     roundInfoText: { type: String, value: '' },
     scrollLeft: { type: Number, value: 0 },
+    intoView: { type: String, value: '' },
     mode: { type: String, value: 'inflow' },
     sticky: { type: Boolean, value: false },
     top: { type: Number, value: 0 },

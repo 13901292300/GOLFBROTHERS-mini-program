@@ -11,6 +11,7 @@ var teamMatchMoreMenu = require('../../../../utils/teamMatchMoreMenu.js');
 var seriesManageRoundPicker = require('./seriesManageRoundPicker.js');
 var seriesManageAccess = require('../../../../utils/seriesManageAccess.js');
 var matchManageAccess = require('../../../../utils/matchManageAccess.js');
+var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -22,7 +23,8 @@ var SERIES_SCOPE_PERMISSIONS = {
   invite_friends_register: true,
   edit_series: true,
   toggle_registration: true,
-  cancel_series: true
+  cancel_series: true,
+  finish_series: true
 };
 
 var SERIES_COMMON_PERMISSIONS = {
@@ -33,7 +35,8 @@ var SERIES_COMMON_PERMISSIONS = {
 var SERIES_MANAGE_PERMISSIONS = {
   edit_series: true,
   toggle_registration: true,
-  cancel_series: true
+  cancel_series: true,
+  finish_series: true
 };
 
 /** 选轮后「本轮普通功能」：仅查看类，不要求管理员 */
@@ -75,7 +78,7 @@ function buildSeriesScopeFeatures(input) {
   var life = asString(series && series.lifecycleStatus);
   var published = life === 'published';
   var historical = life === 'cancelled' || life === 'archived';
-  var seriesCompleted = asString(series && series.competitionPhaseCache) === 'completed';
+  var seriesCompleted = seriesFinishLock.isSeriesCompleted(series);
 
   // 对齐队际赛：邀请/代报名在 published 均可见且不因 closed 置灰；
   // closed 拦截放在点击入口（共享 Modal），不在 ViewModel 置灰。
@@ -106,7 +109,7 @@ function buildSeriesScopeFeatures(input) {
     });
   }
 
-  // 管理四列网格：修改系列赛 / 取消 / 打开关闭报名；第4位自然留空
+  // 管理四列网格：修改系列赛 / 取消 / 报名开关 / 结束系列赛
   var featuresManage = [];
   if (canManage && published && !historical) {
     featuresManage.push({
@@ -116,8 +119,8 @@ function buildSeriesScopeFeatures(input) {
       glyph: '✏️',
       label: '修改系列赛',
       tone: '',
-      disabled: false,
-      disabledReason: ''
+      disabled: !!seriesCompleted,
+      disabledReason: seriesCompleted ? 'series_completed' : ''
     });
     featuresManage.push({
       scope: 'series',
@@ -137,9 +140,23 @@ function buildSeriesScopeFeatures(input) {
       glyph: regState === 'open' ? '🔒' : '🔓',
       label: regState === 'open' ? '关闭报名' : '打开报名',
       tone: regState === 'open' ? 'state' : 'success',
-      disabled: false,
-      disabledReason: '',
+      disabled: !!seriesCompleted,
+      disabledReason: seriesCompleted ? 'series_completed' : '',
       registrationState: regState
+    });
+    featuresManage.push({
+      scope: 'series',
+      tier: 'manage',
+      permission: 'finish_series',
+      glyph: '⏻',
+      label: seriesCompleted ? '已结束' : src.seriesFinishBusy ? '处理中' : '结束系列赛',
+      tone: 'warning',
+      disabled: !!seriesCompleted || !!src.seriesFinishBusy,
+      disabledReason: seriesCompleted
+        ? 'series_completed'
+        : src.seriesFinishBusy
+          ? 'processing'
+          : ''
     });
   }
 
@@ -517,9 +534,21 @@ function buildRoundManageSection(input) {
   var menu = teamMatchMoreMenu.buildMoreMenuViewModel({
     match: gate.match,
     user: src.user || {},
-    options: { managedSeriesMode: true }
+    options: {
+      managedSeriesMode: true,
+      seriesCompleted: seriesFinishLock.isSeriesCompleted(src.series)
+    }
   });
   var projected = projectRoundManageSlots(menu);
+  if (src.stationFinishBusy) {
+    projected.featuresPermission = (projected.featuresPermission || []).map(function (f) {
+      if (!f || f.permission !== 'finish_match') return f;
+      return Object.assign({}, f, {
+        disabled: true,
+        label: '处理中'
+      });
+    });
+  }
 
   return {
     hasSelection: true,
@@ -565,7 +594,8 @@ function buildSeriesManageSheetViewModel(input) {
     series: series,
     user: user,
     canManageSeries: canManage,
-    canRegisterForOther: src.canRegisterForOther
+    canRegisterForOther: src.canRegisterForOther,
+    seriesFinishBusy: !!src.seriesFinishBusy
   });
 
   var life = asString(series.lifecycleStatus);
@@ -616,7 +646,8 @@ function buildSeriesManageSheetViewModel(input) {
         gate: src.gate,
         user: user,
         roundMeta: roundMeta,
-        canManageSeries: true
+        canManageSeries: true,
+        stationFinishBusy: !!src.stationFinishBusy
       });
     }
   }

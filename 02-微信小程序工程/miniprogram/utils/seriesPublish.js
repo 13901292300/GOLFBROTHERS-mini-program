@@ -14,6 +14,7 @@ var seriesStoreMod = require('./seriesStore.js');
 var seriesStationIndexMod = require('./seriesStationIndex.js');
 var seriesPublishJournalMod = require('./seriesPublishJournal.js');
 var teamMatchStore = require('./teamMatchStore.js');
+var seriesFinishLock = require('./seriesFinishLock.js');
 
 var LOCAL_DT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/;
 
@@ -206,6 +207,9 @@ function createSeriesPublisher(deps) {
     if (life !== 'published') {
       return { ok: true, changed: false, series: series, reason: 'not_published' };
     }
+    if (seriesFinishLock.isSeriesCompleted(series)) {
+      return { ok: true, changed: false, series: series, reason: 'series_completed' };
+    }
     var state = asString(series.registrationState).trim();
     if (state !== 'closed') {
       return { ok: true, changed: false, series: series, reason: 'registration_not_closed' };
@@ -339,6 +343,10 @@ function createSeriesPublisher(deps) {
     var sid = asString(series.seriesId).trim();
     if (!sid) {
       return { ok: false, reason: 'series_id_required' };
+    }
+    var completedGate = seriesFinishLock.assertSeriesWritable(series);
+    if (!completedGate.ok) {
+      return { ok: false, reason: 'series_completed', message: completedGate.message };
     }
 
     var existingJ = journalStore.getJournal(sid);
@@ -824,6 +832,10 @@ function createSeriesPublisher(deps) {
 
     var series = loadSeries(sid);
     if (!series) return { ok: false, reason: 'series_not_found' };
+    var completedGate = seriesFinishLock.assertSeriesWritable(series);
+    if (!completedGate.ok) {
+      return { ok: false, reason: 'series_completed', message: completedGate.message };
+    }
 
     var jRes = journalStore.getJournal(sid);
     if (!jRes.ok) return { ok: false, reason: jRes.reason || 'journal_read_failed' };
@@ -1206,6 +1218,10 @@ function createSeriesPublisher(deps) {
    * 仅补偿同一冻结计划：不得删分站、不得重新规划。
    */
   function repairHalfPublished(seriesId, options) {
+    var seriesForLock = loadSeries(seriesId);
+    if (seriesFinishLock.isSeriesCompleted(seriesForLock)) {
+      return { ok: false, reason: 'series_completed' };
+    }
     var insp = inspectPublishState(seriesId);
     if (!insp.ok) return insp;
     if (insp.journalCorrupt) {

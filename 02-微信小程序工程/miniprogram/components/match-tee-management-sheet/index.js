@@ -5,6 +5,7 @@
  */
 
 var teamMatchStore = require('../../utils/teamMatchStore.js');
+var teamMatchFinish = require('../../utils/teamMatchFinish.js');
 var gameStore = require('../../utils/gameStore.js');
 var matchManageAccess = require('../../utils/matchManageAccess.js');
 var teeSheetManage = require('../../utils/teeSheetManage.js');
@@ -325,6 +326,13 @@ Component({
         this._saving = false;
         this._safeSetData({ saving: false });
         wx.showToast({ title: '暂无出发管理权限', icon: 'none' });
+        return;
+      }
+      var teeFinishGuard = teamMatchFinish.assertWritable(match);
+      if (!teeFinishGuard.ok) {
+        this._saving = false;
+        this._safeSetData({ saving: false });
+        wx.showToast({ title: teeFinishGuard.message, icon: 'none' });
         return;
       }
 

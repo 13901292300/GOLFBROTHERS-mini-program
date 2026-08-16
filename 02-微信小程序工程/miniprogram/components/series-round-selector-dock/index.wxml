@@ -16,6 +16,7 @@
         enable-flex="{{true}}"
         show-scrollbar="{{false}}"
         scroll-left="{{scrollLeft}}"
+        scroll-into-view="{{intoView}}"
         scroll-with-animation="{{false}}"
         bindscroll="onHScroll"
       >
@@ -23,12 +24,13 @@
           <view
             wx:for="{{rounds}}"
             wx:key="key"
+            id="srd-{{item.key}}"
             class="series-standings-round-chip round-selector-item {{item.stateClass}} {{item.isSelected ? 'round-selector-item--selected' : ''}}"
             data-key="{{item.key}}"
             bindtap="onRoundTap"
           >
             <text class="series-standings-round-chip__label">{{item.label}}</text>
-            <text wx:if="{{item.showLiveBadge}}" class="series-standings-round-chip__live">LIVE</text>
+            <text wx:if="{{item.showLiveBadge}}" class="series-standings-round-chip__live live-badge-pulse">LIVE</text>
             <view wx:if="{{item.isSelected}}" class="round-selector-item__selected-icon">✓</view>
           </view>
         </view>

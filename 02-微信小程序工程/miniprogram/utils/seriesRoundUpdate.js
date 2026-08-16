@@ -9,6 +9,8 @@ var seriesModel = require('./seriesModel.js');
 var seriesStationMatch = require('./seriesStationMatch.js');
 var seriesStationIndex = require('./seriesStationIndex.js');
 var seriesManageAccess = require('./seriesManageAccess.js');
+var teamMatchFinish = require('./teamMatchFinish.js');
+var seriesFinishLock = require('./seriesFinishLock.js');
 
 var JOURNAL_KEY = 'gb_series_round_edit_journal_v1';
 
@@ -35,8 +37,7 @@ function matchStatusToken(match) {
 }
 
 function isMatchFinished(match) {
-  var s = matchStatusToken(match);
-  return s === 'finished' || s === 'completed';
+  return teamMatchFinish.isMatchCompleted(match);
 }
 
 function isMatchStarted(match) {
@@ -63,6 +64,7 @@ function matchHasScores(match) {
       var bucket = sd[keys[i]];
       if (typeof bucketHasFilled === 'function') {
         if (bucketHasFilled(bucket)) return true;
+        if (bucket != null && typeof bucket !== 'object') return true;
       } else if (bucket && typeof bucket === 'object') {
         // 极端降级：仅识别常见 scores 数组有填充
         var sbp = bucket.scoresByPlayer;
@@ -163,7 +165,8 @@ function resolveRoundEditLocks(series, round, match) {
   var scoringMode = asString(
     series && series.scoringRule && series.scoringRule.mode
   );
-  var finished = isMatchFinished(match);
+  var finished =
+    isMatchFinished(match) || seriesFinishLock.isSeriesCompleted(series);
   var startedOrScored = isMatchStarted(match) || matchHasScores(match);
   var hasStruct = matchHasScoringStructure(match);
   var hasGroups = matchHasGroupingStructure(match);
@@ -458,6 +461,10 @@ function createSeriesRoundUpdateService(deps) {
     if (!series) return { ok: false, reason: 'series_not_found' };
     if (asString(series.lifecycleStatus) !== 'published') {
       return { ok: false, reason: 'series_not_published' };
+    }
+    var seriesLock = seriesFinishLock.assertSeriesWritable(series);
+    if (!seriesLock.ok) {
+      return { ok: false, reason: 'series_completed', message: seriesLock.message };
     }
 
     var expectedUpdatedAt = asString(src.expectedSeriesUpdatedAt);

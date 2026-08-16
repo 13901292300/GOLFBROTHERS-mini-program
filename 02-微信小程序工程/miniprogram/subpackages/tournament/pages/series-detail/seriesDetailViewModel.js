@@ -13,14 +13,9 @@ var seriesColorMark = require('../../../../utils/seriesColorMark.js');
 var seriesStandingsViewModel = require('./seriesStandingsViewModel.js');
 var seriesRegisterViewModel = require('./seriesRegisterViewModel.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
+var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 
-var SERIES_TABS = [
-  { id: 'info', label: '赛事信息' },
-  { id: 'standings', label: '总榜' },
-  { id: 'register', label: '报名' },
-  { id: 'schedule', label: '赛程' },
-  { id: 'discussion', label: '讨论区' }
-];
+var SERIES_TABS = seriesLiveSession.SERIES_TABS;
 
 var TEMPLATE_LABELS = {
   inter_team_series: '队际系列赛',
@@ -1283,9 +1278,20 @@ function buildSeriesDetailViewModel(seriesInput, options) {
   var participants = buildParticipantsView(series);
   var hero = buildHeroView(series, access);
   var roundStates = seriesStandingsViewModel.projectRoundStatesFromRoundCards(roundCards);
+  var hasLiveRound = seriesLiveSession.hasAnyLiveRound(roundStates);
+  var standingsKey = seriesLiveSession.resolveSessionSelectedRoundId({
+    currentKey: opts.standingsSelectedKey,
+    userPicked: !!opts.standingsUserPicked,
+    visited: !!opts.standingsVisited,
+    roundStates: roundStates,
+    extraValidKeys:
+      asString(series.scoringRule && series.scoringRule.mode) === 'global_m'
+        ? { cumulative: true }
+        : null
+  });
   var standings = seriesStandingsViewModel.buildSeriesStandingsViewModel({
     series: series,
-    selectedKey: opts.standingsSelectedKey || seriesStandingsViewModel.CUMULATIVE_KEY,
+    selectedKey: standingsKey,
     roundStates: roundStates,
     // 生产默认空结果；页面不得注入演示成绩。自测可经 options 传入 fixture。
     // 展开态由页面 expandedStandingsTeamId 控制，不在此投影 isExpanded。
@@ -1298,7 +1304,8 @@ function buildSeriesDetailViewModel(seriesInput, options) {
   return {
     ok: true,
     access: access,
-    tabs: SERIES_TABS.slice(),
+    tabs: seriesLiveSession.buildSeriesDetailTabs(hasLiveRound),
+    hasLiveRound: hasLiveRound,
     seriesId: asString(series.seriesId).trim(),
     seriesName: asString(series.seriesName).trim() || '系列赛',
     templateId: asString(series.templateId).trim(),

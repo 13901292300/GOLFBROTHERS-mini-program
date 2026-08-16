@@ -1570,6 +1570,12 @@ function hydrateCreatePageFromMatch(match) {
 
 function saveMatch(match) {
   if (!match || !match.matchId) return null;
+  var seriesGuard = require('./seriesFinishLock.js').assertWritableForMatch(match);
+  if (seriesGuard && !seriesGuard.ok) {
+    var err = new Error(seriesGuard.message || seriesGuard.reason || 'series_completed');
+    err.reason = seriesGuard.reason;
+    throw err;
+  }
   match.scoreData = normalizeScoreData(match.scoreData);
   const list = _readAll();
   const next = [match].concat(list.filter((item) => item && item.matchId !== match.matchId));

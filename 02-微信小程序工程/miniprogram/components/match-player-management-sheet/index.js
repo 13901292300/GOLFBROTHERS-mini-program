@@ -5,6 +5,7 @@
  */
 
 var teamMatchStore = require('../../utils/teamMatchStore.js');
+var teamMatchFinish = require('../../utils/teamMatchFinish.js');
 var gameStore = require('../../utils/gameStore.js');
 var matchManageAccess = require('../../utils/matchManageAccess.js');
 var playerManage = require('../../utils/playerManage.js');
@@ -902,6 +903,13 @@ Component({
         this._saving = false;
         this._safeSetData({ saving: false });
         wx.showToast({ title: '暂无选手管理权限', icon: 'none' });
+        return;
+      }
+      var playerFinishGuard = teamMatchFinish.assertWritable(match);
+      if (!playerFinishGuard.ok) {
+        this._saving = false;
+        this._safeSetData({ saving: false });
+        wx.showToast({ title: playerFinishGuard.message, icon: 'none' });
         return;
       }
 

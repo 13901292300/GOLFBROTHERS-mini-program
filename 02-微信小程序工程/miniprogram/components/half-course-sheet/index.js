@@ -106,6 +106,13 @@ Component({
         return;
       }
       const result = halfCourseEdit.apply(this._ctx(), front9, back9);
+      if (result && result.ok === false) {
+        wx.showToast({
+          title: result.message || '比赛已经结束。',
+          icon: 'none'
+        });
+        return;
+      }
       this.triggerEvent('confirm', result);
       this.triggerEvent('close');
       wx.showToast({ title: '半场已更新', icon: 'success' });

@@ -8,6 +8,7 @@
  */
 
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
+var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
 var playerManage = require('../../../../utils/playerManage.js');
 var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
@@ -255,23 +256,7 @@ function buildTotalSelectorChip(isSelected) {
  * 多 LIVE 时沿用 roundStates 既有顺序，不另做时间比较。取消轮永不默认。
  */
 function resolveDefaultPerRoundSelectedKey(roundStates) {
-  var list = Array.isArray(roundStates) ? roundStates : [];
-  var firstLive = '';
-  var firstGrouped = '';
-  var lastCompleted = '';
-  var firstAvailable = '';
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i] || {};
-    var rid = asString(r.roundId).trim();
-    if (!rid) continue;
-    var visual = seriesRoundVisualState.normalizeRoundVisualFromStateRow(r);
-    if (visual.state === 'cancelled') continue;
-    if (!firstAvailable) firstAvailable = rid;
-    if (visual.state === 'live' && !firstLive) firstLive = rid;
-    if (visual.state === 'grouped' && !firstGrouped) firstGrouped = rid;
-    if (visual.state === 'completed') lastCompleted = rid;
-  }
-  return firstLive || firstGrouped || lastCompleted || firstAvailable;
+  return seriesLiveSession.resolveDefaultTargetRoundId(roundStates);
 }
 
 function rxFallbackLabel(round, state, orderIndex) {
@@ -304,7 +289,7 @@ function buildRoundSelectorParts(roundStates, selectedKey, options) {
   var opts = options && typeof options === 'object' ? options : {};
   var includeTot = opts.includeTot !== false;
   var displayLabels = opts.displayLabels && typeof opts.displayLabels === 'object' ? opts.displayLabels : null;
-  var key = asString(selectedKey).trim() || (includeTot ? CUMULATIVE_KEY : '');
+  var key = asString(selectedKey).trim();
   var roundSelectorItems = [];
   var list = Array.isArray(roundStates) ? roundStates : [];
   var valid = Object.create(null);
@@ -332,9 +317,8 @@ function buildRoundSelectorParts(roundStates, selectedKey, options) {
       showSelectedCheck: false
     });
   }
-  var fallbackKey = includeTot
-    ? CUMULATIVE_KEY
-    : resolveDefaultPerRoundSelectedKey(roundStates);
+  var fallbackKey = resolveDefaultPerRoundSelectedKey(roundStates);
+  if (!fallbackKey && includeTot) fallbackKey = CUMULATIVE_KEY;
   var effectiveKey = valid[key] ? key : fallbackKey;
   if (!includeTot && (!effectiveKey || !valid[effectiveKey])) {
     effectiveKey = fallbackKey;
@@ -1238,7 +1222,7 @@ function buildSeriesStandingsViewModel(input) {
 
   var isPerRoundN = scoringMode === 'per_round_n';
   var roundStates = Array.isArray(src.roundStates) ? src.roundStates.slice() : [];
-  var selectedKey = asString(src.selectedKey).trim() || (isPerRoundN ? '' : CUMULATIVE_KEY);
+  var selectedKey = asString(src.selectedKey).trim();
   var standingsResult =
     src.standingsResult && typeof src.standingsResult === 'object'
       ? src.standingsResult
@@ -1416,6 +1400,7 @@ module.exports = {
   resolvePerRoundNTeamGameModeLabel: resolvePerRoundNTeamGameModeLabel,
   formatTotRowSubLabel: formatTotRowSubLabel,
   resolveDefaultPerRoundSelectedKey: resolveDefaultPerRoundSelectedKey,
+  resolveDefaultTargetRoundId: seriesLiveSession.resolveDefaultTargetRoundId,
   buildStandingsRoundDisplayLabels: buildStandingsRoundDisplayLabels,
   resolveStandingsRoundDisplayLabel: resolveStandingsRoundDisplayLabel,
   resolveRoundChipLabel: resolveRoundChipLabel

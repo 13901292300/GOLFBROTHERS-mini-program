@@ -203,7 +203,7 @@ function lockInput(series, roundId, harness) {
   assert('allowRepeat=false R2 启用', lock.ok === true && lock.enabled === true);
   assert('R2 锁 R1 全部正式分组球员', !!(lock.playerIds.p1 && lock.playerIds.p2 && lock.playerIds.p3));
   assert('R2 不锁未上场 p4', !lock.playerIds.p4);
-  assert('R2 不锁未来轮 p-future', !lock.playerIds['p-future']);
+  assert('R2 锁未来轮已分组 p-future', !!lock.playerIds['p-future']);
   assert('R2 不锁仅报名 p-roster', !lock.playerIds['p-roster']);
 })();
 
@@ -230,8 +230,8 @@ function lockInput(series, roundId, harness) {
   };
   var harness = makeHarness(series, matches);
   var lock = pickRoster.collectPriorPlayedPlayerIds(lockInput(series, 'r1', harness));
-  assert('R1 启用但无前序', lock.ok === true && lock.enabled === true);
-  assert('R1 不锁任何人', Object.keys(lock.playerIds).length === 0);
+  assert('R1 启用且锁后续轮', lock.ok === true && lock.enabled === true);
+  assert('R1 锁 R2/R3 已分组球员', !!(lock.playerIds.p1 && lock.playerIds.p2));
 })();
 
 (function testAllowRepeatTrue() {
@@ -299,11 +299,11 @@ function lockInput(series, roundId, harness) {
   );
   assert('本轮占用 disabled 不被清掉', occupied.isDisabled === true && occupied.isOccupied === true);
   assert(
-    '前序上场置灰并带原因',
+    '其他轮上场置灰并带原因',
     locked.isDisabled === true &&
       locked.noRepeatLocked === true &&
-      locked.disabledReason === 'no_repeat_prior_round' &&
-      locked.noRepeatHint === '已在前序轮次上场'
+      locked.disabledReason === 'no_repeat_other_round' &&
+      locked.noRepeatHint === '已在 R1 上场'
   );
   assert('未上场保持可选', free.isDisabled === false && !free.noRepeatLocked);
 })();
@@ -326,7 +326,7 @@ function lockInput(series, roundId, harness) {
   var readd = pickRoster.shouldBlockNoRepeatAdd('p1', lock);
   assert(
     '取消后不可重新选',
-    readd.blocked === true && readd.message === '该球员已在前序轮次上场'
+    readd.blocked === true && readd.message === '已在 R1 上场'
   );
 })();
 
@@ -372,12 +372,12 @@ function lockInput(series, roundId, harness) {
   var confirm = pickRoster.assertPlayersNotPlayedPriorRound(['p1'], lockInput(series, 'r2', harness));
   assert(
     '确认前状态变化会拒绝',
-    confirm.ok === false && confirm.reason === 'player_already_played_prior_round'
+    confirm.ok === false && confirm.reason === 'player_already_played_other_round'
   );
   var saved = trySave([{ groupId: 'g-cur', players: [seat('p1')] }]);
   assert(
     '最终保存前拒绝',
-    saved.ok === false && saved.message === '存在已在前序轮次上场的球员'
+    saved.ok === false && /已在 R1 上场/.test(String(saved.message || ''))
   );
   assert('当前轮 match 零写入', writes === 0 && JSON.stringify(r2) === r2Before);
 })();
@@ -449,15 +449,17 @@ function lockInput(series, roundId, harness) {
 })();
 
 (function testWiring() {
+  var lineupJs = read(path.join(utilsDir, 'seriesNoRepeatLineup.js'));
   var pickJs = read(path.join(groupPickDir, 'index.js'));
   var pickWxml = read(path.join(groupPickDir, 'index.wxml'));
   var editorJs = read(path.join(groupEditorDir, 'index.js'));
   var rosterJs = read(path.join(pageDir, 'seriesGroupPickRoster.js'));
 
   assert(
-    '锁定集合只认正式 groups.players',
-    rosterJs.indexOf('collectPlayerIdsFromGroups') >= 0 &&
-      /groups\[\]\.players|gate\.match && gate\.match\.groups/.test(rosterJs)
+    '锁定集合认正式 groups / pairings 成员',
+    lineupJs.indexOf('collectFormalMemberIdsFromMatch') >= 0 &&
+      lineupJs.indexOf('collectPlayerIdsFromPairings') >= 0 &&
+      rosterJs.indexOf('seriesNoRepeatLineup') >= 0
   );
   assert(
     '选人列表合并 no-repeat 且不覆盖占用 disabled',
@@ -465,8 +467,8 @@ function lockInput(series, roundId, harness) {
       pickJs.indexOf('_collectNoRepeatLock') >= 0
   );
   assert(
-    '展示已在前序轮次上场',
-    pickWxml.indexOf('已在前序轮次上场') >= 0 && pickWxml.indexOf('noRepeatLocked') >= 0
+    '展示占用提示走 noRepeatHint',
+    pickWxml.indexOf('noRepeatHint') >= 0 && pickWxml.indexOf('noRepeatLocked') >= 0
   );
   assert(
     '点击不信任旧 isDisabled 并重新核验',
@@ -483,7 +485,7 @@ function lockInput(series, roundId, harness) {
   );
   assert(
     '最终保存前二次校验且在 saveMatch 之前',
-    /onConfirm\(\) \{[\s\S]*assertPlayersNotPlayedPriorRound[\s\S]*this\.setData\(\{\s*saving:\s*true\s*\}\)/.test(
+    /onConfirm\(\) \{[\s\S]*assertPlayersNotOccupied[\s\S]*this\.setData\(\{\s*saving:\s*true\s*\}\)/.test(
       editorJs
     )
   );

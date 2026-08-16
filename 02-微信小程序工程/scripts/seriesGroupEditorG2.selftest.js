@@ -228,8 +228,10 @@ function buildVm(series, match, canManage) {
     vmFilled.cta.showEditGroups === true && vmFilled.cta.editGroupsLabel === '修改分组'
   );
   assert(
-    '进行中仍可管理分组（对齐队际门闩）',
-    vmLive.cta.showEditGroups === true &&
+    'LIVE 出发表复用进入自己小组，不再用 Series 专属开始/修改分组',
+    vmLive.cta.showEnterMyGroupEligible === true &&
+      vmLive.cta.showEditGroups === false &&
+      vmLive.cta.enterMyGroupLabel === '快速进入自己的小组 ›' &&
       vmLive.panelMode === 'tee' &&
       vmLive.hasGroups === true
   );

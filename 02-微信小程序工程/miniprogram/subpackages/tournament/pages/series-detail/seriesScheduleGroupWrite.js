@@ -7,6 +7,9 @@
 var teamMatchStore = require('../../../../utils/teamMatchStore.js');
 var seriesStationMatch = require('../../../../utils/seriesStationMatch.js');
 var tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js');
+var seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
+var teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
+var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 var teeSheetManage = require('../../../../utils/teeSheetManage.js');
 var { normalizeFormalGroupSeats } = require('../../../../utils/strokeGroupSeatNormalizer.js');
 var {
@@ -18,6 +21,7 @@ var {
 } = require('../../../../utils/strokeEntityValidator.js');
 var { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
 var seriesScheduleCandidates = require('./seriesScheduleCandidates.js');
+var seriesRoundPhaseAggregate = require('../../../../utils/seriesRoundPhaseAggregate.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -309,6 +313,24 @@ function saveStationGroups(input) {
   });
   if (!ctxCheck.ok) return ctxCheck;
 
+  var seriesLock = seriesFinishLock.assertSeriesWritable(series);
+  if (!seriesLock.ok) {
+    return {
+      ok: false,
+      reason: 'series_completed',
+      message: seriesLock.message
+    };
+  }
+
+  var finishedGuard = teamMatchFinish.assertMatchNotCompleted(match);
+  if (!finishedGuard.ok) {
+    return {
+      ok: false,
+      reason: 'match_finished',
+      message: finishedGuard.message
+    };
+  }
+
   var status = asString(match.status).toLowerCase();
   if (status !== expectedStatus) {
     return {
@@ -320,6 +342,22 @@ function saveStationGroups(input) {
 
   var affiliation = validateSeriesSeatAffiliation(src.groupDraft, series);
   if (!affiliation.ok) return affiliation;
+
+  var currentRoundId =
+    asString(src.roundId) ||
+    asString(match.seriesContext && match.seriesContext.roundId);
+  var noRepeatCheck = seriesNoRepeatLineup.assertPlayersNotOccupied(
+    seriesNoRepeatLineup.collectDraftMemberIds(src.groupDraft, src.pairingDraft),
+    {
+      fromSeries: true,
+      series: series,
+      seriesId: asString(series.seriesId),
+      currentRoundId: currentRoundId,
+      getMatchById: getMatchById,
+      getIndexByMatchId: src.getIndexByMatchId
+    }
+  );
+  if (!noRepeatCheck.ok) return noRepeatCheck;
 
   var gameMode = asString(match.gameMode || match.selectedGameMode);
   var isG2G3 = isG2G3FamilyMode(gameMode);
@@ -483,14 +521,33 @@ function startStationRound(input) {
   });
   if (!ctxCheck.ok) return ctxCheck;
 
+  var seriesLock = seriesFinishLock.assertSeriesWritable(series);
+  if (!seriesLock.ok) {
+    return {
+      ok: false,
+      reason: 'series_completed',
+      message: seriesLock.message
+    };
+  }
+
+  var finishedGuard = teamMatchFinish.assertMatchNotCompleted(match);
+  if (!finishedGuard.ok) {
+    return { ok: false, reason: 'already_finished', message: finishedGuard.message };
+  }
   var status = asString(match.status).toLowerCase();
-  if (status === 'finished' || status === 'completed') {
-    return { ok: false, reason: 'already_finished', message: '比赛已经结束。' };
+  if (status === 'ongoing' || status === 'live') {
+    return {
+      ok: false,
+      reason: 'already_live',
+      startedLive: false,
+      message: '当前分站不可开赛'
+    };
   }
   if (status !== 'registering') {
     return {
       ok: false,
       reason: 'status_not_registering',
+      startedLive: false,
       message: '当前分站不可开赛'
     };
   }
@@ -518,7 +575,29 @@ function startStationRound(input) {
   }
 
   var saved = getMatchById(matchId) || next;
-  return { ok: true, match: saved };
+  var savedStatus = asString(saved && saved.status).toLowerCase();
+  if (savedStatus !== 'ongoing' && savedStatus !== 'live') {
+    return {
+      ok: false,
+      reason: 'start_not_live',
+      startedLive: false,
+      message: '开赛失败，请重试'
+    };
+  }
+  var roundId =
+    asString(src.roundId) ||
+    asString(saved.seriesContext && saved.seriesContext.roundId) ||
+    asString(match.seriesContext && match.seriesContext.roundId);
+  return {
+    ok: true,
+    match: saved,
+    startedLive: true,
+    roundId: roundId,
+    liveNotice: seriesRoundPhaseAggregate.formatSeriesRoundEnteredLiveNotice(
+      series,
+      roundId
+    )
+  };
 }
 
 function matchHasFilledSeat(match) {

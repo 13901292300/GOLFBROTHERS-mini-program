@@ -352,7 +352,7 @@ assert(
   registerVm.isSeriesCompetitionPhaseCompleted('completed') === true &&
     registerVm.isSeriesCompetitionPhaseCompleted('live') === false &&
     registerVm.isSeriesCompetitionPhaseCompleted('settlement_pending') === false &&
-    registerVm.isSeriesCompetitionPhaseCompleted('finished') === false &&
+    registerVm.isSeriesCompetitionPhaseCompleted('finished') === true &&
     /function resolveRegisterCta[\s\S]*?isSeriesCompetitionPhaseCompleted/.test(
       fs.readFileSync(path.join(pageDir, 'seriesRegisterViewModel.js'), 'utf8')
     )
