@@ -1,0 +1,491 @@
+<view class="poster-shell">
+  <view hidden="{{step != 0}}" class="template-screen">
+    <view class="template-heading">
+      <text class="step-kicker">01 / 07</text>
+      <view class="template-heading-row">
+        <text class="page-title">{{copy.chooseTemplate}}</text>
+        <button class="reset-button" bindtap="resetPoster" aria-label="{{copy.reset}}">
+          <view class="reset-icon"></view>
+        </button>
+      </view>
+      <text class="page-subtitle">{{copy.chooseTemplateHint}}</text>
+    </view>
+
+    <scroll-view class="template-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="template-grid">
+        <button
+          wx:for="{{templates}}"
+          wx:key="id"
+          class="template-card {{selectedTemplateId == item.id ? 'selected' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="openTemplatePreview"
+        >
+          <view class="template-art tone-{{item.tone}}">
+            <view class="template-brand-line"></view>
+            <text class="template-total" style="color: {{item.total}}">72</text>
+            <view class="template-subject"></view>
+            <view class="template-score direction-{{item.direction}}" style="background: {{item.card}}; border-color: {{item.line}}">
+              <view></view><view></view>
+            </view>
+          </view>
+          <view class="template-card-copy">
+            <view>
+              <text class="template-name">{{item.name}}</text>
+              <text class="template-description">{{item.description}}</text>
+            </view>
+            <view class="radio-mark"><view wx:if="{{selectedTemplateId == item.id}}"></view></view>
+          </view>
+        </button>
+      </view>
+    </scroll-view>
+
+    <view class="template-footer">
+      <button wx:if="{{returnToSummaryMode}}" class="back-action" bindtap="cancelSummaryEdit">
+        <text>‹</text> {{backActionLabel}}
+      </button>
+      <button class="primary-action" disabled="{{!selectedTemplateId}}" bindtap="useSelectedTemplate">
+        {{primaryActionLabel}} <text class="button-arrow">{{primaryActionIcon}}</text>
+      </button>
+    </view>
+  </view>
+
+  <view hidden="{{step == 0}}" class="editor-screen">
+    <view class="preview-zone {{largeEdit ? 'preview-zone--large' : ''}}">
+      <view class="preview-toolbar">
+        <view>
+          <text class="step-kicker">{{stepCounter}}</text>
+          <text class="preview-title">{{stepTitle}}</text>
+        </view>
+        <view class="preview-toolbar-actions">
+          <button class="reset-button" bindtap="resetPoster" aria-label="{{copy.reset}}">
+            <view class="reset-icon"></view>
+          </button>
+          <button wx:if="{{!largeEdit}}" class="preview-text-button" bindtap="openLargeEdit">{{copy.preview}}</button>
+          <button wx:else class="preview-close-button" bindtap="closeLargeEdit">{{copy.close}}</button>
+        </view>
+      </view>
+
+      <view class="canvas-frame-slot">
+        <view class="canvas-frame {{largeEdit ? 'canvas-frame--fullscreen' : ''}}">
+          <canvas
+            id="posterCanvas"
+            type="2d"
+            class="poster-canvas"
+            bindtouchstart="onCanvasTouchStart"
+            catchtouchmove="onCanvasTouchMove"
+            bindtouchend="onCanvasTouchEnd"
+            bindtouchcancel="onCanvasTouchCancel"
+          ></canvas>
+        </view>
+      </view>
+      <canvas id="segmentationCanvas" type="2d" class="segmentation-work-canvas"></canvas>
+      <text class="gesture-hint">{{gestureHint}}</text>
+    </view>
+
+    <view class="control-area {{largeEdit ? 'preview-disabled' : ''}}">
+      <view wx:if="{{largeEdit}}" class="preview-overlay" catchtap="closeLargeEdit">
+        <view class="large-edit-close" catchtap="closeLargeEdit" aria-label="{{copy.close}}">
+          <text class="close-icon">✕</text>
+        </view>
+      </view>
+    <scroll-view class="control-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <view wx:if="{{step == 1}}" class="control-panel">
+        <view class="panel-heading">
+          <text class="panel-number">02</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[1]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[1]}}</text>
+          </view>
+        </view>
+        <view class="action-row">
+          <button class="upload-action" bindtap="choosePhoto"><view class="upload-icon"></view>{{copy.uploadPhoto}}</button>
+          <button class="secondary-action" bindtap="resetLayout">{{copy.resetLayout}}</button>
+        </view>
+        <view class="control-card">
+          <view class="control-label"><text>{{copy.photoScale}}</text><text>{{form.photoScale}}%</text></view>
+          <slider min="80" max="260" value="{{form.photoScale}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onPhotoScale" bindchange="onPhotoScale" />
+        </view>
+        <view class="control-card">
+          <view class="control-label"><text>{{copy.backgroundBlur}}</text><text>{{form.blur}}px</text></view>
+          <slider min="0" max="30" value="{{form.blur}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onBlurChange" bindchange="onBlurChange" />
+        </view>
+        <view class="recognition-card">
+          <view><text>{{copy.subjectDepth}}</text><text>{{photoStatus}}</text></view>
+          <button bindtap="retrySegmentation">{{copy.retry}}</button>
+        </view>
+      </view>
+
+      <view wx:if="{{step == 2}}" class="control-panel">
+        <view class="panel-heading">
+          <text class="panel-number">03</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[2]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[2]}}</text>
+          </view>
+        </view>
+
+        <view class="control-card">
+          <text class="field-title">{{copy.palette}}</text>
+          <view class="palette-list">
+            <button
+              wx:for="{{paletteOptions}}"
+              wx:key="id"
+              class="palette-option {{item.active ? 'active' : ''}}"
+              data-id="{{item.id}}"
+              bindtap="selectPalette"
+            >
+              <view class="palette-bars">
+                <view style="background: {{item.total}}"></view>
+                <view style="background: {{item.card}}"></view>
+                <view style="background: {{item.line}}"></view>
+              </view>
+              <text>{{item.name}}</text>
+            </button>
+          </view>
+        </view>
+
+        <view class="control-card">
+          <text class="field-title">{{copy.scoringStyle}}</text>
+          <view class="segmented">
+            <button class="{{form.scoringStyle == 'pga' ? 'active' : ''}}" data-style="pga" bindtap="selectScoringStyle">PGA TOUR</button>
+            <button class="{{form.scoringStyle == 'dp' ? 'active' : ''}}" data-style="dp" bindtap="selectScoringStyle">DP WORLD TOUR</button>
+          </view>
+        </view>
+
+        <view class="control-card">
+          <text class="field-title">{{copy.scoreMode}}</text>
+          <view class="style-control-row">
+            <view class="segmented mode-switch">
+              <view
+                class="mode-option {{form.scoreMode == 'strokes' ? 'active' : ''}}"
+                data-mode="strokes"
+                bindtap="selectScoreMode"
+              >{{copy.strokes}}</view>
+              <view
+                class="mode-option {{form.scoreMode == 'relative' ? 'active' : ''}}"
+                data-mode="relative"
+                bindtap="selectScoreMode"
+              >{{copy.relative}}</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="control-card">
+          <text class="field-title">{{copy.scoreFont}}</text>
+          <picker mode="selector" range="{{fontOptions}}" range-key="label" value="{{scoreFontIndex}}" bindchange="onScoreFontChange">
+            <view class="picker-value">{{fontOptions[scoreFontIndex].label}} <text>⌄</text></view>
+          </picker>
+        </view>
+
+        <view class="color-settings">
+          <view class="color-row">
+            <text>{{copy.board}}</text>
+            <scroll-view class="swatch-scroll" scroll-x show-scrollbar="{{false}}">
+              <view class="swatch-list">
+                <button wx:for="{{cardColorOptions}}" wx:key="value" class="swatch {{item.active ? 'active' : ''}}" style="background: {{item.value}}" data-key="card" data-value="{{item.value}}" bindtap="selectColor" aria-label="{{item.name}}"></button>
+              </view>
+            </scroll-view>
+          </view>
+          <view class="color-row">
+            <text>{{copy.rules}}</text>
+            <scroll-view class="swatch-scroll" scroll-x show-scrollbar="{{false}}">
+              <view class="swatch-list">
+                <button wx:for="{{lineColorOptions}}" wx:key="value" class="swatch {{item.active ? 'active' : ''}}" style="background: {{item.value}}" data-key="line" data-value="{{item.value}}" bindtap="selectColor" aria-label="{{item.name}}"></button>
+              </view>
+            </scroll-view>
+          </view>
+          <view class="color-row" wx:for="{{scoreColorRows}}" wx:key="key" wx:for-item="row">
+            <text>{{row.label}}</text>
+            <scroll-view class="swatch-scroll" scroll-x show-scrollbar="{{false}}">
+              <view class="swatch-list">
+                <button
+                  wx:for="{{row.options}}"
+                  wx:key="value"
+                  wx:for-item="option"
+                  class="swatch {{option.active ? 'active' : ''}}"
+                  style="background: {{option.value}}"
+                  data-key="{{row.key}}"
+                  data-value="{{option.value}}"
+                  bindtap="selectColor"
+                  aria-label="{{option.name}}"
+                ></button>
+              </view>
+            </scroll-view>
+          </view>
+        </view>
+
+        <view class="control-card">
+          <view class="control-label"><text>{{copy.scorecardScale}}</text><text>{{form.scorecardScale}}%</text></view>
+          <slider min="55" max="180" value="{{form.scorecardScale}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onScorecardScale" bindchange="onScorecardScale" />
+          <view class="style-control-row">
+            <button class="style-btn" bindtap="onAlignScorecardCenter">⇔ {{copy.alignScorecardCenter}}</button>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{step == 3}}" class="control-panel">
+        <view class="panel-heading">
+          <text class="panel-number">04</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[3]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[3]}}</text>
+          </view>
+        </view>
+
+        <view class="tab-bar">
+          <view class="tab-item {{totalTab === 'total' ? 'active' : ''}}" data-tab="total" bindtap="switchTotalTab">{{copy.totalTabTotal}}</view>
+          <view class="tab-item {{totalTab === 'relative' ? 'active' : ''}}" data-tab="relative" bindtap="switchTotalTab">{{copy.totalTabRelative}}</view>
+        </view>
+
+        <view wx:if="{{totalTab === 'total'}}" class="config-panel">
+          <view class="control-card total-card">
+            <view class="control-label">
+              <text>{{copy.totalValueLabel}}</text>
+              <label class="switch-line"><text>{{copy.autoTotal}}</text><switch checked="{{form.autoTotal}}" color="#ffd100" bindchange="onAutoTotalChange" /></label>
+            </view>
+            <input class="total-input" value="{{form.totalValue}}" disabled="{{form.autoTotal}}" type="number" bindinput="onTotalInput" />
+            <text class="field-note">{{form.totalHint}}</text>
+          </view>
+
+          <view class="control-card">
+            <text class="field-title">{{copy.totalFont}}</text>
+            <picker mode="selector" range="{{fontOptions}}" range-key="label" value="{{totalFontIndex}}" bindchange="onTotalFontChange">
+              <view class="picker-value">{{fontOptions[totalFontIndex].label}} <text>⌄</text></view>
+            </picker>
+          </view>
+
+          <view class="control-card">
+            <view class="control-label"><text>{{copy.totalSize}}</text><text>{{form.totalSize}}px</text></view>
+            <slider min="100" max="900" value="{{form.totalSize}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onTotalSize" bindchange="onTotalSize" show-value />
+          </view>
+
+          <view class="control-card">
+            <text class="field-title">{{copy.totalColor}}</text>
+            <scroll-view class="swatch-scroll" scroll-x show-scrollbar="{{false}}">
+              <view class="swatch-list">
+                <button
+                  wx:for="{{totalColorOptions}}"
+                  wx:key="value"
+                  class="swatch {{item.active ? 'active' : ''}}"
+                  style="background: {{item.value}}"
+                  data-color="{{item.value}}"
+                  bindtap="onTotalColorSelect"
+                  aria-label="{{item.name}}"
+                ></button>
+              </view>
+            </scroll-view>
+          </view>
+
+          <view class="control-card">
+            <view class="control-label"><text>{{copy.totalOpacity}}</text><text>{{form.totalOpacity}}%</text></view>
+            <slider min="35" max="100" value="{{form.totalOpacity}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onTotalOpacity" bindchange="onTotalOpacity" />
+          </view>
+          <view class="control-card switch-card">
+            <text>{{copy.totalAbove}}</text>
+            <switch checked="{{form.totalAbove}}" color="#ffd100" bindchange="onTotalAboveChange" />
+          </view>
+        </view>
+
+        <view wx:else class="config-panel">
+          <view class="control-card">
+            <view class="field-row">
+              <text class="field-title">{{copy.relativeValueLabel}}</text>
+              <button class="field-action-btn" bindtap="onToggleRelativeTotal">
+                {{relativeTotalCleared ? copy.relativeTotalRestore : copy.relativeTotalClear}}
+              </button>
+            </view>
+            <view class="field-value-display">
+              <text class="relative-total-value" style="color: {{form.relativeTotalColor}}">
+                {{relativeTotalCleared ? '—' : (form.relativeTotal || '—')}}
+              </text>
+            </view>
+            <text class="field-hint">{{copy.relativeTotalHint}}{{form.roundPar || 72}}{{copy.relativeTotalHintEnd}}</text>
+          </view>
+
+          <view wx:if="{{form.scoreMode == 'relative'}}" class="control-card">
+            <text class="field-title">{{copy.roundPar}}</text>
+            <input value="{{form.roundPar}}" type="number" bindinput="onRoundParInput" />
+          </view>
+
+          <view class="control-card">
+            <text class="field-title">{{copy.totalFont}}</text>
+            <picker mode="selector" range="{{fontOptions}}" range-key="label" value="{{relativeFontIndex}}" bindchange="onRelativeFontChange">
+              <view class="picker-value">{{fontOptions[relativeFontIndex].label}} <text>⌄</text></view>
+            </picker>
+          </view>
+
+          <view class="control-card">
+            <view class="control-label"><text>{{copy.totalSize}}</text><text>{{form.relativeTotalSize}}px</text></view>
+            <slider min="80" max="700" value="{{form.relativeTotalSize}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onRelativeSizeChange" bindchange="onRelativeSizeChange" show-value />
+          </view>
+
+          <view class="control-card">
+            <text class="field-title">{{copy.totalColor}}</text>
+            <scroll-view class="swatch-scroll" scroll-x show-scrollbar="{{false}}">
+              <view class="swatch-list">
+                <button
+                  wx:for="{{relativeTotalColorOptions}}"
+                  wx:key="value"
+                  class="swatch {{item.active ? 'active' : ''}}"
+                  style="background: {{item.value}}"
+                  data-color="{{item.value}}"
+                  bindtap="onRelativeColorSelect"
+                  aria-label="{{item.name}}"
+                ></button>
+              </view>
+            </scroll-view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{step == 4}}" class="control-panel">
+        <view class="panel-heading">
+          <text class="panel-number">05</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[4]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[4]}}</text>
+          </view>
+        </view>
+
+        <view class="identity-tabs">
+          <button class="{{activeIdentity == 'nickname' ? 'active' : ''}}" data-key="nickname" bindtap="selectIdentity">{{copy.nickname}}</button>
+          <button class="{{activeIdentity == 'course' ? 'active' : ''}}" data-key="course" bindtap="selectIdentity">{{copy.course}}</button>
+          <button class="{{activeIdentity == 'date' ? 'active' : ''}}" data-key="date" bindtap="selectIdentity">{{copy.date}}</button>
+          <button class="{{activeIdentity == 'extra' ? 'active' : ''}}" data-key="extra" bindtap="selectIdentity">{{copy.extra}}</button>
+        </view>
+
+        <view class="control-card">
+          <text class="field-title">{{copy.nickname}}</text>
+          <text class="identity-readonly">{{form.nickname}}</text>
+          <text class="score-readonly-hint">{{copy.nicknameReadonlyHint}}</text>
+        </view>
+        <view class="control-card"><text class="field-title">{{copy.course}}</text><input value="{{form.course}}" data-key="course" bindinput="onIdentityInput" maxlength="40" /></view>
+        <view class="control-card">
+          <text class="field-title">{{copy.date}}</text>
+          <picker mode="date" value="{{form.date}}" bindchange="onDateChange"><view class="picker-value">{{form.date || 'YYYY-MM-DD'}} <text>⌄</text></view></picker>
+        </view>
+        <view class="control-card"><text class="field-title">{{copy.extra}}</text><input value="{{form.extra}}" data-key="extra" bindinput="onIdentityInput" maxlength="48" /></view>
+
+        <view class="control-card">
+          <text class="field-title">{{copy.textFont}}</text>
+          <picker mode="selector" range="{{fontOptions}}" range-key="label" value="{{textFontIndex}}" bindchange="onTextFontChange">
+            <view class="picker-value">{{fontOptions[textFontIndex].label}} <text>⌄</text></view>
+          </picker>
+        </view>
+        <view class="control-card">
+          <text class="field-title">{{copy.textColor}}</text>
+          <scroll-view class="swatch-scroll" scroll-x show-scrollbar="{{false}}">
+            <view class="swatch-list">
+              <button
+                wx:for="{{textColorOptions}}"
+                wx:key="value"
+                class="swatch {{item.active ? 'active' : ''}}"
+                style="background: {{item.value}}"
+                data-value="{{item.value}}"
+                bindtap="selectTextColor"
+                aria-label="{{item.name}}"
+              ></button>
+            </view>
+          </scroll-view>
+        </view>
+        <view class="control-card">
+          <view class="control-label"><text>{{copy.textSize}}</text><text>{{form.identitySize}}px</text></view>
+          <slider min="12" max="100" value="{{form.identitySize}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onIdentitySize" bindchange="onIdentitySize" />
+        </view>
+        <view class="control-card"><text class="field-title">{{copy.brand}}</text><input value="{{form.brand}}" bindinput="onBrandInput" maxlength="24" /></view>
+      </view>
+
+      <view wx:if="{{step == 5}}" class="control-panel">
+        <view class="panel-heading">
+          <text class="panel-number">06</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[5]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[5]}}</text>
+          </view>
+        </view>
+
+        <view class="action-row">
+          <button class="upload-action" disabled="{{stickers.length >= 5}}" bindtap="chooseStickers"><view class="upload-icon"></view>{{copy.uploadSticker}}</button>
+          <text class="sticker-count">{{stickerCount}}</text>
+        </view>
+        <text wx:if="{{!stickers.length}}" class="empty-note">{{copy.stickerEmpty}}</text>
+        <scroll-view wx:else class="sticker-list" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="sticker-row">
+            <button wx:for="{{stickers}}" wx:key="id" class="sticker-item {{item.selected ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectSticker">
+              <image src="{{item.path}}" mode="aspectFit"></image>
+            </button>
+          </view>
+        </scroll-view>
+        <view class="control-card">
+          <view class="control-label"><text>{{copy.stickerSize}}</text><text>{{form.stickerScale}}%</text></view>
+          <slider min="10" max="260" value="{{form.stickerScale}}" disabled="{{!stickers.length}}" activeColor="#ffd100" block-color="#00233f" bindchanging="onStickerScale" bindchange="onStickerScale" />
+        </view>
+        <button class="danger-action" disabled="{{!stickers.length}}" bindtap="removeSticker">{{copy.removeSticker}}</button>
+      </view>
+
+      <view wx:if="{{step == 6}}" class="control-panel summary-panel">
+        <view class="panel-heading">
+          <text class="panel-number">07</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[6]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[6]}}</text>
+          </view>
+        </view>
+        <button class="free-edit-action" bindtap="openLargeEdit">
+          <view class="edit-icon"></view>
+          <view><text>{{copy.freeEdit}}</text><text>{{copy.freeEditHint}}</text></view>
+        </button>
+        <view class="summary-grid">
+          <button data-step="template" bindtap="jumpToStep">{{copy.editTemplate}}</button>
+          <button data-step="photo" bindtap="jumpToStep">{{copy.editPhoto}}</button>
+          <button data-step="scorecard" bindtap="jumpToStep">{{copy.editScorecard}}</button>
+          <button data-step="total" bindtap="jumpToStep">{{copy.editTotal}}</button>
+          <button data-step="identity" bindtap="jumpToStep">{{copy.editIdentity}}</button>
+          <button data-step="stickers" bindtap="jumpToStep">{{copy.editStickers}}</button>
+        </view>
+        <button class="download-action" bindtap="exportPoster"><view class="download-icon"></view>{{copy.exportPoster}}</button>
+      </view>
+    </scroll-view>
+
+    <view wx:if="{{showWizardFooter}}" class="wizard-footer">
+      <button class="back-action" bindtap="previousStep"><text>‹</text> {{backActionLabel}}</button>
+      <button class="primary-action" bindtap="nextStep">{{primaryActionLabel}} <text class="button-arrow">{{primaryActionIcon}}</text></button>
+    </view>
+    </view>
+  </view>
+
+  <view wx:if="{{templatePreviewOpen}}" class="template-modal">
+    <view class="modal-backdrop" bindtap="closeTemplatePreview"></view>
+    <view class="modal-dialog">
+      <view class="modal-heading">
+        <view><text class="step-kicker">GOLFBROTHERS</text><text>{{copy.previewTemplate}}</text></view>
+        <button bindtap="closeTemplatePreview">×</button>
+      </view>
+      <view class="modal-canvas-frame">
+        <canvas id="templatePreviewCanvas" type="2d" class="template-preview-canvas"></canvas>
+      </view>
+      <button class="primary-action" bindtap="confirmPreviewTemplate">{{copy.useTemplate}}</button>
+    </view>
+  </view>
+
+  <view wx:if="{{showSharePanel}}" class="share-mask" catchtap="closeSharePanel">
+    <view class="share-panel" catchtap="stopPropagation">
+      <view class="share-title">{{copy.sharePoster}}</view>
+      <view class="share-options">
+        <view class="share-option" bindtap="onShareToCircle">
+          <view class="share-icon-wrapper">
+            <text class="share-icon">⛳</text>
+          </view>
+          <text class="share-label">{{copy.shareToCircle}}</text>
+        </view>
+        <view class="share-option" bindtap="onShareToWechat">
+          <view class="share-icon-wrapper">
+            <text class="share-icon">💬</text>
+          </view>
+          <text class="share-label">{{copy.shareToWechat}}</text>
+        </view>
+      </view>
+      <view class="share-close" bindtap="closeSharePanel">{{copy.shareCancel}}</view>
+    </view>
+  </view>
+</view>
