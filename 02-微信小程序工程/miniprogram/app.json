@@ -11,7 +11,8 @@
     "pages/profile/history/index",
     "pages/profile/contacts/index",
     "pages/profile/statistics/index",
-    "pages/profile/edit/index"
+    "pages/profile/edit/index",
+    "pages/poster/index"
   ],
   "subPackages": [
     {
