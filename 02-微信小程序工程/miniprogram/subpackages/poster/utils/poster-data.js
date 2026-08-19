@@ -429,7 +429,10 @@ function createPosterModel(templateId, sample, brand) {
     templateId: id,
     photo: null,
     photoPath: "",
+    photoFileID: "",
     subject: null,
+    subjectPath: "",
+    subjectFileID: "",
     segmentationStatus: "idle",
     segmentationSource: "none",
     image: { scale: 1, x: 0, y: 0, blur: 0 },
@@ -597,7 +600,10 @@ function switchTemplate(previous, templateId, brand) {
   const next = createPosterModel(templateId, false, brand || previous.identity.brand);
   next.photo = previous.photo;
   next.photoPath = previous.photoPath;
+  next.photoFileID = previous.photoFileID || "";
   next.subject = previous.subject;
+  next.subjectPath = previous.subjectPath || "";
+  next.subjectFileID = previous.subjectFileID || "";
   next.segmentationStatus = previous.segmentationStatus;
   next.segmentationSource = previous.segmentationSource;
   next.image = Object.assign({}, previous.image);

@@ -80,7 +80,7 @@ const COPY = {
     backgroundBlur: "背景模糊",
     subjectDepth: "人物景深",
     waitingPhoto: "等待上传照片",
-    segmenting: "正在抠图...",
+    segmenting: "马上就好...",
     personReadyCloud: "云端人物图层已生成",
     localModelDownloading: "首次使用正在下载本地模型",
     localModelLoading: "正在加载本地模型",
@@ -221,7 +221,7 @@ const COPY = {
     backgroundBlur: "Background blur",
     subjectDepth: "Subject depth",
     waitingPhoto: "Waiting for a photo",
-    segmenting: "Removing the background...",
+    segmenting: "Just a moment...",
     personReadyCloud: "Cloud subject layer is ready",
     localModelDownloading: "Downloading the local model for first use",
     localModelLoading: "Loading the local model",
@@ -576,6 +576,9 @@ Component({
         step: this.data.step,
         templateId: this.data.selectedTemplateId || this.posterState.templateId || "academy",
         photoPath: this.posterState.photoPath || "",
+        photoFileID: this.posterState.photoFileID || "",
+        subjectPath: this.posterState.subjectPath || "",
+        subjectFileID: this.posterState.subjectFileID || "",
         largeEdit: Boolean(this.data.largeEdit),
         posterState: this.posterState,
         updatedAt: Date.now()
@@ -586,9 +589,18 @@ Component({
       return this.saveDraft();
     },
 
+    _clearPosterCanvas() {
+      const ctx = this.posterContext;
+      if (!ctx || typeof ctx.clearRect !== "function") return;
+      const width = (this.posterCanvas && this.posterCanvas.width) || POSTER_WIDTH;
+      const height = (this.posterCanvas && this.posterCanvas.height) || POSTER_HEIGHT;
+      ctx.clearRect(0, 0, width, height);
+    },
+
     clearDraft() {
       this._discardDraft = true;
       this._draftRestoredKey = "";
+      this._clearPosterCanvas();
       clearPosterDraft();
       return true;
     },
@@ -637,6 +649,9 @@ Component({
       merged.subject = null;
       merged.badge = "";
       merged.photoPath = draft.photoPath || saved.photoPath || "";
+      merged.photoFileID = draft.photoFileID || saved.photoFileID || "";
+      merged.subjectPath = draft.subjectPath || saved.subjectPath || "";
+      merged.subjectFileID = draft.subjectFileID || saved.subjectFileID || "";
       merged.templateId = templateId;
       this.posterState = merged;
       this._applyScoreFromRound(this.properties.roundId);
@@ -662,14 +677,55 @@ Component({
         return true;
       }
 
-      if (this.posterState.photoPath) {
+      if (this.posterState.photoPath || this.posterState.photoFileID) {
         try {
-          this.posterState.photo = await this._loadCanvasImage(this.posterState.photoPath);
+          let photoPath = this.posterState.photoPath || "";
+          if (photoPath) {
+            try {
+              this.posterState.photo = await this._loadCanvasImage(photoPath);
+            } catch (error) {
+              console.warn("[golf-poster] draft photoPath missing", error);
+              photoPath = "";
+            }
+          }
+          if (!this.posterState.photo && this.posterState.photoFileID) {
+            const downloaded = await this._downloadCloudFile(this.posterState.photoFileID);
+            photoPath = await this._persistDraftFile(downloaded, "photo");
+            this.posterState.photoPath = photoPath;
+            this.posterState.photo = await this._loadCanvasImage(photoPath);
+          }
+          if (!this.posterState.photo) {
+            this.posterState.photoPath = "";
+            this.posterState.segmentationStatus = "idle";
+          }
         } catch (error) {
           console.warn("[golf-poster] draft photo missing", error);
           this.posterState.photoPath = "";
           this.posterState.photo = null;
           this.posterState.segmentationStatus = "idle";
+        }
+        this._renderNow();
+      }
+
+      let subjectPath = this.posterState.subjectPath || "";
+      if (!subjectPath && this.posterState.subjectFileID) {
+        try {
+          const downloaded = await this._downloadCloudFile(this.posterState.subjectFileID);
+          subjectPath = await this._persistDraftFile(downloaded, "subject");
+          this.posterState.subjectPath = subjectPath;
+        } catch (error) {
+          console.warn("[golf-poster] draft subject cloud missing", error);
+        }
+      }
+      if (subjectPath) {
+        try {
+          this.posterState.subject = await this._loadCanvasImage(subjectPath);
+          this.posterState.segmentationStatus = "person";
+          this.saveDraft();
+        } catch (error) {
+          console.warn("[golf-poster] draft subject missing", error);
+          this.posterState.subject = null;
+          this.posterState.subjectPath = "";
         }
       }
 
@@ -688,7 +744,11 @@ Component({
       this.posterState.stickers = restoredStickers;
       this._syncStickerControls();
 
-      if (this.posterState.photo && this.posterState.segmentationStatus === "person") {
+      if (
+        !this.posterState.subject
+        && this.posterState.photo
+        && this.posterState.segmentationStatus === "person"
+      ) {
         this.posterState.segmentationStatus = "loading";
         this._runSegmentation(this.posterState.photoPath);
       }
@@ -974,6 +1034,7 @@ Component({
           : "清空当前海报并返回模板选择？",
         success: (result) => {
           if (!result.confirm) return;
+          this._clearPosterCanvas();
           clearPosterDraft();
           this._draftRestoredKey = "";
           this.posterState = createPosterModel("academy", false, this.properties.brand);
@@ -1011,10 +1072,20 @@ Component({
 
     async _loadPhoto(filePath) {
       try {
-        const image = await this._loadCanvasImage(filePath);
+        this._clearPosterCanvas();
+        let persistedPhoto = filePath;
+        try {
+          persistedPhoto = await this._persistDraftFile(filePath, "photo");
+        } catch (error) {
+          console.warn("[golf-poster] persist photo failed", error);
+        }
+        const image = await this._loadCanvasImage(persistedPhoto);
         this.posterState.photo = image;
-        this.posterState.photoPath = filePath;
+        this.posterState.photoPath = persistedPhoto;
+        this.posterState.photoFileID = "";
         this.posterState.subject = null;
+        this.posterState.subjectPath = "";
+        this.posterState.subjectFileID = "";
         this.posterState.segmentationStatus = "loading";
         this.posterState.segmentationSource = "none";
         this.segmentationFailure = null;
@@ -1031,10 +1102,48 @@ Component({
         await this._runSegmentation(filePath);
         this.saveDraft();
       } catch (error) {
-        try { wx.hideLoading(); } catch (e) { /* ignore */ }
         this.setData({ segLoading: false });
         wx.showToast({ title: this.data.copy.segmentFailed, icon: "none" });
       }
+    },
+
+    _persistDraftFile(srcPath, kind) {
+      const source = String(srcPath || "");
+      if (!source) return Promise.reject(new Error("empty draft file"));
+      const roundId = String(this.properties.roundId || "draft").replace(/[^\w-]/g, "_");
+      const ext = kind === "subject" ? ".png" : ".jpg";
+      const destPath = wx.env.USER_DATA_PATH + "/poster_" + kind + "_" + roundId + ext;
+      const fs = wx.getFileSystemManager();
+      return new Promise((resolve, reject) => {
+        const copy = () => {
+          fs.copyFile({
+            srcPath: source,
+            destPath: destPath,
+            success: () => resolve(destPath),
+            fail: (error) => {
+              if (typeof wx.saveFile === "function") {
+                wx.saveFile({
+                  tempFilePath: source,
+                  success: (res) => resolve(res.savedFilePath || destPath),
+                  fail: reject
+                });
+                return;
+              }
+              reject(error);
+            }
+          });
+        };
+        fs.access({
+          path: destPath,
+          success: () => {
+            fs.unlink({
+              filePath: destPath,
+              complete: copy
+            });
+          },
+          fail: copy
+        });
+      });
     },
 
     _readFileBase64(filePath) {
@@ -1190,7 +1299,11 @@ Component({
         error.code = payload.code || "CLOUD_SEGMENT_FAILED";
         throw error;
       }
-      return this._downloadCloudFile(payload.resultFileID);
+      return {
+        tempPath: await this._downloadCloudFile(payload.resultFileID),
+        fileID: payload.resultFileID,
+        photoFileID: fileID
+      };
     },
 
     async _uploadAndSegment(filePath) {
@@ -1213,14 +1326,26 @@ Component({
     },
 
     async _runSegmentation(filePath) {
-      this.setData({ segLoading: true });
+      this.setData({
+        segLoading: true,
+        photoStatus: this.data.copy.segmenting
+      });
       try {
-        wx.showLoading({ title: "抠图中...", mask: true });
-        const cutoutPath = await this._uploadAndSegment(filePath);
+        const result = await this._uploadAndSegment(filePath);
+        let cutoutPath = result.tempPath;
+        try {
+          cutoutPath = await this._persistDraftFile(result.tempPath, "subject");
+        } catch (error) {
+          console.warn("[golf-poster] persist subject failed", error);
+        }
         this.segmentationFailure = null;
         this.posterState.subject = await this._loadCanvasImage(cutoutPath);
+        this.posterState.subjectPath = cutoutPath;
+        this.posterState.subjectFileID = result.fileID || "";
+        this.posterState.photoFileID = result.photoFileID || this.posterState.photoFileID || "";
         this.posterState.segmentationStatus = "person";
         this.posterState.segmentationSource = "cloud";
+        this.saveDraft();
       } catch (error) {
         this.segmentationFailure = {
           code: error.code || "CLOUD_SEGMENT_FAILED",
@@ -1233,7 +1358,6 @@ Component({
         this.posterState.segmentationSource = "none";
         wx.showToast({ title: this.data.copy.fullPhotoFallback, icon: "none" });
       }
-      try { wx.hideLoading(); } catch (e) { /* ignore */ }
       this.setData({
         segLoading: false,
         photoStatus: this._photoStatusText(this.posterState.segmentationStatus)
@@ -1267,8 +1391,14 @@ Component({
       } else {
         this.segmentationFailure = null;
         this.posterState.subject = await this._loadCanvasImage(filePath);
+        try {
+          this.posterState.subjectPath = await this._persistDraftFile(filePath, "subject");
+        } catch (error) {
+          this.posterState.subjectPath = filePath;
+        }
         this.posterState.segmentationStatus = "person";
         this.posterState.segmentationSource = "hd";
+        this.saveDraft();
       }
       this.setData({
         photoStatus: this._photoStatusText(this.posterState.segmentationStatus)

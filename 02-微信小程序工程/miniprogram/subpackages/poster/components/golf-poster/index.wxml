@@ -78,7 +78,7 @@
           ></canvas>
           <view wx:if="{{segLoading}}" class="seg-loading">
             <view class="seg-loading-spinner"></view>
-            <text>正在抠图...</text>
+            <text>{{copy.segmenting}}</text>
           </view>
         </view>
       </view>

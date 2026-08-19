@@ -23,6 +23,9 @@ function savePosterDraft(draftData) {
     step: Number(draftData.step) || 0,
     templateId: draftData.templateId || "academy",
     photoPath: draftData.photoPath || "",
+    photoFileID: draftData.photoFileID || "",
+    subjectPath: draftData.subjectPath || "",
+    subjectFileID: draftData.subjectFileID || "",
     largeEdit: Boolean(draftData.largeEdit),
     posterState: clonePlain(draftData.posterState) || {},
     updatedAt: draftData.updatedAt || Date.now()
