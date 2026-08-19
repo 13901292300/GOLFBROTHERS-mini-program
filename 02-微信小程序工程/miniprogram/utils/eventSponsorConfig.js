@@ -25,20 +25,20 @@ function withEventSponsorAssetVersion(url) {
 
 /**
  * 默认 2 个广告位；bright/dark 为 COS HTTPS（带版本号）；
- * fallback* 为旧本地 partners 图，不加版本号。
+ * fallback* 为 COS 上的旧 partner 图，不加版本号。
  */
 const DEFAULT_EVENT_SPONSOR_IMAGES = [
   {
     bright: withEventSponsorAssetVersion(COS_SPONSOR_BASE + '/sponsor-01-bright.jpg'),
     dark: withEventSponsorAssetVersion(COS_SPONSOR_BASE + '/sponsor-01-dark.jpg'),
-    fallbackBright: '/assets/partners/partner-g-one-golf.png',
-    fallbackDark: '/assets/partners/partner-g-one-golf.png'
+    fallbackBright: COS_SPONSOR_BASE + '/miniprogram/partners/partner-g-one-golf.png',
+    fallbackDark: COS_SPONSOR_BASE + '/miniprogram/partners/partner-g-one-golf.png'
   },
   {
     bright: withEventSponsorAssetVersion(COS_SPONSOR_BASE + '/sponsor-02-bright.jpg'),
     dark: withEventSponsorAssetVersion(COS_SPONSOR_BASE + '/sponsor-02-dark.jpg'),
-    fallbackBright: '/assets/partners/partner-vivata-1872.png',
-    fallbackDark: '/assets/partners/partner-vivata-1872.png'
+    fallbackBright: COS_SPONSOR_BASE + '/miniprogram/partners/partner-vivata-1872.png',
+    fallbackDark: COS_SPONSOR_BASE + '/miniprogram/partners/partner-vivata-1872.png'
   }
 ];
 
@@ -63,6 +63,10 @@ const EVENT_SPONSOR_FALLBACK_BY_URL = (function buildMap() {
 function getEventSponsorLocalFallback(src) {
   const s = String(src || '').trim();
   if (!s) return '';
+  if (s.indexOf('/assets/partners/') === 0 || s.indexOf('assets/partners/') === 0) {
+    const name = s.replace(/^\/?assets\/partners\//, '');
+    return COS_SPONSOR_BASE + '/miniprogram/partners/' + name;
+  }
   if (s.indexOf('/assets/') === 0 || s.indexOf('assets/') === 0) {
     return s.charAt(0) === '/' ? s : '/' + s;
   }

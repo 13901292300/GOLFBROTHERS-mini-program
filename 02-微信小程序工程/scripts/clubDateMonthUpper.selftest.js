@@ -136,12 +136,12 @@ var monthIso = [
 ];
 var allMonthsOk = true;
 for (var i = 0; i < 12; i++) {
-  var expected = EXPECTED_MONTHS[i] + '/05/2026';
+  var expected = EXPECTED_MONTHS[i] + ' 05 2026';
   var a = clubDateFormat.formatClubDate(monthIso[i] + ' 08:00');
   var b = teamMatchStore.formatClubDate(monthIso[i] + ' 08:00');
   if (a !== expected || b !== expected) allMonthsOk = false;
 }
-assert('十二个月单日 MON/DD/YYYY 且 store 与入口一致', allMonthsOk);
+assert('十二个月单日 MON DD YYYY 且 store 与入口一致', allMonthsOk);
 
 assert(
   '空/非法日期：队内口径空串',
@@ -164,11 +164,11 @@ assert(
   seriesVm.formatSeriesDateRange([
     { dateTime: '2026-08-11 08:00' },
     { dateTime: '2026-08-13 09:00' }
-  ]) === 'AUG/11-13  (2026)' &&
+    ]) === 'AUG 11-13 2026' &&
     seriesAdapter.formatSeriesDateRange([
       { dateTime: '2026-08-13 09:00' },
       { dateTime: '2026-08-11 08:00' }
-    ]) === 'AUG/11-13  (2026)'
+    ]) === 'AUG 11-13 2026'
 );
 
 assert(
@@ -176,11 +176,11 @@ assert(
   seriesVm.formatSeriesDateRange([
     { dateTime: '2026-08-11 08:00' },
     { dateTime: '2026-09-16 08:00' }
-  ]) === 'AUG/11-SEP/16  (2026)' &&
+    ]) === 'AUG 11-SEP 16 2026' &&
     seriesAdapter.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-09-16 08:00' }
-    ]) === 'AUG/11-SEP/16  (2026)'
+    ]) === 'AUG 11-SEP 16 2026'
 );
 
 assert(
@@ -188,7 +188,7 @@ assert(
   seriesVm.formatSeriesDateRange([
     { dateTime: '2026-12-31 08:00' },
     { dateTime: '2027-01-02 08:00' }
-  ]) === 'DEC/31 (2026)-JAN/02 (2027)'
+  ]) === 'DEC 31 2026-JAN 02 2027'
 );
 
 var internalCard = teamMatchStore.toTournamentCard({
@@ -215,13 +215,13 @@ var interCard = teamMatchStore.toTournamentCard({
 assert(
   '首页队内卡月份大写且日/年不变',
   internalCard &&
-    internalCard.clubDate === 'MAR/09/2026' &&
+    internalCard.clubDate === 'MAR 09 2026' &&
     internalCard.clubDate.indexOf('07:30') < 0
 );
 assert(
   '首页队际卡月份大写且日/年不变',
   interCard &&
-    interCard.clubDate === 'NOV/02/2026' &&
+    interCard.clubDate === 'NOV 02 2026' &&
     interCard.clubDate.indexOf('13:00') < 0
 );
 
@@ -257,7 +257,7 @@ var seriesHero = seriesVm.buildHeroView(
 
 assert(
   '首页系列卡与 Series Hero 同月范围一致',
-  seriesCard.clubDate === 'APR/01-03  (2026)' &&
+  seriesCard.clubDate === 'APR 01-03 2026' &&
     seriesHero.dateText === seriesCard.clubDate
 );
 

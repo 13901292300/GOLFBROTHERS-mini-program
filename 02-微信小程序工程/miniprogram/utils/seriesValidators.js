@@ -6,6 +6,7 @@
  */
 
 var model = require('./seriesModel.js');
+var seriesRyderCup = require('./seriesRyderCup.js');
 
 function pushError(errors, code, message, path) {
   errors.push({
@@ -102,6 +103,16 @@ function validateDraftStructure(series) {
         }
       }
     }
+  }
+
+  var typeMode = seriesRyderCup.assertRyderCupTypeAndScoringMode(s);
+  if (!typeMode.ok) {
+    pushError(
+      errors,
+      typeMode.reason,
+      typeMode.message,
+      typeMode.reason === 'ryder_mode_requires_type' ? 'scoringRule.mode' : 'seriesCompetitionType'
+    );
   }
 
   if (s.rounds != null && !Array.isArray(s.rounds)) {

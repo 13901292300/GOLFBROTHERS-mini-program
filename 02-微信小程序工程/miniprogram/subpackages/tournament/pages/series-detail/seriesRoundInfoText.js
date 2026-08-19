@@ -5,6 +5,11 @@
  */
 
 var CUMULATIVE_KEY = 'cumulative';
+var TIME_PENDING = '比赛时间待定';
+var GAME_MODE_PENDING = '赛制待定';
+
+var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
+var seriesRyderCupAccumulate = require('../../../../utils/seriesRyderCupAccumulate.js');
 
 var ROUND_INFO_MONTH_LABELS = [
   'JAN',
@@ -38,7 +43,7 @@ function pad2(n) {
 function parseRoundInfoDateParts(input) {
   var s = asString(input).trim();
   if (!s) return null;
-  var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/.exec(s);
+  var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);
   if (!m) return null;
   var year = Number(m[1]);
   var month = Number(m[2]);
@@ -47,7 +52,16 @@ function parseRoundInfoDateParts(input) {
     return null;
   }
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  return { year: year, month: month, day: day };
+  var hour = m[4] != null ? Number(m[4]) : 0;
+  var minute = m[5] != null ? Number(m[5]) : 0;
+  return {
+    year: year,
+    month: month,
+    day: day,
+    hour: hour,
+    minute: minute,
+    hasTime: m[4] != null
+  };
 }
 
 function formatRoundInfoMonthDay(parts) {
@@ -56,6 +70,60 @@ function formatRoundInfoMonthDay(parts) {
   var dd = pad2(parts.day);
   if (!mon || !dd) return '';
   return mon + ' ' + dd;
+}
+
+/** 莱德杯得分榜时间：2026年8月20日 08:00；缺失走比赛时间待定 */
+function formatSeriesRoundDateTimeText(dateTime, emptyText) {
+  var pending = emptyText == null ? TIME_PENDING : String(emptyText);
+  var parts = parseRoundInfoDateParts(dateTime);
+  if (!parts) return pending;
+  var date = parts.year + '年' + parts.month + '月' + parts.day + '日';
+  if (!parts.hasTime) return date;
+  return date + ' ' + pad2(parts.hour) + ':' + pad2(parts.minute);
+}
+
+function findSeriesRoundById(series, roundId) {
+  var rid = asString(roundId).trim();
+  if (!rid) return null;
+  var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+  for (var i = 0; i < rounds.length; i++) {
+    var r = rounds[i] || {};
+    if (asString(r.roundId).trim() === rid) return r;
+  }
+  return null;
+}
+
+function resolveRyderCupRoundDisplayIndex(round, series, roundId) {
+  if (round && round.index != null && Number.isFinite(Number(round.index))) {
+    var n = Math.floor(Number(round.index));
+    if (n > 0) return n;
+  }
+  var rid = asString(roundId).trim();
+  var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+  for (var i = 0; i < rounds.length; i++) {
+    if (asString(rounds[i] && rounds[i].roundId).trim() === rid) return i + 1;
+  }
+  return 0;
+}
+
+/**
+ * 莱德杯得分榜：第一轮 · 时间 · 赛制。身份只用 roundId。
+ */
+function buildRyderCupRoundInfoText(selectedKey, selectedRound, series) {
+  var rid = asString(selectedKey).trim();
+  if (!rid || rid === CUMULATIVE_KEY) return '';
+  var round = selectedRound && asString(selectedRound.roundId).trim() === rid
+    ? selectedRound
+    : findSeriesRoundById(series, rid);
+  if (!round || asString(round.roundId).trim() !== rid) return '';
+  var chineseName = seriesRyderCupAccumulate.formatChineseRoundName(
+    resolveRyderCupRoundDisplayIndex(round, series, rid)
+  );
+  var timeText = formatSeriesRoundDateTimeText(round.dateTime, TIME_PENDING);
+  var modeText = seriesGameModeLabel.resolveSeriesGameModeLabel(round.gameMode);
+  if (!modeText) modeText = GAME_MODE_PENDING;
+  if (!chineseName) return '';
+  return [chineseName, timeText, modeText].join(' · ');
 }
 
 function findRoundInfoSource(roundId, roundStates, series) {
@@ -115,6 +183,27 @@ function buildSeriesRoundInfoText(selectedKey, roundStates, series) {
     .join(' · ');
 }
 
+function resolveScheduleGameModeLabel(selectedKey, series, stationGameMode) {
+  var fromStation = seriesGameModeLabel.resolveSeriesGameModeLabel(stationGameMode);
+  if (fromStation) return fromStation;
+  var round = findSeriesRoundById(series, selectedKey);
+  var fromRound = seriesGameModeLabel.resolveSeriesGameModeLabel(
+    round && (round.gameMode || round.selectedGameMode)
+  );
+  if (fromRound) return fromRound;
+  return GAME_MODE_PENDING;
+}
+
+/** 莱德杯赛程 TAB：在现有 roundInfoText 末尾追加 G5–G8 展示名 */
+function appendRyderCupScheduleGameMode(baseText, selectedKey, series, stationGameMode) {
+  var rid = asString(selectedKey).trim();
+  if (!rid || rid === CUMULATIVE_KEY) return asString(baseText).trim();
+  var mode = resolveScheduleGameModeLabel(rid, series, stationGameMode);
+  var base = asString(baseText).trim();
+  if (!base) return mode;
+  return base + ' · ' + mode;
+}
+
 module.exports = {
   CUMULATIVE_KEY: CUMULATIVE_KEY,
   pad2: pad2,
@@ -122,5 +211,11 @@ module.exports = {
   formatRoundInfoMonthDay: formatRoundInfoMonthDay,
   findRoundInfoSource: findRoundInfoSource,
   buildSeriesRoundInfoText: buildSeriesRoundInfoText,
-  buildStandingsRoundInfoText: buildSeriesRoundInfoText
+  buildStandingsRoundInfoText: buildSeriesRoundInfoText,
+  TIME_PENDING: TIME_PENDING,
+  GAME_MODE_PENDING: GAME_MODE_PENDING,
+  formatSeriesRoundDateTimeText: formatSeriesRoundDateTimeText,
+  buildRyderCupRoundInfoText: buildRyderCupRoundInfoText,
+  resolveScheduleGameModeLabel: resolveScheduleGameModeLabel,
+  appendRyderCupScheduleGameMode: appendRyderCupScheduleGameMode
 };

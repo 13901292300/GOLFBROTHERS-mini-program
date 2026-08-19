@@ -211,6 +211,13 @@
         class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}}"
       >
         <view class="series-round-dock__inner">
+          <view wx:if="{{standings.useRyderCupScoreboard}}" class="series-round-dock__scorebar">
+            <match-play-scoreboard
+              scoreboard="{{standings.matchPlayScoreboard}}"
+              show-summary="{{true}}"
+              show-cards="{{false}}"
+            />
+          </view>
           <series-round-selector-dock
             mode="inflow"
             sticky="{{isStickyRoundSelector}}"
@@ -380,7 +387,15 @@
               class="series-standings-content-host"
               style="{{contentHostMinHeight > 0 ? 'min-height:' + contentHostMinHeight + 'px;' : ''}}"
             >
-            <block wx:if="{{standings.useLiveLeaderboard}}">
+            <block wx:if="{{standings.useRyderCupScoreboard}}">
+              <match-play-scoreboard
+                scoreboard="{{standings.matchPlayScoreboard}}"
+                show-summary="{{false}}"
+                show-cards="{{true}}"
+                bind:togglecard="onRyderCupScoreboardToggleCard"
+              />
+            </block>
+            <block wx:elif="{{standings.useLiveLeaderboard}}">
               <live-leaderboard-board
                 view="{{standings.liveView}}"
                 score-type="{{standings.liveScoreType}}"
@@ -702,7 +717,7 @@
               wx:if="{{schedule.showViewLeaderboard}}"
               class="schedule-leaderboard-entry"
               bindtap="onScheduleViewLeaderboard"
-            >查看领先榜</view>
+            >{{schedule.viewLeaderboardLabel}}</view>
           <block wx:if="{{schedule.panelMode === 'groups'}}">
             <view class="schedule-groups-panel {{schedule.cta.showEditGroups ? 'schedule-groups-panel--with-cta' : ''}}">
               <view wx:if="{{!schedule.groupCards.length}}" class="series-empty">
@@ -872,6 +887,13 @@
       style="top:{{stickyRoundSelectorTop}}px;"
     >
       <view class="series-round-dock__inner">
+        <view wx:if="{{standings.useRyderCupScoreboard}}" class="series-round-dock__scorebar">
+          <match-play-scoreboard
+            scoreboard="{{standings.matchPlayScoreboard}}"
+            show-summary="{{true}}"
+            show-cards="{{false}}"
+          />
+        </view>
         <series-round-selector-dock
           mode="fixed"
           sticky="{{isStickyRoundSelector}}"

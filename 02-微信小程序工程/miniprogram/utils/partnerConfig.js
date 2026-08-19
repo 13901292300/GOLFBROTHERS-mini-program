@@ -15,12 +15,12 @@ const COS_PARTNER_BASE =
  */
 const PARTNER_ASSET_VERSION = '20260710';
 
-/** 旧本地资源，加载失败时回退（暂不删除磁盘文件） */
+/** COS 旧 partner 图（主图加载失败时回退） */
 const LOCAL_PARTNER_ASSETS = [
-  '/assets/partners/partner-g-one-golf.png',
-  '/assets/partners/partner-bentley.png',
-  '/assets/partners/partner-vivata-1872.png',
-  '/assets/partners/partner-ailiai-golf.png'
+  COS_PARTNER_BASE + '/miniprogram/partners/partner-g-one-golf.png',
+  COS_PARTNER_BASE + '/miniprogram/partners/partner-bentley.png',
+  COS_PARTNER_BASE + '/miniprogram/partners/partner-vivata-1872.png',
+  COS_PARTNER_BASE + '/miniprogram/partners/partner-ailiai-golf.png'
 ];
 
 /**
@@ -79,13 +79,18 @@ const PARTNER_LOGO_FALLBACK_BY_URL = (function buildFallbackMap() {
 })();
 
 /**
- * 云图加载失败时，回退到旧本地路径；已是本地路径则原样返回。
+ * 云图加载失败时，回退到 COS 上的旧 partner 图；已是该路径则原样返回。
  */
 function getPartnerLogoLocalFallback(src) {
   const s = String(src || '').trim();
   if (!s) return '';
+  const partnerPrefix = COS_PARTNER_BASE + '/miniprogram/partners/';
   if (s.indexOf('/assets/partners/') === 0 || s.indexOf('assets/partners/') === 0) {
-    return s.charAt(0) === '/' ? s : '/' + s;
+    const name = s.replace(/^\/?assets\/partners\//, '');
+    return partnerPrefix + name;
+  }
+  if (s.indexOf(partnerPrefix) === 0) {
+    return s.split('?')[0];
   }
   if (PARTNER_LOGO_FALLBACK_BY_URL[s]) return PARTNER_LOGO_FALLBACK_BY_URL[s];
   const base = s.split('?')[0];

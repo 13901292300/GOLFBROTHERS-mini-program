@@ -5,7 +5,7 @@ BASE = Path(__file__).resolve().parent.parent
 
 FILES = [
     BASE / 'utils/groupsStore.js',
-    BASE / 'pages/game/hub/index.js',
+    BASE / 'subpackages/scoring/pages/hub/index.js',
     BASE / 'pages/tournament/detail/index.js',
     BASE / 'pages/score/index.js',
 ]

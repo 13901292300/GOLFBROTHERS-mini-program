@@ -11,8 +11,7 @@
     "pages/profile/history/index",
     "pages/profile/contacts/index",
     "pages/profile/statistics/index",
-    "pages/profile/edit/index",
-    "pages/poster/index"
+    "pages/profile/edit/index"
   ],
   "subPackages": [
     {
@@ -44,7 +43,8 @@
       "root": "subpackages/scoring",
       "name": "scoring",
       "pages": [
-        "pages/score/index"
+        "pages/score/index",
+        "pages/hub/index"
       ]
     },
     {
@@ -64,6 +64,13 @@
       "name": "reaction",
       "pages": [
         "pages/_preload/index"
+      ]
+    },
+    {
+      "root": "subpackages/poster",
+      "name": "posterModule",
+      "pages": [
+        "pages/create/index"
       ]
     }
   ],

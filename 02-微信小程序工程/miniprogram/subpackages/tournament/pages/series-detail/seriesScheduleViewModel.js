@@ -9,11 +9,12 @@ var seriesDetailViewModel = require('./seriesDetailViewModel.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
 var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
+var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
-var tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js');
-var tournamentGroupCardView = require('../../../../utils/tournamentGroupCardView.js');
+var tournamentGroupDraft = require('../../utils/tournamentGroupDraft.js');
+var tournamentGroupCardView = require('../../utils/tournamentGroupCardView.js');
 var teeSheetManage = require('../../../../utils/teeSheetManage.js');
-var teamMatchBottomCta = require('../../../../utils/teamMatchBottomCta.js');
+var teamMatchBottomCta = require('../../utils/teamMatchBottomCta.js');
 var {
   isG2G3FamilyMode,
   isG4FamilyMode,
@@ -350,6 +351,7 @@ function projectGroupCards(match, series) {
   var cards = tournamentGroupCardView.buildReadonlyGroupCards(match, {
     series: series || null
   });
+  cards = teeSheetManage.applyMatchPlayStartHoleToTeeGroups(match, cards);
   cards = teeSheetManage.applyLiveHoleStatusBadgeToTeeGroups(match, cards);
   return attachCompositionPreviews(cards, match, series);
 }
@@ -376,6 +378,7 @@ function emptyScheduleViewModel() {
     roundStatusBadge: '',
     roundStatusBadgeClass: '',
     showViewLeaderboard: false,
+    viewLeaderboardLabel: '查看领先榜',
     emptyGroupsTitle: '暂无分组',
     emptyTeeTitle: '暂无出发表',
     panelMode: 'groups',
@@ -395,7 +398,7 @@ function emptyScheduleViewModel() {
   };
 }
 
-function applySelectedRoundStatus(out) {
+function applySelectedRoundStatus(out, series) {
   var vm = out && typeof out === 'object' ? out : emptyScheduleViewModel();
   var items = Array.isArray(vm.roundSelectorItems) ? vm.roundSelectorItems : [];
   var visualState = '';
@@ -411,22 +414,53 @@ function applySelectedRoundStatus(out) {
   vm.roundStatusBadge = roundStatus.text;
   vm.roundStatusBadgeClass = roundStatus.badgeClass;
   vm.showViewLeaderboard = visualState === 'live';
+  vm.viewLeaderboardLabel = seriesRyderCup.isRyderCupSeries(series)
+    ? '查看得分榜'
+    : '查看领先榜';
   vm.emptyGroupsTitle = visualState === 'unassigned' ? '等待分组' : '暂无分组';
   vm.emptyTeeTitle = '暂无出发表';
   return vm;
 }
 
-function attachRoundDock(vm, roundStates, series) {
+function resolveSelectedStationGameMode(series, selectedKey, getMatchById, fallback) {
+  var round = findRoundById(series, selectedKey);
+  var mid = asString(round && round.matchId);
+  var match = null;
+  if (mid && typeof getMatchById === 'function') {
+    match = getMatchById(mid);
+  }
+  var fromMatch = asString(match && (match.gameMode || match.selectedGameMode));
+  if (fromMatch) return fromMatch;
+  return asString(fallback);
+}
+
+function attachRoundDock(vm, roundStates, series, getMatchById) {
   var out = vm && typeof vm === 'object' ? vm : emptyScheduleViewModel();
   var items = Array.isArray(out.roundSelectorItems) ? out.roundSelectorItems : [];
   out.roundSelectorItems = items;
   out.roundSelector = items;
-  out.roundInfoText = seriesRoundInfoText.buildSeriesRoundInfoText(
+  var labeled = labeledStatesForScheduleDock(series, roundStates);
+  var baseInfo = seriesRoundInfoText.buildSeriesRoundInfoText(
     out.selectedKey,
-    labeledStatesForScheduleDock(series, roundStates),
+    labeled,
     series
   );
-  return applySelectedRoundStatus(out);
+  if (seriesRyderCup.isRyderCupSeries(series)) {
+    out.roundInfoText = seriesRoundInfoText.appendRyderCupScheduleGameMode(
+      baseInfo,
+      out.selectedKey,
+      series,
+      resolveSelectedStationGameMode(
+        series,
+        out.selectedKey,
+        getMatchById,
+        out.gameMode
+      )
+    );
+  } else {
+    out.roundInfoText = baseInfo;
+  }
+  return applySelectedRoundStatus(out, series);
 }
 
 /**
@@ -451,7 +485,8 @@ function buildSeriesScheduleViewModel(input) {
         blockMessage: '无法加载系列赛'
       }),
       src.roundStates,
-      series
+      series,
+      src.getMatchById
     );
   }
 
@@ -495,7 +530,8 @@ function buildSeriesScheduleViewModel(input) {
         })
       }),
       src.roundStates,
-      series
+      series,
+      src.getMatchById
     );
   }
 
@@ -528,7 +564,8 @@ function buildSeriesScheduleViewModel(input) {
         showCompositionPreview: false
       },
       src.roundStates,
-      series
+      series,
+      src.getMatchById
     );
   }
 
@@ -593,7 +630,8 @@ function buildSeriesScheduleViewModel(input) {
       cta: cta
     },
     src.roundStates,
-    series
+    series,
+    src.getMatchById
   );
 }
 

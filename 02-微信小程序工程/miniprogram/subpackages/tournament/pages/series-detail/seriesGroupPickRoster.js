@@ -6,7 +6,7 @@
 
 var seriesStore = require('../../../../utils/seriesStore.js');
 var seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
-var seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
+var seriesNoRepeatLineup = require('../../utils/seriesNoRepeatLineup.js');
 var seriesScheduleGroupWrite = require('./seriesScheduleGroupWrite.js');
 
 var STATION_DATA_INVALID_MSG =

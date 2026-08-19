@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>字体预览（FontFace API）</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 24px 64px;
+      background: #111827;
+      color: #f9fafb;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .hint { margin: 0 0 24px; color: #9ca3af; font-size: 14px; line-height: 1.6; }
+    #container { display: flex; flex-direction: column; gap: 20px; }
+    .card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 16px;
+      padding: 20px 24px 24px;
+    }
+    .card.is-failed { border-color: #7f1d1d; }
+    .name { font-size: 16px; font-weight: 700; }
+    .meta { margin-top: 4px; color: #9ca3af; font-size: 12px; }
+    .label {
+      margin: 16px 0 8px;
+      color: #9ca3af;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .digits {
+      font-size: 72px;
+      line-height: 1.1;
+      color: #fff7d6;
+      letter-spacing: 0.02em;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+    canvas {
+      display: block;
+      background: #ffffff;
+      border-radius: 8px;
+    }
+    .fail { color: #f87171; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>字体预览（FontFace API）</h1>
+  <p class="hint">
+    用唯一别名动态加载本地 TTF，再用 DOM 和 Canvas 2D 对照数字。请用 Live Server 打开本文件，不要直接用 file://。
+  </p>
+  <div id="container"></div>
+
+  <script>
+    async function loadFont(family, url, weight) {
+      const font = new FontFace(family, "url(" + url + ")", {
+        weight: String(weight || 700),
+        style: "normal"
+      });
+      await font.load();
+      document.fonts.add(font);
+      return font;
+    }
+
+    const fonts = [
+      { family: "Playfair_My", url: "assets/fonts/PlayfairDisplay-Bold.ttf", weight: 700 },
+      { family: "Bodoni_My", url: "assets/fonts/BodoniModa-Bold.ttf", weight: 700 },
+      { family: "Cormorant_My", url: "assets/fonts/CormorantGaramond-Bold.ttf", weight: 700 },
+      { family: "Anton_My", url: "assets/fonts/Anton-Regular.ttf", weight: 400 },
+      { family: "Inter_My", url: "assets/fonts/Inter-Bold.ttf", weight: 700 }
+    ];
+
+    function drawSix(canvas, family, weight) {
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#111827";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = weight + ' 80px "' + family + '"';
+      console.log("[Canvas]", family, "ctx.font =", ctx.font);
+      ctx.fillText("6", canvas.width / 2, canvas.height / 2);
+    }
+
+    async function main() {
+      const container = document.getElementById("container");
+      for (let i = 0; i < fonts.length; i += 1) {
+        const item = fonts[i];
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML =
+          '<div class="name">' + item.family + "</div>" +
+          '<div class="meta">' + item.url + " · weight " + item.weight + "</div>" +
+          '<div class="label">DOM 0–9</div>' +
+          '<div class="digits" data-digits>0123456789</div>' +
+          '<div class="label">Canvas 2D · 数字 6</div>' +
+          '<div class="row"><canvas width="160" height="140"></canvas></div>';
+        container.appendChild(card);
+
+        const digits = card.querySelector("[data-digits]");
+        const canvas = card.querySelector("canvas");
+        try {
+          await loadFont(item.family, item.url, item.weight);
+          console.log("[" + item.family + "] 加载成功");
+          digits.style.fontFamily = '"' + item.family + '"';
+          digits.style.fontWeight = String(item.weight);
+          drawSix(canvas, item.family, item.weight);
+        } catch (error) {
+          console.error("[" + item.family + "] 加载失败", error);
+          card.classList.add("is-failed");
+          const fail = document.createElement("div");
+          fail.className = "fail";
+          fail.textContent = "加载失败";
+          card.appendChild(fail);
+        }
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

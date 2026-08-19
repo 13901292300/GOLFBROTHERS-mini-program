@@ -2,21 +2,22 @@ const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const seriesModel = require('../../../../utils/seriesModel.js');
 const seriesStoreMod = require('../../../../utils/seriesStore.js');
 const seriesValidators = require('../../../../utils/seriesValidators.js');
-const timeWheelBridge = require('../../../../utils/timeWheelBridge.js');
+const timeWheelBridge = require('../../utils/timeWheelBridge.js');
 const roundDraft = require('./roundDraft.js');
 const participantDraft = require('./participantDraft.js');
 const basicInfoDraft = require('./basicInfoDraft.js');
 const partnerConfigUtil = require('../../../../utils/partnerConfig.js');
 const seriesPublishAdapter = require('./seriesPublishAdapter.js');
-const seriesPublishMod = require('../../../../utils/seriesPublish.js');
+const seriesPublishMod = require('../../utils/seriesPublish.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
-const seriesRoundUpdate = require('../../../../utils/seriesRoundUpdate.js');
-const seriesInfoUpdate = require('../../../../utils/seriesInfoUpdate.js');
-const seriesParticipantsUpdate = require('../../../../utils/seriesParticipantsUpdate.js');
+const seriesRoundUpdate = require('../../utils/seriesRoundUpdate.js');
+const seriesInfoUpdate = require('../../utils/seriesInfoUpdate.js');
+const seriesParticipantsUpdate = require('../../utils/seriesParticipantsUpdate.js');
 const seriesStationMatch = require('../../../../utils/seriesStationMatch.js');
 const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
+const seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 const seriesStoreDefault = require('../../../../utils/seriesStore.js');
 
 var PUBLISHED_STRUCTURE_LOCKED_MSG =
@@ -35,7 +36,7 @@ var TEAM_TEMPLATES = [
     id: 'ryder',
     title: '莱德杯',
     desc: '队内两分队对抗 · 多轮比洞赛',
-    badge: '后续阶段'
+    badge: '首版目标'
   },
   {
     id: 'individual_tour',
@@ -62,7 +63,7 @@ var ORG_TEMPLATES = [
     id: 'ryder',
     title: '莱德杯',
     desc: '不同球队之间 · 多轮比洞赛',
-    badge: '后续阶段'
+    badge: '首版目标'
   },
   {
     id: 'individual_tour',
@@ -408,6 +409,7 @@ Page({
     roundCountInput: '2',
     roundCards: [],
     gameModeOptions: STROKE_GAME_MODES,
+    isRyderCup: false,
     showGameModeSheet: false,
     gameModeSheetRoundId: '',
     showTimePicker: false,
@@ -501,6 +503,7 @@ Page({
   onLoad(query) {
     this._isSaving = false;
     this._isPublishing = false;
+    this._isDiscarding = false;
     this._publishNavPending = false;
     this._publishDetailUrl = '';
     this._pageAlive = true;
@@ -788,7 +791,11 @@ Page({
     var stepHintText = meta.hint;
     var primaryBtnText = '下一步';
     if (step === 1) primaryBtnText = '下一步：选择类型';
-    if (step === 2) primaryBtnText = '下一步：计分规则';
+    if (step === 2) {
+      primaryBtnText = seriesRyderCup.shouldSkipScoringStep(d)
+        ? '下一步：轮次设置'
+        : '下一步：计分规则';
+    }
     if (step === 3) primaryBtnText = '下一步：轮次设置';
     if (step === 4) primaryBtnText = '下一步：主体与信息';
     if (step === 5) primaryBtnText = '下一步：确认创建';
@@ -843,11 +850,12 @@ Page({
       };
     var sortUi = this._buildEventInfoSortUi(eventInfoList);
     var confirmRounds = basicInfoDraft.summarizeRoundsForConfirm(rounds, scoringMode);
-    var scoringText =
-      (scoringMode === 'global_m' ? '全局最好 M=' + (rule.globalM != null ? rule.globalM : 10) : '每轮 Top N') +
-      ' · ' +
-      (rule.scoreBasis === 'net' ? '净杆' : rule.scoreBasis === 'to_par' ? '相对标准杆' : '总杆') +
-      (rule.allowRepeat ? ' · 允许重复上场' : ' · 不允许重复上场');
+    var scoringText = seriesRyderCup.shouldSkipScoringStep(d)
+      ? '莱德杯 · 胜 1 / 平 0.5 / 负 0 · 同轮不可重复、跨轮可重复'
+      : (scoringMode === 'global_m' ? '全局最好 M=' + (rule.globalM != null ? rule.globalM : 10) : '每轮 Top N') +
+        ' · ' +
+        (rule.scoreBasis === 'net' ? '净杆' : rule.scoreBasis === 'to_par' ? '相对标准杆' : '总杆') +
+        (rule.allowRepeat ? ' · 允许重复上场' : ' · 不允许重复上场');
     var logoCount = (partnerConfig.partnerLogos || []).length;
     var partnerText =
       d.partnerConfig == null
@@ -923,6 +931,10 @@ Page({
         scoreBasis: rule.scoreBasis || 'gross',
         showGlobalM: scoringMode === 'global_m',
         showPerRoundN: scoringMode === 'per_round_n',
+        isRyderCup: seriesRyderCup.isRyderCupSeries(d),
+        gameModeOptions: seriesRyderCup.shouldSkipScoringStep(d)
+          ? seriesRyderCup.listRyderCupGameModeOptions()
+          : STROKE_GAME_MODES,
         templateOptions: templates,
         roundCountInput: String(Math.max(2, rounds.length || 2)),
         roundCards: roundCards,
@@ -1647,6 +1659,20 @@ Page({
     }
     this._persistNextDraft(function (draft) {
       draft.templateId = value;
+      if (seriesRyderCup.isRyderCupTemplateId(value)) {
+        seriesRyderCup.applyRyderCupDraftSelection(draft);
+        var defMode = seriesRyderCup.defaultRyderCupRoundGameMode();
+        draft.rounds = (draft.rounds || []).map(function (r) {
+          var next = deepClone(r);
+          if (!next.gameMode) next.gameMode = defMode;
+          else if (!seriesRyderCup.isAllowedRyderCupGameMode(next.gameMode)) {
+            next.gameMode = defMode;
+          }
+          return next;
+        });
+      } else {
+        seriesRyderCup.clearRyderCupDraftSelection(draft, seriesModel.createDefaultScoringRule(null));
+      }
     }, { keepStep: true });
   },
 
@@ -2230,6 +2256,10 @@ Page({
     var roundId = this.data.gameModeSheetRoundId;
     this.closeGameModeSheet();
     if (!mode || !roundId || !seriesModel.GAME_MODE[mode]) return;
+    if (seriesRyderCup.shouldSkipScoringStep(this.lastSavedDraft) && !seriesRyderCup.isAllowedRyderCupGameMode(mode)) {
+      wx.showToast({ title: '莱德杯每轮只能选择 G5–G8 比洞赛', icon: 'none' });
+      return;
+    }
     if (!this.lastSavedDraft) return;
     if (!this._assertEditRoundField('gameMode')) return;
     // edit_round：禁止 R1 同步全部轮次
@@ -2599,6 +2629,9 @@ Page({
     var step = this.data.currentStep;
     if (step <= 1) return;
     var prev = step - 1;
+    if (prev === 3 && seriesRyderCup.shouldSkipScoringStep(this.lastSavedDraft)) {
+      prev = 2;
+    }
     if (prev === 5) {
       this._enterStep5Ui();
       return;
@@ -2787,6 +2820,10 @@ Page({
         return;
       }
       this._clearNumberEditBuffers();
+      if (seriesRyderCup.shouldSkipScoringStep(draft)) {
+        this._safeSetData(this._projectUiFromDraft(draft, 4));
+        return;
+      }
       this._safeSetData(this._projectUiFromDraft(draft, 3));
       return;
     }
@@ -3172,11 +3209,94 @@ Page({
   },
 
   onBack() {
+    if (this._editRoundMode || this._editSeriesMode) {
+      this._leaveCreatePage();
+      return;
+    }
+    if (this._isSaving || this._isPublishing || this._isDiscarding) return;
+    this._confirmLeaveOrDiscardInterrupted();
+  },
+
+  _leaveCreatePage() {
     if (getCurrentPages().length > 1) {
       wx.navigateBack({ delta: 1 });
     } else {
-      wx.redirectTo({ url: '/pages/home/index' });
+      wx.redirectTo({ url: seriesPublishAdapter.HOME_URL || '/pages/home/index' });
     }
+  },
+
+  _exitCreateToCleanHome() {
+    var home = seriesPublishAdapter.HOME_URL || '/pages/home/index';
+    if (typeof wx !== 'undefined' && typeof wx.reLaunch === 'function') {
+      wx.reLaunch({
+        url: home,
+        fail: function () {
+          if (typeof wx.redirectTo === 'function') {
+            wx.redirectTo({ url: home, fail: function () {} });
+          }
+        }
+      });
+      return;
+    }
+    this._leaveCreatePage();
+  },
+
+  _confirmLeaveOrDiscardInterrupted() {
+    var seriesId =
+      (this.lastSavedDraft && this.lastSavedDraft.seriesId) || this._seriesId || '';
+    seriesId = seriesId != null ? String(seriesId).trim() : '';
+    if (!seriesId) {
+      this._leaveCreatePage();
+      return;
+    }
+    var insp = seriesPublishMod.inspectPublishState(seriesId);
+    if (!seriesPublishAdapter.shouldConfirmInterruptedDiscard(insp)) {
+      this._leaveCreatePage();
+      return;
+    }
+    var self = this;
+    wx.showModal({
+      title: '放弃本次创建',
+      content: seriesPublishAdapter.TOAST.DISCARD_CONFIRM,
+      confirmText: '放弃创建',
+      cancelText: '取消',
+      success: function (res) {
+        if (!self._pageAlive) return;
+        if (!res || !res.confirm) return;
+        self._runInterruptedPublishDiscard(seriesId);
+      }
+    });
+  },
+
+  _runInterruptedPublishDiscard: function (seriesId) {
+    if (!this._pageAlive || this._isDiscarding) return;
+    var actor = gameStore.getCurrentUser() || {};
+    var actorId = String(actor.userId || actor.playerId || '').trim();
+    this._isDiscarding = true;
+    this._safeSetData({ isSaving: true });
+    var result = null;
+    try {
+      result = seriesPublishMod.discardInterruptedPublishSafely(seriesId, {
+        actorUserId: actorId,
+        actor: actor
+      });
+    } catch (eDiscard) {
+      result = { ok: false, reason: 'discard_threw' };
+    } finally {
+      this._isDiscarding = false;
+      if (this._pageAlive) this._safeSetData({ isSaving: false });
+    }
+    if (!this._pageAlive) return;
+    if (!result || !result.ok) {
+      wx.showToast({
+        title: seriesPublishAdapter.mapDiscardFailure(result),
+        icon: 'none',
+        duration: 2800
+      });
+      return;
+    }
+    this.lastSavedDraft = null;
+    this._exitCreateToCleanHome();
   },
 
   onRetryInit() {
@@ -3265,6 +3385,13 @@ Page({
           var list =
             payload && Array.isArray(payload.participants) ? payload.participants : [];
           var mapped = participantDraft.mapTeamParticipantsFromSelect(list);
+          if (seriesRyderCup.shouldSkipScoringStep(self.lastSavedDraft)) {
+            var sides = seriesRyderCup.assertExactlyTwoSides({ participants: mapped });
+            if (!sides.ok) {
+              wx.showToast({ title: sides.message, icon: 'none' });
+              return;
+            }
+          }
           if (
             !self._assertRemovedParticipantsHaveNoRoster(
               self.lastSavedDraft && self.lastSavedDraft.participants,
@@ -3446,6 +3573,13 @@ Page({
     if (!this._assertParticipantsEditable()) return;
     if (this._isSaving || !this.lastSavedDraft) return;
     if (this.data.hostMode !== 'team') return;
+    if (seriesRyderCup.shouldSkipScoringStep(this.lastSavedDraft)) {
+      var n = participantDraft.countDivisionParticipants(this.lastSavedDraft.participants);
+      if (n >= 2) {
+        wx.showToast({ title: '莱德杯只能设置两个分队', icon: 'none' });
+        return;
+      }
+    }
     if (!participantDraft.hasHostTeam(this.lastSavedDraft)) {
       wx.showToast({ title: '请先选择主办球队', icon: 'none' });
       return;

@@ -2,7 +2,7 @@
  * 球员主页（P1A-1 资料壳 + P1A-2 关注/计数/私人备注）
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
-const publicPlayerProfile = require('../../../../utils/publicPlayerProfile.js');
+const publicPlayerProfile = require('../../utils/publicPlayerProfile.js');
 const genderNormalize = require('../../../../utils/genderNormalize.js');
 const playerActionModal = require('../../../../utils/playerActionModal.js');
 const contactFollowAction = require('../../../../utils/contactFollowAction.js');
@@ -14,13 +14,13 @@ const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 const reactionPopularityLedger = require('../../../../utils/reactionPopularityLedger.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
 const playerMatchHistory = require('../../../../utils/playerMatchHistory.js');
-const playerMomentStore = require('../../../../utils/playerMomentStore.js');
-const playerMomentInteractionStore = require('../../../../utils/playerMomentInteractionStore.js');
-const playerMomentMedia = require('../../../../utils/playerMomentMedia.js');
-const playerMomentImageLayout = require('../../../../utils/playerMomentImageLayout.js');
-const contentReportService = require('../../../../utils/contentReportService.js');
+const playerMomentStore = require('../../utils/playerMomentStore.js');
+const playerMomentInteractionStore = require('../../utils/playerMomentInteractionStore.js');
+const playerMomentMedia = require('../../utils/playerMomentMedia.js');
+const playerMomentImageLayout = require('../../utils/playerMomentImageLayout.js');
+const contentReportService = require('../../utils/contentReportService.js');
 const publicScorecardView = require('../../../../utils/publicScorecardView.js');
-const openMomentGameHub = require('../../../../utils/openMomentGameHub.js');
+const openMomentGameHub = require('../../utils/openMomentGameHub.js');
 
 const REMARK_NAME_MAX = contactStore.REMARK_NAME_MAX || 12;
 const MOMENT_PAGE_SIZE = playerMomentStore.PAGE_SIZE || 20;

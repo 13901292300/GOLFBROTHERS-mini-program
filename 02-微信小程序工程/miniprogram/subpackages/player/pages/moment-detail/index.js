@@ -2,11 +2,11 @@
  * 动态详情：点赞 / 评论 / 回复
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
-const playerMomentStore = require('../../../../utils/playerMomentStore.js');
-const playerMomentInteractionStore = require('../../../../utils/playerMomentInteractionStore.js');
-const playerMomentMedia = require('../../../../utils/playerMomentMedia.js');
-const playerMomentImageLayout = require('../../../../utils/playerMomentImageLayout.js');
-const contentReportService = require('../../../../utils/contentReportService.js');
+const playerMomentStore = require('../../utils/playerMomentStore.js');
+const playerMomentInteractionStore = require('../../utils/playerMomentInteractionStore.js');
+const playerMomentMedia = require('../../utils/playerMomentMedia.js');
+const playerMomentImageLayout = require('../../utils/playerMomentImageLayout.js');
+const contentReportService = require('../../utils/contentReportService.js');
 const publicScorecardView = require('../../../../utils/publicScorecardView.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');

@@ -222,7 +222,7 @@ function planNormalCreateSuccessNav(input) {
 function buildNormalCreateHubUrl(gameId, startGroupIndex, creatorInGame) {
   const gid = gameId != null ? encodeURIComponent(String(gameId)) : '';
   const base =
-    '/pages/game/hub/index?gameId=' +
+    '/subpackages/scoring/pages/hub/index?gameId=' +
     gid +
     '&activeTab=group&fromFlow=' +
     FROM_FLOW_NORMAL_CREATE;

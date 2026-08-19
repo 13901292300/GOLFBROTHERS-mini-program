@@ -4,19 +4,19 @@
 
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const groupsStore = require('../../../../utils/groupsStore.js');
-const playerSlots = require('../../../../utils/playerSlots.js');
+const playerSlots = require('../../utils/playerSlots.js');
 const { getGenderById } = require('../../../../utils/playerDirectory.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
 const gameStore = require('../../../../utils/gameStore.js');
-const weatherService = require('../../../../utils/weatherService.js');
+const weatherService = require('../../utils/weatherService.js');
 const matchState = require('../../../../utils/matchState.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const matchStatus = require('../../../../utils/matchStatus.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 const scoreCompleteness = require('../../../../utils/scoreCompleteness.js');
-const scoreGroupCompletePrompt = require('../../../../utils/scoreGroupCompletePrompt.js');
-const scoreGroupFinish = require('../../../../utils/scoreGroupFinish.js');
+const scoreGroupCompletePrompt = require('../../utils/scoreGroupCompletePrompt.js');
+const scoreGroupFinish = require('../../utils/scoreGroupFinish.js');
 const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
@@ -66,7 +66,7 @@ const matchManageAccess = require('../../../../utils/matchManageAccess.js');
 const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
 const userDirectory = require('../../../../utils/userDirectory.js');
-const userStore = require('../../../../utils/userStore.js');
+const userStore = require('../../utils/userStore.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
@@ -6957,7 +6957,7 @@ Page({
    * 统计栈内同 gameId 的 Game Hub 数量（诊断 / 去重）。
    */
   _countGameHubsInStack(pages, gameId) {
-    const hubRoute = 'pages/game/hub/index';
+    const hubRoute = 'subpackages/scoring/pages/hub/index';
     const gid = gameId != null ? String(gameId).trim() : '';
     let count = 0;
     const list = pages || [];
@@ -6979,7 +6979,7 @@ Page({
     if (list.length < 2) return false;
     const prev = list[list.length - 2];
     const route = (prev && (prev.route || prev.__route__)) || '';
-    if (route !== 'pages/game/hub/index') return false;
+    if (route !== 'subpackages/scoring/pages/hub/index') return false;
     const prevGid =
       prev && prev.options && prev.options.gameId != null
         ? String(prev.options.gameId).trim()
@@ -7004,7 +7004,7 @@ Page({
    */
   _returnToExistingGameHub(gameId, extraQuery, releaseBackLock) {
     const gid = gameId != null ? String(gameId).trim() : '';
-    const hubRoute = 'pages/game/hub/index';
+    const hubRoute = 'subpackages/scoring/pages/hub/index';
     const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
     const stack = this._scoreNavStackRoutes();
     const hubCountBefore = this._countGameHubsInStack(pages, gid);
@@ -10016,6 +10016,12 @@ Page({
       return;
     }
 
+    // 更多菜单「海报」：只传场次 ID，成绩由海报页从 gameStore 实时读取
+    if (action === 'poster' || label === '海报') {
+      this._openScorePoster();
+      return;
+    }
+
     if (
       action === 'publish_moment' ||
       label === '发布到球友圈' ||
@@ -10024,6 +10030,49 @@ Page({
     ) {
       this._openMomentPublishFromScore();
     }
+  },
+
+  /**
+   * 解析当前场次 ID：页面 data.gameId → data.match.gameId → matchState.gameId
+   */
+  _resolvePosterGameId() {
+    const fromData = this.data.gameId != null ? String(this.data.gameId).trim() : '';
+    if (fromData) return fromData;
+    const matchObj = this.data.match;
+    const fromMatch =
+      matchObj && matchObj.gameId != null ? String(matchObj.gameId).trim() : '';
+    if (fromMatch) return fromMatch;
+    const ms = this._matchState || this._readMatchState() || {};
+    return ms.gameId != null ? String(ms.gameId).trim() : '';
+  },
+
+  /**
+   * 打开海报页。不在此写入 scores；海报页通过 roundId / currentGameId 从 gameStore 读取。
+   */
+  _openScorePoster() {
+    const gameId = this._resolvePosterGameId();
+    if (!gameId) {
+      wx.showToast({ title: '请先开始记分', icon: 'none' });
+      return;
+    }
+    try {
+      const app = getApp();
+      if (app) {
+        if (!app.globalData) app.globalData = {};
+        app.globalData.currentGameId = gameId;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      wx.setStorageSync('currentGameId', gameId);
+    } catch (e) {
+      /* ignore */
+    }
+    wx.navigateTo({
+      url: '/subpackages/poster/pages/create/index?roundId=' + gameId,
+      fail: () => wx.showToast({ title: '海报页面尚未注册', icon: 'none' })
+    });
   },
 
   openStyleSheet() {
@@ -12857,7 +12906,7 @@ Page({
     setTimeout(() => {
       if (nextGroups.length > 1) {
         wx.redirectTo({
-          url: '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId),
+          url: '/subpackages/scoring/pages/hub/index?gameId=' + encodeURIComponent(gameId),
           fail: () => wx.reLaunch({ url: '/pages/home/index?tab=my' })
         });
         return;

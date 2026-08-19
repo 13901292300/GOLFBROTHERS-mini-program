@@ -1,6 +1,10 @@
 /**
  * 首页赛事卡片 / 详情 Hero 共用月份格式（大写英文三字母 JAN–DEC）
  * 手工映射，不读设备 locale；不改存储、创建页滚轮、赛程 dock。
+ *
+ * 展示：
+ * - 单日：MON DD YYYY（如 SEP 10 2026）
+ * - 同年同月跨日：MON DD-DD YYYY（如 SEP 10-17 2026）
  */
 
 var CLUB_MONTH_LABELS = [
@@ -36,30 +40,30 @@ function formatClubMonthDay(parts) {
   var month = clubMonthLabel(parts.month);
   var day = pad2(parts.day);
   if (!month || !day) return '';
-  return month + '/' + day;
+  return month + ' ' + day;
 }
 
 function formatClubDateFromParts(parts) {
   var md = formatClubMonthDay(parts);
   if (!md || !parts || parts.year == null || String(parts.year).trim() === '') return '';
-  return md + '/' + parts.year;
+  return md + ' ' + parts.year;
 }
 
-/** 单日：MON/DD/YYYY；无法解析则空串（队内/队际卡片与 Hero） */
+/** 单日：MON DD YYYY；无法解析则空串（队内/队际卡片与 Hero） */
 function formatClubDate(timeString) {
   var m = String(timeString || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return '';
   var month = clubMonthLabel(m[2]);
   if (!month) return '';
-  return month + '/' + m[3] + '/' + m[1];
+  return month + ' ' + m[3] + ' ' + m[1];
 }
 
 /**
  * 已解析起止日期 → 展示文案
- * - 同日：MON/DD/YYYY
- * - 同年同月跨日：MON/DD-DD  (YYYY)（月份只出现一次）
- * - 同年跨月：MON/DD-MON/DD  (YYYY)
- * - 跨年：MON/DD (YYYY)-MON/DD (YYYY)
+ * - 同日：MON DD YYYY
+ * - 同年同月跨日：MON DD-DD YYYY（月份只出现一次）
+ * - 同年跨月：MON DD-MON DD YYYY
+ * - 跨年：MON DD YYYY-MON DD YYYY
  */
 function formatDateRangeFromParts(minP, maxP, emptyText) {
   var empty = emptyText == null ? '' : String(emptyText);
@@ -69,27 +73,17 @@ function formatDateRangeFromParts(minP, maxP, emptyText) {
   if (sameDay) return formatClubDateFromParts(minP);
   if (minP.year === maxP.year) {
     if (minP.month === maxP.month) {
-      return formatClubMonthDay(minP) + '-' + pad2(maxP.day) + '  (' + minP.year + ')';
+      return formatClubMonthDay(minP) + '-' + pad2(maxP.day) + ' ' + minP.year;
     }
     return (
       formatClubMonthDay(minP) +
       '-' +
       formatClubMonthDay(maxP) +
-      '  (' +
-      minP.year +
-      ')'
+      ' ' +
+      minP.year
     );
   }
-  return (
-    formatClubMonthDay(minP) +
-    ' (' +
-    minP.year +
-    ')-' +
-    formatClubMonthDay(maxP) +
-    ' (' +
-    maxP.year +
-    ')'
-  );
+  return formatClubDateFromParts(minP) + '-' + formatClubDateFromParts(maxP);
 }
 
 module.exports = {

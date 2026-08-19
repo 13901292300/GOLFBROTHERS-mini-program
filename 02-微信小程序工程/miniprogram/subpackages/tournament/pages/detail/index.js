@@ -26,9 +26,9 @@ const {
 const matchManageAccess = require('../../../../utils/matchManageAccess.js');
 const teamMatchMoreMenu = require('../../../../utils/teamMatchMoreMenu.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
-const teamMatchBottomCta = require('../../../../utils/teamMatchBottomCta.js');
-const teamMatchEnterGroupScore = require('../../../../utils/teamMatchEnterGroupScore.js');
-const teamMatchViewerGroup = require('../../../../utils/teamMatchViewerGroup.js');
+const teamMatchBottomCta = require('../../utils/teamMatchBottomCta.js');
+const teamMatchEnterGroupScore = require('../../utils/teamMatchEnterGroupScore.js');
+const teamMatchViewerGroup = require('../../utils/teamMatchViewerGroup.js');
 const seriesFinalize = require('../../../../utils/seriesFinalize.js');
 const demoJiaobeiMatch = require('../../../../utils/demoJiaobeiMatch.js');
 const gameLifecycle = require('../../../../utils/gameLifecycle.js');
@@ -44,7 +44,7 @@ const qrAccessAuth = require('../../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../../utils/playerManage.js');
 const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const paymentManage = require('../../../../utils/paymentManage.js');
-const registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
+const registrationInteractionModel = require('../../utils/registrationInteractionModel.js');
 const REG_CTA_COPY = {
   register: registrationInteractionModel.resolveRegistrationCtaCopy('register'),
   cancel: registrationInteractionModel.resolveRegistrationCtaCopy('cancel'),
@@ -74,6 +74,8 @@ const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const scheduleStore = require('../../../../utils/scheduleStore.js');
 const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
 const { buildMatchPlayResultSummary } = require('../../../../utils/matchPlayResult.js');
+const matchPlayTeamScore = require('../../../../utils/matchPlayTeamScore.js');
+const matchPlayScoreboardView = require('../../utils/matchPlayScoreboardView.js');
 const playerActionModal = require('../../../../utils/playerActionModal.js');
 const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
@@ -81,7 +83,7 @@ const reactionPanelConfig = require('../../../../utils/reactionPanelConfig.js');
 const scoreReactionAccess = require('../../../../utils/scoreReactionAccess.js');
 const leaderboardSettingViewModel = require('../../../../utils/leaderboardSettingViewModel.js');
 const personalLeaderboardBoard = require('../../../../utils/personalLeaderboardBoard.js');
-const teamLeaderboardView = require('../../../../utils/teamLeaderboardView.js');
+const teamLeaderboardView = require('../../utils/teamLeaderboardView.js');
 const liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScorecard.js');
 
 /**
@@ -2280,47 +2282,7 @@ Page({
    * @param {boolean} [opts.resetExpanded] true=全部折叠（从记分页返回）；默认保留已有 expanded
    */
   _buildMatchPlayScoreboard(match, opts) {
-    const board = buildMockMatchPlayScoreboard();
-    const summary = this._buildMatchPlayTeamScoreSummary(match);
-    // 顶部总比分条队名：teamGroups[0]/[1].name；队内回退「红队/蓝队」，队际回退「球队A/B」
-    // LOGO 仅队际赛展示（快照 sourceTeamLogo，缺省默认图）；队内赛不展示以免回归
-    const teamGroups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
-    const interTeam = isInterTeamMatch(match);
-    const teamAName =
-      teamGroups[0] && String(teamGroups[0].name || '').trim()
-        ? String(teamGroups[0].name).trim()
-        : interTeam
-          ? '球队A'
-          : (board.teamA && board.teamA.name) || '红队';
-    const teamBName =
-      teamGroups[1] && String(teamGroups[1].name || '').trim()
-        ? String(teamGroups[1].name).trim()
-        : interTeam
-          ? '球队B'
-          : (board.teamB && board.teamB.name) || '蓝队';
-    const teamALogo = interTeam
-      ? String((teamGroups[0] && teamGroups[0].sourceTeamLogo) || '').trim() ||
-        DEFAULT_ORG_LOGO
-      : '';
-    const teamBLogo = interTeam
-      ? String((teamGroups[1] && teamGroups[1].sourceTeamLogo) || '').trim() ||
-        DEFAULT_ORG_LOGO
-      : '';
-    const teamScores = {
-      teamA: Object.assign({}, board.teamA, {
-        name: teamAName,
-        logo: teamALogo,
-        score: this._formatMatchPlayTeamScore(summary.redScore)
-      }),
-      teamB: Object.assign({}, board.teamB, {
-        name: teamBName,
-        logo: teamBLogo,
-        score: this._formatMatchPlayTeamScore(summary.blueScore)
-      })
-    };
-    const groups = match && Array.isArray(match.groups) ? match.groups : [];
     const resetExpanded = !!(opts && opts.resetExpanded);
-    // 普通刷新：保留 expanded；从记分页返回：全部折叠
     const prevExpandedById = {};
     const prevBoard = this.data && this.data.matchPlayScoreboard;
     if (!resetExpanded && prevBoard && Array.isArray(prevBoard.matches)) {
@@ -2329,89 +2291,19 @@ Page({
         prevExpandedById[String(m.id)] = !!m.expanded;
       });
     }
-    const applyCardMeta = (card, index, groupId) => {
-      if (!card) return card;
-      const id = card.id != null ? String(card.id) : '';
-      const gid = groupId != null && String(groupId).trim() !== '' ? String(groupId) : 'mock';
-      const cardKey = gid + '_' + index;
-      const expanded = resetExpanded
-        ? false
-        : !!(id && Object.prototype.hasOwnProperty.call(prevExpandedById, id) && prevExpandedById[id]);
-      return Object.assign({}, card, { expanded: expanded, cardKey: cardKey });
-    };
-    if (!groups.length || !board || !Array.isArray(board.matches) || !board.matches.length) {
-      const mockMatches = (board.matches || []).map((m, index) =>
-        applyCardMeta(Object.assign({}, m, { detailsMode: 'scorecard' }), index, 'mock')
-      );
-      // 无真实分组：保留 mock 摘要
-      const finishedMatches =
-        board.finishedMatches != null ? board.finishedMatches : 0;
-      const totalMatches =
-        board.totalMatches != null ? board.totalMatches : mockMatches.length;
-      return Object.assign({}, board, teamScores, {
-        finishedMatches: finishedMatches,
-        totalMatches: totalMatches,
-        matchesCompleteText:
-          board.matchesCompleteText ||
-          finishedMatches + '/' + totalMatches + ' MATCHES COMPLETE',
-        matches: mockMatches
-      });
-    }
-    const lookup = this._buildGroupPlayerLookup(match);
-    const teamIds = this._resolveMatchPlaySideTeamIds(match);
-    const gameMode = resolveGameMode(match);
-    const isG5 = isG5MatchPlayMode(gameMode);
-    const templates = board.matches;
-    // 未开打：仍提供 18 个 empty 圆点供卡片底部走势条展示（不碰成绩计算）
-    const emptyHoleDots = [];
-    for (let di = 1; di <= 18; di++) {
-      emptyHoleDots.push({ n: di, cls: 'empty', result: '' });
-    }
-    const emptyDetail = {
-      holeColumns: [],
-      holeLabels: [],
-      pars: [],
-      statusCells: [],
-      scoreCells: [],
-      holeDots: emptyHoleDots
-    };
-    const matches = groups.map((group, index) => {
-      const base = Object.assign({}, templates[index] || templates[templates.length - 1]);
-      const sides = this._buildMatchPlayCardSides(match, group, lookup, teamIds);
-      const groupId = group && group.groupId != null ? String(group.groupId) : '';
-      const id = groupId || base.id;
-      const centerStatus = this._buildMatchPlayCardCenterStatus(match, group, teamIds, isG5);
-      const started = this._hasMatchPlayGroupAnyHoleScore(match, group, teamIds, isG5);
-      const detailsMode = started ? 'scorecard' : 'comingSoon';
-      const detailTable = started
-        ? this._buildMatchPlayCardDetailTable(match, group, teamIds, isG5)
-        : emptyDetail;
-      return applyCardMeta(Object.assign({}, base, {
-        id: id,
-        detailsMode: detailsMode,
-        sideA: sides.sideA,
-        sideB: sides.sideB,
-        phaseLabel: centerStatus.phaseLabel,
-        statusMain: centerStatus.statusMain,
-        statusSub: centerStatus.statusSub,
-        statusLeadClass: centerStatus.statusLeadClass,
-        statusLayerClass: centerStatus.statusLayerClass,
-        holeColumns: detailTable.holeColumns,
-        holeLabels: detailTable.holeLabels,
-        pars: detailTable.pars,
-        statusCells: detailTable.statusCells,
-        scoreCells: detailTable.scoreCells,
-        holeDots: detailTable.holeDots
-      }), index, groupId || 'mock');
+    return matchPlayScoreboardView.buildMatchPlayScoreboard(match, {
+      resetExpanded: resetExpanded,
+      prevExpandedById: prevExpandedById,
+      resolveAnyPlayerId: (raw) => this._resolveAnyPlayerId(raw),
+      resolveAnyPlayerNickname: (raw) => this._resolveAnyPlayerNickname(raw),
+      resolveViewerDisplayName: (id, fallback, nameOpts) =>
+        this._resolveViewerDisplayName(id, fallback, nameOpts),
+      resolveGroupedPlayerAvatar: (id, slotPlayer, lookup) =>
+        this._resolveGroupedPlayerAvatar(id, slotPlayer, lookup),
+      getHolePars: (m) => this._getMatchHolePars(m),
+      buildGroupPlayerLookup: (m) => this._buildGroupPlayerLookup(m)
     });
-    const pkProgress = this._buildMatchPlayPkProgressSummary(match, groups, teamIds, isG5);
-    return Object.assign({}, board, teamScores, pkProgress, { matches: matches });
   },
-
-  /**
-   * 顶部摘要：finishedMatches/totalMatches MATCHES COMPLETE
-   * 分子仅统计 buildMatchPlayResultSummary().status === 'finished'（FINAL）。
-   */
   _buildMatchPlayPkProgressSummary(match, groups, teamIds, isG5) {
     const list = Array.isArray(groups) ? groups : [];
     const totalMatches = list.length;
@@ -2667,30 +2559,9 @@ Page({
    * @returns {{ redScore: number, blueScore: number }}
    */
   _buildMatchPlayTeamScoreSummary(match) {
-    let redScore = 0;
-    let blueScore = 0;
-    if (!match || typeof match !== 'object') {
-      return { redScore: 0, blueScore: 0 };
-    }
-    const groups = Array.isArray(match.groups) ? match.groups : [];
-    if (!groups.length) {
-      return { redScore: 0, blueScore: 0 };
-    }
-    const gameMode = resolveGameMode(match);
-    const isG5 = isG5MatchPlayMode(gameMode);
-    const teamIds = this._resolveMatchPlaySideTeamIds(match);
-
-    groups.forEach((group) => {
-      const leader = this._resolveMatchPlayGroupFinalLeader(match, group, teamIds, isG5);
-      if (leader === 'A') redScore += 1;
-      else if (leader === 'B') blueScore += 1;
-      else if (leader === 'AS') {
-        redScore += 0.5;
-        blueScore += 0.5;
-      }
+    return matchPlayTeamScore.buildMatchPlayTeamScoreSummary(match, {
+      resolveAnyPlayerId: (raw) => this._resolveAnyPlayerId(raw)
     });
-
-    return { redScore: redScore, blueScore: blueScore };
   },
 
   /** 整数 → "3"；半分 → "3.5" */
@@ -7228,9 +7099,11 @@ Page({
   // 点击领先榜球员行：在该行下方展开/收起逐洞详情（一次仅一个）
   /** G5–G8 得分榜：展开/收起 Details（手风琴：同时仅一张展开） */
   toggleMatchPlayScoreboardCard(e) {
-    const id = e && e.currentTarget && e.currentTarget.dataset
-      ? String(e.currentTarget.dataset.id || '')
-      : '';
+    const id = String(
+      (e && e.detail && e.detail.id) ||
+        (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) ||
+        ''
+    );
     const board = this.data.matchPlayScoreboard;
     if (!id || !board || !Array.isArray(board.matches)) return;
     const target = board.matches.find((m) => m && String(m.id) === id);

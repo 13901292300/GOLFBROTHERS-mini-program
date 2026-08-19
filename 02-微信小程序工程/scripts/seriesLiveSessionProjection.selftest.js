@@ -233,6 +233,16 @@ assert(
 );
 
 assert(
+  '所选轮已取消时自动落到仍有效轮',
+  live.resolveSessionSelectedRoundId({
+    currentKey: 'r1',
+    userPicked: true,
+    visited: true,
+    roundStates: states([{ state: 'cancelled' }, { state: 'live' }])
+  }) === 'r2'
+);
+
+assert(
   'global_m 空 selectedKey 默认 LIVE 而非 TOT',
   standingsVm.buildSeriesStandingsViewModel({
     series: seriesOf('global_m'),
@@ -284,7 +294,7 @@ assert(
   pageJs.indexOf('onScheduleViewLeaderboard') >= 0 &&
     /_standingsSelectedKey = rid/.test(pageJs) &&
     pageJs.indexOf("_performSwitchTab('standings')") >= 0 &&
-    pageWxml.indexOf('查看领先榜') >= 0
+    pageWxml.indexOf('schedule.viewLeaderboardLabel') >= 0
 );
 
 assert(

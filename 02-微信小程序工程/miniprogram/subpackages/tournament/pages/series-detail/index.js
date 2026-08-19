@@ -9,24 +9,24 @@
 var { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 var seriesStore = require('../../../../utils/seriesStore.js');
 var seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
-var seriesAccessGate = require('../../../../utils/seriesAccessGate.js');
+var seriesAccessGate = require('../../utils/seriesAccessGate.js');
 var teamMatchStore = require('../../../../utils/teamMatchStore.js');
 var partnerConfigUtil = require('../../../../utils/partnerConfig.js');
 var eventSponsorConfig = require('../../../../utils/eventSponsorConfig.js');
 var gameStore = require('../../../../utils/gameStore.js');
 var userProfileStore = require('../../../../utils/userProfileStore.js');
 var seriesRegistration = require('../../../../utils/seriesRegistration.js');
-var seriesSelfCancellationOrchestrator = require('../../../../utils/seriesSelfCancellationOrchestrator.js');
+var seriesSelfCancellationOrchestrator = require('../../utils/seriesSelfCancellationOrchestrator.js');
 var seriesIds = require('../../../../utils/seriesIds.js');
 var viewModel = require('./seriesDetailViewModel.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
-var seriesStandingsAssembler = require('../../../../utils/seriesStandingsAssembler.js');
+var seriesStandingsAssembler = require('../../utils/seriesStandingsAssembler.js');
 var teamMatchScorecard = require('../../../../utils/teamMatchScorecard.js');
-var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
+var seriesStandingsExpandIdentity = require('../../utils/seriesStandingsExpandIdentity.js');
 var openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
 var contactFollowAction = require('../../../../utils/contactFollowAction.js');
 var registerViewModel = require('./seriesRegisterViewModel.js');
-var registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
+var registrationInteractionModel = require('../../utils/registrationInteractionModel.js');
 var seriesRegisterEligibility = require('./seriesRegisterEligibility.js');
 
 var REG_SELF_CANCEL_UNGROUPED = registrationInteractionModel.buildSelfCancelDialogModel({
@@ -61,7 +61,7 @@ var seriesLiveLeaderboardAdapter = require('./seriesLiveLeaderboardAdapter.js');
 var liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScorecard.js');
 var seriesBottomDockVisibility = require('./seriesBottomDockVisibility.js');
 var seriesLayerStack = require('./seriesLayerStack.js');
-var teamMatchEnterGroupScore = require('../../../../utils/teamMatchEnterGroupScore.js');
+var teamMatchEnterGroupScore = require('../../utils/teamMatchEnterGroupScore.js');
 var manageRoundOverflowArrows = require('../../../../components/series-round-selector-dock/overflowArrows.js');
 var teamDirectory = require('../../../../utils/teamDirectory.js');
 var mockAvatars = require('../../../../utils/mockAvatars.js');
@@ -3053,6 +3053,7 @@ Page({
 
   _applyStandingsBoardViewOverlay: function (standings) {
     var vm = standings && typeof standings === 'object' ? standings : {};
+    if (vm.useRyderCupScoreboard) return vm;
     var selectedKey =
       vm.selectedKey != null && String(vm.selectedKey).trim()
         ? String(vm.selectedKey).trim()
@@ -3211,19 +3212,39 @@ Page({
     });
   },
 
+  _getStandingsStationDeps: function () {
+    return {
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
+      },
+      getIndexByMatchId: function (id) {
+        return seriesStationIndex.getByMatchId(id);
+      }
+    };
+  },
+
   /**
    * 轮次切换等：轻量重建 standings 投影（不用于球队展开/收起）
    * ST-JUMP-4：切轮不重测 TAB/dock、不写 filler/scrollTop/sticky；吸顶时同帧持有 contentHostMinHeight
    */
   _rebuildStandingsProjection: function (extraPatch) {
     if (!this._lastSeriesForStandings) return;
-    // 切 TOT/R：复用缓存成绩，不重读分站 / 不完整 reload（主榜序保持累计）
-    var standings = standingsViewModel.buildSeriesStandingsViewModel({
-      series: this._lastSeriesForStandings,
+    var series = this._lastSeriesForStandings;
+    var stationDeps = this._getStandingsStationDeps();
+    // 切 TOT/R：与完整构建同一赛制分流；global_m 复用缓存成绩
+    var standings = viewModel.buildSeriesStandingsProjection({
+      series: series,
       selectedKey: this._standingsSelectedKey,
       roundStates: this._lastStandingsRoundStates || [],
+      userPicked: !!this._standingsUserPicked,
+      visited: !!this._standingsVisited,
       standingsResult:
-        this._cachedStandingsResult || standingsViewModel.emptyStandingsResult()
+        this._cachedStandingsResult || standingsViewModel.emptyStandingsResult(),
+      getMatchById: stationDeps.getMatchById,
+      getIndexByMatchId: stationDeps.getIndexByMatchId,
+      evaluateRoundStationGate: function (s, r) {
+        return viewModel.evaluateRoundStationGate(s, r, stationDeps);
+      }
     });
     if (standings && standings.selectedKey) {
       this._standingsSelectedKey = standings.selectedKey;
@@ -3329,6 +3350,21 @@ Page({
       if (!self._pageAlive) return;
       self.scheduleStandingsContentFillerMeasure();
     });
+  },
+
+  onRyderCupScoreboardToggleCard: function (e) {
+    var id =
+      (e && e.detail && e.detail.id) ||
+      (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) ||
+      '';
+    if (!id) return;
+    var board = this.data.standings && this.data.standings.matchPlayScoreboard;
+    if (!board || !Array.isArray(board.matches)) return;
+    var matches = board.matches.map(function (m) {
+      if (!m || String(m.id) !== String(id)) return m;
+      return Object.assign({}, m, { expanded: !m.expanded });
+    });
+    this.setData({ 'standings.matchPlayScoreboard.matches': matches });
   },
 
   onStandingsRoundTap: function (e) {

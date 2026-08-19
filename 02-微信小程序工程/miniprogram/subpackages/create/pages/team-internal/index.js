@@ -75,7 +75,8 @@ const EVENT_INFO_ROW_HEIGHT_RPX = 128;
 const EVENT_INFO_ROW_STEP_RPX = EVENT_INFO_ROW_HEIGHT_RPX + EVENT_INFO_ROW_GAP_RPX;
 
 const EMPTY_TEAM_LABEL = '请选择球队';
-const EMPTY_TEAM_LOGO = '/assets/mock-avatars/default-avatar.jpg';
+const EMPTY_TEAM_LOGO =
+  'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/default-avatar.jpg';
 
 const DEFAULT_FEE_LIST = [
   { id: 1, name: '正式队员', amount: '0' },

@@ -701,28 +701,28 @@ function freeze(obj) {
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-08-11 14:30' }
-    ]) === 'AUG/11/2026'
+    ]) === 'AUG 11 2026'
   );
   assert(
     '同年跨日',
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-08-13 09:00' }
-    ]) === 'AUG/11-13  (2026)'
+    ]) === 'AUG 11-13 2026'
   );
   assert(
     '跨月',
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-09-16 08:00' }
-    ]) === 'AUG/11-SEP/16  (2026)'
+    ]) === 'AUG 11-SEP 16 2026'
   );
   assert(
     '跨年',
     viewModel.formatSeriesDateRange([
       { dateTime: '2026-12-31 08:00' },
       { dateTime: '2027-01-02 08:00' }
-    ]) === 'DEC/31 (2026)-JAN/02 (2027)'
+    ]) === 'DEC 31 2026-JAN 02 2027'
   );
   assert(
     'rounds 无序仍取最早最晚',
@@ -730,7 +730,7 @@ function freeze(obj) {
       { dateTime: '2026-08-13 09:00' },
       { dateTime: '2026-08-11 08:00' },
       { dateTime: '2026-08-12 10:00' }
-    ]) === 'AUG/11-13  (2026)'
+    ]) === 'AUG 11-13 2026'
   );
   assert(
     '非法与缺失时间 → 比赛时间待定',
@@ -832,7 +832,7 @@ function freeze(obj) {
   );
   assert(
     'Hero dateText 无序跨日',
-    heroVm.ok && heroVm.hero.dateText === 'AUG/11-13  (2026)'
+    heroVm.ok && heroVm.hero.dateText === 'AUG 11-13 2026'
   );
   assert(
     'Hero 不再展示报名信息',

@@ -10,6 +10,7 @@ var matchStatus = require('./matchStatus.js');
 var teamMatchStore = require('./teamMatchStore.js');
 var strokeEntityValidator = require('./strokeEntityValidator.js');
 var seriesFinishLock = require('./seriesFinishLock.js');
+var seriesRyderCup = require('./seriesRyderCup.js');
 
 var MATCH_FINISHED_TOAST = '比赛已经结束。';
 var MATCH_FINISHED_EDIT_TOAST = '比赛已结束，无法修改';
@@ -138,20 +139,28 @@ function assertWritable(match, options) {
   return assertMatchNotCompleted(match);
 }
 
-function confirmFinishWholeTeamMatch(match) {
+function confirmFinishWholeTeamMatch(match, options) {
   if (!match) {
     return { ok: false, reason: 'match_missing', message: '未找到比赛信息' };
   }
   if (isCancelledMatch(match)) {
     return { ok: false, reason: 'match_cancelled', message: '比赛已取消' };
   }
-  var seriesGuard = seriesFinishLock.assertWritableForMatch(match);
+  var seriesGuard = seriesFinishLock.assertWritableForMatch(match, options);
   if (!seriesGuard.ok) return seriesGuard;
   if (isMatchCompleted(match)) {
     return {
       ok: false,
       reason: 'already_finished',
       message: MATCH_FINISHED_TOAST
+    };
+  }
+  var loaded = seriesFinishLock.loadSeriesForMatch(match, options && options.getSeriesById);
+  if (seriesRyderCup.isRyderCupSeries(loaded.series) && !allValidGroupsConfirmedFinished(match)) {
+    return {
+      ok: false,
+      reason: 'groups_incomplete',
+      message: '仍有分组未结束，不能结束本轮'
     };
   }
   applyFinishWholeMatch(match);

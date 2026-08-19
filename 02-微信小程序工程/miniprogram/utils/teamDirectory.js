@@ -49,7 +49,8 @@ const ORGANIZATION_TYPE_LABELS = {
 
 /** 队际赛默认公共赛事机构（稳定 ID，勿与数字球队 id 冲突） */
 const DEFAULT_INTER_TEAM_ORG_ID = 'gb-event-org-lianyisai';
-const DEFAULT_INTER_TEAM_ORG_LOGO = '/assets/orgs/lianyisai-trophy.png';
+const DEFAULT_INTER_TEAM_ORG_LOGO =
+  'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/orgs/lianyisai-trophy.png';
 /**
  * 公共赛事机构的平台运营管理员 mock ID。
  * 不得使用普通当前用户 `me`：创建者权限走 createdBy，运营权限走 adminUserIds。

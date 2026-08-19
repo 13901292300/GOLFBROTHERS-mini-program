@@ -102,7 +102,7 @@ function buildRelatedGameViewUrl(related) {
   }
   if (_trim(r.gameId)) {
     return (
-      '/pages/game/hub/index?gameId=' +
+      '/subpackages/scoring/pages/hub/index?gameId=' +
       encodeURIComponent(_trim(r.gameId)) +
       '&activeTab=leaderboard'
     );

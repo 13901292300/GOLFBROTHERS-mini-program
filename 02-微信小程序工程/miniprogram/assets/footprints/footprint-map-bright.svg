@@ -50,9 +50,9 @@
     <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite" begin="1.2s"/>
   </circle>
 
-  <text x="720" y="125" fill="#002d62" font-size="11" font-weight="600" text-anchor="middle">-ý · 28:</text>
-  <text x="695" y="228" fill="#ce9224" font-size="9" text-anchor="middle">ðý · 4:</text>
-  <text x="790" y="120" fill="#ce9224" font-size="9" text-anchor="middle">å, · 3:</text>
-  <text x="770" y="118" fill="#ce9224" font-size="9" text-anchor="end">éý · 2:</text>
-  <text x="810" y="350" fill="#ce9224" font-size="9" text-anchor="middle">³')š · 1:</text>
+  <text x="720" y="125" fill="#002d62" font-size="11" font-weight="600" text-anchor="middle">-ï¿½ ï¿½ 28:</text>
+  <text x="695" y="228" fill="#ce9224" font-size="9" text-anchor="middle">ï¿½ï¿½ ï¿½ 4:</text>
+  <text x="790" y="120" fill="#ce9224" font-size="9" text-anchor="middle">ï¿½, ï¿½ 3:</text>
+  <text x="770" y="118" fill="#ce9224" font-size="9" text-anchor="end">ï¿½ï¿½ ï¿½ 2:</text>
+  <text x="810" y="350" fill="#ce9224" font-size="9" text-anchor="middle">ï¿½')ï¿½ ï¿½ 1:</text>
 </svg>

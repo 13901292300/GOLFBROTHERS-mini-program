@@ -1,6 +1,7 @@
 {
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
+  "cloudbaseEnv": "cloud1-d5gluh1ode0ef8738",
   "setting": {
     "urlCheck": true,
     "es6": true,
@@ -42,7 +43,9 @@
     "useCompilerPlugins": false,
     "condition": false,
     "swc": false,
-    "disableSWC": true
+    "disableSWC": true,
+    "ignoreDevUnusedFiles": false,
+    "ignoreUploadUnusedFiles": false
   },
   "appid": "wx008c277ada443354",
   "projectname": "quickstart-wx-cloud",

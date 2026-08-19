@@ -3,14 +3,14 @@
  * 不 remap 展示字段、不走 TOT、不写 Series / match / storage。
  */
 
-var liveLeaderboardBoard = require('../../../../utils/liveLeaderboardBoard.js');
+var liveLeaderboardBoard = require('../../utils/liveLeaderboardBoard.js');
 var leaderboardSettingViewModel = require('../../../../utils/leaderboardSettingViewModel.js');
-var seriesStandingsAssembler = require('../../../../utils/seriesStandingsAssembler.js');
-var seriesResultAdapter = require('../../../../utils/seriesResultAdapter.js');
-var teamLeaderboardHost = require('../../../../utils/teamLeaderboardHost.js');
+var seriesStandingsAssembler = require('../../utils/seriesStandingsAssembler.js');
+var seriesResultAdapter = require('../../utils/seriesResultAdapter.js');
+var teamLeaderboardHost = require('../../utils/teamLeaderboardHost.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
 var seriesPersonalLeaderboardAdapter = require('./seriesPersonalLeaderboardAdapter.js');
-var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
+var seriesStandingsExpandIdentity = require('../../utils/seriesStandingsExpandIdentity.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();

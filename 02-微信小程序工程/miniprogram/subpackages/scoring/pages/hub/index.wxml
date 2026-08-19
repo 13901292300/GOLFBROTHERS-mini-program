@@ -1,0 +1,821 @@
+<view class="detail-page {{themeClass}} {{fontScaleClass}}" bindtap="onPageTap">
+  <!-- Header -->
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">GAME HUB</text>
+          <text class="gb-header__title">{{headerTitle}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="detail-scroll" scroll-y="{{scrollEnabled}}" bindscroll="onScroll">
+    <!-- HEADER 与 TAB 直连：Game 概要信息统一在「游戏」TAB 内展示，此处不再插入信息栏 -->
+    <!-- Tabs（流内） -->
+    <view class="tab-scroll-wrap">
+      <scroll-view class="gb-tabs" scroll-x enable-flex>
+        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+        <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+        <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      </scroll-view>
+    </view>
+
+    <!-- 讨论区改由页面根级 .ds-fullscreen 复用统一组件渲染，此处不再插入围观行 -->
+
+    <view class="detail-main {{activeTab === 'interaction' ? 'detail-main--flush' : ''}}">
+
+      <!-- 领先榜 -->
+      <block wx:if="{{activeTab === 'leaderboard'}}">
+        <view class="leaderboard-table-wrap">
+          <view class="leaderboard-head">
+            <text class="lh-pos">POS</text>
+            <text class="lh-player">PLAYER</text>
+            <text class="lh-thru">THRU</text>
+            <text class="lh-total">TOTAL</text>
+          </view>
+          <view wx:if="{{leaderboard.length === 0}}" class="hub-empty">暂无成绩</view>
+
+          <block wx:for="{{leaderboard}}" wx:key="rowId">
+            <view bindtap="toggleScorecard" data-index="{{index}}" class="leaderboard-row">
+              <text class="lr-pos pos-cell">{{item.pos}}</text>
+              <view class="lr-player">
+                <text class="player-name">{{item.name}}</text>
+                <text wx:if="{{!item.isTeam && item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
+              </view>
+              <text class="lr-thru">{{item.thru}}</text>
+              <text class="lr-total leaderboard-total {{item.scoreClass}}">{{item.scoreStr}}</text>
+            </view>
+
+            <view wx:if="{{item.expanded}}" class="scorecard-row">
+              <!-- 组合：每名成员完整身份（与个人展开面板同一组件） -->
+              <view wx:if="{{item.isTeam}}" class="sc-team-stack-wrap">
+                <!-- 普通多组 Hub：无国旗；昵称下江湖差点/浮动（显式配置，不改组件默认） -->
+                <leaderboard-player-identity
+                  wx:for="{{item.members}}"
+                  wx:for-item="mem"
+                  wx:key="playerId"
+                  player="{{mem}}"
+                  avatar-badge="none"
+                  meta-mode="handicapFloatHub"
+                  followed="{{followMap[mem.playerId]}}"
+                  relation-status="{{relationMap[mem.playerId] || (followMap[mem.playerId] ? 'following' : 'none')}}"
+                  is-self="{{mem.playerId === currentUserId}}"
+                  bind:follow="onLeaderboardFollow"
+                  bind:profiletap="onLeaderboardPlayerProfileTap"
+                />
+              </view>
+
+              <!-- 个人：资料卡（与个人比杆赛展开面板同一组件） -->
+              <leaderboard-player-identity
+                wx:else
+                player="{{item.player}}"
+                avatar-badge="none"
+                meta-mode="handicapFloatHub"
+                followed="{{followMap[item.playerId]}}"
+                relation-status="{{relationMap[item.playerId] || (followMap[item.playerId] ? 'following' : 'none')}}"
+                is-self="{{item.playerId === currentUserId}}"
+                bind:follow="onLeaderboardFollow"
+                bind:profiletap="onLeaderboardPlayerProfileTap"
+              />
+
+              <view wx:if="{{openScorecard}}" class="scorecard-dark-panel ld-scorecard {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">
+                <text class="sc-course course-name-title">{{courseName}}</text>
+
+                <view class="tour-scorecard">
+                  <view class="tsc-row tsc-head">
+                    <text wx:for="{{openScorecard.frontHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <text wx:for="{{openScorecard.frontPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <view wx:for="{{openScorecard.frontScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view class="tour-scorecard">
+                  <view class="tsc-row tsc-head">
+                    <text wx:for="{{openScorecard.backHead}}" wx:for-item="h" wx:key="*this" class="tsc-cell">{{h}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <text wx:for="{{openScorecard.backPar}}" wx:for-item="c" wx:key="index" class="tsc-cell">{{c.t}}</text>
+                  </view>
+                  <view class="tsc-row">
+                    <view wx:for="{{openScorecard.backScore}}" wx:for-item="c" wx:key="index" class="tsc-cell ld-score-cell">
+                      <view wx:if="{{c.m}}" class="ld-score-marker {{c.m}} {{c.c}}">
+                        <text class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                      </view>
+                      <text wx:else class="ld-score-value {{scoreDisplayMode === 'diff' ? 'diff-mode' : ''}}">{{c.t}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view class="score-legend-area">
+                  <view class="legend-item"><view class="score-legend-dot dot-eagle"></view>EAGLE OR BETTER</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-birdie"></view>BIRDIE</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-bogey"></view>BOGEY</view>
+                  <view class="legend-item"><view class="score-legend-dot dot-double"></view>DOUBLE BOGEY+</view>
+                </view>
+                <image class="sc-ad" src="{{scorecardAdImage}}" mode="widthFix"></image>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
+
+      <!-- 分组表：结构与「球队比赛 → 出发表」完全一致（整卡点击进入对应组记分页，无额外入口） -->
+      <view wx:if="{{activeTab === 'group'}}" class="tee-sheet-list">
+        <view wx:if="{{groupCards.length === 0}}" class="hub-empty">暂无分组</view>
+        <view wx:for="{{groupCards}}" wx:key="groupId" bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="tee-group-card {{index === 0 ? 'js-first-tee-group' : ''}}">
+          <view class="tee-group-meta">
+            <text class="tee-group-badge">{{item.name}}</text>
+            <view class="tee-start-info"><text class="tee-clock">🕘</text>{{item.teeMetaLine}}</view>
+          </view>
+          <view class="gb-group-player-grid">
+            <view wx:for="{{item.players}}" wx:for-item="pl" wx:key="playerId" class="gb-group-player">
+              <view class="gb-group-player-avatar-wrap">
+                <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
+              </view>
+              <view class="gb-group-player-meta">
+                <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
+                  <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
+                  <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || 'T'}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+          <text class="tee-status">{{item.statusBadge}}</text>
+        </view>
+      </view>
+
+      <!-- 讨论区内容由页面根级 .ds-fullscreen 统一组件承载，scroll 容器内不再渲染聊天 -->
+
+      <!-- 游戏 -->
+      <block wx:if="{{activeTab === 'game'}}">
+        <view class="ds-card info-card">
+          <view class="info-row"><text class="info-row-label">状态</text><text class="info-row-value">{{statusText}}</text></view>
+          <view class="info-row"><text class="info-row-label">球场</text><text class="info-row-value">{{courseName}}</text></view>
+          <view class="info-row"><text class="info-row-label">赛制</text><text class="info-row-value">{{gameFormat}}</text></view>
+          <view class="info-row"><text class="info-row-label">分组</text><text class="info-row-value">{{groupCards.length}} 组</text></view>
+        </view>
+
+        <view class="hub-section-title">按组继续记分</view>
+        <view wx:for="{{groupCards}}" wx:key="groupId" class="hub-game-row">
+          <view class="hub-game-row__left">
+            <text class="hub-game-row__name">{{item.name}}</text>
+            <text class="hub-group-status hub-group-status--{{item.statusKey}}">{{item.statusText}} · {{item.playerCount}}人</text>
+          </view>
+          <view bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="hub-enter-btn">进入记分</view>
+        </view>
+      </block>
+
+    </view>
+  </scroll-view>
+
+  <!-- 吸顶 TAB（讨论区时围观行随 TAB 一同吸附，构成 TAB + 围观行同一吸附体系） -->
+  <view wx:if="{{tabFixed}}" class="tab-scroll-wrap tab-scroll-wrap--fixed" style="top:{{headerTotalHeight}}px;">
+    <scroll-view class="gb-tabs" scroll-x enable-flex>
+      <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+      <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+      <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
+      <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+    </scroll-view>
+  </view>
+
+  <!-- 讨论区全屏层：TAB（固定）+ 统一讨论区组件（围观/聊天/输入自包含）。与球队比赛完全一致的复用方式 -->
+  <view wx:if="{{activeTab === 'interaction'}}" class="ds-fullscreen" style="top:{{headerTotalHeight}}px;">
+    <view class="tab-scroll-wrap">
+      <scroll-view class="gb-tabs" scroll-x enable-flex>
+        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+        <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+        <view bindtap="switchTab" data-tab="interaction" class="tab-btn active">讨论区</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      </scroll-view>
+    </view>
+    <discussion
+      class="ds-fill"
+      watchers="{{watchers}}"
+      messages="{{chat}}"
+      theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
+      fontScale="{{fontScale}}"
+    ></discussion>
+  </view>
+
+  <!-- 分组表 TAB 底部快捷入口：与「出发表」完全一致（透明悬浮、第一组完全进入视口时出现、点击进入自己小组） -->
+  <view
+    wx:if="{{activeTab === 'group' && quickEntryVisible}}"
+    bindtap="onEnterMyGroup"
+    class="tee-quick-entry-float"
+  >快速进入自己的小组 ›</view>
+
+  <!-- MORE FAB（与球队比赛完全一致） -->
+  <view
+    wx:if="{{activeTab !== 'interaction'}}"
+    catchtap="onMoreFabTap"
+    bindtouchstart="onMoreFabTouchStart"
+    bindtouchmove="onMoreFabTouchMove"
+    bindtouchend="onMoreFabTouchEnd"
+    bindtouchcancel="onMoreFabTouchEnd"
+    class="leaderboard-fab {{moreFabExpanded ? 'leaderboard-fab--expanded' : ''}} {{moreFabDragging ? 'leaderboard-fab--dragging' : ''}} {{moreFabHitTarget ? 'leaderboard-fab--hit' : ''}}"
+    style="{{fabStyle}}"
+  >
+    <text class="fab-label">{{moreFabExpanded ? 'MORE' : 'M'}}</text>
+  </view>
+
+  <!-- 更多功能 bottom sheet（100% 复用球队比赛结构/样式/动画） -->
+  <view wx:if="{{showMoreSheet}}" bindtap="closeMoreSheet" class="sheet-overlay"></view>
+  <view wx:if="{{showMoreSheet}}" class="bottom-sheet" catchtap="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="feature-section">
+      <view class="feature-section-title"><text class="fst-main">常用功能</text><text class="fst-sub">普通用户可用</text></view>
+      <view class="feature-grid">
+        <view
+          wx:for="{{featuresCommon}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
+          <view class="feature-icon"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="feature-section">
+      <view class="feature-section-title"><text class="fst-main">管理功能</text><text class="fst-sub">需权限</text></view>
+      <view class="feature-grid">
+        <view
+          wx:for="{{featuresPermission}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+        <view
+          wx:for="{{featuresPermissionFooterPad}}"
+          wx:key="permission"
+          class="feature-item feature-item--empty"
+        ></view>
+        <view
+          wx:for="{{featuresPermissionFooter}}"
+          wx:key="permission"
+          bindtap="onFeatureTap"
+          data-permission="{{item.permission}}"
+          data-disabled="{{item.disabled}}"
+          class="feature-item {{item.disabled ? 'is-disabled' : ''}}"
+        >
+          <view class="feature-icon {{item.tone}}"><text>{{item.glyph}}</text></view>
+          <text class="feature-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="sheet-cancel-wrap">
+      <view bindtap="closeMoreSheet" class="sheet-cancel-btn">取 消</view>
+    </view>
+  </view>
+
+  <!-- 显示设置 sheet（由「显示设置」功能项打开，与球队比赛一致） -->
+  <view wx:if="{{showStyleSheet}}" bindtap="closeStyleSheet" class="sheet-overlay"></view>
+  <view class="style-sheet {{showStyleSheet ? 'active' : ''}}" catchtap="stopPropagation">
+    <view class="style-sheet__head">
+      <view>
+        <text class="style-sheet__title">显示设置</text>
+        <text class="style-sheet__sub">这些设置会影响所有记分相关页面。</text>
+      </view>
+      <view bindtap="closeStyleSheet" class="style-sheet__close">✕</view>
+    </view>
+    <view class="style-section">
+      <text class="style-section-title">字体大小</text>
+      <view class="style-option-row">
+        <view
+          bindtap="onFontScaleChange"
+          data-value="normal"
+          class="style-option {{fontScale === 'normal' ? 'active' : ''}}"
+        >标准字体</view>
+        <view
+          bindtap="onFontScaleChange"
+          data-value="large"
+          class="style-option {{fontScale === 'large' ? 'active' : ''}}"
+        >大字体</view>
+      </view>
+    </view>
+    <view class="style-done-wrap">
+      <view bindtap="closeStyleSheet" class="style-done-btn">完成</view>
+    </view>
+  </view>
+
+  <!-- 权限管理（临时管理员二维码 + 球童记分员二维码） -->
+  <view wx:if="{{tempAdminSheetVisible}}" bindtap="cancelTempAdminSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view wx:if="{{tempAdminSheetVisible}}" class="bottom-sheet register-sheet temp-admin-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">PERMISSION</text>
+      <text class="register-sheet__title">权限管理</text>
+      <text class="register-sheet__sub">通过二维码授权本场临时管理员与球童记分员，仅对当前 GAME 生效。</text>
+    </view>
+    <scroll-view scroll-y class="temp-admin-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <!-- 容器一：添加临时管理员（扫码申请 → 管理者授权） -->
+      <view class="perm-section-card">
+        <view class="perm-section-card__head" bindtap="toggleAdminQrExpanded">
+          <view class="perm-section-card__head-main">
+            <text class="perm-section-card__title">添加临时管理员</text>
+            <text class="perm-section-card__desc">生成申请二维码；扫码用户进入待审批列表，由你勾选权限后生效。</text>
+          </view>
+          <text class="perm-section-card__toggle">{{adminQrExpanded ? '收起' : '展开二维码'}}</text>
+        </view>
+
+        <view class="caddie-scorer-list">
+          <text class="register-sheet__hint caddie-scorer-list__title">已扫码临时管理员</text>
+          <view wx:if="{{!adminQrAdminList.length}}" class="caddie-scorer-list__empty">暂无临时管理员扫码加入</view>
+          <view wx:else class="temp-admin-candidate-list">
+            <view
+              wx:for="{{adminQrAdminList}}"
+              wx:key="userId"
+              class="temp-admin-row"
+            >
+              <view
+                class="temp-admin-row__head"
+                data-userid="{{item.userId}}"
+                bindtap="toggleAdminCandidateExpand"
+              >
+                <image class="temp-admin-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+                <view class="temp-admin-row__meta">
+                  <text class="temp-admin-row__name">{{item.nickname}}</text>
+                  <text class="temp-admin-row__badge {{item.status === 'approved' ? 'temp-admin-row__badge--approved' : 'temp-admin-row__badge--pending'}}">{{item.statusLabel}}</text>
+                </view>
+                <text class="temp-admin-row__expand {{item.expanded ? 'is-open' : ''}}">›</text>
+              </view>
+              <view wx:if="{{item.expanded}}" class="temp-admin-row__body">
+                <text class="register-sheet__hint temp-admin-row__perms-hint">勾选本场可授权权限</text>
+                <view class="register-sheet__groups">
+                  <view
+                    wx:for="{{item.permissionOptions}}"
+                    wx:for-item="perm"
+                    wx:key="key"
+                    class="register-sheet__group {{perm.selected ? 'register-sheet__group--active' : ''}}"
+                    data-userid="{{item.userId}}"
+                    data-perm="{{perm.key}}"
+                    bindtap="toggleAdminCandidatePermission"
+                  >{{perm.label}}</view>
+                </view>
+                <view
+                  class="temp-admin-row__remove-btn"
+                  data-userid="{{item.userId}}"
+                  bindtap="onRemoveAdminQrTempAdmin"
+                >移除临时管理员</view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{adminQrExpanded}}" class="perm-section-card__body">
+          <view wx:if="{{!adminQrHasQr}}" class="caddie-scoring-section__generate-wrap">
+            <view
+              class="register-sheet__confirm caddie-scoring-section__generate {{adminQrGenerating ? 'is-disabled' : ''}}"
+              bindtap="generateTempAdminQr"
+            >生成二维码</view>
+          </view>
+          <view wx:else class="caddie-scoring-card">
+            <image class="caddie-scoring-card__qr" src="{{adminQrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}"></image>
+            <text class="register-sheet__hint caddie-scoring-card__hint">扫码后提交管理员申请，需你授权后才生效</text>
+            <view class="register-sheet__actions caddie-scoring-card__actions">
+              <view class="register-sheet__cancel" bindtap="regenerateTempAdminQr">重新生成</view>
+              <view class="register-sheet__confirm" bindtap="saveTempAdminQrImage">保存图片</view>
+            </view>
+            <view class="qr-mock-actions">
+              <view class="qr-mock-actions__btn" bindtap="mockScanAdminQr">模拟扫码申请</view>
+              <view class="qr-mock-actions__btn qr-mock-actions__btn--ghost" bindtap="toggleMockPhoneBound">切换手机号绑定状态</view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 容器二：添加球童记分员 -->
+      <view class="perm-section-card">
+        <view class="perm-section-card__head" bindtap="toggleCaddieQrExpanded">
+          <view class="perm-section-card__head-main">
+            <text class="perm-section-card__title">添加球童记分员</text>
+            <text class="perm-section-card__desc">生成本场球童记分二维码，球童扫码后即可获得记分权限。</text>
+          </view>
+          <text class="perm-section-card__toggle">{{caddieQrExpanded ? '收起' : '展开二维码'}}</text>
+        </view>
+
+        <view class="caddie-scorer-list">
+          <text class="register-sheet__hint caddie-scorer-list__title">已扫码球童记分员</text>
+          <view wx:if="{{!caddieScorerList.length}}" class="caddie-scorer-list__empty">暂无球童记分员扫码加入</view>
+          <scroll-view wx:else scroll-x class="caddie-scorer-list__row" enable-flex="{{true}}">
+            <view
+              wx:for="{{caddieScorerList}}"
+              wx:key="userId"
+              class="caddie-scorer-item"
+              data-userid="{{item.userId}}"
+              bindtap="openCaddieScorerManage"
+            >
+              <image class="caddie-scorer-item__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <text class="caddie-scorer-item__name">{{item.nickname}}</text>
+              <text class="caddie-scorer-item__tag">记分员</text>
+            </view>
+          </scroll-view>
+        </view>
+
+        <view wx:if="{{caddieQrExpanded}}" class="perm-section-card__body">
+          <view wx:if="{{!caddieScoringHasQr}}" class="caddie-scoring-section__generate-wrap">
+            <view
+              class="register-sheet__confirm caddie-scoring-section__generate {{caddieScoringGenerating ? 'is-disabled' : ''}}"
+              bindtap="generateCaddieScoringQr"
+            >生成二维码</view>
+          </view>
+          <view wx:else class="caddie-scoring-card">
+            <image class="caddie-scoring-card__qr" src="{{caddieScoringQrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}"></image>
+            <text class="register-sheet__hint caddie-scoring-card__hint">扫码后获得本场记分权限（可为任意参赛球员记分）</text>
+            <view class="register-sheet__actions caddie-scoring-card__actions">
+              <view class="register-sheet__cancel" bindtap="regenerateCaddieScoringQr">重新生成</view>
+              <view class="register-sheet__confirm" bindtap="saveCaddieScoringQrImage">保存图片</view>
+            </view>
+            <view class="qr-mock-actions">
+              <view class="qr-mock-actions__btn" bindtap="mockScanCaddieQr">模拟球童扫码</view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions temp-admin-sheet__footer">
+      <view bindtap="cancelTempAdminSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="saveTempAdminSheet" class="register-sheet__confirm">保存</view>
+    </view>
+  </view>
+
+  <!-- 球童记分员管理 -->
+  <view wx:if="{{caddieManageSheetVisible}}" bindtap="closeCaddieScorerManage" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{caddieManageSheetVisible}}" class="bottom-sheet register-sheet caddie-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">CADDIE</text>
+      <text class="register-sheet__title">球童记分员</text>
+    </view>
+    <view class="caddie-manage-sheet__body" wx:if="{{caddieManageTarget}}">
+      <image class="caddie-manage-sheet__avatar" src="{{caddieManageTarget.avatar}}" mode="aspectFill"></image>
+      <text class="caddie-manage-sheet__name">{{caddieManageTarget.nickname}}</text>
+      <text class="register-sheet__hint caddie-manage-sheet__desc">该球童拥有本场比赛记分权限。</text>
+      <view class="caddie-manage-sheet__remove" bindtap="onRemoveCaddieScoringPermission">移除记分权限</view>
+    </view>
+    <view class="register-sheet__actions">
+      <view bindtap="closeCaddieScorerManage" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
+
+  <half-course-sheet
+    visible="{{halfSheetVisible}}"
+    game-id="{{gameId}}"
+    theme-class="{{themeClass}}"
+    bind:close="closeHalfSheet"
+    bind:confirm="onHalfCourseConfirmed"
+  />
+
+  <phone-bind-sheet
+    visible="{{phoneBindSheetVisible}}"
+    entry-type="{{phoneBindEntryType}}"
+    title="绑定手机号"
+    hint="{{phoneBindHint}}"
+    bind:cancel="onPhoneBindSheetCancel"
+    bind:success="onPhoneBindSheetSuccess"
+  />
+
+  <!-- 选手管理 -->
+  <view wx:if="{{playerManageSheetVisible}}" bindtap="cancelPlayerManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view wx:if="{{playerManageSheetVisible}}" class="bottom-sheet register-sheet player-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">PLAYERS</text>
+      <text class="register-sheet__title">选手管理</text>
+      <text class="register-sheet__sub">{{normalGamePlayerManageMode ? '普通比赛成员直接绑定到各组 Slot，不使用报名、球队或分队流程。' : '仅修改本场比赛中的选手信息，不会同步修改用户资料。手机号仅用于本场赛事组织者联系、报名确认、出发安排等赛事管理用途。'}}</text>
+    </view>
+    <view class="player-manage-sheet__toolbar">
+      <view class="player-manage-search">
+        <input
+          class="player-manage-search__input"
+          value="{{playerManageSearchKeyword}}"
+          placeholder="{{normalGamePlayerManageMode ? '搜索选手姓名' : '搜索选手姓名 / 昵称 / 手机号'}}"
+          placeholder-class="player-manage-search__ph"
+          confirm-type="search"
+          bindinput="onPlayerManageSearchInput"
+        />
+        <view
+          wx:if="{{playerManageSearchKeyword}}"
+          class="player-manage-search__clear"
+          bindtap="clearPlayerManageSearch"
+        >×</view>
+      </view>
+      <view wx:if="{{normalGamePlayerManageMode}}" class="player-manage-status-tabs">
+        <view class="player-manage-status-tab is-active" bindtap="openNormalGameManageFriendPicker">添加好友</view>
+        <view class="player-manage-status-tab is-active" bindtap="openNormalGameManageManualPicker">手工添加</view>
+      </view>
+      <view wx:else class="player-manage-team-select player-manage-filter-select" bindtap="openPlayerManageFilterPicker">
+        <text class="player-manage-team-select__value">{{playerManageTeamFilterLabel || '全部分队'}}</text>
+        <text class="player-manage-team-select__arrow">›</text>
+      </view>
+      <view wx:if="{{!normalGamePlayerManageMode}}" class="player-manage-status-tabs">
+        <view
+          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'all' ? 'is-active' : ''}}"
+          data-status="all"
+          bindtap="onPlayerManageGroupStatusTap"
+        >全部</view>
+        <view
+          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'grouped' ? 'is-active' : ''}}"
+          data-status="grouped"
+          bindtap="onPlayerManageGroupStatusTap"
+        >已分组</view>
+        <view
+          class="player-manage-status-tab {{playerManageGroupStatusFilter === 'ungrouped' ? 'is-active' : ''}}"
+          data-status="ungrouped"
+          bindtap="onPlayerManageGroupStatusTap"
+        >未分组</view>
+      </view>
+      <text wx:if="{{playerManageCountTip}}" class="player-manage-sheet__count">{{playerManageCountTip}}</text>
+    </view>
+    <scroll-view scroll-y class="player-manage-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view wx:if="{{!playerManageDisplayUsers.length}}" class="player-manage-sheet__empty">{{playerManageEmptyText}}</view>
+      <view
+        wx:for="{{playerManageDisplayUsers}}"
+        wx:key="userId"
+        class="player-manage-row"
+      >
+        <view
+          class="player-manage-row__head"
+          data-userid="{{item.userId}}"
+          bindtap="togglePlayerManageExpand"
+        >
+          <image class="player-manage-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view class="player-manage-row__meta">
+            <view class="player-manage-row__name-row">
+              <text class="player-manage-row__name">{{item.matchNickname || item.competitionName || '未命名选手'}}</text>
+              <text wx:if="{{!normalGamePlayerManageMode && item.genderIcon}}" class="gender-icon {{item.genderClass}}">{{item.genderIcon}}</text>
+              <text wx:if="{{!normalGamePlayerManageMode}}" class="player-manage-group-tag {{item.formalGrouped ? 'is-grouped' : 'is-ungrouped'}}">{{item.formalGroupStatusLabel}}</text>
+            </view>
+            <view class="player-manage-row__sub">
+              <block wx:if="{{normalGamePlayerManageMode}}">
+                <text class="player-manage-row__sub-rest">{{item.normalGameSlotText}}</text>
+              </block>
+              <block wx:else>
+              <text
+                class="player-manage-row__phone {{item.hasPhone ? 'is-callable' : ''}}"
+                data-userid="{{item.userId}}"
+                data-phone="{{item.phone}}"
+                catchtap="onPlayerManageCallPhone"
+              >{{item.phone || '暂无手机号'}}</text>
+              <text class="player-manage-row__sub-rest"> · {{item.matchGenderLabel || '男'}}{{item.matchTeamName ? ' · ' + item.matchTeamName : ''}}</text>
+              </block>
+            </view>
+          </view>
+          <text class="player-manage-row__expand {{item.expanded ? 'is-open' : ''}}">›</text>
+        </view>
+        <view wx:if="{{item.expanded}}" class="player-manage-row__body">
+          <block wx:if="{{normalGamePlayerManageMode}}">
+            <text class="register-sheet__label">所在组</text>
+            <view class="player-manage-phone-row">
+              <text class="player-manage-phone-row__value">{{item.groupName}}</text>
+            </view>
+            <text class="register-sheet__label player-manage-row__label-gap">Slot位置</text>
+            <view class="player-manage-phone-row">
+              <text class="player-manage-phone-row__value">{{item.slotPositionText}}</text>
+            </view>
+          </block>
+          <block wx:else>
+          <text class="register-sheet__label">比赛名</text>
+          <input
+            class="player-manage-row__input"
+            maxlength="20"
+            placeholder="请输入本场比赛名"
+            value="{{item.matchNickname}}"
+            data-userid="{{item.userId}}"
+            bindinput="onPlayerManageNicknameInput"
+          />
+          <text class="register-sheet__label player-manage-row__label-gap">手机号</text>
+          <view class="player-manage-phone-row">
+            <text
+              class="player-manage-phone-row__value {{item.hasPhone ? 'is-callable' : ''}}"
+              data-userid="{{item.userId}}"
+              data-phone="{{item.phone}}"
+              catchtap="onPlayerManageCallPhone"
+            >{{item.phoneDisplay}}</text>
+            <view
+              class="player-manage-phone-row__copy"
+              data-userid="{{item.userId}}"
+              data-phone="{{item.phone}}"
+              catchtap="onPlayerManageCopyPhone"
+            >复制手机号</view>
+          </view>
+          <text class="register-sheet__label player-manage-row__label-gap">性别</text>
+          <view class="register-sheet__groups">
+            <view
+              wx:for="{{item.genderOptions}}"
+              wx:for-item="g"
+              wx:key="key"
+              class="register-sheet__group {{g.selected ? 'register-sheet__group--active' : ''}}"
+              data-userid="{{item.userId}}"
+              data-gender="{{g.key}}"
+              bindtap="onPlayerManageGenderTap"
+            >{{g.label}}</view>
+          </view>
+          <text class="register-sheet__label player-manage-row__label-gap">分队</text>
+          <view
+            class="player-manage-team-select"
+            data-userid="{{item.userId}}"
+            bindtap="openPlayerManageTeamPicker"
+          >
+            <text class="player-manage-team-select__value">{{item.matchTeamName}}</text>
+            <text class="player-manage-team-select__arrow">›</text>
+          </view>
+          </block>
+          <view
+            class="player-manage-row__remove"
+            data-userid="{{item.userId}}"
+            bindtap="onPlayerManageRemove"
+          >{{normalGamePlayerManageMode ? '从 Slot 移除' : '删除选手'}}</view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions player-manage-sheet__footer">
+      <view bindtap="cancelPlayerManageSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="savePlayerManageSheet" class="register-sheet__confirm">保存</view>
+    </view>
+  </view>
+
+  <!-- 选手管理 · 分队筛选 -->
+  <view wx:if="{{playerManageFilterPickVisible}}" bindtap="closePlayerManageFilterPicker" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{playerManageFilterPickVisible}}" class="bottom-sheet register-sheet player-team-pick-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">FILTER</text>
+      <text class="register-sheet__title">筛选分队</text>
+    </view>
+    <scroll-view scroll-y class="player-team-pick-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view
+        wx:for="{{playerManageFilterPickOptions}}"
+        wx:key="optionKey"
+        class="player-team-pick-item {{item.selected ? 'is-selected' : ''}}"
+        data-filter="{{item.optionKey}}"
+        bindtap="onPlayerManageFilterPick"
+      >
+        <text class="player-team-pick-item__name">{{item.name}}</text>
+        <text wx:if="{{item.selected}}" class="player-team-pick-item__check">✓</text>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions">
+      <view bindtap="closePlayerManageFilterPicker" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
+
+  <!-- 选手管理 · 选择分队 -->
+  <view wx:if="{{playerTeamPickVisible}}" bindtap="closePlayerManageTeamPicker" catchtouchmove="stopPropagation" class="sheet-overlay sheet-overlay--top"></view>
+  <view wx:if="{{playerTeamPickVisible}}" class="bottom-sheet register-sheet player-team-pick-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">TEAM</text>
+      <text class="register-sheet__title">选择分队</text>
+    </view>
+    <scroll-view scroll-y class="player-team-pick-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view
+        wx:for="{{playerTeamPickOptions}}"
+        wx:key="id"
+        class="player-team-pick-item {{item.selected ? 'is-selected' : ''}}"
+        data-teamid="{{item.id}}"
+        bindtap="onPlayerManageTeamPick"
+      >
+        <text class="player-team-pick-item__name">{{item.name}}</text>
+        <text wx:if="{{item.selected}}" class="player-team-pick-item__check">✓</text>
+      </view>
+    </scroll-view>
+    <view class="register-sheet__actions">
+      <view bindtap="closePlayerManageTeamPicker" class="register-sheet__cancel">取消</view>
+    </view>
+  </view>
+
+  <!-- 出发管理 -->
+  <view wx:if="{{teeSheetManageSheetVisible}}" bindtap="cancelTeeSheetManageSheet" catchtouchmove="stopPropagation" class="sheet-overlay"></view>
+  <view wx:if="{{teeSheetManageSheetVisible}}" class="bottom-sheet register-sheet tee-sheet-manage-sheet" catchtap="stopPropagation" catchtouchmove="stopPropagation">
+    <view class="sheet-top-accent"></view>
+    <view class="sheet-handle"></view>
+    <view class="register-sheet__head">
+      <text class="register-sheet__overline">TEE SHEET</text>
+      <text class="register-sheet__title">出发管理</text>
+      <text class="register-sheet__sub">为每个分组设置开球时间和出发洞号，选手可在出发表中查看自己的出发安排。</text>
+    </view>
+    <scroll-view scroll-y class="tee-sheet-manage-sheet__body" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <block wx:if="{{!teeSheetManageHasGroups}}">
+        <view class="tee-sheet-manage-empty">请先完成分组后再设置出发表</view>
+      </block>
+      <block wx:else>
+        <view class="tee-sheet-manage-config">
+          <text class="tee-sheet-manage-config__title">时间配置</text>
+          <view class="tee-sheet-manage-radios">
+            <view
+              class="tee-sheet-manage-radio {{teeSheetManageTimeMode === 'uniform' ? 'is-active' : ''}}"
+              data-mode="uniform"
+              bindtap="onTeeSheetTimeModeTap"
+            >统一时间发球</view>
+            <view
+              class="tee-sheet-manage-radio {{teeSheetManageTimeMode === 'interval' ? 'is-active' : ''}}"
+              data-mode="interval"
+              bindtap="onTeeSheetTimeModeTap"
+            >每【{{teeSheetManageIntervalMinutes}}】分钟发一组</view>
+          </view>
+          <view wx:if="{{teeSheetManageTimeMode === 'uniform'}}" class="tee-sheet-manage-field">
+            <text class="tee-sheet-manage-field__label">统一出发时间</text>
+            <picker mode="selector" range="{{teeSheetTimeOptions}}" value="{{teeSheetManageUnifiedTimeIndex}}" bindchange="onTeeSheetUnifiedTimeChange">
+              <view class="tee-sheet-manage-picker">{{teeSheetManageUnifiedTime}} ›</view>
+            </picker>
+          </view>
+          <view wx:else class="tee-sheet-manage-field tee-sheet-manage-field--interval">
+            <text class="tee-sheet-manage-field__label">每</text>
+            <input
+              class="tee-sheet-manage-interval-input"
+              type="number"
+              value="{{teeSheetManageIntervalInput}}"
+              bindinput="onTeeSheetIntervalInput"
+              bindblur="onTeeSheetIntervalBlur"
+            />
+            <text class="tee-sheet-manage-field__label">分钟发一组</text>
+          </view>
+        </view>
+
+        <view class="tee-sheet-manage-config">
+          <text class="tee-sheet-manage-config__title">发球台配置</text>
+          <view class="tee-sheet-manage-radios">
+            <view
+              class="tee-sheet-manage-radio {{teeSheetManageHoleMode === 'manual' ? 'is-active' : ''}}"
+              data-mode="manual"
+              bindtap="onTeeSheetHoleModeTap"
+            >手工配置</view>
+            <view
+              class="tee-sheet-manage-radio {{teeSheetManageHoleMode === 'bilateral' ? 'is-active' : ''}}"
+              data-mode="bilateral"
+              bindtap="onTeeSheetHoleModeTap"
+            >双边逐组发球</view>
+          </view>
+        </view>
+
+        <view
+          wx:for="{{teeSheetManageGroups}}"
+          wx:key="groupId"
+          class="tee-sheet-manage-group"
+        >
+          <text class="tee-sheet-manage-group__name">{{item.groupName}}</text>
+          <text class="tee-sheet-manage-group__players">{{item.playersText}}</text>
+          <view class="tee-sheet-manage-field">
+            <text class="tee-sheet-manage-field__label">开球时间</text>
+            <picker
+              mode="selector"
+              range="{{teeSheetTimeOptions}}"
+              value="{{item.timeIndex}}"
+              data-index="{{item.index}}"
+              bindchange="onTeeSheetGroupTimeChange"
+            >
+              <view class="tee-sheet-manage-picker">{{item.teeTimeLabel}} ›</view>
+            </picker>
+          </view>
+          <view class="tee-sheet-manage-field">
+            <text class="tee-sheet-manage-field__label">出发洞号</text>
+            <picker
+              mode="selector"
+              range="{{teeSheetHoleLabels}}"
+              value="{{item.holeIndex}}"
+              data-index="{{item.index}}"
+              bindchange="onTeeSheetGroupHoleChange"
+            >
+              <view class="tee-sheet-manage-picker">{{item.startHoleLabel}} ›</view>
+            </picker>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+    <view class="register-sheet__actions tee-sheet-manage-sheet__footer">
+      <view bindtap="cancelTeeSheetManageSheet" class="register-sheet__cancel">取消</view>
+      <view bindtap="saveTeeSheetManageSheet" class="register-sheet__confirm">保存</view>
+    </view>
+  </view>
+</view>

@@ -699,6 +699,79 @@ function _resolveTeeSheetLiveHoleCount(match, group) {
 }
 
 /**
+ * G5–G8：出发表组卡出发 T 台号（仅展示，不写盘）
+ * 优先 scoreData[groupId].matchPlayMeta.startHole，其次 group.startHole。
+ */
+function resolveTeeSheetMatchPlayStartHole(match, groupId, group) {
+  const gid = groupId != null ? String(groupId).trim() : '';
+  const matchPlayTeamScore = require('./matchPlayTeamScore.js');
+  const teamMatchStore = require('./teamMatchStore.js');
+  const bucket = matchPlayTeamScore.readMatchPlayGroupScoreBucket(match, gid);
+  const normalized =
+    typeof teamMatchStore.normalizeMatchPlayMeta === 'function'
+      ? teamMatchStore.normalizeMatchPlayMeta(bucket && bucket.matchPlayMeta)
+      : null;
+  if (normalized && normalized.startHole) return normalized.startHole;
+  const rawMeta = bucket && bucket.matchPlayMeta;
+  if (rawMeta && rawMeta.startHole != null && rawMeta.startHole !== '') {
+    const n = Number(rawMeta.startHole);
+    if (Number.isFinite(n)) {
+      const h = Math.floor(n);
+      if (h >= 1 && h <= 18) return h;
+    }
+  }
+  return resolveGroupStartHole(group);
+}
+
+function formatMatchPlayTeeMetaLine(teeTime, startHole) {
+  const t = normalizeTeeTime(teeTime);
+  const matchPlayScoreboardMock = require('./matchPlayScoreboardMock.js');
+  const label = matchPlayScoreboardMock.formatMatchPlayDisplayHole(startHole);
+  if (t && label) return t + ' · ' + label + '出发';
+  if (t) return t + ' · 待分配';
+  if (label) return label + '出发';
+  return '待分配';
+}
+
+/**
+ * G5–G8：出发表组卡 T 台号与普通单场同一口径（仅展示，不写盘）
+ * 优先 scoreData[groupId].matchPlayMeta.startHole，其次 group.startHole；文案为 A1–B9。
+ */
+function applyMatchPlayStartHoleToTeeGroups(match, teeGroups) {
+  const strokeEntityValidator = require('./strokeEntityValidator.js');
+  const gameMode = String(
+    (match && (match.gameMode || match.selectedGameMode)) || ''
+  ).trim();
+  if (!match || !strokeEntityValidator.isMatchPlayBoardMode(gameMode)) {
+    return Array.isArray(teeGroups) ? teeGroups : [];
+  }
+  const list = Array.isArray(teeGroups) ? teeGroups : [];
+  const groups = Array.isArray(match.groups) ? match.groups : [];
+  const groupById = {};
+  groups.forEach((g, index) => {
+    const id = g && g.groupId != null ? String(g.groupId) : '';
+    if (id) groupById[id] = g;
+    else groupById['group-' + (index + 1)] = g;
+  });
+  return list.map((tg, index) => {
+    if (!tg) return tg;
+    const gid =
+      tg.groupId != null ? String(tg.groupId) : tg.id != null ? String(tg.id) : '';
+    const group = groupById[gid] || groups[index] || null;
+    const startHole = resolveTeeSheetMatchPlayStartHole(match, gid, group);
+    const holeLabel = require('./matchPlayScoreboardMock.js').formatMatchPlayDisplayHole(
+      startHole
+    );
+    return Object.assign({}, tg, {
+      startHole: startHole,
+      hole: holeLabel ? holeLabel + '出发' : '待分配',
+      teeMetaLine: formatMatchPlayTeeMetaLine(tg.teeTime, startHole),
+      hasTeeInfo: !!(tg.teeTime || startHole != null)
+    });
+  });
+}
+
+/**
  * 出发表 LIVE 角标：洞数 + 可选用时（如 3H 45'）。
  * 与赛事详情出发表同一投影：仅覆盖 statusKey==='live' 的组；不改 statusKey / matchStatus。
  */
@@ -788,6 +861,9 @@ module.exports = {
   commitTeeSheetDraft,
   mergeTeeFieldsByGroupId,
   buildTeeSheetTabView,
+  resolveTeeSheetMatchPlayStartHole,
+  formatMatchPlayTeeMetaLine,
+  applyMatchPlayStartHoleToTeeGroups,
   applyLiveHoleStatusBadgeToTeeGroups,
   resolveGroupDisplayPlayers,
   inferStartHoleIfNeededForGameGroup,

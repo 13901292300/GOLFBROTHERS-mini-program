@@ -1,5 +1,6 @@
 /* Phase1-A: 共用样式见 styles/tournament-common.wxss（本文件暂保留完整副本） */
 @import "/styles/tournament-common.wxss";
+@import "/styles/match-play-scoreboard.wxss";
 
 /* 赛事详情页（球队赛 / 队内赛正在进行中）—— 复刻 队内赛正在进行中.html */
 

@@ -50,7 +50,8 @@ var TEMPLATE_ID = {
 
 var SCORING_MODE = {
   per_round_n: true,
-  global_m: true
+  global_m: true,
+  ryder_match_play: true
 };
 
 var SCORE_BASIS = {
@@ -79,7 +80,12 @@ var GAME_MODE = {
   个人比杆赛: true,
   四人四球比杆赛: true,
   最佳球位比杆赛: true,
-  四人两球比杆赛: true
+  四人两球比杆赛: true,
+  个人比洞赛: true,
+  最好成绩比洞赛: true,
+  四人四球比洞赛: true,
+  最佳球位比洞赛: true,
+  四人两球比洞赛: true
 };
 
 var PARTICIPANT_KIND = {
@@ -183,6 +189,16 @@ function resolveRankingValue(entry, scoreBasis) {
 
 function createDefaultScoringRule(partial) {
   var src = isPlainObject(partial) ? partial : {};
+  if (src.mode === 'ryder_match_play') {
+    return {
+      mode: 'ryder_match_play',
+      allowRepeat: asBool(src.allowRepeat, true),
+      scoreBasis:
+        src.scoreBasis === 'net' || src.scoreBasis === 'to_par' ? src.scoreBasis : 'gross',
+      ruleVersion:
+        asFiniteNumberOrNull(src.ruleVersion) != null ? Math.floor(Number(src.ruleVersion)) : 1
+    };
+  }
   return {
     mode: src.mode === 'global_m' ? 'global_m' : 'per_round_n',
     globalM: asFiniteNumberOrNull(src.globalM) != null ? Math.floor(Number(src.globalM)) : 10,
@@ -232,7 +248,7 @@ function normalizeScoringRule(raw) {
   return {
     mode: mode,
     globalM: globalM,
-    allowRepeat: asBool(raw.allowRepeat, false),
+    allowRepeat: asBool(raw.allowRepeat, mode === 'ryder_match_play'),
     scoreBasis: scoreBasis,
     ruleVersion: ruleVersion,
     defaultTopN: defaultTopN
@@ -356,6 +372,7 @@ function createEmptySeriesDraft(partial) {
     competitionPhaseCache: phase,
     hostMode: HOST_MODE[src.hostMode] ? src.hostMode : '',
     templateId: TEMPLATE_ID[src.templateId] ? src.templateId : '',
+    seriesCompetitionType: asString(src.seriesCompetitionType, ''),
     seriesName: asString(src.seriesName, ''),
     // 副标题独立字段；默认空；不从 seriesName 拆分。
     // 消费边界：Detail Hero / 未来 4C-3 LIVE 卡 / 4C-4 报名卡双行展示；本批不改广场/Home/报名页。
@@ -713,6 +730,7 @@ function normalizeSeries(raw) {
     ),
     hostMode: asString(src.hostMode, ''),
     templateId: asString(src.templateId, ''),
+    seriesCompetitionType: asString(src.seriesCompetitionType, ''),
     seriesName: asString(src.seriesName, ''),
     seriesSubtitle: sanitizeSeriesSubtitle(src.seriesSubtitle),
     organization: isPlainObject(src.organization)

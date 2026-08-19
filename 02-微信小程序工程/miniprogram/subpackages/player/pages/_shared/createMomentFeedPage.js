@@ -12,16 +12,16 @@
  * 后续应下沉卡片/列表为 player 分包组件，再接入 feedType TAB（all/featured/friends）。
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
-const playerMomentStore = require('../../../../utils/playerMomentStore.js');
-const playerMomentInteractionStore = require('../../../../utils/playerMomentInteractionStore.js');
-const playerMomentMedia = require('../../../../utils/playerMomentMedia.js');
-const playerMomentImageLayout = require('../../../../utils/playerMomentImageLayout.js');
-const contentReportService = require('../../../../utils/contentReportService.js');
+const playerMomentStore = require('../../utils/playerMomentStore.js');
+const playerMomentInteractionStore = require('../../utils/playerMomentInteractionStore.js');
+const playerMomentMedia = require('../../utils/playerMomentMedia.js');
+const playerMomentImageLayout = require('../../utils/playerMomentImageLayout.js');
+const contentReportService = require('../../utils/contentReportService.js');
 const publicScorecardView = require('../../../../utils/publicScorecardView.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
-const openMomentGameHub = require('../../../../utils/openMomentGameHub.js');
+const openMomentGameHub = require('../../utils/openMomentGameHub.js');
 
 const PAGE_SIZE = playerMomentStore.PAGE_SIZE || 20;
 

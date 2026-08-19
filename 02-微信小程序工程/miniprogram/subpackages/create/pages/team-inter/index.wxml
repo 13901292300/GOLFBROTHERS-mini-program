@@ -68,7 +68,7 @@
             >
               <image
                 class="participant-chip__logo"
-                src="{{teamGroup.sourceTeamLogo || '/assets/mock-avatars/default-avatar.jpg'}}"
+                src="{{teamGroup.sourceTeamLogo || 'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/default-avatar.jpg'}}"
                 mode="aspectFill"
               ></image>
               <text class="participant-chip__name">{{teamGroup.sourceTeamShortName || teamGroup.name}}</text>

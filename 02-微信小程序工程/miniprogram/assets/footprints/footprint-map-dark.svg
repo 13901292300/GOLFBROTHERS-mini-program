@@ -2,14 +2,14 @@
   <!-- Prototype palette: golf-dark canvas -->
   <rect width="1000" height="500" fill="#0a0f0d"/>
 
-  <!-- Continents from ÞL0þH,.html -->
+  <!-- Continents from ï¿½L0ï¿½H,.html -->
   <path d="M580 80 Q620 60 680 70 Q740 65 780 80 Q820 70 850 90 Q870 110 860 140 Q850 170 830 190 Q810 210 780 220 Q750 230 720 225 Q700 240 680 250 Q660 240 640 230 Q610 240 590 230 Q570 220 560 200 Q550 180 555 160 Q550 140 560 120 Q565 100 580 80Z" fill="#1e2e26" opacity="0.5"/>
   <path d="M440 70 Q460 55 480 60 Q500 55 520 65 Q540 60 550 75 Q560 90 555 110 Q550 130 535 145 Q520 155 500 150 Q480 155 465 145 Q450 135 445 115 Q440 95 440 70Z" fill="#1e2e26" opacity="0.5"/>
   <path d="M440 180 Q460 170 480 175 Q500 170 520 180 Q535 195 540 220 Q545 250 535 280 Q525 310 510 330 Q495 345 480 350 Q465 345 455 330 Q445 310 440 280 Q435 250 438 220 Q437 200 440 180Z" fill="#1e2e26" opacity="0.5"/>
   <path d="M150 60 Q170 50 200 55 Q230 50 260 60 Q280 70 290 90 Q300 110 295 130 Q290 150 275 165 Q260 175 240 180 Q230 200 225 220 Q220 245 230 270 Q235 290 225 310 Q215 330 200 340 Q185 345 175 335 Q165 320 160 300 Q155 275 160 250 Q158 230 155 210 Q150 190 145 170 Q140 145 142 120 Q143 90 150 60Z" fill="#1e2e26" opacity="0.5"/>
   <path d="M750 300 Q780 290 820 295 Q860 300 880 320 Q890 340 875 355 Q860 365 835 370 Q810 370 790 360 Q765 350 755 335 Q748 320 750 300Z" fill="#1e2e26" opacity="0.5"/>
 
-  <!-- China dots #2ecc71  pulse via SMIL (CSS pulse: opacity 0.7”1, scale 1”1.5 ’ r*1.5) -->
+  <!-- China dots #2ecc71  pulse via SMIL (CSS pulse: opacity 0.7ï¿½1, scale 1ï¿½1.5 ï¿½ r*1.5) -->
   <circle cx="720" cy="140" r="5" fill="#2ecc71" opacity="0.7">
     <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0s"/>
     <animate attributeName="r" values="5;7.5;5" dur="2s" repeatCount="indefinite" begin="0s"/>
@@ -54,9 +54,9 @@
   </circle>
 
   <!-- Labels -->
-  <text x="720" y="125" fill="#2ecc71" font-size="11" font-weight="600" text-anchor="middle">-ý · 28:</text>
-  <text x="695" y="228" fill="#d4a843" font-size="9" text-anchor="middle">ðý · 4:</text>
-  <text x="790" y="120" fill="#d4a843" font-size="9" text-anchor="middle">å, · 3:</text>
-  <text x="770" y="118" fill="#d4a843" font-size="9" text-anchor="end">éý · 2:</text>
-  <text x="810" y="350" fill="#d4a843" font-size="9" text-anchor="middle">³')š · 1:</text>
+  <text x="720" y="125" fill="#2ecc71" font-size="11" font-weight="600" text-anchor="middle">-ï¿½ ï¿½ 28:</text>
+  <text x="695" y="228" fill="#d4a843" font-size="9" text-anchor="middle">ï¿½ï¿½ ï¿½ 4:</text>
+  <text x="790" y="120" fill="#d4a843" font-size="9" text-anchor="middle">ï¿½, ï¿½ 3:</text>
+  <text x="770" y="118" fill="#d4a843" font-size="9" text-anchor="end">ï¿½ï¿½ ï¿½ 2:</text>
+  <text x="810" y="350" fill="#d4a843" font-size="9" text-anchor="middle">ï¿½')ï¿½ ï¿½ 1:</text>
 </svg>

@@ -516,7 +516,7 @@ function _projectGameRecord(game, part, idSet) {
   const groups = gameStore.listGroups(game) || [];
   const navUrl =
     groups.length > 1
-      ? '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId)
+      ? '/subpackages/scoring/pages/hub/index?gameId=' + encodeURIComponent(gameId)
       : '/subpackages/scoring/pages/score/index?gameId=' +
         encodeURIComponent(gameId) +
         '&groupIndex=0';

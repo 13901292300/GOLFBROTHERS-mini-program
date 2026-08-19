@@ -6,8 +6,8 @@
 
 var teamMatchStore = require('../../../../utils/teamMatchStore.js');
 var seriesStationMatch = require('../../../../utils/seriesStationMatch.js');
-var tournamentGroupDraft = require('../../../../utils/tournamentGroupDraft.js');
-var seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
+var tournamentGroupDraft = require('../../utils/tournamentGroupDraft.js');
+var seriesNoRepeatLineup = require('../../utils/seriesNoRepeatLineup.js');
 var teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 var teeSheetManage = require('../../../../utils/teeSheetManage.js');

@@ -10,6 +10,7 @@ var partnerConfigUtil = require('../../../../utils/partnerConfig.js');
 var eventInfoDefaults = require('../../../../utils/eventInfoDefaults.js');
 var bannerConfig = require('../../../../utils/bannerConfig.js');
 var participantDraft = require('./participantDraft.js');
+var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 var seriesSameDayMultiCourse = require('../../../../utils/seriesSameDayMultiCourse.js');
 
 var SERIES_NAME_MAX = 40;
@@ -492,6 +493,9 @@ function roundsStructureOk(draft) {
 }
 
 function scoringStructureOk(draft) {
+  if (seriesRyderCup.isRyderCupSeries(draft)) {
+    return seriesRyderCup.assertRyderCupTypeAndScoringMode(draft).ok;
+  }
   var rule = (draft && draft.scoringRule) || {};
   if (!seriesModel.SCORING_MODE[rule.mode]) return false;
   if (!seriesModel.SCORE_BASIS[rule.scoreBasis]) return false;
@@ -518,12 +522,20 @@ function canEnterStep6(draft) {
     if (participantDraft.countTeamParticipants(d.participants) < 2) {
       return { ok: false, code: 'participants', message: '至少需要两支参赛球队' };
     }
+    if (seriesRyderCup.shouldSkipScoringStep(d)) {
+      var sides = seriesRyderCup.assertExactlyTwoSides(d);
+      if (!sides.ok) return { ok: false, code: 'participants', message: sides.message };
+    }
   } else if (d.hostMode === 'team') {
     if (!asString(d.hostTeam && d.hostTeam.teamId).trim()) {
       return { ok: false, code: 'host_team', message: '请选择主办球队' };
     }
     if (participantDraft.countDivisionParticipants(d.participants) < 2) {
       return { ok: false, code: 'participants', message: '至少需要两个分队' };
+    }
+    if (seriesRyderCup.shouldSkipScoringStep(d)) {
+      var divSides = seriesRyderCup.assertExactlyTwoSides(d);
+      if (!divSides.ok) return { ok: false, code: 'participants', message: divSides.message };
     }
   } else {
     return { ok: false, code: 'host_mode', message: '请选择主办场景' };
@@ -578,7 +590,7 @@ function deriveWizardStep(draft, options) {
     return 2;
   }
   if (!participantDraft.isFirstWaveTemplate(d.hostMode, d.templateId)) return 2;
-  if (!scoringStructureOk(d)) return 3;
+  if (!seriesRyderCup.shouldSkipScoringStep(d) && !scoringStructureOk(d)) return 3;
   if (!roundsStructureOk(d)) return 4;
   if (!canEnterStep6(d).ok) return 5;
   return 6;

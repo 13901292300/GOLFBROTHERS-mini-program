@@ -29,6 +29,7 @@ function asString(v) {
 function isFirstWaveTemplate(hostMode, templateId) {
   var host = asString(hostMode);
   var tid = asString(templateId);
+  if (tid === 'ryder' && (host === 'team' || host === 'organization')) return true;
   if (host === 'team' && tid === 'division_series') return true;
   if (host === 'organization' && tid === 'inter_team_series') return true;
   return false;

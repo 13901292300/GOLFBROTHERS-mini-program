@@ -769,8 +769,12 @@ page {
 }
 /* 球队比赛卡片（Fluid）：标题允许换行并撑高卡片，禁止省略号截断（高特异性覆盖单行截断组） */
 .ds-card-club__content .ds-card-club__title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   flex: 0 0 auto;
   overflow: visible;
+  gap: 6px;
 }
 .ds-card-club__content .ds-card-club__title-wrap text {
   display: block;
@@ -782,10 +786,7 @@ page {
   text-overflow: clip;
   text-align: left;
 }
-/* Series 可选副标题：与主标题同字号/字重/左对齐；无字段时不占位 */
-.ds-card-club__title-sub {
-  margin-top: 2px;
-}
+/* Series 可选副标题：与主标题同字号/字重/左对齐；间距由 title-wrap gap 统一 */
 .ds-card-club__tagline,
 .ds-card-club__privacy {
   min-width: 0;
@@ -794,6 +795,11 @@ page {
 }
 .ds-card-club__date {
   flex-shrink: 0;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+.ds-card-club__date text {
+  font-style: italic;
 }
 .ds-card-club__meta-row {
   display: flex;

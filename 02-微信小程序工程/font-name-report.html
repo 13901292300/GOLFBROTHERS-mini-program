@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>TTF 内部名称检测</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 24px; background: #111; color: #eee; }
+    h1 { font-size: 20px; }
+    table { border-collapse: collapse; width: 100%; background: #1b1b1b; }
+    th, td { border: 1px solid #333; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { color: #aaa; }
+    .warn { color: #fbbf24; }
+    .ok { color: #86efac; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>TTF name 表检测（Full name / PostScript）</h1>
+  <p><code>document.fonts</code> 和 <code>local()</code> 读不到文件内部名称。本页直接解析 TTF 的 <code>name</code> 表。</p>
+  <table>
+    <thead>
+      <tr>
+        <th>文件</th>
+        <th>Family</th>
+        <th>Full name</th>
+        <th>PostScript</th>
+        <th>Subfamily</th>
+        <th>备注</th>
+      </tr>
+    </thead>
+    <tbody id="out"></tbody>
+  </table>
+  <pre id="log"></pre>
+  <script>
+    const FILES = [
+      "PlayfairDisplay-Bold.ttf",
+      "BodoniModa-Bold.ttf",
+      "CormorantGaramond-Bold.ttf",
+      "Anton-Regular.ttf",
+      "Inter-Bold.ttf"
+    ];
+    const IDS = {
+      1: "family",
+      2: "subfamily",
+      4: "fullName",
+      6: "postScript",
+      16: "typoFamily",
+      17: "typoSubfamily"
+    };
+
+    function u16(view, offset) { return view.getUint16(offset, false); }
+    function u32(view, offset) { return view.getUint32(offset, false); }
+
+    function decodeName(bytes, platform, encoding) {
+      if (platform === 3 && (encoding === 1 || encoding === 10)) {
+        return new TextDecoder("utf-16be").decode(bytes);
+      }
+      try { return new TextDecoder("utf-8").decode(bytes); }
+      catch (e) { return Array.from(bytes).map(function (b) { return String.fromCharCode(b); }).join(""); }
+    }
+
+    function parseNameTable(buffer) {
+      const view = new DataView(buffer);
+      const numTables = u16(view, 4);
+      let nameOff = -1;
+      for (let i = 0; i < numTables; i++) {
+        const p = 12 + i * 16;
+        const tag = String.fromCharCode(view.getUint8(p), view.getUint8(p + 1), view.getUint8(p + 2), view.getUint8(p + 3));
+        if (tag === "name") { nameOff = u32(view, p + 8); break; }
+      }
+      if (nameOff < 0) throw new Error("no name table");
+      const count = u16(view, nameOff + 2);
+      const stringOff = u16(view, nameOff + 4);
+      const picked = {};
+      for (let i = 0; i < count; i++) {
+        const rec = nameOff + 6 + i * 12;
+        const platform = u16(view, rec);
+        const encoding = u16(view, rec + 2);
+        const lang = u16(view, rec + 4);
+        const nid = u16(view, rec + 6);
+        const length = u16(view, rec + 8);
+        const soff = u16(view, rec + 10);
+        const key = IDS[nid];
+        if (!key) continue;
+        const start = nameOff + stringOff + soff;
+        const bytes = new Uint8Array(buffer, start, length);
+        const text = decodeName(bytes, platform, encoding).replace(/\0/g, "").trim();
+        const score = (platform === 3 ? 4 : 0) + (encoding === 1 || encoding === 10 ? 2 : 0) + (lang === 0x0409 ? 1 : 0);
+        if (!picked[key] || score > picked[key].score) picked[key] = { score: score, text: text };
+      }
+      const out = {};
+      Object.keys(picked).forEach(function (k) { out[k] = picked[k].text; });
+      return out;
+    }
+
+    function noteFor(file, info) {
+      const ps = (info.postScript || "").toLowerCase();
+      const full = (info.fullName || "").toLowerCase();
+      const sub = (info.subfamily || "").toLowerCase();
+      const namedBold = /bold/i.test(file);
+      const isBold = /bold/.test(ps) || /bold/.test(full) || sub === "bold";
+      const isLight = /light/.test(ps) || /light/.test(full);
+      const isRegular = /regular/.test(ps) || /regular/.test(full) || sub === "regular";
+      if (namedBold && !isBold) {
+        return "文件名是 Bold，内部却是 " + (info.fullName || info.postScript) + "。Canvas 写 700 会匹配失败。";
+      }
+      if (isLight) return "这是 Light，不是 Bold。";
+      if (namedBold && isBold) return "内部名称与 Bold 一致。";
+      if (isRegular) return "内部是 Regular。";
+      return "";
+    }
+
+    const out = document.getElementById("out");
+    const log = document.getElementById("log");
+
+    Promise.all(FILES.map(function (file) {
+      return fetch("assets/fonts/" + file).then(function (res) {
+        if (!res.ok) throw new Error(res.status + " " + file);
+        return res.arrayBuffer();
+      }).then(function (buf) {
+        const info = parseNameTable(buf);
+        const tr = document.createElement("tr");
+        const remark = noteFor(file, info);
+        tr.innerHTML =
+          "<td>" + file + "</td>" +
+          "<td>" + (info.family || "") + "</td>" +
+          "<td>" + (info.fullName || "") + "</td>" +
+          "<td>" + (info.postScript || "") + "</td>" +
+          "<td>" + (info.subfamily || "") + "</td>" +
+          "<td class=\"" + (remark.indexOf("Bold") >= 0 && remark.indexOf("却是") >= 0 ? "warn" : "ok") + "\">" + remark + "</td>";
+        out.appendChild(tr);
+        log.textContent += file + "\n  Family: " + (info.family || "") +
+          "\n  Full name: " + (info.fullName || "") +
+          "\n  PostScript: " + (info.postScript || "") +
+          "\n  Subfamily: " + (info.subfamily || "") + "\n\n";
+      }).catch(function (err) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = "<td>" + file + "</td><td colspan='5' class='warn'>" + err.message + "</td>";
+        out.appendChild(tr);
+      });
+    }));
+  </script>
+</body>
+</html>

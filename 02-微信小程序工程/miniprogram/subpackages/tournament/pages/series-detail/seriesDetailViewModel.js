@@ -9,11 +9,14 @@ var bannerConfig = require('../../../../utils/bannerConfig.js');
 var clubDateFormat = require('../../../../utils/clubDateFormat.js');
 var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
 var seriesCourseIdentity = require('../../../../utils/seriesCourseIdentity.js');
-var seriesColorMark = require('../../../../utils/seriesColorMark.js');
+var seriesColorMark = require('../../utils/seriesColorMark.js');
 var seriesStandingsViewModel = require('./seriesStandingsViewModel.js');
 var seriesRegisterViewModel = require('./seriesRegisterViewModel.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
 var seriesLiveSession = require('./seriesLiveSessionProjection.js');
+var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
+var seriesRyderCupAccumulate = require('../../../../utils/seriesRyderCupAccumulate.js');
+var seriesRyderCupScoreboardAdapter = require('./seriesRyderCupScoreboardAdapter.js');
 
 var SERIES_TABS = seriesLiveSession.SERIES_TABS;
 
@@ -168,6 +171,19 @@ function resolveLifecycleAccess(series, options) {
 }
 
 function buildScoringRuleView(series) {
+  if (seriesRyderCup.isRyderCupSeries(series)) {
+    return {
+      mode: seriesRyderCup.SCORING_MODE,
+      modeLabel: '莱德杯比洞计分',
+      globalM: null,
+      perRoundTopN: [],
+      allowRepeat: true,
+      allowRepeatLabel: '同轮不可重复，跨轮可重复',
+      scoreBasis: 'match_play',
+      scoreBasisLabel: '比洞',
+      summaryText: '胜 1 · 平 0.5 · 负 0 · 系列累计红蓝得分'
+    };
+  }
   var rule = (series && series.scoringRule) || {};
   var mode = asString(rule.mode).trim() || 'per_round_n';
   var basis = SCORE_BASIS_LABELS[rule.scoreBasis] || SCORE_BASIS_LABELS.gross;
@@ -356,12 +372,12 @@ function formatSeriesDateRange(roundsInput) {
 
 /**
  * Hero 周期字号档位：按最终 dateText 长度，不改格式化逻辑。
- * 短（默认 60rpx）：同日 AUG/11/2026、同年同月 AUG/11-13  (2026)、待定
- * 中（略缩小）：介于同年与跨年之间的长度
- * 长（再缩小）：跨年 DEC/31 (2026)-JAN/02 (2027)
+ * 短（默认 60rpx）：同日 AUG 11 2026、同年同月 AUG 11-13 2026、待定
+ * 中（略缩小）：同年跨月 AUG 11-SEP 16 2026
+ * 长（再缩小）：跨年 DEC 31 2026-JAN 02 2027
  */
-var HERO_DATE_RANGE_MD_MIN = 23;
-var HERO_DATE_RANGE_LG_MIN = 27;
+var HERO_DATE_RANGE_MD_MIN = 18;
+var HERO_DATE_RANGE_LG_MIN = 23;
 
 function resolveHeroDateRangeSizeClass(dateText) {
   var s = asString(dateText).trim();
@@ -791,7 +807,7 @@ function resolveHeroTeamLogoReturnRestore(opts) {
 /**
  * 英雄区投影（对齐 detail hero 槽位；不展开参赛主体列表）
  */
-function buildHeroView(series, access) {
+function buildHeroView(series, access, opts) {
   var host = buildHostView(series);
   var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
   var courses = buildSeriesCourseLines(rounds);
@@ -853,9 +869,14 @@ function buildHeroView(series, access) {
     dateRangeSizeClass: resolveHeroDateRangeSizeClass(dateText),
     titleMain: asString(series && series.seriesName).trim() || '系列赛',
     // 正式名称第二行（与 titleMain 同级样式）；空则不渲染、不占空高
-    titleSub: asString(series && series.seriesSubtitle)
-      .replace(/[\r\n\u2028\u2029]+/g, '')
-      .trim(),
+    titleSub: (function () {
+      if (seriesRyderCup.isRyderCupSeries(series)) {
+        return seriesRyderCupAccumulate.buildRyderCupDisplaySubtitle(series, opts || {}).text;
+      }
+      return asString(series && series.seriesSubtitle)
+        .replace(/[\r\n\u2028\u2029]+/g, '')
+        .trim();
+    })(),
     metaChips: buildSeriesGameModeMetaChips(rounds),
     infoRows: infoRows,
     participantDisplay: participantDisplay,
@@ -1238,6 +1259,79 @@ function buildStandingsEmptyState(series) {
   };
 }
 
+function resolveStandingsStationDeps(src) {
+  var o = src && typeof src === 'object' ? src : {};
+  var getMatchById =
+    typeof o.getMatchById === 'function'
+      ? o.getMatchById
+      : function () {
+          return null;
+        };
+  var getIndexByMatchId =
+    typeof o.getIndexByMatchId === 'function'
+      ? o.getIndexByMatchId
+      : function () {
+          return null;
+        };
+  var evaluate =
+    typeof o.evaluateRoundStationGate === 'function'
+      ? function (s, r) {
+          return o.evaluateRoundStationGate(s, r);
+        }
+      : function (s, r) {
+          return evaluateRoundStationGate(s, r, {
+            getMatchById: getMatchById,
+            getIndexByMatchId: getIndexByMatchId
+          });
+        };
+  return {
+    getMatchById: getMatchById,
+    getIndexByMatchId: getIndexByMatchId,
+    evaluateRoundStationGate: evaluate
+  };
+}
+
+/**
+ * 完整页面与轻量切轮共用：仅显式 ryder_cup 走莱德杯 adapter。
+ */
+function buildSeriesStandingsProjection(input) {
+  var src = input && typeof input === 'object' ? input : {};
+  var series = src.series && typeof src.series === 'object' ? src.series : {};
+  var roundStates = Array.isArray(src.roundStates) ? src.roundStates : [];
+  var isRyderCup = seriesRyderCup.isRyderCupSeries(series);
+  var standingsKey = seriesLiveSession.resolveSessionSelectedRoundId({
+    currentKey: src.selectedKey,
+    userPicked: !!src.userPicked,
+    visited: !!src.visited,
+    roundStates: roundStates,
+    extraValidKeys:
+      !isRyderCup && asString(series.scoringRule && series.scoringRule.mode) === 'global_m'
+        ? { cumulative: true }
+        : null
+  });
+  if (isRyderCup) {
+    return seriesRyderCupScoreboardAdapter.buildRyderCupStandingsView({
+      series: series,
+      selectedKey: standingsKey,
+      roundStates: roundStates,
+      userPicked: !!src.userPicked,
+      visited: !!src.visited,
+      resetExpanded: !!src.resetExpanded,
+      prevExpandedById: src.prevExpandedById || {},
+      deps: resolveStandingsStationDeps(src)
+    });
+  }
+  return seriesStandingsViewModel.buildSeriesStandingsViewModel({
+    series: series,
+    selectedKey: standingsKey,
+    roundStates: roundStates,
+    standingsResult:
+      src.standingsResult != null
+        ? src.standingsResult
+        : seriesStandingsViewModel.emptyStandingsResult()
+  });
+}
+
 /**
  * 组装完整只读页面 VM
  * options: {
@@ -1276,36 +1370,30 @@ function buildSeriesDetailViewModel(seriesInput, options) {
   var visibility = buildVisibilityView(series);
   var host = buildHostView(series);
   var participants = buildParticipantsView(series);
-  var hero = buildHeroView(series, access);
+  var hero = buildHeroView(series, access, opts);
   var roundStates = seriesStandingsViewModel.projectRoundStatesFromRoundCards(roundCards);
   var hasLiveRound = seriesLiveSession.hasAnyLiveRound(roundStates);
-  var standingsKey = seriesLiveSession.resolveSessionSelectedRoundId({
-    currentKey: opts.standingsSelectedKey,
+  var isRyderCup = seriesRyderCup.isRyderCupSeries(series);
+  var standings = buildSeriesStandingsProjection({
+    series: series,
+    selectedKey: opts.standingsSelectedKey,
+    roundStates: roundStates,
     userPicked: !!opts.standingsUserPicked,
     visited: !!opts.standingsVisited,
-    roundStates: roundStates,
-    extraValidKeys:
-      asString(series.scoringRule && series.scoringRule.mode) === 'global_m'
-        ? { cumulative: true }
-        : null
-  });
-  var standings = seriesStandingsViewModel.buildSeriesStandingsViewModel({
-    series: series,
-    selectedKey: standingsKey,
-    roundStates: roundStates,
-    // 生产默认空结果；页面不得注入演示成绩。自测可经 options 传入 fixture。
-    // 展开态由页面 expandedStandingsTeamId 控制，不在此投影 isExpanded。
-    standingsResult:
-      opts.standingsResult != null
-        ? opts.standingsResult
-        : seriesStandingsViewModel.emptyStandingsResult()
+    standingsResult: opts.standingsResult,
+    getMatchById: opts.getMatchById,
+    getIndexByMatchId: opts.getIndexByMatchId,
+    evaluateRoundStationGate: function (s, r) {
+      return evaluateRoundStationGate(s, r, opts);
+    }
   });
 
   return {
     ok: true,
     access: access,
-    tabs: seriesLiveSession.buildSeriesDetailTabs(hasLiveRound),
+    tabs: seriesLiveSession.buildSeriesDetailTabs(hasLiveRound, { ryderCup: isRyderCup }),
     hasLiveRound: hasLiveRound,
+    isRyderCup: isRyderCup,
     seriesId: asString(series.seriesId).trim(),
     seriesName: asString(series.seriesName).trim() || '系列赛',
     templateId: asString(series.templateId).trim(),
@@ -1381,6 +1469,7 @@ module.exports = {
   evaluateRoundStationGate: evaluateRoundStationGate,
   buildRoundCard: buildRoundCard,
   buildStandingsEmptyState: buildStandingsEmptyState,
+  buildSeriesStandingsProjection: buildSeriesStandingsProjection,
   buildSeriesDetailViewModel: buildSeriesDetailViewModel,
   seriesStandingsViewModel: seriesStandingsViewModel,
   seriesRegisterViewModel: seriesRegisterViewModel

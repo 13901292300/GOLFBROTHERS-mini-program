@@ -1,18 +1,25 @@
 /**
- * 本地 mock 头像（真机 / 预览 / 体验版可用，不依赖外网域名）
+ * Mock 头像（COS HTTPS）
  *
  * 规则：
- * - 虚拟球员使用 mock-avatar-01 ~ 10 等不同人物头像
+ * - 虚拟球员使用 mock-avatar-01 ~ 10
  * - 同一 playerId / 昵称稳定映射到同一头像
  * - 仅空值 / 非法路径 / 加载失败时使用 default-avatar
  */
-const DEFAULT_AVATAR = '/assets/mock-avatars/default-avatar.jpg';
+const COS_BASE =
+  (require('../config.js').cdnBaseUrl ||
+    'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com').replace(
+    /\/$/,
+    ''
+  );
+const MOCK_AVATAR_BASE = COS_BASE + '/miniprogram/mock-avatars';
+const DEFAULT_AVATAR = MOCK_AVATAR_BASE + '/default-avatar.jpg';
 
 const MOCK_AVATAR_COUNT = 10;
 
 const MOCK_AVATAR_PATHS = Array.from({ length: MOCK_AVATAR_COUNT }, (_, i) => {
   const n = String(i + 1).padStart(2, '0');
-  return '/assets/mock-avatars/mock-avatar-' + n + '.jpg';
+  return MOCK_AVATAR_BASE + '/mock-avatar-' + n + '.jpg';
 });
 
 function stableHash(str) {
@@ -49,7 +56,6 @@ function isInvalidAvatarSrc(s) {
   return (
     !s ||
     s.startsWith('http://') ||
-    s.startsWith('https://') ||
     s.startsWith('file:') ||
     /^[A-Za-z]:[\\/]/.test(s) ||
     /wxfile:\/\//.test(s) ||
@@ -63,6 +69,9 @@ function normalizeLocalPath(s) {
   if (legacy) {
     return avatarByIndex(parseInt(legacy[1], 10) - 1);
   }
+  if (/\/default-avatar\.(png|jpg)$/.test(norm)) {
+    return DEFAULT_AVATAR;
+  }
   return norm;
 }
 
@@ -71,6 +80,9 @@ function resolveAvatar(src, seed) {
   const s = String(src || '').trim();
   if (isLocalAvatarPath(s)) {
     return normalizeLocalPath(s);
+  }
+  if (s.indexOf('https://') === 0) {
+    return s;
   }
   if (isInvalidAvatarSrc(s)) {
     return seed != null && String(seed).trim() ? pickMockAvatar(seed) : DEFAULT_AVATAR;

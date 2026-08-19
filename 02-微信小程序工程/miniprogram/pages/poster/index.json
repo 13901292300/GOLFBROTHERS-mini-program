@@ -1,8 +1,0 @@
-{
-  "usingComponents": {
-    "golf-poster": "/components/golf-poster/index"
-  },
-  "navigationStyle": "custom",
-  "navigationBarTitleText": "高尔夫海报",
-  "enableShareAppMessage": true
-}

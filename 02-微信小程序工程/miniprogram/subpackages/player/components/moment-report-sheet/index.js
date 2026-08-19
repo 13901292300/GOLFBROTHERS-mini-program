@@ -2,7 +2,7 @@
  * 球友圈举报原因 Bottom Sheet（展示层）。
  * 提交由页面调用 contentReportService；本组件不写 Storage。
  */
-const contentReportService = require('../../../../utils/contentReportService.js');
+const contentReportService = require('../../utils/contentReportService.js');
 
 const REASONS = contentReportService.REPORT_REASONS || [];
 const DESC_MAX = contentReportService.DESCRIPTION_MAX_CHARS || 200;

@@ -9,16 +9,16 @@
  * - 不写 Series / match / storage
  */
 
-var teamLeaderboardView = require('../../../../utils/teamLeaderboardView.js');
-var teamLeaderboardHost = require('../../../../utils/teamLeaderboardHost.js');
-var seriesStandingsAssembler = require('../../../../utils/seriesStandingsAssembler.js');
-var seriesResultAdapter = require('../../../../utils/seriesResultAdapter.js');
+var teamLeaderboardView = require('../../utils/teamLeaderboardView.js');
+var teamLeaderboardHost = require('../../utils/teamLeaderboardHost.js');
+var seriesStandingsAssembler = require('../../utils/seriesStandingsAssembler.js');
+var seriesResultAdapter = require('../../utils/seriesResultAdapter.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
 var seriesPersonalLeaderboardAdapter = require('./seriesPersonalLeaderboardAdapter.js');
 var leaderboardSettingViewModel = require('../../../../utils/leaderboardSettingViewModel.js');
 var strokeEntityValidator = require('../../../../utils/strokeEntityValidator.js');
 var { isInterTeamMatch } = require('../../../../utils/teamMatchCapabilities.js');
-var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
+var seriesStandingsExpandIdentity = require('../../utils/seriesStandingsExpandIdentity.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();

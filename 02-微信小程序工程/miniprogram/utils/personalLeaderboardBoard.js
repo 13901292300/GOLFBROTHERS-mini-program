@@ -885,9 +885,13 @@ function emptyBoard(match, options) {
  */
 function buildPersonalLeaderboardBoard(match, options) {
   var opts = options && typeof options === 'object' ? options : {};
-  var view = asString(opts.view) || 'all';
+  var sel = leaderboardSettingViewModel.normalizeLeaderboardSelection(match, {
+    view: opts.view,
+    scoreType: opts.scoreType
+  });
+  var view = sel.view;
   if (view !== 'male' && view !== 'female') view = 'all';
-  var scoreType = asString(opts.scoreType) === 'net' ? 'net' : 'gross';
+  var scoreType = sel.scoreType;
   var openIndex = opts.openIndex != null ? Number(opts.openIndex) : -1;
   if (!Number.isFinite(openIndex)) openIndex = -1;
 

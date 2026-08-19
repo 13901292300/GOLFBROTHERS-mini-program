@@ -11,7 +11,7 @@ var seriesRoundVisualState = require('./seriesRoundVisualState.js');
 var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
 var playerManage = require('../../../../utils/playerManage.js');
-var seriesStandingsExpandIdentity = require('../../../../utils/seriesStandingsExpandIdentity.js');
+var seriesStandingsExpandIdentity = require('../../utils/seriesStandingsExpandIdentity.js');
 var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
 var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
 

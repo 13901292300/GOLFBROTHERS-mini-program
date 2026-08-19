@@ -131,21 +131,21 @@ var startOnlyText = viewModel.formatSeriesDateRange(startOnly);
 var endOnlyText = viewModel.formatSeriesDateRange(endOnly);
 var pendingText = viewModel.formatSeriesDateRange([]);
 
-assert('同日日期输出锁定', sameDayText === 'AUG/11/2026');
-assert('同年跨日输出锁定', sameYearText === 'AUG/11-13  (2026)');
-assert('跨年输出锁定', crossYearText === 'DEC/31 (2026)-JAN/02 (2027)');
+assert('同日日期输出锁定', sameDayText === 'AUG 11 2026');
+assert('同年跨日输出锁定', sameYearText === 'AUG 11-13 2026');
+assert('跨年输出锁定', crossYearText === 'DEC 31 2026-JAN 02 2027');
 assert(
   '极端月份跨年输出锁定',
-  extremeText === 'SEP/28 (2026)-SEP/30 (2027)'
+  extremeText === 'SEP 28 2026-SEP 30 2027'
 );
 assert('无日期 → 比赛时间待定', pendingText === '比赛时间待定');
 assert(
   '仅开始日期无多余分隔符',
-  startOnlyText === 'AUG/20/2026' && startOnlyText.indexOf('-') < 0
+  startOnlyText === 'AUG 20 2026' && startOnlyText.indexOf('-') < 0
 );
 assert(
   '仅结束日期无多余分隔符',
-  endOnlyText === 'MAY/18/2026' && endOnlyText.indexOf('-') < 0
+  endOnlyText === 'MAY 18 2026' && endOnlyText.indexOf('-') < 0
 );
 
 assert(
@@ -155,12 +155,12 @@ assert(
     viewModel.resolveHeroDateRangeSizeClass(pendingText) === ''
 );
 assert(
-  '中档：长度 23–26',
-  viewModel.resolveHeroDateRangeSizeClass(new Array(23 + 1).join('x')) ===
+  '中档：长度 18–22',
+  viewModel.resolveHeroDateRangeSizeClass(new Array(18 + 1).join('x')) ===
     'event-date--md' &&
-    viewModel.resolveHeroDateRangeSizeClass(new Array(26 + 1).join('x')) ===
+    viewModel.resolveHeroDateRangeSizeClass(new Array(22 + 1).join('x')) ===
       'event-date--md' &&
-    viewModel.resolveHeroDateRangeSizeClass(new Array(22 + 1).join('x')) === ''
+    viewModel.resolveHeroDateRangeSizeClass(new Array(17 + 1).join('x')) === ''
 );
 assert(
   '长档：跨年与极端月份',

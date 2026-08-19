@@ -74,7 +74,8 @@ const EVENT_INFO_ROW_HEIGHT_RPX = 128;
 const EVENT_INFO_ROW_STEP_RPX = EVENT_INFO_ROW_HEIGHT_RPX + EVENT_INFO_ROW_GAP_RPX;
 
 const EMPTY_ORG_LABEL = '请选择组织机构';
-const EMPTY_ORG_LOGO = '/assets/mock-avatars/default-avatar.jpg';
+const EMPTY_ORG_LOGO =
+  'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/default-avatar.jpg';
 
 const DEFAULT_FEE_LIST = [
   { id: 1, name: '正式队员', amount: '0' },

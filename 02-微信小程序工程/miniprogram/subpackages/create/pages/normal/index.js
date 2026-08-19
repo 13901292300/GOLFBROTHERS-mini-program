@@ -1386,7 +1386,7 @@ Page({
         matchStateUtil.enterScorePage();
       } else if (gameStore.isMultiGroup(updated)) {
         wx.redirectTo({
-          url: '/pages/game/hub/index?gameId=' + encodeURIComponent(gameId)
+          url: '/subpackages/scoring/pages/hub/index?gameId=' + encodeURIComponent(gameId)
         });
       } else {
         wx.redirectTo({ url: '/pages/home/index?tab=my' });

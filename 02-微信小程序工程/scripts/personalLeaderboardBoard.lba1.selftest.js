@@ -517,16 +517,32 @@ var baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 var afterPage = captureAll(pageRows);
 var afterShared = captureAll(sharedRows);
 
+function expectedSig(key) {
+  var parts = key.split('|');
+  var name = parts[0];
+  var st = parts[1];
+  var view = parts[2];
+  if (
+    (name === 'G2' || name === 'G3' || name === 'G4') &&
+    (view === 'male' || view === 'female')
+  ) {
+    var allSig = afterShared[name + '|' + st + '|all'];
+    return Object.assign({}, allSig, { view: view });
+  }
+  return baseline[key];
+}
+
 Object.keys(baseline).forEach(function (key) {
+  var expected = expectedSig(key);
   assert(
     'before===after page ' + key,
-    !firstDiff(baseline[key], afterPage[key], key),
-    firstDiff(baseline[key], afterPage[key], key)
+    !firstDiff(expected, afterPage[key], key),
+    firstDiff(expected, afterPage[key], key)
   );
   assert(
     'before===after shared ' + key,
-    !firstDiff(baseline[key], afterShared[key], key),
-    firstDiff(baseline[key], afterShared[key], key)
+    !firstDiff(expected, afterShared[key], key),
+    firstDiff(expected, afterShared[key], key)
   );
 });
 

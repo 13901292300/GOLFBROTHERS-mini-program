@@ -52,10 +52,11 @@ function read(p) {
 }
 
 function expectedAuthorityCards(match, series) {
-  return teeSheetManage.applyLiveHoleStatusBadgeToTeeGroups(
-    match,
-    tournamentGroupCardView.buildReadonlyGroupCards(match, { series: series || null })
-  );
+  var cards = tournamentGroupCardView.buildReadonlyGroupCards(match, {
+    series: series || null
+  });
+  cards = teeSheetManage.applyMatchPlayStartHoleToTeeGroups(match, cards);
+  return teeSheetManage.applyLiveHoleStatusBadgeToTeeGroups(match, cards);
 }
 
 function makeSeries(templateId, gameMode) {
@@ -217,7 +218,7 @@ function buildVm(series, matches, selectedRoundId) {
   assert(
     '查看领先榜入口仍在出发表 LIVE 轮',
     seriesWxml.indexOf('schedule.showViewLeaderboard') >= 0 &&
-      seriesWxml.indexOf('查看领先榜') >= 0
+      seriesWxml.indexOf('schedule.viewLeaderboardLabel') >= 0
   );
 })();
 
@@ -276,6 +277,7 @@ function buildVm(series, matches, selectedRoundId) {
     '轮次层仍为 LIVE 且可查看领先榜',
     vm.roundVisualState === 'live' &&
       vm.showViewLeaderboard === true &&
+      vm.viewLeaderboardLabel === '查看领先榜' &&
       vm.roundSelectorItems[1].showLiveBadge === true &&
       vm.roundSelectorItems[1].stateClass.indexOf('live') >= 0
   );
@@ -493,6 +495,68 @@ function buildVm(series, matches, selectedRoundId) {
       vm.tabs[0].id === 'info' &&
       vm.tabs[vm.tabs.length - 1].id === 'register' &&
       vm.standings.selectedKey === 'r2'
+  );
+})();
+
+(function testMatchPlayTeeHoleLabel() {
+  var g5Match = {
+    matchId: 'm-g5',
+    gameMode: '个人比洞赛',
+    status: 'ongoing',
+    groups: [
+      {
+        groupId: 'g-a',
+        groupName: '第1组',
+        teeTime: '08:00',
+        startHole: 1,
+        players: [{ position: 1, userId: 'u1' }]
+      },
+      {
+        groupId: 'g-b',
+        groupName: '第2组',
+        teeTime: '08:10',
+        startHole: 1,
+        players: [{ position: 1, userId: 'u2' }]
+      }
+    ],
+    scoreData: {
+      'g-b': { matchPlayMeta: { startHole: 10, source: 'manual' } }
+    }
+  };
+  var g5Cards = expectedAuthorityCards(g5Match, null);
+  assert(
+    'G5 无 meta 时组卡 T 台号为 A1',
+    g5Cards[0].teeMetaLine === '08:00 · A1出发' && g5Cards[0].teeMetaLine.indexOf('1号洞') < 0
+  );
+  assert(
+    'G5 matchPlayMeta 优先，10 号洞显示 B1',
+    g5Cards[1].teeMetaLine === '08:10 · B1出发' && g5Cards[1].startHole === 10
+  );
+
+  var strokeMatch = {
+    matchId: 'm-stroke',
+    gameMode: '个人比杆赛',
+    status: 'ongoing',
+    groups: [
+      {
+        groupId: 'g-s',
+        groupName: '第1组',
+        teeTime: '07:10',
+        startHole: 1,
+        players: [{ position: 1, userId: 'u1' }]
+      }
+    ]
+  };
+  var strokeCards = expectedAuthorityCards(strokeMatch, null);
+  assert(
+    '比杆赛仍用号洞，不改成 A1',
+    strokeCards[0].teeMetaLine === '07:10 · 1号洞出发'
+  );
+
+  var seriesVmSrc = read(path.join(pageDir, 'seriesScheduleViewModel.js'));
+  assert(
+    'Series 出发表复用公共 match-play T 台号投影',
+    seriesVmSrc.indexOf('applyMatchPlayStartHoleToTeeGroups') >= 0
   );
 })();
 

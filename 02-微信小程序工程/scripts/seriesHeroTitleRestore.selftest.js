@@ -112,7 +112,7 @@ var hero = viewModel.buildHeroView(
 assert(
   '比赛名称完整投影且跨年日期仍走长档',
   hero.titleMain === '湘鹰队际系列赛超长中文名称测试' &&
-    hero.dateText === 'DEC/31 (2026)-JAN/02 (2027)' &&
+    hero.dateText === 'DEC 31 2026-JAN 02 2027' &&
     hero.dateRangeSizeClass === 'event-date--lg'
 );
 

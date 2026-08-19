@@ -136,7 +136,8 @@ function validateTeamMatchSideGroups(matchOrType, gameMode, teamGroups) {
   };
 }
 
-const DEFAULT_ORG_LOGO = '/assets/mock-avatars/default-avatar.jpg';
+const DEFAULT_ORG_LOGO =
+  'https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/default-avatar.jpg';
 
 /**
  * 赛事卡片底部主体类型标签：

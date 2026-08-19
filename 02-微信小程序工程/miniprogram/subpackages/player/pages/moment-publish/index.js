@@ -3,9 +3,9 @@
  * 草稿以 draftMedia 为准；images 仅作图片网格短期兼容展示。
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
-const playerMomentStore = require('../../../../utils/playerMomentStore.js');
-const playerMomentMedia = require('../../../../utils/playerMomentMedia.js');
-const playerMomentImageLayout = require('../../../../utils/playerMomentImageLayout.js');
+const playerMomentStore = require('../../utils/playerMomentStore.js');
+const playerMomentMedia = require('../../utils/playerMomentMedia.js');
+const playerMomentImageLayout = require('../../utils/playerMomentImageLayout.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 const playerMomentPublishContext = require('../../../../utils/playerMomentPublishContext.js');
@@ -117,6 +117,7 @@ Page({
       return;
     }
     this._relatedGame = assert.relatedGame;
+    this._fromPoster = safeDecode((query && query.from) || '') === 'poster';
     this.setData({
       gateReady: true,
       gateError: '',
@@ -128,6 +129,7 @@ Page({
       videoDraft: null
     });
     this._syncCanPublish();
+    this._attachPosterShareImage(query);
   },
 
   onHide() {
@@ -151,6 +153,44 @@ Page({
 
   applyTheme(theme) {
     this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
+  },
+
+  _attachPosterShareImage(query) {
+    let imagePath = safeDecode((query && query.imagePath) || '');
+    try {
+      const packed = wx.getStorageSync('posterCircleShare');
+      if (packed && packed.imagePath) {
+        if (!imagePath) imagePath = String(packed.imagePath);
+        wx.removeStorageSync('posterCircleShare');
+      }
+    } catch (e) { /* ignore */ }
+    if (!imagePath) return;
+    const self = this;
+    const imageTemps = [{ tempFilePath: imagePath, width: 0, height: 0 }];
+    playerMomentImageLayout
+      .ensureTempFilesDimensions(imageTemps)
+      .then(function (ready) {
+        const file = (ready && ready[0]) || { tempFilePath: imagePath };
+        if (!file.tempFilePath) return;
+        self._applyDraftMedia([
+          {
+            type: 'image',
+            tempFilePath: file.tempFilePath,
+            width: Number(file.width) || 0,
+            height: Number(file.height) || 0
+          }
+        ]);
+      })
+      .catch(function () {
+        self._applyDraftMedia([
+          {
+            type: 'image',
+            tempFilePath: imagePath,
+            width: 0,
+            height: 0
+          }
+        ]);
+      });
   },
 
   _getDraftMedia() {
@@ -568,6 +608,10 @@ Page({
       try {
         const channel = this.getOpenerEventChannel && this.getOpenerEventChannel();
         if (channel && channel.emit) {
+          channel.emit('afterPublish', {
+            momentId: created.moment && created.moment.momentId,
+            revision: created.revision
+          });
           channel.emit('momentPublished', {
             momentId: created.moment && created.moment.momentId,
             revision: created.revision
@@ -575,6 +619,7 @@ Page({
         }
       } catch (e) { /* ignore */ }
       wx.showToast({ title: '已发布', icon: 'success', duration: 800 });
+      if (this._fromPoster) return;
       setTimeout(function () {
         wx.navigateBack({ fail: function () {} });
       }, 400);

@@ -1,0 +1,10 @@
+{
+  "name": "segmentPortrait",
+  "version": "1.0.0",
+  "description": "Call Tencent Cloud SegmentPortraitPic for golf poster cutout",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.4.0",
+    "tencentcloud-sdk-nodejs-bda": "^4.0.0"
+  }
+}

@@ -100,7 +100,7 @@
       </view>
 
       <!-- Step 3 -->
-      <view class="section" wx:if="{{!draftInitError && currentStep === 3}}">
+      <view class="section" wx:if="{{!draftInitError && currentStep === 3 && !isRyderCup}}">
         <view class="section-label"><text class="section-label__h2">计分模式</text></view>
         <view class="hint-line">按计分结果取最好 N/M 份；默认 N 会同步到未单独修改的轮次。</view>
         <view class="choice-list">
@@ -463,7 +463,7 @@
                 catchtap="onRemoveDivision"
               >删除</view>
             </view>
-            <view class="add-team-group-btn" bindtap="onAddDivision">
+            <view class="add-team-group-btn" bindtap="onAddDivision" wx:if="{{!isRyderCup}}">
               <text class="add-team-group-icon">+</text>
               <text>添加分队</text>
             </view>

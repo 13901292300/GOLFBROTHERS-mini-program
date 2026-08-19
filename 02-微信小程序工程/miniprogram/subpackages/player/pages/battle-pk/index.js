@@ -2,11 +2,11 @@
  * 战绩 PK：当前登录用户 VS 球员主页目标
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
-const playerBattlePk = require('../../../../utils/playerBattlePk.js');
+const playerBattlePk = require('../../utils/playerBattlePk.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const contactStore = require('../../../../utils/contactStore.js');
-const publicPlayerProfile = require('../../../../utils/publicPlayerProfile.js');
+const publicPlayerProfile = require('../../utils/publicPlayerProfile.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 
 function safeDecode(raw) {

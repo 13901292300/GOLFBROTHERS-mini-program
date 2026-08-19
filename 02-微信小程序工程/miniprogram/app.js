@@ -26,7 +26,7 @@ App({
     // env 参数决定接下来小程序发起的云开发调用（wx.cloud.xxx）会请求到哪个云环境的资源
     // 此处请填入环境 ID, 环境 ID 可在微信开发者工具右上顶部工具栏点击云开发按钮打开获取
     // 也可写入 envList.js（与云开发 quickstart 一致）；勿传空字符串给 wx.cloud.init
-    env: "",
+    env: "cloud1-d5gluh1ode0ef8738",
     // 全局唯一主题状态：'bright' | 'dark'（仅首页可写）
     theme: 'bright'
   },
@@ -37,16 +37,12 @@ App({
     if (!wx.cloud) {
       console.error("请使用 2.2.3 或以上的基础库以使用云能力");
     } else {
-      const envId = resolveCloudEnvId(this.globalData.env);
-      if (envId) {
-        this.globalData.env = envId;
-      }
-      // 仅在有有效 env 时写入；空串会导致 Environment not found / INVALID_ENV
-      const initOpts = { traceUser: true };
-      if (envId) {
-        initOpts.env = envId;
-      }
-      wx.cloud.init(initOpts);
+      const envId = resolveCloudEnvId(this.globalData.env) || "cloud1-d5gluh1ode0ef8738";
+      this.globalData.env = envId;
+      wx.cloud.init({
+        env: envId,
+        traceUser: true
+      });
     }
   },
 

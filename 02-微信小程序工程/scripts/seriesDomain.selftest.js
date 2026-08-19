@@ -1468,8 +1468,8 @@ function freezeClone(value) {
     participantDraft.isFirstWaveTemplate('organization', 'inter_team_series') === true
   );
   assert(
-    '非首版 ryder 不可进 3～5',
-    participantDraft.isFirstWaveTemplate('organization', 'ryder') === false
+    '首版模板 organization+ryder',
+    participantDraft.isFirstWaveTemplate('organization', 'ryder') === true
   );
   assert(
     '非首版 custom 不可进 3～5',
@@ -1864,7 +1864,7 @@ function freezeClone(value) {
 
   var draftA = seriesModel.createEmptySeriesDraft({});
   draftA.hostMode = 'organization';
-  draftA.templateId = 'ryder';
+  draftA.templateId = 'custom';
   draftA.organization = org;
   draftA.participants = mappedTeams;
   assert(

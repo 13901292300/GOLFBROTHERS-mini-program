@@ -9,6 +9,8 @@ var seriesGameModeLabel = require('./seriesGameModeLabel.js');
 var seriesPlazaLiveSubtitle = require('./seriesPlazaLiveSubtitle.js');
 var seriesRoundPhaseAggregate = require('./seriesRoundPhaseAggregate.js');
 var seriesFinishLock = require('./seriesFinishLock.js');
+var seriesRyderCupAccumulate = require('./seriesRyderCupAccumulate.js');
+var seriesRyderCup = require('./seriesRyderCup.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -230,7 +232,12 @@ function toSeriesClubCard(series, listPhase, options) {
     /[\r\n\u2028\u2029]+/g,
     ''
   );
-  if (listPhase === 'live') {
+  if (seriesRyderCup.isRyderCupSeries(series)) {
+    titleSub = seriesRyderCupAccumulate.buildRyderCupDisplaySubtitle(
+      series,
+      options
+    ).text;
+  } else if (listPhase === 'live') {
     titleSub = seriesPlazaLiveSubtitle.projectPlazaSeriesTitleSub(
       series,
       options && options.getMatchById
@@ -265,7 +272,7 @@ function toSeriesClubCard(series, listPhase, options) {
   var privacyLabel =
     series.visibility === 'private' ? '访问码保护' : '';
 
-  return {
+  var card = {
     id: 'series:' + sid,
     seriesId: sid,
     matchId: '',
@@ -288,6 +295,7 @@ function toSeriesClubCard(series, listPhase, options) {
     _sortAt: stableTimeMs(series),
     _cardKind: 'series'
   };
+  return seriesRyderCupAccumulate.decoratePlazaSeriesCard(card, series, listPhase, options);
 }
 
 function filterOrdinaryMatchesForPublicLists(matches) {
@@ -441,7 +449,9 @@ function _buildList(deps, mode) {
         ) {
           continue;
         }
-        var regCard = toSeriesClubCard(series, 'registration');
+        var regCard = toSeriesClubCard(series, 'registration', {
+          getMatchById: d.getMatchById
+        });
         if (!regCard) continue;
         seen[sid] = 1;
         seriesCards.push(regCard);

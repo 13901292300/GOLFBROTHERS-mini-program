@@ -92,11 +92,16 @@ function resolveSessionSelectedRoundId(input) {
   var visited = !!src.visited;
   var def = resolveDefaultTargetRoundId(roundStates);
 
-  if (userPicked && isValidRoundKey(roundStates, current, extraValidKeys)) {
+  if (
+    userPicked &&
+    isValidRoundKey(roundStates, current, extraValidKeys) &&
+    stateOfKey(roundStates, current) !== 'cancelled'
+  ) {
     return current;
   }
   if (!visited) return def;
   if (!isValidRoundKey(roundStates, current, extraValidKeys)) return def;
+  if (stateOfKey(roundStates, current) === 'cancelled') return def;
   if (extraValidKeys && extraValidKeys[current]) return current;
 
   var curState = stateOfKey(roundStates, current);
@@ -112,8 +117,16 @@ function resolveSessionSelectedRoundId(input) {
  * 有任意未取消 LIVE 时，报名 TAB 移到最后；其它 TAB 相对顺序不变。
  * 选中态必须用 id，禁止下标。
  */
-function buildSeriesDetailTabs(hasLiveRound) {
+function buildSeriesDetailTabs(hasLiveRound, options) {
   var tabs = cloneTabs(SERIES_TABS);
+  if (options && options.ryderCup) {
+    for (var t = 0; t < tabs.length; t++) {
+      if (tabs[t].id === 'standings') tabs[t].label = '得分榜';
+      if (tabs[t].id === 'schedule') {
+        tabs[t].label = hasLiveRound ? '出发表' : '分组';
+      }
+    }
+  }
   if (!hasLiveRound) return tabs;
   var register = null;
   var rest = [];

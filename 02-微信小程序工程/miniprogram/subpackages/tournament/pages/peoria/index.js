@@ -4,8 +4,8 @@
  * 已生成 peoriaResult 后冻结，禁止重算覆盖。
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
-const peoriaStore = require('../../../../utils/peoriaStore.js');
-const peoriaCalculator = require('../../../../utils/peoriaCalculator.js');
+const peoriaStore = require('../../utils/peoriaStore.js');
+const peoriaCalculator = require('../../utils/peoriaCalculator.js');
 const teamMatchStore = require('../../../../utils/teamMatchStore.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
 const halfCourse = require('../../../../utils/halfCourse.js');

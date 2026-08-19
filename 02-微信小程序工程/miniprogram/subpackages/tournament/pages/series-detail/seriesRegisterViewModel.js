@@ -7,7 +7,7 @@
  */
 
 var openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
-var registrationInteractionModel = require('../../../../utils/registrationInteractionModel.js');
+var registrationInteractionModel = require('../../utils/registrationInteractionModel.js');
 var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 
 var SERIES_SELF_REGISTER_SHEET_TITLE = '赛事报名';

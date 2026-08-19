@@ -7,7 +7,7 @@
  */
 
 var personalLeaderboardBoard = require('../../../../utils/personalLeaderboardBoard.js');
-var seriesStandingsAssembler = require('../../../../utils/seriesStandingsAssembler.js');
+var seriesStandingsAssembler = require('../../utils/seriesStandingsAssembler.js');
 var teamMatchScorecard = require('../../../../utils/teamMatchScorecard.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
 var playerManage = require('../../../../utils/playerManage.js');

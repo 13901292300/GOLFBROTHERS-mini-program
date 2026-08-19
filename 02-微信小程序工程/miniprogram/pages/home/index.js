@@ -246,7 +246,7 @@ Page({
         active: false,
         live: false,
         clubLogo: 'https://cdn.screenshottocode.com/4xhZC0kyGivdD4E_wX-1F.png',
-        clubDate: 'MAY/25/2026',
+        clubDate: 'MAY 25 2026',
         title: '交杯鲜啤挑战赛&江湖业余球员巡回赛第三站',
         teamName: '江湖业余球员巡回赛',
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
@@ -260,7 +260,7 @@ Page({
         id: 'tour-1',
         favorited: true,
         clubLogo: 'https://cdn.screenshottocode.com/4xhZC0kyGivdD4E_wX-1F.png',
-        clubDate: 'MAY/25/2026',
+        clubDate: 'MAY 25 2026',
         title: '交杯鲜啤挑战赛&江湖业余球员巡回赛第三站',
         teamName: '江湖业余球员巡回赛',
         venue: '北京清河湾高尔夫乡村俱乐部A&B',
@@ -271,7 +271,7 @@ Page({
         id: 'tour-2',
         favorited: true,
         clubLogo: 'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100',
-        clubDate: 'AUG/15/2026',
+        clubDate: 'AUG 15 2026',
         title: '高球兄弟精英队内部排名赛',
         teamName: '高球兄弟精英队',
         venue: '北京通盈雁栖湖高尔夫俱乐部',
@@ -282,7 +282,7 @@ Page({
         id: 'tour-3',
         favorited: false,
         clubLogo: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=100',
-        clubDate: 'SEP/22/2026',
+        clubDate: 'SEP 22 2026',
         title: '北京球友联合会月度挑战赛',
         teamName: '北京球友联合会',
         venue: '鸿华国际高尔夫俱乐部',
@@ -851,7 +851,7 @@ Page({
     // 多组 Game → 进入 Game Hub 控制页；单组 → 直接进入记分
     const multi = Array.isArray(g.groups) && g.groups.length > 1;
     const navUrl = multi
-      ? '/pages/game/hub/index?gameId=' + g.gameId
+      ? '/subpackages/scoring/pages/hub/index?gameId=' + g.gameId
       : '/subpackages/scoring/pages/score/index?gameId=' + g.gameId + '&groupIndex=0';
     const progress = gameProgress.buildProgressUi(g, 0);
     const ended = g.status === 'finished' || g.status === 'ended';

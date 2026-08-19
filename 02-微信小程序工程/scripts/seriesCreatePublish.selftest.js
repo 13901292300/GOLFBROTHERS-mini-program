@@ -307,6 +307,15 @@ assert(
   pageJs.indexOf('_commitPendingRoundTopNInputs') >= 0 &&
     /_enterStep5FromStep4\(\) \{[\s\S]{0,80}_commitPendingRoundTopNInputs\(\)/.test(pageJs)
 );
+assert(
+  '冻结/失败草稿取消走领域安全清理并回首页',
+  pageJs.indexOf('discardInterruptedPublishSafely') >= 0 &&
+    pageJs.indexOf('_runInterruptedPublishDiscard') >= 0 &&
+    pageJs.indexOf('_exitCreateToCleanHome') >= 0 &&
+    adapterSrc.indexOf('shouldConfirmInterruptedDiscard') >= 0 &&
+    adapterSrc.indexOf('DISCARD_CONFLICT') >= 0 &&
+    adapterSrc.indexOf('DISCARD_CONFIRM') >= 0
+);
 
 console.log('');
 console.log('seriesCreatePublish.selftest: ' + passed + ' passed, ' + failed + ' failed');

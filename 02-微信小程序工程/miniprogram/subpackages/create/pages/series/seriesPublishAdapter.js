@@ -5,7 +5,7 @@
  * - published / frozen 路径禁止 saveDraft、禁止重冻
  */
 
-var seriesPublishMod = require('../../../../utils/seriesPublish.js');
+var seriesPublishMod = require('../../utils/seriesPublish.js');
 
 var SERIES_DETAIL_PATH = '/subpackages/tournament/pages/series-detail/index';
 
@@ -20,6 +20,12 @@ var TOAST = {
   SOURCE_DRIFT: '草稿与已冻结的创建计划不一致，无法覆盖；请返回处理或联系支持',
   JOURNAL_CORRUPT: '创建记录已损坏，无法自动覆盖或重建',
   ENTITY_CONFLICT: '已发布数据存在冲突，无法自动覆盖',
+  DISCARD_CONFLICT: '存在冲突分站，无法自动取消',
+  DISCARD_PUBLISHED: '系列赛已创建，不能从创建页取消',
+  DISCARD_DENIED: '只能取消自己未完成的创建',
+  DISCARD_FAILED: '取消失败，请重试',
+  DISCARD_CONFIRM:
+    '将放弃本次创建并清理已生成的分站比赛，此操作不可恢复。是否继续？',
   SERIES_MISSING: '找不到系列赛草稿',
   SERIES_ID_REQUIRED: '缺少系列赛编号',
   DRAFT_SAVE_FAILED: '草稿保存失败',
@@ -567,8 +573,31 @@ function resolvePrimaryButtonText(mode, publishing) {
   return PLACEHOLDER.CREATE;
 }
 
+function shouldConfirmInterruptedDiscard(insp) {
+  if (!insp || insp.ok === false) return false;
+  if (!insp.hasFrozenPlan) return false;
+  var life =
+    insp.series && insp.series.lifecycleStatus
+      ? asString(insp.series.lifecycleStatus).trim()
+      : '';
+  if (life === 'published') return false;
+  return true;
+}
+
+function mapDiscardFailure(result) {
+  var reason = asString(result && result.reason).trim();
+  if (reason === 'station_conflict') return TOAST.DISCARD_CONFLICT;
+  if (reason === 'published_not_allowed') return TOAST.DISCARD_PUBLISHED;
+  if (reason === 'permission_denied') return TOAST.DISCARD_DENIED;
+  if (reason === 'no_frozen_plan' || reason === 'actor_required') {
+    return TOAST.DISCARD_FAILED;
+  }
+  return (result && result.message) || TOAST.DISCARD_FAILED;
+}
+
 module.exports = {
   SERIES_DETAIL_PATH: SERIES_DETAIL_PATH,
+  HOME_URL: '/pages/home/index',
   PLACEHOLDER: PLACEHOLDER,
   TOAST: TOAST,
   buildSeriesDetailUrl: buildSeriesDetailUrl,
@@ -578,5 +607,7 @@ module.exports = {
   isPublishBusinessSuccess: isPublishBusinessSuccess,
   runCreatePublish: runCreatePublish,
   resolvePrimaryButtonText: resolvePrimaryButtonText,
+  shouldConfirmInterruptedDiscard: shouldConfirmInterruptedDiscard,
+  mapDiscardFailure: mapDiscardFailure,
   hasEntityBlockingIssues: hasEntityBlockingIssues
 };

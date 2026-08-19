@@ -46,7 +46,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "me",
               "userId": "me",
               "name": "TIGERHOODS",
-              "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
               "gender": "",
               "tPosition": "",
               "tee": ""
@@ -55,7 +55,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "fr-1003",
               "userId": "fr-1003",
               "name": "阿杰",
-              "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
               "gender": "male",
               "tPosition": "BLUE_T",
               "tee": "BLUE_T"
@@ -66,7 +66,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "me",
               "userId": "me",
               "name": "TIGERHOODS",
-              "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
               "gender": "",
               "tPosition": "",
               "tee": ""
@@ -75,7 +75,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "fr-1003",
               "userId": "fr-1003",
               "name": "阿杰",
-              "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
               "gender": "male",
               "tPosition": "BLUE_T",
               "tee": "BLUE_T"
@@ -92,7 +92,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "fr-1005",
               "userId": "fr-1005",
               "name": "老张",
-              "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
               "gender": "",
               "tPosition": "",
               "tee": ""
@@ -101,7 +101,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "fr-1008",
               "userId": "fr-1008",
               "name": "陈浩",
-              "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
               "gender": "",
               "tPosition": "",
               "tee": ""
@@ -112,7 +112,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "fr-1005",
               "userId": "fr-1005",
               "name": "老张",
-              "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
               "gender": "",
               "tPosition": "",
               "tee": ""
@@ -121,7 +121,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               "playerId": "fr-1008",
               "userId": "fr-1008",
               "name": "陈浩",
-              "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+              "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
               "gender": "",
               "tPosition": "",
               "tee": ""
@@ -135,7 +135,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           "teamId": "team-1",
           "playerId": "me",
           "name": "TIGERHOODS",
-          "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
           "gender": "",
           "tPosition": "",
           "tee": ""
@@ -145,7 +145,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           "teamId": "team-1",
           "playerId": "fr-1003",
           "name": "阿杰",
-          "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
           "gender": "male",
           "tPosition": "BLUE_T",
           "tee": "BLUE_T"
@@ -155,7 +155,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           "teamId": "team-2",
           "playerId": "fr-1005",
           "name": "老张",
-          "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
           "gender": "",
           "tPosition": "",
           "tee": ""
@@ -165,7 +165,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           "teamId": "team-2",
           "playerId": "fr-1008",
           "name": "陈浩",
-          "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
           "gender": "",
           "tPosition": "",
           "tee": ""
@@ -188,7 +188,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "me",
             "userId": "me",
             "name": "TIGERHOODS",
-            "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -197,7 +197,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "fr-1003",
             "userId": "fr-1003",
             "name": "阿杰",
-            "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
             "gender": "male",
             "tPosition": "BLUE_T",
             "tee": "BLUE_T"
@@ -208,7 +208,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "me",
             "userId": "me",
             "name": "TIGERHOODS",
-            "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -217,7 +217,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "fr-1003",
             "userId": "fr-1003",
             "name": "阿杰",
-            "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
             "gender": "male",
             "tPosition": "BLUE_T",
             "tee": "BLUE_T"
@@ -234,7 +234,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "fr-1005",
             "userId": "fr-1005",
             "name": "老张",
-            "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -243,7 +243,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "fr-1008",
             "userId": "fr-1008",
             "name": "陈浩",
-            "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -254,7 +254,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "fr-1005",
             "userId": "fr-1005",
             "name": "老张",
-            "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -263,7 +263,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "playerId": "fr-1008",
             "userId": "fr-1008",
             "name": "陈浩",
-            "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -278,7 +278,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
         "teamId": "team-1",
         "playerId": "me",
         "name": "TIGERHOODS",
-        "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+        "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
         "gender": "",
         "tPosition": "",
         "tee": ""
@@ -288,7 +288,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
         "teamId": "team-1",
         "playerId": "fr-1003",
         "name": "阿杰",
-        "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+        "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
         "gender": "male",
         "tPosition": "BLUE_T",
         "tee": "BLUE_T"
@@ -298,7 +298,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
         "teamId": "team-2",
         "playerId": "fr-1005",
         "name": "老张",
-        "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+        "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
         "gender": "",
         "tPosition": "",
         "tee": ""
@@ -308,7 +308,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
         "teamId": "team-2",
         "playerId": "fr-1008",
         "name": "陈浩",
-        "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+        "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
         "gender": "",
         "tPosition": "",
         "tee": ""
@@ -322,28 +322,28 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
     {
       "playerId": "me",
       "name": "TIGERHOODS",
-      "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+      "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
       "gender": "",
       "tPosition": ""
     },
     {
       "playerId": "fr-1003",
       "name": "阿杰",
-      "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+      "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
       "gender": "",
       "tPosition": ""
     },
     {
       "playerId": "fr-1005",
       "name": "老张",
-      "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+      "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
       "gender": "",
       "tPosition": ""
     },
     {
       "playerId": "fr-1008",
       "name": "陈浩",
-      "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+      "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
       "gender": "",
       "tPosition": ""
     }
@@ -357,28 +357,28 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
         {
           "playerId": "me",
           "name": "TIGERHOODS",
-          "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
           "gender": "",
           "tPosition": ""
         },
         {
           "playerId": "fr-1003",
           "name": "阿杰",
-          "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
           "gender": "",
           "tPosition": ""
         },
         {
           "playerId": "fr-1005",
           "name": "老张",
-          "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
           "gender": "",
           "tPosition": ""
         },
         {
           "playerId": "fr-1008",
           "name": "陈浩",
-          "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+          "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
           "gender": "",
           "tPosition": ""
         }
@@ -430,7 +430,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "me",
                 "userId": "me",
                 "name": "TIGERHOODS",
-                "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
                 "gender": "",
                 "tPosition": "",
                 "tee": ""
@@ -439,7 +439,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "fr-1003",
                 "userId": "fr-1003",
                 "name": "阿杰",
-                "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
                 "gender": "male",
                 "tPosition": "BLUE_T",
                 "tee": "BLUE_T"
@@ -450,7 +450,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "me",
                 "userId": "me",
                 "name": "TIGERHOODS",
-                "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
                 "gender": "",
                 "tPosition": "",
                 "tee": ""
@@ -459,7 +459,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "fr-1003",
                 "userId": "fr-1003",
                 "name": "阿杰",
-                "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
                 "gender": "male",
                 "tPosition": "BLUE_T",
                 "tee": "BLUE_T"
@@ -476,7 +476,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "fr-1005",
                 "userId": "fr-1005",
                 "name": "老张",
-                "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
                 "gender": "",
                 "tPosition": "",
                 "tee": ""
@@ -485,7 +485,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "fr-1008",
                 "userId": "fr-1008",
                 "name": "陈浩",
-                "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
                 "gender": "",
                 "tPosition": "",
                 "tee": ""
@@ -496,7 +496,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "fr-1005",
                 "userId": "fr-1005",
                 "name": "老张",
-                "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
                 "gender": "",
                 "tPosition": "",
                 "tee": ""
@@ -505,7 +505,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
                 "playerId": "fr-1008",
                 "userId": "fr-1008",
                 "name": "陈浩",
-                "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+                "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
                 "gender": "",
                 "tPosition": "",
                 "tee": ""
@@ -519,7 +519,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "teamId": "team-1",
             "playerId": "me",
             "name": "TIGERHOODS",
-            "avatar": "/assets/mock-avatars/mock-avatar-01.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -529,7 +529,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "teamId": "team-1",
             "playerId": "fr-1003",
             "name": "阿杰",
-            "avatar": "/assets/mock-avatars/mock-avatar-03.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-03.jpg",
             "gender": "male",
             "tPosition": "BLUE_T",
             "tee": "BLUE_T"
@@ -539,7 +539,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "teamId": "team-2",
             "playerId": "fr-1005",
             "name": "老张",
-            "avatar": "/assets/mock-avatars/mock-avatar-05.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-05.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""
@@ -549,7 +549,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "teamId": "team-2",
             "playerId": "fr-1008",
             "name": "陈浩",
-            "avatar": "/assets/mock-avatars/mock-avatar-08.jpg",
+            "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-08.jpg",
             "gender": "",
             "tPosition": "",
             "tee": ""

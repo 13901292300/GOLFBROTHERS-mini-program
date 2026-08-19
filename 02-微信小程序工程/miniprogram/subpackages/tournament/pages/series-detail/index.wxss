@@ -1,4 +1,5 @@
 @import "/styles/tournament-common.wxss";
+@import "/styles/match-play-scoreboard.wxss";
 
 /* ===== Hero（镜像 detail/index.wxss 必要规则，不改公共样式/详情页） ===== */
 .hero-wrap { position: relative; }
@@ -458,6 +459,11 @@
   box-sizing: border-box;
   padding: 12rpx 32rpx;
   background: var(--bg-primary);
+}
+/* 莱德杯累计得分条与单场摘要同宽；Rx 仍走 inner 的 32rpx */
+.series-round-dock__scorebar {
+  margin: -12rpx -32rpx 0;
+  width: auto;
 }
 
 /* 总榜 dock 体：选择器 + 轮信息同一列，一起二次吸顶；底部舒适留白仅总榜 */
