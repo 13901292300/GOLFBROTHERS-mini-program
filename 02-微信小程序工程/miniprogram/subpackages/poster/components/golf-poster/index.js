@@ -509,6 +509,7 @@ Component({
       this.sceneBounds = {};
       this.gesture = null;
       this.renderPending = false;
+      this._renderDirty = false;
       this.returnToSummary = false;
       this.segmentationFailure = null;
       this._posterReady = false;
@@ -1065,7 +1066,13 @@ Component({
         sizeType: ["original", "compressed"],
         success: (result) => {
           const file = result.tempFiles && result.tempFiles[0];
-          if (file) this._loadPhoto(file.tempFilePath);
+          const tempFilePath = file && file.tempFilePath;
+          console.log("[poster] chooseMedia 成功:", tempFilePath, file && file.size);
+          if (tempFilePath) this._loadPhoto(tempFilePath);
+          else console.error("[poster] chooseMedia 无 tempFilePath", result);
+        },
+        fail: (err) => {
+          console.error("[poster] chooseMedia 失败:", err);
         }
       });
     },
@@ -1073,17 +1080,14 @@ Component({
     async _loadPhoto(filePath) {
       try {
         this._clearPosterCanvas();
-        let persistedPhoto = filePath;
-        try {
-          persistedPhoto = await this._persistDraftFile(filePath, "photo");
-        } catch (error) {
-          console.warn("[golf-poster] persist photo failed", error);
+        if (this.posterState.photo) {
+          this.posterState.photo = null;
         }
-        const image = await this._loadCanvasImage(persistedPhoto);
-        this.posterState.photo = image;
-        this.posterState.photoPath = persistedPhoto;
+        if (this.posterState.subject) {
+          this.posterState.subject = null;
+        }
+        this.posterState.photoPath = "";
         this.posterState.photoFileID = "";
-        this.posterState.subject = null;
         this.posterState.subjectPath = "";
         this.posterState.subjectFileID = "";
         this.posterState.segmentationStatus = "loading";
@@ -1098,21 +1102,65 @@ Component({
           segLoading: true
         });
         this._render();
-        this.triggerEvent("segmentationstart", { filePath });
-        await this._runSegmentation(filePath);
+
+        if (!this.posterCanvas) {
+          await this._initPosterCanvas();
+        }
+        const canvas = this.posterCanvas;
+        if (!canvas || typeof canvas.createImage !== "function") {
+          throw new Error("Poster canvas is not initialized");
+        }
+
+        let persistedPhoto = this._localFilePath(filePath);
+        try {
+          persistedPhoto = this._localFilePath(await this._persistDraftFile(filePath, "photo"));
+        } catch (error) {
+          console.warn("[golf-poster] persist photo failed", error);
+        }
+        const uploadPath = persistedPhoto || this._localFilePath(filePath);
+        console.log("[poster] _loadPhoto 本地路径:", {
+          original: filePath,
+          persistedPhoto: persistedPhoto,
+          uploadPath: uploadPath
+        });
+
+        await new Promise((resolve, reject) => {
+          const image = canvas.createImage();
+          image.onload = () => {
+            this.posterState.photo = image;
+            this.posterState.photoPath = uploadPath;
+            this.renderPending = false;
+            console.log("[poster] Canvas 图片加载成功:", uploadPath);
+            this._renderNow();
+            resolve(image);
+          };
+          image.onerror = (error) => {
+            console.error("[poster] Canvas 图片加载失败:", uploadPath, error);
+            reject(error || new Error("load image failed"));
+          };
+          image.src = uploadPath;
+        });
+
+        this.triggerEvent("segmentationstart", { filePath: uploadPath });
+        await this._runSegmentation(uploadPath);
         this.saveDraft();
       } catch (error) {
+        console.error("[poster] _loadPhoto 失败:", error);
         this.setData({ segLoading: false });
         wx.showToast({ title: this.data.copy.segmentFailed, icon: "none" });
       }
     },
 
+    _localFilePath(filePath) {
+      return String(filePath || "").split("?")[0];
+    },
+
     _persistDraftFile(srcPath, kind) {
-      const source = String(srcPath || "");
+      const source = this._localFilePath(srcPath);
       if (!source) return Promise.reject(new Error("empty draft file"));
       const roundId = String(this.properties.roundId || "draft").replace(/[^\w-]/g, "_");
       const ext = kind === "subject" ? ".png" : ".jpg";
-      const destPath = wx.env.USER_DATA_PATH + "/poster_" + kind + "_" + roundId + ext;
+      const destPath = wx.env.USER_DATA_PATH + "/poster_" + kind + "_" + roundId + "_" + Date.now() + ext;
       const fs = wx.getFileSystemManager();
       return new Promise((resolve, reject) => {
         const copy = () => {
@@ -1147,9 +1195,10 @@ Component({
     },
 
     _readFileBase64(filePath) {
+      const localPath = this._localFilePath(filePath);
       return new Promise((resolve, reject) => {
         wx.getFileSystemManager().readFile({
-          filePath: filePath,
+          filePath: localPath,
           encoding: "base64",
           success: (result) => resolve(result.data),
           fail: reject
@@ -1158,6 +1207,7 @@ Component({
     },
 
     _compressImage(filePath, quality, maxEdge) {
+      const srcPath = this._localFilePath(filePath);
       const q = Number.isFinite(Number(quality))
         ? Math.max(1, Math.min(100, Number(quality)))
         : 80;
@@ -1165,13 +1215,13 @@ Component({
       return new Promise((resolve) => {
         if (typeof wx.compressImage !== "function") {
           console.warn("[poster] wx.compressImage 不可用，使用原图");
-          resolve(filePath);
+          resolve(srcPath);
           return;
         }
 
         const runCompress = function (compressedWidth, compressedHeight) {
           const options = {
-            src: filePath,
+            src: srcPath,
             quality: q,
             success: (res) => {
               console.log("[poster] 图片压缩成功:", res.tempFilePath, {
@@ -1179,11 +1229,11 @@ Component({
                 compressedWidth: compressedWidth,
                 compressedHeight: compressedHeight
               });
-              resolve(res.tempFilePath || filePath);
+              resolve(res.tempFilePath || srcPath);
             },
             fail: (err) => {
               console.warn("[poster] 图片压缩失败，使用原图:", err);
-              resolve(filePath);
+              resolve(srcPath);
             }
           };
           if (compressedWidth > 0 && compressedHeight > 0) {
@@ -1199,13 +1249,13 @@ Component({
         }
 
         wx.getImageInfo({
-          src: filePath,
+          src: srcPath,
           success: (info) => {
             const width = Number(info.width) || 0;
             const height = Number(info.height) || 0;
             if (!width || !height) {
               console.warn("[poster] 图片尺寸无效，使用原图");
-              resolve(filePath);
+              resolve(srcPath);
               return;
             }
             let compressedWidth = width;
@@ -1228,7 +1278,7 @@ Component({
           },
           fail: (err) => {
             console.warn("[poster] 获取图片信息失败，使用原图:", err);
-            resolve(filePath);
+            resolve(srcPath);
           }
         });
       });
@@ -1241,7 +1291,8 @@ Component({
         { quality: 60, maxEdge: 600 },
         { quality: 40, maxEdge: 480 }
       ];
-      let currentPath = filePath;
+      let currentPath = this._localFilePath(filePath);
+      console.log("[poster] 开始压缩上传文件:", currentPath);
       for (let i = 0; i < steps.length; i += 1) {
         currentPath = await this._compressImage(currentPath, steps[i].quality, steps[i].maxEdge);
         const imageBase64 = await this._readFileBase64(currentPath);
@@ -1254,11 +1305,16 @@ Component({
     },
 
     _uploadCloudFile(filePath) {
+      const localPath = this._localFilePath(filePath);
       const cloudPath = "poster/seg_" + Date.now() + ".jpg";
+      console.log("[poster] 准备上传云存储:", { filePath: localPath, cloudPath: cloudPath });
+      if (!localPath) {
+        return Promise.reject(new Error("upload filePath empty"));
+      }
       return new Promise((resolve, reject) => {
         wx.cloud.uploadFile({
           cloudPath: cloudPath,
-          filePath: filePath,
+          filePath: localPath,
           success: (res) => {
             console.log("[poster] 云存储上传成功:", res.fileID);
             resolve(res.fileID);
@@ -1326,12 +1382,14 @@ Component({
     },
 
     async _runSegmentation(filePath) {
+      const localPath = this._localFilePath(filePath);
+      console.log("[poster] 开始云端抠图:", localPath);
       this.setData({
         segLoading: true,
         photoStatus: this.data.copy.segmenting
       });
       try {
-        const result = await this._uploadAndSegment(filePath);
+        const result = await this._uploadAndSegment(localPath);
         let cutoutPath = result.tempPath;
         try {
           cutoutPath = await this._persistDraftFile(result.tempPath, "subject");
@@ -2392,9 +2450,13 @@ Component({
           return;
         }
         const image = this.posterCanvas.createImage();
+        const rawPath = this._localFilePath(filePath);
         image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.src = filePath;
+        image.onerror = (error) => {
+          console.error("[poster] _loadCanvasImage 失败:", rawPath, error);
+          reject(error || new Error("load image failed"));
+        };
+        image.src = rawPath;
       });
     },
 
@@ -2404,11 +2466,19 @@ Component({
     },
 
     _render() {
-      if (!this.posterContext || this.renderPending) return;
+      if (!this.posterContext) return;
+      if (this.renderPending) {
+        this._renderDirty = true;
+        return;
+      }
       this.renderPending = true;
       const draw = () => {
         this.renderPending = false;
         this._renderNow();
+        if (this._renderDirty) {
+          this._renderDirty = false;
+          this._render();
+        }
       };
       if (this.posterCanvas && typeof this.posterCanvas.requestAnimationFrame === "function") {
         this.posterCanvas.requestAnimationFrame(draw);
