@@ -4,9 +4,10 @@
   --accent-red: #cc0000;
   --stats-bg: #f0f2f5;
   --stats-card: #ffffff;
-  --stats-text: #1f2937;
+  --stats-row-alt: #f3f4f6;
+  --stats-text: #111827;
   --stats-text-strong: #111827;
-  --stats-muted: #d1d5db;
+  --stats-muted: #9ca3af;
   --stats-row-border: #f0f0f0;
   --stats-cell-border: #f3f4f6;
   --stats-thead-bg: #002d62;
@@ -19,10 +20,10 @@
   /*
    * 横屏 4 人刚好铺满统计滚动区（不按人数动态缩放）：
    * 行高 = (100vh − 顶栏 − 底栏 − 表头) / 4
-   * --stats-header-chrome 由页面按 statusBarHeight + 标题条写入
+  * --stats-header-chrome 由胶囊 getMenuButtonBoundingClientRect 写入
    */
-  --stats-header-chrome: 62px;
-  --stats-footer-h: calc(22px + env(safe-area-inset-bottom, 0px));
+  --stats-header-chrome: 46px;
+  --stats-footer-h: calc(26px + env(safe-area-inset-bottom, 0px));
   --stats-thead-h: 28px;
   --stats-row-h: calc(
     (100vh - var(--stats-header-chrome) - var(--stats-footer-h) - var(--stats-thead-h)) / 4
@@ -40,6 +41,7 @@
 .stats-page.dark-mode {
   --stats-bg: #000000;
   --stats-card: #111111;
+  --stats-row-alt: #1a1a1a;
   --stats-text: #cbd5e1;
   --stats-text-strong: #f1f5f9;
   --stats-muted: #6b7280;
@@ -57,6 +59,8 @@
 .stats-header {
   width: 100%;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
   background: var(--stats-header-bg);
   border-bottom: 2px solid var(--champion-gold);
   box-sizing: border-box;
@@ -65,10 +69,9 @@
 .stats-header__inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 2px 12px 4px;
-  height: 40px;
-  min-height: 40px;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 16px;
   box-sizing: border-box;
 }
 
@@ -94,15 +97,17 @@
 .stats-header__titles {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-width: 0;
 }
 
 .stats-header__eyebrow {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 9px;
+  color: #ffffff;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.14em;
-  line-height: 1.2;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  line-height: 1;
 }
 
 .stats-header__title {
@@ -110,15 +115,7 @@
   font-size: 14px;
   font-weight: 900;
   font-style: italic;
-  line-height: 1.2;
-}
-
-.stats-header__sub {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 10px;
-  font-weight: 700;
-  flex-shrink: 0;
-  margin-left: 10px;
+  line-height: 1.15;
 }
 
 .stats-scroll {
@@ -168,9 +165,9 @@
   height: var(--stats-thead-h);
   background: var(--stats-thead-bg);
   color: var(--stats-thead-text);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   position: sticky;
   top: 0;
@@ -185,15 +182,19 @@
   background: var(--stats-card);
   color: var(--stats-text);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   box-sizing: border-box;
   flex-shrink: 0;
+}
+
+.stats-row:nth-child(odd) {
+  background: var(--stats-row-alt);
 }
 
 .st-cell {
   width: auto;
   min-width: 0;
-  padding: 0 2px;
+  padding: 0 1px;
   text-align: center;
   box-sizing: border-box;
   border-left: 1px solid rgba(255, 255, 255, 0.18);
@@ -219,9 +220,9 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
   height: 100%;
-  padding: 0 10px;
+  padding: 0 10px 0 6px;
   text-align: left;
   border-left: 0 !important;
   overflow: hidden;
@@ -238,6 +239,10 @@
 
 .stats-row .st-player {
   background: var(--stats-card);
+}
+
+.stats-row:nth-child(odd) .st-player {
+  background: var(--stats-row-alt);
 }
 
 /* 与记分页一致：T台竖线贴 PLAYER 列右侧边界 */
@@ -261,52 +266,55 @@
 }
 
 .st-avatar {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   flex-shrink: 0;
   background: #e5e7eb;
+  border: 2px solid #e5e7eb;
   display: block;
+  box-sizing: border-box;
 }
 
 .stats-page.dark-mode .st-avatar {
   background: #2a2a2a;
+  border-color: #3f3f46;
 }
 
 /* 固定头像槽：单人 / 组合叠放（对齐 score paired-avatars 层级思路） */
 .st-avatar-slot {
   position: relative;
   flex-shrink: 0;
-  height: 28px;
-  width: 28px;
+  height: 36px;
+  width: 36px;
 }
 .st-avatar-slot--single {
-  width: 28px;
+  width: 36px;
 }
 .st-avatar-slot--n1 {
-  width: 28px;
+  width: 36px;
 }
 .st-avatar-slot--n2 {
-  width: 42px;
+  width: 54px;
 }
 .st-avatar-slot--n3 {
-  width: 56px;
+  width: 72px;
 }
 .st-avatar-slot--n4 {
-  width: 70px;
+  width: 90px;
 }
 
 .st-paired-avatars {
   position: relative;
   width: 100%;
-  height: 28px;
+  height: 36px;
 }
 
 .st-pair-avatar {
   position: absolute;
   top: 0;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
 }
 
 /* 对齐 score：前者更高 z-index，后者右移叠放 */
@@ -315,15 +323,15 @@
   z-index: 10;
 }
 .st-pair-avatar:nth-child(2) {
-  left: 14px;
+  left: 18px;
   z-index: 9;
 }
 .st-pair-avatar:nth-child(3) {
-  left: 28px;
+  left: 36px;
   z-index: 8;
 }
 .st-pair-avatar:nth-child(4) {
-  left: 42px;
+  left: 54px;
   z-index: 7;
 }
 
@@ -348,8 +356,8 @@
 
 .st-name {
   color: var(--stats-text-strong);
-  font-size: 12px;
-  font-weight: 900;
+  font-size: 13px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -387,6 +395,7 @@
 .stats-thead .st-total {
   background: transparent;
   color: inherit;
+  font-style: italic;
 }
 
 /* 仅当前 sortField 对应表头金色高亮；同一时间只允许一个 */
@@ -398,8 +407,9 @@
 }
 
 .st-total-val {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
+  font-style: italic;
   color: var(--stats-text-strong);
   border-left: 1px solid var(--stats-total-border);
   background: transparent;

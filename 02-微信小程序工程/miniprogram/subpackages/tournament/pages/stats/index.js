@@ -334,13 +334,43 @@ function parseStatsSortValue(raw) {
   return { missing: false, num: null, str: s };
 }
 
+function measureHeaderSafeArea() {
+  const fallback = {
+    headerPadY: 6,
+    headerPadRight: 96,
+    headerInnerH: 32,
+    statsHeaderChrome: 46
+  };
+  try {
+    const sys = wx.getSystemInfoSync();
+    const windowWidth = sys.windowWidth || sys.screenWidth || 0;
+    const menu = wx.getMenuButtonBoundingClientRect();
+    if (!menu || !menu.height) return fallback;
+    const capTop = Math.max(0, Number(menu.top) || 0);
+    const capH = Math.max(32, Number(menu.height) || 32);
+    let padRight = fallback.headerPadRight;
+    if (menu.left > 0 && windowWidth > menu.left) {
+      padRight = Math.max(16, windowWidth - menu.left + 8);
+    }
+    return {
+      headerPadY: capTop,
+      headerPadRight: padRight,
+      headerInnerH: capH,
+      statsHeaderChrome: capTop * 2 + capH + 2
+    };
+  } catch (e) {
+    return fallback;
+  }
+}
+
 Page({
   data: {
-    statusBarHeight: 20,
+    headerPadY: 6,
+    headerPadRight: 96,
+    headerInnerH: 32,
     matchId: '',
     gameId: '',
-    /** 顶栏占位：statusBarHeight + 标题条 40 + 底边 2，供 --stats-header-chrome */
-    statsHeaderChrome: 62,
+    statsHeaderChrome: 46,
     themeClass: 'bright-mode',
     title: 'Player Statistics',
     subtitle: '赛事统计',
@@ -356,27 +386,18 @@ Page({
     const opts = options || {};
     const matchId = opts.matchId ? String(opts.matchId) : '';
     const gameId = opts.gameId ? String(opts.gameId) : '';
-    let statusBarHeight = 20;
-    try {
-      const sys = wx.getSystemInfoSync();
-      statusBarHeight = sys.statusBarHeight || 20;
-    } catch (e) {
-      statusBarHeight = 20;
-    }
     const loaded = this._loadStatisticsPageRows(opts);
-    this.setData({
+    this.setData(Object.assign({
       matchId: matchId,
       gameId: gameId,
-      statusBarHeight: statusBarHeight,
-      statsHeaderChrome: statusBarHeight + 42,
       themeClass: this._resolveThemeClass(),
       sortField: 'total',
       sortOrder: 'asc',
       dataSource: loaded.dataSource,
-      subtitle: this._resolveStatsSubtitle(opts, loaded.dataSource),
       rows: loaded.rows
-    });
+    }, measureHeaderSafeArea()));
     this._applyPageBackground();
+    this._bindWindowResize();
     this._lockLandscape();
   },
 
@@ -568,7 +589,7 @@ Page({
         genderIcon: isEntity ? '' : (p.genderIcon || ''),
         genderClass: gender === 'female' ? 'gender-female' : (gender === 'male' ? 'gender-male' : ''),
         teeColor: p.teeColor || '#ffffff',
-        teeMarkerClass: resolveTeeMarkerClass(p.teeColor),
+        teeMarkerClass: p.teeMarkerClass || resolveTeeMarkerClass(p.teeColor),
         hasScore: hasScore,
         eagle: eagle,
         birdie: birdie,
@@ -764,6 +785,7 @@ Page({
   },
 
   onUnload() {
+    this._unbindWindowResize();
     this._restorePortrait();
   },
 
@@ -772,10 +794,49 @@ Page({
     this._restorePortrait();
   },
 
-  _lockLandscape() {
-    if (typeof wx.setPageOrientation === 'function') {
-      wx.setPageOrientation({ orientation: 'landscape' });
+  _syncHeaderSafeArea() {
+    const next = measureHeaderSafeArea();
+    if (
+      this.data.headerPadY === next.headerPadY &&
+      this.data.headerPadRight === next.headerPadRight &&
+      this.data.headerInnerH === next.headerInnerH &&
+      this.data.statsHeaderChrome === next.statsHeaderChrome
+    ) {
+      return;
     }
+    this.setData(next);
+  },
+
+  _bindWindowResize() {
+    if (this._onWindowResize) return;
+    this._onWindowResize = () => {
+      this._syncHeaderSafeArea();
+    };
+    if (typeof wx.onWindowResize === 'function') {
+      wx.onWindowResize(this._onWindowResize);
+    }
+  },
+
+  _unbindWindowResize() {
+    if (this._onWindowResize && typeof wx.offWindowResize === 'function') {
+      wx.offWindowResize(this._onWindowResize);
+    }
+    this._onWindowResize = null;
+  },
+
+  _lockLandscape() {
+    const sync = () => {
+      this._syncHeaderSafeArea();
+      setTimeout(() => this._syncHeaderSafeArea(), 80);
+    };
+    if (typeof wx.setPageOrientation !== 'function') {
+      sync();
+      return;
+    }
+    wx.setPageOrientation({
+      orientation: 'landscape',
+      complete: sync
+    });
   },
 
   _restorePortrait(done) {

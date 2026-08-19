@@ -131,12 +131,82 @@ function buildPlayerLookup(match) {
   return map;
 }
 
-function resolveTeeColor(player, lookup) {
-  if (player && player.teeColor) return String(player.teeColor);
-  const tp = tPosition.resolve(
-    Object.assign({}, lookup || {}, player || {})
+function isTeeKey(value) {
+  const s = String(value || '').toUpperCase();
+  return (
+    s === 'BLUE_T' ||
+    s === 'RED_T' ||
+    s === 'WHITE_T' ||
+    s === 'BLACK_T' ||
+    s === 'GOLD_T' ||
+    s === 'YELLOW_T'
   );
-  return tp === tPosition.RED_T ? '#dc2626' : '#00aeef';
+}
+
+const TEE_PACK = {
+  BLACK_T: {
+    tee: 'BLACK_T',
+    tPosition: 'BLACK_T',
+    teeColor: '#111827',
+    teeLabel: '黑Tee',
+    teeClass: 'tee-black',
+    teeMarkerClass: 'border-black'
+  },
+  GOLD_T: {
+    tee: 'GOLD_T',
+    tPosition: 'GOLD_T',
+    teeColor: '#ce9224',
+    teeLabel: '黄Tee',
+    teeClass: 'tee-gold',
+    teeMarkerClass: 'border-gold'
+  },
+  WHITE_T: {
+    tee: 'WHITE_T',
+    tPosition: 'WHITE_T',
+    teeColor: '#ffffff',
+    teeLabel: '白Tee',
+    teeClass: 'tee-white',
+    teeMarkerClass: 'border-white'
+  },
+  RED_T: {
+    tee: 'RED_T',
+    tPosition: 'RED_T',
+    teeColor: '#dc2626',
+    teeLabel: '红Tee',
+    teeClass: 'tee-red',
+    teeMarkerClass: 'border-red'
+  },
+  BLUE_T: {
+    tee: 'BLUE_T',
+    tPosition: 'BLUE_T',
+    teeColor: '#00aeef',
+    teeLabel: '蓝Tee',
+    teeClass: 'tee-blue',
+    teeMarkerClass: 'border-light'
+  }
+};
+
+/** 与记分页一致：显式 tPosition/tee 优先，其次颜色，再按性别回退红/蓝 */
+function resolveTeeFields(player, lookup) {
+  const src = Object.assign({}, lookup || {}, player || {});
+  const raw = isTeeKey(src.tPosition)
+    ? String(src.tPosition).toUpperCase()
+    : (isTeeKey(src.tee) ? String(src.tee).toUpperCase() : '');
+  const key = raw === 'YELLOW_T' ? 'GOLD_T' : raw;
+  if (TEE_PACK[key]) return TEE_PACK[key];
+  const color = String(src.teeColor || '').toLowerCase();
+  if (color === '#dc2626' || color === '#cc0000') return TEE_PACK.RED_T;
+  if (color === '#ffffff' || color === '#fff') return TEE_PACK.WHITE_T;
+  if (color === '#111827' || color === '#000000' || color === '#000') return TEE_PACK.BLACK_T;
+  if (color === '#00aeef' || color === '#2563eb') return TEE_PACK.BLUE_T;
+  if (color === '#ce9224' || color === '#f1b434' || color === '#ffd100') return TEE_PACK.GOLD_T;
+  const gender =
+    src.gender === 'female' || src.matchGender === 'female' ? 'female' : 'male';
+  return gender === 'female' ? TEE_PACK.RED_T : TEE_PACK.BLUE_T;
+}
+
+function resolveTeeColor(player, lookup) {
+  return resolveTeeFields(player, lookup).teeColor;
 }
 
 /**
@@ -319,6 +389,10 @@ function buildStatisticsRows(match) {
         meta.avatar || player.avatar || player.avatarUrl || '',
         playerId
       );
+      const teeFields = resolveTeeFields(
+        Object.assign({}, player, { gender: genderDisplay.gender || player.gender }),
+        meta
+      );
 
       rows.push({
         playerId: playerId,
@@ -328,7 +402,11 @@ function buildStatisticsRows(match) {
         name: name,
         gender: genderDisplay.gender || '',
         genderIcon: genderDisplay.icon || '',
-        teeColor: resolveTeeColor(player, meta),
+        tee: teeFields.tee,
+        teeColor: teeFields.teeColor,
+        teeLabel: teeFields.teeLabel,
+        teeClass: teeFields.teeClass,
+        teeMarkerClass: teeFields.teeMarkerClass,
         eagle: holeStats.eagle,
         birdie: holeStats.birdie,
         par: holeStats.par,
@@ -471,6 +549,9 @@ function buildGameStatisticsRows(game) {
         slot.avatar || slot.avatarUrl || '',
         playerId
       );
+      const teeFields = resolveTeeFields(
+        Object.assign({}, slot, { gender: genderDisplay.gender || slot.gender })
+      );
 
       rows.push({
         playerId: playerId,
@@ -480,7 +561,11 @@ function buildGameStatisticsRows(game) {
         name: name,
         gender: genderDisplay.gender || '',
         genderIcon: genderDisplay.icon || '',
-        teeColor: resolveTeeColor(slot, null),
+        tee: teeFields.tee,
+        teeColor: teeFields.teeColor,
+        teeLabel: teeFields.teeLabel,
+        teeClass: teeFields.teeClass,
+        teeMarkerClass: teeFields.teeMarkerClass,
         eagle: holeStats.eagle,
         birdie: holeStats.birdie,
         par: holeStats.par,
@@ -600,6 +685,7 @@ function buildEntityStatisticsRows(match) {
         };
       });
       const avatar = (members[0] && members[0].avatar) || '';
+      const teeFields = resolveTeeFields(null, lookup[memberIds[0]] || {});
 
       rows.push({
         isEntity: true,
@@ -613,7 +699,11 @@ function buildEntityStatisticsRows(match) {
         name: name,
         gender: '',
         genderIcon: '',
-        teeColor: resolveTeeColor(null, lookup[memberIds[0]] || {}),
+        tee: teeFields.tee,
+        teeColor: teeFields.teeColor,
+        teeLabel: teeFields.teeLabel,
+        teeClass: teeFields.teeClass,
+        teeMarkerClass: teeFields.teeMarkerClass,
         eagle: holeStats.eagle,
         birdie: holeStats.birdie,
         par: holeStats.par,
@@ -867,5 +957,7 @@ module.exports = {
   resolveMatchHolePars,
   resolveSlotScorePlayerId,
   resolveScoresByPlayerRecord,
-  resolveAnyPlayerId
+  resolveAnyPlayerId,
+  resolveTeeFields,
+  resolveTeeColor
 };

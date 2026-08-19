@@ -1,6 +1,9 @@
 <view class="stats-page {{themeClass}}" style="--stats-header-chrome: {{statsHeaderChrome}}px;">
-  <view class="stats-header" style="padding-top: {{statusBarHeight}}px;">
-    <view class="stats-header__inner">
+  <view class="stats-header" style="padding-top: {{headerPadY}}px; padding-bottom: {{headerPadY}}px;">
+    <view
+      class="stats-header__inner"
+      style="padding-right: {{headerPadRight}}px; height: {{headerInnerH}}px;"
+    >
       <view class="stats-header__left" bindtap="onBack">
         <text class="stats-header__back">‹</text>
         <view class="stats-header__titles">
@@ -8,7 +11,6 @@
           <text class="stats-header__title">数据统计</text>
         </view>
       </view>
-      <text class="stats-header__sub">{{subtitle}}</text>
     </view>
   </view>
 

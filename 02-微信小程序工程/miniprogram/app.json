@@ -52,6 +52,7 @@
       "name": "tournament",
       "pages": [
         "pages/stats/index",
+        "pages/scorecard/index",
         "pages/peoria/index",
         "pages/group-editor/index",
         "pages/group-pick/index",

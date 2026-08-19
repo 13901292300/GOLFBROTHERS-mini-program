@@ -1,0 +1,99 @@
+<view class="sc-page {{themeClass}}" style="--sc-header-chrome: {{headerChrome}}px;">
+  <view class="sc-header" style="padding-top: {{headerPadY}}px; padding-bottom: {{headerPadY}}px;">
+    <view
+      class="sc-header__inner"
+      style="padding-right: {{headerPadRight}}px; height: {{headerInnerH}}px;"
+    >
+      <view class="sc-header__left" bindtap="onBack">
+        <text class="sc-header__back-icon">‹</text>
+        <view class="sc-header__titles">
+          <text class="sc-header__en">SCORECARD</text>
+          <text class="sc-header__title">成绩卡</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="sc-board">
+    <view class="sc-table">
+      <view class="sc-row sc-row--head">
+        <text class="sc-cell sc-cell--player sc-cell--head">PLAYER</text>
+        <block wx:for="{{holeNumbers}}" wx:key="*this">
+          <text class="sc-cell sc-cell--hole sc-cell--head">{{item}}</text>
+        </block>
+        <text class="sc-cell sc-cell--sum sc-cell--head sc-cell--out">OUT</text>
+        <block wx:for="{{backHoleNumbers}}" wx:key="*this">
+          <text class="sc-cell sc-cell--hole sc-cell--head">{{item}}</text>
+        </block>
+        <text class="sc-cell sc-cell--sum sc-cell--head sc-cell--in">IN</text>
+        <text class="sc-cell sc-cell--total sc-cell--head">TOTAL</text>
+      </view>
+
+      <view class="sc-row sc-row--par">
+        <text class="sc-cell sc-cell--player sc-cell--par">PAR</text>
+        <block wx:for="{{frontPars}}" wx:key="index">
+          <text class="sc-cell sc-cell--hole sc-cell--par">{{item}}</text>
+        </block>
+        <text class="sc-cell sc-cell--sum sc-cell--par">{{outPar}}</text>
+        <block wx:for="{{backPars}}" wx:key="index">
+          <text class="sc-cell sc-cell--hole sc-cell--par">{{item}}</text>
+        </block>
+        <text class="sc-cell sc-cell--sum sc-cell--par">{{inPar}}</text>
+        <text class="sc-cell sc-cell--total sc-cell--par-total">{{totalPar}}</text>
+      </view>
+
+      <block wx:for="{{rows}}" wx:key="id">
+        <view class="sc-row {{index % 2 === 1 ? 'sc-row--alt' : ''}}">
+          <view class="sc-cell sc-cell--player">
+            <view class="sc-player">
+              <image wx:if="{{item.hasAvatar}}" class="sc-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <view wx:else class="sc-avatar sc-avatar--fallback">
+                <text class="sc-avatar__letter">{{item.initial}}</text>
+              </view>
+              <text class="sc-name">{{item.name}}</text>
+              <text wx:if="{{item.diffText}}" class="sc-diff {{item.diffUnder ? 'sc-diff--under' : ''}}">{{item.diffText}}</text>
+            </view>
+            <view wx:if="{{item.teeMarkerClass}}" class="sc-tee-marker {{item.teeMarkerClass}}"></view>
+          </view>
+          <block wx:for="{{item.front}}" wx:for-item="hole" wx:key="index">
+            <view class="sc-cell sc-cell--hole">
+              <view wx:if="{{hole.text}}" class="sc-mark sc-mark--{{hole.mark}}">{{hole.text}}</view>
+            </view>
+          </block>
+          <text class="sc-cell sc-cell--sum sc-cell--out-val">{{item.out}}</text>
+          <block wx:for="{{item.back}}" wx:for-item="hole" wx:key="index">
+            <view class="sc-cell sc-cell--hole">
+              <view wx:if="{{hole.text}}" class="sc-mark sc-mark--{{hole.mark}}">{{hole.text}}</view>
+            </view>
+          </block>
+          <text class="sc-cell sc-cell--sum sc-cell--in-val">{{item.in}}</text>
+          <text class="sc-cell sc-cell--total sc-cell--total-val">{{item.total}}</text>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="sc-legend">
+    <view class="sc-legend__left">
+      <view class="sc-legend__item">
+        <view class="sc-mark sc-mark--eagle sc-mark--legend"></view>
+        <text class="sc-legend__label">Eagle</text>
+      </view>
+      <view class="sc-legend__item">
+        <view class="sc-mark sc-mark--birdie sc-mark--legend"></view>
+        <text class="sc-legend__label">Birdie</text>
+      </view>
+      <view class="sc-legend__item">
+        <text class="sc-legend__label sc-legend__label--par">Par</text>
+      </view>
+      <view class="sc-legend__item">
+        <view class="sc-mark sc-mark--bogey sc-mark--legend"></view>
+        <text class="sc-legend__label">Bogey</text>
+      </view>
+      <view class="sc-legend__item">
+        <view class="sc-mark sc-mark--double-bogey sc-mark--legend"></view>
+        <text class="sc-legend__label">D-Bogey</text>
+      </view>
+    </view>
+  </view>
+</view>

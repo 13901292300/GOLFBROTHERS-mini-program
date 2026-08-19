@@ -9978,6 +9978,24 @@ Page({
       return;
     }
 
+    if (label === '成绩卡' || action === 'scorecard') {
+      const gameId = this.data.gameId || '';
+      const ms = this._matchState || (typeof this._readMatchState === 'function' ? this._readMatchState() : {}) || {};
+      const matchId = ms.matchId || '';
+      const qs = [];
+      if (matchId) qs.push('matchId=' + encodeURIComponent(matchId));
+      else if (gameId) qs.push('gameId=' + encodeURIComponent(gameId));
+      if (!qs.length) {
+        wx.showToast({ title: '当前为演示模式', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({
+        url: '/subpackages/tournament/pages/scorecard/index?' + qs.join('&'),
+        fail: () => wx.showToast({ title: '成绩卡页面尚未注册', icon: 'none' })
+      });
+      return;
+    }
+
     if (label === '统计数据') {
       // 队内赛记分页菜单已过滤本项，此处不处理 matchId；仅普通创建带 gameId 进统计页
       const gameId = this.data.gameId || '';
