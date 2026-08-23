@@ -177,9 +177,14 @@ const COLOR_OPTIONS = [
 
 const FONT_OPTIONS = [
   { id: "playfair", label: "Playfair Display", family: "GOLF_Playfair", weight: 700 },
-  { id: "bodoni", label: "Bodoni Moda", family: "GOLF_Bodoni", weight: 700 },
-  { id: "cormorant", label: "Cormorant Garamond", family: "Cormorant Garamond", weight: 700 },
+  { id: "bodoni", label: "Bodoni Moda Bold", family: "GOLF_Bodoni", weight: 700 },
+  { id: "bodoniRegular", label: "Bodoni Moda Regular", family: "GOLF_BodoniRegular", weight: 400 },
+  { id: "cormorant", label: "Cormorant Garamond", family: "GOLF_Cormorant", weight: 700 },
   { id: "anton", label: "Anton", family: "Anton", weight: 400 },
+  { id: "oswald", label: "Oswald", family: "GOLF_Oswald", weight: 700 },
+  { id: "paytone", label: "Paytone One", family: "GOLF_Paytone", weight: 400 },
+  { id: "outfit", label: "Outfit Black", family: "GOLF_Outfit", weight: 900 },
+  { id: "montserrat", label: "Montserrat Black", family: "GOLF_Montserrat", weight: 900 },
   { id: "inter", label: "Inter", family: "Inter", weight: 700 },
   { id: "pingfang", label: "PingFang SC", family: "PingFang SC", weight: 700 }
 ];
@@ -210,6 +215,33 @@ function normalizeFontId(fontId) {
   const lower = id.toLowerCase();
   if (FONT_FALLBACK_MAP[lower]) return FONT_FALLBACK_MAP[lower];
   return "pingfang";
+}
+
+function resolveItalic(value, fallback) {
+  if (value === true || value === false) return value;
+  return Boolean(fallback);
+}
+
+function ensureTextItalic(model) {
+  if (!model || typeof model !== "object") return model;
+  if (model.total && typeof model.total === "object") {
+    model.total.italic = resolveItalic(model.total.italic, false);
+  }
+  if (model.relativeTotal && typeof model.relativeTotal === "object") {
+    model.relativeTotal.italic = resolveItalic(model.relativeTotal.italic, false);
+  }
+  if (model.fonts && typeof model.fonts === "object") {
+    model.fonts.scoreItalic = resolveItalic(model.fonts.scoreItalic, false);
+  }
+  if (model.identity && typeof model.identity === "object") {
+    ["nickname", "course", "date", "extra"].forEach((key) => {
+      const item = model.identity[key];
+      if (item && typeof item === "object") {
+        item.italic = resolveItalic(item.italic, key === "nickname");
+      }
+    });
+  }
+  return model;
 }
 
 function remapPosterFonts(model) {
@@ -244,12 +276,32 @@ const GOOGLE_FONT_FACES = [
     url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/BodoniModa-Bold.ttf")'
   },
   {
-    family: "Cormorant Garamond",
+    family: "GOLF_BodoniRegular",
+    url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/BodoniModa-Regular.ttf")'
+  },
+  {
+    family: "GOLF_Cormorant",
     url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/CormorantGaramond-Bold.ttf")'
   },
   {
     family: "Anton",
     url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Anton-Regular.ttf")'
+  },
+  {
+    family: "GOLF_Oswald",
+    url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Oswald-Bold.ttf")'
+  },
+  {
+    family: "GOLF_Paytone",
+    url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/PaytoneOne-Regular.ttf")'
+  },
+  {
+    family: "GOLF_Outfit",
+    url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Outfit-Black.ttf")'
+  },
+  {
+    family: "GOLF_Montserrat",
+    url: 'url("https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Montserrat-Black.ttf")'
   },
   {
     family: "Inter",
@@ -258,6 +310,39 @@ const GOOGLE_FONT_FACES = [
 ];
 
 const SHARED_BRAND = { x: 0, y: 0, w: 1000, h: 70 };
+
+const SYSTEM_BACKDROPS = [
+  {
+    id: "forest-dark",
+    zh: "暗绿",
+    en: "Dark green",
+    path: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/poster-bj/poster-bg-forest-dark.jpg"
+  },
+  {
+    id: "woodland",
+    zh: "林地",
+    en: "Woodland",
+    path: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/poster-bj/poster-bg-woodland.jpg"
+  },
+  {
+    id: "fairway-soft",
+    zh: "浅绿",
+    en: "Soft",
+    path: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/poster-bj/poster-bg-fairway-soft.jpg"
+  },
+  {
+    id: "studio-light",
+    zh: "浅素",
+    en: "Light studio",
+    path: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/poster-bj/poster-bg-studio-light.jpg"
+  },
+  {
+    id: "studio-dark",
+    zh: "深素",
+    en: "Dark studio",
+    path: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/poster-bj/poster-bg-studio-dark.jpg"
+  }
+];
 
 const TEMPLATES = {
   academy: {
@@ -435,6 +520,10 @@ function createPosterModel(templateId, sample, brand) {
     subjectFileID: "",
     segmentationStatus: "idle",
     segmentationSource: "none",
+    backdropMode: "photo",
+    backdropId: SYSTEM_BACKDROPS[0].id,
+    backdrop: null,
+    subjectContact: null,
     image: { scale: 1, x: 0, y: 0, blur: 0 },
     scoreMode: "relative",
     scoreSets: {
@@ -460,6 +549,8 @@ function createPosterModel(templateId, sample, brand) {
       opacity: template.defaults.totalOpacity,
       aboveSubject: false,
       font: "playfair",
+      italic: false,
+      hidden: false,
       color: palette.total
     },
     relativeTotal: {
@@ -469,6 +560,8 @@ function createPosterModel(templateId, sample, brand) {
       size: Math.max(80, Math.round(template.defaults.totalSize * 0.42)),
       opacity: template.defaults.totalOpacity,
       font: "bodoni",
+      italic: false,
+      hidden: false,
       color: "#dc3f4d"
     },
     scorecard: { x: scorecard.x, y: scorecard.y, scale: 1 },
@@ -479,7 +572,10 @@ function createPosterModel(templateId, sample, brand) {
         y: nickname.y,
         size: template.defaults.nicknameSize,
         color: palette.text,
-        font: "pingfang"
+        font: "pingfang",
+        italic: true,
+        rotated: Boolean(template.layout.nickname && template.layout.nickname.vertical),
+        hidden: false
       },
       course: {
         value: sample ? "GOLF CLUB / CHAMPIONSHIP" : "",
@@ -487,7 +583,10 @@ function createPosterModel(templateId, sample, brand) {
         y: course.y,
         size: template.defaults.courseSize,
         color: palette.text,
-        font: "pingfang"
+        font: "pingfang",
+        italic: false,
+        rotated: Boolean(template.layout.course && template.layout.course.vertical),
+        hidden: false
       },
       date: {
         value: sample ? "2026.07.31" : "",
@@ -495,7 +594,10 @@ function createPosterModel(templateId, sample, brand) {
         y: date.y,
         size: template.defaults.dateSize,
         color: palette.text,
-        font: "pingfang"
+        font: "pingfang",
+        italic: false,
+        rotated: Boolean(template.layout.date && template.layout.date.vertical),
+        hidden: false
       },
       extra: {
         value: sample ? "ROUND ONE" : "",
@@ -503,7 +605,10 @@ function createPosterModel(templateId, sample, brand) {
         y: extra.y,
         size: template.defaults.dateSize,
         color: palette.text,
-        font: "pingfang"
+        font: "pingfang",
+        italic: false,
+        rotated: Boolean(template.layout.extra && template.layout.extra.vertical),
+        hidden: false
       },
       brand: brand || "GOLFBROTHERS"
     },
@@ -512,6 +617,7 @@ function createPosterModel(templateId, sample, brand) {
       total: palette.total,
       relativeTotalColor: "#dc3f4d",
       card: palette.card,
+      cardOpacity: defaultCardOpacityPercent(template),
       line: palette.line,
       scoreText: palette.scoreText,
       markerColor: palette.total,
@@ -523,6 +629,7 @@ function createPosterModel(templateId, sample, brand) {
     },
     fonts: {
       score: id === "client1" ? "playfair" : "pingfang",
+      scoreItalic: false,
       total: "playfair"
     },
     stickers: [],
@@ -533,9 +640,52 @@ function createPosterModel(templateId, sample, brand) {
   return remapPosterFonts(model);
 }
 
+function defaultCardOpacityPercent(template) {
+  if (!template) return 88;
+  if (template.scoreStyle === "grid") return 16;
+  if (template.scoreStyle === "sidebar") return 68;
+  return 88;
+}
+
+function ensureCardOpacity(model) {
+  if (!model || !model.style) return model;
+  const n = Number(model.style.cardOpacity);
+  if (!Number.isFinite(n)) {
+    const template = TEMPLATES[model.templateId];
+    model.style.cardOpacity = defaultCardOpacityPercent(template);
+  } else {
+    model.style.cardOpacity = Math.max(0, Math.min(100, Math.round(n)));
+  }
+  return model;
+}
+
+function ensureVisibility(model) {
+  if (!model || typeof model !== "object") return model;
+  if (model.total && typeof model.total === "object") {
+    if (model.total.hidden !== true && model.total.hidden !== false) model.total.hidden = false;
+  }
+  if (model.relativeTotal && typeof model.relativeTotal === "object") {
+    if (model.relativeTotal.hidden !== true && model.relativeTotal.hidden !== false) {
+      model.relativeTotal.hidden = Boolean(model.relativeTotalCleared);
+    }
+  }
+  if (model.identity && typeof model.identity === "object") {
+    ["nickname", "course", "date", "extra"].forEach((key) => {
+      const item = model.identity[key];
+      if (item && typeof item === "object" && item.hidden !== true && item.hidden !== false) {
+        item.hidden = false;
+      }
+    });
+  }
+  return model;
+}
+
 function ensureTotalDisplayModel(model) {
   if (!model || !model.total) return model;
   remapPosterFonts(model);
+  ensureTextItalic(model);
+  ensureCardOpacity(model);
+  ensureVisibility(model);
   if (!model.total.font) {
     model.total.font = (model.fonts && model.fonts.total) || "playfair";
   }
@@ -606,6 +756,11 @@ function switchTemplate(previous, templateId, brand) {
   next.subjectFileID = previous.subjectFileID || "";
   next.segmentationStatus = previous.segmentationStatus;
   next.segmentationSource = previous.segmentationSource;
+  next.backdropMode = previous.backdropMode === "system" ? "system" : "photo";
+  next.backdropId = previous.backdropId || SYSTEM_BACKDROPS[0].id;
+  next.backdrop = previous.backdrop;
+  next.subjectContact = previous.subjectContact || null;
+  next.subjectShadow = previous.subjectShadow || null;
   next.image = Object.assign({}, previous.image);
   next.scoreMode = previous.scoreMode;
   next.scoreSets = {
@@ -616,17 +771,27 @@ function switchTemplate(previous, templateId, brand) {
   next.scoringStyle = previous.scoringStyle;
   next.highlights = previous.highlights.slice();
   next.badge = previous.badge;
-  next.autoTotal = previous.autoTotal;
+  next.autoTotal = true;
   next.roundPar = previous.roundPar;
   next.toPar = previous.toPar;
-  next.relativeTotalCleared = previous.relativeTotalCleared;
+  next.total.hidden = Boolean(previous.total && previous.total.hidden);
+  next.relativeTotal.hidden = previous.relativeTotal && (previous.relativeTotal.hidden === true || previous.relativeTotal.hidden === false)
+    ? previous.relativeTotal.hidden
+    : Boolean(previous.relativeTotalCleared);
+  next.relativeTotalCleared = next.relativeTotal.hidden;
   next.style.relativeTotalColor = previous.style.relativeTotalColor || previous.style.total;
+  next.style.cardOpacity = previous.style && Number.isFinite(Number(previous.style.cardOpacity))
+    ? previous.style.cardOpacity
+    : next.style.cardOpacity;
   next.total.value = previous.total.value;
   next.total.aboveSubject = previous.total.aboveSubject;
   next.total.font = previous.total.font || next.total.font;
+  next.total.italic = resolveItalic(previous.total && previous.total.italic, next.total.italic);
   next.total.color = previous.total.color || next.total.color;
   next.fonts.total = next.total.font;
+  next.fonts.scoreItalic = resolveItalic(previous.fonts && previous.fonts.scoreItalic, next.fonts.scoreItalic);
   next.relativeTotal = Object.assign({}, next.relativeTotal, previous.relativeTotal || {});
+  next.relativeTotal.italic = resolveItalic(previous.relativeTotal && previous.relativeTotal.italic, next.relativeTotal.italic);
   next.colorPresets = previous.colorPresets
     ? {
       pga: Object.assign({}, previous.colorPresets.pga),
@@ -639,6 +804,16 @@ function switchTemplate(previous, templateId, brand) {
   next.identity.date.value = previous.identity.date.value;
   next.identity.extra.value = previous.identity.extra.value;
   next.identity.brand = previous.identity.brand;
+  ["nickname", "course", "date", "extra"].forEach((key) => {
+    next.identity[key].italic = resolveItalic(previous.identity[key] && previous.identity[key].italic, next.identity[key].italic);
+    if (previous.identity[key] && (previous.identity[key].rotated === true || previous.identity[key].rotated === false)) {
+      next.identity[key].rotated = previous.identity[key].rotated;
+    }
+    if (previous.identity[key] && previous.identity[key].font) {
+      next.identity[key].font = previous.identity[key].font;
+    }
+    next.identity[key].hidden = Boolean(previous.identity[key] && previous.identity[key].hidden);
+  });
   next.stickers = previous.stickers;
   next.selectedStickerId = previous.selectedStickerId;
   return next;
@@ -675,6 +850,7 @@ module.exports = {
   FONT_FALLBACK_MAP,
   GOOGLE_FONT_FACES,
   TEMPLATES,
+  SYSTEM_BACKDROPS,
   centerOf,
   createPosterModel,
   initColorPresets,

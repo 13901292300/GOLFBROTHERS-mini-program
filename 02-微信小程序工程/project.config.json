@@ -72,7 +72,8 @@
   "srcMiniprogramRoot": "miniprogram/",
   "packOptions": {
     "ignore": [
-      { "type": "folder", "value": "scripts" }
+      { "type": "folder", "value": "scripts" },
+      { "type": "folder", "value": "subpackages/poster/fonts" }
     ],
     "include": []
   },

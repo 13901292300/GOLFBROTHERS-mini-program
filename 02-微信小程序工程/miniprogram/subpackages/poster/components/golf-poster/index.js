@@ -15,7 +15,8 @@ const {
   applyMarkerPreset,
   applyPalette,
   switchTemplate,
-  templateCards
+  templateCards,
+  SYSTEM_BACKDROPS
 } = require("../../utils/poster-data");
 const {
   parseScoreInput,
@@ -24,7 +25,7 @@ const {
 } = require("../../utils/score");
 const {
   renderPoster,
-  hitTest
+  prepareSubjectShadow
 } = require("../../utils/poster-engine");
 const { getScoreData, applyScoreData } = require("../../utils/score-data");
 const {
@@ -62,6 +63,11 @@ const COPY = {
     backToSummary: "返回完成",
     preview: "预览",
     close: "关闭",
+    nudgePosition: "微调位置",
+    nudgeUp: "上",
+    nudgeDown: "下",
+    nudgeLeft: "左",
+    nudgeRight: "右",
     tapToExpand: "轻点海报放大编辑",
     tapToClose: "拖动元素调整，轻点海报返回步骤",
     stepTitles: ["模板", "照片", "成绩卡", "总成绩", "文字信息", "贴纸", "完成海报"],
@@ -78,6 +84,10 @@ const COPY = {
     resetLayout: "复位画布",
     photoScale: "照片大小",
     backgroundBlur: "背景模糊",
+    backdrop: "海报背景",
+    backdropPhoto: "原图背景",
+    backdropSystem: "系统背景",
+    backdropNeedSubject: "请先完成人物抠图后再换系统背景",
     subjectDepth: "人物景深",
     waitingPhoto: "等待上传照片",
     segmenting: "马上就好...",
@@ -118,6 +128,8 @@ const COPY = {
     holePar: "PAR",
     badge: "首洞标记",
     scoreFont: "成绩字体",
+    italic: "斜体",
+    rotate: "旋转",
     board: "底板",
     rules: "分隔线",
     numbers: "逐洞成绩文字",
@@ -129,11 +141,13 @@ const COPY = {
     bogey: "柏忌",
     doubleBogey: "双柏忌及更差",
     scorecardScale: "成绩卡大小",
+    boardOpacity: "底板透明度",
+    scorecardBoard: "成绩卡",
+    scoreColors: "成绩颜色",
     alignScorecardCenter: "水平居中",
     locked: "已锁定",
     unavailable: "当前底板不可用",
     totalStrokes: "总杆",
-    autoTotal: "自动统计",
     relativeTotal: "杆差",
     relativeTotalColor: "杆差颜色",
     relativeTotalClear: "清空",
@@ -150,16 +164,17 @@ const COPY = {
     totalTabTotal: "总杆",
     totalTabRelative: "杆差",
     totalAbove: "总成绩置于人物上方",
-    totalEmpty: "录入逐洞成绩后自动合计",
+    visible: "显示",
+    totalEmpty: "成绩卡尚无逐洞成绩",
+    totalReadonlyHint: "总杆来自成绩卡，不可在此修改",
     nickname: "昵称",
     nicknameReadonlyHint: "昵称来自记分卡，如需修改请返回记分页",
     course: "球场 / 赛事",
     date: "日期",
     extra: "补充信息",
-    textFont: "文字字体",
+    textFont: "字体",
     textColor: "文字颜色",
     textSize: "当前文字大小",
-    brand: "品牌文字",
     uploadSticker: "上传贴纸",
     stickerSize: "贴纸大小",
     removeSticker: "删除选中贴纸",
@@ -203,6 +218,11 @@ const COPY = {
     backToSummary: "RETURN",
     preview: "PREVIEW",
     close: "CLOSE",
+    nudgePosition: "Nudge",
+    nudgeUp: "Up",
+    nudgeDown: "Down",
+    nudgeLeft: "Left",
+    nudgeRight: "Right",
     tapToExpand: "Tap the poster to enlarge and edit",
     tapToClose: "Drag to adjust; tap the poster to return",
     stepTitles: ["Template", "Photo", "Scorecard", "Total", "Text", "Stickers", "Complete"],
@@ -219,6 +239,10 @@ const COPY = {
     resetLayout: "RESET LAYOUT",
     photoScale: "Photo size",
     backgroundBlur: "Background blur",
+    backdrop: "Poster background",
+    backdropPhoto: "Photo background",
+    backdropSystem: "System background",
+    backdropNeedSubject: "Finish subject cutout before using a system background",
     subjectDepth: "Subject depth",
     waitingPhoto: "Waiting for a photo",
     segmenting: "Just a moment...",
@@ -259,6 +283,8 @@ const COPY = {
     holePar: "PAR",
     badge: "First-hole badge",
     scoreFont: "Score font",
+    italic: "Italic",
+    rotate: "Rotate",
     board: "Board",
     rules: "Rules",
     numbers: "Hole score text",
@@ -270,11 +296,13 @@ const COPY = {
     bogey: "Bogey",
     doubleBogey: "Double bogey +",
     scorecardScale: "Scorecard size",
+    boardOpacity: "Board opacity",
+    scorecardBoard: "Scorecard",
+    scoreColors: "Score colors",
     alignScorecardCenter: "Center horizontally",
     locked: "Locked",
     unavailable: "Unavailable on this board",
     totalStrokes: "Total strokes",
-    autoTotal: "Auto total",
     relativeTotal: "To par",
     relativeTotalColor: "To-par color",
     relativeTotalClear: "Clear",
@@ -291,16 +319,17 @@ const COPY = {
     totalTabTotal: "Total",
     totalTabRelative: "To par",
     totalAbove: "Total above player",
-    totalEmpty: "Hole scores will be totaled automatically",
+    visible: "Visible",
+    totalEmpty: "No hole scores on the scorecard yet",
+    totalReadonlyHint: "Total comes from the scorecard and cannot be edited here",
     nickname: "Name",
     nicknameReadonlyHint: "Name comes from the scorecard. Go back to edit it there.",
     course: "Course / event",
     date: "Date",
     extra: "Additional info",
-    textFont: "Text font",
+    textFont: "Font",
     textColor: "Text color",
     textSize: "Active text size",
-    brand: "Brand text",
     uploadSticker: "UPLOAD STICKER",
     stickerSize: "Sticker size",
     removeSticker: "REMOVE STICKER",
@@ -418,6 +447,7 @@ Component({
     selectedTemplateId: "",
     templatePreviewOpen: false,
     largeEdit: false,
+    previewCanvasStyle: "",
     activeIdentity: "nickname",
     activeEditTarget: "",
     activeEditLabel: COPY.zh.noSelection,
@@ -429,6 +459,7 @@ Component({
     colorOptions: COLOR_OPTIONS,
     totalTab: "total",
     paletteOptions: [],
+    backdropOptions: [],
     cardColorOptions: [],
     lineColorOptions: [],
     scoreColorRows: [],
@@ -447,27 +478,35 @@ Component({
     form: {
       photoScale: 100,
       blur: 0,
+      backdropMode: "photo",
       scoreMode: "relative",
       scoringStyle: "pga",
       scoreInput: "",
       badge: "",
       scorecardScale: 100,
-      autoTotal: true,
+      cardOpacity: 88,
+      scoreItalic: false,
       roundPar: 72,
       relativeTotal: "",
       relativeTotalColor: "#dc3f4d",
       relativeTotalSize: 200,
+      relativeItalic: false,
       totalValue: "",
       totalHint: COPY.zh.totalEmpty,
       totalOpacity: 90,
       totalSize: 500,
+      totalItalic: false,
       totalAbove: false,
       nickname: "",
       course: "",
       date: "",
       extra: "",
-      brand: "GOLFBROTHERS",
       identitySize: 38,
+      identityItalic: true,
+      identityRotated: false,
+      identityVisible: true,
+      totalVisible: true,
+      relativeVisible: true,
       stickerScale: 100
     },
     saving: false,
@@ -479,7 +518,6 @@ Component({
     brand(value) {
       if (!this.posterState) return;
       this.posterState.identity.brand = value || "GOLFBROTHERS";
-      this.setData({ "form.brand": this.posterState.identity.brand });
       this._render();
     },
 
@@ -516,6 +554,7 @@ Component({
       this._draftRestoredKey = "";
       this._draftRestoreLock = null;
       this._discardDraft = false;
+      this._backdropCache = {};
     },
 
     async attached() {
@@ -530,8 +569,13 @@ Component({
       const fonts = [
         { family: "GOLF_Playfair", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/PlayfairDisplay-Bold.ttf" },
         { family: "GOLF_Bodoni", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/BodoniModa-Bold.ttf" },
-        { family: "Cormorant Garamond", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/CormorantGaramond-Bold.ttf" },
+        { family: "GOLF_BodoniRegular", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/BodoniModa-Regular.ttf" },
+        { family: "GOLF_Cormorant", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/CormorantGaramond-Bold.ttf" },
         { family: "Anton", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Anton-Regular.ttf" },
+        { family: "GOLF_Oswald", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Oswald-Bold.ttf" },
+        { family: "GOLF_Paytone", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/PaytoneOne-Regular.ttf" },
+        { family: "GOLF_Outfit", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Outfit-Black.ttf" },
+        { family: "GOLF_Montserrat", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Montserrat-Black.ttf" },
         { family: "Inter", url: "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/fonts/Inter-Bold.ttf" }
       ];
       for (let i = 0; i < fonts.length; i += 1) {
@@ -648,6 +692,8 @@ Component({
       );
       merged.photo = null;
       merged.subject = null;
+      merged.backdrop = null;
+      merged.subjectShadow = null;
       merged.badge = "";
       merged.photoPath = draft.photoPath || saved.photoPath || "";
       merged.photoFileID = draft.photoFileID || saved.photoFileID || "";
@@ -722,10 +768,13 @@ Component({
         try {
           this.posterState.subject = await this._loadCanvasImage(subjectPath);
           this.posterState.segmentationStatus = "person";
+          this._bindSubjectContact(this.posterState.subject);
           this.saveDraft();
         } catch (error) {
           console.warn("[golf-poster] draft subject missing", error);
           this.posterState.subject = null;
+          this.posterState.subjectContact = null;
+          this.posterState.subjectShadow = null;
           this.posterState.subjectPath = "";
         }
       }
@@ -744,6 +793,15 @@ Component({
       }
       this.posterState.stickers = restoredStickers;
       this._syncStickerControls();
+
+      if (this.posterState.backdropMode === "system") {
+        try {
+          await this._ensureSystemBackdrop();
+        } catch (error) {
+          console.warn("[golf-poster] draft backdrop missing", error);
+          this.posterState.backdropMode = "photo";
+        }
+      }
 
       if (
         !this.posterState.subject
@@ -808,6 +866,7 @@ Component({
       });
       this._rebuildColorControls(language);
       this._rebuildPaletteOptions(language);
+      this._rebuildBackdropOptions(language);
     },
 
     _gestureHint(copyArg, stepArg, largeEditArg) {
@@ -1003,8 +1062,7 @@ Component({
         this._updateStepMeta();
         this._syncLargeEdit();
         const afterLayout = () => {
-          this._refreshCanvasRect();
-          this._renderNow();
+          this._fitPreviewCanvas();
         };
         if (typeof wx.nextTick === "function") wx.nextTick(afterLayout);
         else setTimeout(afterLayout, 16);
@@ -1014,6 +1072,7 @@ Component({
     closeLargeEdit() {
       this.setData({
         largeEdit: false,
+        previewCanvasStyle: "",
         activeEditTarget: "",
         activeElementScaleDisabled: true
       }, () => {
@@ -1025,6 +1084,78 @@ Component({
         if (typeof wx.nextTick === "function") wx.nextTick(afterLayout);
         else setTimeout(afterLayout, 16);
       });
+    },
+
+    _fitPreviewCanvas() {
+      if (!this.data.largeEdit) return;
+      this.createSelectorQuery()
+        .in(this)
+        .select(".canvas-frame-slot")
+        .boundingClientRect((rect) => {
+          if (!rect || !rect.width || !rect.height) {
+            this._refreshCanvasRect();
+            this._renderNow();
+            return;
+          }
+          const ratio = POSTER_WIDTH / POSTER_HEIGHT;
+          let width = rect.width;
+          let height = width / ratio;
+          if (height > rect.height) {
+            height = rect.height;
+            width = height * ratio;
+          }
+          this.setData({
+            previewCanvasStyle: "width:" + Math.floor(width) + "px;height:" + Math.floor(height) + "px;"
+          }, () => {
+            this._refreshCanvasRect();
+            this._renderNow();
+          });
+        })
+        .exec();
+    },
+
+    _nudgeOffset(dir) {
+      const step = 6;
+      if (dir === "left") return { dx: -step, dy: 0 };
+      if (dir === "right") return { dx: step, dy: 0 };
+      if (dir === "up") return { dx: 0, dy: -step };
+      if (dir === "down") return { dx: 0, dy: step };
+      return { dx: 0, dy: 0 };
+    },
+
+    _prepareTextNudge(target) {
+      const patch = { activeEditTarget: target };
+      if (["nickname", "course", "date", "extra"].indexOf(target) >= 0) {
+        patch.activeIdentity = target;
+      }
+      if (target === "total" || target === "relativeTotal") {
+        patch.totalTab = target === "relativeTotal" ? "relative" : "total";
+      }
+      return patch;
+    },
+
+    openTextNudge(event) {
+      const target = event.currentTarget.dataset.target;
+      if (!target) return;
+      const patch = this._prepareTextNudge(target);
+      this.setData(Object.assign({ largeEdit: true }, patch), () => {
+        this._updateStepMeta();
+        this._syncLargeEdit();
+        const afterLayout = () => {
+          this._fitPreviewCanvas();
+        };
+        if (typeof wx.nextTick === "function") wx.nextTick(afterLayout);
+        else setTimeout(afterLayout, 16);
+      });
+    },
+
+    onPreviewNudge(event) {
+      const dir = event.currentTarget.dataset.dir;
+      const target = this.data.activeEditTarget;
+      if (!dir || !target) return;
+      const offset = this._nudgeOffset(dir);
+      this._moveTarget(target, offset.dx, offset.dy);
+      this._render();
     },
 
     resetPoster() {
@@ -1086,6 +1217,8 @@ Component({
         if (this.posterState.subject) {
           this.posterState.subject = null;
         }
+        this.posterState.subjectContact = null;
+        this.posterState.subjectShadow = null;
         this.posterState.photoPath = "";
         this.posterState.photoFileID = "";
         this.posterState.subjectPath = "";
@@ -1304,6 +1437,21 @@ Component({
       throw error;
     },
 
+    _ensureCloud() {
+      const app = getApp();
+      if (app && typeof app.ensureCloud === "function") {
+        if (app.ensureCloud()) return;
+        const error = new Error("云开发未初始化，请确认已开通云开发并关联环境");
+        error.code = "CLOUD_NOT_READY";
+        throw error;
+      }
+      if (!wx.cloud) {
+        const error = new Error("当前基础库不支持云开发");
+        error.code = "CLOUD_UNAVAILABLE";
+        throw error;
+      }
+    },
+
     _uploadCloudFile(filePath) {
       const localPath = this._localFilePath(filePath);
       const cloudPath = "poster/seg_" + Date.now() + ".jpg";
@@ -1344,6 +1492,7 @@ Component({
     },
 
     async _callSegmentCloud(localFilePath) {
+      this._ensureCloud();
       const fileID = await this._uploadCloudFile(localFilePath);
       const res = await wx.cloud.callFunction({
         name: "segmentPortrait",
@@ -1403,6 +1552,7 @@ Component({
         this.posterState.photoFileID = result.photoFileID || this.posterState.photoFileID || "";
         this.posterState.segmentationStatus = "person";
         this.posterState.segmentationSource = "cloud";
+        this._bindSubjectContact(this.posterState.subject);
         this.saveDraft();
       } catch (error) {
         this.segmentationFailure = {
@@ -1412,6 +1562,8 @@ Component({
         };
         console.warn("[poster] 云端抠图失败:", this.segmentationFailure);
         this.posterState.subject = null;
+        this.posterState.subjectContact = null;
+        this.posterState.subjectShadow = null;
         this.posterState.segmentationStatus = "fallback";
         this.posterState.segmentationSource = "none";
         wx.showToast({ title: this.data.copy.fullPhotoFallback, icon: "none" });
@@ -1444,11 +1596,14 @@ Component({
       if (!hasPerson || !filePath) {
         this.segmentationFailure = null;
         this.posterState.subject = null;
+        this.posterState.subjectContact = null;
+        this.posterState.subjectShadow = null;
         this.posterState.segmentationStatus = "fallback";
         this.posterState.segmentationSource = "none";
       } else {
         this.segmentationFailure = null;
         this.posterState.subject = await this._loadCanvasImage(filePath);
+        this._bindSubjectContact(this.posterState.subject);
         try {
           this.posterState.subjectPath = await this._persistDraftFile(filePath, "subject");
         } catch (error) {
@@ -1499,6 +1654,68 @@ Component({
       this.posterState.image.blur = Number(event.detail.value);
       this.setData({ "form.blur": Number(event.detail.value) });
       this._render();
+    },
+
+    _rebuildBackdropOptions(languageArg) {
+      const language = languageArg || this.data.language;
+      const activeId = this.posterState.backdropId || SYSTEM_BACKDROPS[0].id;
+      this.setData({
+        backdropOptions: SYSTEM_BACKDROPS.map((item) => ({
+          id: item.id,
+          path: item.path,
+          name: language === "en" ? item.en : item.zh,
+          active: item.id === activeId
+        }))
+      });
+    },
+
+    async _ensureSystemBackdrop() {
+      const id = this.posterState.backdropId || SYSTEM_BACKDROPS[0].id;
+      const spec = SYSTEM_BACKDROPS.find((item) => item.id === id) || SYSTEM_BACKDROPS[0];
+      this.posterState.backdropId = spec.id;
+      this._backdropCache = this._backdropCache || {};
+      if (this._backdropCache[spec.id]) {
+        this.posterState.backdrop = this._backdropCache[spec.id];
+        return;
+      }
+      const image = await this._loadCanvasImage(spec.path);
+      this._backdropCache[spec.id] = image;
+      this.posterState.backdrop = image;
+    },
+
+    selectBackdropMode(event) {
+      const mode = event.currentTarget.dataset.mode === "system" ? "system" : "photo";
+      this.posterState.backdropMode = mode;
+      this.setData({ "form.backdropMode": mode });
+      this._rebuildBackdropOptions();
+      if (mode !== "system") {
+        this._render();
+        return;
+      }
+      if (this.posterState.segmentationStatus !== "person") {
+        wx.showToast({ title: this.data.copy.backdropNeedSubject, icon: "none" });
+      }
+      this._ensureSystemBackdrop()
+        .then(() => this._render())
+        .catch((error) => {
+          console.warn("[golf-poster] load system backdrop failed", error);
+          this.posterState.backdropMode = "photo";
+          this.setData({ "form.backdropMode": "photo" });
+        });
+    },
+
+    selectBackdrop(event) {
+      const id = event.currentTarget.dataset.id;
+      if (!id) return;
+      this.posterState.backdropMode = "system";
+      this.posterState.backdropId = id;
+      this.setData({ "form.backdropMode": "system" });
+      this._rebuildBackdropOptions();
+      this._ensureSystemBackdrop()
+        .then(() => this._render())
+        .catch((error) => {
+          console.warn("[golf-poster] load system backdrop failed", error);
+        });
     },
 
     selectPalette(event) {
@@ -1577,9 +1794,22 @@ Component({
       this._render();
     },
 
+    onScoreItalicChange(event) {
+      this.posterState.fonts.scoreItalic = Boolean(event.detail.value);
+      this.setData({ "form.scoreItalic": this.posterState.fonts.scoreItalic });
+      this._render();
+    },
+
     onScorecardScale(event) {
       this.posterState.scorecard.scale = Number(event.detail.value) / 100;
       this.setData({ "form.scorecardScale": Number(event.detail.value) });
+      this._render();
+    },
+
+    onCardOpacity(event) {
+      const value = Math.max(0, Math.min(100, Number(event.detail.value)));
+      this.posterState.style.cardOpacity = value;
+      this.setData({ "form.cardOpacity": value });
       this._render();
     },
 
@@ -1615,24 +1845,29 @@ Component({
       this._render();
     },
 
-    onToggleRelativeTotal() {
-      const cleared = !this.data.relativeTotalCleared;
-      this.posterState.relativeTotalCleared = cleared;
-      if (cleared) {
-        this.posterState.toPar = undefined;
-        if (this.posterState.relativeTotal) this.posterState.relativeTotal.value = "";
-        this.setData({
-          relativeTotalCleared: true,
-          "form.relativeTotal": ""
-        });
-      } else {
-        this._updateRelativeTotal();
-      }
+    onTotalVisibleChange(event) {
+      this.posterState.total.hidden = !event.detail.value;
+      this.setData({ "form.totalVisible": Boolean(event.detail.value) });
+      this._render();
+    },
+
+    onRelativeVisibleChange(event) {
+      if (!this.posterState.relativeTotal) return;
+      const visible = Boolean(event.detail.value);
+      this.posterState.relativeTotal.hidden = !visible;
+      this.posterState.relativeTotalCleared = !visible;
+      this.setData({ "form.relativeVisible": visible, relativeTotalCleared: !visible });
+      this._render();
+    },
+
+    onIdentityVisibleChange(event) {
+      const visible = Boolean(event.detail.value);
+      this.posterState.identity[this.data.activeIdentity].hidden = !visible;
+      this.setData({ "form.identityVisible": visible });
       this._render();
     },
 
     _updateRelativeTotal() {
-      this.posterState.relativeTotalCleared = false;
       const calculation = calculateTotal(this.posterState);
       let diff = null;
       if (calculation.relative !== null && calculation.relative !== undefined) {
@@ -1648,15 +1883,8 @@ Component({
         this.posterState.relativeTotal.value = display;
       }
       this.setData({
-        relativeTotalCleared: false,
         "form.relativeTotal": display
       });
-    },
-
-    onAutoTotalChange(event) {
-      this.posterState.autoTotal = Boolean(event.detail.value);
-      this.setData({ "form.autoTotal": this.posterState.autoTotal });
-      this._updateAutoTotal();
     },
 
     onRoundParInput(event) {
@@ -1664,14 +1892,6 @@ Component({
       this.posterState.roundPar = Number.isFinite(value) ? clamp(value, 1, 180) : null;
       this.setData({ "form.roundPar": event.detail.value });
       this._updateAutoTotal();
-    },
-
-    onTotalInput(event) {
-      if (this.posterState.autoTotal) return;
-      this.posterState.total.value = event.detail.value;
-      this.setData({ "form.totalValue": event.detail.value });
-      if (!this.posterState.relativeTotalCleared) this._updateRelativeTotal();
-      this._render();
     },
 
     switchTotalTab(event) {
@@ -1693,6 +1913,12 @@ Component({
       this._render();
     },
 
+    onTotalItalicChange(event) {
+      this.posterState.total.italic = Boolean(event.detail.value);
+      this.setData({ "form.totalItalic": this.posterState.total.italic });
+      this._render();
+    },
+
     onTotalColorSelect(event) {
       const color = event.currentTarget.dataset.color;
       this.posterState.total.color = color;
@@ -1709,6 +1935,13 @@ Component({
       if (!font || !this.posterState.relativeTotal) return;
       this.posterState.relativeTotal.font = font.id;
       this.setData({ relativeFontIndex: index });
+      this._render();
+    },
+
+    onRelativeItalicChange(event) {
+      if (!this.posterState.relativeTotal) return;
+      this.posterState.relativeTotal.italic = Boolean(event.detail.value);
+      this.setData({ "form.relativeItalic": this.posterState.relativeTotal.italic });
       this._render();
     },
 
@@ -1761,7 +1994,6 @@ Component({
       if (key === "nickname") return;
       this.posterState.identity[key].value = event.detail.value;
       this.setData({ [`form.${key}`]: event.detail.value });
-      if (key === "brand") this.posterState.identity.brand = event.detail.value;
       this._render();
     },
 
@@ -1771,16 +2003,26 @@ Component({
       this._render();
     },
 
-    onBrandInput(event) {
-      this.posterState.identity.brand = event.detail.value;
-      this.setData({ "form.brand": event.detail.value });
-      this._render();
-    },
-
     onTextFontChange(event) {
       const index = Number(event.detail.value);
       this.posterState.identity[this.data.activeIdentity].font = FONT_OPTIONS[index].id;
       this.setData({ textFontIndex: index });
+      this._render();
+    },
+
+    onIdentityItalicChange(event) {
+      if (this.posterState.identity[this.data.activeIdentity].hidden) return;
+      this.posterState.identity[this.data.activeIdentity].italic = Boolean(event.detail.value);
+      this.setData({ "form.identityItalic": this.posterState.identity[this.data.activeIdentity].italic });
+      this._render();
+    },
+
+    onIdentityRotateTap() {
+      if (this.posterState.identity[this.data.activeIdentity].hidden) return;
+      const key = this.data.activeIdentity;
+      const next = !this._identityRotated(key);
+      this.posterState.identity[key].rotated = next;
+      this.setData({ "form.identityRotated": next });
       this._render();
     },
 
@@ -1860,14 +2102,7 @@ Component({
     onCanvasTouchStart(event) {
       if (!this.canvasRect || !event.touches.length) return;
       const points = this._posterTouchPoints(event.touches);
-      let target = this._gestureTarget();
-      if (this.data.largeEdit && points.length === 1) {
-        const selected = hitTest(this.sceneBounds, points[0]);
-        if (selected) {
-          target = selected;
-          this.setData({ activeEditTarget: selected }, () => this._syncLargeEdit());
-        }
-      }
+      const target = this._gestureTarget();
       const gestureCenter = center(points);
       this.gesture = {
         target,
@@ -1949,6 +2184,9 @@ Component({
       wx.showLoading({ title: this.data.copy.saving, mask: true });
       try {
         const tempFilePath = await this._exportPoster();
+        this._discardDraft = true;
+        this._draftRestoredKey = "";
+        clearPosterDraft();
         this.triggerEvent("export", { tempFilePath });
         this.setData({
           saving: false,
@@ -2443,6 +2681,18 @@ Component({
         .exec();
     },
 
+    _bindSubjectContact(image) {
+      try {
+        const prepared = prepareSubjectShadow(image);
+        this.posterState.subjectShadow = prepared;
+        this.posterState.subjectContact = prepared && prepared.contact ? prepared.contact : null;
+      } catch (error) {
+        console.warn("[golf-poster] measure subject contact failed", error);
+        this.posterState.subjectShadow = null;
+        this.posterState.subjectContact = null;
+      }
+    },
+
     _loadCanvasImage(filePath) {
       return new Promise((resolve, reject) => {
         if (!this.posterCanvas || typeof this.posterCanvas.createImage !== "function") {
@@ -2461,6 +2711,7 @@ Component({
     },
 
     _guideTarget() {
+      if (this.data.step >= 6) return "";
       if (this.data.largeEdit) return this.data.activeEditTarget;
       return this._gestureTarget();
     },
@@ -2490,26 +2741,19 @@ Component({
     _renderNow(exporting) {
       if (!this.posterContext) return;
       this.sceneBounds = renderPoster(this.posterContext, this.posterState, {
-        showGuide: !exporting && (this.data.largeEdit || this.data.step > 0 && this.data.step < 6),
+        showGuide: !exporting && this.data.step > 0 && this.data.step < 6,
         guideTarget: this._guideTarget()
       });
     },
 
     _updateAutoTotal() {
-      if (this.posterState.autoTotal) {
-        const result = calculateTotal(this.posterState);
-        this.posterState.total.value = result.total === null ? "" : String(result.total);
-        const hint = result.total === null
-          ? this.data.copy.totalEmpty
-          : this.posterState.scoreMode === "relative"
-            ? `${result.count} · ${result.relative > 0 ? "+" : ""}${result.relative} · ${result.total}`
-            : `${result.count} · ${result.total}`;
-        this.setData({
-          "form.totalValue": this.posterState.total.value,
-          "form.totalHint": hint
-        });
-      }
-      if (!this.posterState.relativeTotalCleared) this._updateRelativeTotal();
+      const result = calculateTotal(this.posterState);
+      this.posterState.total.value = result.total === null ? "" : String(result.total);
+      this.setData({
+        "form.totalValue": this.posterState.total.value,
+        "form.totalHint": result.total === null ? this.data.copy.totalEmpty : `${result.count} · ${result.total}`
+      });
+      this._updateRelativeTotal();
       this._render();
     },
 
@@ -2604,10 +2848,21 @@ Component({
       this._syncLargeEdit();
     },
 
+    _identityRotated(key) {
+      const item = this.posterState.identity[key];
+      if (item && (item.rotated === true || item.rotated === false)) return item.rotated;
+      const template = TEMPLATES[this.posterState.templateId];
+      const region = template && template.layout && template.layout[key];
+      return Boolean(region && region.vertical);
+    },
+
     _syncIdentityForm() {
       const item = this.posterState.identity[this.data.activeIdentity];
       this.setData({
         "form.identitySize": Math.round(item.size),
+        "form.identityItalic": Boolean(item.italic),
+        "form.identityRotated": this._identityRotated(this.data.activeIdentity),
+        "form.identityVisible": !Boolean(item.hidden),
         textFontIndex: fontIndex(item.font)
       });
       this._rebuildColorControls();
@@ -2618,18 +2873,16 @@ Component({
       model.badge = "";
       ensureTotalDisplayModel(model);
       const calculation = calculateTotal(model);
-      if (model.autoTotal) model.total.value = calculation.total === null ? "" : String(calculation.total);
-      if (!model.relativeTotalCleared) {
-        if (calculation.relative !== null && calculation.relative !== undefined) {
-          model.toPar = calculation.relative;
-        } else {
-          const totalNum = Number(model.total.value);
-          const par = Number(model.roundPar || 72);
-          model.toPar = Number.isFinite(totalNum) && Number.isFinite(par) ? totalNum - par : undefined;
-        }
-        const display = formatToParDisplay(model.toPar);
-        if (model.relativeTotal) model.relativeTotal.value = display;
+      model.total.value = calculation.total === null ? "" : String(calculation.total);
+      if (calculation.relative !== null && calculation.relative !== undefined) {
+        model.toPar = calculation.relative;
+      } else {
+        const totalNum = Number(model.total.value);
+        const par = Number(model.roundPar || 72);
+        model.toPar = Number.isFinite(totalNum) && Number.isFinite(par) ? totalNum - par : undefined;
       }
+      const display = formatToParDisplay(model.toPar);
+      if (model.relativeTotal) model.relativeTotal.value = display;
       const hint = calculation.total === null
         ? this.data.copy.totalEmpty
         : model.scoreMode === "relative"
@@ -2646,33 +2899,41 @@ Component({
         form: {
           photoScale: Math.round(model.image.scale * 100),
           blur: model.image.blur,
+          backdropMode: model.backdropMode === "system" ? "system" : "photo",
           scoreMode: model.scoreMode,
           scoringStyle: model.scoringStyle,
           scoreInput: formatScoreInput(model.scoreSets[model.scoreMode]),
           badge: "",
           scorecardScale: Math.round(model.scorecard.scale * 100),
-          autoTotal: model.autoTotal,
+          cardOpacity: Number.isFinite(Number(model.style.cardOpacity)) ? Math.round(model.style.cardOpacity) : 88,
+          scoreItalic: Boolean(model.fonts.scoreItalic),
           roundPar: model.roundPar,
-          relativeTotal: model.relativeTotalCleared ? "" : formatToParDisplay(model.toPar),
+          relativeTotal: formatToParDisplay(model.toPar),
           relativeTotalColor: (model.relativeTotal && model.relativeTotal.color) || model.style.relativeTotalColor,
           relativeTotalSize: Math.round((model.relativeTotal && model.relativeTotal.size) || 200),
+          relativeItalic: Boolean(model.relativeTotal && model.relativeTotal.italic),
+          relativeVisible: !Boolean(model.relativeTotal && model.relativeTotal.hidden),
           totalValue: model.total.value,
           totalHint: hint,
           totalOpacity: Math.round(model.total.opacity),
           totalSize: Math.round(model.total.size),
+          totalItalic: Boolean(model.total.italic),
           totalAbove: model.total.aboveSubject,
+          totalVisible: !Boolean(model.total.hidden),
           nickname: model.identity.nickname.value,
           course: model.identity.course.value,
           date: model.identity.date.value,
           extra: model.identity.extra.value,
-          brand: model.identity.brand,
           identitySize: Math.round(model.identity[this.data.activeIdentity].size),
+          identityItalic: Boolean(model.identity[this.data.activeIdentity].italic),
+          identityRotated: this._identityRotated(this.data.activeIdentity),
+          identityVisible: !Boolean(model.identity[this.data.activeIdentity].hidden),
           stickerScale: this._selectedSticker() ? Math.round(this._selectedSticker().scale * 100) : 100
         },
-        textFontIndex: fontIndex(model.identity[this.data.activeIdentity].font),
-        relativeTotalCleared: Boolean(model.relativeTotalCleared)
+        textFontIndex: fontIndex(model.identity[this.data.activeIdentity].font)
       });
       this._rebuildPaletteOptions();
+      this._rebuildBackdropOptions();
       this._rebuildColorControls();
       this._syncStickerControls();
       if (this.data.largeEdit) this._syncLargeEdit();

@@ -419,7 +419,7 @@ function applyScoreData(model, scoreData) {
     if (model.total && typeof model.total === 'object') {
       model.total.value = total === '' || total == null ? '' : String(total);
     }
-    if (!model.relativeTotalCleared) {
+    if (model.relativeTotal && typeof model.relativeTotal === "object") {
       const toPar = Number.isFinite(Number(src.toPar))
         ? Number(src.toPar)
         : (Number.isFinite(Number(total)) ? Number(total) - par : null);

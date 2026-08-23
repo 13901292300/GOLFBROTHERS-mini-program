@@ -16,8 +16,13 @@ function fontFamily(id) {
   const map = {
     playfair: "GOLF_Playfair",
     bodoni: "GOLF_Bodoni",
-    cormorant: "Cormorant Garamond",
+    bodoniRegular: "GOLF_BodoniRegular",
+    cormorant: "GOLF_Cormorant",
     anton: "Anton",
+    oswald: "GOLF_Oswald",
+    paytone: "GOLF_Paytone",
+    outfit: "GOLF_Outfit",
+    montserrat: "GOLF_Montserrat",
     inter: "Inter",
     pingfang: "PingFang SC"
   };
@@ -27,6 +32,11 @@ function fontFamily(id) {
 function fontWeight(id) {
   const font = FONT_OPTIONS.find((item) => item.id === normalizeFontId(id));
   return font && font.weight ? font.weight : 700;
+}
+
+function fontCss(fontId, sizePx, italic) {
+  const style = italic ? "italic " : "";
+  return `${style}${fontWeight(fontId)} ${sizePx}px "${fontFamily(fontId)}"`;
 }
 
 function centerOf(region) {
@@ -147,19 +157,24 @@ function imageSource(asset) {
   return asset.path || asset.src || "";
 }
 
-function drawCover(ctx, asset, model, offsetX, offsetY) {
-  if (!asset) return;
-  const drawable = typeof asset === "string" ? asset : (asset.path && typeof asset.complete !== "boolean" ? asset.path : asset);
+function coverPlacement(asset, model, offsetX, offsetY) {
   const sourceWidth = asset.width || asset.naturalWidth || 1;
   const sourceHeight = asset.height || asset.naturalHeight || 1;
   const areaHeight = POSTER_HEIGHT - BRAND_HEIGHT;
   const coverScale = Math.max(POSTER_WIDTH / sourceWidth, areaHeight / sourceHeight);
-  const scale = coverScale * model.image.scale;
+  const scale = coverScale * ((model.image && model.image.scale) || 1);
   const width = sourceWidth * scale;
   const height = sourceHeight * scale;
-  const x = (POSTER_WIDTH - width) / 2 + model.image.x + (offsetX || 0);
-  const y = BRAND_HEIGHT + (areaHeight - height) / 2 + model.image.y + (offsetY || 0);
-  ctx.drawImage(drawable, x, y, width, height);
+  const x = (POSTER_WIDTH - width) / 2 + ((model.image && model.image.x) || 0) + (offsetX || 0);
+  const y = BRAND_HEIGHT + (areaHeight - height) / 2 + ((model.image && model.image.y) || 0) + (offsetY || 0);
+  return { x: x, y: y, width: width, height: height };
+}
+
+function drawCover(ctx, asset, model, offsetX, offsetY) {
+  if (!asset) return;
+  const drawable = typeof asset === "string" ? asset : (asset.path && typeof asset.complete !== "boolean" ? asset.path : asset);
+  const place = coverPlacement(asset, model, offsetX, offsetY);
+  ctx.drawImage(drawable, place.x - 1, place.y - 1, place.width + 2, place.height + 2);
 }
 
 function drawApproximateBlur(ctx, asset, model, radius) {
@@ -218,7 +233,28 @@ function drawPlaceholder(ctx, template, model) {
   ctx.restore();
 }
 
+function drawFillCover(ctx, asset) {
+  if (!asset) return;
+  const drawable = typeof asset === "string" ? asset : (asset.path && typeof asset.complete !== "boolean" ? asset.path : asset);
+  const sourceWidth = asset.width || asset.naturalWidth || 1;
+  const sourceHeight = asset.height || asset.naturalHeight || 1;
+  const areaHeight = POSTER_HEIGHT - BRAND_HEIGHT;
+  const coverScale = Math.max(POSTER_WIDTH / sourceWidth, areaHeight / sourceHeight);
+  const width = sourceWidth * coverScale;
+  const height = sourceHeight * coverScale;
+  const x = (POSTER_WIDTH - width) / 2;
+  const y = BRAND_HEIGHT + (areaHeight - height) / 2;
+  ctx.drawImage(drawable, x - 1, y - 1, width + 2, height + 2);
+}
+
 function drawBackground(ctx, template, model) {
+  const useSystem = model.backdropMode === "system" && model.backdrop;
+  if (useSystem) {
+    ctx.save();
+    drawFillCover(ctx, model.backdrop);
+    ctx.restore();
+    return;
+  }
   if (!model.photo) {
     drawPlaceholder(ctx, template, model);
     return;
@@ -330,16 +366,193 @@ function drawPreviewSubject(ctx, template) {
   ctx.restore();
 }
 
+function createOffscreen2d(width, height) {
+  if (typeof wx === "undefined" || typeof wx.createOffscreenCanvas !== "function") return null;
+  try {
+    const canvas = wx.createOffscreenCanvas({
+      type: "2d",
+      width: width,
+      height: height
+    });
+    if (!canvas) return null;
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  } catch (error) {
+    return null;
+  }
+}
+
+function scanSubjectContact(pixels, sampleW, sampleH) {
+  const alphaMin = 28;
+  let maxY = -1;
+  for (let i = 3; i < pixels.length; i += 4) {
+    if (pixels[i] <= alphaMin) continue;
+    const y = Math.floor((i / 4) / sampleW);
+    if (y > maxY) maxY = y;
+  }
+  if (maxY < 0 || maxY / sampleH < 0.58) return null;
+  const band = Math.max(1, Math.round(sampleH * 0.05));
+  let sumX = 0;
+  let count = 0;
+  let minX = sampleW;
+  let maxX = 0;
+  for (let y = Math.max(0, maxY - band); y <= maxY; y += 1) {
+    for (let x = 0; x < sampleW; x += 1) {
+      const a = pixels[(y * sampleW + x) * 4 + 3];
+      if (a <= alphaMin) continue;
+      sumX += x;
+      count += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+  }
+  if (!count) return null;
+  return {
+    nx: sumX / count / sampleW,
+    ny: maxY / sampleH,
+    nw: Math.max(0.16, (maxX - minX + 1) / sampleW),
+    maxY: maxY
+  };
+}
+
+function prepareSubjectShadow(image) {
+  const srcW = image && (image.width || image.naturalWidth);
+  const srcH = image && (image.height || image.naturalHeight);
+  if (!srcW || !srcH) return null;
+  const sampleW = 180;
+  const sampleH = Math.max(24, Math.round(srcH * sampleW / srcW));
+  const silhouette = createOffscreen2d(sampleW, sampleH);
+  if (!silhouette) return null;
+  const ctx = silhouette.getContext("2d");
+  if (!ctx) return null;
+  ctx.clearRect(0, 0, sampleW, sampleH);
+  ctx.drawImage(image, 0, 0, sampleW, sampleH);
+  ctx.globalCompositeOperation = "source-in";
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, sampleW, sampleH);
+  ctx.globalCompositeOperation = "source-over";
+  let pixels = null;
+  try {
+    pixels = ctx.getImageData(0, 0, sampleW, sampleH).data;
+  } catch (error) {
+    return null;
+  }
+  const contact = scanSubjectContact(pixels, sampleW, sampleH);
+  if (!contact) return { canvas: silhouette, footCanvas: null, sampleW: sampleW, sampleH: sampleH, foot: null, contact: null };
+
+  const band = Math.max(6, Math.round(sampleH * 0.16));
+  const sy = Math.max(0, contact.maxY - band);
+  const sh = Math.max(4, Math.min(sampleH - sy, band + 3));
+  const pad = 20;
+  const footCanvas = createOffscreen2d(sampleW + pad * 2, sh + pad * 2);
+  if (footCanvas) {
+    const footCtx = footCanvas.getContext("2d");
+    if (footCtx) {
+      footCtx.clearRect(0, 0, footCanvas.width, footCanvas.height);
+      footCtx.drawImage(silhouette, 0, sy, sampleW, sh, pad, pad, sampleW, sh);
+    }
+  }
+  return {
+    canvas: silhouette,
+    footCanvas: footCanvas,
+    sampleW: sampleW,
+    sampleH: sampleH,
+    foot: { sy: sy, sh: sh, pad: pad },
+    contact: contact
+  };
+}
+
+function measureSubjectContact(image) {
+  const prepared = prepareSubjectShadow(image);
+  return prepared && prepared.contact ? prepared.contact : null;
+}
+
+function drawBlurredImage(ctx, drawable, x, y, width, height, blur, alpha) {
+  if (!drawable || !width || !height) return;
+  const radius = Math.max(1, blur);
+  const supportsFilter = typeof ctx.filter === "string";
+  if (supportsFilter) {
+    ctx.save();
+    ctx.filter = "blur(" + radius + "px)";
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(drawable, x, y, width, height);
+    ctx.restore();
+    return;
+  }
+  const offsets = [
+    [0, 0],
+    [radius, 0],
+    [-radius, 0],
+    [0, radius],
+    [0, -radius],
+    [radius * 0.7, radius * 0.7],
+    [-radius * 0.7, radius * 0.7],
+    [radius * 0.7, -radius * 0.7],
+    [-radius * 0.7, -radius * 0.7]
+  ];
+  ctx.save();
+  ctx.globalAlpha = alpha / offsets.length * 1.35;
+  offsets.forEach((offset) => {
+    ctx.drawImage(drawable, x + offset[0], y + offset[1], width, height);
+  });
+  ctx.restore();
+}
+
+function drawSubjectShadow(ctx, model) {
+  const subject = model && model.subject;
+  const shadow = model && model.subjectShadow;
+  const contact = (shadow && shadow.contact) || (model && model.subjectContact);
+  if (!subject || !contact) return;
+  const place = coverPlacement(subject, model);
+  const pivotX = place.x + contact.nx * place.width;
+  const pivotY = place.y + contact.ny * place.height;
+  const footWidth = Math.max(24, contact.nw * place.width);
+  const side = Math.max(3, footWidth * 0.06);
+  const blur = Math.max(4, footWidth * 0.08);
+
+  if (shadow && shadow.footCanvas && shadow.foot) {
+    const scaleX = place.width / shadow.sampleW;
+    const scaleY = place.height / shadow.sampleH;
+    const pad = shadow.foot.pad;
+    const drawW = shadow.footCanvas.width * scaleX;
+    const drawH = shadow.footCanvas.height * scaleY;
+    const footX = place.x - pad * scaleX;
+    const footY = place.y + shadow.foot.sy * scaleY - pad * scaleY;
+    ctx.save();
+    ctx.translate(pivotX + side, pivotY);
+    ctx.scale(1, 0.16);
+    ctx.translate(-pivotX, -pivotY);
+    drawBlurredImage(ctx, shadow.footCanvas, footX, footY, drawW, drawH, blur, 0.32);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(pivotX + side, pivotY);
+  ctx.scale(1, 0.12);
+  const radius = Math.max(12, footWidth * 0.22);
+  const core = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+  core.addColorStop(0, "rgba(0,0,0,0.28)");
+  core.addColorStop(0.55, "rgba(0,0,0,0.08)");
+  core.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawSubject(ctx, template, model) {
   if (model.previewSubject) {
     drawPreviewSubject(ctx, template);
   } else if (model.subject && model.segmentationStatus === "person") {
+    drawSubjectShadow(ctx, model);
     drawCover(ctx, model.subject, model);
   }
 }
 
 function drawTotal(ctx, template, model, bounds) {
-  if (!model.total.value) return;
+  if (!model.total || model.total.hidden || !model.total.value) return;
   const fontId = model.total.font || (model.fonts && model.fonts.total);
   const color = model.total.color || model.style.total;
   ctx.save();
@@ -347,7 +560,7 @@ function drawTotal(ctx, template, model, bounds) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = color;
-  applyCanvasFont(ctx, `${fontWeight(fontId)} ${model.total.size}px "${fontFamily(fontId)}"`);
+  applyCanvasFont(ctx, fontCss(fontId, model.total.size, model.total.italic));
   const metrics = typeof ctx.measureText === "function"
     ? ctx.measureText(model.total.value)
     : { width: 0 };
@@ -369,9 +582,8 @@ function formatToParText(diff) {
 }
 
 function drawRelativeTotal(ctx, model, bounds) {
-  if (model.relativeTotalCleared) return;
   const item = model.relativeTotal;
-  if (!item) return;
+  if (!item || item.hidden || model.relativeTotalCleared) return;
   const text = item.value || formatToParText(Number(model.toPar));
   if (!text) return;
   ctx.save();
@@ -379,7 +591,7 @@ function drawRelativeTotal(ctx, model, bounds) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = item.color || model.style.relativeTotalColor || "#dc3f4d";
-  applyCanvasFont(ctx, `${fontWeight(item.font || "bodoni")} ${item.size}px "${fontFamily(item.font || "bodoni")}"`);
+  applyCanvasFont(ctx, fontCss(item.font || "bodoni", item.size, item.italic));
   const metrics = ctx.measureText(text);
   ctx.fillText(text, item.x, item.y);
   ctx.restore();
@@ -462,7 +674,10 @@ function drawScorecard(ctx, template, model, bounds) {
   const scale = geometry.scale;
   bounds.scorecard = board;
   ctx.save();
-  ctx.globalAlpha = template.scoreStyle === "grid" ? 0.16 : template.scoreStyle === "sidebar" ? 0.68 : 0.88;
+  const cardOpacity = Number(model.style && model.style.cardOpacity);
+  ctx.globalAlpha = Number.isFinite(cardOpacity)
+    ? Math.max(0, Math.min(100, cardOpacity)) / 100
+    : (template.scoreStyle === "grid" ? 0.16 : template.scoreStyle === "sidebar" ? 0.68 : 0.88);
   ctx.fillStyle = model.style.card;
   ctx.fillRect(board.x, board.y, board.w, board.h);
   ctx.globalAlpha = 1;
@@ -559,7 +774,7 @@ function drawScorecard(ctx, template, model, bounds) {
     const maxWidth = markerDifference !== null && markerDifference !== 0
       ? Math.max(20, (radius - Math.max(4, 5 * scale)) * 1.55)
       : cellWidth * 0.78;
-    fitFont(ctx, label, maxWidth, Math.floor(adjustedSize), Math.max(14, Math.floor(fontSize * 0.5)), model.fonts.score);
+    fitFont(ctx, label, maxWidth, Math.floor(adjustedSize), Math.max(14, Math.floor(fontSize * 0.5)), model.fonts.score, fontWeight(model.fonts.score), Boolean(model.fonts.scoreItalic));
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = scoreColor;
@@ -573,40 +788,56 @@ function formattedDate(value) {
   return value ? String(value).replace(/-/g, ".") : "";
 }
 
+function isIdentitySideways(item, region) {
+  if (item && (item.rotated === true || item.rotated === false)) return item.rotated;
+  return Boolean(region && region.vertical);
+}
+
 function drawIdentityItem(ctx, region, item, text, bounds, key) {
-  if (!region || !text) return;
-  const actualRegion = {
-    x: item.x - region.w / 2,
-    y: item.y - region.h / 2,
-    w: region.w,
-    h: region.h
-  };
-  bounds[key] = actualRegion;
+  if (!region || !text || (item && item.hidden)) return;
+  const sideways = isIdentitySideways(item, region);
+  const maxWidth = sideways ? Math.max(region.w, region.h) : region.w;
+  const startSize = Math.min(item.size, sideways ? Math.max(region.w, region.h) : region.h);
   ctx.save();
   ctx.fillStyle = item.color;
   ctx.textBaseline = "middle";
-  ctx.textAlign = region.align || "center";
-  const drawX = region.align === "left"
-    ? actualRegion.x
-    : region.align === "right"
-      ? actualRegion.x + actualRegion.w
-      : item.x;
+  ctx.textAlign = sideways ? "center" : (region.align || "center");
   fitFont(
     ctx,
     text,
-    region.vertical ? region.h : region.w,
-    Math.min(item.size, region.vertical ? region.w : region.h),
+    maxWidth,
+    startSize,
     10,
     item.font,
     fontWeight(item.font),
-    Boolean(region.italic)
+    Boolean(item.italic)
   );
-  if (region.vertical) {
+  const metrics = typeof ctx.measureText === "function" ? ctx.measureText(text) : { width: Math.max(24, text.length * startSize * 0.55) };
+  const textWidth = Math.max(12, metrics.width);
+  const textHeight = Math.max(12, startSize * 0.92);
+  if (sideways) {
+    bounds[key] = {
+      x: item.x - textHeight / 2,
+      y: item.y - textWidth / 2,
+      w: textHeight,
+      h: textWidth
+    };
     ctx.translate(item.x, item.y);
     ctx.rotate(Math.PI / 2);
-    ctx.textAlign = "center";
     ctx.fillText(text, 0, 0);
   } else {
+    const actualRegion = {
+      x: item.x - region.w / 2,
+      y: item.y - region.h / 2,
+      w: region.w,
+      h: region.h
+    };
+    bounds[key] = actualRegion;
+    const drawX = region.align === "left"
+      ? actualRegion.x
+      : region.align === "right"
+        ? actualRegion.x + actualRegion.w
+        : item.x;
     ctx.fillText(text, drawX, item.y);
   }
   ctx.restore();
@@ -663,6 +894,8 @@ function renderPoster(ctx, model, options) {
   const template = TEMPLATES[model.templateId];
   const bounds = {};
   ctx.clearRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+  ctx.fillStyle = "#080b09";
+  ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
   ctx.imageSmoothingEnabled = true;
 
   drawBackground(ctx, template, model);
@@ -702,6 +935,8 @@ function hitTest(bounds, point) {
 module.exports = {
   renderPoster,
   hitTest,
+  prepareSubjectShadow,
+  measureSubjectContact,
   isLightNeutralBoard,
   scorecardTextColor,
   transformedRect
