@@ -36,7 +36,7 @@ const SAMPLE = {
   total: DEFAULT_PAR,
   toPar: 0,
   scoreMode: 'strokes',
-  templateId: 'academy',
+  templateId: 'template1',
   photoPath: '',
   scores: SAMPLE_STROKES.slice(),
   strokes: SAMPLE_STROKES.slice(),
@@ -169,14 +169,13 @@ function resolveScoreGroup(game, gameId, groupIndex) {
  * 在 playersSlots 中查找当前用户槽位（跳过空位）。
  */
 function findPlayerSlot(group, playerId) {
-  const slots = group && Array.isArray(group.playersSlots) ? group.playersSlots : [];
+  const slots = listGroupSlots(group);
   const pid = String(playerId || '').trim();
   let slotIndex = -1;
   for (let i = 0; i < slots.length; i++) {
     const p = slots[i];
     if (!p) continue;
-    const id = p.playerId != null ? String(p.playerId).trim() : '';
-    if (pid && id === pid) {
+    if (pid && memberMatchesPlayer(p, pid)) {
       slotIndex = i;
       break;
     }
@@ -187,13 +186,293 @@ function findPlayerSlot(group, playerId) {
 
 const DEFAULT_NICKNAME = '球员';
 
+const COMBO_GAME_MODES = {
+  最好成绩赛: true,
+  最佳球位赛: true,
+  四人两球赛: true,
+  最好成绩比杆赛: true,
+  四人四球比杆赛: true,
+  最佳球位比杆赛: true,
+  四人两球比杆赛: true,
+  最好成绩比洞赛: true,
+  四人四球比洞赛: true,
+  最佳球位比洞赛: true,
+  四人两球比洞赛: true
+};
+
+function memberIdOf(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string' || typeof raw === 'number') return String(raw).trim();
+  return String(raw.playerId || raw.userId || raw.id || '').trim();
+}
+
+function memberNameOf(raw) {
+  if (!raw || typeof raw !== 'object') return '';
+  return String(raw.name || raw.nickname || raw.displayName || '').trim();
+}
+
+function formatComboNickname(names) {
+  const list = (names || []).map((n) => String(n || '').trim()).filter(Boolean);
+  if (list.length >= 2) return list.join('&');
+  return list[0] || '';
+}
+
+function isComboGameModeName(mode) {
+  return !!COMBO_GAME_MODES[String(mode || '').trim()];
+}
+
+function readGroupComposition(host, group, groupIndex) {
+  const map = (host && host.groupCompositionMap) || {};
+  const gid = (group && (group.groupId || group.id)) || '';
+  if (gid && map[gid]) return map[gid];
+  if (group && group.composition) return group.composition;
+  if ((groupIndex || 0) === 0 && host && host.composition) return host.composition;
+  return null;
+}
+
+function listGroupSlots(group) {
+  if (!group || typeof group !== 'object') return [];
+  if (Array.isArray(group.playersSlots)) return group.playersSlots;
+  if (Array.isArray(group.players)) return group.players;
+  return [];
+}
+
+function slotNameById(group, playerId) {
+  const pid = String(playerId || '').trim();
+  if (!pid) return '';
+  const slots = listGroupSlots(group);
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (!slot) continue;
+    if (memberIdOf(slot) === pid) return memberNameOf(slot);
+  }
+  return '';
+}
+
+function registerNameById(host, playerId) {
+  const pid = String(playerId || '').trim();
+  if (!pid || !host) return '';
+  const users =
+    (host.registerInfo && Array.isArray(host.registerInfo.users) && host.registerInfo.users) ||
+    [];
+  for (let i = 0; i < users.length; i++) {
+    const user = users[i];
+    if (!user) continue;
+    if (memberIdOf(user) === pid) return memberNameOf(user);
+  }
+  return '';
+}
+
+function namesFromMembers(host, group, members) {
+  const list = Array.isArray(members) ? members : [];
+  const names = [];
+  for (let i = 0; i < list.length; i++) {
+    const raw = list[i];
+    const fromObj = memberNameOf(raw);
+    if (fromObj) {
+      names.push(fromObj);
+      continue;
+    }
+    const id = memberIdOf(raw);
+    const fromSlot = slotNameById(group, id);
+    if (fromSlot) {
+      names.push(fromSlot);
+      continue;
+    }
+    const fromRegister = registerNameById(host, id);
+    if (fromRegister) names.push(fromRegister);
+  }
+  return names;
+}
+
+function listScoreEntities(host, group) {
+  if (group && Array.isArray(group.scoreEntities)) return group.scoreEntities;
+  const map = host && host.scoreEntities;
+  const gid = group && (group.groupId || group.id);
+  if (map && gid && Array.isArray(map[gid])) return map[gid];
+  if (map && gid && Array.isArray(map[String(gid)])) return map[String(gid)];
+  return [];
+}
+
+function findComboMembersForPlayer(host, group, groupIndex, playerId) {
+  const ctx = findComboTeamContext(host, group, groupIndex, playerId);
+  return ctx && Array.isArray(ctx.members) ? ctx.members : [];
+}
+
+function isPairSlotComboMode(host) {
+  const mode = String((host && (host.gameMode || host.selectedGameMode)) || '');
+  return mode.indexOf('四人两球') >= 0;
+}
+
+function isComboHost(host) {
+  const mode = (host && (host.gameMode || host.selectedGameMode)) || '';
+  if (isComboGameModeName(mode)) return true;
+  try {
+    const teamMatchStore = require('../../../utils/teamMatchStore.js');
+    if (teamMatchStore.isComboGameMode && teamMatchStore.isComboGameMode(mode)) return true;
+  } catch (e) {
+    /* ignore */
+  }
+  return false;
+}
+
+function hostUsesComboScores(host, group, groupIndex, playerId) {
+  if (isComboHost(host)) return true;
+  const members = findComboMembersForPlayer(host, group, groupIndex, playerId);
+  return members.length >= 2;
+}
+
+function memberMatchesPlayer(raw, playerId) {
+  const pid = String(playerId || '').trim();
+  if (!pid || raw == null) return false;
+  if (typeof raw === 'string' || typeof raw === 'number') return String(raw).trim() === pid;
+  const ids = [raw.playerId, raw.userId, raw.playerUserId, raw.id]
+    .map((v) => (v == null ? '' : String(v).trim()))
+    .filter(Boolean);
+  return ids.indexOf(pid) >= 0;
+}
+
+function findComboTeamContext(host, group, groupIndex, playerId) {
+  const pid = String(playerId || '').trim();
+  if (!pid) return null;
+
+  const comp = readGroupComposition(host, group, groupIndex);
+  const teams = comp && Array.isArray(comp.teams) ? comp.teams : [];
+  for (let t = 0; t < teams.length; t++) {
+    const members = (teams[t] && (teams[t].members || teams[t].players)) || [];
+    if (members.some((m) => memberMatchesPlayer(m, pid))) {
+      return {
+        teamIndex: t,
+        members: members,
+        teamId: String((teams[t] && (teams[t].teamId || teams[t].id || teams[t].entityId)) || '').trim()
+      };
+    }
+  }
+
+  const entities = listScoreEntities(host, group);
+  for (let e = 0; e < entities.length; e++) {
+    const entity = entities[e];
+    const members = (entity && entity.members) || [];
+    if (members.some((m) => memberMatchesPlayer(m, pid))) {
+      return {
+        teamIndex: e,
+        members: members,
+        teamId: String((entity && (entity.entityId || entity.teamId || entity.id)) || '').trim()
+      };
+    }
+  }
+
+  if (isPairSlotComboMode(host)) {
+    const slots = listGroupSlots(group);
+    let slotIndex = -1;
+    for (let i = 0; i < slots.length; i++) {
+      if (slots[i] && memberMatchesPlayer(slots[i], pid)) {
+        slotIndex = i;
+        break;
+      }
+    }
+    if (slotIndex >= 0) {
+      const pairStart = slotIndex < 2 ? 0 : 2;
+      const pair = [slots[pairStart], slots[pairStart + 1]].filter(Boolean);
+      if (pair.length >= 2) {
+        return {
+          teamIndex: pairStart === 0 ? 0 : 1,
+          members: pair,
+          teamId: ''
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function listTeamScoreRecords(host, group) {
+  const out = [];
+  const seen = [];
+  const pushList = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (let i = 0; i < arr.length; i++) {
+      const rec = arr[i];
+      if (!rec || typeof rec !== 'object') continue;
+      if (seen.indexOf(rec) >= 0) continue;
+      seen.push(rec);
+      out.push(rec);
+    }
+  };
+  pushList(group && group.teamScoresByEntity);
+  pushList(host && host.teamScoresByEntity);
+  const gid = group && (group.groupId || group.id);
+  const scoreData = host && host.scoreData;
+  if (scoreData && gid != null && gid !== '') {
+    const bucket = scoreData[gid] || scoreData[String(gid)];
+    if (bucket) pushList(bucket.teamScoresByEntity);
+  }
+  return out;
+}
+
+function recordTeamKey(rec) {
+  if (!rec || typeof rec !== 'object') return '';
+  return String(rec.teamId || rec.entityId || rec.id || '').trim();
+}
+
+function pickTeamEntityScores(records, ctx) {
+  if (!Array.isArray(records) || !records.length) return null;
+  const tid = ctx ? String(ctx.teamId || '').trim() : '';
+  if (tid) {
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
+      if (recordTeamKey(rec) === tid) return Array.isArray(rec.scores) ? rec.scores : [];
+    }
+  }
+  if (ctx && Number.isFinite(Number(ctx.teamIndex)) && records[ctx.teamIndex]) {
+    const byIndex = records[ctx.teamIndex];
+    return Array.isArray(byIndex.scores) ? byIndex.scores : [];
+  }
+  return null;
+}
+
+function toParFromFilledHoles(scores, holePars) {
+  const list = Array.isArray(scores) ? scores : [];
+  const pars = Array.isArray(holePars) ? holePars : [];
+  let total = 0;
+  let parThru = 0;
+  let count = 0;
+  for (let i = 0; i < HOLE_COUNT; i++) {
+    const n = Number(list[i]);
+    if (list[i] === '' || list[i] === null || list[i] === undefined || !Number.isFinite(n)) continue;
+    const par = Number(pars[i]);
+    parThru += Number.isFinite(par) && par > 0 ? par : 4;
+    total += n;
+    count += 1;
+  }
+  if (!count) return { total: '', toPar: null };
+  return { total: total, toPar: total - parThru };
+}
+
+function resolvePosterStrokeScores(host, group, groupIndex, playerId, personalScores) {
+  if (hostUsesComboScores(host, group, groupIndex, playerId)) {
+    const ctx = findComboTeamContext(host, group, groupIndex, playerId);
+    const entityScores = pickTeamEntityScores(listTeamScoreRecords(host, group), ctx);
+    return padScores(entityScores || []);
+  }
+  return padScores(personalScores);
+}
+
+/**
+ * 组合成绩昵称：两名（或以上）球员用 & 连接，如 A&B。
+ */
+function resolveComboNickname(host, group, groupIndex, playerId, fallbackName) {
+  if (!hostUsesComboScores(host, group, groupIndex, playerId)) return fallbackName;
+  const members = findComboMembersForPlayer(host, group, groupIndex, playerId);
+  const nick = formatComboNickname(namesFromMembers(host, group, members));
+  return nick || fallbackName;
+}
+
 /**
  * 当前用户展示名：槽位 name → 当前用户 name → 「球员」。
  */
 function resolvePlayerDisplayName(found, playerId) {
-  const slotName = found && found.slot && found.slot.name
-    ? String(found.slot.name).trim()
-    : '';
+  const slotName = memberNameOf(found && found.slot);
   if (slotName) return slotName;
 
   let userName = '';
@@ -311,18 +590,21 @@ function buildScoreDataFromGame(game, gameId, groupIndex, playerId) {
   if (!group) return null;
 
   const found = findPlayerSlot(group, playerId);
+  const comboPlayerId = memberIdOf(found.slot) || playerId;
   const rec =
-    gameStore.resolveGroupSlotScoreRecord(group, found.slotIndex, playerId) || {
+    gameStore.resolveGroupSlotScoreRecord(group, found.slotIndex, comboPlayerId) || {
       scores: [],
       putts: []
     };
 
-  const scores = padScores(rec.scores);
-  const total = sumFilledScores(rec.scores);
-  const par = resolvePar(game);
+  const scores = resolvePosterStrokeScores(game, group, groupIndex, comboPlayerId, rec.scores);
   const holePars = resolveHolePars(game);
+  const agg = toParFromFilledHoles(scores, holePars);
+  const total = agg.total;
+  const par = resolvePar(game);
   const relative = buildRelativeScores(scores, holePars);
   const playerName = resolvePlayerDisplayName(found, playerId);
+  const nickname = resolveComboNickname(game, group, groupIndex, comboPlayerId, playerName);
   const date = formatDateYMD(game.createdAt) || formatDateYMD(Date.now());
   const extra = game.roundName || game.gameMode || '';
 
@@ -333,7 +615,7 @@ function buildScoreDataFromGame(game, gameId, groupIndex, playerId) {
     slotIndex: found.slotIndex,
     playerId: playerId,
     playerName: playerName,
-    nickname: playerName,
+    nickname: nickname,
     courseName: game.courseName || '',
     course: game.courseName || '',
     date: date,
@@ -341,9 +623,9 @@ function buildScoreDataFromGame(game, gameId, groupIndex, playerId) {
     par: par,
     roundPar: par,
     total: total,
-    toPar: total - par,
+    toPar: agg.toPar,
     scoreMode: 'strokes',
-    templateId: 'academy',
+    templateId: 'template1',
     photoPath: '',
     scores: scores,
     strokes: scores.slice(),
@@ -370,10 +652,19 @@ function getScoreData(roundId) {
     if (!gameId) return Object.assign({}, SAMPLE);
 
     const game = gameStore.getGame(gameId) || gameStore.getGameById(gameId);
-    if (!game) return Object.assign({}, SAMPLE);
+    let host = game;
+    if (!host) {
+      try {
+        const teamMatchStore = require('../../../utils/teamMatchStore.js');
+        host = teamMatchStore.getMatchById(gameId);
+      } catch (e) {
+        host = null;
+      }
+    }
+    if (!host) return Object.assign({}, SAMPLE);
 
     const groupIndex = resolveGroupIndex();
-    const data = buildScoreDataFromGame(game, gameId, groupIndex, playerId);
+    const data = buildScoreDataFromGame(host, gameId, groupIndex, playerId);
     if (!data) return Object.assign({}, SAMPLE);
     return data;
   } catch (e) {
@@ -420,14 +711,15 @@ function applyScoreData(model, scoreData) {
       model.total.value = total === '' || total == null ? '' : String(total);
     }
     if (model.relativeTotal && typeof model.relativeTotal === "object") {
-      const toPar = Number.isFinite(Number(src.toPar))
-        ? Number(src.toPar)
-        : (Number.isFinite(Number(total)) ? Number(total) - par : null);
+      const explicitToPar = src.toPar === null || src.toPar === undefined || src.toPar === ''
+        ? null
+        : Number(src.toPar);
+      const toPar = Number.isFinite(explicitToPar)
+        ? explicitToPar
+        : null;
       model.toPar = Number.isFinite(toPar) ? toPar : null;
-      if (model.relativeTotal && typeof model.relativeTotal === "object") {
-        if (!Number.isFinite(toPar)) model.relativeTotal.value = "";
-        else model.relativeTotal.value = toPar > 0 ? "+" + toPar : String(toPar);
-      }
+      if (!Number.isFinite(toPar)) model.relativeTotal.value = "";
+      else model.relativeTotal.value = toPar > 0 ? "+" + toPar : String(toPar);
     }
     model.identity.nickname.value = playerName;
     if (courseName) model.identity.course.value = courseName;
@@ -439,9 +731,10 @@ function applyScoreData(model, scoreData) {
     return model;
   }
 
-  const toPar = Number.isFinite(Number(src.toPar))
-    ? Number(src.toPar)
-    : Number(total) - par;
+  const explicitToPar = src.toPar === null || src.toPar === undefined || src.toPar === ''
+    ? null
+    : Number(src.toPar);
+  const toPar = Number.isFinite(explicitToPar) ? explicitToPar : null;
   model.playerName = playerName;
   model.nickname = playerName;
   model.courseName = courseName;

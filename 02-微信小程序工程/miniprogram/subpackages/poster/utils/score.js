@@ -48,14 +48,55 @@ function formatRelativeScore(value) {
   return value > 0 ? `+${value}` : String(value).replace("-", "\u2212");
 }
 
+function nineHoleStrokeTotal(model, start) {
+  const startIndex = start >= 9 ? 9 : 0;
+  const scoreSets = (model && (model.scoreSets || model.scoreSets)) || {};
+  const strokes = scoreSets.strokes || [];
+  const relatives = scoreSets.relative || [];
+  const pars = model && (model.holePars || model.holePars);
+  const holePars = Array.isArray(pars) ? pars : [];
+  let sum = 0;
+  let count = 0;
+  for (let index = startIndex; index < startIndex + 9; index += 1) {
+    const stroke = parseStrokeScore(strokes[index]);
+    if (stroke !== null) {
+      sum += stroke;
+      count += 1;
+      continue;
+    }
+    const relative = parseRelativeScore(relatives[index]);
+    if (relative === null) continue;
+    const par = Number(holePars[index]);
+    const holePar = Number.isFinite(par) && par > 0 ? par : 4;
+    sum += holePar + relative;
+    count += 1;
+  }
+  return count ? sum : null;
+}
+
+function holeParAt(model, index) {
+  const pars = model && Array.isArray(model.holePars) ? model.holePars : [];
+  const par = Number(pars[index]);
+  return Number.isFinite(par) && par > 0 ? par : 4;
+}
+
 function calculateTotal(model) {
-  const scores = model.scoreSets[model.scoreMode] || [];
+  const scores = (model && model.scoreSets && model.scoreSets[model.scoreMode]) || [];
   if (model.scoreMode === "strokes") {
-    const values = scores.map(parseStrokeScore).filter((value) => value !== null);
+    let total = 0;
+    let relative = 0;
+    let count = 0;
+    scores.forEach((score, index) => {
+      const value = parseStrokeScore(score);
+      if (value === null) return;
+      total += value;
+      relative += value - holeParAt(model, index);
+      count += 1;
+    });
     return {
-      count: values.length,
-      relative: null,
-      total: values.length ? values.reduce((sum, value) => sum + value, 0) : null
+      count: count,
+      relative: count ? relative : null,
+      total: count ? total : null
     };
   }
   const values = scores.map(parseRelativeScore).filter((value) => value !== null);
@@ -71,8 +112,11 @@ function calculateTotal(model) {
 module.exports = {
   parseRelativeScore,
   parseStrokeScore,
+  parseRelativeScore: parseRelativeScore,
+  parseStrokeScore: parseStrokeScore,
   parseScoreInput,
   formatScoreInput,
   formatRelativeScore,
+  nineHoleStrokeTotal,
   calculateTotal
 };

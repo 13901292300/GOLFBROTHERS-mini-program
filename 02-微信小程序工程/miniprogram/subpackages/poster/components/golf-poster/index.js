@@ -8,12 +8,22 @@ const {
   FONT_OPTIONS,
   MARKER_STYLE_KEYS,
   TEMPLATES,
+  DEFAULT_TEMPLATE_ID,
   createPosterModel,
   ensureTotalDisplayModel,
   normalizeFontId,
   ensureColorPresets,
   applyMarkerPreset,
   applyPalette,
+  applyLinkedColor,
+  resolvePalette,
+  paletteLinksActive,
+  markersFollowTotal,
+  syncLinkedPaletteGroups,
+  identityRotation,
+  nextIdentityRotation,
+  applyIdentityRotation,
+  mirrorPosterLayout,
   switchTemplate,
   templateCards,
   SYSTEM_BACKDROPS
@@ -112,6 +122,7 @@ const COPY = {
     segmentImageTooLarge: "图片过大，请压缩后重试",
     retry: "重新识别",
     palette: "模板配色",
+    paletteCustom: "自定义",
     scoreMode: "成绩模式",
     strokes: "总杆",
     relative: "杆差",
@@ -123,8 +134,8 @@ const COPY = {
     scoreReadonlyHint: "成绩来自记分卡，如需修改请返回记分页",
     scoreFromCardHint: "成绩来自记分卡，无需手动输入",
     backToScorePage: "返回修改成绩",
-    frontNine: "前九",
-    backNine: "后九",
+    frontNine: "FRONT",
+    backNine: "BACK",
     holePar: "PAR",
     badge: "首洞标记",
     scoreFont: "成绩字体",
@@ -161,9 +172,14 @@ const COPY = {
     totalSize: "字号",
     totalValueLabel: "总杆数值",
     relativeValueLabel: "杆差数值",
+    relativeReadonlyHint: "杆差来自成绩卡，不可在此修改",
     totalTabTotal: "总杆",
     totalTabRelative: "杆差",
     totalAbove: "总成绩置于人物上方",
+    scorecardLayer: "成绩板图层",
+    scorecardAbovePortrait: "人像之上",
+    scorecardBelowPortrait: "人像之下",
+    mirrorElements: "镜像元素",
     visible: "显示",
     totalEmpty: "成绩卡尚无逐洞成绩",
     totalReadonlyHint: "总杆来自成绩卡，不可在此修改",
@@ -267,6 +283,7 @@ const COPY = {
     segmentImageTooLarge: "Photo is too large. Please compress and retry",
     retry: "RETRY",
     palette: "Template palette",
+    paletteCustom: "Custom",
     scoreMode: "Score mode",
     strokes: "Strokes",
     relative: "To par",
@@ -278,8 +295,8 @@ const COPY = {
     scoreReadonlyHint: "Scores come from the scorecard. Go back to edit them there.",
     scoreFromCardHint: "Scores come from the scorecard. No manual input needed.",
     backToScorePage: "Edit scores on card",
-    frontNine: "OUT",
-    backNine: "IN",
+    frontNine: "FRONT",
+    backNine: "BACK",
     holePar: "PAR",
     badge: "First-hole badge",
     scoreFont: "Score font",
@@ -316,9 +333,14 @@ const COPY = {
     totalSize: "Size",
     totalValueLabel: "Total strokes",
     relativeValueLabel: "To par",
+    relativeReadonlyHint: "To-par comes from the scorecard and cannot be edited here",
     totalTabTotal: "Total",
     totalTabRelative: "To par",
     totalAbove: "Total above player",
+    scorecardLayer: "Scorecard layer",
+    scorecardAbovePortrait: "Above portrait",
+    scorecardBelowPortrait: "Below portrait",
+    mirrorElements: "Mirror elements",
     visible: "Visible",
     totalEmpty: "No hole scores on the scorecard yet",
     totalReadonlyHint: "Total comes from the scorecard and cannot be edited here",
@@ -484,6 +506,8 @@ Component({
       scoreInput: "",
       badge: "",
       scorecardScale: 100,
+      scorecardAbove: true,
+      layoutMirrored: false,
       cardOpacity: 88,
       scoreItalic: false,
       roundPar: 72,
@@ -537,7 +561,7 @@ Component({
 
   lifetimes: {
     created() {
-      this.posterState = createPosterModel("academy", false, "GOLFBROTHERS");
+      this.posterState = createPosterModel(DEFAULT_TEMPLATE_ID, false, "GOLFBROTHERS");
       this.posterCanvas = null;
       this.posterContext = null;
       this.segmentationCanvas = null;
@@ -619,7 +643,7 @@ Component({
       return savePosterDraft({
         roundId,
         step: this.data.step,
-        templateId: this.data.selectedTemplateId || this.posterState.templateId || "academy",
+        templateId: this.data.selectedTemplateId || this.posterState.templateId || DEFAULT_TEMPLATE_ID,
         photoPath: this.posterState.photoPath || "",
         photoFileID: this.posterState.photoFileID || "",
         subjectPath: this.posterState.subjectPath || "",
@@ -685,7 +709,7 @@ Component({
       if (Array.isArray(saved.stickers)) {
         saved.stickers = saved.stickers.map((item) => Object.assign({}, item, { image: null }));
       }
-      const templateId = draft.templateId || saved.templateId || "academy";
+      const templateId = draft.templateId || saved.templateId || DEFAULT_TEMPLATE_ID;
       const merged = Object.assign(
         createPosterModel(templateId, false, this.properties.brand),
         saved
@@ -713,6 +737,7 @@ Component({
           largeEdit: false
         }, resolve);
       });
+      this._onStepEntered(safeStep);
       this._updateStepMeta();
       this._syncAllControls();
       if (safeStep <= 0) return true;
@@ -913,9 +938,14 @@ Component({
 
     openTemplatePreview(event) {
       const templateId = event.currentTarget.dataset.id;
+      const keepMirror = templateId === "template2" && (
+        Boolean(this.data.form.layoutMirrored)
+        || Boolean(this.posterState && this.posterState.templateId === "template2" && this.posterState.layoutMirrored)
+      );
       this.setData({
         selectedTemplateId: templateId,
-        templatePreviewOpen: true
+        templatePreviewOpen: true,
+        "form.layoutMirrored": keepMirror
       }, () => {
         this._initTemplateCanvas(templateId);
       });
@@ -947,6 +977,9 @@ Component({
       this.posterState = hasStarted
         ? switchTemplate(this.posterState, templateId, this.properties.brand)
         : createPosterModel(templateId, false, this.properties.brand);
+      if (templateId === "template2" && this.data.form.layoutMirrored && !this.posterState.layoutMirrored) {
+        mirrorPosterLayout(this.posterState);
+      }
       this._applyScoreFromRound(this.properties.roundId);
       this.returnToSummary = false;
       this.setData({
@@ -958,9 +991,17 @@ Component({
         this._updateStepMeta();
         this._syncAllControls();
         this._initPosterCanvas().then(() => {
+          const waitBackdrop = this.posterState.backdropMode === "system"
+            ? this._ensureSystemBackdrop()
+            : Promise.resolve();
+          return waitBackdrop.then(() => {
+            this._renderNow();
+            this._refreshCanvasRect();
+            this.saveDraft();
+          });
+        }).catch((error) => {
+          console.warn("[golf-poster] activate template backdrop failed", error);
           this._renderNow();
-          this._refreshCanvasRect();
-          this.saveDraft();
         });
       });
     },
@@ -972,6 +1013,7 @@ Component({
         return;
       }
       this.setData({ step: this.data.step + 1 }, () => {
+        this._onStepEntered(this.data.step);
         this._updateStepMeta();
         this._syncAllControls();
         this._render();
@@ -993,6 +1035,7 @@ Component({
         return;
       }
       this.setData({ step: this.data.step - 1 }, () => {
+        this._onStepEntered(this.data.step);
         this._updateStepMeta();
         this._syncAllControls();
         this._render();
@@ -1046,6 +1089,7 @@ Component({
       if (index < 1) return;
       this.returnToSummary = true;
       this.setData({ step: index }, () => {
+        this._onStepEntered(index);
         this._updateStepMeta();
         this._syncAllControls();
         this._render();
@@ -1053,11 +1097,47 @@ Component({
       });
     },
 
+    _onStepEntered(step) {
+      if (step === 5) this._enterStickerStep();
+    },
+
+    _ensureStickerSelection() {
+      const stickers = this.posterState.stickers || [];
+      const currentId = this.posterState.selectedStickerId;
+      const valid = currentId && stickers.some((item) => item.id === currentId);
+      if (!stickers.length) {
+        this.posterState.selectedStickerId = "";
+        return "";
+      }
+      if (!valid) this.posterState.selectedStickerId = stickers[stickers.length - 1].id;
+      return "sticker:" + this.posterState.selectedStickerId;
+    },
+
+    _enterStickerStep() {
+      const target = this._ensureStickerSelection();
+      this.setData({
+        largeEdit: false,
+        previewCanvasStyle: "",
+        activeEditTarget: target,
+        activeElementScaleDisabled: !target
+      }, () => {
+        this._syncStickerControls();
+        this._refreshCanvasRect();
+        this._renderNow();
+      });
+    },
+
     openLargeEdit() {
-      const stepTarget = this._gestureTarget();
+      const onStickers = Number(this.data.step) === 5;
+      const stepTarget = onStickers
+        ? this._ensureStickerSelection()
+        : this._gestureTarget();
+      const fallback = onStickers
+        ? ""
+        : (this.posterState.total.value ? "total" : "scorecard");
       this.setData({
         largeEdit: true,
-        activeEditTarget: stepTarget || (this.posterState.total.value ? "total" : "scorecard")
+        activeEditTarget: stepTarget || fallback
       }, () => {
         this._updateStepMeta();
         this._syncLargeEdit();
@@ -1070,11 +1150,14 @@ Component({
     },
 
     closeLargeEdit() {
+      const stickerTarget = Number(this.data.step) === 5
+        ? this._ensureStickerSelection()
+        : "";
       this.setData({
         largeEdit: false,
         previewCanvasStyle: "",
-        activeEditTarget: "",
-        activeElementScaleDisabled: true
+        activeEditTarget: stickerTarget,
+        activeElementScaleDisabled: !stickerTarget
       }, () => {
         this._updateStepMeta();
         const afterLayout = () => {
@@ -1169,7 +1252,7 @@ Component({
           this._clearPosterCanvas();
           clearPosterDraft();
           this._draftRestoredKey = "";
-          this.posterState = createPosterModel("academy", false, this.properties.brand);
+          this.posterState = createPosterModel(DEFAULT_TEMPLATE_ID, false, this.properties.brand);
           this._applyScoreFromRound(this.properties.roundId);
           this.posterCanvas = null;
           this.posterContext = null;
@@ -1634,7 +1717,10 @@ Component({
       ["nickname", "course", "date", "extra"].forEach((key) => {
         this.posterState.identity[key].x = defaults.identity[key].x;
         this.posterState.identity[key].y = defaults.identity[key].y;
+        this.posterState.identity[key].rotation = defaults.identity[key].rotation;
+        this.posterState.identity[key].rotated = defaults.identity[key].rotated;
       });
+      this.posterState.layoutMirrored = false;
       this.posterState.stickers.forEach((sticker, index) => {
         sticker.x = 500 + (index % 3 - 1) * 90;
         sticker.y = 630 + index % 2 * 90;
@@ -1724,7 +1810,26 @@ Component({
       this._rebuildPaletteOptions();
       this._rebuildColorControls();
       this._syncIdentityForm();
-      this._render();
+      this.setData({
+        "form.cardOpacity": Number.isFinite(Number(this.posterState.style.cardOpacity))
+          ? Math.round(this.posterState.style.cardOpacity)
+          : 88,
+        "form.backdropMode": this.posterState.backdropMode === "system" ? "system" : "photo",
+        "form.scoringStyle": this.posterState.scoringStyle === "dp" ? "dp" : "pga",
+        scoreFontIndex: fontIndex(this.posterState.fonts && this.posterState.fonts.score),
+        totalFontIndex: fontIndex(this.posterState.total && this.posterState.total.font),
+        relativeFontIndex: fontIndex(this.posterState.relativeTotal && this.posterState.relativeTotal.font)
+      });
+      this._rebuildBackdropOptions();
+      const waitBackdrop = this.posterState.backdropMode === "system"
+        ? this._ensureSystemBackdrop()
+        : Promise.resolve();
+      waitBackdrop
+        .then(() => this._render())
+        .catch((error) => {
+          console.warn("[golf-poster] load palette backdrop failed", error);
+          this._render();
+        });
     },
 
     selectScoreMode(event) {
@@ -1743,7 +1848,13 @@ Component({
       const style = event.currentTarget.dataset.style === "dp" ? "dp" : "pga";
       this.posterState.scoringStyle = style;
       applyMarkerPreset(this.posterState, style);
-      this.setData({ "form.scoringStyle": style });
+      syncLinkedPaletteGroups(this.posterState);
+      this.setData({
+        "form.scoringStyle": style,
+        "form.cardOpacity": Number.isFinite(Number(this.posterState.style.cardOpacity))
+          ? Math.round(this.posterState.style.cardOpacity)
+          : 15
+      });
       this._rebuildColorControls();
       this._render();
     },
@@ -1814,7 +1925,7 @@ Component({
     },
 
     onAlignScorecardCenter() {
-      const template = TEMPLATES[this.posterState.templateId] || TEMPLATES.academy;
+      const template = TEMPLATES[this.posterState.templateId] || TEMPLATES[DEFAULT_TEMPLATE_ID];
       const base = template.layout && template.layout.score;
       const scale = this.posterState.scorecard.scale || 1;
       const width = (base && base.w ? base.w : 0) * scale;
@@ -1824,23 +1935,63 @@ Component({
       this._render();
     },
 
+    selectScorecardLayer(event) {
+      const above = event.currentTarget.dataset.layer !== "below";
+      if (!this.posterState.scorecard) this.posterState.scorecard = {};
+      this.posterState.scorecard.aboveSubject = above;
+      this.setData({ "form.scorecardAbove": above });
+      this._render();
+    },
+
+    mirrorTemplate2Layout() {
+      if (this.data.selectedTemplateId !== "template2") return;
+      const next = !this.data.form.layoutMirrored;
+      this.setData({ "form.layoutMirrored": next }, () => {
+        if (this.data.templatePreviewOpen) {
+          this._initTemplateCanvas("template2");
+          return;
+        }
+        if (this.posterState.templateId === "template2") {
+          mirrorPosterLayout(this.posterState);
+          this._syncAllControls();
+          this._render();
+        }
+      });
+    },
+
     selectColor(event) {
       const styleKey = event.currentTarget.dataset.key;
       const value = event.currentTarget.dataset.value;
-      this.posterState.paletteId = "custom";
-      const keys = COLOR_KEY_GROUPS[styleKey] || [styleKey];
-      const mode = this.posterState.scoringStyle === "dp" ? "dp" : "pga";
-      ensureColorPresets(this.posterState);
-      keys.forEach((key) => {
-        this.posterState.style[key] = value;
-        if (MARKER_STYLE_KEYS.indexOf(key) >= 0) {
-          this.posterState.colorPresets[mode][key] = value;
-        }
-      });
+      const template = TEMPLATES[this.posterState.templateId];
+      const linksOn = paletteLinksActive(this.posterState);
+      const markerLinked = linksOn
+        && template
+        && this.posterState.scoringStyle !== "dp"
+        && (markersFollowTotal(this.posterState) || template.scoreTextLinksToRelative)
+        && (styleKey === "pgaUnder" || styleKey === "pgaOver" || MARKER_STYLE_KEYS.indexOf(styleKey) >= 0);
+      const boardLinked = linksOn && template && template.boardLinksToTotal && styleKey === "card";
+      const scoreTextLinked = linksOn && template && (
+        template.scoreTextLinksToRelative || template.scoreTextLinksToTotal
+      ) && styleKey === "scoreText";
+      if (linksOn && (styleKey === "line" || styleKey === "total" || styleKey === "relativeTotalColor" || markerLinked || boardLinked || scoreTextLinked)) {
+        applyLinkedColor(this.posterState, styleKey, value);
+      } else {
+        const keys = COLOR_KEY_GROUPS[styleKey] || [styleKey];
+        const mode = this.posterState.scoringStyle === "dp" ? "dp" : "pga";
+        ensureColorPresets(this.posterState);
+        keys.forEach((key) => {
+          this.posterState.style[key] = value;
+          if (MARKER_STYLE_KEYS.indexOf(key) >= 0) {
+            this.posterState.colorPresets[mode][key] = value;
+          }
+        });
+      }
+      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
       const patch = {};
       if (styleKey === "relativeTotalColor") patch["form.relativeTotalColor"] = value;
       this._rebuildColorControls();
       this._rebuildPaletteOptions();
+      this._syncIdentityForm();
       if (Object.keys(patch).length) this.setData(patch);
       this._render();
     },
@@ -1896,6 +2047,7 @@ Component({
 
     switchTotalTab(event) {
       const tab = event.currentTarget.dataset.tab === "relative" ? "relative" : "total";
+      this._updateRelativeTotal();
       this.setData({
         totalTab: tab,
         activeEditTarget: tab === "relative" ? "relativeTotal" : "total"
@@ -1921,9 +2073,8 @@ Component({
 
     onTotalColorSelect(event) {
       const color = event.currentTarget.dataset.color;
-      this.posterState.total.color = color;
-      this.posterState.style.total = color;
-      this.posterState.paletteId = "custom";
+      applyLinkedColor(this.posterState, "total", color);
+      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
       this._rebuildColorControls();
       this._rebuildPaletteOptions();
       this._render();
@@ -1956,11 +2107,12 @@ Component({
     onRelativeColorSelect(event) {
       const color = event.currentTarget.dataset.color;
       if (!this.posterState.relativeTotal) return;
-      this.posterState.relativeTotal.color = color;
-      this.posterState.style.relativeTotalColor = color;
+      applyLinkedColor(this.posterState, "relativeTotalColor", color);
+      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
       this.setData({ "form.relativeTotalColor": color });
-      this.posterState.paletteId = "custom";
       this._rebuildColorControls();
+      this._rebuildPaletteOptions();
+      this._syncIdentityForm();
       this._render();
     },
 
@@ -2020,18 +2172,21 @@ Component({
     onIdentityRotateTap() {
       if (this.posterState.identity[this.data.activeIdentity].hidden) return;
       const key = this.data.activeIdentity;
-      const next = !this._identityRotated(key);
-      this.posterState.identity[key].rotated = next;
-      this.setData({ "form.identityRotated": next });
+      const template = TEMPLATES[this.posterState.templateId];
+      const region = template && template.layout && template.layout[key];
+      const current = identityRotation(this.posterState.identity[key], region);
+      applyIdentityRotation(this.posterState.identity[key], nextIdentityRotation(current));
+      this.setData({ "form.identityRotated": this._identityRotated(key) });
       this._render();
     },
 
     selectTextColor(event) {
       const value = event.currentTarget.dataset.value;
-      this.posterState.identity[this.data.activeIdentity].color = value;
-      this.posterState.paletteId = "custom";
+      applyLinkedColor(this.posterState, this.data.activeIdentity, value);
+      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
       this._rebuildColorControls();
       this._rebuildPaletteOptions();
+      this._syncIdentityForm();
       this._render();
     },
 
@@ -2068,6 +2223,11 @@ Component({
             this.posterState.stickers.push(sticker);
             this.posterState.selectedStickerId = sticker.id;
           }
+          const target = this._ensureStickerSelection();
+          this.setData({
+            activeEditTarget: target,
+            activeElementScaleDisabled: !target
+          });
           this._syncStickerControls();
           this._render();
           this.saveDraft();
@@ -2077,6 +2237,10 @@ Component({
 
     selectSticker(event) {
       this.posterState.selectedStickerId = event.currentTarget.dataset.id;
+      this.setData({
+        activeEditTarget: this._ensureStickerSelection(),
+        activeElementScaleDisabled: false
+      });
       this._syncStickerControls();
       this._render();
     },
@@ -2093,8 +2257,11 @@ Component({
       const selectedId = this.posterState.selectedStickerId;
       if (!selectedId) return;
       this.posterState.stickers = this.posterState.stickers.filter((item) => item.id !== selectedId);
-      const last = this.posterState.stickers[this.posterState.stickers.length - 1];
-      this.posterState.selectedStickerId = last ? last.id : "";
+      const target = this._ensureStickerSelection();
+      this.setData({
+        activeEditTarget: target,
+        activeElementScaleDisabled: !target
+      });
       this._syncStickerControls();
       this._render();
     },
@@ -2502,17 +2669,26 @@ Component({
       return this.posterState.stickers.find((item) => item.id === this.posterState.selectedStickerId) || null;
     },
 
+    _identityMoveKeys(target) {
+      const template = TEMPLATES[this.posterState.templateId];
+      const courseLayout = template && template.layout && template.layout.course;
+      const group = courseLayout && courseLayout.metaKeys && courseLayout.metaKeys.length
+        ? courseLayout.metaKeys
+        : ["extra", "course", "date"];
+      if (courseLayout && courseLayout.metaLine && group.indexOf(target) >= 0) return group.slice();
+      return [target];
+    },
+
     _gestureTarget() {
-      if (this.data.largeEdit) return this.data.activeEditTarget;
-      if (this.data.step === 1) return "photo";
-      if (this.data.step === 2) return "scorecard";
-      if (this.data.step === 3) {
+      const step = Number(this.data.step);
+      if (step === 5) return this._ensureStickerSelection();
+      if (this.data.largeEdit) return this.data.activeEditTarget || "";
+      if (step === 1) return "photo";
+      if (step === 2) return "scorecard";
+      if (step === 3) {
         return this.data.totalTab === "relative" ? "relativeTotal" : "total";
       }
-      if (this.data.step === 4) return this.data.activeIdentity;
-      if (this.data.step === 5 && this.posterState.selectedStickerId) {
-        return `sticker:${this.posterState.selectedStickerId}`;
-      }
+      if (step === 4) return this.data.activeIdentity || "";
       return "";
     },
 
@@ -2530,8 +2706,10 @@ Component({
         this.posterState.relativeTotal.x += dx;
         this.posterState.relativeTotal.y += dy;
       } else if (["nickname", "course", "date", "extra"].indexOf(target) >= 0) {
-        this.posterState.identity[target].x += dx;
-        this.posterState.identity[target].y += dy;
+        this._identityMoveKeys(target).forEach((key) => {
+          this.posterState.identity[key].x += dx;
+          this.posterState.identity[key].y += dy;
+        });
       } else if (target.indexOf("sticker:") === 0) {
         const sticker = this.posterState.stickers.find((item) => `sticker:${item.id}` === target);
         if (sticker) {
@@ -2644,12 +2822,23 @@ Component({
     },
 
     _initTemplateCanvas(templateId) {
-      this._queryCanvas("#templatePreviewCanvas").then((result) => {
+      this._queryCanvas("#templatePreviewCanvas").then(async (result) => {
         this.templateCanvas = result.node;
         this.templateCanvas.width = POSTER_WIDTH;
         this.templateCanvas.height = POSTER_HEIGHT;
         this.templateContext = this.templateCanvas.getContext("2d");
         const sample = createPosterModel(templateId, true, this.properties.brand);
+        if (templateId === "template2" && this.data.form.layoutMirrored && !sample.layoutMirrored) {
+          mirrorPosterLayout(sample);
+        }
+        if (sample.backdropMode === "system") {
+          const spec = SYSTEM_BACKDROPS.find((item) => item.id === sample.backdropId) || SYSTEM_BACKDROPS[0];
+          try {
+            sample.backdrop = await this._loadCanvasImage(spec.path);
+          } catch (error) {
+            console.warn("[golf-poster] template backdrop missing", error);
+          }
+        }
         renderPoster(this.templateContext, sample, { showGuide: false });
       }).catch((error) => {
         console.warn("[golf-poster] template canvas init failed", error);
@@ -2711,8 +2900,10 @@ Component({
     },
 
     _guideTarget() {
-      if (this.data.step >= 6) return "";
-      if (this.data.largeEdit) return this.data.activeEditTarget;
+      const step = Number(this.data.step);
+      if (step >= 6 || step <= 0) return "";
+      if (step === 5) return this._ensureStickerSelection();
+      if (this.data.largeEdit) return this.data.activeEditTarget || "";
       return this._gestureTarget();
     },
 
@@ -2757,19 +2948,51 @@ Component({
       this._render();
     },
 
+    _paletteBarSwatch(color) {
+      const value = String(color || "").trim();
+      const normalized = value.toLowerCase().replace(/\s/g, "");
+      const light = normalized === "#fff"
+        || normalized === "#ffffff"
+        || normalized === "white"
+        || normalized === "rgb(255,255,255)"
+        || normalized === "rgba(255,255,255,1)";
+      return { color: value || "#ffffff", light };
+    },
+
     _rebuildPaletteOptions(languageArg) {
       const language = languageArg || this.data.language;
+      const copy = COPY[language];
       const template = TEMPLATES[this.posterState.templateId];
-      const options = template.paletteIds.map((id) => {
-        const palette = PALETTES[id];
+      const style = this.posterState.style || {};
+      const options = (template.paletteIds || []).map((id) => {
+        const palette = resolvePalette(template, id);
+        if (!palette) return null;
+        const colors = Array.isArray(palette.barColors) && palette.barColors.length >= 3
+          ? palette.barColors
+          : [
+            palette.total,
+            template.boardLinksToTotal ? palette.total : palette.card,
+            template.boardLinksToTotal
+              ? (palette.scoreText || palette.line)
+              : (template.colorLinks ? palette.total : palette.line)
+          ];
+        const bars = colors.slice(0, 3).map((color) => this._paletteBarSwatch(color));
         return {
           id,
           name: language === "en" ? palette.en : palette.zh,
-          total: palette.total,
-          card: palette.card,
-          line: palette.line,
+          bars,
           active: this.posterState.paletteId === id
         };
+      }).filter(Boolean);
+      options.push({
+        id: "custom",
+        name: copy.paletteCustom,
+        bars: [
+          this._paletteBarSwatch((this.posterState.total && this.posterState.total.color) || style.total),
+          this._paletteBarSwatch(style.card),
+          this._paletteBarSwatch(style.line)
+        ],
+        active: this.posterState.paletteId === "custom"
       });
       this.setData({ paletteOptions: options });
     },
@@ -2811,10 +3034,10 @@ Component({
           ["overMarker", copy.bogey],
           ["doubleBogeyMarker", copy.doubleBogey]
         ];
-      const scoreColorRows = rowDefinitions.map(([key, label]) => ({
-        key,
-        label,
-        options: this._colorOptions(key, language)
+      const scoreColorRows = rowDefinitions.map((row) => ({
+        key: row[0],
+        label: row[1],
+        options: this._colorOptions(row[0], language)
       }));
       const activeTextColor = this.posterState.identity[this.data.activeIdentity].color.toLowerCase();
       const textSource = COLOR_OPTIONS.some((item) => item.value === activeTextColor)
@@ -2850,10 +3073,9 @@ Component({
 
     _identityRotated(key) {
       const item = this.posterState.identity[key];
-      if (item && (item.rotated === true || item.rotated === false)) return item.rotated;
       const template = TEMPLATES[this.posterState.templateId];
       const region = template && template.layout && template.layout[key];
-      return Boolean(region && region.vertical);
+      return identityRotation(item, region) !== 0;
     },
 
     _syncIdentityForm() {
@@ -2905,6 +3127,8 @@ Component({
           scoreInput: formatScoreInput(model.scoreSets[model.scoreMode]),
           badge: "",
           scorecardScale: Math.round(model.scorecard.scale * 100),
+          scorecardAbove: !model.scorecard || model.scorecard.aboveSubject !== false,
+          layoutMirrored: Boolean(model.layoutMirrored),
           cardOpacity: Number.isFinite(Number(model.style.cardOpacity)) ? Math.round(model.style.cardOpacity) : 88,
           scoreItalic: Boolean(model.fonts.scoreItalic),
           roundPar: model.roundPar,

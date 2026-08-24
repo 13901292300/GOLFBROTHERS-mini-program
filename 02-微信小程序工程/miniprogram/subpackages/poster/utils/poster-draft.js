@@ -21,7 +21,7 @@ function savePosterDraft(draftData) {
   const payload = {
     roundId: String(draftData.roundId),
     step: Number(draftData.step) || 0,
-    templateId: draftData.templateId || "academy",
+    templateId: draftData.templateId || "template1",
     photoPath: draftData.photoPath || "",
     photoFileID: draftData.photoFileID || "",
     subjectPath: draftData.subjectPath || "",
