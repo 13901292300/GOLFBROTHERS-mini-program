@@ -153,7 +153,7 @@ function resolveRegisterCta(input) {
   if (!(Number(src.eligibleCount) > 0)) {
     return {
       disabled: true,
-      label: asString(src.ineligibleMessage) || '当前账号不属于参赛球队',
+      label: asString(src.ineligibleMessage) || '暂无参赛球队',
       action: 'none'
     };
   }

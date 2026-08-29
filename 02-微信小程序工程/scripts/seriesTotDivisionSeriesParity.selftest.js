@@ -8,14 +8,15 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var utilsDir = path.join(mini, 'utils');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 
-var teamLeaderboardView = require(path.join(utilsDir, 'teamLeaderboardView.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardView = require(seriesTestPaths.util('teamLeaderboardView.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 var adapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 
 var passed = 0;

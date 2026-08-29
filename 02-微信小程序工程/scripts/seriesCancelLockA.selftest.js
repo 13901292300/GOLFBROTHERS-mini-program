@@ -7,6 +7,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -21,7 +22,7 @@ if (typeof global.wx === 'undefined') {
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var utilsDir = path.join(mini, 'utils');
-var gatePath = path.join(utilsDir, 'seriesRegistrationCancellationGate.js');
+var gatePath = seriesTestPaths.util('seriesRegistrationCancellationGate.js');
 var gateSrc = fs.readFileSync(gatePath, 'utf8');
 var gate = require(gatePath);
 var pageJs = fs.readFileSync(

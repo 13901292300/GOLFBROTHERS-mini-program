@@ -42,6 +42,16 @@ function assert(name, cond, detail) {
   }
 }
 
+function selectorHasTotal(vm) {
+  var items = (vm && vm.roundSelectorItems) || [];
+  var i;
+  for (i = 0; i < items.length; i++) {
+    var key = String((items[i] && items[i].key) || '');
+    if (key === 'total' || key === 'cumulative') return true;
+  }
+  return false;
+}
+
 function extractFn(src, name) {
   var re = new RegExp(name + ':\\s*function\\s*\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n  \\},');
   var m = src.match(re);
@@ -313,7 +323,9 @@ assert(
     gm.available === true &&
     !gm.useRyderCupScoreboard &&
     gm.selectedKey === 'r2' &&
-    !!gm.totalSelector
+    gm.showTot === false &&
+    gm.totalSelector == null &&
+    selectorHasTotal(gm)
 );
 
 var pn = viewModel.buildSeriesStandingsProjection({

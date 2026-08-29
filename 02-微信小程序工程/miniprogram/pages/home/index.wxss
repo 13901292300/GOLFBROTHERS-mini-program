@@ -428,8 +428,8 @@ page {
   flex-shrink: 0;
 }
 
-/* --- Text intrinsic width seal (no direct text layout leak) ---
-   普通球局卡片(Compact)：标题单行省略，纳入本组；球队比赛卡片(Fluid)标题换行在下方单独定义。 */
+/* --- Text intrinsic width seal (no direct text layout leak)
+   普通球局卡片(Compact)与球队比赛卡片标题均为单行省略。 */
 .ds-card-tour-title,
 .ds-card-tour-meta text,
 .ds-card-club-main text,
@@ -474,13 +474,23 @@ page {
 
 .card-star {
   font-size: 18px;
-  color: var(--star-inactive);
-  opacity: 0.6;
   line-height: 1;
 }
 
+.card-star.star-empty {
+  color: #ccc;
+  opacity: 1;
+}
+
+.card-star.star-gold,
 .card-star.active {
-  color: var(--champion-gold);
+  color: #CE9224 !important;
+  opacity: 1;
+}
+
+.card-star.star-blue,
+.card-star.star-locked {
+  color: var(--data-blue);
   opacity: 1;
 }
 
@@ -520,12 +530,18 @@ page {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: var(--tour-blue);
+  background: #002d62;
+  z-index: 1;
 }
-.ds-card-tour.ds-card-active {
-  border: 3px solid var(--champion-gold) !important;
+.ds-card-tour.ds-card-mine {
+  border-top: 2px solid var(--data-blue);
+  border-left: 2px solid var(--data-blue);
+  border-right: 2px solid var(--data-blue);
+  border-bottom: 2px solid var(--data-blue);
 }
-.ds-card-tour.ds-card-active::before { display: none; }
+.ds-card-tour.ds-card-mine::before {
+  display: none;
+}
 
 .ds-group-avatar {
   width: 64px;
@@ -655,6 +671,74 @@ page {
   height: 3px;
   background: var(--tour-blue);
 }
+/* 报名中系列赛：日期 / 状态标签 / ORG 使用全局冠军金 --champion-gold (#CE9224) */
+.ds-card-club--registration .ds-card-club__date text,
+.ds-card-club--registration .ds-card-club__date .ds-text-data {
+  color: var(--champion-gold);
+}
+.ds-card-club--registration .ds-badge--registration,
+.ds-card-club--registration .ds-card-club__status-tag .badge-gold {
+  background: var(--champion-gold);
+  color: #ffffff;
+}
+.ds-card-club--registration .ds-club-footer-label {
+  color: var(--champion-gold);
+}
+.ds-card-club--registration .status-tag--live .ds-badge {
+  background: transparent !important;
+  color: #00AEEF !important;
+  border-color: #00AEEF !important;
+}
+/* LIVE 系列赛：日期 / 状态 / ORG 使用信息蓝，覆盖报名金 */
+.ds-card-club--live {
+  --data-blue: #00AEEF;
+}
+.ds-card-club--live .ds-card-club__date text,
+.ds-card-club--live .ds-card-club__date .ds-text-data {
+  color: var(--data-blue) !important;
+}
+.ds-card-club--live .ds-club-footer-label {
+  color: var(--data-blue) !important;
+}
+.ds-card-club--live .ds-club-footer-line {
+  background: linear-gradient(to right, transparent, var(--data-blue)) !important;
+}
+.ds-card-club--live .ds-club-footer-line--right {
+  background: linear-gradient(to left, transparent, var(--data-blue)) !important;
+}
+/* LIVE 标签：仅改标签本身（信息蓝 + 呼吸点），不改日期 / ORG / 描边 */
+.status-tag--live .ds-badge {
+  display: inline-flex !important;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 40rpx;
+  padding: 0 12rpx;
+  background: transparent !important;
+  color: #00AEEF !important;
+  border: 1px solid #00AEEF;
+  box-sizing: border-box;
+}
+.status-tag--live .ds-badge text {
+  color: #00AEEF !important;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 20rpx;
+  line-height: 1;
+}
+.status-tag--live .live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00AEEF;
+  flex-shrink: 0;
+  animation: live-dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes live-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
 /* 以 LOGO 为垂直锚点的卡片主体：纵向堆叠（锚定行 + LOGO 下方信息行） */
 .ds-card-club-main {
   flex-direction: column;
@@ -731,7 +815,7 @@ page {
   font-style: italic;
 }
 .badge-live {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   color: #ffffff;
   font-style: italic;
 }
@@ -754,12 +838,11 @@ page {
   padding-right: 24px;
   gap: 4px;
 }
-/* LOGO 锚定子块：与 64px LOGO 等高，date 顶对齐 LOGO 顶、title 底对齐 LOGO 底（space-between，非 margin/line-height 假对齐） */
+/* 日期与标题栈固定间距；不再用 64px space-between 拉齐 LOGO 底 */
 .ds-card-club__anchor {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 64px;
+  gap: 9px;
   min-width: 0;
 }
 /* 球队名称：与球场信息同一字体体系（text-9px / ds-text-muted），左对齐，不破坏层级 */
@@ -767,23 +850,26 @@ page {
   min-width: 0;
   width: 100%;
 }
-/* 球队比赛卡片（Fluid）：标题允许换行并撑高卡片，禁止省略号截断（高特异性覆盖单行截断组） */
+/* 球队比赛卡片：主/副标题各固定单行省略；系统 · Rx 与副标题同一节点 */
 .ds-card-club__content .ds-card-club__title-wrap {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   flex: 0 0 auto;
-  overflow: visible;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
   gap: 6px;
 }
-.ds-card-club__content .ds-card-club__title-wrap text {
+.ds-card-club__content .ds-card-club__title-main,
+.ds-card-club__content .ds-card-club__title-sub {
   display: block;
   width: 100%;
+  min-width: 0;
   max-width: 100%;
-  white-space: normal;
-  word-break: break-word;
-  overflow: visible;
-  text-overflow: clip;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: left;
 }
 /* Series 可选副标题：与主标题同字号/字重/左对齐；间距由 title-wrap gap 统一 */
@@ -793,9 +879,78 @@ page {
   width: 100%;
   text-align: left;
 }
+/* 系列赛附加信息：组织机构 / 赛制 / 球场 */
+.ds-card-club__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+.ds-card-club__meta-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+.ds-card-club__meta-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 13px;
+  font-size: 11px;
+  line-height: 13px;
+  text-align: center;
+}
+/* ⛳ 字形重心偏右，左移与 🏛️🏆 视觉中线对齐 */
+.ds-card-club__meta-icon--course {
+  transform: translateX(-2px);
+}
+.ds-card-club__content .ds-card-club__meta-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 9px;
+  line-height: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-card-club__content .ds-card-club__format-text {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ds-card-club__content .ds-card-club__course-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 9px;
+  line-height: 13px;
+  color: var(--text-muted);
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-card-club__course-name--indent {
+  display: block;
+  flex: none;
+  width: 100%;
+  padding-left: 26px;
+  box-sizing: border-box;
+}
 .ds-card-club__date {
   flex-shrink: 0;
-  margin-bottom: 6px;
   font-style: italic;
 }
 .ds-card-club__date text {
@@ -1248,7 +1403,7 @@ page {
   left: 0;
   top: 0;
   height: 100%;
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   border-radius: 9999px;
 }
 /* indicator：左缘锚点定位
@@ -1261,7 +1416,7 @@ page {
   width: var(--progress-marker-size, 16px);
   height: var(--progress-marker-size, 16px);
   max-width: var(--progress-marker-size, 16px);
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   border: 2px solid var(--bg-card);
   border-radius: 9999px;
   display: flex;

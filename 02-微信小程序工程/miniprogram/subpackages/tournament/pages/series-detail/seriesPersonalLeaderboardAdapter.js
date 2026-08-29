@@ -430,7 +430,7 @@ function projectSeriesStandingsPersonalBoard(input) {
   var openIndex = src.openIndex != null ? Number(src.openIndex) : -1;
   if (!Number.isFinite(openIndex)) openIndex = -1;
 
-  if (selectedKey === standingsViewModel.CUMULATIVE_KEY) {
+  if (standingsViewModel.isCumulativeStandingsKey(selectedKey)) {
     return {
       useShared: false,
       reason: 'tot',

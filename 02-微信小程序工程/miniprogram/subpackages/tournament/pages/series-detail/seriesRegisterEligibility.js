@@ -1,9 +1,8 @@
 /**
  * 系列赛报名页面适配层（B2/B3）
  * - 只服务 series-detail；不进 B1 领域服务
- * - 成员资格只读调用 teamDirectory.listActiveClubTeamsForUser
+ * - 报名不校验用户俱乐部球队归属；可选全部参赛主体
  * - 不使用 isMine、不默认固定 me、不伪造测试用户
- * - 不得静默放宽为「任意选队」
  */
 
 var teamDirectory = require('../../../../utils/teamDirectory.js');
@@ -16,6 +15,8 @@ function asString(v) {
 var MSG_IDENTITY = '无法确认当前用户身份';
 var MSG_NOT_PARTICIPANT_TEAM = '当前账号不属于参赛球队';
 var MSG_NOT_HOST_MEMBER = '仅主办球队成员可以报名';
+var MSG_NO_TEAM_PARTICIPANTS = '暂无参赛球队';
+var MSG_NO_DIVISION_PARTICIPANTS = '暂无参赛分队';
 
 /**
  * 页面身份解析矩阵：
@@ -80,16 +81,42 @@ function buildParticipantOption(p) {
   };
 }
 
+function isEligibleSeriesParticipant(p) {
+  if (!p || typeof p !== 'object') return false;
+  if (!asString(p.seriesParticipantId)) return false;
+  if (p.cancelled === true || p.invalid === true) return false;
+  var st = asString(p.status || p.lifecycleStatus || p.participantStatus).toLowerCase();
+  if (st === 'cancelled' || st === 'canceled' || st === 'invalid' || st === 'removed') {
+    return false;
+  }
+  return true;
+}
+
+function collectParticipantOptions(series, kind) {
+  var parts = Array.isArray(series && series.participants) ? series.participants : [];
+  var options = [];
+  var ids = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i] || {};
+    if (asString(p.kind) !== kind) continue;
+    if (!isEligibleSeriesParticipant(p)) continue;
+    var opt = buildParticipantOption(p);
+    if (!opt.id) continue;
+    ids.push(opt.id);
+    options.push(opt);
+  }
+  return { ids: ids, options: options };
+}
+
 /**
- * organization：参赛球队 sourceTeamId ∩ 用户所属球队
- * team：须属主办球队，再可选全部参赛分队（首版自由选分队，不默认）
+ * 可选全部参赛主体，不按用户俱乐部球队过滤。
+ * organization：全部 kind=team；team：全部 kind=division。
+ * 仅一个可选主体时默认选中；两个及以上必须用户手动选择。
  *
  * @param {object} input
  * @param {object} input.series
  * @param {string} input.playerId 已解析的同一 playerId
  * @param {object} [deps]
- * @param {function} [deps.listActiveClubTeamsForUser]
- * @param {function} [deps.getTeamsByUserId] 测试注入别名
  */
 function resolveSeriesRegistrationEligibility(input, deps) {
   var src = input && typeof input === 'object' ? input : {};
@@ -101,7 +128,7 @@ function resolveSeriesRegistrationEligibility(input, deps) {
       reason: 'series_required',
       eligibleParticipantIds: [],
       options: [],
-      ineligibleMessage: MSG_NOT_PARTICIPANT_TEAM,
+      ineligibleMessage: MSG_NO_TEAM_PARTICIPANTS,
       hostMode: '',
       defaultSheetParticipantId: ''
     };
@@ -119,68 +146,27 @@ function resolveSeriesRegistrationEligibility(input, deps) {
   }
 
   var hostMode = asString(series.hostMode);
-  var userTeamIds = listUserTeamIds(playerId, deps);
-  var userSet = Object.create(null);
-  for (var u = 0; u < userTeamIds.length; u++) {
-    userSet[userTeamIds[u]] = true;
-  }
-
-  var parts = Array.isArray(series.participants) ? series.participants : [];
-  var options = [];
-  var ids = [];
-
   if (hostMode === 'team') {
-    var hostTeamId = asString(series.hostTeam && series.hostTeam.teamId);
-    if (!hostTeamId || !userSet[hostTeamId]) {
-      return {
-        ok: true,
-        reason: 'not_host_member',
-        eligibleParticipantIds: [],
-        options: [],
-        ineligibleMessage: MSG_NOT_HOST_MEMBER,
-        hostMode: hostMode,
-        defaultSheetParticipantId: ''
-      };
-    }
-    for (var di = 0; di < parts.length; di++) {
-      var dp = parts[di] || {};
-      if (asString(dp.kind) !== 'division') continue;
-      var dOpt = buildParticipantOption(dp);
-      if (!dOpt.id) continue;
-      ids.push(dOpt.id);
-      options.push(dOpt);
-    }
-    // team：即使仅一分队也不默认；必须手选
+    var divs = collectParticipantOptions(series, 'division');
     return {
       ok: true,
-      reason: ids.length ? '' : 'no_division_participants',
-      eligibleParticipantIds: ids,
-      options: options,
-      ineligibleMessage: ids.length ? '' : MSG_NOT_HOST_MEMBER,
+      reason: divs.ids.length ? '' : 'no_division_participants',
+      eligibleParticipantIds: divs.ids,
+      options: divs.options,
+      ineligibleMessage: divs.ids.length ? '' : MSG_NO_DIVISION_PARTICIPANTS,
       hostMode: hostMode,
-      defaultSheetParticipantId: ''
+      defaultSheetParticipantId: divs.ids.length === 1 ? divs.ids[0] : ''
     };
   }
 
-  // organization（及未知 hostMode 按队际球队交集，失败则空）
-  for (var ti = 0; ti < parts.length; ti++) {
-    var tp = parts[ti] || {};
-    if (asString(tp.kind) !== 'team') continue;
-    var sourceTeamId = asString(tp.sourceTeamId);
-    if (!sourceTeamId || !userSet[sourceTeamId]) continue;
-    var tOpt = buildParticipantOption(tp);
-    if (!tOpt.id) continue;
-    ids.push(tOpt.id);
-    options.push(tOpt);
-  }
-
-  var defaultId = ids.length === 1 ? ids[0] : '';
+  var teams = collectParticipantOptions(series, 'team');
+  var defaultId = teams.ids.length === 1 ? teams.ids[0] : '';
   return {
     ok: true,
-    reason: ids.length ? '' : 'no_eligible_team',
-    eligibleParticipantIds: ids,
-    options: options,
-    ineligibleMessage: ids.length ? '' : MSG_NOT_PARTICIPANT_TEAM,
+    reason: teams.ids.length ? '' : 'no_participants',
+    eligibleParticipantIds: teams.ids,
+    options: teams.options,
+    ineligibleMessage: teams.ids.length ? '' : MSG_NO_TEAM_PARTICIPANTS,
     hostMode: hostMode || 'organization',
     defaultSheetParticipantId: defaultId
   };
@@ -199,7 +185,7 @@ function resolveEligibleParticipantIdsForService(ctx, deps) {
   if (!result.ok) {
     return {
       ok: false,
-      reason: result.reason || 'affiliation_unresolved'
+      reason: result.reason || 'identity_unresolved'
     };
   }
   return {
@@ -215,5 +201,7 @@ module.exports = {
   listUserTeamIds: listUserTeamIds,
   MSG_IDENTITY: MSG_IDENTITY,
   MSG_NOT_PARTICIPANT_TEAM: MSG_NOT_PARTICIPANT_TEAM,
-  MSG_NOT_HOST_MEMBER: MSG_NOT_HOST_MEMBER
+  MSG_NOT_HOST_MEMBER: MSG_NOT_HOST_MEMBER,
+  MSG_NO_TEAM_PARTICIPANTS: MSG_NO_TEAM_PARTICIPANTS,
+  MSG_NO_DIVISION_PARTICIPANTS: MSG_NO_DIVISION_PARTICIPANTS
 };

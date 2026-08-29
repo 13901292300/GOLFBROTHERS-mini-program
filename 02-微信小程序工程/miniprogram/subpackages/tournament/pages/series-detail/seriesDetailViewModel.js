@@ -274,7 +274,7 @@ function buildParticipantsView(series) {
   var kindLabel = hostMode === 'team' ? '参赛分队' : '参赛球队';
   var unit = hostMode === 'team' ? '个' : '支';
   var count = parts.length;
-  var showDivisionColorMark = isDivisionSeriesHero(series);
+  var showDivisionColorMark = shouldUseDivisionLogoMarks(series);
   return {
     kindLabel: kindLabel,
     count: count,
@@ -413,20 +413,237 @@ function resolveSeriesGameModeLabel(rawMode) {
 }
 
 /**
- * Hero meta chips：轮次赛制去重（首次出现序）+ 末尾固定「系列赛」
+ * Hero meta chips：与列表卡片同序，「系列赛」永远第一，其后按轮次去重赛制
  */
 function buildSeriesGameModeMetaChips(roundsInput) {
   var rounds = Array.isArray(roundsInput) ? roundsInput : [];
   var seen = Object.create(null);
-  var chips = [];
+  var chips = [{ text: '系列赛' }];
   for (var i = 0; i < rounds.length; i++) {
     var label = resolveSeriesGameModeLabel(rounds[i] && rounds[i].gameMode);
     if (!label || seen[label]) continue;
     seen[label] = 1;
     chips.push({ text: label });
   }
-  chips.push({ text: '系列赛' });
   return chips;
+}
+
+function loadRoundMatch(round, opts) {
+  var getter = opts && typeof opts.getMatchById === 'function' ? opts.getMatchById : null;
+  var mid = asString(round && round.matchId);
+  if (!getter || !mid) return null;
+  try {
+    var match = getter(mid);
+    return match && typeof match === 'object' ? match : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function findFirstLiveRound(series, opts) {
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  for (var i = 0; i < rounds.length; i++) {
+    var round = rounds[i] || {};
+    var visual = seriesRoundVisualState.resolveSeriesRoundVisualState(
+      round,
+      loadRoundMatch(round, opts)
+    );
+    if ((visual && visual.state === 'live') || asString(round.state) === 'live') {
+      return round;
+    }
+  }
+  return null;
+}
+
+function findLiveRoundFromStates(series, roundStates) {
+  var states = Array.isArray(roundStates) ? roundStates : [];
+  var liveId = '';
+  for (var i = 0; i < states.length; i++) {
+    if (seriesRoundVisualState.normalizeRoundVisualFromStateRow(states[i]).state === 'live') {
+      liveId = asString(states[i] && states[i].roundId);
+      if (liveId) break;
+    }
+  }
+  if (!liveId) return null;
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  for (var j = 0; j < rounds.length; j++) {
+    if (asString(rounds[j] && rounds[j].roundId) === liveId) return rounds[j];
+  }
+  return null;
+}
+
+/**
+ * 详情 Hero 运行态 chip：终态优先于残留 station LIVE；LIVE 只认 hasLiveRound。
+ * 不读 storage、不改 Series/Match。
+ */
+function resolveSeriesHeroStatusChip(input) {
+  var src = input && typeof input === 'object' ? input : {};
+  var access = src.access && typeof src.access === 'object' ? src.access : {};
+  var phase = asString(src.competitionPhaseCache).trim();
+  var hasLiveRound = !!src.hasLiveRound;
+  var fallback = access.lifecycleLabel || '已发布';
+
+  if (access.isDraftPreview) {
+    return { text: '草稿预览', tone: 'default' };
+  }
+  if (access.lifecycleStatus === 'cancelled' || access.lifecycleStatus === 'archived') {
+    return { text: access.lifecycleLabel || fallback, tone: 'finished' };
+  }
+  if (access.lifecycleStatus === 'completed' || phase === 'completed') {
+    return { text: '已完赛', tone: 'finished' };
+  }
+  if (hasLiveRound) {
+    return { text: 'LIVE', tone: 'live' };
+  }
+  if (phase === 'registration') {
+    return { text: '报名中', tone: 'default' };
+  }
+  if (phase === 'scheduled') {
+    return { text: '赛程待开', tone: 'default' };
+  }
+  if (phase === 'settlement_pending') {
+    return { text: '待结算', tone: 'default' };
+  }
+  return { text: fallback, tone: 'default' };
+}
+
+function isVerifiedStationIdentity(gate) {
+  if (!gate || !gate.match) return false;
+  var reason = asString(gate.blockReason);
+  if (
+    reason === 'missing_match_id' ||
+    reason === 'match_missing' ||
+    reason === 'not_series_managed' ||
+    reason === 'context_series_id_conflict' ||
+    reason === 'context_round_id_conflict' ||
+    reason === 'context_publish_token_conflict' ||
+    reason === 'index_conflict'
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function buildAllFormatText(roundsInput) {
+  var parts = ['系列赛'];
+  var seen = Object.create(null);
+  var rounds = Array.isArray(roundsInput) ? roundsInput : [];
+  for (var i = 0; i < rounds.length; i++) {
+    var label = resolveSeriesGameModeLabel(rounds[i] && rounds[i].gameMode);
+    if (!label || seen[label]) continue;
+    seen[label] = 1;
+    parts.push(label);
+  }
+  return parts.join(' · ');
+}
+
+function buildLiveFormatText(liveRound) {
+  var label = resolveSeriesGameModeLabel(liveRound && liveRound.gameMode);
+  return label ? '系列赛 · ' + label : '系列赛';
+}
+
+function formatPlazaLiveTitleSub(series, liveRound) {
+  if (!liveRound) return '';
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  var rid = asString(liveRound.roundId);
+  var idx = 0;
+  var mode = '';
+  for (var i = 0; i < rounds.length; i++) {
+    var round = rounds[i] || {};
+    if (rid && asString(round.roundId) === rid) {
+      idx =
+        round.index != null && Number.isFinite(Number(round.index))
+          ? Math.floor(Number(round.index))
+          : i + 1;
+      mode = seriesGameModeLabel.resolveRoundSelectorModeLabel
+        ? seriesGameModeLabel.resolveRoundSelectorModeLabel(
+            round.gameMode || round.selectedGameMode
+          )
+        : resolveSeriesGameModeLabel(round.gameMode || round.selectedGameMode);
+      break;
+    }
+  }
+  if (!idx && liveRound.index != null && Number.isFinite(Number(liveRound.index))) {
+    idx = Math.floor(Number(liveRound.index));
+  }
+  if (!mode) {
+    mode = seriesGameModeLabel.resolveRoundSelectorModeLabel
+      ? seriesGameModeLabel.resolveRoundSelectorModeLabel(
+          liveRound.gameMode || liveRound.selectedGameMode
+        )
+      : resolveSeriesGameModeLabel(liveRound.gameMode || liveRound.selectedGameMode);
+  }
+  var roundPart = idx > 0 ? '第' + idx + '轮' : '';
+  if (roundPart && mode) return roundPart + '-' + mode;
+  return roundPart || mode || '';
+}
+
+function resolveHeroTitleSub(series, header, opts) {
+  if (seriesRyderCup.isRyderCupSeries(series)) {
+    var ryder = seriesRyderCupAccumulate.buildRyderCupDisplaySubtitle(series, opts || {});
+    return asString(ryder && ryder.text).trim();
+  }
+  var manual = asString(series && (series.subtitle || series.seriesSubtitle))
+    .replace(/[\r\n\u2028\u2029]+/g, '')
+    .trim();
+  if (asString(opts && opts.heroEntryContext) !== 'plaza') {
+    return manual;
+  }
+  if (manual) return manual;
+  if (header && header.isLive) return formatPlazaLiveTitleSub(series, header.liveRound);
+  return '';
+}
+
+function formatLiveRoundDate(liveRound, rounds) {
+  var single = clubDateFormat.formatClubDate(
+    liveRound && (liveRound.dateTime || liveRound.date)
+  );
+  if (single) return single;
+  return formatSeriesDateRange(rounds);
+}
+
+/**
+ * 详情 Hero 头
+ * - 报名 TAB 进入：全系列日期区间；色调固定冠军金（不受 LIVE 影响）
+ * - 广场进入且有 LIVE：日期为 LIVE 轮具体日；色调信息蓝
+ */
+function buildDetailHeader(series, opts) {
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  var o = opts || {};
+  var liveRound = null;
+  var isLive = false;
+  if (Object.prototype.hasOwnProperty.call(o, 'hasLiveRound')) {
+    isLive = !!o.hasLiveRound;
+    liveRound = isLive
+      ? o.liveRound ||
+        findLiveRoundFromStates(series, o.roundStates) ||
+        findFirstLiveRound(series, o)
+      : null;
+  } else {
+    liveRound = findFirstLiveRound(series, o);
+    isLive = !!liveRound;
+  }
+  var entryContext = asString(o.heroEntryContext);
+  var fromPlaza = entryContext === 'plaza';
+  var fromRegistration = entryContext === 'registration';
+  var dateText =
+    fromPlaza && isLive
+      ? formatLiveRoundDate(liveRound, rounds)
+      : formatSeriesDateRange(rounds);
+  var courses = buildSeriesCourseLines(rounds);
+  var formatText = buildAllFormatText(rounds);
+  var metaChips = buildSeriesGameModeMetaChips(rounds);
+  return {
+    isLive: isLive,
+    liveRound: liveRound,
+    entryContext: entryContext,
+    dateText: dateText,
+    dateTone: fromRegistration ? 'gold' : isLive ? 'live' : 'default',
+    dateRangeSizeClass: resolveHeroDateRangeSizeClass(dateText),
+    formatText: formatText,
+    metaChips: metaChips,
+    courses: courses
+  };
 }
 
 function firstCharFallback(name) {
@@ -442,17 +659,20 @@ function takeFirstGrapheme(str) {
   return seriesColorMark.takeFirstGrapheme(str);
 }
 
-function isDivisionSeriesHero(series) {
-  return (
-    asString(series && series.hostMode).trim() === 'team' &&
-    asString(series && series.templateId).trim() === 'division_series'
-  );
+/**
+ * 队内分队比杆（division_series）与显式队内莱德杯共用颜色圆 Logo。
+ * 仅 seriesCompetitionType === ryder_cup 视为莱德杯；不得凭 templateId:'ryder' 推断。
+ */
+function shouldUseDivisionLogoMarks(series) {
+  if (asString(series && series.hostMode).trim() !== 'team') return false;
+  if (asString(series && series.templateId).trim() === 'division_series') return true;
+  return seriesRyderCup.isRyderCupSeries(series);
 }
 
 /**
  * Hero 参赛主体展示：
  * - organization → 球队 Logo 栈
- * - team + division_series → 复用同一 Logo 栈（圆形色块 + 首字符）
+ * - team + division_series / 队内显式莱德杯 → 复用同一 Logo 栈（圆形色块 + 首字符）
  * - 其它队内系列 → 分队标签（保持现状）
  * 不截断、无 +N；布局步进由页面测量后 calculateLogoStackLayout 计算
  */
@@ -460,7 +680,7 @@ function buildHeroParticipantDisplay(series) {
   var hostMode = asString(series && series.hostMode).trim();
   var parts = Array.isArray(series && series.participants) ? series.participants : [];
   if (hostMode === 'team') {
-    if (isDivisionSeriesHero(series)) {
+    if (shouldUseDivisionLogoMarks(series)) {
       var teamItemsFromDivisions = [];
       for (var d = 0; d < parts.length; d++) {
         var div = parts[d];
@@ -809,39 +1029,34 @@ function resolveHeroTeamLogoReturnRestore(opts) {
  */
 function buildHeroView(series, access, opts) {
   var host = buildHostView(series);
-  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
-  var courses = buildSeriesCourseLines(rounds);
+  var o = opts || {};
   var phase = asString(series && series.competitionPhaseCache).trim();
-  var phaseLabel = PHASE_CACHE_LABELS[phase] || '';
+  var derivedLive = Object.prototype.hasOwnProperty.call(o, 'hasLiveRound')
+    ? !!o.hasLiveRound
+    : !!findFirstLiveRound(series, o);
+  var chip = resolveSeriesHeroStatusChip({
+    access: access || {},
+    competitionPhaseCache: phase,
+    hasLiveRound: derivedLive
+  });
+  var displayLive = chip.tone === 'live';
+  var header = buildDetailHeader(
+    series,
+    Object.assign({}, o, {
+      hasLiveRound: displayLive,
+      liveRound: displayLive
+        ? o.liveRound ||
+          findLiveRoundFromStates(series, o.roundStates) ||
+          findFirstLiveRound(series, o)
+        : null
+    })
+  );
+  var courses = header.courses;
   var participantDisplay = buildHeroParticipantDisplay(series);
+  var chipText = chip.text;
+  var chipTone = chip.tone;
 
-  var chipText = access.lifecycleLabel || '已发布';
-  var chipTone = 'default';
-  if (access.isDraftPreview) {
-    chipText = '草稿预览';
-    chipTone = 'default';
-  } else if (access.lifecycleStatus === 'cancelled' || access.lifecycleStatus === 'archived') {
-    chipText = access.lifecycleLabel;
-    chipTone = 'finished';
-  } else if (phase === 'live') {
-    chipText = 'LIVE';
-    chipTone = 'live';
-  } else if (phase === 'completed') {
-    chipText = '已完赛';
-    chipTone = 'finished';
-  } else if (phaseLabel) {
-    chipText =
-      phase === 'registration'
-        ? '报名中'
-        : phase === 'scheduled'
-          ? '赛程待开'
-          : phase === 'settlement_pending'
-            ? '待结算'
-            : access.lifecycleLabel;
-    chipTone = 'default';
-  }
-
-  var dateText = formatSeriesDateRange(rounds);
+  var dateText = header.dateText;
 
   // 信息卡：主办 → 球队/分队 → 球场（无报名、无阶段；状态在顶部 chip）
   var infoRows = [
@@ -866,23 +1081,20 @@ function buildHeroView(series, access, opts) {
     chipText: chipText,
     chipTone: chipTone,
     dateText: dateText,
-    dateRangeSizeClass: resolveHeroDateRangeSizeClass(dateText),
+    dateTone: header.dateTone,
+    dateRangeSizeClass: header.dateRangeSizeClass,
+    entryContext: asString(header.entryContext),
+    isLive: !!header.isLive,
     titleMain: asString(series && series.seriesName).trim() || '系列赛',
     // 正式名称第二行（与 titleMain 同级样式）；空则不渲染、不占空高
-    titleSub: (function () {
-      if (seriesRyderCup.isRyderCupSeries(series)) {
-        return seriesRyderCupAccumulate.buildRyderCupDisplaySubtitle(series, opts || {}).text;
-      }
-      return asString(series && series.seriesSubtitle)
-        .replace(/[\r\n\u2028\u2029]+/g, '')
-        .trim();
-    })(),
-    metaChips: buildSeriesGameModeMetaChips(rounds),
+    titleSub: resolveHeroTitleSub(series, header, opts),
+    metaChips: header.metaChips,
+    formatText: header.formatText,
     infoRows: infoRows,
     participantDisplay: participantDisplay,
     courseLines: courses.lines.slice(),
     coursePending: courses.pending,
-    dividerText: host.hostMode === 'organization' ? 'ORG.' : '赛事组织',
+    dividerText: host.hostMode === 'team' ? 'CLUB' : 'ORG',
     hasParticipantList: false,
     // Hero 不再展示参赛数量摘要
     participantSummaryOnly: ''
@@ -1234,6 +1446,7 @@ function buildRoundCard(series, round, deps, indexHint) {
     blockReason: gate.blockReason,
     blockMessage: gate.blockMessage,
     stationStatusLabel: gate.stationStatusLabel,
+    stationIdentityOk: isVerifiedStationIdentity(gate),
     matchId: gate.matchId,
     matchStatus: asString(gate.match && gate.match.status).trim(),
     hasFormalGroups: seriesRoundVisualState.hasFormalNonEmptyGroups(gate.match),
@@ -1299,16 +1512,38 @@ function buildSeriesStandingsProjection(input) {
   var series = src.series && typeof src.series === 'object' ? src.series : {};
   var roundStates = Array.isArray(src.roundStates) ? src.roundStates : [];
   var isRyderCup = seriesRyderCup.isRyderCupSeries(series);
+  var extraValidKeys = null;
+  var includeTot = seriesStandingsViewModel.shouldIncludeTotalSelector(series);
+  if (includeTot) {
+    extraValidKeys = { cumulative: true, total: true };
+  }
+  var scoringMode = asString(series.scoringRule && series.scoringRule.mode).trim();
+  var defaultStandingsKey = includeTot
+    ? seriesStandingsViewModel.resolveDefaultStandingsSelectedKey(roundStates, {
+        includeTot: true,
+        series: series
+      })
+    : scoringMode === 'per_round_n'
+      ? seriesStandingsViewModel.resolveDefaultPerRoundSelectedKey(roundStates)
+      : '';
   var standingsKey = seriesLiveSession.resolveSessionSelectedRoundId({
     currentKey: src.selectedKey,
     userPicked: !!src.userPicked,
     visited: !!src.visited,
     roundStates: roundStates,
-    extraValidKeys:
-      !isRyderCup && asString(series.scoringRule && series.scoringRule.mode) === 'global_m'
-        ? { cumulative: true }
-        : null
+    extraValidKeys: extraValidKeys,
+    defaultKey: defaultStandingsKey || undefined
   });
+  if (
+    includeTot &&
+    defaultStandingsKey &&
+    !src.userPicked &&
+    (!src.visited ||
+      seriesStandingsViewModel.isCumulativeStandingsKey(src.selectedKey) ||
+      !asString(src.selectedKey).trim())
+  ) {
+    standingsKey = defaultStandingsKey;
+  }
   if (isRyderCup) {
     return seriesRyderCupScoreboardAdapter.buildRyderCupStandingsView({
       series: series,
@@ -1338,6 +1573,7 @@ function buildSeriesStandingsProjection(input) {
  *   preview, theme, getMatchById, getIndexByMatchId,
  *   standingsSelectedKey, standingsResult（展开态由页面 expandedStandingsTeamId 控制）
  *   registerActiveParticipantId（报名子 TAB；空则默认第一个主体）
+ *   heroEntryContext: 'plaza'|'registration'（广场 LIVE 映射日期/副标题；缺省保持原区间且不自动副标题）
  * }
  */
 function buildSeriesDetailViewModel(seriesInput, options) {
@@ -1370,9 +1606,18 @@ function buildSeriesDetailViewModel(seriesInput, options) {
   var visibility = buildVisibilityView(series);
   var host = buildHostView(series);
   var participants = buildParticipantsView(series);
-  var hero = buildHeroView(series, access, opts);
   var roundStates = seriesStandingsViewModel.projectRoundStatesFromRoundCards(roundCards);
   var hasLiveRound = seriesLiveSession.hasAnyLiveRound(roundStates);
+  var liveRound = hasLiveRound ? findLiveRoundFromStates(series, roundStates) : null;
+  var hero = buildHeroView(
+    series,
+    access,
+    Object.assign({}, opts, {
+      hasLiveRound: hasLiveRound,
+      roundStates: roundStates,
+      liveRound: liveRound
+    })
+  );
   var isRyderCup = seriesRyderCup.isRyderCupSeries(series);
   var standings = buildSeriesStandingsProjection({
     series: series,
@@ -1438,10 +1683,12 @@ module.exports = {
   buildSeriesGameModeMetaChips: buildSeriesGameModeMetaChips,
   parseLocalDateTimeParts: parseLocalDateTimeParts,
   formatSeriesDateRange: formatSeriesDateRange,
+  buildDetailHeader: buildDetailHeader,
   resolveHeroDateRangeSizeClass: resolveHeroDateRangeSizeClass,
   firstDisplayGrapheme: firstDisplayGrapheme,
   takeFirstGrapheme: takeFirstGrapheme,
   buildHeroParticipantDisplay: buildHeroParticipantDisplay,
+  shouldUseDivisionLogoMarks: shouldUseDivisionLogoMarks,
   calculateLogoStackLayout: calculateLogoStackLayout,
   resolveTeamLogoLayout: resolveTeamLogoLayout,
   resolveLogoStackZIndexes: resolveLogoStackZIndexes,
@@ -1465,6 +1712,7 @@ module.exports = {
   buildPartnerView: buildPartnerView,
   applyEventSponsorImageError: applyEventSponsorImageError,
   applyPartnerLogoError: applyPartnerLogoError,
+  resolveSeriesHeroStatusChip: resolveSeriesHeroStatusChip,
   buildHeroView: buildHeroView,
   evaluateRoundStationGate: evaluateRoundStationGate,
   buildRoundCard: buildRoundCard,

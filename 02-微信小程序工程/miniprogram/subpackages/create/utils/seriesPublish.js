@@ -385,7 +385,9 @@ function createSeriesPublisher(deps) {
       };
     }
 
-    var pubCheck = seriesValidators.validateForPublish(series);
+    var pubCheck = seriesValidators.validateForPublish(series, {
+      titleBaseline: opts.titleBaseline
+    });
     if (!pubCheck.ok) {
       return { ok: false, reason: 'publish_invalid', errors: pubCheck.errors };
     }

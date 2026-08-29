@@ -9,6 +9,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -19,8 +20,8 @@ var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
 var strokeEntityBuilder = require(path.join(utilsDir, 'strokeEntityBuilder.js'));
 var strokeEntityValidator = require(path.join(utilsDir, 'strokeEntityValidator.js'));
 var personalLeaderboardBoard = require(path.join(utilsDir, 'personalLeaderboardBoard.js'));
-var teamLeaderboardView = require(path.join(utilsDir, 'teamLeaderboardView.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardView = require(seriesTestPaths.util('teamLeaderboardView.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 var leaderboardSettingViewModel = require(path.join(utilsDir, 'leaderboardSettingViewModel.js'));
 var adapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 var viewOptions = require(path.join(seriesDir, 'seriesStandingsViewOptions.js'));

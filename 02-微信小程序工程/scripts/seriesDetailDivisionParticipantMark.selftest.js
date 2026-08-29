@@ -7,6 +7,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -14,8 +15,9 @@ var pageDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-deta
 var createDir = path.join(mini, 'subpackages', 'create', 'pages', 'series');
 
 var viewModel = require(path.join(pageDir, 'seriesDetailViewModel.js'));
-var seriesColorMark = require(path.join(mini, 'utils', 'seriesColorMark.js'));
+var seriesColorMark = require(seriesTestPaths.util('seriesColorMark.js'));
 var participantDraft = require(path.join(createDir, 'participantDraft.js'));
+var seriesRyderCup = require(path.join(mini, 'utils', 'seriesRyderCup.js'));
 
 var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var pageWxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
@@ -169,13 +171,38 @@ assert(
 assert(
   '不再使用旧标签式分队标识',
   pageWxml.indexOf('item.colorMark') >= 0 &&
-    pageWxml.indexOf('hero-logo-stack__fallback') >= 0 &&
+    pageWxml.indexOf('series-division-logo-mark') >= 0 &&
+    pageWxml.indexOf('hero-logo-stack__item--division') >= 0 &&
     pageWxml.indexOf('participant-row__name') >= 0 &&
     pageWxml.indexOf('hero-division-tag') > 0 &&
     !/participants\.items[\s\S]{0,400}hero-division-tag/.test(pageWxml) &&
     /flex-shrink:\s*0/.test(extractRule(pageWxss, '.participant-row__logo')) &&
     /width:\s*56rpx/.test(extractRule(pageWxss, '.participant-row__logo')) &&
-    /font-size:\s*22rpx/.test(extractRule(pageWxss, '.hero-logo-stack__fallback'))
+    /font-size:\s*22rpx/.test(extractRule(pageWxss, '.series-division-logo-mark'))
+);
+
+var markRule = extractRule(pageWxss, '.series-division-logo-mark');
+var heroItemRule = extractRule(pageWxss, '.hero-logo-stack__item');
+var heroDivisionRule = extractRule(pageWxss, '.hero-logo-stack__item--division');
+var infoLogoRule = extractRule(pageWxss, '.participant-row__logo');
+var heroStackRule = extractRule(pageWxss, '.hero-logo-stack');
+assert(
+  'Hero 与信息卡分队圆外径 56rpx、颜色填充直径一致、无内部 border',
+  /height:\s*56rpx/.test(heroStackRule) &&
+    /width:\s*56rpx/.test(infoLogoRule) &&
+    /height:\s*56rpx/.test(infoLogoRule) &&
+    /border:\s*1\.5px/.test(heroItemRule) &&
+    /border:\s*0/.test(heroDivisionRule) &&
+    /border:\s*none/.test(infoLogoRule) &&
+    /font-size:\s*22rpx/.test(markRule) &&
+    /font-weight:\s*700/.test(markRule) &&
+    /color:\s*#FFFFFF/i.test(markRule) &&
+    !/font-size=/.test(pageWxml) &&
+    !/transform:\s*scale/.test(pageWxss) &&
+    (pageWxml.match(/series-division-logo-mark/g) || []).length >= 2 &&
+    pageWxml.indexOf('wx:for="{{participants.items}}"') >= 0 &&
+    pageWxml.indexOf('item.colorMark.fallbackText') >= 0 &&
+    pageWxml.indexOf("item.color ? 'hero-logo-stack__item--division'") >= 0
 );
 
 var plain = viewModel.buildParticipantsView(
@@ -213,6 +240,130 @@ assert(
     createWxml.indexOf('item.colorMark') < 0 &&
     scheduleSrc.indexOf('colorMark') < 0 &&
     manageSrc.indexOf('colorMark') < 0
+);
+
+var redBlue = [division('red', '红队', '#CE9224'), division('blue', '蓝队', '#002D62')];
+var teamRyder = seriesOf({
+  templateId: 'ryder',
+  seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+  scoringRule: seriesRyderCup.createRyderCupScoringRule(),
+  participants: freeze(redBlue)
+});
+var teamRyderBefore = freeze(teamRyder);
+var teamRyderList = viewModel.buildParticipantsView(teamRyder);
+var teamRyderHero = viewModel.buildHeroParticipantDisplay(teamRyder);
+assert(
+  '队内显式莱德杯与分队比杆共用颜色圆 Logo',
+  viewModel.shouldUseDivisionLogoMarks(teamRyder) === true &&
+    teamRyderHero.mode === 'team_logos' &&
+    teamRyderHero.label === '分队' &&
+    teamRyderList.kindLabel === '参赛分队' &&
+    teamRyderList.items.length === 2 &&
+    teamRyderHero.teamItems.length === 2 &&
+    teamRyderList.items[0].seriesParticipantId === teamRyderHero.teamItems[0].participantId &&
+    teamRyderList.items[1].seriesParticipantId === teamRyderHero.teamItems[1].participantId &&
+    teamRyderList.items[0].colorMark.color === teamRyderHero.teamItems[0].color &&
+    teamRyderList.items[0].colorMark.fallbackText === teamRyderHero.teamItems[0].fallbackText &&
+    teamRyderList.items[1].colorMark.fallbackText === '蓝' &&
+    JSON.stringify(teamRyder.participants) === JSON.stringify(teamRyderBefore.participants) &&
+    vmSrc.indexOf('function shouldUseDivisionLogoMarks') >= 0 &&
+    (vmSrc.match(/shouldUseDivisionLogoMarks\(series\)/g) || []).length >= 2 &&
+    pageWxml.indexOf('templateId') < 0 &&
+    pageWxml.indexOf('ryder-division-logo') < 0 &&
+    pageWxss.indexOf('ryder-division-logo') < 0
+);
+
+var templateOnly = seriesOf({
+  templateId: 'ryder',
+  participants: freeze(redBlue)
+});
+assert(
+  '仅 templateId:ryder 不按莱德杯推断',
+  viewModel.shouldUseDivisionLogoMarks(templateOnly) === false &&
+    viewModel.buildHeroParticipantDisplay(templateOnly).mode === 'division_tags' &&
+    !viewModel.buildParticipantsView(templateOnly).items[0].colorMark
+);
+
+var orgRyder = viewModel.buildParticipantsView({
+  hostMode: 'organization',
+  templateId: 'ryder',
+  seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+  participants: [
+    {
+      seriesParticipantId: 't1',
+      kind: 'team',
+      fullNameSnapshot: '甲队',
+      logoSnapshot: '/a.png',
+      colorSnapshot: '#ff0000'
+    }
+  ]
+});
+var orgRyderHero = viewModel.buildHeroParticipantDisplay({
+  hostMode: 'organization',
+  templateId: 'ryder',
+  seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+  participants: [
+    {
+      seriesParticipantId: 't1',
+      kind: 'team',
+      fullNameSnapshot: '甲队',
+      logoSnapshot: '/a.png',
+      colorSnapshot: '#ff0000'
+    }
+  ]
+});
+assert(
+  '队际莱德杯继续显示球队 Logo',
+  viewModel.shouldUseDivisionLogoMarks({
+    hostMode: 'organization',
+    templateId: 'ryder',
+    seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE
+  }) === false &&
+    orgRyderHero.mode === 'team_logos' &&
+    orgRyderHero.label === '球队' &&
+    orgRyderHero.teamItems[0].logo === '/a.png' &&
+    !orgRyderHero.teamItems[0].color &&
+    !orgRyder.items[0].colorMark &&
+    orgRyder.items[0].logo === '/a.png'
+);
+
+var dualGate = seriesOf({
+  templateId: 'division_series',
+  seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+  participants: freeze(redBlue)
+});
+var dualHero = viewModel.buildHeroParticipantDisplay(dualGate);
+var dualList = viewModel.buildParticipantsView(dualGate);
+assert(
+  'division_series + ryder_cup 只投影一次',
+  dualHero.teamItems.length === 2 &&
+    dualList.items.length === 2 &&
+    dualHero.divisionItems.length === 0 &&
+    dualList.items.every(function (it) {
+      return !!it.colorMark;
+    })
+);
+
+var emptyRyder = viewModel.buildHeroParticipantDisplay(
+  seriesOf({
+    templateId: 'ryder',
+    seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+    participants: []
+  })
+);
+var emptyRyderList = viewModel.buildParticipantsView(
+  seriesOf({
+    templateId: 'ryder',
+    seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+    participants: []
+  })
+);
+assert(
+  '空分队安全显示既有空态文案',
+  emptyRyder.mode === 'team_logos' &&
+    emptyRyder.emptyText === '待创建分队' &&
+    emptyRyderList.items.length === 0 &&
+    emptyRyderList.kindLabel === '参赛分队'
 );
 
 console.log('');

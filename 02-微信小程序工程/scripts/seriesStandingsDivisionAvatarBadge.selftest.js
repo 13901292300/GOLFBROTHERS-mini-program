@@ -7,13 +7,14 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 
-var expandId = require(path.join(mini, 'utils', 'seriesStandingsExpandIdentity.js'));
-var seriesColorMark = require(path.join(mini, 'utils', 'seriesColorMark.js'));
+var expandId = require(seriesTestPaths.util('seriesStandingsExpandIdentity.js'));
+var seriesColorMark = require(seriesTestPaths.util('seriesColorMark.js'));
 var seriesStationMatch = require(path.join(mini, 'utils', 'seriesStationMatch.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 var liveAdapter = require(path.join(seriesDir, 'seriesLiveLeaderboardAdapter.js'));
@@ -33,7 +34,7 @@ var liveWxml = fs.readFileSync(
 );
 var pageJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(seriesDir, 'index.wxml'), 'utf8');
-var teamViewSrc = fs.readFileSync(path.join(mini, 'utils', 'teamLeaderboardView.js'), 'utf8');
+var teamViewSrc = fs.readFileSync(seriesTestPaths.util('teamLeaderboardView.js'), 'utf8');
 var detailJs = fs.readFileSync(
   path.join(mini, 'subpackages', 'tournament', 'pages', 'detail', 'index.js'),
   'utf8'

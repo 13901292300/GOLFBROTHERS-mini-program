@@ -21,7 +21,7 @@ var standingsVm = require(path.join(pageDir, 'seriesStandingsViewModel.js'));
 var wxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var wxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
-var dockDir = path.join(root, 'miniprogram', 'components', 'series-round-selector-dock');
+var dockDir = path.join(root, 'miniprogram', 'subpackages', 'tournament', 'components', 'series-round-selector-dock');
 var dockWxml = fs.readFileSync(path.join(dockDir, 'index.wxml'), 'utf8');
 var dockWxss = fs.readFileSync(path.join(dockDir, 'index.wxss'), 'utf8');
 
@@ -91,9 +91,11 @@ assert(
 );
 
 assert(
-  '6 信息行不进入横向 scroll 内容',
-  infoOutsideScroll &&
-    !/<scroll-view[\s\S]*series-standings-round-meta[\s\S]*<\/scroll-view>/.test(
+  '6 信息行不进入横向 scroll 内容，也不进入 dropdown 菜单',
+  standingsTpl.indexOf('series-standings-round-meta') >= 0 &&
+    standingsTpl.indexOf('round-dropdown-menu') >= 0 &&
+    !/round-dropdown-menu[\s\S]*series-standings-round-meta/.test(standingsTpl) &&
+    /series-standings-round-bar[\s\S]*<\/scroll-view>[\s\S]*series-standings-round-meta/.test(
       standingsTpl
     )
 );

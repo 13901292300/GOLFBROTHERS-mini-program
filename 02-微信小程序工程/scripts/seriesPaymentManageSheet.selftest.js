@@ -81,8 +81,11 @@ assert(
   )
 );
 assert(
-  '6 half deep-link retained',
-  /_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs)
+  '6 half / payment / tee / temp-admin 均原页打开，不再走 deep-link 调用',
+  pageJs.indexOf('_openSeriesHalfCourseSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesPaymentManageSheet') >= 0 &&
+    !/_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs) &&
+    !/_openSeriesDetailSheetDeepLink\('payment'\)/.test(pageJs)
 );
 assert(
   '7 deep-link helper retained',
@@ -162,6 +165,7 @@ var seriesGroupedPaymentManage = require(path.join(
 var teamMatchStore = require(path.join(utilsDir, 'teamMatchStore.js'));
 var gameStore = require(path.join(utilsDir, 'gameStore.js'));
 var paymentManage = require(path.join(utilsDir, 'paymentManage.js'));
+var mockAvatars = require(path.join(utilsDir, 'mockAvatars.js'));
 
 var storeBag = {};
 var indexBag = {};
@@ -348,6 +352,13 @@ function makePageHost() {
       this._manageSelectedRoundId = '';
       this._manageSelectedMatchId = '';
     },
+    _syncStickyByScroll: function () {},
+    _clearManageRoundOverflowRuntime: methods._clearManageRoundOverflowRuntime,
+    _buildCloseMoreSheetPatch: methods._buildCloseMoreSheetPatch,
+    _resolveBottomDockVisibilityPatch: methods._resolveBottomDockVisibilityPatch,
+    _commitManageOverlayPatch: methods._commitManageOverlayPatch,
+    _openFromManageSheet: methods._openFromManageSheet,
+    _closeManageSecondaryPatch: methods._closeManageSecondaryPatch,
     _buildTempAdminRoundSubtitle: methods._buildTempAdminRoundSubtitle,
     _openSeriesPaymentManageSheet: methods._openSeriesPaymentManageSheet,
     onPaymentManageSheetClose: methods.onPaymentManageSheetClose,
@@ -712,10 +723,12 @@ assert(
         }
       ]
     );
+    var expected = mockAvatars.resolveAvatar(rosterAvatar, 'u9');
     return (
       users[0] &&
-      users[0].displayAvatar === rosterAvatar &&
-      users[0].name === '席位甲'
+      users[0].name === '席位甲' &&
+      users[0].displayAvatar === expected &&
+      expected.indexOf('/assets/') < 0
     );
   })()
 );

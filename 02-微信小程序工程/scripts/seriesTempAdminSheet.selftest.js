@@ -97,9 +97,12 @@ assert(
 assert(
   'deep-link helper retained for payment/players/half',
   pageJs.indexOf('_openSeriesDetailSheetDeepLink') >= 0 &&
-    /_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs) &&
-    /_openSeriesDetailSheetDeepLink\('players'\)/.test(pageJs) &&
-    /_openSeriesDetailSheetDeepLink\('payment'\)/.test(pageJs)
+    pageJs.indexOf('_openSeriesHalfCourseSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesPlayerManageSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesPaymentManageSheet') >= 0 &&
+    !/_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs) &&
+    !/_openSeriesDetailSheetDeepLink\('players'\)/.test(pageJs) &&
+    !/_openSeriesDetailSheetDeepLink\('payment'\)/.test(pageJs)
 );
 assert(
   'open freezes matchId into data field',
@@ -129,10 +132,13 @@ assert(
 );
 assert(
   'saved avoids duplicate toast',
-  /onTempAdminPermissionSheetSaved[\s\S]{0,500}reloadViewModel\(\{\s*resetScroll:\s*false\s*\}\)/.test(
+  /onTempAdminPermissionSheetSaved[\s\S]{0,900}_closeManageSecondaryPatch/.test(
     pageJs
   ) &&
-    !/onTempAdminPermissionSheetSaved[\s\S]{0,500}showToast\([\s\S]{0,80}权限已保存/.test(
+    /onTempAdminPermissionSheetSaved[\s\S]{0,1600}reloadViewModel\(\{\s*resetScroll:\s*false\s*\}\)/.test(
+      pageJs
+    ) &&
+    !/onTempAdminPermissionSheetSaved[\s\S]{0,1600}showToast\([\s\S]{0,80}权限已保存/.test(
       pageJs
     )
 );
@@ -313,6 +319,13 @@ function makeHost() {
       this._manageSelectedRoundId = '';
       this._manageSelectedMatchId = '';
     },
+    _syncStickyByScroll: function () {},
+    _clearManageRoundOverflowRuntime: methods._clearManageRoundOverflowRuntime,
+    _buildCloseMoreSheetPatch: methods._buildCloseMoreSheetPatch,
+    _resolveBottomDockVisibilityPatch: methods._resolveBottomDockVisibilityPatch,
+    _commitManageOverlayPatch: methods._commitManageOverlayPatch,
+    _openFromManageSheet: methods._openFromManageSheet,
+    _closeManageSecondaryPatch: methods._closeManageSecondaryPatch,
     _verifyCurrentManageStation: function () {
       return seriesStationManageGate.verifyManagedStationForManage({
         series: this._lastSeriesForSchedule,

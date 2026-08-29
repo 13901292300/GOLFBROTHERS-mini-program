@@ -14,6 +14,9 @@ const gameProgress = require('../../../../utils/gameProgress.js');
 const matchStatus = require('../../../../utils/matchStatus.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
+const seriesStore = require('../../../../utils/seriesStore.js');
+const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
+const seriesPickRegisterSource = require('../../../../utils/seriesPickRegisterSource.js');
 const scoreCompleteness = require('../../../../utils/scoreCompleteness.js');
 const scoreGroupCompletePrompt = require('../../utils/scoreGroupCompletePrompt.js');
 const scoreGroupFinish = require('../../utils/scoreGroupFinish.js');
@@ -8756,7 +8759,34 @@ Page({
     if (this._gameSingleWindowWidthCache != null) return this._gameSingleWindowWidthCache;
     let ww = 375;
     try {
-      ww = (wx.getSystemInfoSync() || {}).windowWidth || 375;
+      if (typeof wx.getWindowInfo === 'function') {
+        try {
+          const info = wx.getWindowInfo();
+          if (
+            info &&
+            typeof info.windowWidth === 'number' &&
+            Number.isFinite(info.windowWidth) &&
+            info.windowWidth > 0
+          ) {
+            ww = info.windowWidth;
+            this._gameSingleWindowWidthCache = ww;
+            return ww;
+          }
+        } catch (e) {
+          /* 回退 getSystemInfoSync */
+        }
+      }
+      const sys = wx.getSystemInfoSync();
+      if (
+        sys &&
+        typeof sys.windowWidth === 'number' &&
+        Number.isFinite(sys.windowWidth) &&
+        sys.windowWidth > 0
+      ) {
+        ww = sys.windowWidth;
+      } else {
+        ww = 375;
+      }
     } catch (err) {
       ww = 375;
     }
@@ -9339,6 +9369,7 @@ Page({
         ctx.courseName = game.courseName;
         ctx.front9Course = game.front9Course;
         ctx.back9Course = game.back9Course;
+        ctx.courseHalfText = game.courseHalfText;
       }
     } else if (this.data.mode === 'individual_stroke') {
       const c = (ms && ms.course) || {};
@@ -9990,7 +10021,7 @@ Page({
         return;
       }
       wx.navigateTo({
-        url: '/subpackages/tournament/pages/scorecard/index?' + qs.join('&'),
+        url: '/subpackages/tournament-tools/pages/scorecard/index?' + qs.join('&'),
         fail: () => wx.showToast({ title: '成绩卡页面尚未注册', icon: 'none' })
       });
       return;
@@ -10004,7 +10035,7 @@ Page({
         return;
       }
       wx.navigateTo({
-        url: '/subpackages/tournament/pages/stats/index?gameId=' + encodeURIComponent(gameId),
+        url: '/subpackages/tournament-tools/pages/stats/index?gameId=' + encodeURIComponent(gameId),
         fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
       });
       return;
@@ -15763,7 +15794,12 @@ Page({
       gender: u.gender || u.matchGender || '',
       userType: u.userType || '',
       identitySource: u.identitySource || '',
-      source: 'register'
+      source: 'register',
+      sourceKind: u.sourceKind || '',
+      seriesId: u.seriesId || '',
+      roundId: u.roundId || '',
+      seriesParticipantId: u.seriesParticipantId || '',
+      rosterEntryId: u.rosterEntryId || ''
     };
   },
 
@@ -15819,7 +15855,7 @@ Page({
     });
   },
 
-  // 【1】报名列表：本页二级列表，数据源为 match.registerInfo.users
+  // 【1】报名列表：普通单场 = match.registerInfo；Series 分站 = 最新 series.roster 只读投影
   addMethodRegister() {
     if (!this._isTeamMatchPlayerSourceContext()) {
       this.setData({ addSheetVisible: false });
@@ -15828,9 +15864,21 @@ Page({
     }
     const match = this._readScoreTeamMatch();
     const used = this._usedCanonicalPlayerMap();
-    const users = match && match.registerInfo && Array.isArray(match.registerInfo.users)
-      ? match.registerInfo.users
-      : [];
+    const loaded = seriesPickRegisterSource.loadScoreRegisterCandidates(
+      Object.assign({ match: match }, this._scoreSeriesRegisterLoadDeps())
+    );
+    if (!loaded || !loaded.ok) {
+      this.setData({ addSheetVisible: false });
+      wx.showToast({
+        title:
+          (loaded && loaded.message) ||
+          seriesPickRegisterSource.SCORE_REGISTER_READ_FAIL_MSG ||
+          '系列赛报名数据读取失败，请返回后重试',
+        icon: 'none'
+      });
+      return;
+    }
+    const users = Array.isArray(loaded.users) ? loaded.users : [];
     const items = [];
     users.forEach((user) => {
       const player = this._normalizeRegisterSourcePlayer(user);
@@ -16049,6 +16097,56 @@ Page({
     this._onPlayerPicked(item.player, target);
   },
 
+  _scoreSeriesRegisterLoadDeps() {
+    return {
+      getSeriesById: function (id) {
+        return seriesStore.getSeriesById(id);
+      },
+      getIndexByMatchId: function (id) {
+        return seriesStationIndex.getByMatchId(id);
+      },
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
+      }
+    };
+  },
+
+  _failSeriesRosterPickStale() {
+    wx.showToast({
+      title: seriesPickRegisterSource.SCORE_ROSTER_STALE_MSG || '报名信息已变化，请重新选择',
+      icon: 'none'
+    });
+    this.closePlayerSourceListSheet();
+    this.setData({ addSheetVisible: false });
+  },
+
+  _onSeriesRosterPlayerPicked(player, target) {
+    const match = this._readScoreTeamMatch();
+    const used = this._usedCanonicalPlayerMap() || {};
+    const checked = seriesPickRegisterSource.assertScoreSeriesRosterPick(
+      Object.assign({}, this._scoreSeriesRegisterLoadDeps(), {
+        match: match,
+        player: player,
+        usedPlayerIds: used
+      })
+    );
+    if (!checked || !checked.ok) {
+      this._failSeriesRosterPickStale();
+      return;
+    }
+    const slots = this._draftSlots || [];
+    let idx = target != null && target >= 0 ? target : this._firstDraftEmptySlotIndex();
+    if (idx < 0 || (slots[idx] && slots[idx].status === 'occupied')) idx = this._firstDraftEmptySlotIndex();
+    if (idx < 0) {
+      wx.showToast({ title: '本组已满（4 人）', icon: 'none' });
+      return;
+    }
+    const bindPlayer = Object.assign({}, checked.bindPlayer, {
+      seatIndex: this._targetSeatIndex
+    });
+    this._bindDraftPlayerToSlot(idx, bindPlayer, 'register');
+  },
+
   // 【4】手工添加：本页底部弹窗（姓名必填 / 手机选填 / 性别），不跳转独立页
   addMethodManual() {
     this.setData({
@@ -16238,6 +16336,10 @@ Page({
   _onPlayerPicked(player, target) {
     if (!player) return;
     if (!this._draftSlots) return;
+    if (player.sourceKind === seriesPickRegisterSource.SOURCE_KIND_SERIES_ROSTER) {
+      this._onSeriesRosterPlayerPicked(player, target);
+      return;
+    }
     let userId = String(player.userId || '').trim();
     const slotPlayerId = String(player.playerId || player.id || userId || '').trim();
     if (!userId && player.userType === 'guest') {

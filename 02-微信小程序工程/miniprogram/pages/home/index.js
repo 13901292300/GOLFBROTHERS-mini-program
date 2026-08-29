@@ -15,10 +15,13 @@ const scheduleStore = require('../../utils/scheduleStore.js');
 const { sortSchedules } = require('../../utils/scheduleSort.js');
 const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 const contactNotifyStore = require('../../utils/contactNotifyStore.js');
+
+const FAVORITES_STORAGE_KEY = 'favorites';
 function decorateTournamentCard(match, card) {
   if (!card) return null;
   const status = String((match && match.status) || '').trim().toLowerCase();
   const out = Object.assign({}, card);
+  if (!out.type) out.type = 'club';
   // LIVE / 报名中 / 已结束 三态显式映射，禁止 LIVE 被显示成报名中
   if (status === 'finished') {
     out.statusLabel = '已结束';
@@ -156,6 +159,7 @@ Page({
     userProfile: {
       nickname: '',
       competitionName: '',
+      gender: '男',
       avatar: '',
       handicap: null,
       floatCoef: null
@@ -187,8 +191,11 @@ Page({
       {
         id: 'my-1',
         favorited: true,
+        isFavorited: false,
+        starLocked: true,
         active: true,
         live: true,
+        state: 'live',
         avatarCount: 3,
         avatars: [
           'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=100',
@@ -209,13 +216,18 @@ Page({
         date: '2025/07/20',
         views: '64',
         type: 'tour',
+        isMine: true,
+        hasBorder: true,
         navUrl: '/subpackages/scoring/pages/score/index?gameId=demo-weekend-amateur&groupIndex=0'
       },
       {
         id: 'my-2',
-        favorited: false,
+        favorited: true,
+        isFavorited: false,
+        starLocked: true,
         active: false,
         live: false,
+        state: 'finished',
         avatarCount: 4,
         avatars: [
           'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=100',
@@ -238,6 +250,8 @@ Page({
         date: '2025/04/15',
         views: '72',
         type: 'tour',
+        isMine: false,
+        hasBorder: true,
         navUrl: '/subpackages/scoring/pages/score/index?mode=fourball_best'
       },
       {
@@ -798,6 +812,7 @@ Page({
       userProfile: {
         nickname: profile.nickname || '',
         competitionName: profile.competitionName || '',
+        gender: profile.gender || '男',
         avatar: profile.avatar || userProfileStore.DEFAULT_AVATAR,
         handicap: profile.handicap,
         floatCoef: profile.floatCoef,
@@ -809,32 +824,266 @@ Page({
     });
   },
 
-  // 进行中 GAME → 卡片：我的 TAB 金色边框置顶；广场 TAB 普通卡片同步
+  _readFavorites() {
+    try {
+      const raw = wx.getStorageSync(FAVORITES_STORAGE_KEY);
+      if (!Array.isArray(raw)) return [];
+      return raw
+        .map((item) => {
+          if (item == null) return null;
+          if (typeof item === 'string' || typeof item === 'number') {
+            return { id: String(item) };
+          }
+          if (item.id == null && item.gameId == null) return null;
+          return item;
+        })
+        .filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  },
+
+  _writeFavorites(list) {
+    try {
+      wx.setStorageSync(FAVORITES_STORAGE_KEY, Array.isArray(list) ? list : []);
+    } catch (e) {
+      /* ignore */
+    }
+  },
+
+  _favoriteIdSet() {
+    const set = {};
+    this._readFavorites().forEach((item) => {
+      const id = item && (item.id != null ? item.id : item.gameId);
+      if (id != null && id !== '') set[String(id)] = true;
+    });
+    return set;
+  },
+
+  _isFavorite(id) {
+    if (id == null || id === '') return false;
+    return !!this._favoriteIdSet()[String(id)];
+  },
+
+  _currentUserInGame(g) {
+    if (!g) return false;
+    const user = gameStore.getCurrentUser() || {};
+    const uid = String(user.userId || 'me');
+    const ids = {};
+    ids[uid] = true;
+    ids.me = true;
+    const slotMatches = (p) => {
+      if (!p) return false;
+      const pid = p.playerId != null ? String(p.playerId) : '';
+      const userId = p.userId != null ? String(p.userId) : '';
+      return !!(pid && ids[pid]) || !!(userId && ids[userId]);
+    };
+    if (Array.isArray(g.groups)) {
+      for (let gi = 0; gi < g.groups.length; gi++) {
+        const slots = (g.groups[gi] && g.groups[gi].playersSlots) || [];
+        for (let i = 0; i < slots.length; i++) {
+          if (slotMatches(slots[i])) return true;
+        }
+      }
+    }
+    const topSlots = g.playersSlots || [];
+    for (let i = 0; i < topSlots.length; i++) {
+      if (slotMatches(topSlots[i])) return true;
+    }
+    if (g.creatorInGame) {
+      const creatorId = String(g.creatorId || g.createdBy || '');
+      if (creatorId && ids[creatorId]) return true;
+    }
+    return false;
+  },
+
+  _favoriteSnapshot(card) {
+    if (!card) return null;
+    const snap = Object.assign({}, card);
+    snap.id = card.id != null ? card.id : card.gameId;
+    snap.favorited = true;
+    snap.isFavorited = true;
+    snap.starLocked = false;
+    snap.isMine = false;
+    return snap;
+  },
+
+  _hydrateFavoriteCard(item, occupiedIds, plazaTournamentCards) {
+    if (!item) return null;
+    const id = String(item.id != null ? item.id : item.gameId || '');
+    if (!id || occupiedIds[id]) return null;
+    const plazaList = Array.isArray(plazaTournamentCards)
+      ? plazaTournamentCards
+      : this.data.plazaTournamentCards || [];
+    const seriesHit = plazaList.find((card) => card && String(card.id) === id);
+    if (seriesHit) {
+      return Object.assign({}, seriesHit, { favorited: true });
+    }
+    const live = gameStore.getGame(id);
+    if (live) {
+      const card = this._gameToCard(live, false, false);
+      card.favorited = true;
+      card.isFavorited = true;
+      card.starLocked = false;
+      return card;
+    }
+    const snap = Object.assign({}, item, {
+      id: id,
+      favorited: true,
+      isFavorited: true,
+      starLocked: false,
+      isMine: false
+    });
+    if (!snap.type) snap.type = snap.clubLogo || snap.matchType === 'series' ? 'club' : 'tour';
+    return snap;
+  },
+
+  _stampFavoriteFlags(cards, favoriteIds) {
+    const ids = favoriteIds || this._favoriteIdSet();
+    return (cards || []).map((c) => {
+      if (!c) return c;
+      const id = c.id != null ? String(c.id) : '';
+      return Object.assign({}, c, { favorited: !!ids[id], isFavorited: !!ids[id] });
+    });
+  },
+
+  _parseClubDateSortMs(raw) {
+    const s = String(raw || '').trim().toUpperCase();
+    if (!s) return NaN;
+    const months = {
+      JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+      JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11
+    };
+    let m = s.match(/^([A-Z]{3})\s+(\d{1,2})(?:-\d{1,2})?\s+(\d{4})/);
+    if (m && months[m[1]] != null) {
+      return new Date(Number(m[3]), months[m[1]], Number(m[2])).getTime();
+    }
+    m = s.match(/^([A-Z]{3})\s+(\d{1,2})-[A-Z]{3}\s+\d{1,2}\s+(\d{4})/);
+    if (m && months[m[1]] != null) {
+      return new Date(Number(m[3]), months[m[1]], Number(m[2])).getTime();
+    }
+    const parsed = Date.parse(String(raw));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  },
+
+  _parseSortableTimeMs(raw) {
+    if (raw == null || raw === '') return NaN;
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+      return raw < 1e12 ? raw * 1000 : raw;
+    }
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n < 1e12 ? n * 1000 : n;
+    const parsed = Date.parse(String(raw));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  },
+
+  _cardStartTimeMs(card) {
+    if (!card) return NaN;
+    const liveMs = this._parseSortableTimeMs(card.liveStartTime);
+    if (Number.isFinite(liveMs)) return liveMs;
+    const startMs = this._parseSortableTimeMs(card.startTime);
+    if (Number.isFinite(startMs)) return startMs;
+    const fromLabel = this._parseClubDateSortMs(card.clubDate || card.date);
+    if (Number.isFinite(fromLabel)) return fromLabel;
+    const sortAt = Number(card._sortAt);
+    if (Number.isFinite(sortAt) && sortAt > 0) return sortAt;
+    return NaN;
+  },
+
+  /** 置顶组：LIVE 中的本人 GAME */
+  _isParticipatedGameCard(card) {
+    if (!card) return false;
+    const state = card.state != null ? String(card.state).toLowerCase() : '';
+    const isLive = state === 'live' || (state === '' && card.live === true);
+    return card.isMine === true && isLive;
+  },
+
+  _compareCardsByStartTimeNearToFar(a, b) {
+    const ta = this._cardStartTimeMs(a);
+    const tb = this._cardStartTimeMs(b);
+    const aOk = Number.isFinite(ta);
+    const bOk = Number.isFinite(tb);
+    if (aOk && bOk && ta !== tb) return tb - ta;
+    if (aOk && !bOk) return -1;
+    if (!aOk && bOk) return 1;
+    const ida = String((a && a.id) || '');
+    const idb = String((b && b.id) || '');
+    if (ida === idb) return 0;
+    return ida < idb ? -1 : 1;
+  },
+
+  _sortCardsByStartTimeNearToFar(cards) {
+    return (cards || []).slice().sort((a, b) => this._compareCardsByStartTimeNearToFar(a, b));
+  },
+
+  _sortMyCardsByStartTime(cards) {
+    const list = cards || [];
+    const participated = [];
+    const others = [];
+    for (let i = 0; i < list.length; i++) {
+      const card = list[i];
+      if (this._isParticipatedGameCard(card)) participated.push(card);
+      else others.push(card);
+    }
+    return this._sortCardsByStartTimeNearToFar(participated).concat(
+      this._sortCardsByStartTimeNearToFar(others)
+    );
+  },
+
+  // 广场全量进行中 GAME；我的 = 本人参赛 + 收藏
   refreshGames() {
+    const favoriteIds = this._favoriteIdSet();
     const activeGames = gameStore.getActiveGames();
     const finishedGames = gameStore.listGames().filter(
       (g) => g && (g.status === 'finished' || g.status === 'ended')
     );
-    const myGameCards = activeGames
-      .map((g) => this._gameToCard(g, true))
-      .concat(finishedGames.map((g) => this._gameToCard(g, false)));
-    const plazaCards = activeGames.map((g) => this._gameToCard(g, false));
+    const mineActive = activeGames.filter((g) => this._currentUserInGame(g));
+    const mineFinished = finishedGames.filter((g) => this._currentUserInGame(g));
+    const myGameCards = mineActive
+      .map((g) => this._gameToCard(g, true, true))
+      .concat(mineFinished.map((g) => this._gameToCard(g, false, true)));
+    const occupiedIds = {};
+    myGameCards.forEach((c) => {
+      if (c && c.id != null) occupiedIds[String(c.id)] = true;
+    });
+    const plazaTournamentCards = this._stampFavoriteFlags(
+      this._buildPlazaTournamentCardsRaw(),
+      favoriteIds
+    );
+    const favoriteCards = this._readFavorites()
+      .map((item) => this._hydrateFavoriteCard(item, occupiedIds, plazaTournamentCards))
+      .filter(Boolean);
+    const plazaCards = activeGames.map((g) => {
+      const inMine = this._currentUserInGame(g);
+      const card = this._gameToCard(g, false, inMine);
+      const fav = !!favoriteIds[String(card.id)];
+      card.isFavorited = fav;
+      card.favorited = inMine || fav;
+      card.isMine = inMine;
+      card.starLocked = inMine;
+      return card;
+    });
     const demoId = demoWeekendAmateurGame.DEMO_WEEKEND_AMATEUR_GAME_ID;
     const hasDemoDynamic = myGameCards.some(
       (c) => c && (c.gameId === demoId || c.id === demoId)
     );
-    // 动态卡已有 demo-weekend-amateur 时隐藏静态演示卡，避免双卡
     const base = (this._baseMyCards || []).filter((c) => {
-      if (!hasDemoDynamic) return true;
-      return !(c && c.id === 'my-1');
+      if (!c) return false;
+      if (hasDemoDynamic && c.id === 'my-1') return false;
+      if (occupiedIds[String(c.id)]) return false;
+      if (c.type === 'tour' && !c.starLocked) return false;
+      return true;
     });
     this.setData({
-      myCards: myGameCards.concat(base),
-      plazaCards: plazaCards
+      myCards: this._sortMyCardsByStartTime(
+        myGameCards.concat(favoriteCards).concat(base)
+      ),
+      plazaCards: plazaCards,
+      plazaTournamentCards: plazaTournamentCards
     });
   },
 
-  _gameToCard(g, gold) {
+  _gameToCard(g, gold, starLocked) {
     // 头像取值顺序：创建者所在组(groups[0]) → 其余组（已确认/最近加入）；合成逻辑由组件统一处理
     const allPlayers = [];
     if (Array.isArray(g.groups) && g.groups.length) {
@@ -855,16 +1104,22 @@ Page({
       : '/subpackages/scoring/pages/score/index?gameId=' + g.gameId + '&groupIndex=0';
     const progress = gameProgress.buildProgressUi(g, 0);
     const ended = g.status === 'finished' || g.status === 'ended';
+    const isLive = !!gold && !ended && !progress.progressFinish;
     return {
       id: g.gameId,
       gameId: g.gameId,
       type: 'tour',
-      favorited: true,
+      favorited: !!starLocked || this._isFavorite(g.gameId),
+      isFavorited: this._isFavorite(g.gameId),
+      starLocked: !!starLocked,
       active: !!gold && !ended,
-      live: !!gold && !ended && !progress.progressFinish,
+      live: isLive,
+      state: ended ? 'finished' : isLive ? 'live' : 'active',
       avatars: avatars,
       displayAvatars: displayAvatars,
       title: g.roundName || g.courseName || '高尔夫球局',
+      isMine: !!gold && !ended,
+      hasBorder: !!starLocked || (!!gold && !ended),
       progressWidth: progress.progressWidth,
       progressMarkerLeft: progress.progressMarkerLeft,
       progressMarkerText: progress.progressMarkerText,
@@ -890,7 +1145,7 @@ Page({
     return '';
   },
 
-  _seriesListDeps() {
+  _seriesListDeps(listContext) {
     const user = gameStore.getCurrentUser() || {};
     return {
       listMatches: function () {
@@ -923,14 +1178,16 @@ Page({
       },
       decorateOrdinaryCard: function (m, card) {
         return decorateTournamentCard(m, card);
-      }
+      },
+      context: listContext || ''
     };
   },
 
   /** 报名 TAB「所有报名」：只读 list/滤/投影；零写入 Series storage */
   _buildAllRegisteringTournamentCards() {
     try {
-      return seriesListCardAdapter.buildRegistrationAllCards(this._seriesListDeps());
+      const cards = seriesListCardAdapter.buildRegistrationAllCards(this._seriesListDeps('registration')) || [];
+      return this._stampFavoriteFlags(this._prepareRegistrationTabCards(cards));
     } catch (e) {
       return [];
     }
@@ -939,10 +1196,28 @@ Page({
   /** 报名 TAB「我的报名」：只读；零写入 */
   _buildMyRegisteredTournamentCards() {
     try {
-      return seriesListCardAdapter.buildRegistrationMineCards(this._seriesListDeps());
+      const cards = seriesListCardAdapter.buildRegistrationMineCards(this._seriesListDeps('registration')) || [];
+      return this._stampFavoriteFlags(this._prepareRegistrationTabCards(cards));
     } catch (e) {
       return [];
     }
+  },
+
+  _prepareRegistrationTabCards(cards) {
+    const list = (cards || []).filter((c) => c && c.showInRegistration === true);
+    return list.slice().sort((a, b) => {
+      const ta = Number(a && a.upcomingSortTime);
+      const tb = Number(b && b.upcomingSortTime);
+      const aOk = Number.isFinite(ta);
+      const bOk = Number.isFinite(tb);
+      if (aOk && bOk && ta !== tb) return ta - tb;
+      if (aOk && !bOk) return -1;
+      if (!aOk && bOk) return 1;
+      const ida = String((a && a.id) || '');
+      const idb = String((b && b.id) || '');
+      if (ida === idb) return 0;
+      return ida < idb ? -1 : 1;
+    });
   },
 
   refreshTeamMatchCards() {
@@ -997,16 +1272,37 @@ Page({
 
   toggleFavorite(e) {
     const id = e.currentTarget.dataset.id;
-    const toggleById = (list) => list.map((item) => {
-      if (item.id === id) {
-        return Object.assign({}, item, { favorited: !item.favorited });
-      }
-      return item;
+    if (id == null || id === '') return;
+    const sid = String(id);
+    if (e.currentTarget.dataset.locked) return;
+    const isLocked = (item) => item && String(item.id) === sid && item.starLocked;
+    if ((this.data.myCards || []).some(isLocked)) return;
+
+    const list = this._readFavorites();
+    const idx = list.findIndex((item) => {
+      const fid = item && (item.id != null ? item.id : item.gameId);
+      return fid != null && String(fid) === sid;
     });
-    this.setData({
-      myCards: toggleById(this.data.myCards),
-      tournamentCards: toggleById(this.data.tournamentCards)
-    });
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      this._writeFavorites(list);
+      this.refreshGames();
+      this.refreshTeamMatchCards();
+      return;
+    }
+
+    const pools = []
+      .concat(this.data.plazaCards || [])
+      .concat(this.data.plazaTournamentCards || [])
+      .concat(this.data.myCards || [])
+      .concat(this.data.tournamentCards || []);
+    const found = pools.find((item) => item && String(item.id) === sid);
+    const snap = this._favoriteSnapshot(found || { id: sid, type: 'tour' });
+    if (!snap) return;
+    list.unshift(snap);
+    this._writeFavorites(list);
+    this.refreshGames();
+    this.refreshTeamMatchCards();
   },
 
   /** 首页三态：primary=我的 / secondary=日程 / tertiary=报名；广场仅用 primary|secondary */
@@ -1034,12 +1330,16 @@ Page({
   },
 
   /** 广场「团体比赛」：普通 ongoing/finished（滤托管分站）+ 聚合 Series LIVE/已结束 */
-  _buildPlazaTournamentCards() {
+  _buildPlazaTournamentCardsRaw() {
     try {
-      return seriesListCardAdapter.buildPlazaTournamentCards(this._seriesListDeps());
+      return seriesListCardAdapter.buildPlazaTournamentCards(this._seriesListDeps('standings')) || [];
     } catch (e) {
       return [];
     }
+  },
+
+  _buildPlazaTournamentCards() {
+    return this._stampFavoriteFlags(this._buildPlazaTournamentCardsRaw());
   },
 
   setHeroTabsVisible(visible) {
@@ -1327,7 +1627,7 @@ Page({
 
   navigateToFootprints() {
     wx.navigateTo({
-      url: '/pages/profile/footprints/index',
+      url: '/subpackages/player/pages/me/footprints/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
@@ -1336,7 +1636,7 @@ Page({
 
   navigateToHistory() {
     wx.navigateTo({
-      url: '/pages/profile/history/index',
+      url: '/subpackages/player/pages/me/history/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
@@ -1345,7 +1645,7 @@ Page({
 
   navigateToContacts() {
     wx.navigateTo({
-      url: '/pages/profile/contacts/index',
+      url: '/subpackages/player/pages/me/contacts/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
@@ -1354,7 +1654,7 @@ Page({
 
   navigateToStatistics() {
     wx.navigateTo({
-      url: '/pages/profile/statistics/index',
+      url: '/subpackages/player/pages/me/statistics/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }
@@ -1378,7 +1678,7 @@ Page({
 
   navigateToProfileEdit() {
     wx.navigateTo({
-      url: '/pages/profile/edit/index',
+      url: '/subpackages/player/pages/me/edit/index',
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }

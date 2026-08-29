@@ -38,7 +38,7 @@ page {
 
 .gb-header {
   background: #002d62;
-  border-bottom: 2px solid #c8a24a;
+  border-bottom: 2px solid #CE9224;
   color: #fff;
   flex-shrink: 0;
 }
@@ -192,7 +192,7 @@ page {
   display: flex;
   justify-content: center;
   align-items: center;
-  color: #c8a24a;
+  color: #CE9224;
   font-size: 28rpx;
   font-weight: 800;
 }
@@ -240,7 +240,7 @@ page {
   text-align: center;
   padding: 26rpx 0;
   border-radius: 16rpx;
-  background: #c8a24a;
+  background: #CE9224;
   color: #ffffff;
   font-size: 32rpx;
   font-weight: 900;
@@ -260,12 +260,12 @@ page {
 }
 
 .group-pick-page.dark-mode .register-subtab--active::after {
-  background: #00aeef;
+  background: var(--data-blue);
 }
 
 .group-pick-page.dark-mode .roster-checkbox--checked {
-  border-color: #00aeef;
-  background: #00aeef;
+  border-color: var(--data-blue);
+  background: var(--data-blue);
 }
 
 .group-pick-page.dark-mode .group-pick-cta-bar {

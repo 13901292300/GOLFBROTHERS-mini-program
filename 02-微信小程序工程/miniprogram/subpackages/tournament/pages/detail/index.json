@@ -11,7 +11,7 @@
     "registration-cancel-dialog": "/components/registration-cancel-dialog/index",
     "leaderboard-setting-sheet": "/components/leaderboard-setting-sheet/index",
     "live-leaderboard-board": "/components/live-leaderboard-board/index",
-    "match-play-scoreboard": "/components/match-play-scoreboard/index",
+    "match-play-scoreboard": "/subpackages/tournament/components/match-play-scoreboard/index",
     "personal-leaderboard-board": "/components/personal-leaderboard-board/index",
     "leaderboard-player-name-cell": "/components/leaderboard-player-name-cell/index",
     "phone-bind-sheet": "/components/phone-bind-sheet/index",

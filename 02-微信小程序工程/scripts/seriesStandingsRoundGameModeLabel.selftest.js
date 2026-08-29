@@ -119,8 +119,11 @@ var gmR2 = buildVm(gm, 'r2');
 var gmR3 = buildVm(gm, 'r3');
 
 assert(
-  'global_m TOT 保持 Top M',
-  tot.leaderboardViewLabel === '本榜取全队前 6 名最好成绩进行排行' &&
+  'global_m TOT 保持 Top M 于下拉',
+  tot.selectedKey === 'total' &&
+    tot.leaderboardViewLabel === '' &&
+    tot.roundSelectorItems[0].key === 'total' &&
+    String(tot.roundSelectorItems[0].displayText).indexOf('取全队前6名最好成绩进行排序') >= 0 &&
     tot.leaderboardViewLabel.indexOf('个人比杆赛') < 0
 );
 

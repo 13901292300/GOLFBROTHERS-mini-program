@@ -5,6 +5,7 @@
 
 var path = require('path');
 var assert = require('assert');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -19,8 +20,8 @@ if (typeof global.wx === 'undefined') {
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
 var completeness = require(path.join(utilsDir, 'scoreCompleteness.js'));
-var prompt = require(path.join(utilsDir, 'scoreGroupCompletePrompt.js'));
-var finish = require(path.join(utilsDir, 'scoreGroupFinish.js'));
+var prompt = require(seriesTestPaths.util('scoreGroupCompletePrompt.js'));
+var finish = require(seriesTestPaths.util('scoreGroupFinish.js'));
 var gameProgress = require(path.join(utilsDir, 'gameProgress.js'));
 
 var failed = 0;

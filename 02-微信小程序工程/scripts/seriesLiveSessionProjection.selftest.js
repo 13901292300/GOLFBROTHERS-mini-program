@@ -21,6 +21,8 @@ var dockDir = path.join(
   __dirname,
   '..',
   'miniprogram',
+  'subpackages',
+  'tournament',
   'components',
   'series-round-selector-dock'
 );
@@ -261,18 +263,32 @@ assert(
       roundStates: liveR2,
       standingsResult: standingsVm.emptyStandingsResult()
     });
-    return vm.selectedKey === 'r2' && vm.showTot === false;
+    return (
+      vm.selectedKey === 'r2' &&
+      vm.showTot === false &&
+      !(vm.roundSelectorItems || []).some(function (x) {
+        return x && x.key === 'total';
+      })
+    );
   })()
 );
 
 assert(
   'global_m 仍可手选 TOT',
-  standingsVm.buildSeriesStandingsViewModel({
-    series: seriesOf('global_m'),
-    selectedKey: 'cumulative',
-    roundStates: liveR2,
-    standingsResult: standingsVm.emptyStandingsResult()
-  }).selectedKey === 'cumulative'
+  (function () {
+    var vm = standingsVm.buildSeriesStandingsViewModel({
+      series: seriesOf('global_m'),
+      selectedKey: 'cumulative',
+      roundStates: liveR2,
+      standingsResult: standingsVm.emptyStandingsResult()
+    });
+    return (
+      vm.selectedKey === 'total' &&
+      (vm.roundSelectorItems || []).some(function (x) {
+        return x && x.key === 'total' && x.isSelected;
+      })
+    );
+  })()
 );
 
 assert(

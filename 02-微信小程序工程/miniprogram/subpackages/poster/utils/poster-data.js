@@ -1,6 +1,9 @@
 const POSTER_WIDTH = 1000;
 const POSTER_HEIGHT = 1265;
 const BRAND_HEIGHT = 70;
+/** 临时赛事顶栏：名校杯 LOGO + 文案（中间圆点） */
+const EVENT_BRAND_LOGO_PATH = "/subpackages/poster/images/mingxiaobei-logo.jpg";
+const EVENT_BRAND_TITLE = "2026青花郎·名校杯高校校友联谊赛";
 const MAX_STICKERS = 5;
 
 const PGA_MARKER_DEFAULTS = {
@@ -1797,6 +1800,8 @@ module.exports = {
   POSTER_WIDTH,
   POSTER_HEIGHT,
   BRAND_HEIGHT,
+  EVENT_BRAND_LOGO_PATH,
+  EVENT_BRAND_TITLE,
   MAX_STICKERS,
   PALETTES,
   COLOR_OPTIONS,

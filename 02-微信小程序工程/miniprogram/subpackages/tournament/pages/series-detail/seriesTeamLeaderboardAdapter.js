@@ -320,7 +320,7 @@ function projectSeriesStandingsTeamBoard(input) {
   var selectedKey = asString(src.selectedKey) || standingsViewModel.CUMULATIVE_KEY;
   var sharedEmpty = seriesPersonalLeaderboardAdapter.emptySharedPersonalBoardFields();
 
-  if (selectedKey === standingsViewModel.CUMULATIVE_KEY) {
+  if (standingsViewModel.isCumulativeStandingsKey(selectedKey)) {
     return projectSeriesTotG2G3TeamBoard(src);
   }
 

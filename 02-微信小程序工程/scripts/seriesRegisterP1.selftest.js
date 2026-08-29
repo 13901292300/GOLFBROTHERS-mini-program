@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -25,10 +26,7 @@ var utilsDir = path.join(mini, 'utils');
 var pageDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 
-var registrationInteractionModel = require(path.join(
-  utilsDir,
-  'registrationInteractionModel.js'
-));
+var registrationInteractionModel = require(seriesTestPaths.util('registrationInteractionModel.js'));
 var seriesRegistration = require(path.join(utilsDir, 'seriesRegistration.js'));
 var registerVm = require(path.join(pageDir, 'seriesRegisterViewModel.js'));
 var eligibility = require(path.join(pageDir, 'seriesRegisterEligibility.js'));
@@ -247,8 +245,8 @@ assert(
     return (
       one.defaultSheetParticipantId === 'team:1' &&
       many.defaultSheetParticipantId === '' &&
-      teamMode.defaultSheetParticipantId === '' &&
-      none.eligibleParticipantIds.length === 0 &&
+      teamMode.defaultSheetParticipantId === 'div:1' &&
+      none.eligibleParticipantIds.length === 2 &&
       /openRegisterSheet:[\s\S]{0,1800}eligibleParticipantIds/.test(pageJs)
     );
   })()

@@ -14,6 +14,7 @@ const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
 const {
   createDefaultEventInfoList
 } = require('../../../../utils/eventInfoDefaults.js');
+const matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -33,7 +34,6 @@ const GAME_MODE_OPTIONS = TEAM_GAME_MODES.map((item) => item.name);
 
 const MATCH_PLAY_MODES = [
   '个人比洞赛',
-  '最好成绩比洞赛',
   '四人四球比洞赛',
   '最佳球位比洞赛',
   '四人两球比洞赛'
@@ -42,7 +42,9 @@ const MATCH_PLAY_MODES = [
 const MATCH_PLAY_TEAMS_TIP = '比洞赛有且只能有两支球队参与';
 
 function isMatchPlayMode(name) {
-  return MATCH_PLAY_MODES.indexOf(name) >= 0;
+  var n = String(name || '').trim();
+  if (n === '最好成绩比洞赛') return true;
+  return MATCH_PLAY_MODES.indexOf(n) >= 0;
 }
 
 const RECOMMENDED_EVENT_INFO = [
@@ -122,20 +124,7 @@ const DEFAULT_EVENT_INFO_LIST = createDefaultEventInfoList();
  * @returns {string}
  */
 function buildDefaultRoundNameFromTeamGroups(teamGroups) {
-  const groups = Array.isArray(teamGroups) ? teamGroups : [];
-  const count = groups.length;
-  if (count < 2 || count > 4) {
-    return ROUND_NAME_SUFFIX;
-  }
-  const names = [];
-  for (let i = 0; i < groups.length; i++) {
-    const n = String((groups[i] && groups[i].name) || '').trim();
-    if (n) names.push(n);
-  }
-  if (names.length < 2) {
-    return ROUND_NAME_SUFFIX;
-  }
-  return names.join('&') + ROUND_NAME_SUFFIX;
+  return matchTitlePolicy.buildAutoInterRoundName(teamGroups);
 }
 
 function pad2(n) {
@@ -208,6 +197,9 @@ Page({
     teamRole: '',
 
     roundName: ROUND_NAME_SUFFIX,
+    roundNameCount: matchTitlePolicy.countTypingChars(ROUND_NAME_SUFFIX),
+    roundNameMax: matchTitlePolicy.MATCH_TITLE_MAX,
+    roundNameQuota: matchTitlePolicy.MATCH_TITLE_MAX,
     courseName: '',
     courseId: '',
     courseLocation: '',
@@ -292,6 +284,8 @@ Page({
   onLoad(options) {
     // 页面级 dirty：用户手改比赛名后为 true；不写入 Match 持久化
     this._roundNameManual = false;
+    this._roundNameBaseline = '';
+    this._roundNameLastOk = this.data.roundName || '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
 
@@ -317,6 +311,7 @@ Page({
         }
       )
     );
+    this._roundNameLastOk = this.data.roundName || '';
   },
 
   /**
@@ -329,6 +324,12 @@ Page({
     const next = patch || {};
     if (!this._roundNameManual) {
       next.roundName = buildDefaultRoundNameFromTeamGroups(teamGroups);
+      next.roundNameCount = matchTitlePolicy.countTypingChars(next.roundName);
+      next.roundNameMax = matchTitlePolicy.resolveInputMaxlength(
+        next.roundName,
+        matchTitlePolicy.MATCH_TITLE_MAX
+      );
+      this._roundNameLastOk = next.roundName;
     }
     return next;
   },
@@ -401,6 +402,8 @@ Page({
     this._activeTimeTarget = 'tee';
     this._editMatchId = matchId;
     this._roundNameManual = true;
+    this._roundNameBaseline = form.roundName || '';
+    this._roundNameLastOk = form.roundName || '';
     // 编辑页：记录进入时已落盘赛制，保存失败时仅回滚赛制 UI（不碰 teamGroups）
     this._originalGameMode = form.gameMode || '个人比杆赛';
 
@@ -459,6 +462,12 @@ Page({
         teamLogo: organizationLogo,
         teamRole: '',
         roundName: form.roundName || '',
+        roundNameCount: matchTitlePolicy.countTypingChars(form.roundName || ''),
+        roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+          form.roundName || '',
+          matchTitlePolicy.MATCH_TITLE_MAX
+        ),
+        roundNameQuota: matchTitlePolicy.MATCH_TITLE_MAX,
         courseId: form.courseId || '',
         courseName: form.courseName || '',
         courseLocation: form.courseLocation || '',
@@ -530,7 +539,66 @@ Page({
 
   onRoundNameInput(e) {
     this._roundNameManual = true;
-    this.setData({ roundName: e.detail.value });
+    var raw = e && e.detail && e.detail.value != null ? e.detail.value : '';
+    var value = matchTitlePolicy.constrainTyping(raw, {
+      max: matchTitlePolicy.MATCH_TITLE_MAX,
+      previous: this._roundNameBaseline
+    });
+    this.setData({
+      roundName: value,
+      roundNameCount: matchTitlePolicy.countTypingChars(value),
+      roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+        value,
+        matchTitlePolicy.MATCH_TITLE_MAX
+      )
+    });
+    return value;
+  },
+
+  onRoundNameBlur(e) {
+    var raw =
+      e && e.detail && e.detail.value != null
+        ? e.detail.value
+        : this.data.roundName;
+    return this._commitRoundNameInput(raw);
+  },
+
+  _commitRoundNameInput(raw) {
+    var check = matchTitlePolicy.normalizeTitleInput(raw, {
+      required: true,
+      max: matchTitlePolicy.MATCH_TITLE_MAX,
+      previous: this._roundNameBaseline
+    });
+    if (!check.ok) {
+      var fallback = this._roundNameLastOk != null ? String(this._roundNameLastOk) : '';
+      this.setData({
+        roundName: fallback,
+        roundNameCount: matchTitlePolicy.countTypingChars(fallback),
+        roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+          fallback,
+          matchTitlePolicy.MATCH_TITLE_MAX
+        )
+      });
+      wx.showToast({
+        title: check.reason === 'empty' ? '请输入比赛名称' : '比赛名称最多 14 个字符',
+        icon: 'none'
+      });
+      return false;
+    }
+    this._roundNameLastOk = check.value;
+    this.setData({
+      roundName: check.value,
+      roundNameCount: matchTitlePolicy.countTypingChars(check.value),
+      roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+        check.value,
+        matchTitlePolicy.MATCH_TITLE_MAX
+      )
+    });
+    return true;
+  },
+
+  _assertRoundNameOrTip() {
+    return this._commitRoundNameInput(this.data.roundName);
   },
 
   _hasSelectedOrganization() {
@@ -587,7 +655,7 @@ Page({
   onSelectOrganization() {
     const initPayload = this._buildOrganizationInitPayload();
     wx.navigateTo({
-      url: '/pages/team/select/index?mode=event_org',
+      url: '/subpackages/create/pages/team/select/index?mode=event_org',
       success: (res) => {
         try {
           if (res && res.eventChannel && res.eventChannel.emit) {
@@ -668,7 +736,7 @@ Page({
 
   onSelectCourse() {
     wx.navigateTo({
-      url: '/pages/course/select/index?selectedId=' + (this.data.courseId || ''),
+      url: '/subpackages/create/pages/course/select/index?selectedId=' + (this.data.courseId || ''),
       events: {
         courseSelected: (payload) => {
           if (!payload) return;
@@ -745,7 +813,7 @@ Page({
 
   /** 参赛球队选择页 URL：仅 mode / maxCount，完整已选对象走 eventChannel */
   _buildParticipantsNavigateUrl() {
-    let url = '/pages/team/select/index?mode=inter_team_participants';
+    let url = '/subpackages/create/pages/team/select/index?mode=inter_team_participants';
     if (this.data.isMatchPlayMode) {
       url += '&maxCount=2';
     }
@@ -1758,6 +1826,10 @@ Page({
         showCancel: false,
         confirmText: '确认'
       });
+      return;
+    }
+
+    if (!this._assertRoundNameOrTip()) {
       return;
     }
 

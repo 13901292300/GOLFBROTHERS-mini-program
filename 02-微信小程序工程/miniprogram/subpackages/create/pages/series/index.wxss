@@ -1,4 +1,4 @@
-@import '/styles/create-team-common.wxss';
+@import '/subpackages/create/styles/create-team-common.wxss';
 
 .series-wizard .progress-rail {
   display: flex;

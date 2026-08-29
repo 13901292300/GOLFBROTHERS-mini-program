@@ -20,7 +20,7 @@ var standingsVm = require(path.join(pageDir, 'seriesStandingsViewModel.js'));
 var wxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var wxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
-var dockDir = path.join(root, 'miniprogram', 'components', 'series-round-selector-dock');
+var dockDir = path.join(root, 'miniprogram', 'subpackages', 'tournament', 'components', 'series-round-selector-dock');
 var dockWxml = fs.readFileSync(path.join(dockDir, 'index.wxml'), 'utf8');
 var dockWxss = fs.readFileSync(path.join(dockDir, 'index.wxss'), 'utf8');
 
@@ -167,7 +167,8 @@ assert(
   '11 切换不完整 reload',
   rebuildFn.indexOf('reloadViewModel') < 0 &&
     tapFn.indexOf('reloadViewModel') < 0 &&
-    rebuildFn.indexOf('不完整 reload') >= 0
+    rebuildFn.indexOf('_rebuildStandingsProjection') >= 0 &&
+    rebuildFn.indexOf('不改 scrollTop / filler / sticky') >= 0
 );
 
 assert(
@@ -203,7 +204,8 @@ assert(
   '14 R1/R2 文案仍正确更新',
   r1.indexOf('R1') === 0 &&
     r2 === 'R2 · SEP 01 · 测试球场 · 后九' &&
-    standingsVm.buildStandingsRoundInfoText('cumulative', [], null) === ''
+    standingsVm.buildStandingsRoundInfoText('cumulative', [], null) === '' &&
+    standingsVm.buildStandingsRoundInfoText('total', [], null) === ''
 );
 
 assert(
@@ -242,7 +244,8 @@ assert(
   '19 共享个人榜不在 roundBar；TOT 文案为空',
   standingsTpl.indexOf('personal-leaderboard-board') < 0 &&
     standingsTpl.indexOf('personalLeaderboard') < 0 &&
-    standingsVm.buildStandingsRoundInfoText('cumulative', [], null) === ''
+    standingsVm.buildStandingsRoundInfoText('cumulative', [], null) === '' &&
+    standingsVm.buildStandingsRoundInfoText('total', [], null) === ''
 );
 
 console.log('');

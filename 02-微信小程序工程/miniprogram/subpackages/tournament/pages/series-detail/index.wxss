@@ -1,5 +1,5 @@
 @import "/styles/tournament-common.wxss";
-@import "/styles/match-play-scoreboard.wxss";
+@import "../../styles/match-play-scoreboard.wxss";
 
 /* ===== Hero（镜像 detail/index.wxss 必要规则，不改公共样式/详情页） ===== */
 .hero-wrap { position: relative; }
@@ -32,7 +32,7 @@
   border-radius: 8rpx;
 }
 .registered-chip--live {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   border-color: rgba(255, 255, 255, 0.18);
   color: #ffffff;
 }
@@ -90,6 +90,12 @@
 .event-date--lg {
   font-size: 40rpx;
   letter-spacing: -0.055em;
+}
+.event-date--live {
+  color: var(--data-blue, #00AEEF);
+}
+.event-date--gold {
+  color: #CE9224;
 }
 /* 主/副标题同为正式名称行：字号/字重/颜色/行高一致；按原设计换行，不单行省略 */
 .event-title {
@@ -152,12 +158,26 @@
   background: linear-gradient(90deg, transparent, var(--champion-gold), transparent);
   opacity: 0.9;
 }
+.section-divider--live::before,
+.section-divider--live::after {
+  background: linear-gradient(90deg, transparent, var(--data-blue, #00AEEF), transparent);
+}
+.section-divider--gold::before,
+.section-divider--gold::after {
+  background: linear-gradient(90deg, transparent, #CE9224, transparent);
+}
 .section-divider__text {
   font-size: 20rpx;
   font-weight: 900;
   font-style: italic;
   letter-spacing: 0.28em;
   white-space: nowrap;
+}
+.org-text--live {
+  color: var(--data-blue, #00AEEF) !important;
+}
+.org-text--gold {
+  color: #CE9224 !important;
 }
 
 .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; }
@@ -289,9 +309,15 @@
   border: 1.5px solid var(--bg-card);
   background: #e5e7eb;
 }
+.hero-logo-stack__item--division {
+  border: 0;
+}
 .detail-page.dark-mode .hero-logo-stack__item {
   background: #2a2a2a;
   border-color: var(--bg-card);
+}
+.detail-page.dark-mode .hero-logo-stack__item--division {
+  border: 0;
 }
 .hero-logo-stack__img {
   width: 100%;
@@ -308,6 +334,19 @@
   font-weight: 700;
   line-height: 1;
   color: var(--text-secondary, #666);
+}
+.series-division-logo-mark {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1;
+  color: #FFFFFF;
+  box-sizing: border-box;
 }
 .hero-division-tags {
   display: flex;
@@ -360,8 +399,8 @@
   z-index: 5;
 }
 .series-banner--draft {
-  background: rgba(201, 164, 92, 0.18);
-  color: var(--champion-gold, #c9a45c);
+  background: rgba(206, 146, 36, 0.18);
+  color: var(--champion-gold, #CE9224);
 }
 .series-banner--history {
   background: rgba(0, 0, 0, 0.06);
@@ -452,6 +491,11 @@
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+}
+/* 比洞下拉菜单超出 dock 高度时不被裁切 */
+.series-round-dock--dropdown.series-round-dock--fixed,
+.series-round-dock--dropdown .series-round-dock__inner {
+  overflow: visible;
 }
 /* 内容壳：流内/fixed 共用；上下 12rpx 增高；水平 32rpx 对齐领先榜；chip 在 bar 内垂直居中 */
 .series-round-dock__inner {
@@ -575,9 +619,9 @@
   border-color: var(--champion-gold);
 }
 .round-selector-state--live {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   color: #ffffff;
-  border-color: var(--data-blue, #00aeef);
+  border-color: var(--data-blue, #00AEEF);
 }
 .round-selector-state--completed {
   background: #6b7280;
@@ -659,12 +703,12 @@
   height: 30rpx;
   border-radius: 50%;
   background: #fff;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 .detail-page.dark-mode .series-standings-round-selector .round-selector-item__selected-icon,
 .series-detail-page.dark-mode .series-standings-round-selector .round-selector-item__selected-icon {
   background: #fff;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 /* 总榜选中：水平 padding 左右互换式避让，外轮廓宽高不变 */
 .series-standings-round-selector .series-standings-round-chip.round-selector-item--selected {
@@ -833,7 +877,7 @@
   font-size: 20rpx;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--champion-gold, #c9a45c);
+  color: var(--champion-gold, #CE9224);
 }
 .round-card__status {
   font-size: 22rpx;
@@ -894,6 +938,7 @@
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
+  border: none;
   background: rgba(0, 0, 0, 0.06);
   flex-shrink: 0;
   overflow: hidden;
@@ -1324,7 +1369,7 @@
   line-height: 1.2;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 .manual-sheet__title {
   display: block;
@@ -1448,7 +1493,7 @@
   align-items: center;
   justify-content: flex-end;
   padding: 8rpx 8rpx 20rpx;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   font-size: 26rpx;
   font-weight: 800;
 }

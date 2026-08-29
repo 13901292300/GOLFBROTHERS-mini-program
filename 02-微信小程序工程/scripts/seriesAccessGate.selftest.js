@@ -6,14 +6,9 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
-var gate = require(path.join(
-  __dirname,
-  '..',
-  'miniprogram',
-  'utils',
-  'seriesAccessGate.js'
-));
+var gate = require(seriesTestPaths.util('seriesAccessGate.js'));
 
 var detailDir = path.join(
   __dirname,
@@ -26,10 +21,7 @@ var detailDir = path.join(
 );
 var pageJs = fs.readFileSync(path.join(detailDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(detailDir, 'index.wxml'), 'utf8');
-var gateSrc = fs.readFileSync(
-  path.join(__dirname, '..', 'miniprogram', 'utils', 'seriesAccessGate.js'),
-  'utf8'
-);
+var gateSrc = fs.readFileSync(seriesTestPaths.util('seriesAccessGate.js'), 'utf8');
 
 var passed = 0;
 var failed = 0;
@@ -144,7 +136,7 @@ assert(
 // ----- 页面接线（静态）-----
 assert(
   'detail require seriesAccessGate',
-  pageJs.indexOf("require('../../../../utils/seriesAccessGate.js')") >= 0
+  pageJs.indexOf("require('../../utils/seriesAccessGate.js')") >= 0
 );
 
 assert(

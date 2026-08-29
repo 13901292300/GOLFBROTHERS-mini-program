@@ -72,6 +72,57 @@ function formatRoundInfoMonthDay(parts) {
   return mon + ' ' + dd;
 }
 
+/** 下拉日期：AUG 20；不带年、不带时分 */
+function formatRoundSelectorDate(dateTime) {
+  return formatRoundInfoMonthDay(parseRoundInfoDateParts(dateTime)) || '';
+}
+
+function resolveRoundSelectorFormatName(round, stateRow) {
+  var r = round && typeof round === 'object' ? round : {};
+  var st = stateRow && typeof stateRow === 'object' ? stateRow : {};
+  var tokens = [
+    r.matchType,
+    r.gameMode,
+    r.selectedGameMode,
+    r.formatType,
+    r.playFormat,
+    st.gameMode,
+    st.matchType
+  ];
+  for (var i = 0; i < tokens.length; i++) {
+    var raw = asString(tokens[i]).trim();
+    if (!raw) continue;
+    var fromTable = seriesGameModeLabel.resolveSeriesGameModeLabel(raw);
+    if (fromTable) return fromTable;
+    if (raw.indexOf('比杆') >= 0 || raw.indexOf('比洞') >= 0) return raw;
+  }
+  return GAME_MODE_PENDING;
+}
+
+/**
+ * 得分榜 / 出发表下拉唯一文案：R1 · SEP 08 · 四人四球比洞赛
+ * 缺日期省略；缺赛制 → 赛制待定；不产生连续分隔符。TOTAL 不得调用。
+ */
+function buildSeriesRoundSelectorDisplayText(round, stateRow, fallbackIndex) {
+  var r = round && typeof round === 'object' ? round : {};
+  var st = stateRow && typeof stateRow === 'object' ? stateRow : {};
+  var idxRaw = r.index != null ? r.index : st.index;
+  var roundNum =
+    idxRaw != null && Number.isFinite(Number(idxRaw)) && Number(idxRaw) > 0
+      ? Math.floor(Number(idxRaw))
+      : fallbackIndex > 0
+        ? fallbackIndex
+        : 1;
+  var dateStr = formatRoundSelectorDate(
+    r.startTime || r.dateTime || r.teeTime || st.startTime || st.dateTime
+  );
+  var formatName = resolveRoundSelectorFormatName(r, st) || GAME_MODE_PENDING;
+  var parts = ['R' + roundNum];
+  if (dateStr) parts.push(dateStr);
+  if (formatName) parts.push(formatName);
+  return parts.join(' · ');
+}
+
 /** 莱德杯得分榜时间：2026年8月20日 08:00；缺失走比赛时间待定 */
 function formatSeriesRoundDateTimeText(dateTime, emptyText) {
   var pending = emptyText == null ? TIME_PENDING : String(emptyText);
@@ -111,7 +162,7 @@ function resolveRyderCupRoundDisplayIndex(round, series, roundId) {
  */
 function buildRyderCupRoundInfoText(selectedKey, selectedRound, series) {
   var rid = asString(selectedKey).trim();
-  if (!rid || rid === CUMULATIVE_KEY) return '';
+  if (!rid || rid === CUMULATIVE_KEY || rid === 'total') return '';
   var round = selectedRound && asString(selectedRound.roundId).trim() === rid
     ? selectedRound
     : findSeriesRoundById(series, rid);
@@ -174,7 +225,7 @@ function findRoundInfoSource(roundId, roundStates, series) {
  */
 function buildSeriesRoundInfoText(selectedKey, roundStates, series) {
   var key = asString(selectedKey).trim() || CUMULATIVE_KEY;
-  if (key === CUMULATIVE_KEY) return '';
+  if (key === CUMULATIVE_KEY || key === 'total') return '';
   var src = findRoundInfoSource(key, roundStates, series);
   if (!src) return '';
   var dateText = formatRoundInfoMonthDay(parseRoundInfoDateParts(src.dateTime));
@@ -197,7 +248,7 @@ function resolveScheduleGameModeLabel(selectedKey, series, stationGameMode) {
 /** 莱德杯赛程 TAB：在现有 roundInfoText 末尾追加 G5–G8 展示名 */
 function appendRyderCupScheduleGameMode(baseText, selectedKey, series, stationGameMode) {
   var rid = asString(selectedKey).trim();
-  if (!rid || rid === CUMULATIVE_KEY) return asString(baseText).trim();
+  if (!rid || rid === CUMULATIVE_KEY || rid === 'total') return asString(baseText).trim();
   var mode = resolveScheduleGameModeLabel(rid, series, stationGameMode);
   var base = asString(baseText).trim();
   if (!base) return mode;
@@ -215,6 +266,9 @@ module.exports = {
   TIME_PENDING: TIME_PENDING,
   GAME_MODE_PENDING: GAME_MODE_PENDING,
   formatSeriesRoundDateTimeText: formatSeriesRoundDateTimeText,
+  formatRoundSelectorDate: formatRoundSelectorDate,
+  resolveRoundSelectorFormatName: resolveRoundSelectorFormatName,
+  buildSeriesRoundSelectorDisplayText: buildSeriesRoundSelectorDisplayText,
   buildRyderCupRoundInfoText: buildRyderCupRoundInfoText,
   resolveScheduleGameModeLabel: resolveScheduleGameModeLabel,
   appendRyderCupScheduleGameMode: appendRyderCupScheduleGameMode

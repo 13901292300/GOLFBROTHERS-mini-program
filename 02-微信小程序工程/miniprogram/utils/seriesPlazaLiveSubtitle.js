@@ -1,7 +1,8 @@
 /**
- * 广场「团体比赛」系列赛卡片副标题：LIVE 轮次赛显示投影
- * - 有原副标题：原文案 + 全角（Rx）
- * - 空/无效原副标题：第{原始轮次序号}轮
+ * 广场「团体比赛」系列赛卡片副标题投影
+ * - 有用户副标题 + 有效 LIVE：原文 + 「 · Rx」
+ * - 有用户副标题 + 无 LIVE：只显示原副标题
+ * - 空副标题：交回调用方既有系统规则
  * 只读；不写 series.seriesSubtitle / rounds。
  */
 
@@ -9,6 +10,7 @@ var seriesRoundVisualState = require('./seriesRoundVisualState.js');
 var seriesLiveRoundSelect = require('./seriesLiveRoundSelect.js');
 var seriesRoundDisplayLabels = require('./seriesRoundDisplayLabels.js');
 var seriesSameDayMultiCourse = require('./seriesSameDayMultiCourse.js');
+var seriesStationMatch = require('./seriesStationMatch.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -18,25 +20,100 @@ function sanitizeTitleSub(raw) {
   return asString(raw).replace(/[\r\n\u2028\u2029]+/g, '');
 }
 
-function buildPlazaRoundStates(series, getMatchById) {
-  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
-  var getter = typeof getMatchById === 'function' ? getMatchById : function () {
+function resolvePlazaDeps(getMatchByIdOrOptions) {
+  if (typeof getMatchByIdOrOptions === 'function') {
+    return { getMatchById: getMatchByIdOrOptions };
+  }
+  if (getMatchByIdOrOptions && typeof getMatchByIdOrOptions === 'object') {
+    return getMatchByIdOrOptions;
+  }
+  return {};
+}
+
+function isPlazaSubtitleContext(options) {
+  var ctx = asString(options && options.context);
+  return ctx === 'standings' || ctx === 'plaza';
+}
+
+function readUserPlazaSubtitle(series) {
+  if (!series || typeof series !== 'object') return '';
+  var raw =
+    series.subtitle != null && String(series.subtitle).trim() !== ''
+      ? series.subtitle
+      : series.seriesSubtitle;
+  return sanitizeTitleSub(raw);
+}
+
+function loadMatch(getter, matchId) {
+  var mid = asString(matchId);
+  if (!mid || typeof getter !== 'function') return null;
+  try {
+    var match = getter(mid);
+    return match && typeof match === 'object' ? match : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 分站身份：managed + seriesId/roundId/publishToken。
+ * getIndexByMatchId 缺失不挡 LIVE；显式 index 冲突不算 LIVE。
+ */
+function plazaStationIdentityOk(series, round, match, options) {
+  if (!match || !seriesStationMatch.isSeriesManagedMatch(match)) return false;
+  var ctx = match.seriesContext || {};
+  var seriesId = asString(series && series.seriesId);
+  var roundId = asString(round && round.roundId);
+  var publishToken = asString(series && series.publishToken);
+  if (asString(ctx.seriesId) !== seriesId) return false;
+  if (asString(ctx.roundId) !== roundId) return false;
+  if (asString(ctx.publishToken) !== publishToken) return false;
+  var getIndexByMatchId = options && options.getIndexByMatchId;
+  if (typeof getIndexByMatchId !== 'function') return true;
+  var link = null;
+  try {
+    link = getIndexByMatchId(asString(round && round.matchId));
+  } catch (e) {
+    link = null;
+  }
+  if (!link) return true;
+  if (asString(link.seriesId) !== seriesId || asString(link.roundId) !== roundId) {
+    return false;
+  }
+  return true;
+}
+
+function roundForUnverifiedVisual(round) {
+  var copy = {};
+  var key;
+  for (key in round) {
+    if (Object.prototype.hasOwnProperty.call(round, key)) copy[key] = round[key];
+  }
+  var rs = asString(copy.roundStatus).toLowerCase();
+  if (rs === 'live' || rs === 'ongoing') copy.roundStatus = 'scheduled';
+  var st = asString(copy.state).toLowerCase();
+  if (st === 'live' || st === 'ongoing') copy.state = 'scheduled';
+  return copy;
+}
+
+function buildPlazaRoundStates(series, getMatchByIdOrOptions) {
+  var options = resolvePlazaDeps(getMatchByIdOrOptions);
+  var getter = typeof options.getMatchById === 'function' ? options.getMatchById : function () {
     return null;
   };
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
   var out = [];
   for (var i = 0; i < rounds.length; i++) {
     var round = rounds[i] || {};
     var rid = asString(round.roundId);
-    var mid = asString(round.matchId);
-    var match = null;
-    if (mid) {
-      try {
-        match = getter(mid);
-      } catch (e) {
-        match = null;
-      }
-    }
-    var visual = seriesRoundVisualState.resolveSeriesRoundVisualState(round, match);
+    var match = loadMatch(getter, round.matchId);
+    var identityOk = plazaStationIdentityOk(series, round, match, options);
+    var visualRound = identityOk ? round : roundForUnverifiedVisual(round);
+    var visualMatch = identityOk ? match : null;
+    var visual = seriesRoundVisualState.resolveSeriesRoundVisualState(
+      visualRound,
+      visualMatch
+    );
     var index =
       round.index != null && Number.isFinite(Number(round.index))
         ? Number(round.index)
@@ -55,7 +132,8 @@ function buildPlazaRoundStates(series, getMatchById) {
       state: visual.state,
       stateClass: visual.stateClass,
       statusLabel: visual.statusLabel,
-      statusToken: visual.state
+      statusToken: visual.state,
+      stationIdentityOk: identityOk
     });
   }
   return out;
@@ -74,28 +152,32 @@ function isRxDisplayLabel(label) {
 }
 
 /**
- * 轮次赛且存在未取消 LIVE 时，返回公共显示标签（如 R2）；否则 ''。
+ * 轮次赛且存在未取消、身份有效的 LIVE 时，返回公共显示标签（如 R2）；否则 ''。
+ * 不按同日 COURSE / 日期猜 LIVE；多 LIVE 取系列顺序最早一轮。
  */
-function resolvePlazaLiveRoundLabel(series, getMatchById) {
+function resolvePlazaLiveRoundLabel(series, getMatchByIdOrOptions) {
   if (!series || typeof series !== 'object') return '';
-  var states = buildPlazaRoundStates(series, getMatchById);
+  var states = buildPlazaRoundStates(series, getMatchByIdOrOptions);
   if (!states.length) return '';
-  if (isSameDayMultiCourseSeries(series, states)) return '';
   if (!seriesLiveRoundSelect.hasAnyLiveRound(states)) return '';
   var rid = seriesLiveRoundSelect.resolveDefaultTargetRoundId(states);
   if (!rid) return '';
   var liveState = '';
+  var identityOk = false;
   for (var i = 0; i < states.length; i++) {
     if (asString(states[i] && states[i].roundId) === rid) {
       liveState = asString(states[i].state);
+      identityOk = states[i].stationIdentityOk !== false;
       break;
     }
   }
-  if (liveState !== 'live') return '';
+  if (liveState !== 'live' || !identityOk) return '';
+  var roundIndex = resolveOriginalSeriesRoundIndex(series, rid);
+  if (!roundIndex) return '';
   var labels = seriesRoundDisplayLabels.buildSeriesRoundDisplayLabels(series, states);
-  var label = labels && labels[rid] ? asString(labels[rid]) : '';
-  if (!isRxDisplayLabel(label)) return '';
-  return label;
+  var fromLabel = labels && labels[rid] ? asString(labels[rid]) : '';
+  if (isRxDisplayLabel(fromLabel)) return fromLabel;
+  return 'R' + roundIndex;
 }
 
 /**
@@ -124,27 +206,38 @@ function formatChineseRoundTitle(roundIndex) {
   return '第' + n + '轮';
 }
 
+var TRAILING_PLAZA_RX_SUFFIX = /(?:[（(]R\d+[）)]| · R\d+)\s*$/;
+
+/** 只剥字符串末尾明确系统轮次尾缀，不改正文中间的 R1。 */
+function stripTrailingPlazaLiveSuffixes(text) {
+  var s = sanitizeTitleSub(text);
+  var next;
+  while (TRAILING_PLAZA_RX_SUFFIX.test(s)) {
+    next = s.replace(TRAILING_PLAZA_RX_SUFFIX, '');
+    next = sanitizeTitleSub(next);
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
 /**
- * 有原副标题时末尾追加全角（Rx）；空原串不造孤立括号。
+ * 有原副标题时末尾追加「 · Rx」；空原串不造孤立圆点。
  */
 function appendPlazaLiveRoundSubtitle(baseTitleSub, liveLabel) {
-  var base = sanitizeTitleSub(baseTitleSub);
+  var base = stripTrailingPlazaLiveSuffixes(baseTitleSub);
   var label = asString(liveLabel);
   if (!base) return '';
   if (!isRxDisplayLabel(label)) return base;
-  var suffix = '（' + label + '）';
-  if (base.length >= suffix.length && base.slice(-suffix.length) === suffix) {
-    return base;
-  }
-  return base + suffix;
+  return base + ' · ' + label;
 }
 
-function resolvePlazaLiveRoundInfo(series, getMatchById) {
-  var label = resolvePlazaLiveRoundLabel(series, getMatchById);
+function resolvePlazaLiveRoundInfo(series, getMatchByIdOrOptions) {
+  var label = resolvePlazaLiveRoundLabel(series, getMatchByIdOrOptions);
   if (!label) {
     return { label: '', roundId: '', roundIndex: 0 };
   }
-  var states = buildPlazaRoundStates(series, getMatchById);
+  var states = buildPlazaRoundStates(series, getMatchByIdOrOptions);
   var rid = seriesLiveRoundSelect.resolveDefaultTargetRoundId(states);
   return {
     label: label,
@@ -153,12 +246,27 @@ function resolvePlazaLiveRoundInfo(series, getMatchById) {
   };
 }
 
-function projectPlazaSeriesTitleSub(series, getMatchById) {
-  var base = sanitizeTitleSub(series && series.seriesSubtitle);
-  var info = resolvePlazaLiveRoundInfo(series, getMatchById);
+function projectPlazaSeriesTitleSub(series, getMatchByIdOrOptions) {
+  var base = readUserPlazaSubtitle(series);
+  var info = resolvePlazaLiveRoundInfo(series, getMatchByIdOrOptions);
   if (!info.label) return base;
   if (base) return appendPlazaLiveRoundSubtitle(base, info.label);
   return formatChineseRoundTitle(info.roundIndex);
+}
+
+/**
+ * 广场卡片副标题权威入口。
+ * 仅 context === standings/plaza 且存在真实 LIVE 时，给用户副标题追加 · Rx。
+ * 无用户副标题时返回 ''，由 adapter 沿用各类型既有系统副标题。
+ */
+function buildPlazaSeriesSubtitle(series, options) {
+  var opts = resolvePlazaDeps(options);
+  var userSub = readUserPlazaSubtitle(series);
+  if (!userSub) return '';
+  if (!isPlazaSubtitleContext(opts)) return userSub;
+  var liveLabel = resolvePlazaLiveRoundLabel(series, opts);
+  if (!liveLabel) return userSub;
+  return appendPlazaLiveRoundSubtitle(userSub, liveLabel);
 }
 
 module.exports = {
@@ -166,6 +274,8 @@ module.exports = {
   resolvePlazaLiveRoundLabel: resolvePlazaLiveRoundLabel,
   resolveOriginalSeriesRoundIndex: resolveOriginalSeriesRoundIndex,
   formatChineseRoundTitle: formatChineseRoundTitle,
+  stripTrailingPlazaLiveSuffixes: stripTrailingPlazaLiveSuffixes,
   appendPlazaLiveRoundSubtitle: appendPlazaLiveRoundSubtitle,
-  projectPlazaSeriesTitleSub: projectPlazaSeriesTitleSub
+  projectPlazaSeriesTitleSub: projectPlazaSeriesTitleSub,
+  buildPlazaSeriesSubtitle: buildPlazaSeriesSubtitle
 };

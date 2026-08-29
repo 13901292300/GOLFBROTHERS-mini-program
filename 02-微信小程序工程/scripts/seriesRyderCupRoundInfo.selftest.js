@@ -32,7 +32,7 @@ var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 
 var pageWxml = fs.readFileSync(path.join(seriesDir, 'index.wxml'), 'utf8');
 var dockWxml = fs.readFileSync(
-  path.join(root, 'miniprogram', 'components', 'series-round-selector-dock', 'index.wxml'),
+  path.join(root, 'miniprogram', 'subpackages', 'tournament', 'components', 'series-round-selector-dock', 'index.wxml'),
   'utf8'
 );
 

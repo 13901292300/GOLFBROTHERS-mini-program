@@ -125,6 +125,50 @@ const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
 const FAB_EDGE_GAP_RPX = 10;
 
+function isPositiveFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/** Hub FAB 窗口尺寸：优先 getWindowInfo，按字段回退 getSystemInfoSync */
+function readHubFabWindowSize() {
+  let width;
+  let height;
+  let modernComplete = false;
+  try {
+    if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
+      const info = wx.getWindowInfo();
+      if (info) {
+        if (isPositiveFiniteNumber(info.windowWidth)) width = info.windowWidth;
+        if (isPositiveFiniteNumber(info.windowHeight)) height = info.windowHeight;
+      }
+      modernComplete = isPositiveFiniteNumber(width) && isPositiveFiniteNumber(height);
+    }
+  } catch (err) {
+    modernComplete = false;
+  }
+  if (!modernComplete) {
+    try {
+      if (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function') {
+        const sys = wx.getSystemInfoSync();
+        if (sys) {
+          if (!isPositiveFiniteNumber(width) && isPositiveFiniteNumber(sys.windowWidth)) {
+            width = sys.windowWidth;
+          }
+          if (!isPositiveFiniteNumber(height) && isPositiveFiniteNumber(sys.windowHeight)) {
+            height = sys.windowHeight;
+          }
+        }
+      }
+    } catch (err2) {
+      /* 保持已有有效字段 / 默认值 */
+    }
+  }
+  return {
+    windowWidth: isPositiveFiniteNumber(width) ? width : 375,
+    windowHeight: isPositiveFiniteNumber(height) ? height : 667
+  };
+}
+
 function isFilled(s) {
   return s !== null && s !== undefined && s !== '';
 }
@@ -491,7 +535,11 @@ Page({
 
   _initMoreFab() {
     let sys = { windowWidth: 375, windowHeight: 667 };
-    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    try {
+      sys = readHubFabWindowSize() || sys;
+    } catch (e) {
+      sys = { windowWidth: 375, windowHeight: 667 };
+    }
     this._fabWindowH = sys.windowHeight || 667;
     this._rpx2px = (sys.windowWidth || 375) / 750;
     this._fabSizePx = FAB_SIZE_RPX * this._rpx2px;
@@ -600,7 +648,8 @@ Page({
       courseId: game.courseId,
       courseName: game.courseName,
       front9Course: game.front9Course,
-      back9Course: game.back9Course
+      back9Course: game.back9Course,
+      courseHalfText: game.courseHalfText
     });
     holeLayout.applyLayout(layout);
   },
@@ -939,7 +988,7 @@ Page({
         return;
       }
       wx.navigateTo({
-        url: '/subpackages/tournament/pages/stats/index?gameId=' + encodeURIComponent(gameId),
+        url: '/subpackages/tournament-tools/pages/stats/index?gameId=' + encodeURIComponent(gameId),
         fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
       });
       return;

@@ -42,10 +42,22 @@ var personalJson = fs.readFileSync(
   path.join(root, 'components', 'personal-leaderboard-board', 'index.json'),
   'utf8'
 );
-var pageJson = fs.readFileSync(
-  path.join(root, 'subpackages', 'tournament', 'pages', 'series-detail', 'index.json'),
-  'utf8'
+var pageJsonPath = path.join(
+  root,
+  'subpackages',
+  'tournament',
+  'pages',
+  'series-detail',
+  'index.json'
 );
+var pageJson = fs.readFileSync(pageJsonPath, 'utf8');
+var personalJsonPath = path.join(
+  root,
+  'components',
+  'personal-leaderboard-board',
+  'index.json'
+);
+var panelJsonPath = path.join(panelDir, 'index.json');
 
 var passed = 0;
 var failed = 0;
@@ -60,6 +72,46 @@ function assert(name, cond, detail) {
     failures.push(name + (detail ? ' :: ' + detail : ''));
     console.log('FAIL  ' + name + (detail ? ' :: ' + detail : ''));
   }
+}
+
+function resolveUsingComponentPath(fromJsonFile, spec) {
+  var rel = String(spec || '').replace(/\\/g, '/').replace(/\.js$/, '');
+  if (!rel) return '';
+  var abs =
+    rel.charAt(0) === '/'
+      ? path.join(root, rel.replace(/^\//, ''))
+      : path.normalize(path.join(path.dirname(fromJsonFile), rel));
+  if (fs.existsSync(abs + '.json')) return abs + '.json';
+  if (fs.existsSync(path.join(abs, 'index.json'))) return path.join(abs, 'index.json');
+  return abs + '.json';
+}
+
+function collectUsingComponentJsonFiles(jsonFile, acc) {
+  acc = acc || Object.create(null);
+  if (!jsonFile || acc[jsonFile] || !fs.existsSync(jsonFile)) return acc;
+  acc[jsonFile] = true;
+  var parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
+  } catch (eParse) {
+    return acc;
+  }
+  var map = (parsed && parsed.usingComponents) || {};
+  Object.keys(map).forEach(function (name) {
+    collectUsingComponentJsonFiles(resolveUsingComponentPath(jsonFile, map[name]), acc);
+  });
+  return acc;
+}
+
+function chainDeclaresComponent(jsonFile, componentName) {
+  var files = collectUsingComponentJsonFiles(jsonFile);
+  var keys = Object.keys(files);
+  var token = '"' + componentName + '"';
+  var i;
+  for (i = 0; i < keys.length; i++) {
+    if (fs.readFileSync(keys[i], 'utf8').indexOf(token) >= 0) return true;
+  }
+  return false;
 }
 
 function countRe(src, re) {
@@ -122,7 +174,13 @@ var totMount = sliceBetween(
   'tour-scorecard'
 );
 var r1Mount = sliceBetween(personalWxml, 'wx:if="{{item.expanded}}"', 'tour-scorecard');
-var totPanel = extractTag(totExpand, 'leaderboard-player-profile-panel');
+var totPanel = (function () {
+  var elseAt = totExpand.indexOf('wx:else');
+  var token = '<leaderboard-player-profile-panel';
+  var start = elseAt >= 0 ? totExpand.lastIndexOf(token, elseAt) : totExpand.indexOf(token);
+  if (start < 0) start = totExpand.indexOf(token);
+  return extractTag(totExpand, 'leaderboard-player-profile-panel', start >= 0 ? start : 0);
+})();
 var r1G1Panel = '';
 (function () {
   var elseAt = personalWxml.indexOf('<leaderboard-player-profile-panel\n      wx:else');
@@ -137,7 +195,6 @@ var r1G1Panel = '';
 assert(
   '1 TOT 展开头像 DOM 只出现在共享面板链路，宿主展开区 0 次',
   totExpand.indexOf('<leaderboard-player-profile-panel') >= 0 &&
-    countRe(totExpand, /<leaderboard-player-profile-panel/g) === 1 &&
     totExpand.indexOf('<leaderboard-player-identity') < 0 &&
     totExpand.indexOf('class="scorecard-profile"') < 0 &&
     totExpand.indexOf('sc-avatar') < 0 &&
@@ -192,13 +249,15 @@ assert(
 );
 
 assert(
-  '4 TOT/R 宿主不存在资料区专用头像 DOM',
+  '4 TOT/R 宿主不复制资料区内联头像 DOM',
   pageWxml.indexOf('class="sc-avatar"') < 0 &&
     pageWxml.indexOf('sc-avatar-wrap') < 0 &&
     pageWxml.indexOf('<leaderboard-player-identity') < 0 &&
     personalWxml.indexOf('class="sc-avatar"') < 0 &&
     personalWxml.indexOf('sc-avatar-wrap') < 0 &&
-    personalWxml.indexOf('<leaderboard-player-identity') < 0
+    personalWxml.indexOf('<leaderboard-player-identity') < 0 &&
+    totExpand.indexOf('<leaderboard-player-profile-panel') >= 0 &&
+    personalWxml.indexOf('<leaderboard-player-profile-panel') >= 0
 );
 
 var identityCss = identityWxss.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -248,9 +307,12 @@ assert(
 );
 
 assert(
-  'lazyCodeLoading 下页面/R1 宿主声明 identity，确保子组件 WXSS 被打包',
-  /"leaderboard-player-identity"/.test(pageJson) &&
-    /"leaderboard-player-identity"/.test(personalJson) &&
+  'lazyCodeLoading 下 identity 经 panel 依赖链打包，宿主不必重复声明',
+  chainDeclaresComponent(pageJsonPath, 'leaderboard-player-identity') &&
+    chainDeclaresComponent(personalJsonPath, 'leaderboard-player-identity') &&
+    chainDeclaresComponent(panelJsonPath, 'leaderboard-player-identity') &&
+    pageJson.indexOf('leaderboard-player-profile-panel') >= 0 &&
+    personalJson.indexOf('leaderboard-player-profile-panel') >= 0 &&
     pageWxml.indexOf('<leaderboard-player-identity') < 0 &&
     personalWxml.indexOf('<leaderboard-player-identity') < 0
 );

@@ -266,7 +266,7 @@ var roundStates = [
     '6 未开赛/等待成绩不写逐洞标题；仅 scorecard 态拼 occurrence 标题',
     openBody.indexOf("panel.state === 'scorecard'") >= 0 &&
       openBody.indexOf('buildTotOccurrenceScorecardTitle') >= 0 &&
-      openBody.indexOf('CUMULATIVE_KEY') >= 0 &&
+    openBody.indexOf('isCumulativeStandingsKey') >= 0 &&
       /if \(panel\.state === 'scorecard'\) \{[\s\S]*buildTotOccurrenceScorecardTitle/.test(openBody)
   );
   assert(
@@ -276,7 +276,7 @@ var roundStates = [
   );
   assert(
     'R 单轮榜不走 TOT 标题前缀',
-    openBody.indexOf('selectorKey === standingsViewModel.CUMULATIVE_KEY') >= 0
+    openBody.indexOf('isCumulativeStandingsKey(selectorKey)') >= 0
   );
 })();
 

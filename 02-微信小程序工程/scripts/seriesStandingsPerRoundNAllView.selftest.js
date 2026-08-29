@@ -7,18 +7,19 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var utilsDir = path.join(mini, 'utils');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 
-var liveLeaderboardBoard = require(path.join(utilsDir, 'liveLeaderboardBoard.js'));
+var liveLeaderboardBoard = require(seriesTestPaths.util('liveLeaderboardBoard.js'));
 var personalLeaderboardBoard = require(path.join(utilsDir, 'personalLeaderboardBoard.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 var liveAdapter = require(path.join(seriesDir, 'seriesLiveLeaderboardAdapter.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
-var seriesStandingsAssembler = require(path.join(utilsDir, 'seriesStandingsAssembler.js'));
+var seriesStandingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 
 var pageJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(seriesDir, 'index.wxml'), 'utf8');
@@ -460,7 +461,7 @@ assert(
 
 assert(
   'global_m TOT 路径仍独立且在 per_round_n 分支之后',
-  /if \(vm\.mode === 'per_round_n'\) \{[\s\S]*?if \(selectedKey === standingsViewModel\.CUMULATIVE_KEY\) \{[\s\S]*?projectSeriesStandingsTeamBoard/.test(
+  /if \(standingsViewModel\.isCumulativeStandingsKey\(selectedKey\)\) \{[\s\S]*?if \(vm\.mode === 'per_round_n'\) \{[\s\S]*?applyPerRoundNStandingsOverlay/.test(
     pageJs
   )
 );

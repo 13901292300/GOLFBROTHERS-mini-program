@@ -705,6 +705,10 @@ function buildStandingsResult(input) {
 
   var rule = series.scoringRule || {};
   var globalM = Math.floor(Number(rule.globalM));
+  var cfgBest = series.scoringConfig && Number(series.scoringConfig.bestOfRounds);
+  if (Number.isFinite(cfgBest) && cfgBest >= 1) {
+    globalM = Math.floor(cfgBest);
+  }
   var allowRepeat = rule.allowRepeat === true;
   var participantIds = collectParticipantIds(series);
 

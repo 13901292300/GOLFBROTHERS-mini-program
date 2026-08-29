@@ -16,7 +16,7 @@ var pageDir = path.join(
   'pages',
   'series-detail'
 );
-var dockDir = path.join(mini, 'components', 'series-round-selector-dock');
+var dockDir = path.join(mini, 'subpackages', 'tournament', 'components', 'series-round-selector-dock');
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 
 var standingsVm = require(path.join(pageDir, 'seriesStandingsViewModel.js'));
@@ -65,7 +65,7 @@ var tapFn = extractFn(pageJs, 'onScheduleRoundTap');
 assert(
   '1 页面注册共享组件',
   pageJson.indexOf('series-round-selector-dock') >= 0 &&
-    pageJson.indexOf('/components/series-round-selector-dock/index') >= 0
+    pageJson.indexOf('/subpackages/tournament/components/series-round-selector-dock/index') >= 0
 );
 
 assert(
@@ -249,7 +249,7 @@ assert(
 );
 
 assert(
-  '12 赛程切轮不重测 dock、不写 filler/sticky/scrollTop',
+  '12 赛程切轮不重测 dock、不在投影 patch 写 filler/sticky/scrollTop',
   rebuildFn.indexOf('measureRoundSelectorTop(') < 0 &&
     rebuildFn.indexOf('measureTabTop(') < 0 &&
     rebuildFn.indexOf('delete patch.scrollTop') >= 0 &&
@@ -258,6 +258,7 @@ assert(
     rebuildFn.indexOf('delete patch.isStickyRoundSelector') >= 0 &&
     rebuildFn.indexOf('delete patch.roundSelectorOffsetTop') >= 0 &&
     rebuildFn.indexOf('scrollTop:') < 0 &&
+    rebuildFn.indexOf('scheduleScheduleContentFillerMeasure') >= 0 &&
     tapFn.indexOf('measureRoundSelectorTop(') < 0 &&
     tapFn.indexOf('_rebuildScheduleProjection') >= 0
 );

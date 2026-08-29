@@ -447,7 +447,7 @@ assert(
     !/buildSeriesRoundBoardViewModel/.test(adapterSrc) &&
     /projectSeriesRnLiveLeaderboard/.test(seriesJs) &&
     /useLiveLeaderboard/.test(seriesWxml) &&
-    /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,800}projectSeriesStandingsTeamBoard/.test(
+    /isCumulativeStandingsKey\(selectedKey\)[\s\S]{0,1200}projectSeriesStandingsTeamBoard/.test(
       seriesJs
     )
 );
@@ -517,7 +517,7 @@ assert(
 
 assert(
   '页面 overlay 不在 TOT 调用共享个人投影；Rn 走 LIVE',
-  /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,900}sharedEmpty/.test(seriesJs) &&
+  /isCumulativeStandingsKey\(selectedKey\)[\s\S]{0,1200}sharedEmpty/.test(seriesJs) &&
     /projectSeriesRnLiveLeaderboard/.test(seriesJs) &&
     /useLiveLeaderboard: false/.test(seriesJs) &&
     !/selection.view === 'team'\) \{[\s\S]{0,400}projectSeriesStandingsPersonalBoard/.test(seriesJs)

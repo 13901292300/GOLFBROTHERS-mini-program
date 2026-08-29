@@ -65,16 +65,48 @@ function applyLayout(layout) {
   return _active;
 }
 
+function isHalfKeyOnCourse(course, key) {
+  if (!key) return false;
+  const halves = halfCourse.buildHalves(course);
+  return halves.some((h) => h.key === key);
+}
+
+/** 缺半场、或记下的 A/B 在该球场不存在时，回退到球场真实前两个 COURSE（如 C/D） */
+function resolveHalfKeys(course, ctx) {
+  const c = ctx || {};
+  let front9 = c.front9Course || null;
+  let back9 = c.back9Course || null;
+  if (!isHalfKeyOnCourse(course, front9) && !isHalfKeyOnCourse(course, back9)) {
+    const parsed = halfCourse.parseCourseHalfText(c.courseHalfText || c.halfText || '');
+    front9 = parsed.front9Course;
+    back9 = parsed.back9Course;
+  }
+  if (!isHalfKeyOnCourse(course, front9) && !isHalfKeyOnCourse(course, back9)) {
+    const name = String((c.courseName || (course && course.courseName) || '')).toUpperCase();
+    const m = name.match(/([A-Z])\s*[&＆／/]\s*([A-Z])/);
+    if (m) {
+      front9 = m[1];
+      back9 = m[2];
+    }
+  }
+  const halves = halfCourse.buildHalves(course);
+  if (!isHalfKeyOnCourse(course, front9)) {
+    front9 = halves[0] ? halves[0].key : null;
+  }
+  if (!isHalfKeyOnCourse(course, back9)) {
+    back9 = halves[1] ? halves[1].key : front9;
+  }
+  return { front9: front9, back9: back9 };
+}
+
 function resolveLayoutFromContext(ctx) {
   const c = ctx || {};
   const course =
     halfCourse.resolveHalfCourseRecord(c.courseId, c.courseName) || null;
-  const front9 = c.front9Course || null;
-  const back9 = c.back9Course || null;
-  if (course && (front9 || back9)) {
-    return buildHoleLayout(course, front9, back9);
-  }
-  return createDefaultLayout();
+  if (!course) return createDefaultLayout();
+  const keys = resolveHalfKeys(course, c);
+  if (!keys.front9 && !keys.back9) return createDefaultLayout();
+  return buildHoleLayout(course, keys.front9, keys.back9);
 }
 
 module.exports = {

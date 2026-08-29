@@ -346,6 +346,73 @@ assert('选择身份是 roundId', (function () {
   return view.roundSelectorItems[0].key === 'r1' && view.roundSelectorItems[1].key === 'r2';
 })());
 
+assert('MATCHES COMPLETE 全系列汇总且切轮不变', (function () {
+  var r1Match = g5Match({
+    matchId: 'm1',
+    scores: emptyScores(),
+    g2: 'g2',
+    scores2: emptyScores(),
+    seriesContext: { seriesId: 's1', roundId: 'r1', matchId: 'm1' }
+  });
+  r1Match.groups[0].status = 'finished';
+  r1Match.groups[1].status = 'ongoing';
+  var r2Match = g5Match({
+    matchId: 'm2',
+    g1: 'g-r2-1',
+    scores: emptyScores(),
+    g2: 'g2b',
+    scores2: emptyScores(),
+    seriesContext: { seriesId: 's1', roundId: 'r2', matchId: 'm2' }
+  });
+  r2Match.groups[0].status = 'completed';
+  r2Match.groups[1].status = 'finished';
+  var fx = seriesFixture({ m1: r1Match, m2: r2Match });
+  var v1 = adapter.buildRyderCupStandingsView({
+    series: fx.series,
+    selectedKey: 'r1',
+    roundStates: roundStates,
+    userPicked: true,
+    visited: true,
+    deps: fx.deps
+  });
+  var v2 = adapter.buildRyderCupStandingsView({
+    series: fx.series,
+    selectedKey: 'r2',
+    roundStates: roundStates,
+    userPicked: true,
+    visited: true,
+    deps: fx.deps
+  });
+  var b1 = v1.matchPlayScoreboard;
+  var b2 = v2.matchPlayScoreboard;
+  return (
+    b1.totalMatches === 4 &&
+    b1.completedMatches === 3 &&
+    b1.matchesCompleteText === '3/4 MATCHES COMPLETE' &&
+    b2.totalMatches === b1.totalMatches &&
+    b2.completedMatches === b1.completedMatches &&
+    b2.matchesCompleteText === b1.matchesCompleteText
+  );
+})());
+
+assert('MATCHES COMPLETE 无数据为 -/-', (function () {
+  var fx = seriesFixture({});
+  var view = adapter.buildRyderCupStandingsView({
+    series: fx.series,
+    selectedKey: 'r1',
+    roundStates: roundStates,
+    userPicked: true,
+    visited: true,
+    deps: fx.deps
+  });
+  var board = view.matchPlayScoreboard;
+  return (
+    board.totalMatches === 0 &&
+    board.completedMatches === 0 &&
+    board.matchesCompleteText === '-/-'
+  );
+})());
+
 if (failed) {
   console.log('\nFAILED ' + failed);
   failures.forEach(function (f) {

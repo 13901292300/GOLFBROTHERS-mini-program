@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var createPageDir = path.join(
@@ -19,7 +20,7 @@ var createPageDir = path.join(
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var seriesParticipantsUpdate = require(path.join(utilsDir, 'seriesParticipantsUpdate.js'));
+var seriesParticipantsUpdate = require(seriesTestPaths.util('seriesParticipantsUpdate.js'));
 
 var passed = 0;
 var failed = 0;
@@ -509,7 +510,7 @@ function createHarness(opts) {
 })();
 
 (function testNoPublishPlanInModule() {
-  var src = fs.readFileSync(path.join(utilsDir, 'seriesParticipantsUpdate.js'), 'utf8');
+  var src = fs.readFileSync(seriesTestPaths.util('seriesParticipantsUpdate.js'), 'utf8');
   assert(
     '编排不调用 publish/plan',
     src.indexOf('publishSeries') < 0 &&

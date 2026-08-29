@@ -135,12 +135,148 @@ assert(
     pageWxml.indexOf('+N') < 0
 );
 
+function rpxToPx(rpx, screenPx) {
+  return (Number(rpx) / 750) * screenPx;
+}
+
+function heroLogoContentWidth(screenPx) {
+  return screenPx - rpxToPx(48 * 2 + 32 * 2 + 84 + 24, screenPx);
+}
+
+function layoutAtScreen(count, screenPx) {
+  return layout(count, heroLogoContentWidth(screenPx), rpxToPx(56, screenPx), rpxToPx(12, screenPx));
+}
+
+function matrixSafe(count, screenPx) {
+  var box = heroLogoContentWidth(screenPx);
+  var size = rpxToPx(56, screenPx);
+  var laid = layoutAtScreen(count, screenPx);
+  if (count === 0) return laid.items.length === 0 && laid.groupWidth === 0;
+  if (laid.items[0].left !== 0) return false;
+  var last = laid.items[count - 1];
+  if (last.left < 0) return false;
+  if (last.left + size - box > 1e-6) return false;
+  if (laid.mode === 'normal' && laid.groupWidth - box > 1e-6) return false;
+  for (var i = 1; i < count; i++) {
+    if (laid.items[i].left < laid.items[i - 1].left) return false;
+  }
+  return true;
+}
+
+var m375_5 = layoutAtScreen(5, 375);
+var m375_10 = layoutAtScreen(10, 375);
+var m430_20 = layoutAtScreen(20, 430);
+assert(
+  '375/430 宽 × 0/1/5/10/20 支队：首项靠左、末项不越界、顺序不反转',
+  matrixSafe(0, 375) &&
+    matrixSafe(1, 375) &&
+    matrixSafe(5, 375) &&
+    matrixSafe(10, 375) &&
+    matrixSafe(20, 375) &&
+    matrixSafe(5, 430) &&
+    matrixSafe(10, 430) &&
+    matrixSafe(20, 430) &&
+    m375_5.mode === 'normal' &&
+    m375_10.mode === 'collapsed' &&
+    m375_10.step < rpxToPx(56, 375) &&
+    m430_20.mode === 'collapsed' &&
+    Math.abs(m430_20.items[19].left + rpxToPx(56, 430) - heroLogoContentWidth(430)) < 1e-6 &&
+    !/row-reverse/.test(pageWxss) &&
+    !/row-reverse/.test(pageWxml)
+);
+
+var divisionHero = viewModel.buildHeroView(
+  {
+    hostMode: 'team',
+    templateId: 'division_series',
+    hostTeam: { teamLogo: 'https://host.example/logo.png', teamName: '主办队' },
+    participants: [
+      {
+        kind: 'division',
+        seriesParticipantId: 'd1',
+        nameSnapshot: '红队',
+        colorSnapshot: '#e11'
+      },
+      {
+        kind: 'division',
+        seriesParticipantId: 'd2',
+        nameSnapshot: '蓝队',
+        colorSnapshot: '#11e'
+      }
+    ]
+  },
+  { ok: true, lifecycleLabel: '已发布', lifecycleStatus: 'published', isDraftPreview: false }
+);
+var twoTeamHero = viewModel.buildHeroView(
+  {
+    hostMode: 'organization',
+    organization: { organizationName: '机构' },
+    participants: [
+      { kind: 'team', seriesParticipantId: 'a', nameSnapshot: 'A', logoSnapshot: 'a.png' },
+      { kind: 'team', seriesParticipantId: 'b', nameSnapshot: 'B', logoSnapshot: 'b.png' }
+    ]
+  },
+  { ok: true, lifecycleLabel: '已发布', lifecycleStatus: 'published', isDraftPreview: false }
+);
+assert(
+  '分队色块不吃主办 Logo；两队顺序与 participants 一致',
+  divisionHero.participantDisplay.mode === 'team_logos' &&
+    divisionHero.participantDisplay.teamItems.length === 2 &&
+    divisionHero.participantDisplay.teamItems[0].logo === '' &&
+    divisionHero.participantDisplay.teamItems[1].logo === '' &&
+    divisionHero.participantDisplay.teamItems[0].color === '#e11' &&
+    twoTeamHero.participantDisplay.teamItems.length === 2 &&
+    twoTeamHero.participantDisplay.teamItems[0].participantId === 'a' &&
+    twoTeamHero.participantDisplay.teamItems[1].participantId === 'b'
+);
+
+assert(
+  'Hero 分队项去边框；真实球队 Logo 保留分隔边框；bright/dark 填充圆同径',
+  /border:\s*1\.5px solid var\(--bg-card\)/.test(
+    extractRule(pageWxss, '.hero-logo-stack__item')
+  ) &&
+    /border:\s*0/.test(extractRule(pageWxss, '.hero-logo-stack__item--division')) &&
+    /border:\s*0/.test(extractRule(pageWxss, '.detail-page.dark-mode .hero-logo-stack__item--division')) &&
+    /border:\s*none/.test(extractRule(pageWxss, '.participant-row__logo')) &&
+    /width:\s*100%/.test(extractRule(pageWxss, '.series-division-logo-mark')) &&
+    /height:\s*100%/.test(extractRule(pageWxss, '.series-division-logo-mark')) &&
+    pageJs.indexOf('HERO_LOGO_SIZE_RPX = 56') >= 0 &&
+    !/transform:\s*scale/.test(pageWxss)
+);
+
+var internalPlainHero = viewModel.buildHeroParticipantDisplay({
+  hostMode: 'team',
+  templateId: 'individual_tour',
+  participants: [
+    { kind: 'division', seriesParticipantId: 'd1', nameSnapshot: '红队', colorSnapshot: '#e11' },
+    { kind: 'division', seriesParticipantId: 'd2', nameSnapshot: '蓝队', colorSnapshot: '#11e' }
+  ]
+});
+assert(
+  '非 division_series 的队内 Series 不被强制改成 Logo 栈',
+  internalPlainHero.mode === 'division_tags' &&
+    internalPlainHero.teamItems.length === 0 &&
+    internalPlainHero.divisionItems.length === 2
+);
+
+assert(
+  '2/5/10/20 个分队 Logo 栈不溢出且顺序不反转',
+  matrixSafe(2, 375) &&
+    matrixSafe(2, 430) &&
+    matrixSafe(5, 375) &&
+    matrixSafe(10, 375) &&
+    matrixSafe(20, 375) &&
+    matrixSafe(20, 430)
+);
+
 assert(
   'Hero 其他区域与普通页不受影响',
   pageWxml.indexOf('series-hero-meta-list') >= 0 &&
     pageWxml.indexOf('series-hero-course-list') >= 0 &&
-    pageWxml.indexOf('class="event-date {{hero.dateRangeSizeClass}}"') >= 0 &&
+    /<text\s+class="event-date[^"]*\{\{hero\.dateRangeSizeClass\}\}/.test(pageWxml) &&
     pageWxml.indexOf('event-title__line--main') >= 0 &&
+    pageWxml.indexOf('leftPx') >= 0 &&
+    pageWxml.indexOf('stackWidthPx') >= 0 &&
     ordinaryWxml.indexOf('hero-logo-stack') < 0 &&
     ordinaryWxss.indexOf('hero-logo-stack') < 0
 );

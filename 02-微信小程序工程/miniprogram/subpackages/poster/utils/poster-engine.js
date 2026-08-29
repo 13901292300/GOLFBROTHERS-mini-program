@@ -2,6 +2,7 @@ const {
   POSTER_WIDTH,
   POSTER_HEIGHT,
   BRAND_HEIGHT,
+  EVENT_BRAND_TITLE,
   TEMPLATES,
   FONT_OPTIONS,
   normalizeFontId,
@@ -368,38 +369,51 @@ function drawAtmosphere(ctx, template) {
 function drawBrand(ctx, model) {
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, POSTER_WIDTH, BRAND_HEIGHT);
-  ctx.save();
-  ctx.translate(54, 18);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, -3, 5, 40);
-  ctx.fillStyle = "#c9a13d";
-  ctx.beginPath();
-  ctx.moveTo(7, -1);
-  ctx.lineTo(48, 11);
-  ctx.lineTo(7, 23);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
 
-  const brand = String(model.identity.brand || "GOLFBROTHERS").toUpperCase();
-  const split = brand.indexOf("GOLF") === 0 ? 4 : Math.max(3, Math.floor(brand.length * 0.45));
-  const first = brand.slice(0, split);
-  const second = brand.slice(split);
+  const logo = model && model.brandLogo;
+  let textX = 120;
+  if (logo) {
+    const srcW = Number(logo.width || logo.naturalWidth) || 1;
+    const srcH = Number(logo.height || logo.naturalHeight) || 1;
+    const logoH = 58;
+    const logoW = Math.max(1, Math.round((logoH * srcW) / srcH));
+    const logoY = (BRAND_HEIGHT - logoH) / 2;
+    ctx.drawImage(logo, 24, logoY, logoW, logoH);
+    textX = 24 + logoW + 16;
+  } else {
+    ctx.save();
+    ctx.translate(54, 18);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, -3, 5, 40);
+    ctx.fillStyle = "#c9a13d";
+    ctx.beginPath();
+    ctx.moveTo(7, -1);
+    ctx.lineTo(48, 11);
+    ctx.lineTo(7, 23);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const title = EVENT_BRAND_TITLE;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  applyCanvasFont(ctx, 'italic 700 37px "PingFang SC"');
+  const maxTextW = POSTER_WIDTH - 48 - textX;
+  let size = 26;
+  applyCanvasFont(ctx, 'italic 700 ' + size + 'px "GOLF_Playfair", "PingFang SC"');
+  while (size > 16 && ctx.measureText(title).width > maxTextW) {
+    size -= 1;
+    applyCanvasFont(ctx, 'italic 700 ' + size + 'px "GOLF_Playfair", "PingFang SC"');
+  }
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(first, 120, 35);
-  const firstWidth = ctx.measureText(first).width;
-  ctx.fillStyle = "#c9a13d";
-  ctx.fillText(second, 120 + firstWidth, 35);
-  const brandEnd = 120 + firstWidth + ctx.measureText(second).width;
-  const lineStart = brandEnd + 32;
+  ctx.fillText(title, textX, BRAND_HEIGHT / 2);
+  const brandEnd = textX + ctx.measureText(title).width;
+  const lineStart = brandEnd + 24;
   const lineEnd = POSTER_WIDTH - 48;
   if (lineEnd - lineStart >= 28) {
     ctx.beginPath();
-    ctx.moveTo(lineStart, 35);
-    ctx.lineTo(lineEnd, 35);
+    ctx.moveTo(lineStart, BRAND_HEIGHT / 2);
+    ctx.lineTo(lineEnd, BRAND_HEIGHT / 2);
     ctx.strokeStyle = "rgba(226,232,236,0.72)";
     ctx.lineWidth = 1.5;
     ctx.stroke();

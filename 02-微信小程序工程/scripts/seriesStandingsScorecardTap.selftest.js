@@ -5,10 +5,11 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..', 'miniprogram', 'utils');
 var teamMatchScorecard = require(path.join(root, 'teamMatchScorecard.js'));
-var seriesStandingsAssembler = require(path.join(root, 'seriesStandingsAssembler.js'));
+var seriesStandingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(
   __dirname,
   '..',
@@ -76,7 +77,7 @@ var commonWxss = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'styles', 'tournament-common.wxss'),
   'utf8'
 );
-var detailWxml = fs.readFileSync(
+var detailJson = fs.readFileSync(
   path.join(
     __dirname,
     '..',
@@ -85,6 +86,17 @@ var detailWxml = fs.readFileSync(
     'tournament',
     'pages',
     'detail',
+    'index.json'
+  ),
+  'utf8'
+);
+var liveWxml = fs.readFileSync(
+  path.join(
+    __dirname,
+    '..',
+    'miniprogram',
+    'components',
+    'live-leaderboard-board',
     'index.wxml'
   ),
   'utf8'
@@ -237,8 +249,9 @@ assert(
 );
 assert(
   'detail 亦使用同组件/同 profile 结构',
-  detailWxml.indexOf('scorecard-profile') >= 0 ||
-    detailWxml.indexOf('leaderboard-player-identity') >= 0
+  detailJson.indexOf('live-leaderboard-board') >= 0 &&
+    liveWxml.indexOf('leaderboard-player-identity') >= 0 &&
+    identityWxml.indexOf('class="scorecard-profile"') >= 0
 );
 
 // 1–3 未开赛可点 + TEEING OFF SOON
@@ -501,6 +514,42 @@ assert(
       playersOf(vm, 'team:red').every(function (p) {
         return p.canOpenScorecard === true && p.roundId === 'r1' && String(p.occurrenceKey).indexOf('r1:') === 0;
       })
+  );
+})();
+
+(function () {
+  assert(
+    'TOT 成绩卡 roundId 来自行 occurrence，不读当前 selector',
+    standingsVm.resolveStandingsScorecardRoundId(
+      { roundId: 'r1', matchId: 'm1', occurrenceKey: 'r1:u-r1' },
+      'total'
+    ) === 'r1' &&
+      standingsVm.resolveStandingsScorecardRoundId(
+        { roundId: 'r2', matchId: 'm2', occurrenceKey: 'r2:u-r1' },
+        'cumulative'
+      ) === 'r2'
+  );
+  assert(
+    'Rx 点击不得打开另一轮 station',
+    standingsVm.resolveStandingsScorecardRoundId({ roundId: 'r1', matchId: 'm1' }, 'r2') ===
+      '' &&
+      standingsVm.resolveStandingsScorecardRoundId({ roundId: 'r2', matchId: 'm2' }, 'r1') ===
+        '' &&
+      standingsVm.resolveStandingsScorecardRoundId({ roundId: 'r1', matchId: 'm1' }, 'r1') ===
+        'r1'
+  );
+  assert(
+    'TOT 行缺 roundId 则 fail closed，不猜轮次',
+    standingsVm.resolveStandingsScorecardRoundId({}, 'total') === '' &&
+      standingsVm.resolveStandingsScorecardRoundId({ matchId: 'm1' }, 'cumulative') === ''
+  );
+  assert(
+    '页面打开成绩卡写入稳定身份链',
+    pageJs.indexOf('resolveStandingsScorecardRoundId') >= 0 &&
+      /_frozenStandingsScorecard = \{[\s\S]*seriesId:[\s\S]*roundId:[\s\S]*matchId:[\s\S]*groupId:/.test(
+        pageJs
+      ) &&
+      pageJs.indexOf('/pages/scorecard/') < 0
   );
 })();
 

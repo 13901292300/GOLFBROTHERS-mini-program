@@ -5,14 +5,9 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
-var expandId = require(path.join(
-  __dirname,
-  '..',
-  'miniprogram',
-  'utils',
-  'seriesStandingsExpandIdentity.js'
-));
+var expandId = require(seriesTestPaths.util('seriesStandingsExpandIdentity.js'));
 var seriesStationMatch = require(path.join(
   __dirname,
   '..',

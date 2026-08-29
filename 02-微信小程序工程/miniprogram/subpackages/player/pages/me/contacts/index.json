@@ -1,0 +1,6 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "follow-action-btn": "/components/follow-action-btn/index"
+  }
+}

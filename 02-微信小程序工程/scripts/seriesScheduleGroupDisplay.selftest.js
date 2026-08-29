@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -27,8 +28,8 @@ var detailDir = path.join(
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var tournamentGroupDraft = require(path.join(utilsDir, 'tournamentGroupDraft.js'));
-var tournamentGroupCardView = require(path.join(utilsDir, 'tournamentGroupCardView.js'));
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
+var tournamentGroupCardView = require(seriesTestPaths.util('tournamentGroupCardView.js'));
 var tPosition = require(path.join(utilsDir, 'tPosition.js'));
 var scheduleVm = require(path.join(pageDir, 'seriesScheduleViewModel.js'));
 

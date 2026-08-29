@@ -2,6 +2,7 @@ const defaultConfig = require("../../../../config");
 const {
   POSTER_WIDTH,
   POSTER_HEIGHT,
+  EVENT_BRAND_LOGO_PATH,
   MAX_STICKERS,
   PALETTES,
   COLOR_OPTIONS,
@@ -467,6 +468,7 @@ Component({
     backActionLabel: COPY.zh.back,
     templates: templateCards("zh"),
     selectedTemplateId: "",
+    themeClass: "bright-mode",
     templatePreviewOpen: false,
     largeEdit: false,
     previewCanvasStyle: "",
@@ -579,9 +581,11 @@ Component({
       this._draftRestoreLock = null;
       this._discardDraft = false;
       this._backdropCache = {};
+      this.applyTheme();
     },
 
     async attached() {
+      this.applyTheme();
       const language = this.properties.initialLanguage === "en" ? "en" : "zh";
       this.posterState.identity.brand = this.properties.brand || "GOLFBROTHERS";
       this._posterReady = true;
@@ -630,12 +634,27 @@ Component({
   },
 
   pageLifetimes: {
+    show() {
+      this.applyTheme();
+    },
     hide() {
       this.saveDraft();
     }
   },
 
   methods: {
+    applyTheme() {
+      let theme = "bright";
+      try {
+        const app = getApp();
+        if (app && typeof app.getTheme === "function") theme = app.getTheme() || "bright";
+      } catch (e) {
+        theme = "bright";
+      }
+      const themeClass = theme === "dark" ? "dark-mode" : "bright-mode";
+      if (this.data.themeClass !== themeClass) this.setData({ themeClass });
+    },
+
     saveDraft() {
       if (this._discardDraft) return false;
       const roundId = String(this.properties.roundId || "").trim();
@@ -1277,7 +1296,7 @@ Component({
         count: 1,
         mediaType: ["image"],
         sourceType: ["album", "camera"],
-        sizeType: ["original", "compressed"],
+        sizeType: ["original"],
         success: (result) => {
           const file = result.tempFiles && result.tempFiles[0];
           const tempFilePath = file && file.tempFilePath;
@@ -1500,20 +1519,53 @@ Component({
       });
     },
 
+    _fileSize(filePath) {
+      const localPath = this._localFilePath(filePath);
+      return new Promise((resolve) => {
+        if (!localPath || typeof wx.getFileInfo !== "function") {
+          resolve(0);
+          return;
+        }
+        wx.getFileInfo({
+          filePath: localPath,
+          success: (res) => resolve(Number(res.size) || 0),
+          fail: () => resolve(0)
+        });
+      });
+    },
+
     async _prepareCloudImageFile(filePath) {
-      const maxBytes = 800 * 1024;
+      // 云函数 / 腾讯云抠图上限 5MB；长边对齐海报 2x 导出（约 2000px），避免 480px 再被拉大发糊
+      const maxBytes = 3.5 * 1024 * 1024;
       const steps = [
-        { quality: 80, maxEdge: 800 },
-        { quality: 60, maxEdge: 600 },
-        { quality: 40, maxEdge: 480 }
+        { quality: 92, maxEdge: 2048 },
+        { quality: 86, maxEdge: 1600 },
+        { quality: 80, maxEdge: 1280 }
       ];
       let currentPath = this._localFilePath(filePath);
       console.log("[poster] 开始压缩上传文件:", currentPath);
+      const firstSize = await this._fileSize(currentPath);
+      if (firstSize > 0 && firstSize <= maxBytes) {
+        const keepOriginal = await new Promise((resolve) => {
+          wx.getImageInfo({
+            src: currentPath,
+            success: (info) => {
+              const longEdge = Math.max(Number(info.width) || 0, Number(info.height) || 0);
+              resolve(longEdge > 0 && longEdge <= 2048);
+            },
+            fail: () => resolve(false)
+          });
+        });
+        if (keepOriginal) {
+          console.log("[poster] 原图已满足上传尺寸，跳过压缩", firstSize);
+          return currentPath;
+        }
+      }
       for (let i = 0; i < steps.length; i += 1) {
         currentPath = await this._compressImage(currentPath, steps[i].quality, steps[i].maxEdge);
-        const imageBase64 = await this._readFileBase64(currentPath);
-        console.log("[poster] 压缩后 Base64 长度:", imageBase64 && imageBase64.length, steps[i]);
-        if (imageBase64 && imageBase64.length <= maxBytes) return currentPath;
+        const size = await this._fileSize(currentPath);
+        console.log("[poster] 压缩后文件大小:", size, steps[i]);
+        if (size > 0 && size <= maxBytes) return currentPath;
       }
       const error = new Error("图片太大，请选择较小的图片");
       error.code = "IMAGE_TOO_LARGE";
@@ -2394,8 +2446,8 @@ Component({
           y: 0,
           width: POSTER_WIDTH,
           height: POSTER_HEIGHT,
-          destWidth: POSTER_WIDTH,
-          destHeight: POSTER_HEIGHT,
+          destWidth: POSTER_WIDTH * 2,
+          destHeight: POSTER_HEIGHT * 2,
           fileType: "png",
           quality: 1,
           success: (result) => resolve(result.tempFilePath),
@@ -2816,6 +2868,7 @@ Component({
           this.posterCanvas.width = POSTER_WIDTH;
           this.posterCanvas.height = POSTER_HEIGHT;
           this.posterContext = this.posterCanvas.getContext("2d");
+          return this._ensureBrandLogo();
         }));
       }
       return Promise.all(tasks);
@@ -2837,6 +2890,14 @@ Component({
             sample.backdrop = await this._loadCanvasImage(spec.path);
           } catch (error) {
             console.warn("[golf-poster] template backdrop missing", error);
+          }
+        }
+        sample.brandLogo = this._brandLogoImage || null;
+        if (!sample.brandLogo) {
+          try {
+            sample.brandLogo = await this._ensureBrandLogo();
+          } catch (error) {
+            console.warn("[golf-poster] template brand logo missing", error);
           }
         }
         renderPoster(this.templateContext, sample, { showGuide: false });
@@ -2880,6 +2941,47 @@ Component({
         this.posterState.subjectShadow = null;
         this.posterState.subjectContact = null;
       }
+    },
+
+    _punchBrandLogoWhite(image) {
+      try {
+        const w = Number(image.width || image.naturalWidth) || 0;
+        const h = Number(image.height || image.naturalHeight) || 0;
+        if (!w || !h || typeof wx.createOffscreenCanvas !== "function") return image;
+        const off = wx.createOffscreenCanvas({ type: "2d", width: w, height: h });
+        const ctx = off.getContext("2d");
+        if (!ctx) return image;
+        ctx.drawImage(image, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i] > 248 && d[i + 1] > 248 && d[i + 2] > 248) d[i + 3] = 0;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return off;
+      } catch (error) {
+        console.warn("[golf-poster] punch brand logo white failed", error);
+        return image;
+      }
+    },
+
+    _ensureBrandLogo() {
+      if (this._brandLogoImage) return Promise.resolve(this._brandLogoImage);
+      if (this._brandLogoPromise) return this._brandLogoPromise;
+      this._brandLogoPromise = this._loadCanvasImage(EVENT_BRAND_LOGO_PATH)
+        .then((img) => this._punchBrandLogoWhite(img))
+        .then((img) => {
+          this._brandLogoImage = img;
+          if (this.posterState) this.posterState.brandLogo = img;
+          this._render();
+          return img;
+        })
+        .catch((error) => {
+          console.warn("[golf-poster] brand logo missing", error);
+          this._brandLogoPromise = null;
+          return null;
+        });
+      return this._brandLogoPromise;
     },
 
     _loadCanvasImage(filePath) {
@@ -2931,6 +3033,7 @@ Component({
 
     _renderNow(exporting) {
       if (!this.posterContext) return;
+      if (this.posterState) this.posterState.brandLogo = this._brandLogoImage || this.posterState.brandLogo || null;
       this.sceneBounds = renderPoster(this.posterContext, this.posterState, {
         showGuide: !exporting && this.data.step > 0 && this.data.step < 6,
         guideTarget: this._guideTarget()

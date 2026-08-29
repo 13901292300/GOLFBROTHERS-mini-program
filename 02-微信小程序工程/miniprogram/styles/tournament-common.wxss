@@ -165,7 +165,7 @@ page {
   line-height: 1.2;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   margin-bottom: 8rpx;
 }
 .register-sheet__title {
@@ -536,8 +536,8 @@ page {
 .sc-avatar { width: 160rpx; height: 160rpx; border-radius: 999rpx; border: 1px solid var(--border); }
 .sc-flag { position: absolute; bottom: -8rpx; right: -8rpx; z-index: 1; width: 48rpx; height: 48rpx; border-radius: 999rpx; border: 4rpx solid var(--bg-card); overflow: hidden; background: #fff; }
 .sc-flag image { width: 100%; height: 100%; }
-/* 队内多分队圆形 LOGO 首字符：固定纯白；双类选择器高于队际无图 fallback 的次级灰字 */
-.hero-logo-stack__fallback.series-division-logo-glyph,
+/* 队内多分队圆形 LOGO 首字符：固定纯白；与详情 Hero/列表共享 .series-division-logo-mark */
+.series-division-logo-mark,
 .sc-flag__text {
   color: #FFFFFF;
 }
@@ -1077,7 +1077,7 @@ page {
   text-overflow: ellipsis;
 }
 .temp-admin-row__badge {
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   font-size: 22rpx;
   font-weight: 600;
 }
@@ -1085,7 +1085,7 @@ page {
   color: #d97706;
 }
 .temp-admin-row__badge--approved {
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 .temp-admin-row__expand {
   flex-shrink: 0;
@@ -1317,7 +1317,7 @@ page {
 }
 .caddie-scorer-item__tag {
   margin-top: 2rpx;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   font-size: 20rpx;
   font-weight: 600;
 }
@@ -1367,9 +1367,9 @@ page {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 700;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   background: rgba(0, 174, 239, 0.08);
-  border: 1px dashed var(--data-blue, #00aeef);
+  border: 1px dashed var(--data-blue, #00AEEF);
 }
 .qr-mock-actions__btn--ghost {
   color: var(--text-muted);
@@ -1584,7 +1584,7 @@ page {
   font-weight: 600;
 }
 .player-manage-row__phone.is-callable {
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   text-decoration: underline;
   text-underline-offset: 4rpx;
 }
@@ -1636,7 +1636,7 @@ page {
   border-bottom: none;
 }
 .player-team-pick-item.is-selected .player-team-pick-item__name {
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   font-weight: 800;
 }
 .player-team-pick-item__name {
@@ -1651,7 +1651,7 @@ page {
 }
 .player-team-pick-item__check {
   flex-shrink: 0;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   font-size: 28rpx;
   font-weight: 800;
 }
@@ -1752,8 +1752,8 @@ page {
   border: 1px solid var(--border);
 }
 .payment-filter-tab.is-active {
-  background: var(--data-blue, #00aeef);
-  border-color: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
+  border-color: var(--data-blue, #00AEEF);
   color: #fff;
 }
 .payment-sheet__body {
@@ -1851,7 +1851,7 @@ page {
   background: var(--bg-card);
 }
 .detail-page.dark-mode .payment-filter-tab.is-active {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   color: #fff;
 }
 
@@ -1916,8 +1916,8 @@ page {
   font-weight: 700;
 }
 .tee-sheet-manage-radio.is-active {
-  border-color: var(--data-blue, #00aeef);
-  color: var(--data-blue, #00aeef);
+  border-color: var(--data-blue, #00AEEF);
+  color: var(--data-blue, #00AEEF);
   background: rgba(0, 174, 239, 0.08);
 }
 .tee-sheet-manage-field {
@@ -2021,7 +2021,7 @@ page {
   font-style: italic;
 }
 .badge-live {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   color: #ffffff;
   font-style: italic;
 }

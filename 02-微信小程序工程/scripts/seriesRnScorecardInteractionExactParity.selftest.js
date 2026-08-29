@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -15,9 +16,9 @@ var utilsDir = path.join(mini, 'utils');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 
-var liveLeaderboardBoard = require(path.join(utilsDir, 'liveLeaderboardBoard.js'));
+var liveLeaderboardBoard = require(seriesTestPaths.util('liveLeaderboardBoard.js'));
 var liveLeaderboardScorecard = require(path.join(utilsDir, 'liveLeaderboardScorecard.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 var teamMatchScorecard = require(path.join(utilsDir, 'teamMatchScorecard.js'));
 var strokeEntityBuilder = require(path.join(utilsDir, 'strokeEntityBuilder.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));

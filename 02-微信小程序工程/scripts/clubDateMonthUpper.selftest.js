@@ -27,7 +27,7 @@ var detailJsPath = path.join(
   'detail',
   'index.js'
 );
-var createPickerPath = path.join(mini, 'components', 'time-wheel-picker', 'index.js');
+var createPickerPath = path.join(mini, 'subpackages', 'create', 'components', 'time-wheel-picker', 'index.js');
 var roundInfoPath = path.join(seriesDetailDir, 'seriesRoundInfoText.js');
 var scheduleVmPath = path.join(seriesDetailDir, 'seriesScheduleViewModel.js');
 var managePickerPath = path.join(seriesDetailDir, 'seriesManageRoundPicker.js');

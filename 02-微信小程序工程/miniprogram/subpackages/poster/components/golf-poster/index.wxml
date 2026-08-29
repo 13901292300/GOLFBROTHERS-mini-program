@@ -1,4 +1,4 @@
-<view class="poster-shell">
+<view class="poster-shell {{themeClass}}">
   <view hidden="{{step != 0}}" class="template-screen">
     <view class="template-heading">
       <text class="step-kicker">01 / 07</text>

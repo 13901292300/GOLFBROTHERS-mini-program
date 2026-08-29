@@ -25,9 +25,25 @@ const COURSE_DB = [
     ]
   },
   { courseId: 'c-qhw', courseName: '北京清河湾高尔夫乡村俱乐部 A&B', location: '北京 · 昌平', lat: 40.218, lng: 116.231, useCount: 18, lastUsed: '2026-06-21', pinyin: 'beijingqinghewangaoerfuxiangcunjulebu', abbr: 'qhw', halfCourseCount: 2 },
+  {
+    courseId: 'c-honghua',
+    courseName: '北京清河湾乡村高尔夫俱乐部C&D',
+    location: '北京 · 昌平',
+    lat: 40.218,
+    lng: 116.231,
+    useCount: 17,
+    lastUsed: '2026-06-20',
+    pinyin: 'beijingqinghewanxiangcungaoerfujulebucd honghua honghuagaoerfuqiuhui',
+    abbr: 'qhwcd',
+    searchKeys: '红花 红花高尔夫 c&d cd',
+    halfCourseCount: 2,
+    halfCourses: [
+      { code: 'C', name: 'C', holes: 9, par: [4, 4, 4, 4, 4, 3, 5, 4, 5] },
+      { code: 'D', name: 'D', holes: 9, par: [4, 3, 5, 3, 4, 5, 3, 4, 4] }
+    ]
+  },
   { courseId: 'c-huatang', courseName: '华堂高尔夫俱乐部', location: '北京 · 顺义', lat: 40.128, lng: 116.654, useCount: 12, lastUsed: '2026-06-09', pinyin: 'huatanggaoerfujulebu', abbr: 'ht', halfCourseCount: 2 },
   { courseId: 'c-pinevalley', courseName: '北京松山乡村俱乐部', location: '北京 · 延庆', lat: 40.456, lng: 115.974, useCount: 9, lastUsed: '2026-05-30', pinyin: 'beijingsongshanxiangcunjulebu', abbr: 'ss', halfCourseCount: 3 },
-  { courseId: 'c-honghua', courseName: '红花高尔夫球会', location: '北京 · 朝阳', lat: 39.985, lng: 116.512, useCount: 7, lastUsed: '2026-05-18', pinyin: 'honghuagaoerfuqiuhui', abbr: 'hh', halfCourseCount: 2 },
   { courseId: 'c-jiuhua', courseName: '九华山庄高尔夫', location: '北京 · 昌平', lat: 40.176, lng: 116.272, useCount: 6, lastUsed: '2026-05-02', pinyin: 'jiuhuashanzhuanggaoerfu', abbr: 'jhsz', halfCourseCount: 3 },
   { courseId: 'c-laguna', courseName: '北京拉斐特城堡高尔夫', location: '北京 · 昌平', lat: 40.205, lng: 116.118, useCount: 5, lastUsed: '2026-04-21', pinyin: 'beijinglafeitechengbaogaoerfu', abbr: 'lft', halfCourseCount: 4 },
   { courseId: 'c-changping', courseName: '北京高尔夫俱乐部', location: '北京 · 朝阳', lat: 40.012, lng: 116.498, useCount: 4, lastUsed: '2026-04-08', pinyin: 'beijinggaoerfujulebu', abbr: 'bj', halfCourseCount: 2 },

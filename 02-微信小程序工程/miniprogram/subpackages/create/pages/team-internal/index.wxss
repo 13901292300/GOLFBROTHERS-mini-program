@@ -1,5 +1,5 @@
 /* 队内赛创建页样式：公共样式在主包 styles，避免主包 @import 分包路径 */
-@import '/styles/create-team-common.wxss';
+@import '/subpackages/create/styles/create-team-common.wxss';
 
 /* 球队 LOGO 替换角标：复刻队际赛组织机构 LOGO（org-logo-*） */
 .org-logo-wrap {

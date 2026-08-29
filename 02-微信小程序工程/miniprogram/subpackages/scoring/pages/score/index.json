@@ -4,7 +4,7 @@
     "discussion": "/components/discussion/index",
     "half-course-sheet": "/components/half-course-sheet/index",
     "player-source-sheet": "/components/player-source-sheet/index",
-    "caddie-scoring-sheet": "/components/caddie-scoring-sheet/index",
+    "caddie-scoring-sheet": "/subpackages/scoring/components/caddie-scoring-sheet/index",
     "player-action-modal": "/components/player-action-modal/index",
     "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index"
   },

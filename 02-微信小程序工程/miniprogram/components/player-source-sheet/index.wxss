@@ -60,7 +60,7 @@
   line-height: 1.2;
   font-weight: 900;
   letter-spacing: 0.15em;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 
 .pss-title {

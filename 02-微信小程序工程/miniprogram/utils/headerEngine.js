@@ -5,7 +5,8 @@
  * 禁止页面自行计算胶囊位置或写死 padding。
  *
  * 计算依据：
- *   - wx.getSystemInfoSync()              → statusBarHeight / windowWidth
+ *   - wx.getWindowInfo()（缺失/失败时回退 wx.getSystemInfoSync()）
+ *       → statusBarHeight / windowWidth
  *   - wx.getMenuButtonBoundingClientRect() → 系统胶囊 top / height / bottom / left
  *
  * 输出：
@@ -72,37 +73,83 @@ function fallbackResult() {
   };
 }
 
+function hasUsableWindowWidth(info) {
+  if (!info || typeof info !== 'object') return false;
+  var width = info.windowWidth || info.screenWidth;
+  return typeof width === 'number' && width > 0;
+}
+
+function normalizeWindowMetrics(info) {
+  return {
+    statusBarHeight: info.statusBarHeight || FALLBACK_STATUS_BAR,
+    windowWidth: info.windowWidth || info.screenWidth
+  };
+}
+
+function readWindowMetrics() {
+  if (typeof wx.getWindowInfo === 'function') {
+    try {
+      var windowInfo = wx.getWindowInfo();
+      if (hasUsableWindowWidth(windowInfo)) {
+        return normalizeWindowMetrics(windowInfo);
+      }
+    } catch (e) {
+      // 回退 getSystemInfoSync
+    }
+  }
+  if (typeof wx.getSystemInfoSync === 'function') {
+    try {
+      var sys = wx.getSystemInfoSync();
+      if (hasUsableWindowWidth(sys)) {
+        return normalizeWindowMetrics(sys);
+      }
+    } catch (e2) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function readMenuButtonRect() {
+  if (typeof wx.getMenuButtonBoundingClientRect !== 'function') return null;
+  try {
+    var menu = wx.getMenuButtonBoundingClientRect();
+    if (!menu || !menu.top || !menu.height || !menu.bottom) return null;
+    return menu;
+  } catch (e) {
+    return null;
+  }
+}
+
 /**
  * 计算并返回统一的 Header 样式。
  * @returns {{ headerRootStyle: string, headerBarStyle: string, metrics: object }}
  */
 function createHeaderStyle() {
   try {
-    const sys = wx.getSystemInfoSync();
-    const menu = wx.getMenuButtonBoundingClientRect();
-    const statusBarHeight = sys.statusBarHeight || FALLBACK_STATUS_BAR;
+    var menu = readMenuButtonRect();
+    if (!menu) return fallbackResult();
 
-    // 系统胶囊数据缺失时走兜底
-    if (!menu || !menu.top || !menu.height || !menu.bottom) {
-      return fallbackResult();
-    }
+    var win = readWindowMetrics();
+    if (!win) return fallbackResult();
 
-    const capsuleTop = menu.top;
-    const capsuleHeight = menu.height;
-    const capsuleLeft = menu.left;
-    const windowWidth = sys.windowWidth || sys.screenWidth;
+    var statusBarHeight = win.statusBarHeight;
+    var capsuleTop = menu.top;
+    var capsuleHeight = menu.height;
+    var capsuleLeft = menu.left;
+    var windowWidth = win.windowWidth;
 
-    const headerPaddingTop = capsuleTop;
-    const headerContentHeight = Math.max(capsuleHeight, MIN_CONTENT_HEIGHT);
-    const headerTotalHeight = Math.max(
+    var headerPaddingTop = capsuleTop;
+    var headerContentHeight = Math.max(capsuleHeight, MIN_CONTENT_HEIGHT);
+    var headerTotalHeight = Math.max(
       menu.bottom + PADDING_BOTTOM,
       headerPaddingTop + headerContentHeight + PADDING_BOTTOM
     );
-    const headerPaddingRight = Math.max(
+    var headerPaddingRight = Math.max(
       windowWidth - capsuleLeft + 8,
       FALLBACK_PADDING_RIGHT
     );
-    const headerBarMinHeight = headerPaddingTop + headerContentHeight + PADDING_BOTTOM;
+    var headerBarMinHeight = headerPaddingTop + headerContentHeight + PADDING_BOTTOM;
 
     return {
       headerRootStyle: buildRootStyle(headerTotalHeight),

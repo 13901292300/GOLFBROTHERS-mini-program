@@ -27,7 +27,16 @@ var scoreJs = path.join(
   'score',
   'index.js'
 );
-var hubJs = path.join(root, 'miniprogram', 'pages', 'game', 'hub', 'index.js');
+var hubJs = path.join(
+  root,
+  'miniprogram',
+  'subpackages',
+  'scoring',
+  'pages',
+  'hub',
+  'index.js'
+);
+var hubCompatJs = path.join(root, 'miniprogram', 'pages', 'game', 'hub', 'index.js');
 var homeJs = path.join(root, 'miniprogram', 'pages', 'home', 'index.js');
 var appJson = path.join(root, 'miniprogram', 'app.json');
 var seriesDetailJs = path.join(
@@ -124,7 +133,7 @@ var matchState = require(path.join(utilsDir, 'matchState.js'));
   var hubUrl = matchState.buildNormalCreateHubUrl('g-1', 2, true);
   assert(
     'Hub URL 明确传递 fromFlow=normalCreate',
-    hubUrl.indexOf('/pages/game/hub/index?gameId=g-1') === 0 &&
+    hubUrl.indexOf('/subpackages/scoring/pages/hub/index?gameId=g-1') === 0 &&
       hubUrl.indexOf('fromFlow=normalCreate') >= 0 &&
       hubUrl.indexOf('currentGroup=2') >= 0
   );
@@ -204,6 +213,7 @@ var matchState = require(path.join(utilsDir, 'matchState.js'));
 (function testHubBack() {
   var src = read(hubJs);
   var onBack = src.slice(src.indexOf('onBack()'), src.indexOf('onBack()') + 1600);
+  var stub = read(hubCompatJs);
   assert(
     '创建来源 Hub 返回干净首页，不看 pages.length',
     /_fromNormalCreateSuccess[\s\S]*reLaunch[\s\S]*CLEAN_HOME_URL/.test(onBack) &&
@@ -216,12 +226,19 @@ var matchState = require(path.join(utilsDir, 'matchState.js'));
   assert(
     'Hub 来源标记来自 fromFlow 而非栈猜测',
     src.indexOf('isHubOpenedFromNormalCreate') >= 0 &&
-      src.indexOf('_fromNormalCreateSuccess') >= 0
+      src.indexOf('_fromNormalCreateSuccess') >= 0 &&
+      src.indexOf('getCurrentPages().length') < 0
   );
   assert(
     '中间页进记分仍默认 navigateTo（不 replace）',
     src.indexOf("nav: 'enterScorePage/navigateTo'") >= 0 &&
-      src.indexOf('enterScorePage({ replace') < 0
+      src.indexOf('enterScorePage({ replace') < 0 &&
+      /enterScorePage\(\s*\)/.test(src)
+  );
+  assert(
+    '旧主包 Hub 仅转发 query（含 fromFlow）到记分分包',
+    stub.indexOf('/subpackages/scoring/pages/hub/index') >= 0 &&
+      stub.indexOf('queryString(options)') >= 0
   );
 })();
 
@@ -244,15 +261,52 @@ var matchState = require(path.join(utilsDir, 'matchState.js'));
 (function testSeriesUnchanged() {
   var seriesSrc = read(seriesDetailJs);
   var detailSrc = read(tournamentDetailJs);
+  var enterMod = require(path.join(
+    root,
+    'miniprogram',
+    'subpackages',
+    'tournament',
+    'utils',
+    'teamMatchEnterGroupScore.js'
+  ));
+  var enterCalls = [];
+  var match = {
+    matchId: 'm-route',
+    gameMode: '个人比杆赛',
+    groups: [
+      {
+        groupId: 'g1',
+        players: [{ userId: 'u1', playerId: 'u1', name: '甲' }]
+      }
+    ]
+  };
+  enterMod.enterViewerGroupScore(match, 'u1', {
+    groupsStore: {
+      ensureInitialized: function () {},
+      getGroups: function () {
+        return [];
+      }
+    },
+    setMatchState: function () {},
+    emptyScores: function () {
+      return [];
+    },
+    enterScorePage: function (opts) {
+      enterCalls.push(opts);
+    }
+  });
   assert(
-    'Series 进记分仍 enterScorePage() 不 replace',
-    seriesSrc.indexOf('matchStateUtil.enterScorePage()') >= 0 &&
-      seriesSrc.indexOf('enterScorePage({ replace') < 0
+    'Series 进记分仍走 enterViewerGroupScore → enterScorePage() 不 replace',
+    seriesSrc.indexOf('teamMatchEnterGroupScore.enterViewerGroupScore') >= 0 &&
+      seriesSrc.indexOf('enterScorePage({ replace') < 0 &&
+      seriesSrc.indexOf('fromFlow=normalCreate') < 0
   );
   assert(
-    '普通赛事详情进记分仍 enterScorePage() 不 replace',
-    detailSrc.indexOf('matchStateUtil.enterScorePage()') >= 0 &&
-      detailSrc.indexOf('enterScorePage({ replace') < 0
+    '普通赛事详情进记分仍走同一入口且不 replace',
+    detailSrc.indexOf('teamMatchEnterGroupScore.enterViewerGroupScore') >= 0 &&
+      detailSrc.indexOf('enterScorePage({ replace') < 0 &&
+      enterCalls.length === 1 &&
+      enterCalls[0] == null
   );
 })();
 

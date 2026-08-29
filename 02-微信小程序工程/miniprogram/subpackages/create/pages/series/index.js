@@ -6,6 +6,7 @@ const timeWheelBridge = require('../../utils/timeWheelBridge.js');
 const roundDraft = require('./roundDraft.js');
 const participantDraft = require('./participantDraft.js');
 const basicInfoDraft = require('./basicInfoDraft.js');
+const matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
 const partnerConfigUtil = require('../../../../utils/partnerConfig.js');
 const seriesPublishAdapter = require('./seriesPublishAdapter.js');
 const seriesPublishMod = require('../../utils/seriesPublish.js');
@@ -454,9 +455,11 @@ Page({
     seriesNameInput: '',
     seriesNamePlaceholder: '请输入系列赛名称',
     seriesNameMax: basicInfoDraft.SERIES_NAME_MAX,
+    seriesNameQuota: basicInfoDraft.SERIES_NAME_MAX,
     seriesNameCount: 0,
     seriesSubtitleInput: '',
     seriesSubtitleMax: basicInfoDraft.SERIES_SUBTITLE_MAX,
+    seriesSubtitleQuota: basicInfoDraft.SERIES_SUBTITLE_MAX,
     seriesSubtitleCount: 0,
     visibility: 'public',
     accessCode: '',
@@ -518,6 +521,7 @@ Page({
     this._infoUpdateService = null;
     this._participantsUpdateService = null;
     this._editSeriesBaseline = null;
+    this._seriesTitleBaseline = null;
     this._participantsLocks = null;
     this._pendingOrgSelect = false;
     this._pendingParticipantsSelect = false;
@@ -999,10 +1003,18 @@ Page({
           hostTeam: hostTeam,
           templateId: d.templateId
         }),
-        seriesNameMax: basicInfoDraft.SERIES_NAME_MAX,
+        seriesNameMax: matchTitlePolicy.resolveInputMaxlength(
+          d.seriesName,
+          basicInfoDraft.SERIES_NAME_MAX
+        ),
+        seriesNameQuota: basicInfoDraft.SERIES_NAME_MAX,
         seriesNameCount: basicInfoDraft.countInputChars(d.seriesName),
         seriesSubtitleInput: d.seriesSubtitle != null ? String(d.seriesSubtitle) : '',
-        seriesSubtitleMax: basicInfoDraft.SERIES_SUBTITLE_MAX,
+        seriesSubtitleMax: matchTitlePolicy.resolveInputMaxlength(
+          d.seriesSubtitle,
+          basicInfoDraft.SERIES_SUBTITLE_MAX
+        ),
+        seriesSubtitleQuota: basicInfoDraft.SERIES_SUBTITLE_MAX,
         seriesSubtitleCount: basicInfoDraft.countInputChars(d.seriesSubtitle),
         visibility: visibility,
         accessCode: accessCode,
@@ -1023,8 +1035,35 @@ Page({
     );
   },
 
+  _captureSeriesTitleBaselineOnce(series) {
+    if (this._seriesTitleBaseline) return;
+    if (this._editSeriesMode || this._editRoundMode) return;
+    var d = series || {};
+    this._seriesTitleBaseline = {
+      seriesName: d.seriesName != null ? String(d.seriesName) : '',
+      seriesSubtitle: d.seriesSubtitle != null ? String(d.seriesSubtitle) : ''
+    };
+  },
+
+  _copySeriesTitleBaselineSnapshot() {
+    if (!this._seriesTitleBaseline || typeof this._seriesTitleBaseline !== 'object') {
+      return undefined;
+    }
+    return {
+      seriesName:
+        this._seriesTitleBaseline.seriesName != null
+          ? String(this._seriesTitleBaseline.seriesName)
+          : '',
+      seriesSubtitle:
+        this._seriesTitleBaseline.seriesSubtitle != null
+          ? String(this._seriesTitleBaseline.seriesSubtitle)
+          : ''
+    };
+  },
+
   _commitSavedDraft(savedSeries, stepOverride) {
     this.lastSavedDraft = deepClone(savedSeries);
+    this._captureSeriesTitleBaselineOnce(this.lastSavedDraft);
     var step =
       stepOverride != null && stepOverride !== ''
         ? Number(stepOverride)
@@ -2102,7 +2141,7 @@ Page({
     this._pendingCourseRoundId = roundId;
     var self = this;
     wx.navigateTo({
-      url: '/pages/course/select/index?selectedId=' + encodeURIComponent(selectedId || ''),
+      url: '/subpackages/create/pages/course/select/index?selectedId=' + encodeURIComponent(selectedId || ''),
       events: {
         courseSelected: function (payload) {
           var pendingId = self._pendingCourseRoundId;
@@ -2667,14 +2706,26 @@ Page({
       wx.showToast({ title: '请输入6位数字访问码', icon: 'none' });
       return;
     }
-    var nameCheck = basicInfoDraft.normalizeSeriesNameInput(draft.seriesName);
+    var nameCheck = basicInfoDraft.normalizeSeriesNameInput(draft.seriesName, {
+      previous: this._editSeriesBaseline && this._editSeriesBaseline.seriesName
+    });
     if (!nameCheck.ok) {
-      wx.showToast({ title: '请填写系列赛名称', icon: 'none' });
+      wx.showToast({
+        title: nameCheck.reason === 'empty' ? '请填写系列赛名称' : '系列赛名称最多 18 个字符',
+        icon: 'none'
+      });
+      return;
+    }
+    var subCheck = basicInfoDraft.normalizeSeriesSubtitleInput(draft.seriesSubtitle, {
+      previous: this._editSeriesBaseline && this._editSeriesBaseline.seriesSubtitle
+    });
+    if (!subCheck.ok) {
+      wx.showToast({ title: '副标题最多 12 个字符', icon: 'none' });
       return;
     }
     var patch = {
-      seriesName: draft.seriesName,
-      seriesSubtitle: draft.seriesSubtitle != null ? String(draft.seriesSubtitle) : '',
+      seriesName: nameCheck.value,
+      seriesSubtitle: subCheck.value,
       eventInfoList: deepClone(draft.eventInfoList || []),
       partnerConfig: deepClone(draft.partnerConfig),
       bannerImageSnapshot: draft.bannerImageSnapshot != null ? draft.bannerImageSnapshot : '',
@@ -2909,12 +2960,19 @@ Page({
         if (!this._commitSeriesNameInput()) return;
         draft = this.lastSavedDraft;
       }
+      if (this._isEditingSeriesSubtitle()) {
+        if (!this._commitSeriesSubtitleInput()) return;
+        draft = this.lastSavedDraft;
+      }
       if (this._isEditingGlobalM()) {
         this._focusedGlobalM = false;
         this._dirtyGlobalM = false;
         this._editingGlobalMInput = null;
       }
-      var gate5 = basicInfoDraft.canEnterStep6(draft);
+      // canEnterStep6(draft) 会话快照：titleBaseline 独立于当前 draft
+      var gate5 = basicInfoDraft.canEnterStep6(draft, {
+        titleBaseline: this._seriesTitleBaseline
+      });
       if (!gate5.ok) {
         wx.showToast({ title: gate5.message || '请完善主体与基础信息', icon: 'none' });
         return;
@@ -3033,7 +3091,9 @@ Page({
   },
 
   _validateBeforeFirstPublish: function (series) {
-    var gate = basicInfoDraft.canEnterStep6(series);
+    var gate = basicInfoDraft.canEnterStep6(series, {
+      titleBaseline: this._seriesTitleBaseline
+    });
     if (!gate.ok) {
       return {
         ok: false,
@@ -3041,7 +3101,9 @@ Page({
         message: gate.message || '请完善主体与基础信息'
       };
     }
-    var pub = seriesValidators.validateForPublish(series);
+    var pub = seriesValidators.validateForPublish(series, {
+      titleBaseline: this._seriesTitleBaseline
+    });
     if (!pub.ok) {
       var err0 = pub.errors && pub.errors[0];
       var code = err0 && err0.code ? err0.code : 'publish_invalid';
@@ -3161,7 +3223,8 @@ Page({
       },
       validateBeforeFirstPublish: function (series) {
         return self._validateBeforeFirstPublish(series);
-      }
+      },
+      titleBaseline: self._copySeriesTitleBaselineSnapshot()
     });
 
     if (outcome.warnToast) {
@@ -3319,7 +3382,7 @@ Page({
     };
     this._pendingOrgSelect = true;
     wx.navigateTo({
-      url: '/pages/team/select/index?mode=event_org',
+      url: '/subpackages/create/pages/team/select/index?mode=event_org',
       success: function (res) {
         try {
           if (res && res.eventChannel && res.eventChannel.emit) {
@@ -3368,7 +3431,7 @@ Page({
     );
     this._pendingParticipantsSelect = true;
     wx.navigateTo({
-      url: '/pages/team/select/index?mode=inter_team_participants',
+      url: '/subpackages/create/pages/team/select/index?mode=inter_team_participants',
       success: function (res) {
         try {
           if (res && res.eventChannel && res.eventChannel.emit) {
@@ -3452,7 +3515,7 @@ Page({
     var currentId = (this.lastSavedDraft.hostTeam && this.lastSavedDraft.hostTeam.teamId) || '';
     this._pendingHostTeamSelect = true;
     wx.navigateTo({
-      url: '/pages/team/select/index?selectedId=' + encodeURIComponent(currentId || ''),
+      url: '/subpackages/create/pages/team/select/index?selectedId=' + encodeURIComponent(currentId || ''),
       events: {
         teamSelected: function (payload) {
           if (!self._pendingHostTeamSelect) return;
@@ -3708,7 +3771,10 @@ Page({
   },
 
   onSeriesNameInput(e) {
-    var value = readInputDetailValue(e);
+    var value = matchTitlePolicy.constrainTyping(readInputDetailValue(e), {
+      max: basicInfoDraft.SERIES_NAME_MAX,
+      previous: this.lastSavedDraft && this.lastSavedDraft.seriesName
+    });
     this._dirtySeriesName = true;
     this._editingSeriesNameInput = value;
     this._safeSetData({
@@ -3738,7 +3804,7 @@ Page({
     this._focusedSeriesName = false;
     this._dirtySeriesName = false;
     this._editingSeriesNameInput = null;
-    // 草稿允许空名称；非空则必须 1～40
+    // 草稿允许空名称；非空则必须 1～18
     if (trimmed === '') {
       return this._persistNextDraft(
         function (draft) {
@@ -3747,7 +3813,9 @@ Page({
         { keepStep: true }
       );
     }
-    var check = basicInfoDraft.normalizeSeriesNameInput(trimmed);
+    var check = basicInfoDraft.normalizeSeriesNameInput(trimmed, {
+      previous: this.lastSavedDraft && this.lastSavedDraft.seriesName
+    });
     if (!check.ok) {
       var fallback =
         (this.lastSavedDraft && this.lastSavedDraft.seriesName) != null
@@ -3757,7 +3825,7 @@ Page({
         seriesNameInput: fallback,
         seriesNameCount: basicInfoDraft.countInputChars(fallback)
       });
-      wx.showToast({ title: '系列赛名称须为 1～40 个字符', icon: 'none' });
+      wx.showToast({ title: '系列赛名称须为 1～18 个字符', icon: 'none' });
       return false;
     }
     return this._persistNextDraft(
@@ -3776,7 +3844,10 @@ Page({
   },
 
   onSeriesSubtitleInput(e) {
-    var value = readInputDetailValue(e).replace(/[\r\n\u2028\u2029]+/g, '');
+    var value = matchTitlePolicy.constrainTyping(readInputDetailValue(e), {
+      max: basicInfoDraft.SERIES_SUBTITLE_MAX,
+      previous: this.lastSavedDraft && this.lastSavedDraft.seriesSubtitle
+    });
     this._dirtySeriesSubtitle = true;
     this._editingSeriesSubtitleInput = value;
     this._safeSetData({
@@ -3804,7 +3875,9 @@ Page({
     this._focusedSeriesSubtitle = false;
     this._dirtySeriesSubtitle = false;
     this._editingSeriesSubtitleInput = null;
-    var check = basicInfoDraft.normalizeSeriesSubtitleInput(raw);
+    var check = basicInfoDraft.normalizeSeriesSubtitleInput(raw, {
+      previous: this.lastSavedDraft && this.lastSavedDraft.seriesSubtitle
+    });
     if (!check.ok) {
       var fallback =
         (this.lastSavedDraft && this.lastSavedDraft.seriesSubtitle) != null

@@ -29,6 +29,51 @@ function findRound(series, roundId) {
   return null;
 }
 
+function isCompletedMatchStatus(item) {
+  var st = asString(item && (item.status || item.groupStatus || item.roundStatus)).toLowerCase();
+  return st === 'completed' || st === 'finished';
+}
+
+function isCancelledRound(round) {
+  return asString(round && (round.roundStatus || round.status)).toLowerCase() === 'cancelled';
+}
+
+/** 一轮对阵：优先 round.matches，否则用分站 groups（一组一场） */
+function listRoundMatches(series, round, deps) {
+  if (round && Array.isArray(round.matches)) return round.matches;
+  var gate = verifyRoundStation(series, round, deps);
+  if (gate && gate.match && Array.isArray(gate.match.groups)) return gate.match.groups;
+  return [];
+}
+
+/** 全系列 MATCHES COMPLETE：切换轮次时 N/M 不变 */
+function buildMatchesCompleteProgress(series, deps) {
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  var totalMatches = 0;
+  var completedMatches = 0;
+  for (var r = 0; r < rounds.length; r++) {
+    var round = rounds[r];
+    if (!round || isCancelledRound(round)) continue;
+    var list = listRoundMatches(series, round, deps);
+    totalMatches += list.length;
+    for (var i = 0; i < list.length; i++) {
+      if (isCompletedMatchStatus(list[i])) completedMatches += 1;
+    }
+  }
+  if (!totalMatches) {
+    return {
+      totalMatches: 0,
+      completedMatches: 0,
+      matchesCompleteText: '-/-'
+    };
+  }
+  return {
+    totalMatches: totalMatches,
+    completedMatches: completedMatches,
+    matchesCompleteText: completedMatches + '/' + totalMatches + ' MATCHES COMPLETE'
+  };
+}
+
 function buildRyderCupStandingsView(input) {
   var src = input && typeof input === 'object' ? input : {};
   var series = src.series && typeof src.series === 'object' ? src.series : {};
@@ -47,7 +92,8 @@ function buildRyderCupStandingsView(input) {
   });
   var parts = seriesStandingsViewModel.buildRoundSelectorParts(roundStates, sessionKey, {
     includeTot: false,
-    displayLabels: displayLabels
+    displayLabels: displayLabels,
+    series: series
   });
   var selectedKey = asString(parts.selectedKey);
   var selectedRound = findRound(series, selectedKey);
@@ -73,6 +119,8 @@ function buildRyderCupStandingsView(input) {
     getHolePars: deps.getHolePars,
     buildGroupPlayerLookup: deps.buildGroupPlayerLookup
   });
+  var completeProgress = buildMatchesCompleteProgress(series, deps);
+  board = Object.assign({}, board, completeProgress);
 
   return {
     ok: true,
@@ -88,6 +136,7 @@ function buildRyderCupStandingsView(input) {
     totalSelector: null,
     roundSelectorItems: parts.roundSelectorItems,
     roundSelector: parts.roundSelector,
+    roundSelectorMode: 'dropdown',
     roundInfoText: seriesRoundInfoText.buildRyderCupRoundInfoText(
       selectedKey,
       selectedRound,
@@ -111,5 +160,6 @@ function buildRyderCupStandingsView(input) {
 module.exports = {
   verifyRoundStation: verifyRoundStation,
   accumulateSeriesMatchPlayScores: accumulateSeriesMatchPlayScores,
-  buildRyderCupStandingsView: buildRyderCupStandingsView
+  buildRyderCupStandingsView: buildRyderCupStandingsView,
+  buildMatchesCompleteProgress: buildMatchesCompleteProgress
 };

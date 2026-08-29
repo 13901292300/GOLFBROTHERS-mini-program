@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -25,17 +26,17 @@ var seriesRyderCup = require(path.join(utilsDir, 'seriesRyderCup.js'));
 var accumulate = require(path.join(utilsDir, 'seriesRyderCupAccumulate.js'));
 var adapter = require(path.join(seriesDir, 'seriesRyderCupScoreboardAdapter.js'));
 var matchPlayTeamScore = require(path.join(utilsDir, 'matchPlayTeamScore.js'));
-var matchPlayScoreboardView = require(path.join(utilsDir, 'matchPlayScoreboardView.js'));
+var matchPlayScoreboardView = require(seriesTestPaths.util('matchPlayScoreboardView.js'));
 var listAdapter = require(path.join(utilsDir, 'seriesListCardAdapter.js'));
 var teamMatchFinish = require(path.join(utilsDir, 'teamMatchFinish.js'));
-var scoreGroupFinish = require(path.join(utilsDir, 'scoreGroupFinish.js'));
+var scoreGroupFinish = require(seriesTestPaths.util('scoreGroupFinish.js'));
 var seriesFinalize = require(path.join(utilsDir, 'seriesFinalize.js'));
 var seriesFinishLock = require(path.join(utilsDir, 'seriesFinishLock.js'));
 var seriesRoundPhaseAggregate = require(path.join(utilsDir, 'seriesRoundPhaseAggregate.js'));
 var seriesDetailViewModel = require(path.join(seriesDir, 'seriesDetailViewModel.js'));
-var enterScore = require(path.join(utilsDir, 'teamMatchEnterGroupScore.js'));
+var enterScore = require(seriesTestPaths.util('teamMatchEnterGroupScore.js'));
 var seriesRoundDisplayLabels = require(path.join(utilsDir, 'seriesRoundDisplayLabels.js'));
-var seriesRoundUpdate = require(path.join(utilsDir, 'seriesRoundUpdate.js'));
+var seriesRoundUpdate = require(seriesTestPaths.util('seriesRoundUpdate.js'));
 
 var pageJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var adapterSrc = fs.readFileSync(path.join(seriesDir, 'seriesRyderCupScoreboardAdapter.js'), 'utf8');

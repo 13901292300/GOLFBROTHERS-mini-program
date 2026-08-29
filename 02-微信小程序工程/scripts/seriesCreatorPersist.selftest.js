@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var ROOT = path.join(__dirname, '..');
 var mini = path.join(ROOT, 'miniprogram');
@@ -36,8 +37,8 @@ function loadFresh() {
     path.join(mini, 'utils/seriesModel.js'),
     path.join(mini, 'utils/seriesStore.js'),
     path.join(mini, 'utils/seriesStationMatch.js'),
-    path.join(mini, 'utils/seriesPublish.js'),
-    path.join(mini, 'utils/seriesPublishJournal.js'),
+    seriesTestPaths.util('seriesPublish.js'),
+    seriesTestPaths.util('seriesPublishJournal.js'),
     path.join(mini, 'utils/seriesStationIndex.js'),
     path.join(mini, 'utils/seriesManageAccess.js'),
     path.join(mini, 'utils/matchManageAccess.js'),
@@ -49,8 +50,8 @@ function loadFresh() {
     seriesModel: require(path.join(mini, 'utils/seriesModel.js')),
     seriesStoreMod: require(path.join(mini, 'utils/seriesStore.js')),
     seriesStationMatch: require(path.join(mini, 'utils/seriesStationMatch.js')),
-    seriesPublish: require(path.join(mini, 'utils/seriesPublish.js')),
-    seriesPublishJournalMod: require(path.join(mini, 'utils/seriesPublishJournal.js')),
+    seriesPublish: require(seriesTestPaths.util('seriesPublish.js')),
+    seriesPublishJournalMod: require(seriesTestPaths.util('seriesPublishJournal.js')),
     seriesStationIndexMod: require(path.join(mini, 'utils/seriesStationIndex.js')),
     seriesManageAccess: require(path.join(mini, 'utils/seriesManageAccess.js')),
     matchManageAccess: require(path.join(mini, 'utils/matchManageAccess.js')),
@@ -473,7 +474,7 @@ function buildPublishableSeries(seriesModel, overrides) {
     playerId: 'creator-user-a'
   });
   assert(
-    '创建者属参赛队可报名',
+    '创建者可报名参赛队',
     eligCreator.eligibleParticipantIds.indexOf('team:club-mine') >= 0
   );
   var fabCreator = mods.seriesManageAccess.resolveSeriesManageFabVisible({
@@ -490,7 +491,7 @@ function buildPublishableSeries(seriesModel, overrides) {
   });
   assert('创建者可见 M', fabCreator.visible === true, fabCreator.reason);
 
-  // 仅管理员但非参赛：造一条无交集的创建者
+  // 创建者非俱乐部成员：仍应能报名全部参赛队
   var adminOnlySeries = buildPublishableSeries(mods.seriesModel, {
     createdBy: 'admin-not-player',
     participants: [
@@ -513,9 +514,10 @@ function buildPublishableSeries(seriesModel, overrides) {
     playerId: 'admin-not-player'
   });
   assert(
-    '创建者不自动获得报名资格',
-    eligAdminOnly.eligibleParticipantIds.length === 0 &&
-      eligAdminOnly.ineligibleMessage === mods.eligibility.MSG_NOT_PARTICIPANT_TEAM
+    '无俱乐部归属也可报名全部参赛队',
+    eligAdminOnly.eligibleParticipantIds.length === 2 &&
+      eligAdminOnly.eligibleParticipantIds.indexOf('team:club-other') >= 0 &&
+      eligAdminOnly.eligibleParticipantIds.indexOf('team:club-mine') >= 0
   );
   var fabAdminOnly = mods.seriesManageAccess.resolveSeriesManageFabVisible({
     series: adminOnlySeries,
@@ -536,7 +538,7 @@ function buildPublishableSeries(seriesModel, overrides) {
     playerId: 'member-only'
   });
   assert(
-    '非创建者但球队成员可报名',
+    '非创建者也可报名',
     eligMember.eligibleParticipantIds.indexOf('team:club-mine') >= 0
   );
   var fabMember = mods.seriesManageAccess.resolveSeriesManageFabVisible({
@@ -588,7 +590,7 @@ function buildPublishableSeries(seriesModel, overrides) {
   );
   assert('创建页不写死 me', !/createdBy:\s*['"]me['"]/.test(createPage));
 
-  var publishSrc = fs.readFileSync(path.join(mini, 'utils/seriesPublish.js'), 'utf8');
+  var publishSrc = fs.readFileSync(seriesTestPaths.util('seriesPublish.js'), 'utf8');
   assert(
     'planPublish 使用 series.createdBy 而非操作者覆盖',
     publishSrc.indexOf('creator_required') >= 0 &&

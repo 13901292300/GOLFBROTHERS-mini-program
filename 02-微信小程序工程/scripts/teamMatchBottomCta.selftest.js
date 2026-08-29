@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 var assert = require('assert');
 
 if (typeof global.wx === 'undefined') {
@@ -18,9 +19,9 @@ if (typeof global.wx === 'undefined') {
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
-var cta = require(path.join(utilsDir, 'teamMatchBottomCta.js'));
-var viewer = require(path.join(utilsDir, 'teamMatchViewerGroup.js'));
-var enter = require(path.join(utilsDir, 'teamMatchEnterGroupScore.js'));
+var cta = require(seriesTestPaths.util('teamMatchBottomCta.js'));
+var viewer = require(seriesTestPaths.util('teamMatchViewerGroup.js'));
+var enter = require(seriesTestPaths.util('teamMatchEnterGroupScore.js'));
 var scheduleVm = require(path.join(
   root,
   'miniprogram',

@@ -476,7 +476,7 @@ function freeze(obj) {
   assert('organization VM ok', orgVm.ok === true);
   assert('organization logo ← organizationLogo', orgVm.hero.logo === '/assets/a.jpg');
   assert('organization 主办名 ← organizationName', orgVm.hero.infoRows[0].value === '湘鹰机构');
-  assert('organization divider ORG.', orgVm.hero.dividerText === 'ORG.');
+  assert('organization divider ORG', orgVm.hero.dividerText === 'ORG');
   assert(
     'organization Hero 无模板/队际系列标签',
     !(orgVm.hero.metaChips || []).some(function (c) {
@@ -521,7 +521,7 @@ function freeze(obj) {
   assert('team VM ok', teamVm.ok === true);
   assert('team logo ← hostTeam.teamLogo', teamVm.hero.logo === '/assets/team.jpg');
   assert('team 主办名 ← hostTeam.teamName', teamVm.hero.infoRows[0].value === '湘鹰队');
-  assert('team divider 赛事组织', teamVm.hero.dividerText === '赛事组织');
+  assert('team divider CLUB', teamVm.hero.dividerText === 'CLUB');
   assert(
     'team Hero 无分队系列模板标签',
     !(teamVm.hero.metaChips || []).some(function (c) {
@@ -867,10 +867,10 @@ function freeze(obj) {
     { gameMode: '' }
   ]);
   assert(
-    '单一赛制去重且末尾系列赛',
+    '单一赛制去重且系列赛在前',
     singleChips.map(function (c) {
       return c.text;
-    }).join('|') === '个人比杆赛|系列赛'
+    }).join('|') === '系列赛|个人比杆赛'
   );
 
   var multiChips = viewModel.buildSeriesGameModeMetaChips([
@@ -882,10 +882,10 @@ function freeze(obj) {
     { gameMode: '四人四球比杆赛' }
   ]);
   assert(
-    '多赛制首次出现顺序 + 系列赛唯一最后',
+    '多赛制首次出现顺序 + 系列赛唯一最前',
     multiChips.map(function (c) {
       return c.text;
-    }).join('|') === '个人比杆赛|四人四球比杆赛|四人两球比杆赛|系列赛'
+    }).join('|') === '系列赛|个人比杆赛|四人四球比杆赛|四人两球比杆赛'
   );
 
   var emptyChips = viewModel.buildSeriesGameModeMetaChips([
@@ -960,13 +960,13 @@ function freeze(obj) {
     }
   });
   assert(
-    'Hero meta 去重赛制末尾系列赛',
+    'Hero meta 去重赛制且系列赛在前',
     namedVm.ok &&
       namedVm.hero.metaChips
         .map(function (c) {
           return c.text;
         })
-        .join('|') === '个人比杆赛|四人四球比杆赛|系列赛'
+        .join('|') === '系列赛|个人比杆赛|四人四球比杆赛'
   );
   assert(
     'Hero 不再输出模板型标签',
@@ -1329,7 +1329,10 @@ function freeze(obj) {
 
   var cosBright = partnerConfig.DEFAULT_PARTNER_LOGOS[0].bright;
   var localFallback = partnerConfig.getPartnerLogoLocalFallback(cosBright);
-  assert('COS→本地 fallback 映射可用', !!localFallback && localFallback.indexOf('/assets/partners/') === 0);
+  assert(
+    'COS 默认图 fallback 映射到 COS 旧 partner 图',
+    !!localFallback && localFallback.indexOf('/miniprogram/partners/') >= 0
+  );
 
   var errRows = [
     { left: { url: cosBright }, right: { url: 'https://example.com/keep-right.jpg' } },
@@ -1509,8 +1512,8 @@ function freeze(obj) {
   var cosSponsor = eventSponsorConfig.DEFAULT_EVENT_SPONSOR_IMAGES[0].bright;
   var localSponsor = eventSponsorConfig.getEventSponsorLocalFallback(cosSponsor);
   assert(
-    'event sponsor COS→本地 fallback 可用',
-    !!localSponsor && localSponsor.indexOf('/assets/') === 0
+    'event sponsor COS fallback 映射到 COS 旧 partner 图',
+    !!localSponsor && localSponsor.indexOf('/miniprogram/partners/') >= 0
   );
 
   var evList = [
@@ -1823,6 +1826,96 @@ function freeze(obj) {
     }
   });
   assert('空副标题 titleSub 为空串', subEmpty.ok && subEmpty.hero.titleSub === '');
+
+  var liveRoundSeries = baseSeries({
+    seriesSubtitle: '',
+    rounds: [
+      {
+        roundId: 'round-1',
+        index: 1,
+        name: '第1轮',
+        dateTime: '2026-09-08 08:00',
+        courseName: '测试球场',
+        gameMode: '个人比杆赛',
+        matchId: 'team-match-1',
+        roundStatus: 'live'
+      },
+      {
+        roundId: 'round-2',
+        index: 2,
+        name: '第2轮',
+        dateTime: '2026-09-10 08:00',
+        courseName: '测试球场2',
+        gameMode: '四人四球比杆赛',
+        matchId: '',
+        roundStatus: 'scheduled'
+      }
+    ]
+  });
+  var liveMatchDeps = {
+    getMatchById: function (id) {
+      if (id === 'team-match-1') {
+        return managedMatch({
+          status: 'ongoing',
+          roundId: 'round-1'
+        });
+      }
+      return null;
+    },
+    getIndexByMatchId: function () {
+      return null;
+    }
+  };
+  var plazaLiveHero = viewModel.buildSeriesDetailViewModel(
+    liveRoundSeries,
+    Object.assign({ heroEntryContext: 'plaza' }, liveMatchDeps)
+  );
+  var registerLiveHero = viewModel.buildSeriesDetailViewModel(
+    liveRoundSeries,
+    Object.assign({ heroEntryContext: 'registration' }, liveMatchDeps)
+  );
+  var plazaNamedHero = viewModel.buildSeriesDetailViewModel(
+    Object.assign({}, liveRoundSeries, { seriesSubtitle: '手动副标题' }),
+    Object.assign({ heroEntryContext: 'plaza' }, liveMatchDeps)
+  );
+  assert(
+    '广场 LIVE：Hero 日期为本轮日、空副标题自动生成第N轮-赛制',
+    plazaLiveHero.ok &&
+      plazaLiveHero.hero.dateText === 'SEP 08 2026' &&
+      plazaLiveHero.hero.titleSub === '第1轮-比杆赛'
+  );
+  assert(
+    '报名 TAB：Hero 保持系列区间且不自动生成副标题',
+    registerLiveHero.ok &&
+      registerLiveHero.hero.dateText === 'SEP 08-10 2026' &&
+      registerLiveHero.hero.titleSub === ''
+  );
+  assert(
+    '广场 LIVE：已有 subtitle 不覆盖',
+    plazaNamedHero.ok && plazaNamedHero.hero.titleSub === '手动副标题'
+  );
+  assert(
+    '报名入口 Hero 色调固定冠军金，不受 LIVE 影响',
+    registerLiveHero.ok &&
+      registerLiveHero.hero.isLive === true &&
+      registerLiveHero.hero.entryContext === 'registration' &&
+      registerLiveHero.hero.dateTone === 'gold' &&
+      plazaLiveHero.hero.entryContext === 'plaza' &&
+      plazaLiveHero.hero.dateTone === 'live'
+  );
+  assert(
+    '报名入口 WXML/WXSS 冠军金优先于 LIVE 蓝',
+    pageWxml.indexOf("hero.entryContext === 'registration' ? 'event-date--gold'") >= 0 &&
+      pageWxml.indexOf("hero.entryContext === 'registration' ? 'section-divider--gold'") >= 0 &&
+      pageWxml.indexOf("hero.entryContext === 'registration' ? 'org-text--gold'") >= 0 &&
+      pageWxss.indexOf('.event-date--gold') >= 0 &&
+      pageWxss.indexOf('.section-divider--gold') >= 0 &&
+      pageWxss.indexOf('.org-text--gold') >= 0 &&
+      pageWxss.indexOf('#CE9224') >= 0 &&
+      pageWxss.indexOf('#FFD700') < 0 &&
+      pageWxss.indexOf('.event-date--live') >= 0 &&
+      pageWxss.indexOf('.org-text--live') >= 0
+  );
   assert(
     'Hero 不拼接主副标题',
     subFilled.hero.titleMain.indexOf(subFilled.hero.titleSub) < 0 &&

@@ -1,4 +1,4 @@
-.player-page { --tour-blue: #002d62; --champion-gold: #ce9224; --data-blue: #00aeef; }
+.player-page { --tour-blue: #002d62; --champion-gold: #ce9224; --data-blue: #00AEEF; }
 .player-page.dark-mode {
   --bg-primary: #000000; --bg-card: #111111; --bg-subtle: #0a0a0a; --bg-hover: #1a1a1a;
   --border: #222222; --border-hover: #333333;

@@ -69,7 +69,7 @@
   font-weight: 800;
 }
 .composition-mode-option.is-active {
-  border-color: var(--champion-gold, #c8a24a);
+  border-color: var(--champion-gold, #CE9224);
   background: rgba(200, 162, 74, 0.12);
   color: var(--text-primary);
 }
@@ -265,7 +265,7 @@
 .pairing-card__action {
   font-size: 24rpx;
   font-weight: 700;
-  color: var(--champion-gold, #c8a24a);
+  color: var(--champion-gold, #CE9224);
 }
 .pairing-card__action--danger {
   color: var(--error, #ef4444);
@@ -299,7 +299,7 @@
   text-align: center;
   padding: 18rpx 0;
   border-radius: 12rpx;
-  background: var(--champion-gold, #c8a24a);
+  background: var(--champion-gold, #CE9224);
   color: #fff;
   font-size: 26rpx;
   font-weight: 800;

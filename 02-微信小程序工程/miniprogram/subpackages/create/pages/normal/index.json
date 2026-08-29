@@ -1,7 +1,7 @@
 {
   "navigationStyle": "custom",
   "usingComponents": {
-    "time-wheel-picker": "/components/time-wheel-picker/index",
+    "time-wheel-picker": "/subpackages/create/components/time-wheel-picker/index",
     "player-source-sheet": "/components/player-source-sheet/index"
   }
 }

@@ -62,7 +62,7 @@ var liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScoreca
 var seriesBottomDockVisibility = require('./seriesBottomDockVisibility.js');
 var seriesLayerStack = require('./seriesLayerStack.js');
 var teamMatchEnterGroupScore = require('../../utils/teamMatchEnterGroupScore.js');
-var manageRoundOverflowArrows = require('../../../../components/series-round-selector-dock/overflowArrows.js');
+var manageRoundOverflowArrows = require('../../components/series-round-selector-dock/overflowArrows.js');
 var teamDirectory = require('../../../../utils/teamDirectory.js');
 var mockAvatars = require('../../../../utils/mockAvatars.js');
 var { DEFAULT_ORG_LOGO } = require('../../../../utils/teamMatchCapabilities.js');
@@ -73,6 +73,90 @@ var DEFAULT_SCORECARD_AD_IMAGE =
 var FAB_HIDE_MARGIN_RPX = 16;
 var FAB_SIZE_RPX = 60;
 var FAB_EDGE_GAP_RPX = 10;
+
+function isPositiveFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function pickSeriesDetailWindowFields(info, current) {
+  var next = current || {};
+  if (!info) return next;
+  if (!isPositiveFiniteNumber(next.windowWidth) && isPositiveFiniteNumber(info.windowWidth)) {
+    next.windowWidth = info.windowWidth;
+  }
+  if (!isPositiveFiniteNumber(next.windowHeight) && isPositiveFiniteNumber(info.windowHeight)) {
+    next.windowHeight = info.windowHeight;
+  }
+  if (!isPositiveFiniteNumber(next.screenHeight) && isPositiveFiniteNumber(info.screenHeight)) {
+    next.screenHeight = info.screenHeight;
+  }
+  var bottom = info.safeArea && info.safeArea.bottom;
+  if (!isFiniteNumber(next.safeAreaBottom) && isFiniteNumber(bottom)) {
+    next.safeAreaBottom = bottom;
+    next.safeArea = info.safeArea;
+  }
+  return next;
+}
+
+function isSeriesDetailWindowReady(cur, needSafeArea) {
+  var hasWh =
+    isPositiveFiniteNumber(cur.windowWidth) && isPositiveFiniteNumber(cur.windowHeight);
+  if (!needSafeArea) return hasWh;
+  return (
+    hasWh &&
+    isPositiveFiniteNumber(cur.screenHeight) &&
+    isFiniteNumber(cur.safeAreaBottom)
+  );
+}
+
+/** 系列详情窗口/safeArea：优先 getWindowInfo，按字段回退 getSystemInfoSync；缺失为 null */
+function readSeriesDetailWindowLayout(opts) {
+  var needSafeArea = !!(opts && opts.needSafeArea);
+  var cur = {};
+  var threw = false;
+  try {
+    if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
+      try {
+        cur = pickSeriesDetailWindowFields(wx.getWindowInfo(), cur);
+      } catch (err) {
+        threw = true;
+      }
+    }
+  } catch (errOuter) {
+    threw = true;
+  }
+  if (!isSeriesDetailWindowReady(cur, needSafeArea)) {
+    try {
+      if (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function') {
+        try {
+          cur = pickSeriesDetailWindowFields(wx.getSystemInfoSync(), cur);
+        } catch (err2) {
+          threw = true;
+        }
+      }
+    } catch (errLegacy) {
+      threw = true;
+    }
+  }
+  var windowWidth = isPositiveFiniteNumber(cur.windowWidth) ? cur.windowWidth : null;
+  var windowHeight = isPositiveFiniteNumber(cur.windowHeight) ? cur.windowHeight : null;
+  var safeBottom = 0;
+  if (isPositiveFiniteNumber(cur.screenHeight) && isFiniteNumber(cur.safeAreaBottom)) {
+    safeBottom = Math.max(0, cur.screenHeight - cur.safeAreaBottom);
+  }
+  return {
+    windowWidth: windowWidth,
+    windowHeight: windowHeight,
+    screenHeight: isPositiveFiniteNumber(cur.screenHeight) ? cur.screenHeight : null,
+    safeArea: cur.safeArea || null,
+    safeBottom: safeBottom,
+    threwWithoutValue: threw && windowHeight == null
+  };
+}
 var socialRelationStore = require('../../../../utils/socialRelationStore.js');
 var playerDirectory = require('../../../../utils/playerDirectory.js');
 
@@ -548,6 +632,7 @@ Page({
     showScheduleBottomAction: false,
     scheduleQuickEntryVisible: false,
     showDiscussionInput: false,
+    discussionShowInputBar: false,
     hideBottomCta: false,
     tabShowLeftIndicator: false,
     tabShowRightIndicator: false,
@@ -687,7 +772,10 @@ Page({
       chipText: '',
       chipTone: 'default',
       dateText: '',
+      dateTone: 'default',
       dateRangeSizeClass: '',
+      entryContext: '',
+      isLive: false,
       titleMain: '',
       titleSub: '',
       metaChips: [],
@@ -729,6 +817,7 @@ Page({
       },
       roundSelectorItems: [],
       roundSelector: [],
+      roundSelectorMode: 'dropdown',
       teamRows: [],
       unavailableTitle: '',
       unavailableMessage: ''
@@ -881,7 +970,10 @@ Page({
     this._seriesId = q.seriesId != null ? String(q.seriesId).trim() : '';
     this._preview = q.preview === '1' || q.preview === 1 || q.preview === true;
     var tabQ = q.tab != null ? String(q.tab).trim() : '';
+    var fromQ = q.from != null ? String(q.from).trim() : '';
     this._activeTab = ALLOWED_TABS[tabQ] ? tabQ : DEFAULT_TAB;
+    this._heroEntryContext =
+      fromQ === 'registration' || tabQ === 'register' ? 'registration' : 'plaza';
     if (this._activeTab === 'standings') this._standingsVisited = true;
     if (this._activeTab === 'schedule') this._scheduleVisited = true;
     this._accessUnlocked = false;
@@ -1148,6 +1240,10 @@ Page({
       }
     } catch (eRm) {
       /* ignore */
+    }
+    if (this._seriesId && typeof seriesStore.getSeriesById === 'function') {
+      this._lastSeriesForSchedule =
+        seriesStore.getSeriesById(this._seriesId) || this._lastSeriesForSchedule;
     }
     this._applySeriesEditReturnContext(ctx, { restoreManageRound: false });
     this._rebuildScheduleProjection();
@@ -1727,19 +1823,19 @@ Page({
     var token = (this._rosterMeasureToken || 0) + 1;
     this._rosterMeasureToken = token;
     var sys = { windowWidth: 375, windowHeight: 667 };
+    var safeBottom = 0;
     try {
-      if (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function') {
-        sys = wx.getSystemInfoSync() || sys;
+      var info = readSeriesDetailWindowLayout({ needSafeArea: true });
+      if (info) {
+        if (info.windowWidth != null) sys.windowWidth = info.windowWidth;
+        if (info.windowHeight != null) sys.windowHeight = info.windowHeight;
+        if (info.safeBottom != null) safeBottom = info.safeBottom;
       }
     } catch (e) {
       /* ignore */
     }
     var winH = sys.windowHeight || 667;
     var rpx2px = (sys.windowWidth || 375) / 750;
-    var safeBottom = 0;
-    if (sys.safeArea && typeof sys.screenHeight === 'number') {
-      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
-    }
     this.createSelectorQuery()
       .in(this)
       .select('.gb-header')
@@ -2033,6 +2129,28 @@ Page({
     }, 48);
   },
 
+  /**
+   * 赛程 TAB 内容高度变化（切 LIVE Rx / 短出发表）：仅无损重算 filler。
+   * 不重测 Hero/TAB/dock offset，不写 scrollTop，不清零当前 filler。
+   */
+  scheduleScheduleContentFillerMeasure: function () {
+    if (!this._pageAlive) return;
+    if (this._activeTab !== 'schedule') return;
+    var self = this;
+    this._fillerMeasureToken = (this._fillerMeasureToken || 0) + 1;
+    var token = this._fillerMeasureToken;
+    if (this._fillerMeasureTimer) {
+      clearTimeout(this._fillerMeasureTimer);
+      this._fillerMeasureTimer = null;
+    }
+    this._fillerMeasureTimer = setTimeout(function () {
+      self._fillerMeasureTimer = null;
+      if (!self._pageAlive || self._activeTab !== 'schedule') return;
+      if (token !== self._fillerMeasureToken) return;
+      self.updateScrollFillerHeight();
+    }, 48);
+  },
+
   /** 展开/收起前记录滚动锚点（不自动滚到被点球队） */
   _captureScrollLayoutAnchor: function () {
     var scrollTop = Number(this._scrollTop);
@@ -2128,7 +2246,11 @@ Page({
       screenHeight: this._fabWindowH || 667,
       isManageOverlayActive: manageOverlay,
       register: o.register != null ? o.register : this.data.register || {},
-      schedule: o.schedule != null ? o.schedule : this.data.schedule || {}
+      schedule: o.schedule != null ? o.schedule : this.data.schedule || {},
+      discussion:
+        o.discussion != null
+          ? o.discussion
+          : { showInputBar: !!this.data.discussionShowInputBar }
     });
     return {
       hideBottomCta: dock.hideBottomCta,
@@ -2393,7 +2515,9 @@ Page({
       affiliation_unresolved:
         eligibilityMsg || seriesRegisterEligibility.MSG_NOT_PARTICIPANT_TEAM,
       not_host_member: seriesRegisterEligibility.MSG_NOT_HOST_MEMBER,
-      no_eligible_team: seriesRegisterEligibility.MSG_NOT_PARTICIPANT_TEAM,
+      no_eligible_team: seriesRegisterEligibility.MSG_NO_TEAM_PARTICIPANTS,
+      no_participants: seriesRegisterEligibility.MSG_NO_TEAM_PARTICIPANTS,
+      no_division_participants: seriesRegisterEligibility.MSG_NO_DIVISION_PARTICIPANTS,
       participant_id_required: '请选择报名球队',
       participant_not_found: '报名主体不存在',
       already_registered_elsewhere: '您已在其他主体报名',
@@ -2435,11 +2559,10 @@ Page({
 
   _computeDiscussionPanelMinHeight: function () {
     try {
-      var sys =
-        typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function'
-          ? wx.getSystemInfoSync()
-          : null;
-      var wh = sys && sys.windowHeight != null ? Number(sys.windowHeight) : 0;
+      var layout = readSeriesDetailWindowLayout();
+      if (layout && layout.threwWithoutValue) return 0;
+      var wh =
+        layout && layout.windowHeight != null ? Number(layout.windowHeight) : 0;
       if (!Number.isFinite(wh) || wh <= 0) wh = this._lastViewportHeight || 0;
       var header = Number(this.data.headerTotalHeight) || 0;
       var tab = Number(this.data.primaryTabHeight) || 44;
@@ -2479,6 +2602,7 @@ Page({
       discussionChat: this._discussionChat.slice(),
       discussionWatchers: disc.watchers,
       discussionCanSpeak: !!disc.canSpeak,
+      discussionShowInputBar: !!disc.showInputBar,
       discussionInputDisabled: !!disc.inputDisabled,
       discussionInputPlaceholder: disc.inputPlaceholder || '说点什么…',
       discussionSelfAvatar: disc.selfAvatar
@@ -2579,7 +2703,8 @@ Page({
       standingsUserPicked: this._standingsUserPicked,
       standingsVisited: this._standingsVisited,
       standingsResult: standingsResult,
-      registerActiveParticipantId: this._registerActiveParticipantId
+      registerActiveParticipantId: this._registerActiveParticipantId,
+      heroEntryContext: this._heroEntryContext || 'plaza'
     });
 
     if (!vm.ok) {
@@ -2705,7 +2830,8 @@ Page({
       patch,
       this._resolveBottomDockVisibilityPatch(dockScroll, dockSticky, {
         register: register,
-        schedule: schedule
+        schedule: schedule,
+        discussion: { showInputBar: !!discussionPatch.discussionShowInputBar }
       })
     );
 
@@ -2927,7 +3053,7 @@ Page({
 
   _dockIntoViewId: function (roundId) {
     var key = roundId != null ? String(roundId).trim() : '';
-    if (!key || key === standingsViewModel.CUMULATIVE_KEY) return '';
+    if (!key || standingsViewModel.isCumulativeStandingsKey(key)) return '';
     return 'srd-' + key.replace(/[^A-Za-z0-9_-]/g, '');
   },
 
@@ -2972,7 +3098,7 @@ Page({
       if (rememberedByRoundId[rid] == null) rememberedByRoundId[rid] = legacy[rid];
     });
     var match =
-      key && key !== standingsViewModel.CUMULATIVE_KEY
+      key && !standingsViewModel.isCumulativeStandingsKey(key)
         ? this._resolveMatchForStandingsRound(key)
         : null;
     return seriesStandingsViewOptions.resolveStandingsSessionSelection({
@@ -2989,7 +3115,7 @@ Page({
 
   _rememberStandingsSelection: function (roundId, selection) {
     var rid = roundId != null ? String(roundId).trim() : '';
-    if (!rid || rid === standingsViewModel.CUMULATIVE_KEY) return;
+    if (!rid || standingsViewModel.isCumulativeStandingsKey(rid)) return;
     var match = this._resolveMatchForStandingsRound(rid);
     var sel = seriesStandingsViewOptions.normalizeSeriesStandingsSelection(
       match,
@@ -3060,6 +3186,43 @@ Page({
         : standingsViewModel.CUMULATIVE_KEY;
     var selection = this._resolveStandingsSelectionForKey(selectedKey);
     var sharedEmpty = seriesPersonalLeaderboardAdapter.emptySharedPersonalBoardFields();
+    if (standingsViewModel.isCumulativeStandingsKey(selectedKey)) {
+      this._frozenPersonalBoardMatch = null;
+      if (
+        standingsViewModel.isStrokePlaySeries(this._lastSeriesForStandings) ||
+        vm.mode === 'per_round_n'
+      ) {
+        return Object.assign({}, vm, sharedEmpty, { useLiveLeaderboard: false });
+      }
+      var totLabel = standingsViewModel.buildTotTopMDescription(
+        this._lastSeriesForStandings
+      );
+      var totProjected = seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard({
+        selectedKey: selectedKey,
+        series: this._lastSeriesForStandings,
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        },
+        viewerRemarkCtx: this._viewerRemarkCtx
+      });
+      var totOverlay = seriesTeamLeaderboardAdapter.applySeriesTotTeamBoardOverlay(
+        vm,
+        totProjected,
+        totLabel
+      );
+      return Object.assign(
+        {},
+        seriesTeamLeaderboardAdapter.guardTotOverlayAgainstStaleEmpty(
+          this.data && this.data.standings,
+          totOverlay,
+          totProjected
+        ),
+        { useLiveLeaderboard: false }
+      );
+    }
     if (vm.mode === 'per_round_n') {
       var perRoundCtx = this._resolveStandingsRoundContext(selectedKey);
       var perRoundView = selection && selection.view ? String(selection.view) : 'team';
@@ -3095,37 +3258,6 @@ Page({
           match: perRoundCtx.match,
           roundHeadline: perRoundCtx.roundHeadline
         }
-      );
-    }
-    if (selectedKey === standingsViewModel.CUMULATIVE_KEY) {
-      this._frozenPersonalBoardMatch = null;
-      var totLabel = standingsViewModel.buildTotTopMDescription(
-        this._lastSeriesForStandings
-      );
-      var totProjected = seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard({
-        selectedKey: selectedKey,
-        series: this._lastSeriesForStandings,
-        getMatchById: function (id) {
-          return teamMatchStore.getMatchById(id);
-        },
-        getIndexByMatchId: function (id) {
-          return seriesStationIndex.getByMatchId(id);
-        },
-        viewerRemarkCtx: this._viewerRemarkCtx
-      });
-      var totOverlay = seriesTeamLeaderboardAdapter.applySeriesTotTeamBoardOverlay(
-        vm,
-        totProjected,
-        totLabel
-      );
-      return Object.assign(
-        {},
-        seriesTeamLeaderboardAdapter.guardTotOverlayAgainstStaleEmpty(
-          this.data && this.data.standings,
-          totOverlay,
-          totProjected
-        ),
-        { useLiveLeaderboard: false }
       );
     }
     var ctx = this._resolveStandingsRoundContext(selectedKey);
@@ -3373,11 +3505,10 @@ Page({
     if (!(this.data.standings && this.data.standings.available)) return;
     if (key === this._standingsSelectedKey) return;
     // 切换轮次轻量重投影；不改写 roundSelectorScrollLeft；不 capture/restore scrollTop
-    var tot = standingsViewModel.CUMULATIVE_KEY;
     var nextView = this._resolveStandingsBoardViewForKey(key);
     var perRoundN = !!(this.data.standings && this.data.standings.mode === 'per_round_n');
     var clearExpand =
-      !perRoundN && (key === tot || nextView !== 'team')
+      !perRoundN && (standingsViewModel.isCumulativeStandingsKey(key) || nextView !== 'team')
         ? { expandedStandingsTeamId: '' }
         : {};
     var extraBase = Object.assign({}, this._emptyStandingsScorecardPatch(), clearExpand);
@@ -4097,7 +4228,7 @@ Page({
     if (!standings.useLiveLeaderboard) return;
     var selectedKey =
       this._standingsSelectedKey != null ? String(this._standingsSelectedKey).trim() : '';
-    if (!selectedKey || selectedKey === standingsViewModel.CUMULATIVE_KEY) return;
+    if (!selectedKey || standingsViewModel.isCumulativeStandingsKey(selectedKey)) return;
     var ctx = this._resolveStandingsRoundContext(selectedKey);
     var match = this._frozenPersonalBoardMatch || ctx.match;
     var result = liveLeaderboardScorecard.applyLiveScorecardTap(
@@ -4236,7 +4367,7 @@ Page({
       this._standingsSelectedKey != null
         ? String(this._standingsSelectedKey).trim()
         : '';
-    if (!selectedKey || selectedKey === standingsViewModel.CUMULATIVE_KEY) return;
+    if (!selectedKey || standingsViewModel.isCumulativeStandingsKey(selectedKey)) return;
     var standings = this.data.standings || {};
     if (!standings.useLiveLeaderboard && !standings.showSharedPersonalBoard) return;
     var selection = standings.selection || {};
@@ -4654,7 +4785,7 @@ Page({
     if (panel.state === 'scorecard') {
       courseTitle = teamMatchScorecard.buildScorecardCourseTitle(match);
       var selectorKey = selectedRoundId != null ? String(selectedRoundId).trim() : '';
-      if (selectorKey === standingsViewModel.CUMULATIVE_KEY) {
+      if (standingsViewModel.isCumulativeStandingsKey(selectorKey)) {
         courseTitle = standingsViewModel.buildTotOccurrenceScorecardTitle({
           series: series,
           roundId: roundId,
@@ -5087,8 +5218,26 @@ Page({
     delete patch.stickyRoundSelectorTop;
     delete patch.roundSelectorOffsetTop;
     // ROUND-DOCK-B1：切轮只更新赛程内容；不写 scrollTop / filler / sticky；不重测 dock
-    this._safeSetData(patch);
-    this._syncScheduleTeeObserver();
+    // 短内容 LIVE Rx：setData 后无损重算 filler，使 maxScrollTop 能越过二级吸顶阈值
+    var self = this;
+    var shouldCapture =
+      this._activeTab === 'schedule' &&
+      (!!this.data.isStickyTab || !!this.data.isStickyRoundSelector);
+    if (shouldCapture) this._captureScrollLayoutAnchor();
+    this._safeSetData(patch, function () {
+      if (!self._pageAlive) return;
+      self._syncScheduleTeeObserver();
+      if (self._activeTab !== 'schedule') return;
+      var run = function () {
+        if (!self._pageAlive || self._activeTab !== 'schedule') return;
+        self.scheduleScheduleContentFillerMeasure();
+      };
+      if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
+        wx.nextTick(run);
+      } else {
+        setTimeout(run, 0);
+      }
+    });
   },
 
   onScheduleRoundTap: function (e) {
@@ -5440,8 +5589,10 @@ Page({
   _initMoreFab: function () {
     var sys = { windowWidth: 375, windowHeight: 667 };
     try {
-      if (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function') {
-        sys = wx.getSystemInfoSync() || sys;
+      var info = readSeriesDetailWindowLayout();
+      if (info) {
+        if (info.windowWidth != null) sys.windowWidth = info.windowWidth;
+        if (info.windowHeight != null) sys.windowHeight = info.windowHeight;
       }
     } catch (e) {
       /* ignore */
@@ -5545,7 +5696,7 @@ Page({
     if (
       this._activeTab === 'standings' &&
       this._standingsSelectedKey &&
-      this._standingsSelectedKey !== standingsViewModel.CUMULATIVE_KEY
+      !standingsViewModel.isCumulativeStandingsKey(this._standingsSelectedKey)
     ) {
       return String(this._standingsSelectedKey);
     }
@@ -7411,7 +7562,7 @@ Page({
     }
     this.closeMoreSheetFully();
     var url =
-      '/subpackages/tournament/pages/stats/index?matchId=' +
+      '/subpackages/tournament-tools/pages/stats/index?matchId=' +
       encodeURIComponent(matchId);
     if (subtitle) {
       url += '&roundSubtitle=' + encodeURIComponent(subtitle);
@@ -8379,7 +8530,7 @@ Page({
       }
       wx.navigateTo({
         url:
-          '/subpackages/tournament/pages/peoria/index?matchId=' +
+          '/subpackages/tournament-tools/pages/peoria/index?matchId=' +
           encodeURIComponent(matchId),
         fail: function () {
           wx.showToast({ title: '净杆配置页尚未注册', icon: 'none' });

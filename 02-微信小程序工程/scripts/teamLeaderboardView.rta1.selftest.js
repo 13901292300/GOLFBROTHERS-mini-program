@@ -9,6 +9,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -16,6 +17,7 @@ var utilsDir = path.join(mini, 'utils');
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 var baselinePath = path.join(__dirname, 'teamLeaderboardView.rta1.baseline.json');
+var mockAvatars = require(path.join(mini, 'utils', 'mockAvatars.js'));
 
 var passed = 0;
 var failed = 0;
@@ -53,8 +55,8 @@ function pkRules(topN) {
 
 function teamGroupsTwo() {
   return [
-    { id: 'red', name: '深圳湾高尔夫红队', sourceTeamLogo: '/assets/mock-avatars/mock-avatar-01.jpg' },
-    { id: 'blue', name: '前海国际蓝队', sourceTeamLogo: '/assets/mock-avatars/mock-avatar-02.jpg' }
+    { id: 'red', name: '深圳湾高尔夫红队', sourceTeamLogo: mockAvatars.avatarByIndex(0) },
+    { id: 'blue', name: '前海国际蓝队', sourceTeamLogo: mockAvatars.avatarByIndex(1) }
   ];
 }
 
@@ -427,6 +429,12 @@ function firstDiff(a, b, prefix) {
     return p + ' ' + JSON.stringify(a) + ' !== ' + JSON.stringify(b);
   }
   if (typeof a !== 'object') {
+    if (
+      /(^|\.)avatar$/.test(p) &&
+      mockAvatars.resolveAvatar(a, '') === mockAvatars.resolveAvatar(b, '')
+    ) {
+      return '';
+    }
     return p + ' ' + JSON.stringify(a) + ' !== ' + JSON.stringify(b);
   }
   if (Array.isArray(a) !== Array.isArray(b)) {
@@ -500,7 +508,7 @@ function pageTeams(match, scoreType) {
 
 function sharedTeams(match, scoreType) {
   if (scoreType === 'net') return pageTeams(match, 'net');
-  var shared = require(path.join(utilsDir, 'teamLeaderboardView.js'));
+  var shared = require(seriesTestPaths.util('teamLeaderboardView.js'));
   var page = makePage('gross');
   return shared.buildGrossTeamLeaderboardView(match, page) || [];
 }
@@ -578,7 +586,7 @@ var liveWxml = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'components', 'live-leaderboard-board', 'index.wxml'),
   'utf8'
 );
-var sharedSrc = fs.readFileSync(path.join(utilsDir, 'teamLeaderboardView.js'), 'utf8');
+var sharedSrc = fs.readFileSync(seriesTestPaths.util('teamLeaderboardView.js'), 'utf8');
 var seriesVm = fs.readFileSync(path.join(seriesDir, 'seriesStandingsViewModel.js'), 'utf8');
 
 assert(
@@ -623,6 +631,12 @@ assert(
 );
 
 assert(
+  'page and shared map avatars via mockAvatars.resolveAvatar',
+  sharedSrc.indexOf('mockAvatars.resolveAvatar') >= 0 &&
+    detailJs.indexOf('mockAvatars.resolveAvatar') >= 0
+);
+
+assert(
   'shared has no storage write',
   !/setStorageSync|wx\./.test(sharedSrc)
 );
@@ -633,7 +647,7 @@ assert(
     !/buildGrossTeamLeaderboardView/.test(seriesVm)
 );
 
-var sharedMod = require(path.join(utilsDir, 'teamLeaderboardView.js'));
+var sharedMod = require(seriesTestPaths.util('teamLeaderboardView.js'));
 assert(
   'exports builder',
   typeof sharedMod.buildGrossTeamLeaderboardView === 'function' &&

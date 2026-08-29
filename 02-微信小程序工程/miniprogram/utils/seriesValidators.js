@@ -7,6 +7,7 @@
 
 var model = require('./seriesModel.js');
 var seriesRyderCup = require('./seriesRyderCup.js');
+var matchTitlePolicy = require('./matchTitlePolicy.js');
 
 function pushError(errors, code, message, path) {
   errors.push({
@@ -288,12 +289,21 @@ function validateRegistrationFields(series, errors) {
   }
 }
 
+function readTitleBaselinePrevious(options, field) {
+  var baseline = options && options.titleBaseline;
+  if (!baseline || typeof baseline !== 'object') return undefined;
+  if (field === 'seriesName') return baseline.seriesName;
+  if (field === 'seriesSubtitle') return baseline.seriesSubtitle;
+  return undefined;
+}
+
 /**
  * 发布完整校验（本批不接发布；供后续批次使用）
  * @param {object} series
+ * @param {{ titleBaseline?: { seriesName?: string, seriesSubtitle?: string } }} [options]
  * @returns {{ ok: boolean, errors: Array }}
  */
-function validateForPublish(series) {
+function validateForPublish(series, options) {
   var base = validateDraftStructure(series);
   var errors = base.errors.slice();
   var s = series && typeof series === 'object' ? series : null;
@@ -309,6 +319,19 @@ function validateForPublish(series) {
   }
   if (!isNonEmptyString(s.seriesName)) {
     pushError(errors, 'series_name_required', 'seriesName 必填', 'seriesName');
+  } else {
+    var nameCheck = matchTitlePolicy.normalizeSeriesNameInput(s.seriesName, {
+      previous: readTitleBaselinePrevious(options, 'seriesName')
+    });
+    if (!nameCheck.ok) {
+      pushError(errors, 'series_name_length', '系列赛名称最多 18 个字符', 'seriesName');
+    }
+  }
+  var subCheck = matchTitlePolicy.normalizeSeriesSubtitleInput(s.seriesSubtitle, {
+    previous: readTitleBaselinePrevious(options, 'seriesSubtitle')
+  });
+  if (!subCheck.ok) {
+    pushError(errors, 'series_subtitle_length', '副标题最多 12 个字符', 'seriesSubtitle');
   }
   // 发布：私密必须具备恰好 6 位数字访问码（与队际赛 _genAccessCode 形态一致）
   if (s.visibility === 'private') {

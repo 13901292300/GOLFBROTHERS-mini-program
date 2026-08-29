@@ -8,11 +8,12 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
-var assembler = require(path.join(mini, 'utils', 'seriesStandingsAssembler.js'));
+var assembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 var adapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 

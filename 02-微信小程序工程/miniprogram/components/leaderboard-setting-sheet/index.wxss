@@ -91,7 +91,7 @@
 
 .leaderboard-setting__overline {
   display: block;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   font-size: 20rpx;
   font-weight: 900;
   letter-spacing: 0.12em;

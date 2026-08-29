@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -32,13 +33,13 @@ var finishLock = require(path.join(utilsDir, 'seriesFinishLock.js'));
 var aggregate = require(path.join(utilsDir, 'seriesRoundPhaseAggregate.js'));
 var teamMatchFinish = require(path.join(utilsDir, 'teamMatchFinish.js'));
 var registration = require(path.join(utilsDir, 'seriesRegistration.js'));
-var seriesRoundUpdate = require(path.join(utilsDir, 'seriesRoundUpdate.js'));
-var seriesInfoUpdate = require(path.join(utilsDir, 'seriesInfoUpdate.js'));
-var seriesParticipantsUpdate = require(path.join(utilsDir, 'seriesParticipantsUpdate.js'));
+var seriesRoundUpdate = require(seriesTestPaths.util('seriesRoundUpdate.js'));
+var seriesInfoUpdate = require(seriesTestPaths.util('seriesInfoUpdate.js'));
+var seriesParticipantsUpdate = require(seriesTestPaths.util('seriesParticipantsUpdate.js'));
 var manageSheet = require(path.join(seriesDir, 'seriesManageSheetViewModel.js'));
 var scheduleWrite = require(path.join(seriesDir, 'seriesScheduleGroupWrite.js'));
 var listAdapter = require(path.join(utilsDir, 'seriesListCardAdapter.js'));
-var standingsAssembler = require(path.join(utilsDir, 'seriesStandingsAssembler.js'));
+var standingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var moreMenu = require(path.join(utilsDir, 'teamMatchMoreMenu.js'));
 
 var passed = 0;

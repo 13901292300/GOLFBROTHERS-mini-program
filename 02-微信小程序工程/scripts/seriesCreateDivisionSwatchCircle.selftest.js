@@ -13,7 +13,7 @@ var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var createDir = path.join(mini, 'subpackages', 'create', 'pages', 'series');
 var teamInternalDir = path.join(mini, 'subpackages', 'create', 'pages', 'team-internal');
-var commonWxssPath = path.join(mini, 'styles', 'create-team-common.wxss');
+var commonWxssPath = path.join(mini, 'subpackages', 'create', 'styles', 'create-team-common.wxss');
 
 var participantDraft = require(path.join(createDir, 'participantDraft.js'));
 

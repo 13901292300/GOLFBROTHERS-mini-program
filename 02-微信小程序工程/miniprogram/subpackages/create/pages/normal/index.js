@@ -215,7 +215,7 @@ Page({
     const firstGroup = {
       id: 'grp-1',
       players: [
-        { key: 'grp-1-p1', filled: true, playerId: 'me', name: 'TIGERHOODS', avatar: mockAvatars.pickMockAvatar('me') },
+        { key: 'grp-1-p1', filled: true, playerId: 'me', name: (gameStore.getCurrentUser() || {}).name || 'Ken Duan', avatar: mockAvatars.pickMockAvatar('me') },
         { key: 'grp-1-p2', filled: false, name: '玩家2' },
         { key: 'grp-1-p3', filled: false, name: '玩家3' },
         { key: 'grp-1-p4', filled: false, name: '玩家4' }
@@ -312,7 +312,7 @@ Page({
   onSelectCourse() {
     // 打开独立「选择球场」页面（非弹窗），通过事件通道回填 courseName/courseId/courseLocation
     wx.navigateTo({
-      url: '/pages/course/select/index?selectedId=' + (this.data.courseId || ''),
+      url: '/subpackages/create/pages/course/select/index?selectedId=' + (this.data.courseId || ''),
       events: {
         courseSelected: (payload) => {
           if (!payload) return;

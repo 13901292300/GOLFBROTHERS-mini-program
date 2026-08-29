@@ -38,7 +38,7 @@
   --score-color: #CE9224;
   --score-surface: rgba(206, 146, 36, 0.16);
   --score-border: rgba(206, 146, 36, 0.48);
-  --aux-text: #00aeef;
+  --aux-text: var(--data-blue);
   --highlight-strong: #facc15;
   --highlight-on: #002d55;
   --par-color: #CE9224;
@@ -3023,7 +3023,7 @@ page {
   background: #ffffff;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.28);
 }
-.player-tee-marker.border-light { background: #00aeef; }
+.player-tee-marker.border-light { background: var(--data-blue); }
 .player-tee-marker.border-black { background: #111827; }
 
 .diff-under { color: #ef4444 !important; }
@@ -3175,7 +3175,7 @@ page {
   color: #f5620d;
 }
 .score-page.is-score-classic .score-cell.classic-par .hole-cell-score {
-  color: #1c94de;
+  color: var(--data-blue);
 }
 .score-page.is-score-classic .score-cell.classic-bogey .hole-cell-score,
 .score-page.is-score-classic .score-cell.classic-double .hole-cell-score,
@@ -3459,12 +3459,12 @@ page {
 
 /*
  * 演示 Elite 成绩表达（仅 is-score-elite-demo / demo-weekend-amateur）
- * - PAR 主成绩：与 Classic #1c94de 一致（依赖已有 classicClass=classic-par）
+ * - PAR 主成绩：信息蓝 var(--data-blue)（依赖已有 classicClass=classic-par）
  * - 左下 putt：黑
  * - 右下 diff：>0 黑；=0 蓝；<0 红（文案正数无 + 见 classicDiffStr / eliteDiffStr）
  */
 .score-page.is-score-elite-demo .score-cell.classic-par .hole-cell-score {
-  color: #1c94de;
+  color: var(--data-blue);
 }
 .score-page.is-score-elite-demo .hole-cell-putt,
 .score-page.is-score-elite-demo .special-cell-putt {
@@ -3485,7 +3485,7 @@ page {
 }
 .score-page.is-score-elite-demo .hole-cell-diff.diff-even,
 .score-page.is-score-elite-demo .special-cell-diff.diff-even {
-  color: #1c94de !important;
+  color: var(--data-blue) !important;
 }
 .score-page.is-score-elite-demo .hole-cell-diff.diff-under,
 .score-page.is-score-elite-demo .special-cell-diff.diff-under {
@@ -4629,7 +4629,7 @@ page {
 .special-cell-putt {
   font-size: 16rpx;
   font-weight: 700;
-  color: #00aeef;
+  color: var(--data-blue);
   opacity: 0.8;
   line-height: 1;
 }
@@ -4718,7 +4718,7 @@ page {
   flex: 1;
   background: transparent;
   border: 1px solid var(--border-color);
-  color: #00aeef;
+  color: var(--data-blue);
   font-size: 28rpx;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -5927,7 +5927,7 @@ page {
   line-height: 1.2;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 
 .manual-sheet__title {

@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -449,7 +450,7 @@ function lockInput(series, roundId, harness) {
 })();
 
 (function testWiring() {
-  var lineupJs = read(path.join(utilsDir, 'seriesNoRepeatLineup.js'));
+  var lineupJs = read(seriesTestPaths.util('seriesNoRepeatLineup.js'));
   var pickJs = read(path.join(groupPickDir, 'index.js'));
   var pickWxml = read(path.join(groupPickDir, 'index.wxml'));
   var editorJs = read(path.join(groupEditorDir, 'index.js'));

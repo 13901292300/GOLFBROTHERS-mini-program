@@ -6,6 +6,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 
 var seriesIds = require(path.join(utilsDir, 'seriesIds.js'));
@@ -13,7 +14,7 @@ var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesValidators = require(path.join(utilsDir, 'seriesValidators.js'));
 var seriesStoreMod = require(path.join(utilsDir, 'seriesStore.js'));
 var seriesStationIndexMod = require(path.join(utilsDir, 'seriesStationIndex.js'));
-var seriesScoring = require(path.join(utilsDir, 'seriesScoring.js'));
+var seriesScoring = require(seriesTestPaths.util('seriesScoring.js'));
 var roundDraft = require(path.join(
   __dirname,
   '..',
@@ -2046,8 +2047,12 @@ function freezeClone(value) {
   assert('名称 trim 合法', nameOk.ok && nameOk.value === '系列赛A');
   assert('名称空非法', basicInfoDraft.normalizeSeriesNameInput('   ').ok === false);
   assert(
+    '名称 18 字合法',
+    basicInfoDraft.normalizeSeriesNameInput(Array(18).fill('啊').join('')).ok === true
+  );
+  assert(
     '名称超长非法',
-    basicInfoDraft.normalizeSeriesNameInput(Array(41).fill('啊').join('')).ok === false
+    basicInfoDraft.normalizeSeriesNameInput(Array(19).fill('啊').join('')).ok === false
   );
 
   var emptySubDraft = seriesModel.createEmptySeriesDraft({});
@@ -2072,12 +2077,25 @@ function freezeClone(value) {
   assert('副标题空合法且清换行', basicInfoDraft.normalizeSeriesSubtitleInput('').ok === true);
   assert('副标题 trim 合法', subOk.ok && subOk.value === '第二行');
   assert(
-    '副标题超长非法',
-    basicInfoDraft.normalizeSeriesSubtitleInput(Array(29).fill('啊').join('')).ok === false
+    '副标题 12 字合法',
+    basicInfoDraft.normalizeSeriesSubtitleInput(Array(12).fill('啊').join('')).ok === true
   );
   assert(
-    'SERIES_SUBTITLE_MAX=28',
-    basicInfoDraft.SERIES_SUBTITLE_MAX === 28
+    '名称清除换行',
+    basicInfoDraft.normalizeSeriesNameInput('春\n季\r对决\u2028').ok &&
+      basicInfoDraft.normalizeSeriesNameInput('春\n季\r对决\u2028').value === '春季对决'
+  );
+  assert(
+    '副标题超长非法',
+    basicInfoDraft.normalizeSeriesSubtitleInput(Array(13).fill('啊').join('')).ok === false
+  );
+  assert(
+    'SERIES_NAME_MAX=18',
+    basicInfoDraft.SERIES_NAME_MAX === 18
+  );
+  assert(
+    'SERIES_SUBTITLE_MAX=12',
+    basicInfoDraft.SERIES_SUBTITLE_MAX === 12
   );
 
   var createWxml = fs.readFileSync(

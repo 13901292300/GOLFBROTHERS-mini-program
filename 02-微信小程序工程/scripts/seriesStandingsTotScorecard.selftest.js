@@ -6,10 +6,11 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..', 'miniprogram', 'utils');
 var teamMatchScorecard = require(path.join(root, 'teamMatchScorecard.js'));
-var seriesStandingsAssembler = require(path.join(root, 'seriesStandingsAssembler.js'));
+var seriesStandingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(
   __dirname,
   '..',

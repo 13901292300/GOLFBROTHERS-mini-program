@@ -2,7 +2,7 @@
  * Series 讨论区会话投影（页面会话内，不持久化）
  * - 房间语义：seriesId（整 Series 共用，不按 R/分站拆分）
  * - 不读写 seriesStore / teamMatchStore / 分站 match
- * - 讨论 TAB 始终展示底部输入栏；draft/历史只读禁用，published 可发言
+ * - 讨论 TAB 生命周期：输入栏资格由本模块给出；几何显隐由 bottom dock 门闩决定
  */
 
 var mockAvatars = require('../../../../utils/mockAvatars.js');
@@ -24,7 +24,8 @@ function resolveDiscussionCanSpeak(lifecycleAccess) {
 }
 
 /**
- * 输入栏状态：始终可见；按生命周期决定禁用与占位文案。
+ * 输入栏业务状态：资格始终为可展示；按生命周期决定禁用与占位文案。
+ * 页面几何显隐不在本函数内计算。
  * @param {object|null|undefined} lifecycleAccess
  * @returns {{
  *   canSpeak: boolean,

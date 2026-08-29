@@ -6,6 +6,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
@@ -14,8 +15,8 @@ var seriesIds = require(path.join(utilsDir, 'seriesIds.js'));
 var seriesStoreMod = require(path.join(utilsDir, 'seriesStore.js'));
 var seriesRegistration = require(path.join(utilsDir, 'seriesRegistration.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var seriesPublish = require(path.join(utilsDir, 'seriesPublish.js'));
-var seriesPublishJournal = require(path.join(utilsDir, 'seriesPublishJournal.js'));
+var seriesPublish = require(seriesTestPaths.util('seriesPublish.js'));
+var seriesPublishJournal = require(seriesTestPaths.util('seriesPublishJournal.js'));
 var seriesStationIndex = require(path.join(utilsDir, 'seriesStationIndex.js'));
 
 var passed = 0;

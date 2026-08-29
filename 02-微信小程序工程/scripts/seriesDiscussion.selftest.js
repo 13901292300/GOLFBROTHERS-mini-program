@@ -27,6 +27,7 @@ var componentsDir = path.join(__dirname, '..', 'miniprogram', 'components', 'dis
 var timeline = require(path.join(utilsDir, 'discussionTimeline.js'));
 var discussionVm = require(path.join(pageDir, 'seriesDiscussionViewModel.js'));
 var detailVm = require(path.join(pageDir, 'seriesDetailViewModel.js'));
+var dock = require(path.join(pageDir, 'seriesBottomDockVisibility.js'));
 
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
@@ -212,11 +213,118 @@ assert(
     discCancelled.canSpeak === false &&
     discCancelled.inputPlaceholder === discussionVm.PLACEHOLDER_HISTORICAL
 );
+var archivedAccess = detailVm.resolveLifecycleAccess(
+  { lifecycleStatus: 'archived' },
+  {}
+);
+var discArchived = discussionVm.buildSeriesDiscussionViewModel({
+  seriesId: 'series-disc-1',
+  lifecycleAccess: archivedAccess
+});
 assert(
-  '不再依赖 scrollYState 控制输入栏',
-  pageJs.indexOf('discussionCanSpeak && scrollTop >= 100') < 0 &&
-    pageJs.indexOf('discussionCanSpeak && top >= 100') < 0 &&
-    pageWxml.indexOf('show-input-bar="{{true}}"') >= 0
+  '滚动不改变业务权限；最终输入栏可见性走报名同源几何门闩',
+  (function () {
+    var discBlockStart = pageWxml.indexOf('id="series-discussion"');
+    var discBlockEnd = pageWxml.indexOf('</discussion>', discBlockStart);
+    var discBlock =
+      discBlockStart >= 0 && discBlockEnd > discBlockStart
+        ? pageWxml.slice(discBlockStart, discBlockEnd)
+        : '';
+    function inputKey(access) {
+      var s = discussionVm.resolveDiscussionInputState(access);
+      return [s.showInputBar, s.inputDisabled, s.canSpeak, s.inputPlaceholder].join('|');
+    }
+    var geoBase = {
+      isStickyTab: false,
+      tabOffsetTop: 500,
+      tabBarHeight: 50,
+      headerTotalHeight: 92,
+      screenHeight: 667,
+      discussion: { showInputBar: true }
+    };
+    function dockInput(over) {
+      return dock.resolveSeriesBottomDockVisibility(
+        Object.assign({ activeTab: 'discussion' }, geoBase, over || {})
+      );
+    }
+    var hidden = dockInput({ scrollTop: 0, isStickyTab: false });
+    var shown = dockInput({ scrollTop: 120, isStickyTab: false });
+    var sticky = dockInput({ scrollTop: 500, isStickyTab: true });
+    var back = dockInput({ scrollTop: 0, isStickyTab: false });
+    var overlay = dockInput({
+      scrollTop: 120,
+      isStickyTab: false,
+      isManageOverlayActive: true
+    });
+    var otherTab = dock.resolveSeriesBottomDockVisibility(
+      Object.assign({}, geoBase, {
+        activeTab: 'info',
+        scrollTop: 120,
+        discussion: { showInputBar: true }
+      })
+    );
+    var noElig = dockInput({
+      scrollTop: 120,
+      discussion: { showInputBar: false }
+    });
+    var regHidden = dock.resolveSeriesBottomDockVisibility(
+      Object.assign({}, geoBase, {
+        activeTab: 'register',
+        scrollTop: 0,
+        register: { cta: { label: '立即报名' } }
+      })
+    );
+    var regShown = dock.resolveSeriesBottomDockVisibility(
+      Object.assign({}, geoBase, {
+        activeTab: 'register',
+        scrollTop: 120,
+        register: { cta: { label: '立即报名' } }
+      })
+    );
+    var pubKey = inputKey(publishedAccess);
+    var draftKey = inputKey(draftAccess);
+    var cancelledKey = inputKey(cancelledAccess);
+    var archivedKey = inputKey(archivedAccess);
+    var draftShown = dock.resolveSeriesBottomDockVisibility(
+      Object.assign({}, geoBase, {
+        activeTab: 'discussion',
+        scrollTop: 120,
+        discussion: { showInputBar: discDraft.showInputBar }
+      })
+    );
+    return (
+      pubKey === 'true|false|true|' + discussionVm.PLACEHOLDER_PUBLISHED &&
+      draftKey === 'true|true|false|' + discussionVm.PLACEHOLDER_DRAFT &&
+      cancelledKey === 'true|true|false|' + discussionVm.PLACEHOLDER_HISTORICAL &&
+      archivedKey === 'true|true|false|' + discussionVm.PLACEHOLDER_HISTORICAL &&
+      discPub.showInputBar === true &&
+      discDraft.showInputBar === true &&
+      discCancelled.showInputBar === true &&
+      discArchived.showInputBar === true &&
+      discArchived.inputDisabled === true &&
+      hidden.hideBottomCta === regHidden.hideBottomCta &&
+      shown.hideBottomCta === regShown.hideBottomCta &&
+      hidden.showDiscussionInput === false &&
+      shown.showDiscussionInput === true &&
+      sticky.showDiscussionInput === true &&
+      back.showDiscussionInput === false &&
+      overlay.showDiscussionInput === false &&
+      otherTab.showDiscussionInput === false &&
+      noElig.showDiscussionInput === false &&
+      draftShown.showDiscussionInput === true &&
+      discDraft.inputDisabled === true &&
+      discBlock.indexOf('show-input-bar="{{showDiscussionInput}}"') >= 0 &&
+      discBlock.indexOf('input-disabled="{{discussionInputDisabled}}"') >= 0 &&
+      discBlock.indexOf('scrollYState') < 0 &&
+      discBlock.indexOf('discussionShowInputBar') < 0 &&
+      /wx:if="\{\{[^}]*scrollYState/.test(discBlock) === false &&
+      pageJs.indexOf('discussionShowInputBar: !!disc.showInputBar') >= 0 &&
+      pageJs.indexOf('discussionCanSpeak && scrollTop >= 100') < 0 &&
+      pageJs.indexOf("discussion: { showInputBar: !!discussionPatch.discussionShowInputBar }") >=
+        0 &&
+      detailWxml.indexOf('show-input-bar="{{scrollYState >= 100}}"') >= 0
+    );
+  })()
 );
 
 // ===== Page wiring / no store writes =====

@@ -6,12 +6,13 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStoreMod = require(path.join(utilsDir, 'seriesStore.js'));
-var seriesPublish = require(path.join(utilsDir, 'seriesPublish.js'));
-var seriesPublishJournal = require(path.join(utilsDir, 'seriesPublishJournal.js'));
+var seriesPublish = require(seriesTestPaths.util('seriesPublish.js'));
+var seriesPublishJournal = require(seriesTestPaths.util('seriesPublishJournal.js'));
 var seriesStationIndex = require(path.join(utilsDir, 'seriesStationIndex.js'));
 var seriesListCardAdapter = require(path.join(utilsDir, 'seriesListCardAdapter.js'));
 
@@ -27,7 +28,7 @@ var adapterPath = path.join(
 );
 var seriesPublishAdapter = require(adapterPath);
 
-var publishSrc = fs.readFileSync(path.join(utilsDir, 'seriesPublish.js'), 'utf8');
+var publishSrc = fs.readFileSync(seriesTestPaths.util('seriesPublish.js'), 'utf8');
 var homeSrc = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'pages', 'home', 'index.js'),
   'utf8'

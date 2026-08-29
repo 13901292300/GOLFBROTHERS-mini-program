@@ -13,12 +13,13 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..', 'miniprogram', 'utils');
 var seriesModel = require(path.join(root, 'seriesModel.js'));
-var seriesScoring = require(path.join(root, 'seriesScoring.js'));
-var seriesResultAdapter = require(path.join(root, 'seriesResultAdapter.js'));
-var seriesStandingsAssembler = require(path.join(root, 'seriesStandingsAssembler.js'));
+var seriesScoring = require(seriesTestPaths.util('seriesScoring.js'));
+var seriesResultAdapter = require(seriesTestPaths.util('seriesResultAdapter.js'));
+var seriesStandingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(
   __dirname,
   '..',
@@ -576,7 +577,7 @@ function makeManagedMatch(opts) {
 (function testPageWiring() {
   assert(
     '页面引入 seriesStandingsAssembler',
-    pageJs.indexOf("require('../../../../utils/seriesStandingsAssembler.js')") >= 0
+    pageJs.indexOf("require('../../utils/seriesStandingsAssembler.js')") >= 0
   );
   assert(
     'reloadViewModel 调用 buildStandingsResult',

@@ -13,7 +13,7 @@ const DEMO_WEEKEND_AMATEUR_TITLE = '周末业余挑战赛';
  * Demo 第一视角测试入口身份（展示名 / 约定 id）。
  * 种子数据里该球员 playerId/userId 为 "me"；正式产品勿复用此判断。
  */
-const DEMO_SELF_PLAYER_KEY = 'TIGERHOODS';
+const DEMO_SELF_PLAYER_KEY = 'Ken Duan';
 const DEMO_SELF_PLAYER_IDS = ['TIGERHOODS', 'me'];
 
 /** 固化种子（深拷贝自源 GAME；运行时 ensure 再深拷贝一份写入 Storage） */
@@ -45,7 +45,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             {
               "playerId": "me",
               "userId": "me",
-              "name": "TIGERHOODS",
+              "name": "Ken Duan",
               "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
               "gender": "",
               "tPosition": "",
@@ -65,7 +65,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             {
               "playerId": "me",
               "userId": "me",
-              "name": "TIGERHOODS",
+              "name": "Ken Duan",
               "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
               "gender": "",
               "tPosition": "",
@@ -134,7 +134,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           "seatIndex": 1,
           "teamId": "team-1",
           "playerId": "me",
-          "name": "TIGERHOODS",
+          "name": "Ken Duan",
           "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
           "gender": "",
           "tPosition": "",
@@ -187,7 +187,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           {
             "playerId": "me",
             "userId": "me",
-            "name": "TIGERHOODS",
+            "name": "Ken Duan",
             "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
             "gender": "",
             "tPosition": "",
@@ -207,7 +207,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
           {
             "playerId": "me",
             "userId": "me",
-            "name": "TIGERHOODS",
+            "name": "Ken Duan",
             "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
             "gender": "",
             "tPosition": "",
@@ -277,7 +277,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
         "seatIndex": 1,
         "teamId": "team-1",
         "playerId": "me",
-        "name": "TIGERHOODS",
+        "name": "Ken Duan",
         "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
         "gender": "",
         "tPosition": "",
@@ -321,7 +321,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
   "playersSlots": [
     {
       "playerId": "me",
-      "name": "TIGERHOODS",
+      "name": "Ken Duan",
       "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
       "gender": "",
       "tPosition": ""
@@ -356,7 +356,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
       "playersSlots": [
         {
           "playerId": "me",
-          "name": "TIGERHOODS",
+          "name": "Ken Duan",
           "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
           "gender": "",
           "tPosition": ""
@@ -429,7 +429,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               {
                 "playerId": "me",
                 "userId": "me",
-                "name": "TIGERHOODS",
+                "name": "Ken Duan",
                 "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
                 "gender": "",
                 "tPosition": "",
@@ -449,7 +449,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
               {
                 "playerId": "me",
                 "userId": "me",
-                "name": "TIGERHOODS",
+                "name": "Ken Duan",
                 "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
                 "gender": "",
                 "tPosition": "",
@@ -518,7 +518,7 @@ const DEMO_WEEKEND_AMATEUR_GAME_SEED = {
             "seatIndex": 1,
             "teamId": "team-1",
             "playerId": "me",
-            "name": "TIGERHOODS",
+            "name": "Ken Duan",
             "avatar": "https://partnerlogo-1440519371.cos.ap-beijing.myqcloud.com/miniprogram/mock-avatars/mock-avatar-01.jpg",
             "gender": "",
             "tPosition": "",
@@ -591,14 +591,31 @@ function getDemoWeekendAmateurGame() {
   return deepClone(DEMO_WEEKEND_AMATEUR_GAME_SEED);
 }
 
+function renameSelfDisplayName(node) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    node.forEach(renameSelfDisplayName);
+    return;
+  }
+  if (node.name === 'TIGERHOODS') node.name = 'Ken Duan';
+  if (node.nickname === 'TIGERHOODS') node.nickname = 'Ken Duan';
+  Object.keys(node).forEach((k) => {
+    if (node[k] && typeof node[k] === 'object') renameSelfDisplayName(node[k]);
+  });
+}
+
 /**
  * 确保 demo-weekend-amateur 已在 gameStore：
  * - 不存在 → saveGame 写入种子深拷贝
- * - 已存在 → 不覆盖（保留用户测试数据）
+ * - 已存在 → 仅把旧展示名 TIGERHOODS 同步为 Ken Duan（不覆盖成绩）
  */
 function ensureDemoWeekendAmateurGame() {
   const existing = gameStore.getGame(DEMO_WEEKEND_AMATEUR_GAME_ID);
-  if (existing) return existing;
+  if (existing) {
+    renameSelfDisplayName(existing);
+    gameStore.saveGame(existing);
+    return existing;
+  }
   const next = getDemoWeekendAmateurGame();
   gameStore.saveGame(next);
   return next;
@@ -609,7 +626,7 @@ function isDemoWeekendAmateurGameId(gameId) {
 }
 
 /**
- * Demo-only：是否为第一视角测试目标（TIGERHOODS）。
+ * Demo-only：是否为第一视角测试目标（Ken Duan / 当前用户）。
  * 不替代正式 currentUser 身份判断；仅 demo-weekend-amateur 生效。
  *
  * @param {string} gameId
@@ -637,7 +654,7 @@ function isDemoSelfPlayer(gameId, playerOrId) {
 }
 
 /**
- * Demo-only：🚀 允许以 TIGERHOODS 为 Observer 火箭受击目标。
+ * Demo-only：🚀 允许以 Ken Duan 为 Observer 火箭受击目标。
  * 不改 currentUserId / 正式 Self 判断；其它 reaction 仍走 isDemoSelfPlayer。
  *
  * @param {string} gameId

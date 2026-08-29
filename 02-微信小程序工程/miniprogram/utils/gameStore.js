@@ -32,15 +32,34 @@ const teeSheetManage = require('./teeSheetManage.js');
 // 当前登录用户（占位；接入真实账号体系后替换）
 const CURRENT_USER = {
   userId: 'me',
-  name: 'TIGERHOODS',
+  name: 'Ken Duan',
   gender: '男',
   phone: '13800000000',
   avatar: mockAvatars.avatarByIndex(2)
 };
 
 const USER_PHONE_OVERRIDE_KEY = 'gb_current_user_phone_v1';
+const USER_IDENTITY_KEY = 'gb_current_user_identity_v1';
+
+function _applyIdentityRaw(raw) {
+  if (!raw || typeof raw !== 'object') return;
+  if (raw.name != null && String(raw.name).trim()) CURRENT_USER.name = String(raw.name).trim();
+  if (raw.avatar != null && String(raw.avatar).trim()) CURRENT_USER.avatar = String(raw.avatar).trim();
+  if (raw.gender != null && String(raw.gender).trim()) CURRENT_USER.gender = String(raw.gender).trim();
+}
+
+function _loadIdentityOverride() {
+  try {
+    _applyIdentityRaw(wx.getStorageSync(USER_IDENTITY_KEY));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+_loadIdentityOverride();
 
 function getCurrentUser() {
+  _loadIdentityOverride();
   const user = Object.assign({}, CURRENT_USER);
   try {
     const override = wx.getStorageSync(USER_PHONE_OVERRIDE_KEY);
@@ -51,6 +70,21 @@ function getCurrentUser() {
     /* ignore */
   }
   return user;
+}
+
+/** 资料编辑页确认后：更新当前用户昵称 / 头像 / 性别（本地覆盖） */
+function applyCurrentUserIdentity(patch) {
+  _applyIdentityRaw(patch || {});
+  try {
+    wx.setStorageSync(USER_IDENTITY_KEY, {
+      name: CURRENT_USER.name,
+      avatar: CURRENT_USER.avatar,
+      gender: CURRENT_USER.gender
+    });
+  } catch (e) {
+    /* ignore */
+  }
+  return getCurrentUser();
 }
 
 /** 更新当前用户手机号（本地覆盖，供绑定流程写入） */
@@ -547,6 +581,7 @@ function removeGame(gameId) {
 
 module.exports = {
   getCurrentUser,
+  applyCurrentUserIdentity,
   setCurrentUserPhone,
   ensureCurrentUserRegistered,
   listGames,

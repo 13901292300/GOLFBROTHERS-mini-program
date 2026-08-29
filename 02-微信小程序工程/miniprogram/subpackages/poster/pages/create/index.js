@@ -3,6 +3,7 @@ const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 Page({
   data: {
     roundId: '',
+    themeClass: 'bright-mode',
     headerRootStyle: '',
     headerBarStyle: '',
     headerTotalHeight: 0,
@@ -23,13 +24,36 @@ Page({
       /* ignore */
     }
     const headerTotalHeight = header.metrics.headerTotalHeight;
+    let theme = 'bright';
+    try {
+      const app = getApp();
+      if (app && typeof app.getTheme === 'function') theme = app.getTheme() || 'bright';
+    } catch (e) {
+      theme = 'bright';
+    }
     this.setData({
       headerRootStyle: header.headerRootStyle,
       headerBarStyle: header.headerBarStyle,
       headerTotalHeight: headerTotalHeight,
       posterContainerStyle: 'padding-top:' + headerTotalHeight + 'px;',
-      roundId: fromQuery || fromGlobal || ''
+      roundId: fromQuery || fromGlobal || '',
+      themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode'
     });
+  },
+
+  onShow() {
+    this.applyTheme();
+  },
+
+  applyTheme() {
+    let theme = 'bright';
+    try {
+      const app = getApp();
+      if (app && typeof app.getTheme === 'function') theme = app.getTheme() || 'bright';
+    } catch (e) {
+      theme = 'bright';
+    }
+    this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
   },
 
   onHide() {

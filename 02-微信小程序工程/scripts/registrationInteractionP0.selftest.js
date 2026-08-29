@@ -7,10 +7,11 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
-var model = require(path.join(mini, 'utils', 'registrationInteractionModel.js'));
+var model = require(seriesTestPaths.util('registrationInteractionModel.js'));
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 var compDir = path.join(mini, 'components', 'registration-cancel-dialog');
@@ -89,7 +90,7 @@ assert(
 
 assert(
   '普通 detail 已消费共享 model/component',
-  detailJs.indexOf("require('../../../../utils/registrationInteractionModel.js')") >= 0 &&
+  detailJs.indexOf("require('../../utils/registrationInteractionModel.js')") >= 0 &&
     detailJs.indexOf('buildRegistrationClosedModal') >= 0 &&
     detailJs.indexOf('buildSelfCancelDialogModel') >= 0 &&
     detailJs.indexOf('buildPaidCancellationWarningModel') >= 0 &&

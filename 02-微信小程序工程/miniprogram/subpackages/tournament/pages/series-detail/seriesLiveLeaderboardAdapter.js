@@ -55,7 +55,7 @@ function projectSeriesRnLiveLeaderboard(input) {
   var view = sel.view;
   var scoreType = sel.scoreType;
 
-  if (selectedKey === standingsViewModel.CUMULATIVE_KEY) {
+  if (standingsViewModel.isCumulativeStandingsKey(selectedKey)) {
     return {
       useLive: false,
       reason: 'tot',

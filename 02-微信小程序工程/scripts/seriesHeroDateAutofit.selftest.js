@@ -67,6 +67,21 @@ function fontSizeRpx(rule) {
   return m ? Number(m[1]) : NaN;
 }
 
+function eventDateClassAttr(wxml) {
+  var m = String(wxml || '').match(/<text\s+class="(event-date[^"]*)"/);
+  return m ? m[1] : '';
+}
+
+function heroDateBindsSizeClass(wxml) {
+  var cls = eventDateClassAttr(wxml);
+  return (
+    cls.indexOf('{{hero.dateRangeSizeClass}}') >= 0 &&
+    String(wxml || '').indexOf('hero.dateText.length') < 0 &&
+    String(wxml || '').indexOf('dateText.length') < 0 &&
+    !/\{\{[^}]*length[^}]*event-date--/.test(String(wxml || ''))
+  );
+}
+
 function accessPublished() {
   return {
     ok: true,
@@ -229,9 +244,9 @@ assert(
 
 assert(
   'WXML 使用 dateRangeSizeClass，无长度表达式',
-  pageWxml.indexOf('class="event-date {{hero.dateRangeSizeClass}}"') >= 0 &&
-    pageWxml.indexOf('hero.dateText.length') < 0 &&
-    pageWxml.indexOf('dateText.length') < 0
+  heroDateBindsSizeClass(pageWxml) &&
+    eventDateClassAttr(pageWxml).indexOf('event-date--gold') >= 0 &&
+    eventDateClassAttr(pageWxml).indexOf('event-date--live') >= 0
 );
 assert(
   '页面不用测量缩放日期',

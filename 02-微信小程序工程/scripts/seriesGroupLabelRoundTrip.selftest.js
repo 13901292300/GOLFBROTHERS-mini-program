@@ -10,6 +10,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -50,8 +51,8 @@ global.wx = {
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var tournamentGroupDraft = require(path.join(utilsDir, 'tournamentGroupDraft.js'));
-var tournamentGroupCardView = require(path.join(utilsDir, 'tournamentGroupCardView.js'));
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
+var tournamentGroupCardView = require(seriesTestPaths.util('tournamentGroupCardView.js'));
 var strokeGroupSeatNormalizer = require(path.join(utilsDir, 'strokeGroupSeatNormalizer.js'));
 var teamMatchStore = require(path.join(utilsDir, 'teamMatchStore.js'));
 var tPosition = require(path.join(utilsDir, 'tPosition.js'));
@@ -556,8 +557,8 @@ function productionSaveGroups(match, draft) {
     path.join(pageDir, 'index.js'),
     path.join(groupEditorDir, 'index.js'),
     path.join(groupPickDir, 'index.js'),
-    path.join(utilsDir, 'tournamentGroupDraft.js'),
-    path.join(utilsDir, 'tournamentGroupCardView.js'),
+    seriesTestPaths.util('tournamentGroupDraft.js'),
+    seriesTestPaths.util('tournamentGroupCardView.js'),
     path.join(utilsDir, 'strokeGroupSeatNormalizer.js')
   ];
   var diagHit = '';

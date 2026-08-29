@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var paths = require('./lib/seriesTestPaths.js');
 
 var standingsPath = path.join(
   __dirname,
@@ -351,7 +352,7 @@ function fixtureStandingsResult() {
   var result = fixtureStandingsResult();
   var vm = standingsVm.buildSeriesStandingsViewModel({
     series: baseSeries(),
-    selectedKey: 'cumulative',
+    selectedKey: 'r3',
     expandedParticipantId: '',
     roundStates: roundStatesFixture(),
     standingsResult: result
@@ -388,16 +389,24 @@ function fixtureStandingsResult() {
   };
   var g = standingsVm.buildSeriesStandingsViewModel({
     series: baseSeries(),
-    selectedKey: 'cumulative',
+    selectedKey: 'r3',
     expandedParticipantId: 'team:a',
     roundStates: roundStatesFixture(),
     standingsResult: onlyGross
   });
   assert('有 TOTAL 无 toPar 时 TO PAR 为 -', g.teamRows[0].grossTotal === '428' && g.teamRows[0].scoreStr === '-');
+  var gTot = standingsVm.buildSeriesStandingsViewModel({
+    series: baseSeries(),
+    selectedKey: 'total',
+    expandedParticipantId: 'team:a',
+    roundStates: roundStatesFixture(),
+    standingsResult: onlyGross
+  });
   assert(
     '展开无 toParValue 时 TO PAR 为 - 且不塞总杆',
-    g.teamRows[0].players[0].scoreStr === '-' &&
-      g.teamRows[0].players[0].scoreStr !== '72'
+    gTot.selectedKey === 'total' &&
+      gTot.teamRows[0].players[0].scoreStr === '-' &&
+      gTot.teamRows[0].players[0].scoreStr !== '72'
   );
 })();
 
@@ -555,23 +564,24 @@ function fixtureStandingsResult() {
     standingsResult: standingsVm.emptyStandingsResult()
   });
   assert(
-    '累计显示文案为TOT且key仍为cumulative',
-    vm.totalSelector &&
-      vm.totalSelector.key === 'cumulative' &&
-      vm.totalSelector.label === 'TOT' &&
-      vm.totalSelector.isSelected === false &&
-      vm.roundSelector[0].key === 'cumulative' &&
-      vm.roundSelector[0].label === 'TOT'
+    '累计显示文案为TOTAL且key为total',
+    vm.totalSelector == null &&
+      vm.showTot === false &&
+      vm.roundSelector[0].key === 'total' &&
+      vm.roundSelector[0].label === 'TOTAL' &&
+      String(vm.roundSelector[0].displayText).indexOf('TOTAL · 取全队前') === 0 &&
+      vm.roundSelectorItems[0].key === 'total' &&
+      vm.roundSelectorItems[0].isSelected === false
   );
   assert(
-    'R项不在 totalSelector、全在 roundSelectorItems',
+    'TOTAL 是 dropdown 第一项，Rx 仍在 roundSelectorItems',
     Array.isArray(vm.roundSelectorItems) &&
-      vm.roundSelectorItems.length === roundStatesFixture().length &&
-      vm.roundSelectorItems.every(function (x) {
-        return x.key !== 'cumulative';
-      }) &&
-      !vm.roundSelectorItems.some(function (x) {
-        return x.label === 'TOT';
+      vm.roundSelectorItems[0].key === 'total' &&
+      vm.roundSelectorItems.filter(function (x) {
+        return x.key !== 'total';
+      }).length === roundStatesFixture().length &&
+      vm.roundSelectorItems.some(function (x) {
+        return x.key === 'r3';
       })
   );
   var live = vm.roundSelectorItems.find(function (x) {
@@ -586,17 +596,23 @@ function fixtureStandingsResult() {
     standingsResult: standingsVm.emptyStandingsResult()
   });
   assert(
-    '无轮次时仍显示TOT',
-    totOnly.totalSelector.label === 'TOT' &&
-      totOnly.totalSelector.isSelected === true &&
-      totOnly.roundSelectorItems.length === 0
+    '无轮次时仍显示TOTAL',
+    totOnly.selectedKey === 'total' &&
+      totOnly.totalSelector == null &&
+      totOnly.roundSelectorItems.length === 1 &&
+      totOnly.roundSelectorItems[0].key === 'total' &&
+      totOnly.roundSelectorItems[0].isSelected === true
   );
 
-  var parts = standingsVm.buildRoundSelectorParts(roundStatesFixture(), 'cumulative');
+  var parts = standingsVm.buildRoundSelectorParts(roundStatesFixture(), 'cumulative', {
+    series: baseSeries()
+  });
   assert(
     '拆分纯函数稳定且不依赖 index===0',
-    parts.totalSelector.key === 'cumulative' &&
-      parts.roundSelectorItems[0].label === 'R1'
+    parts.totalSelector == null &&
+      parts.selectedKey === 'total' &&
+      parts.roundSelectorItems[0].key === 'total' &&
+      parts.roundSelectorItems[1].label === 'R1'
   );
 })();
 
@@ -605,14 +621,7 @@ function fixtureStandingsResult() {
   var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
   var pageWxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
   var dockWxml = fs.readFileSync(
-    path.join(
-      __dirname,
-      '..',
-      'miniprogram',
-      'components',
-      'series-round-selector-dock',
-      'index.wxml'
-    ),
+    path.join(paths.TOUR_COMPONENTS, 'series-round-selector-dock', 'index.wxml'),
     'utf8'
   );
   var standingsSrc = fs.readFileSync(standingsPath, 'utf8');

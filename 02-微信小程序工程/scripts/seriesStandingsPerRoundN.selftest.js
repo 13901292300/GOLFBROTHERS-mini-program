@@ -6,6 +6,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var seriesDir = path.join(
@@ -18,14 +19,14 @@ var seriesDir = path.join(
   'series-detail'
 );
 
-var seriesScoring = require(path.join(utilsDir, 'seriesScoring.js'));
-var seriesStandingsAssembler = require(path.join(utilsDir, 'seriesStandingsAssembler.js'));
+var seriesScoring = require(seriesTestPaths.util('seriesScoring.js'));
+var seriesStandingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 
 var pageJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(seriesDir, 'index.wxml'), 'utf8');
 var pageWxss = fs.readFileSync(path.join(seriesDir, 'index.wxss'), 'utf8');
-var assemblerSrc = fs.readFileSync(path.join(utilsDir, 'seriesStandingsAssembler.js'), 'utf8');
+var assemblerSrc = fs.readFileSync(seriesTestPaths.util('seriesStandingsAssembler.js'), 'utf8');
 var vmSrc = fs.readFileSync(path.join(seriesDir, 'seriesStandingsViewModel.js'), 'utf8');
 
 var passed = 0;
@@ -488,8 +489,9 @@ assert(
     assemblerSrc.indexOf("mode !== 'global_m' && mode !== 'per_round_n'") >= 0
 );
 assert(
-  '18 VM 默认 includeTot 为 true',
-  /includeTot !== false/.test(vmSrc)
+  '18 VM TOTAL 仅由 scoringRule.mode === global_m 决定',
+  vmSrc.indexOf('shouldIncludeTotalSelector') >= 0 &&
+    /scoringRuleMode\(series\) === 'global_m'/.test(vmSrc)
 );
 
 assert(

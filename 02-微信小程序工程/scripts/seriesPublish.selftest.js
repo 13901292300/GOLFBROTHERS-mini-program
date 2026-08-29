@@ -8,14 +8,15 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStoreMod = require(path.join(utilsDir, 'seriesStore.js'));
 var seriesStationIndexMod = require(path.join(utilsDir, 'seriesStationIndex.js'));
-var seriesPublishJournalMod = require(path.join(utilsDir, 'seriesPublishJournal.js'));
+var seriesPublishJournalMod = require(seriesTestPaths.util('seriesPublishJournal.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var seriesPublish = require(path.join(utilsDir, 'seriesPublish.js'));
+var seriesPublish = require(seriesTestPaths.util('seriesPublish.js'));
 var teamMatchStore = require(path.join(utilsDir, 'teamMatchStore.js'));
 
 var passed = 0;
@@ -1098,7 +1099,7 @@ function wrapJournalFailOnce(baseJournal, predicate) {
   );
   assert(
     '未来开球在 seriesPublish',
-    fs.readFileSync(path.join(utilsDir, 'seriesPublish.js'), 'utf8').indexOf('datetime_not_future') >= 0
+    fs.readFileSync(seriesTestPaths.util('seriesPublish.js'), 'utf8').indexOf('datetime_not_future') >= 0
   );
 })();
 

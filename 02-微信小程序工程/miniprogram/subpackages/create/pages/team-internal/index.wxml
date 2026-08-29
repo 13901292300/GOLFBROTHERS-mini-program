@@ -45,9 +45,18 @@
       <view class="section-label"><text class="section-label__h2">比赛名称设置</text></view>
       <view class="ds-card ds-field">
         <view class="field-main">
-          <input class="round-name-input" type="text" value="{{roundName}}" placeholder="请输入比赛名称" bindinput="onRoundNameInput" />
+          <input
+            class="round-name-input"
+            type="text"
+            value="{{roundName}}"
+            placeholder="请输入比赛名称"
+            maxlength="{{-1}}"
+            bindinput="onRoundNameInput"
+            bindblur="onRoundNameBlur"
+          />
         </view>
       </view>
+      <text class="field-subvalue ds-desc-text">{{roundNameCount}} / {{roundNameQuota}}</text>
     </view>
 
     <!-- 比赛场地 -->
@@ -406,7 +415,7 @@
     <view wx:if="{{draftTeamGroups.length >= 2 && !isMatchPlayMode}}" class="team-competition-rule">
       <view class="team-competition-rule__row">
         <text class="team-competition-rule__name">分队PK</text>
-        <switch checked="{{draftTeamCompetition.enabled}}" bindchange="onTeamCompetitionToggle" color="#C9A45C" />
+        <switch checked="{{draftTeamCompetition.enabled}}" bindchange="onTeamCompetitionToggle" color="#CE9224" />
       </view>
       <view wx:if="{{draftTeamCompetition.enabled}}" class="team-competition-rule__topn">
         <text class="team-competition-rule__label">每队取前</text>

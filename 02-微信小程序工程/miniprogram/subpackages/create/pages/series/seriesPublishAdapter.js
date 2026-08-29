@@ -75,6 +75,14 @@ function asString(v) {
   return v == null ? '' : String(v);
 }
 
+function copyTitleBaselineSnapshot(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    seriesName: raw.seriesName != null ? String(raw.seriesName) : '',
+    seriesSubtitle: raw.seriesSubtitle != null ? String(raw.seriesSubtitle) : ''
+  };
+}
+
 function hasEntityBlockingIssues(insp) {
   if (!insp || !insp.entities) return false;
   var e = insp.entities;
@@ -275,7 +283,8 @@ function isPublishBusinessSuccess(result) {
  *   resumePublish?: Function,
  *   repairHalfPublished?: Function,
  *   saveDraftForFirstPublishOnly?: Function,
- *   validateBeforeFirstPublish?: Function
+ *   validateBeforeFirstPublish?: Function,
+ *   titleBaseline?: { seriesName?: string, seriesSubtitle?: string }
  * }} input
  */
 function runCreatePublish(input) {
@@ -447,6 +456,8 @@ function runCreatePublish(input) {
   }
 
   // first_publish：唯一允许 saveDraft 的路径
+  var titleBaselineForPlan = copyTitleBaselineSnapshot(o.titleBaseline);
+
   if (typeof o.validateBeforeFirstPublish === 'function') {
     var gate = o.validateBeforeFirstPublish(series);
     if (!gate || gate.ok === false) {
@@ -532,7 +543,9 @@ function runCreatePublish(input) {
     }
   }
 
-  var publishedRes = publishFn(seriesId, {});
+  var publishedRes = titleBaselineForPlan
+    ? publishFn(seriesId, { titleBaseline: titleBaselineForPlan })
+    : publishFn(seriesId, {});
   if (isPublishBusinessSuccess(publishedRes)) {
     ensureLegacyFirstPublishRegistration(
       seriesId,

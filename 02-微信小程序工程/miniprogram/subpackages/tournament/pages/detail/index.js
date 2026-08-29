@@ -741,6 +741,117 @@ const FAB_HIDE_MARGIN_RPX = 16;
 const FAB_SIZE_RPX = 60;
 const FAB_EDGE_GAP_RPX = 10;
 
+function isPositiveFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/** 赛事详情窗口宽高：优先 getWindowInfo，按字段回退 getSystemInfoSync；缺失为 null */
+function readTournamentDetailWindowSize() {
+  let width;
+  let height;
+  let modernComplete = false;
+  try {
+    if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
+      const info = wx.getWindowInfo();
+      if (info) {
+        if (isPositiveFiniteNumber(info.windowWidth)) width = info.windowWidth;
+        if (isPositiveFiniteNumber(info.windowHeight)) height = info.windowHeight;
+      }
+      modernComplete = isPositiveFiniteNumber(width) && isPositiveFiniteNumber(height);
+    }
+  } catch (err) {
+    modernComplete = false;
+  }
+  if (!modernComplete) {
+    try {
+      if (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function') {
+        const sys = wx.getSystemInfoSync();
+        if (sys) {
+          if (!isPositiveFiniteNumber(width) && isPositiveFiniteNumber(sys.windowWidth)) {
+            width = sys.windowWidth;
+          }
+          if (!isPositiveFiniteNumber(height) && isPositiveFiniteNumber(sys.windowHeight)) {
+            height = sys.windowHeight;
+          }
+        }
+      }
+    } catch (err2) {
+      /* 保持已有有效字段 */
+    }
+  }
+  return {
+    windowWidth: isPositiveFiniteNumber(width) ? width : null,
+    windowHeight: isPositiveFiniteNumber(height) ? height : null
+  };
+}
+
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function pickTournamentDetailLayoutFields(info, current) {
+  const next = current || {};
+  if (!info) return next;
+  if (!isPositiveFiniteNumber(next.windowWidth) && isPositiveFiniteNumber(info.windowWidth)) {
+    next.windowWidth = info.windowWidth;
+  }
+  if (!isPositiveFiniteNumber(next.windowHeight) && isPositiveFiniteNumber(info.windowHeight)) {
+    next.windowHeight = info.windowHeight;
+  }
+  if (!isPositiveFiniteNumber(next.screenHeight) && isPositiveFiniteNumber(info.screenHeight)) {
+    next.screenHeight = info.screenHeight;
+  }
+  const bottom = info.safeArea && info.safeArea.bottom;
+  if (!isFiniteNumber(next.safeAreaBottom) && isFiniteNumber(bottom)) {
+    next.safeAreaBottom = bottom;
+    next.safeArea = info.safeArea;
+  }
+  return next;
+}
+
+function isTournamentDetailLayoutComplete(cur) {
+  return (
+    isPositiveFiniteNumber(cur.windowWidth) &&
+    isPositiveFiniteNumber(cur.windowHeight) &&
+    isPositiveFiniteNumber(cur.screenHeight) &&
+    isFiniteNumber(cur.safeAreaBottom)
+  );
+}
+
+/** 报名/分组高度：窗口 + safeArea，优先 getWindowInfo，按字段回退 getSystemInfoSync */
+function readTournamentDetailSafeAreaLayout() {
+  let cur = {};
+  try {
+    if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
+      cur = pickTournamentDetailLayoutFields(wx.getWindowInfo(), cur);
+    }
+  } catch (err) {
+    /* 回退 getSystemInfoSync */
+  }
+  if (!isTournamentDetailLayoutComplete(cur)) {
+    try {
+      if (typeof wx !== 'undefined' && typeof wx.getSystemInfoSync === 'function') {
+        cur = pickTournamentDetailLayoutFields(wx.getSystemInfoSync(), cur);
+      }
+    } catch (err2) {
+      /* 保持已有有效字段 / 默认值 */
+    }
+  }
+  const windowWidth = isPositiveFiniteNumber(cur.windowWidth) ? cur.windowWidth : 375;
+  const windowHeight = isPositiveFiniteNumber(cur.windowHeight) ? cur.windowHeight : 667;
+  let safeBottom = 0;
+  if (isPositiveFiniteNumber(cur.screenHeight) && isFiniteNumber(cur.safeAreaBottom)) {
+    safeBottom = Math.max(0, cur.screenHeight - cur.safeAreaBottom);
+  }
+  return {
+    windowWidth: windowWidth,
+    windowHeight: windowHeight,
+    screenHeight: isPositiveFiniteNumber(cur.screenHeight) ? cur.screenHeight : null,
+    safeArea: cur.safeArea || null,
+    safeBottom: safeBottom
+  };
+}
+
 const DEFAULT_REGISTER_GROUPS = [
   { id: 'team-group-1', name: '正式队员' },
   { id: 'team-group-2', name: '嘉宾' }
@@ -3641,14 +3752,13 @@ Page({
   updateRegisterContentLockMetrics(opts) {
     if (this.data.activeTab !== 'register') return;
     const forceSticky = !!(opts && opts.forceSticky);
-    let sys = { windowWidth: 375, windowHeight: 667 };
-    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    let sys = { windowWidth: 375, windowHeight: 667, safeBottom: 0 };
+    try {
+      sys = readTournamentDetailSafeAreaLayout() || sys;
+    } catch (e) {}
     const winH = sys.windowHeight || 667;
     const rpx2px = (sys.windowWidth || 375) / 750;
-    let safeBottom = 0;
-    if (sys.safeArea && typeof sys.screenHeight === 'number') {
-      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
-    }
+    const safeBottom = sys.safeBottom || 0;
     this.createSelectorQuery()
       .in(this)
       .select('.gb-header').boundingClientRect()
@@ -4428,8 +4538,10 @@ Page({
   onResize() {
     this.measureTabTop();
     try {
-      const sys = wx.getSystemInfoSync();
-      if (sys && sys.windowHeight) this._fabWindowH = sys.windowHeight;
+      const info = readTournamentDetailWindowSize();
+      if (info && isPositiveFiniteNumber(info.windowHeight)) {
+        this._fabWindowH = info.windowHeight;
+      }
     } catch (e) { /* ignore */ }
     if (this.data.activeTab === 'register') {
       wx.nextTick(() => {
@@ -4448,7 +4560,13 @@ Page({
 
   _initMoreFab() {
     let sys = { windowWidth: 375, windowHeight: 667 };
-    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    try {
+      const info = readTournamentDetailWindowSize();
+      if (info) {
+        if (info.windowWidth != null) sys.windowWidth = info.windowWidth;
+        if (info.windowHeight != null) sys.windowHeight = info.windowHeight;
+      }
+    } catch (e) {}
     this._fabWindowH = sys.windowHeight || 667;
     this._rpx2px = (sys.windowWidth || 375) / 750;
     this._fabSizePx = FAB_SIZE_RPX * this._rpx2px;
@@ -4727,14 +4845,13 @@ Page({
    */
   computeRosterMinHeight() {
     if (this.data.activeTab !== 'register') return;
-    let sys = { windowWidth: 375, windowHeight: 667 };
-    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    let sys = { windowWidth: 375, windowHeight: 667, safeBottom: 0 };
+    try {
+      sys = readTournamentDetailSafeAreaLayout() || sys;
+    } catch (e) {}
     const winH = sys.windowHeight || 667;
     const rpx2px = (sys.windowWidth || 375) / 750;
-    let safeBottom = 0;
-    if (sys.safeArea && typeof sys.screenHeight === 'number') {
-      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
-    }
+    const safeBottom = sys.safeBottom || 0;
     this.createSelectorQuery()
       .in(this)
       .select('.gb-header').boundingClientRect()
@@ -4770,14 +4887,13 @@ Page({
    */
   computeGroupsPanelMinHeight() {
     if (this.data.activeTab !== 'groups') return;
-    let sys = { windowWidth: 375, windowHeight: 667 };
-    try { sys = wx.getSystemInfoSync() || sys; } catch (e) {}
+    let sys = { windowWidth: 375, windowHeight: 667, safeBottom: 0 };
+    try {
+      sys = readTournamentDetailSafeAreaLayout() || sys;
+    } catch (e) {}
     const winH = sys.windowHeight || 667;
     const rpx2px = (sys.windowWidth || 375) / 750;
-    let safeBottom = 0;
-    if (sys.safeArea && typeof sys.screenHeight === 'number') {
-      safeBottom = Math.max(0, sys.screenHeight - sys.safeArea.bottom);
-    }
+    const safeBottom = sys.safeBottom || 0;
     this.createSelectorQuery()
       .in(this)
       .select('.gb-header').boundingClientRect()
@@ -8380,7 +8496,7 @@ Page({
       const matchId = this.data.matchId || '';
       wx.navigateTo({
         url:
-          '/subpackages/tournament/pages/stats/index' +
+          '/subpackages/tournament-tools/pages/stats/index' +
           (matchId ? '?matchId=' + encodeURIComponent(matchId) : ''),
         fail: () => wx.showToast({ title: '统计页面尚未注册', icon: 'none' })
       });
@@ -8414,7 +8530,7 @@ Page({
         return;
       }
       wx.navigateTo({
-        url: '/subpackages/tournament/pages/peoria/index?matchId=' + encodeURIComponent(matchId),
+        url: '/subpackages/tournament-tools/pages/peoria/index?matchId=' + encodeURIComponent(matchId),
         fail: () => wx.showToast({ title: '净杆配置页尚未注册', icon: 'none' })
       });
       return;

@@ -7,6 +7,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -21,13 +22,13 @@ if (typeof global.wx === 'undefined') {
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var utilsDir = path.join(mini, 'utils');
-var orchPath = path.join(utilsDir, 'seriesSelfCancellationOrchestrator.js');
+var orchPath = seriesTestPaths.util('seriesSelfCancellationOrchestrator.js');
 var orchSrc = fs.readFileSync(orchPath, 'utf8');
 var orchMod = require(orchPath);
 var seriesRegistration = require(path.join(utilsDir, 'seriesRegistration.js'));
 var regSrc = fs.readFileSync(path.join(utilsDir, 'seriesRegistration.js'), 'utf8');
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
-var p3a = require(path.join(utilsDir, 'removePlayerFromMatchCompetitionStructure.js'));
+var p3a = require(seriesTestPaths.util('removePlayerFromMatchCompetitionStructure.js'));
 var pageJs = fs.readFileSync(
   path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail', 'index.js'),
   'utf8'

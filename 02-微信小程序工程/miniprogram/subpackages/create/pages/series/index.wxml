@@ -479,14 +479,14 @@
             type="text"
             value="{{seriesNameInput}}"
             placeholder="{{seriesNamePlaceholder}}"
-            maxlength="{{seriesNameMax}}"
+            maxlength="{{-1}}"
             bindfocus="onSeriesNameFocus"
             bindinput="onSeriesNameInput"
             bindblur="onSeriesNameBlur"
             disabled="{{isSaving}}"
           />
         </view>
-        <text class="hint-line series-char-count">{{seriesNameCount}} / {{seriesNameMax}}</text>
+        <text class="hint-line series-char-count">{{seriesNameCount}} / {{seriesNameQuota}}</text>
 
         <view class="section-label" style="margin-top: 28rpx;"><text class="section-label__h2">副标题（选填）</text></view>
         <view class="ds-card ds-field">
@@ -494,8 +494,8 @@
             class="round-name-input"
             type="text"
             value="{{seriesSubtitleInput}}"
-            placeholder="较长赛事名称可在此填写第二行"
-            maxlength="{{seriesSubtitleMax}}"
+            placeholder="选填，最多 12 字"
+            maxlength="{{-1}}"
             bindfocus="onSeriesSubtitleFocus"
             bindinput="onSeriesSubtitleInput"
             bindblur="onSeriesSubtitleBlur"
@@ -503,7 +503,7 @@
             disabled="{{isSaving}}"
           />
         </view>
-        <text class="hint-line series-char-count">{{seriesSubtitleCount}} / {{seriesSubtitleMax}}</text>
+        <text class="hint-line series-char-count">{{seriesSubtitleCount}} / {{seriesSubtitleQuota}}</text>
 
         <view class="section-label" style="margin-top: 36rpx;"><text class="section-label__h2">可见范围</text></view>
         <view class="ds-card privacy-card">

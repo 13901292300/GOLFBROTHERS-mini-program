@@ -45,6 +45,7 @@ function listRyderCupGameModeNames() {
   function pushKeys(map) {
     Object.keys(map).forEach(function (name) {
       if (!name || seen[name]) return;
+      if (name === '最好成绩比洞赛') return;
       seen[name] = 1;
       names.push(name);
     });
@@ -57,7 +58,6 @@ function listRyderCupGameModeNames() {
 
 var RYDER_GAME_MODE_DESC = {
   个人比洞赛: '每位球员独立记分，按洞数胜负',
-  最好成绩比洞赛: '四人一组，按比洞赛规则计分',
   四人四球比洞赛: '四人一组，按比洞赛规则计分',
   最佳球位比洞赛: '选择最佳落点，按比洞赛计分',
   四人两球比洞赛: '两人一队，按比洞赛规则计分'

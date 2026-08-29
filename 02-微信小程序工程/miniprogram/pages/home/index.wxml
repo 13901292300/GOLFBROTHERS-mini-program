@@ -1,6 +1,59 @@
 <view class="ds-app ds-app-shell {{themeClass}} {{fontScaleClass}} overflow-hidden">
   <view class="ds-app-frame">
 
+    <template name="dsCardClubSeriesMeta">
+      <view class="ds-card-club__meta">
+        <view wx:if="{{item.teamName}}" class="ds-card-club__meta-item">
+          <view class="ds-card-club__meta-icon">🏛️</view>
+          <text class="ds-card-club__meta-text">{{item.teamName}}</text>
+        </view>
+        <view wx:if="{{item.gameModeText}}" class="ds-card-club__meta-item">
+          <view class="ds-card-club__meta-icon">🏆</view>
+          <text class="ds-card-club__meta-text ds-card-club__format-text">{{item.gameModeText}}</text>
+        </view>
+        <block wx:if="{{item.courseList.length}}">
+          <view class="ds-card-club__meta-item">
+            <view class="ds-card-club__meta-icon ds-card-club__meta-icon--course">⛳</view>
+            <text class="ds-card-club__course-name">{{item.courseFirstName}}</text>
+          </view>
+          <text
+            wx:for="{{item.courseList}}"
+            wx:for-item="courseName"
+            wx:for-index="courseIdx"
+            wx:key="courseIdx"
+            wx:if="{{courseIdx > 0}}"
+            class="ds-card-club__course-name ds-card-club__course-name--indent"
+          >{{courseName}}</text>
+        </block>
+      </view>
+      <view wx:if="{{item.privacyLabel}}" class="ds-card-club__privacy ds-text-muted text-9px">
+        <text>{{item.privacyLabel}}</text>
+      </view>
+    </template>
+
+    <template name="dsCardClubOrdinaryMeta">
+      <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
+        <text>{{item.teamName}}</text>
+      </view>
+      <view wx:if="{{item.tagLine}}" class="ds-card-club__tagline ds-text-muted text-9px">
+        <text>{{item.tagLine}}</text>
+      </view>
+      <view wx:if="{{item.privacyLabel}}" class="ds-card-club__privacy ds-text-muted text-9px">
+        <text>{{item.privacyLabel}}</text>
+      </view>
+      <view class="ds-card-club__meta-row ds-text-muted text-9px">
+        <view class="ds-card-club__meta-grow">
+          <text>{{item.venue}}</text>
+        </view>
+        <view class="ds-card-club__meta-fixed">
+          <text>👁</text>
+        </view>
+        <view class="ds-card-club__meta-fixed">
+          <text>{{item.views}}</text>
+        </view>
+      </view>
+    </template>
+
     <!-- Header -->
     <view class="ds-app-header ds-header__fixed z-50" style="{{headerRootStyle}}">
       <view class="ds-app-header-bar" style="{{headerBarStyle}}">
@@ -59,9 +112,9 @@
           <view class="ds-main space-y-4">
             <block wx:for="{{myCards}}" wx:key="id">
               <!-- Tour cards -->
-              <view wx:if="{{item.type === 'tour'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour {{item.active ? 'ds-card-active' : ''}}">
+              <view wx:if="{{item.type === 'tour'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour {{item.isMine ? 'ds-card-mine' : ''}}">
                 <view class="card-action-layer">
-                  <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
+                  <text class="card-star {{item.isMine || item.starLocked ? 'star-blue' : ((item.isFavorited || item.favorited) ? 'star-gold' : 'star-empty')}}" data-id="{{item.id}}" data-locked="{{item.starLocked}}" catchtap="toggleFavorite">{{item.isMine || item.starLocked || item.isFavorited || item.favorited ? '★' : '☆'}}</text>
                 </view>
                 <view class="ds-group-avatar-mosaic">
                   <avatar-mosaic avatars="{{item.displayAvatars}}" size="62"></avatar-mosaic>
@@ -90,16 +143,23 @@
                   </view>
                 </view>
               </view>
-              <!-- Club card -->
-              <view wx:elif="{{item.type === 'club'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
+              <!-- Club card：与广场团体比赛卡同一套 UI -->
+              <view wx:elif="{{item.type === 'club' || item.matchType === 'series' || item._cardKind === 'series'}}" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club {{item.cardStatus === 'live' ? 'ds-card-club--live' : ''}} {{item.cardStatus === 'registration' ? 'ds-card-club--registration' : ''}}">
                 <view class="card-action-layer">
-                  <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
+                  <text class="card-star {{item.isMine || item.starLocked ? 'star-blue' : ((item.isFavorited || item.favorited) ? 'star-gold' : 'star-empty')}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.isMine || item.starLocked || item.isFavorited || item.favorited ? '★' : '☆'}}</text>
                 </view>
                 <view class="ds-card-club-main">
                   <view class="ds-card-club__head">
-                    <view class="ds-card-club__avatar-col">
+                    <view class="ds-card-club__avatar-col {{item.statusLabel ? 'has-status-label' : ''}}">
                       <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
                         <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
+                      </view>
+                      <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag {{item.cardStatus === 'live' ? 'status-tag--live' : ''}}">
+                        <view wx:if="{{item.cardStatus === 'live'}}" class="ds-badge badge-live">
+                          <view class="live-dot"></view>
+                          <text>LIVE</text>
+                        </view>
+                        <text wx:else class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : 'badge-gold'}} {{item.cardStatus === 'registration' ? 'ds-badge--registration' : ''}}">{{item.statusLabel}}</text>
                       </view>
                     </view>
                     <view class="ds-card-club__content">
@@ -108,23 +168,12 @@
                           <text class="text-base font-black ds-text-data tracking-tight leading-none">{{item.clubDate}}</text>
                         </view>
                         <view class="ds-card-club__title-wrap">
-                          <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                          <text class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-main">{{item.title}}</text>
+                          <text wx:if="{{item.titleSub}}" class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-sub">{{item.titleSub}}</text>
                         </view>
                       </view>
-                      <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
-                        <text>{{item.teamName}}</text>
-                      </view>
-                      <view class="ds-card-club__meta-row ds-text-muted text-9px">
-                        <view class="ds-card-club__meta-grow">
-                          <text>{{item.venue}}</text>
-                        </view>
-                        <view class="ds-card-club__meta-fixed">
-                          <text>👁</text>
-                        </view>
-                        <view class="ds-card-club__meta-fixed">
-                          <text>{{item.views}}</text>
-                        </view>
-                      </view>
+                      <template wx:if="{{item.matchType === 'series'}}" is="dsCardClubSeriesMeta" data="{{item: item}}" />
+                      <template wx:else is="dsCardClubOrdinaryMeta" data="{{item: item}}" />
                     </view>
                   </view>
                 </view>
@@ -168,18 +217,23 @@
               <view catchtap="switchRegistrationSegment" data-segment="all" class="registration-segment__item {{registrationSegment === 'all' ? 'is-active' : ''}}">所有报名</view>
               <view catchtap="switchRegistrationSegment" data-segment="mine" class="registration-segment__item {{registrationSegment === 'mine' ? 'is-active' : ''}}">我的报名</view>
             </view>
-            <view wx:for="{{tournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
+            <view wx:for="{{tournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club {{item.cardStatus === 'registration' ? 'ds-card-club--registration' : ''}}">
               <view class="card-action-layer">
-                <text class="card-star {{item.favorited ? 'active' : ''}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.favorited ? '★' : '☆'}}</text>
+                <text class="card-star {{item.isMine || item.starLocked ? 'star-blue' : ((item.isFavorited || item.favorited) ? 'star-gold' : 'star-empty')}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.isMine || item.starLocked || item.isFavorited || item.favorited ? '★' : '☆'}}</text>
               </view>
               <view class="ds-card-club-main">
                 <view class="ds-card-club__head">
-                  <view class="ds-card-club__avatar-col {{item.statusLabel ? 'has-status-label' : ''}}">
+                  <view class="ds-card-club__avatar-col {{item.matchType === 'series' ? (item.registrationStatus ? 'has-status-label' : '') : (item.statusLabel ? 'has-status-label' : '')}}">
                     <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
                       <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
                     </view>
-                    <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag">
-                      <text class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : (item.statusLabel === 'LIVE' || item.statusTone === 'live' ? 'badge-live live-badge-pulse' : 'badge-gold')}}">{{item.statusLabel}}</text>
+                    <view wx:if="{{item.matchType === 'series' ? item.registrationStatus : item.statusLabel}}" class="ds-card-club__status-tag {{item.registrationStatus === 'LIVE' || item.statusLabel === 'LIVE' ? 'status-tag--live' : ''}}">
+                      <view wx:if="{{item.registrationStatus === 'LIVE' || item.statusLabel === 'LIVE'}}" class="ds-badge badge-live">
+                        <view class="live-dot"></view>
+                        <text>LIVE</text>
+                      </view>
+                      <text wx:elif="{{item.registrationStatus === '报名中'}}" class="ds-badge badge-gold ds-badge--registration">报名中</text>
+                      <text wx:elif="{{item.matchType !== 'series'}}" class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : 'badge-gold'}}">{{item.statusLabel}}</text>
                     </view>
                   </view>
                   <view class="ds-card-club__content">
@@ -188,30 +242,12 @@
                         <text class="text-base font-black ds-text-data tracking-tight leading-none">{{item.clubDate}}</text>
                       </view>
                       <view class="ds-card-club__title-wrap">
-                        <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                        <text class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-main">{{item.title}}</text>
                         <text wx:if="{{item.titleSub}}" class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-sub">{{item.titleSub}}</text>
                       </view>
                     </view>
-                    <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
-                      <text>{{item.teamName}}</text>
-                    </view>
-                    <view wx:if="{{item.tagLine}}" class="ds-card-club__tagline ds-text-muted text-9px">
-                      <text>{{item.tagLine}}</text>
-                    </view>
-                    <view wx:if="{{item.privacyLabel}}" class="ds-card-club__privacy ds-text-muted text-9px">
-                      <text>{{item.privacyLabel}}</text>
-                    </view>
-                    <view class="ds-card-club__meta-row ds-text-muted text-9px">
-                      <view class="ds-card-club__meta-grow">
-                        <text>{{item.venue}}</text>
-                      </view>
-                      <view class="ds-card-club__meta-fixed">
-                        <text>👁</text>
-                      </view>
-                      <view class="ds-card-club__meta-fixed">
-                        <text>{{item.views}}</text>
-                      </view>
-                    </view>
+                    <template wx:if="{{item.matchType === 'series'}}" is="dsCardClubSeriesMeta" data="{{item: item}}" />
+                    <template wx:else is="dsCardClubOrdinaryMeta" data="{{item: item}}" />
                   </view>
                 </view>
               </view>
@@ -231,6 +267,9 @@
               <text class="text-xs font-bold text-slate-400 uppercase tracking-widest">暂无进行中的球局</text>
             </view>
             <view wx:for="{{plazaCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-tour">
+              <view class="card-action-layer">
+                <text class="card-star {{item.isMine || item.starLocked ? 'star-blue' : ((item.isFavorited || item.favorited) ? 'star-gold' : 'star-empty')}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.isMine || item.starLocked || item.isFavorited || item.favorited ? '★' : '☆'}}</text>
+              </view>
               <view class="ds-group-avatar-mosaic">
                 <avatar-mosaic avatars="{{item.displayAvatars}}" size="62"></avatar-mosaic>
               </view>
@@ -264,15 +303,22 @@
             <view wx:if="{{plazaTournamentCards.length === 0}}" class="ds-card-dashed p-8 flex flex-col items-center justify-center opacity-60">
               <text class="text-xs font-bold text-slate-400 uppercase tracking-widest">暂无团体比赛</text>
             </view>
-            <view wx:for="{{plazaTournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club">
+            <view wx:for="{{plazaTournamentCards}}" wx:key="id" bindtap="navigateToPage" data-url="{{item.navUrl}}" class="ds-card ds-card-club {{item.cardStatus === 'live' ? 'ds-card-club--live' : ''}} {{item.cardStatus === 'registration' ? 'ds-card-club--registration' : ''}}">
+              <view class="card-action-layer">
+                <text class="card-star {{item.isMine || item.starLocked ? 'star-blue' : ((item.isFavorited || item.favorited) ? 'star-gold' : 'star-empty')}}" data-id="{{item.id}}" catchtap="toggleFavorite">{{item.isMine || item.starLocked || item.isFavorited || item.favorited ? '★' : '☆'}}</text>
+              </view>
               <view class="ds-card-club-main">
                 <view class="ds-card-club__head">
                   <view class="ds-card-club__avatar-col {{item.statusLabel ? 'has-status-label' : ''}}">
                     <view class="w-16 h-16 rounded-full overflow-hidden ds-card-club__avatar-img">
                       <image src="{{item.clubLogo}}" class="w-full h-full" mode="aspectFill"></image>
                     </view>
-                    <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag">
-                      <text class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : (item.statusLabel === 'LIVE' || item.statusTone === 'live' ? 'badge-live live-badge-pulse' : 'badge-gold')}}">{{item.statusLabel}}</text>
+                    <view wx:if="{{item.statusLabel}}" class="ds-card-club__status-tag {{item.cardStatus === 'live' ? 'status-tag--live' : ''}}">
+                      <view wx:if="{{item.cardStatus === 'live'}}" class="ds-badge badge-live">
+                        <view class="live-dot"></view>
+                        <text>LIVE</text>
+                      </view>
+                      <text wx:else class="ds-badge {{item.statusTone === 'finished' ? 'badge-finished' : 'badge-gold'}} {{item.cardStatus === 'registration' ? 'ds-badge--registration' : ''}}">{{item.statusLabel}}</text>
                     </view>
                   </view>
                   <view class="ds-card-club__content">
@@ -281,30 +327,12 @@
                         <text class="text-base font-black ds-text-data tracking-tight leading-none">{{item.clubDate}}</text>
                       </view>
                       <view class="ds-card-club__title-wrap">
-                        <text class="text-sm font-bold ds-text-primary leading-snug">{{item.title}}</text>
+                        <text class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-main">{{item.title}}</text>
                         <text wx:if="{{item.titleSub}}" class="text-sm font-bold ds-text-primary leading-snug ds-card-club__title-sub">{{item.titleSub}}</text>
                       </view>
                     </view>
-                    <view wx:if="{{item.teamName}}" class="ds-card-club__team ds-text-muted text-9px">
-                      <text>{{item.teamName}}</text>
-                    </view>
-                    <view wx:if="{{item.tagLine}}" class="ds-card-club__tagline ds-text-muted text-9px">
-                      <text>{{item.tagLine}}</text>
-                    </view>
-                    <view wx:if="{{item.privacyLabel}}" class="ds-card-club__privacy ds-text-muted text-9px">
-                      <text>{{item.privacyLabel}}</text>
-                    </view>
-                    <view class="ds-card-club__meta-row ds-text-muted text-9px">
-                      <view class="ds-card-club__meta-grow">
-                        <text>{{item.venue}}</text>
-                      </view>
-                      <view class="ds-card-club__meta-fixed">
-                        <text>👁</text>
-                      </view>
-                      <view class="ds-card-club__meta-fixed">
-                        <text>{{item.views}}</text>
-                      </view>
-                    </view>
+                    <template wx:if="{{item.matchType === 'series'}}" is="dsCardClubSeriesMeta" data="{{item: item}}" />
+                    <template wx:else is="dsCardClubOrdinaryMeta" data="{{item: item}}" />
                   </view>
                 </view>
               </view>
@@ -341,9 +369,9 @@
                   </view>
                 </view>
                 <view class="text-center w-full">
-                  <view class="flex items-center justify-center gap-3 mb-5" bindtap="toggleEditProfile" data-show="{{true}}">
+                  <view class="flex items-center justify-center gap-3 mb-5" bindtap="navigateToProfileEdit">
                     <text class="ds-display text-4xl leading-none">{{userProfile.nickname || '未设置昵称'}}</text>
-                    <text class="text-data-blue text-lg">♂</text>
+                    <text class="text-data-blue text-lg">{{userProfile.gender === '女' ? '♀' : '♂'}}</text>
                     <text class="profile-edit-hint">✎</text>
                   </view>
                   <view class="grid grid-cols-2 gap-4 max-w-300 mx-auto">

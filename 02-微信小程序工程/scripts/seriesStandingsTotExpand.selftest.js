@@ -7,14 +7,9 @@
  */
 
 var path = require('path');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
-var seriesStandingsAssembler = require(path.join(
-  __dirname,
-  '..',
-  'miniprogram',
-  'utils',
-  'seriesStandingsAssembler.js'
-));
+var seriesStandingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(
   __dirname,
   '..',

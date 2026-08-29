@@ -115,7 +115,7 @@ function resolveSeriesStandingsDefaultView(match, context) {
   var ctx = context && typeof context === 'object' ? context : {};
   var selectedKey = asString(ctx.selectedKey);
   var scoringMode = asString(ctx.scoringMode || ctx.mode);
-  if (!selectedKey || selectedKey === 'cumulative') {
+  if (!selectedKey || selectedKey === 'cumulative' || selectedKey === 'total') {
     return VIEW.team;
   }
   if (scoringMode === 'global_m') {
@@ -151,7 +151,7 @@ function resolveStandingsSessionSelection(input) {
     src.rememberedByRoundId && typeof src.rememberedByRoundId === 'object'
       ? src.rememberedByRoundId
       : {};
-  if (!selectedKey || selectedKey === 'cumulative') {
+  if (!selectedKey || selectedKey === 'cumulative' || selectedKey === 'total') {
     return normalizeSeriesStandingsSelection(
       src.match,
       { view: VIEW.team, scoreType: 'gross' },

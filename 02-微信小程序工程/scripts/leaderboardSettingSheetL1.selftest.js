@@ -34,6 +34,20 @@ function assert(name, cond, detail) {
   }
 }
 
+function extractRule(wxss, selector) {
+  var re = new RegExp(
+    selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'
+  );
+  var m = String(wxss || '').match(re);
+  return m ? m[1] : '';
+}
+
+var overlayRule = extractRule(compWxss, '.sheet-overlay');
+var sheetRule = extractRule(compWxss, '.bottom-sheet');
+var headRule = extractRule(compWxss, '.leaderboard-setting__head');
+var handleRule = extractRule(compWxss, '.sheet-handle');
+var titleRule = extractRule(compWxss, '.leaderboard-setting__title');
+
 assert(
   '1 队际赛与 Series 共用同一组件',
   /leaderboard-setting-sheet/.test(detailWxml) &&
@@ -58,10 +72,11 @@ assert(
 
 assert(
   '4 overlay：fixed inset 0 + 暗色半透明 + 非白降白',
-  /position:\s*fixed/.test(compWxss) &&
-    /inset:\s*0/.test(compWxss) &&
-    /background:\s*rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.55\s*\)/.test(compWxss) &&
-    !/background:\s*rgba\(\s*255\s*,\s*255\s*,\s*255/.test(compWxss)
+  /position:\s*fixed/.test(overlayRule) &&
+    /inset:\s*0/.test(overlayRule) &&
+    /background:\s*rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.55\s*\)/.test(overlayRule) &&
+    !/background:\s*rgba\(\s*255\s*,\s*255\s*,\s*255/.test(overlayRule) &&
+    /pointer-events:\s*auto/.test(overlayRule)
 );
 
 assert(
@@ -74,13 +89,11 @@ assert(
 
 assert(
   '6 header 整体 padding（非仅标题 margin-top）+ handle 底呼吸',
-  /\.leaderboard-setting__head\s*\{[\s\S]*?padding:\s*8rpx\s+0\s+32rpx/.test(
-    compWxss
-  ) &&
-    /\.sheet-handle\s*\{[\s\S]*?margin:\s*24rpx\s+auto\s+40rpx/.test(compWxss) &&
-    !/\.leaderboard-setting__title\s*\{[\s\S]*?margin-top:\s*[3-9]\d/.test(
-      compWxss
-    )
+  /padding:\s*8rpx\s+0\s+32rpx/.test(headRule) &&
+    /margin:\s*24rpx\s+auto\s+40rpx/.test(handleRule) &&
+    !/margin-top:\s*[3-9]\d/.test(titleRule) &&
+    /z-index:\s*210/.test(overlayRule) &&
+    /z-index:\s*230/.test(sheetRule)
 );
 
 assert(

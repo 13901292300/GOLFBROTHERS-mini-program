@@ -117,8 +117,20 @@ function vmOf(mode, rounds, selectedKey) {
   });
 }
 
+function roundItems(vm) {
+  return (vm.roundSelectorItems || []).filter(function (x) {
+    return x && x.key !== 'total' && x.key !== 'cumulative';
+  });
+}
+
+function hasTotalItem(vm) {
+  return (vm.roundSelectorItems || []).some(function (x) {
+    return x && x.key === 'total';
+  });
+}
+
 function selectorLabels(vm) {
-  return (vm.roundSelectorItems || []).map(function (x) {
+  return roundItems(vm).map(function (x) {
     return x.key + ':' + x.label;
   });
 }
@@ -147,7 +159,9 @@ assert(
   'global_m 与 per_round_n 同一套别名',
   selectorLabels(gmTwo).join(',') === 'r1:C1,r2:C2' &&
     selectorLabels(prnTwo).join(',') === 'r1:C1,r2:C2' &&
-    gmTwo.totalSelector.label === 'TOT' &&
+    hasTotalItem(gmTwo) &&
+    !hasTotalItem(prnTwo) &&
+    gmTwo.totalSelector == null &&
     gmTwo.selectedKey === 'r1' &&
     prnTwo.headScoreLabel === 'C1'
 );
@@ -220,17 +234,25 @@ assert(
 assert(
   '底层 selectedKey 和记分卡 roundId 不变',
   gmTwo.selectedKey === 'r1' &&
-    gmTwo.roundSelectorItems[0].key === 'r1' &&
-    gmTwo.roundSelectorItems[1].key === 'r2' &&
+    roundItems(gmTwo)[0].key === 'r1' &&
+    roundItems(gmTwo)[1].key === 'r2' &&
+    hasTotalItem(gmTwo) &&
     standingsVm.resolveStandingsScorecardRoundId({ roundId: 'r2' }, 'r1') === '' &&
     standingsVm.resolveStandingsScorecardRoundId({ roundId: 'r1' }, 'r1') === 'r1'
 );
 
 assert(
-  'TOT 保持 TOT',
-  vmOf('global_m', sameDayTwo, 'cumulative').totalSelector.label === 'TOT' &&
-    vmOf('global_m', sameDayTwo, 'cumulative').selectedRoundDisplayLabel === 'TOT' &&
-    vmOf('global_m', sameDayTwo, 'cumulative').headScoreLabel === 'TO PAR'
+  'TOT 保持 TOTAL',
+  (function () {
+    var tot = vmOf('global_m', sameDayTwo, 'cumulative');
+    return (
+      tot.selectedKey === 'total' &&
+      tot.selectedRoundDisplayLabel === 'TOTAL' &&
+      tot.totalSelector == null &&
+      hasTotalItem(tot) &&
+      tot.roundSelectorItems[0].isSelected === true
+    );
+  })()
 );
 
 var schedule = scheduleVm.buildSeriesScheduleViewModel({

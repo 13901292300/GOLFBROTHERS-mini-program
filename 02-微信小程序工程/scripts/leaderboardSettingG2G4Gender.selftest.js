@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -16,7 +17,7 @@ var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-de
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 
 var shared = require(path.join(utilsDir, 'leaderboardSettingViewModel.js'));
-var liveLeaderboardBoard = require(path.join(utilsDir, 'liveLeaderboardBoard.js'));
+var liveLeaderboardBoard = require(seriesTestPaths.util('liveLeaderboardBoard.js'));
 var personalLeaderboardBoard = require(path.join(utilsDir, 'personalLeaderboardBoard.js'));
 var seriesOpts = require(path.join(seriesDir, 'seriesStandingsViewOptions.js'));
 var liveAdapter = require(path.join(seriesDir, 'seriesLiveLeaderboardAdapter.js'));
@@ -24,7 +25,7 @@ var liveAdapter = require(path.join(seriesDir, 'seriesLiveLeaderboardAdapter.js'
 var detailJs = fs.readFileSync(path.join(detailDir, 'index.js'), 'utf8');
 var seriesJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var seriesOptsSrc = fs.readFileSync(path.join(seriesDir, 'seriesStandingsViewOptions.js'), 'utf8');
-var liveSrc = fs.readFileSync(path.join(utilsDir, 'liveLeaderboardBoard.js'), 'utf8');
+var liveSrc = fs.readFileSync(seriesTestPaths.util('liveLeaderboardBoard.js'), 'utf8');
 var personalSrc = fs.readFileSync(path.join(utilsDir, 'personalLeaderboardBoard.js'), 'utf8');
 var adapterSrc = fs.readFileSync(path.join(seriesDir, 'seriesLiveLeaderboardAdapter.js'), 'utf8');
 var vmSrc = fs.readFileSync(path.join(utilsDir, 'leaderboardSettingViewModel.js'), 'utf8');
@@ -183,7 +184,7 @@ assert(
 
 assert(
   '不影响 TOT 投影入口',
-  /selectedKey === standingsViewModel.CUMULATIVE_KEY/.test(
+  /isCumulativeStandingsKey/.test(
     fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8')
   ) && adapterSrc.indexOf("reason: 'tot'") >= 0
 );

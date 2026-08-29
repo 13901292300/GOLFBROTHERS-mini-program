@@ -224,8 +224,9 @@ function keysOf(opts) {
   );
   assert(
     'TOT 强制球队榜',
-    /CUMULATIVE_KEY[\s\S]{0,200}VIEW\.team/.test(seriesJs) ||
-      seriesJs.indexOf("key === standingsViewModel.CUMULATIVE_KEY") >= 0
+    /isCumulativeStandingsKey\(key\)/.test(seriesJs) ||
+      /isCumulativeStandingsKey\(selectedKey\)/.test(seriesJs) ||
+      seriesJs.indexOf('isCumulativeStandingsKey') >= 0
   );
 })();
 

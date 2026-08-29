@@ -239,7 +239,8 @@ assert(
   pageWxml.indexOf('hero-logo-stack') >= 0 &&
     pageWxml.indexOf('{{item.backgroundStyle}}') >= 0 &&
     pageWxml.indexOf('hero-logo-stack__fallback') >= 0 &&
-    vmSrc.indexOf('isDivisionSeriesHero') >= 0 &&
+    vmSrc.indexOf('shouldUseDivisionLogoMarks') >= 0 &&
+    vmSrc.indexOf('isDivisionSeriesHero') < 0 &&
     vmSrc.indexOf('firstDisplayGrapheme') >= 0 &&
     pageWxml.indexOf('hero-division-swatch') < 0 &&
     createWxml.indexOf('hero-logo-stack') < 0
@@ -275,6 +276,69 @@ assert(
     /flex-wrap:\s*nowrap/.test(
       (pageWxss.match(/\.hero-division-tags\s*\{[^}]*\}/) || [''])[0]
     )
+);
+
+var seriesRyderCup = require(path.join(mini, 'utils', 'seriesRyderCup.js'));
+var ryderDivisions = [
+  division('red', '红队', '#CE9224'),
+  division('blue', '蓝队', '#002D62')
+];
+var teamRyderHero = viewModel.buildHeroParticipantDisplay(
+  seriesOf({
+    templateId: 'ryder',
+    seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+    scoringRule: seriesRyderCup.createRyderCupScoringRule(),
+    participants: ryderDivisions
+  })
+);
+assert(
+  '队内显式莱德杯 Hero 走分队颜色圆 Logo 栈',
+  teamRyderHero.mode === 'team_logos' &&
+    teamRyderHero.label === '分队' &&
+    teamRyderHero.teamItems.length === 2 &&
+    teamRyderHero.teamItems[0].color === '#CE9224' &&
+    teamRyderHero.teamItems[1].fallbackText === '蓝' &&
+    teamRyderHero.divisionItems.length === 0 &&
+    pageWxml.indexOf('series-division-logo-mark') >= 0 &&
+    pageWxml.indexOf('ryder-division-logo') < 0
+);
+
+assert(
+  '仅 templateId:ryder 的队内 Series 不进入颜色圆栈',
+  viewModel.buildHeroParticipantDisplay(
+    seriesOf({
+      templateId: 'ryder',
+      participants: ryderDivisions
+    })
+  ).mode === 'division_tags'
+);
+
+var orgRyderHero = viewModel.buildHeroParticipantDisplay({
+  hostMode: 'organization',
+  templateId: 'ryder',
+  seriesCompetitionType: seriesRyderCup.COMPETITION_TYPE,
+  participants: [
+    {
+      seriesParticipantId: 't1',
+      kind: 'team',
+      fullNameSnapshot: '甲队',
+      logoSnapshot: '/a.png'
+    },
+    {
+      seriesParticipantId: 't2',
+      kind: 'team',
+      fullNameSnapshot: '乙队',
+      logoSnapshot: '/b.png'
+    }
+  ]
+});
+assert(
+  '队际莱德杯 Hero 仍是两支球队 Logo',
+  orgRyderHero.mode === 'team_logos' &&
+    orgRyderHero.label === '球队' &&
+    orgRyderHero.teamItems[0].logo === '/a.png' &&
+    orgRyderHero.teamItems[1].logo === '/b.png' &&
+    !orgRyderHero.teamItems[0].color
 );
 
 console.log('');

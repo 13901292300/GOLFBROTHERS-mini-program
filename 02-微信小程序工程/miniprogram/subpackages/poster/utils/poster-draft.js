@@ -3,7 +3,7 @@ const STORAGE_KEY = "posterDraft";
 function clonePlain(value) {
   try {
     return JSON.parse(JSON.stringify(value, (key, item) => {
-      if (key === "photo" || key === "subject") return null;
+      if (key === "photo" || key === "subject" || key === "brandLogo" || key === "backdrop") return null;
       // sticker.image 是 Canvas Image；posterState.image 是 {scale,x,y,blur}
       if (key === "image" && item && typeof item === "object" && !("blur" in item)) {
         return null;

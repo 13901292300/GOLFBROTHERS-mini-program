@@ -224,8 +224,40 @@ assert(
 
 assert(
   '15 TOT 仍强制球队',
-  /CUMULATIVE_KEY[\s\S]{0,300}view:\s*'team'/.test(seriesJs) ||
-    seriesJs.indexOf("key === standingsViewModel.CUMULATIVE_KEY") >= 0
+  (function () {
+    var standingsVm = require(path.join(
+      root,
+      'subpackages/tournament/pages/series-detail/seriesStandingsViewModel.js'
+    ));
+    var totView = seriesOpts.resolveSeriesStandingsDefaultView(interMatch, {
+      selectedKey: 'total'
+    });
+    var cumView = seriesOpts.resolveSeriesStandingsDefaultView(interMatch, {
+      selectedKey: 'cumulative'
+    });
+    var sessTot = seriesOpts.resolveStandingsSessionSelection({
+      match: interMatch,
+      selectedKey: 'total'
+    });
+    var sessCum = seriesOpts.resolveStandingsSessionSelection({
+      match: interMatch,
+      selectedKey: 'cumulative'
+    });
+    var rxView = seriesOpts.resolveSeriesStandingsDefaultView(interMatch, {
+      selectedKey: 'r1',
+      scoringMode: 'global_m'
+    });
+    return (
+      standingsVm.isCumulativeStandingsKey('total') === true &&
+      standingsVm.isCumulativeStandingsKey('cumulative') === true &&
+      totView === 'team' &&
+      cumView === 'team' &&
+      sessTot.view === 'team' &&
+      sessCum.view === 'team' &&
+      rxView === 'all' &&
+      seriesJs.indexOf('isCumulativeStandingsKey') >= 0
+    );
+  })()
 );
 
 assert(

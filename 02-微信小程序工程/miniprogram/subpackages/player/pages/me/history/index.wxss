@@ -1,0 +1,248 @@
+/**
+ * 历史成绩 — 个人球局列表
+ * Token / header / card 对齐 footprints、feedback、course 二级页
+ */
+
+.hist-page {
+  --primary-blue: #002d62;
+  --tour-blue: #002d62;
+  --champion-gold: #ce9224;
+  --tee-blue: var(--data-blue, #00AEEF);
+  --tee-red: #dc2626;
+  --text-on-dark: #ffffff;
+  --space-page: 16px;
+  --radius-xl: 12px;
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.hist-page.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.hist-page.dark-mode {
+  --bg-primary: #050816;
+  --bg-card: #0b1220;
+  --bg-subtle: #121a2b;
+  --border: rgba(148, 163, 184, 0.16);
+  --text-primary: #e5eefc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+page {
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* ===== gb-header ===== */
+.gb-header {
+  background: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: var(--text-on-dark);
+  flex-shrink: 0;
+}
+.gb-header__inner {
+  display: flex;
+  align-items: center;
+}
+.gb-header__left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.gb-header__back {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gb-header__chevron {
+  color: var(--text-on-dark);
+  font-size: 52rpx;
+  line-height: 1;
+}
+.gb-header__eyebrow {
+  display: block;
+  font-size: 17rpx;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+.gb-header__title {
+  display: block;
+  color: var(--text-on-dark);
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+}
+
+/* ===== body ===== */
+.hist-body {
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.hist-section {
+  padding: var(--space-page);
+}
+
+.hist-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.hist-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 28rpx 14rpx;
+  border-bottom: 1px solid var(--border);
+}
+
+.hist-overline {
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--champion-gold);
+}
+
+.hist-count {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ===== row ===== */
+.hist-row {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  padding: 28rpx;
+}
+
+.hist-row--divider {
+  border-bottom: 1px solid var(--border);
+}
+
+.hist-row__left {
+  flex-shrink: 0;
+  width: 112rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.hist-score {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 9999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hist-score--blue {
+  background: var(--tee-blue);
+}
+
+.hist-score--red {
+  background: var(--tee-red);
+}
+
+.hist-score__num {
+  color: var(--text-on-dark);
+  font-size: 34rpx;
+  font-weight: 900;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.hist-topar {
+  font-size: 22rpx;
+  font-weight: 800;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.hist-row__right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.hist-course {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hist-datetime {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.hist-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 4rpx;
+}
+
+.hist-tag {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6rpx;
+  padding: 4rpx 12rpx;
+  line-height: 1.4;
+}
+
+.hist-empty {
+  padding: 80rpx 28rpx;
+  text-align: center;
+}
+
+.hist-empty__text {
+  font-size: 26rpx;
+  color: var(--text-muted);
+}
+
+.hist-pad {
+  height: 48rpx;
+}

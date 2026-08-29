@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -18,9 +19,9 @@ var createDir = path.join(mini, 'subpackages', 'create', 'pages', 'series');
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStoreMod = require(path.join(utilsDir, 'seriesStore.js'));
 var seriesStationIndexMod = require(path.join(utilsDir, 'seriesStationIndex.js'));
-var seriesPublishJournalMod = require(path.join(utilsDir, 'seriesPublishJournal.js'));
+var seriesPublishJournalMod = require(seriesTestPaths.util('seriesPublishJournal.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var seriesPublish = require(path.join(utilsDir, 'seriesPublish.js'));
+var seriesPublish = require(seriesTestPaths.util('seriesPublish.js'));
 var teamMatchStore = require(path.join(utilsDir, 'teamMatchStore.js'));
 var strokeEntityBuilder = require(path.join(utilsDir, 'strokeEntityBuilder.js'));
 var participantDraft = require(path.join(createDir, 'participantDraft.js'));
@@ -28,8 +29,8 @@ var adapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 var personalAdapter = require(path.join(seriesDir, 'seriesPersonalLeaderboardAdapter.js'));
 var viewModel = require(path.join(seriesDir, 'seriesDetailViewModel.js'));
-var teamLeaderboardView = require(path.join(utilsDir, 'teamLeaderboardView.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardView = require(seriesTestPaths.util('teamLeaderboardView.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 
 var passed = 0;
 var failed = 0;

@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -33,9 +34,9 @@ var aggregate = require(path.join(utilsDir, 'seriesRoundPhaseAggregate.js'));
 var scheduleVm = require(path.join(seriesDir, 'seriesScheduleViewModel.js'));
 var scheduleWrite = require(path.join(seriesDir, 'seriesScheduleGroupWrite.js'));
 var manageSheet = require(path.join(seriesDir, 'seriesManageSheetViewModel.js'));
-var seriesRoundUpdate = require(path.join(utilsDir, 'seriesRoundUpdate.js'));
+var seriesRoundUpdate = require(seriesTestPaths.util('seriesRoundUpdate.js'));
 var teeSheetManage = require(path.join(utilsDir, 'teeSheetManage.js'));
-var standingsAssembler = require(path.join(utilsDir, 'seriesStandingsAssembler.js'));
+var standingsAssembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 
 var finishJs = fs.readFileSync(path.join(utilsDir, 'teamMatchFinish.js'), 'utf8');
 var scoreJs = fs.readFileSync(
@@ -114,7 +115,7 @@ assert(
 assert(
   'score promotes after last group finish',
   scoreJs.indexOf('scoreGroupFinish') >= 0 &&
-    fs.readFileSync(path.join(utilsDir, 'scoreGroupFinish.js'), 'utf8').indexOf(
+    fs.readFileSync(seriesTestPaths.util('scoreGroupFinish.js'), 'utf8').indexOf(
       'promoteMatchFinishedIfAllGroupsDone'
     ) >= 0
 );
@@ -448,7 +449,7 @@ assert(
   typeof standingsAssembler.buildStandingsResult === 'function'
 );
 
-var assemblerSrc = fs.readFileSync(path.join(utilsDir, 'seriesStandingsAssembler.js'), 'utf8');
+var assemblerSrc = fs.readFileSync(seriesTestPaths.util('seriesStandingsAssembler.js'), 'utf8');
 assert(
   'lock does not snapshot-clear standings',
   assemblerSrc.indexOf('status === \'finished\'') < 0 ||

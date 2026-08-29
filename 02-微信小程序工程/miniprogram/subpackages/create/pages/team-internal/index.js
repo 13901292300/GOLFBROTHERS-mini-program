@@ -7,6 +7,7 @@ const scheduleAdapter = require('../../../../utils/scheduleAdapter.js');
 const {
   createDefaultEventInfoList
 } = require('../../../../utils/eventInfoDefaults.js');
+const matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -26,7 +27,6 @@ const GAME_MODE_OPTIONS = TEAM_GAME_MODES.map((item) => item.name);
 
 const MATCH_PLAY_MODES = [
   '个人比洞赛',
-  '最好成绩比洞赛',
   '四人四球比洞赛',
   '最佳球位比洞赛',
   '四人两球比洞赛'
@@ -35,7 +35,9 @@ const MATCH_PLAY_MODES = [
 const MATCH_PLAY_TEAM_GROUPS_TIP = '比洞赛必须设置两个分队，请调整分队配置后继续。';
 
 function isMatchPlayMode(name) {
-  return MATCH_PLAY_MODES.indexOf(name) >= 0;
+  var n = String(name || '').trim();
+  if (n === '最好成绩比洞赛') return true;
+  return MATCH_PLAY_MODES.indexOf(n) >= 0;
 }
 
 const TEAM_GROUP_DESC_DEFAULT = '用于设置本场队内赛的分队名称，如不需要分队 PK，可保留默认设置。';
@@ -114,8 +116,7 @@ function buildEventTitleMapForList(list) {
 const DEFAULT_EVENT_INFO_LIST = createDefaultEventInfoList();
 
 function buildDefaultRoundName(teamName) {
-  const name = String(teamName || '').trim();
-  return name ? name + ROUND_NAME_SUFFIX : '';
+  return matchTitlePolicy.buildAutoInternalRoundName(teamName);
 }
 
 function pad2(n) {
@@ -181,6 +182,9 @@ Page({
     teamRole: '',
 
     roundName: '',
+    roundNameCount: 0,
+    roundNameMax: matchTitlePolicy.MATCH_TITLE_MAX,
+    roundNameQuota: matchTitlePolicy.MATCH_TITLE_MAX,
     courseName: '',
     courseId: '',
     courseLocation: '',
@@ -278,6 +282,8 @@ Page({
 
   onLoad(options) {
     this._roundNameManual = false;
+    this._roundNameBaseline = '';
+    this._roundNameLastOk = this.data.roundName || '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
 
@@ -316,6 +322,8 @@ Page({
     this._activeTimeTarget = 'tee';
     this._editMatchId = matchId;
     this._roundNameManual = true;
+    this._roundNameBaseline = form.roundName || '';
+    this._roundNameLastOk = form.roundName || '';
     // 编辑页：记录进入时已落盘赛制，保存失败时仅回滚赛制 UI（不碰 teamGroups）
     this._originalGameMode = form.gameMode || '个人比杆赛';
 
@@ -368,6 +376,12 @@ Page({
         teamLogo: teamLogo,
         teamRole: '',
         roundName: form.roundName || '',
+        roundNameCount: matchTitlePolicy.countTypingChars(form.roundName || ''),
+        roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+          form.roundName || '',
+          matchTitlePolicy.MATCH_TITLE_MAX
+        ),
+        roundNameQuota: matchTitlePolicy.MATCH_TITLE_MAX,
         courseId: form.courseId || '',
         courseName: form.courseName || '',
         courseLocation: form.courseLocation || '',
@@ -437,7 +451,66 @@ Page({
 
   onRoundNameInput(e) {
     this._roundNameManual = true;
-    this.setData({ roundName: e.detail.value });
+    var raw = e && e.detail && e.detail.value != null ? e.detail.value : '';
+    var value = matchTitlePolicy.constrainTyping(raw, {
+      max: matchTitlePolicy.MATCH_TITLE_MAX,
+      previous: this._roundNameBaseline
+    });
+    this.setData({
+      roundName: value,
+      roundNameCount: matchTitlePolicy.countTypingChars(value),
+      roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+        value,
+        matchTitlePolicy.MATCH_TITLE_MAX
+      )
+    });
+    return value;
+  },
+
+  onRoundNameBlur(e) {
+    var raw =
+      e && e.detail && e.detail.value != null
+        ? e.detail.value
+        : this.data.roundName;
+    return this._commitRoundNameInput(raw);
+  },
+
+  _commitRoundNameInput(raw) {
+    var check = matchTitlePolicy.normalizeTitleInput(raw, {
+      required: true,
+      max: matchTitlePolicy.MATCH_TITLE_MAX,
+      previous: this._roundNameBaseline
+    });
+    if (!check.ok) {
+      var fallback = this._roundNameLastOk != null ? String(this._roundNameLastOk) : '';
+      this.setData({
+        roundName: fallback,
+        roundNameCount: matchTitlePolicy.countTypingChars(fallback),
+        roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+          fallback,
+          matchTitlePolicy.MATCH_TITLE_MAX
+        )
+      });
+      wx.showToast({
+        title: check.reason === 'empty' ? '请输入比赛名称' : '比赛名称最多 14 个字符',
+        icon: 'none'
+      });
+      return false;
+    }
+    this._roundNameLastOk = check.value;
+    this.setData({
+      roundName: check.value,
+      roundNameCount: matchTitlePolicy.countTypingChars(check.value),
+      roundNameMax: matchTitlePolicy.resolveInputMaxlength(
+        check.value,
+        matchTitlePolicy.MATCH_TITLE_MAX
+      )
+    });
+    return true;
+  },
+
+  _assertRoundNameOrTip() {
+    return this._commitRoundNameInput(this.data.roundName);
   },
 
   _hasSelectedTeam() {
@@ -461,13 +534,19 @@ Page({
     }
     if (!this._roundNameManual) {
       updates.roundName = buildDefaultRoundName(payload.teamName);
+      updates.roundNameCount = matchTitlePolicy.countTypingChars(updates.roundName);
+      updates.roundNameMax = matchTitlePolicy.resolveInputMaxlength(
+        updates.roundName,
+        matchTitlePolicy.MATCH_TITLE_MAX
+      );
+      this._roundNameLastOk = updates.roundName;
     }
     this.setData(updates);
   },
 
   onSelectTeam() {
     wx.navigateTo({
-      url: '/pages/team/select/index?selectedId=' + (this.data.teamId || ''),
+      url: '/subpackages/create/pages/team/select/index?selectedId=' + (this.data.teamId || ''),
       events: {
         teamSelected: (payload) => {
           this._applySelectedTeam(payload);
@@ -526,7 +605,7 @@ Page({
 
   onSelectCourse() {
     wx.navigateTo({
-      url: '/pages/course/select/index?selectedId=' + (this.data.courseId || ''),
+      url: '/subpackages/create/pages/course/select/index?selectedId=' + (this.data.courseId || ''),
       events: {
         courseSelected: (payload) => {
           if (!payload) return;
@@ -1567,6 +1646,10 @@ Page({
         showCancel: false,
         confirmText: '确认'
       });
+      return;
+    }
+
+    if (!this._assertRoundNameOrTip()) {
       return;
     }
 

@@ -22,6 +22,8 @@ var dockDir = path.join(
   __dirname,
   '..',
   'miniprogram',
+  'subpackages',
+  'tournament',
   'components',
   'series-round-selector-dock'
 );

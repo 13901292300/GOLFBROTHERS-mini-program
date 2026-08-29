@@ -207,7 +207,7 @@ function resolveStrokeModeLabel(gameMode) {
 
 /**
  * 球友圈比洞赛制展示名（产品中文语义）。
- * G5→个人比洞；G6→最好成绩比洞；G7→最佳球位比洞；G8→四人两球比洞
+ * G5→个人比洞；G6→四人四球比洞（含历史名「最好成绩比洞赛」）；G7→最佳球位比洞；G8→四人两球比洞
  */
 function resolveMatchPlayModeLabel(gameMode) {
   const mode = _trim(gameMode);
@@ -222,7 +222,7 @@ function resolveMatchPlayModeLabel(gameMode) {
       return '四人两球比洞';
     }
     if (lower.indexOf('best') >= 0 || lower.indexOf('fourball') >= 0) {
-      return '最好成绩比洞';
+      return '四人四球比洞';
     }
     return '个人比洞';
   }
@@ -250,7 +250,7 @@ function resolveMatchPlayModeLabel(gameMode) {
     mode === '四人四球比洞赛' ||
     mode === '四人四球比洞'
   ) {
-    return '最好成绩比洞';
+    return '四人四球比洞';
   }
 
   if (/[A-Za-z_]/.test(mode)) {

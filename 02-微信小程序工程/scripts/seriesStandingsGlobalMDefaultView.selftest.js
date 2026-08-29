@@ -250,7 +250,7 @@ assert(
   '页面按 roundId 记忆且 TOT 不写入',
   pageJs.indexOf('_standingsSelectionByRoundId') >= 0 &&
     pageJs.indexOf('resolveStandingsSessionSelection') >= 0 &&
-    /_rememberStandingsSelection:[\s\S]{0,280}CUMULATIVE_KEY/.test(pageJs) &&
+    /_rememberStandingsSelection:[\s\S]{0,280}isCumulativeStandingsKey/.test(pageJs) &&
     pageJs.indexOf('_standingsViewByRoundId[index]') < 0 &&
     pageJs.indexOf('_standingsSelectionByRoundId[i]') < 0
 );

@@ -5,6 +5,7 @@
  */
 
 var seriesIds = require('./seriesIds.js');
+var matchTitlePolicy = require('./matchTitlePolicy.js');
 
 var SCHEMA_VERSION = 1;
 var CALCULATION_VERSION = 1;
@@ -82,7 +83,7 @@ var GAME_MODE = {
   最佳球位比杆赛: true,
   四人两球比杆赛: true,
   个人比洞赛: true,
-  最好成绩比洞赛: true,
+  最好成绩比洞赛: true, // 历史别名，仅兼容已有数据，不可作为创建选项
   四人四球比洞赛: true,
   最佳球位比洞赛: true,
   四人两球比洞赛: true
@@ -151,9 +152,7 @@ function asFiniteNumberOrNull(value) {
  * 4C-3 LIVE / 4C-4 报名卡左对齐（本批不改那些页面）。
  */
 function sanitizeSeriesSubtitle(raw) {
-  return asString(raw, '')
-    .replace(/[\r\n\u2028\u2029]+/g, '')
-    .trim();
+  return matchTitlePolicy.sanitizeTitleText(raw);
 }
 
 /**

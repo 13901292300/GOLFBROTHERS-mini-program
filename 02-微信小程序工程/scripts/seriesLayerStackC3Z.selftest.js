@@ -95,14 +95,26 @@ assert(
 
 assert(
   '9 一级→二级同帧：_openFromManageSheet = 关一级 + 开二级 + overlay',
-  pageJs.indexOf('_openFromManageSheet') >= 0 &&
+  typeof pageJs === 'string' &&
+    pageJs.indexOf('_openFromManageSheet') >= 0 &&
     pageJs.indexOf('_buildCloseMoreSheetPatch') >= 0 &&
-    /_openFromManageSheet:[\s\S]{0,400}_buildCloseMoreSheetPatch/.test(pageJs) &&
+    pageJs.indexOf('_commitManageOverlayPatch') >= 0 &&
     pageJs.indexOf('_openSeriesTempAdminPermissionSheet') >= 0 &&
-    /_openSeriesTempAdminPermissionSheet:[\s\S]{0,1200}_openFromManageSheet/.test(
-      pageJs
-    ) &&
-    /_openSeriesHalfCourseSheet:[\s\S]{0,1200}_openFromManageSheet/.test(pageJs)
+    pageJs.indexOf('_openSeriesHalfCourseSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesPaymentManageSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesTeeSheetManageSheet') >= 0 &&
+    layer.resolveIsManageOverlayActiveFromData(
+      { showMoreSheet: true },
+      { showMoreSheet: false, paymentManageSheetVisible: true }
+    ) === true &&
+    layer.resolveIsManageOverlayActiveFromData(
+      { showMoreSheet: true, paymentManageSheetVisible: true },
+      { showMoreSheet: false }
+    ) === true &&
+    layer.resolveIsManageOverlayActiveFromData(
+      { paymentManageSheetVisible: true },
+      { paymentManageSheetVisible: false }
+    ) === false
 );
 
 assert(
@@ -119,7 +131,29 @@ assert(
       screenHeight: 667,
       isManageOverlayActive: true,
       register: { cta: { label: '立即报名' } }
-    }).showRegisterBottomAction === false
+    }).showRegisterBottomAction === false &&
+    dock.resolveSeriesBottomDockVisibility({
+      activeTab: 'discussion',
+      isStickyTab: true,
+      scrollTop: 500,
+      tabOffsetTop: 200,
+      tabBarHeight: 50,
+      headerTotalHeight: 92,
+      screenHeight: 667,
+      isManageOverlayActive: true,
+      discussion: { showInputBar: true }
+    }).showDiscussionInput === false &&
+    dock.resolveSeriesBottomDockVisibility({
+      activeTab: 'discussion',
+      isStickyTab: true,
+      scrollTop: 500,
+      tabOffsetTop: 200,
+      tabBarHeight: 50,
+      headerTotalHeight: 92,
+      screenHeight: 667,
+      isManageOverlayActive: false,
+      discussion: { showInputBar: true }
+    }).showDiscussionInput === true
 );
 
 assert(

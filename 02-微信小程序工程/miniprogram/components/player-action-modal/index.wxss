@@ -68,7 +68,7 @@
   flex-shrink: 0;
   font-size: 26rpx;
   font-weight: 700;
-  color: var(--data-blue, #1c94de);
+  color: var(--data-blue, #00AEEF);
   line-height: 1;
 }
 .player-action-modal__stats {

@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -27,7 +28,7 @@ var detailDir = path.join(
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var tournamentGroupCardView = require(path.join(utilsDir, 'tournamentGroupCardView.js'));
+var tournamentGroupCardView = require(seriesTestPaths.util('tournamentGroupCardView.js'));
 var teeSheetManage = require(path.join(utilsDir, 'teeSheetManage.js'));
 var scheduleVm = require(path.join(pageDir, 'seriesScheduleViewModel.js'));
 var detailVm = require(path.join(pageDir, 'seriesDetailViewModel.js'));
@@ -212,7 +213,7 @@ function buildVm(series, matches, selectedRoundId) {
     '轮次层 LIVE 仍在选择器',
     seriesWxml.indexOf('showLiveBadge') >= 0 ||
       read(
-        path.join(root, 'miniprogram', 'components', 'series-round-selector-dock', 'index.wxml')
+        path.join(root, 'miniprogram', 'subpackages', 'tournament', 'components', 'series-round-selector-dock', 'index.wxml')
       ).indexOf('item.showLiveBadge') >= 0
   );
   assert(
@@ -531,6 +532,26 @@ function buildVm(series, matches, selectedRoundId) {
   assert(
     'G5 matchPlayMeta 优先，10 号洞显示 B1',
     g5Cards[1].teeMetaLine === '08:10 · B1出发' && g5Cards[1].startHole === 10
+  );
+
+  var pendingMatch = {
+    matchId: 'm-pending',
+    gameMode: '个人比洞赛',
+    status: 'registering',
+    groups: [
+      {
+        groupId: 'g-p',
+        groupName: '第1组',
+        teeTime: '08:00',
+        players: [{ position: 1, userId: 'u1' }]
+      }
+    ]
+  };
+  var pendingCards = expectedAuthorityCards(pendingMatch, null);
+  assert(
+    '未开始且无 startHole 显示待分配',
+    pendingCards[0].teeMetaLine === '08:00 · 待分配' &&
+      pendingCards[0].hole === '待分配'
   );
 
   var strokeMatch = {

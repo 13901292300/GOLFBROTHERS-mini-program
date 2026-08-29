@@ -88,8 +88,8 @@
   border: 1px solid var(--border);
 }
 .payment-filter-tab.is-active {
-  background: var(--data-blue, #00aeef);
-  border-color: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
+  border-color: var(--data-blue, #00AEEF);
   color: #fff;
 }
 .payment-sheet__body {
@@ -187,6 +187,6 @@
   background: var(--bg-card);
 }
 .detail-page.dark-mode .payment-filter-tab.is-active {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   color: #fff;
 }

@@ -9,6 +9,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var groupEditorPath = path.join(
@@ -22,7 +23,7 @@ var groupEditorPath = path.join(
   'index.js'
 );
 
-var tournamentGroupDraft = require(path.join(utilsDir, 'tournamentGroupDraft.js'));
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 
 var passed = 0;
 var failed = 0;

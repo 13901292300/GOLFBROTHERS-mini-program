@@ -176,6 +176,7 @@ var browse = viewModel.buildSeriesDetailViewModel(r2LiveSeries, {
   standingsSelectedKey: 'r1',
   standingsUserPicked: true,
   standingsVisited: true,
+  heroEntryContext: 'plaza',
   getMatchById: r2LiveGet,
   getIndexByMatchId: function () {
     return null;
@@ -206,11 +207,59 @@ assert(
     again.text.indexOf('（R2）（R2）') < 0
 );
 
-var pair = cardAndHero(r2LiveSeries, 'live', r2LiveGet);
+var plazaLiveDeps = {
+  getMatchById: r2LiveGet,
+  getIndexByMatchId: function () {
+    return null;
+  },
+  context: 'standings'
+};
+var plazaCard = listAdapter.toSeriesClubCard(r2LiveSeries, 'live', plazaLiveDeps);
+var plazaHero = viewModel.buildSeriesDetailViewModel(
+  r2LiveSeries,
+  Object.assign({ heroEntryContext: 'plaza' }, plazaLiveDeps)
+);
 assert(
-  '11 首页卡片与详情 Hero 文案一致',
-  pair.card.titleSub === pair.hero.titleSub &&
-    pair.card.titleSub === '第二轮 · 四人四球比洞赛'
+  '11 广场 LIVE 卡片与详情 Hero 文案一致',
+  plazaCard.titleSub === plazaHero.hero.titleSub &&
+    plazaCard.titleSub === '第二轮 · 四人四球比洞赛'
+);
+
+var namedCard = listAdapter.toSeriesClubCard(
+  Object.assign({}, named, {}),
+  'live',
+  plazaLiveDeps
+);
+var namedHero = viewModel.buildSeriesDetailViewModel(
+  named,
+  Object.assign({ heroEntryContext: 'plaza' }, plazaLiveDeps)
+);
+assert(
+  '11b 当前轮一致：卡片用圆点 Rx，Hero 保留括号格式',
+  namedCard.titleSub === '春季对决 · R2' &&
+    namedHero.ok &&
+    namedHero.hero.titleSub === '春季对决（R2）' &&
+    named.seriesSubtitle === '春季对决'
+);
+
+var regHero = viewModel.buildSeriesDetailViewModel(
+  r2LiveSeries,
+  Object.assign({ heroEntryContext: 'registration' }, plazaLiveDeps)
+);
+var plazaHeroTone = viewModel.buildSeriesDetailViewModel(
+  r2LiveSeries,
+  Object.assign({ heroEntryContext: 'plaza' }, plazaLiveDeps)
+);
+assert(
+  '11c 报名入口与广场入口副标题内容一致，色调仍分流',
+  regHero.ok &&
+    plazaHeroTone.ok &&
+    regHero.hero.titleSub === plazaHeroTone.hero.titleSub &&
+    regHero.hero.titleSub === '第二轮 · 四人四球比洞赛' &&
+    regHero.hero.entryContext === 'registration' &&
+    plazaHeroTone.hero.entryContext === 'plaza' &&
+    regHero.hero.dateTone === 'gold' &&
+    plazaHeroTone.hero.dateTone === 'live'
 );
 
 var ordinary = {

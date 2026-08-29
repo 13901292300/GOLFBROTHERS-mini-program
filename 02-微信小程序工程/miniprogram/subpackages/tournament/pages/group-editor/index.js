@@ -16,6 +16,7 @@ const playerDirectory = require('../../../../utils/playerDirectory.js');
 const tPosition = require('../../../../utils/tPosition.js');
 const {
   validateStrokeEntities,
+  validateGroupForTargetGameMode,
   buildRegisterTeamMap,
   isG5MatchPlayMode,
   isG6G7MatchPlayMode,
@@ -33,7 +34,12 @@ const tournamentGroupDraft = require('../../utils/tournamentGroupDraft.js');
 const seriesStore = require('../../../../utils/seriesStore.js');
 const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
-const seriesNoRepeatLineup = require('../../utils/seriesNoRepeatLineup.js');
+const seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
+const seriesLiveSingleReplaceFlow = require('../../utils/seriesLiveSingleReplaceFlow.js');
+const seriesLiveReplaceExecute = require('../../utils/seriesLiveReplaceExecute.js');
+const seriesLiveRollbackExecute = require('../../utils/seriesLiveRollbackExecute.js');
+const seriesLiveMutationJournal = require('../../utils/seriesLiveMutationJournal.js');
+const seriesLiveMutationRecovery = require('../../utils/seriesLiveMutationRecovery.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 const {
   PLAYER_SLOTS,
@@ -76,11 +82,37 @@ const {
   buildPairingSlotId,
   resolvePairingSlotNo,
   createEmptyPairing,
-  buildAutoPairingsForGroup
+  buildAutoPairingsForGroup,
+  applyLiveGroupsFromDraft,
+  rematerializeLivePlayersAfterNormalize
 } = tournamentGroupDraft;
 
 // 页面方法内原调用 this._validateGroupDraft / _validatePairingDraft / _sanitizeGroupDraft
 // 改为薄封装，语义与抽出前一致
+
+const SERIES_LIVE_ONE_SEAT_MSG = '系列赛 LIVE 每次只能更换一名球员，请分次操作';
+const SERIES_LIVE_SINGLE_REPLACE_ONLY_MSG = '系列赛 LIVE 当前仅支持单个座位换人';
+const SERIES_LIVE_NO_CHANGE_MSG = '未检测到可保存的换人';
+const SERIES_LIVE_GROUP_FINISHED_MSG = '当前分组已结束，无法修改';
+const SERIES_LIVE_ROUND_CANCELLED_MSG = '本轮已取消，无法修改分组';
+const SERIES_LIVE_SERIES_LOCKED_MSG = '系列赛已经结束。';
+const SERIES_LIVE_PERMISSION_MSG = '暂无分组管理权限';
+const SERIES_LIVE_STALE_MSG = '分组状态已变化，请重新操作';
+const SERIES_LIVE_MANUAL_REVIEW_MSG = '保存状态需要管理员检查，请勿重复操作';
+const SERIES_LIVE_SAVE_FAIL_RETRY_MSG = '保存失败，请重试';
+const SERIES_LIVE_ROLLED_BACK_MSG = '保存失败，已恢复原分组';
+const SERIES_LIVE_UPDATED_MSG = '分组已更新';
+
+function livePlayerIdOf(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string' || typeof raw === 'number') return String(raw).trim();
+  return String((raw.userId || raw.playerId || raw.id || '')).trim();
+}
+
+function isRegisteredRosterStatus(status) {
+  const st = String(status || '').trim().toLowerCase();
+  return !st || st === 'registered';
+}
 
 /** 兼容共享视图 triggerEvent(detail) 与旧 dataset */
 function eventField(e, key) {
@@ -125,6 +157,7 @@ Page({
   },
 
   onLoad(options) {
+    this._pageAlive = true;
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     const matchId = options && options.matchId ? decodeURIComponent(options.matchId) : '';
@@ -252,6 +285,10 @@ Page({
       });
     }
     this._applyGroupPickResultIfAny();
+  },
+
+  onUnload() {
+    this._pageAlive = false;
   },
 
   /**
@@ -1183,127 +1220,52 @@ Page({
   },
 
   _findPlayerEntryByPosition(group, position) {
-    const pos = Number(position) || 0;
-    const players = Array.isArray(group && group.players) ? group.players : [];
-    return players.find((player) =>
-      Number(player && (player.position != null ? player.position : player.slotIndex)) === pos
-    ) || null;
+    return tournamentGroupDraft.findPlayerEntryByPosition(group, position);
   },
 
   _buildLivePlayerEntry(oldEntry, draftEntry, position) {
-    const oldUserId = oldEntry && (oldEntry.userId || oldEntry.playerId || oldEntry.id)
-      ? String(oldEntry.userId || oldEntry.playerId || oldEntry.id).trim()
-      : '';
-    const nextUserId = draftEntry && draftEntry.userId ? String(draftEntry.userId).trim() : '';
-    const scorePlayerId = resolveScorePlayerId(oldEntry) || resolveScorePlayerId(draftEntry) || oldUserId || nextUserId;
-    if (!nextUserId) {
-      const empty = { position: position, userId: '', playerId: '', id: '' };
-      if (scorePlayerId) empty.scorePlayerId = scorePlayerId;
-      return empty;
-    }
-    const next = Object.assign({}, oldEntry || {}, {
-      position: position,
-      userId: nextUserId,
-      playerId: nextUserId,
-      id: nextUserId
-    });
-    if (draftEntry && draftEntry.avatar) next.avatar = draftEntry.avatar;
-    if (draftEntry && draftEntry.displayName) next.displayName = draftEntry.displayName;
-    if (draftEntry && draftEntry.gender) next.gender = draftEntry.gender;
-    if (draftEntry && (draftEntry.tPosition || draftEntry.tee || draftEntry.gender)) {
-      next.tPosition = tPosition.resolve(draftEntry);
-      next.tee = next.tPosition;
-    } else if (oldEntry && (oldEntry.tPosition || oldEntry.tee)) {
-      next.tPosition = tPosition.resolve(oldEntry);
-      next.tee = next.tPosition;
-    }
-    if (scorePlayerId) next.scorePlayerId = scorePlayerId;
-    return next;
+    return tournamentGroupDraft.buildLivePlayerEntry(oldEntry, draftEntry, position);
   },
 
   _buildLiveGroupFromDraft(oldGroup, draftGroup, index) {
-    const base = oldGroup || {};
-    const groupId = draftGroup && draftGroup.groupId
-      ? String(draftGroup.groupId)
-      : (base.groupId ? String(base.groupId) : ('group-tab-' + Date.now() + '-' + (index + 1)));
-    const next = Object.assign({}, base, {
-      groupId: groupId,
-      groupName: draftGroup && draftGroup.groupName ? String(draftGroup.groupName) : (base.groupName || ('第' + (index + 1) + '组')),
-      players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
-        const position = i + 1;
-        const oldEntry = this._findPlayerEntryByPosition(base, position);
-        const draftEntry = this._findPlayerEntryByPosition(draftGroup, position);
-        return this._buildLivePlayerEntry(oldEntry, draftEntry, position);
-      })
-    });
-    const teeTime = draftGroup && draftGroup.teeTime != null ? String(draftGroup.teeTime).trim() : '';
-    if (teeTime) next.teeTime = teeTime;
-    const startHole = Number(draftGroup && draftGroup.startHole);
-    if (Number.isFinite(startHole) && startHole >= 1 && startHole <= 18) {
-      next.startHole = Math.floor(startHole);
-    }
-    return next;
+    return tournamentGroupDraft.buildLiveGroupFromDraft(oldGroup, draftGroup, index);
   },
 
   /**
    * normalize 后按 userId / 座位回填 LIVE 的 scorePlayerId 等字段（normalize 只产出 position+userId）
    */
   _rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore) {
-    const byGroupUser = {};
-    const byGroupPos = {};
-    (Array.isArray(liveGroupsBefore) ? liveGroupsBefore : []).forEach((g) => {
-      const gid = g && g.groupId != null ? String(g.groupId) : '';
-      if (!gid) return;
-      if (!byGroupUser[gid]) byGroupUser[gid] = {};
-      if (!byGroupPos[gid]) byGroupPos[gid] = {};
-      (Array.isArray(g.players) ? g.players : []).forEach((p) => {
-        if (!p) return;
-        const pos = Number(p.position) || 0;
-        const uid = p.userId != null ? String(p.userId).trim() : '';
-        const scorePlayerId = resolveScorePlayerId(p);
-        if (uid) {
-          byGroupUser[gid][uid] = p;
-        } else if (pos >= 1) {
-          byGroupPos[gid][pos] = p;
-        }
-      });
-    });
-
-    return (Array.isArray(normalizedGroups) ? normalizedGroups : []).map((g) => {
-      const gid = g && g.groupId != null ? String(g.groupId) : '';
-      const players = (Array.isArray(g.players) ? g.players : []).map((slot) => {
-        const position = Number(slot && slot.position) || 0;
-        const uid = slot && slot.userId != null ? String(slot.userId).trim() : '';
-        if (uid) {
-          const prev = (byGroupUser[gid] && byGroupUser[gid][uid]) || {};
-          return withScorePlayerFields(
-            Object.assign({}, prev, slot, {
-              position: position,
-              userId: uid,
-              playerId: uid,
-              id: uid
-            }),
-            prev
-          );
-        }
-        const prevEmpty = (byGroupPos[gid] && byGroupPos[gid][position]) || {};
-        return withScorePlayerFields(
-          {
-            position: position,
-            userId: '',
-            playerId: '',
-            id: ''
-          },
-          prevEmpty
-        );
-      });
-      return Object.assign({}, g, { players: players });
-    });
+    return rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore);
   },
 
-  _confirmLiveGroups(match, rawDraft, pairingDraft) {
-    const oldGroups = Array.isArray(match && match.groups) ? match.groups : [];
-    const sanitized = this._sanitizeGroupDraft(rawDraft);
+  _persistLiveMatchWithReadback(next, previousMatch) {
+    const prev = previousMatch;
+    try {
+      teamMatchStore.saveMatch(next);
+    } catch (eSave) {
+      return { ok: false, reason: 'save_failed' };
+    }
+    const mid = next && next.matchId != null ? String(next.matchId).trim() : '';
+    const read = mid ? teamMatchStore.getMatchById(mid) : null;
+    if (!read) {
+      try {
+        teamMatchStore.saveMatch(prev);
+      } catch (e1) {
+        /* ignore */
+      }
+      return { ok: false, reason: 'save_failed' };
+    }
+    return { ok: true, match: read };
+  },
+
+  /**
+   * LIVE：从最新 Match + sanitized draft 生成校验前候选（不写盘、不改 UI）。
+   * pairingDraft 与 _confirmLiveGroups 第三参一致，缺省读 this.data.pairingDraft。
+   */
+  _buildLiveCandidateBase(latestMatch, sanitizedDraft, pairingDraft) {
+    const match = latestMatch && typeof latestMatch === 'object' ? latestMatch : {};
+    const sanitized = Array.isArray(sanitizedDraft) ? sanitizedDraft : [];
+    const oldGroups = Array.isArray(match.groups) ? match.groups : [];
     const isClear = sanitized.length === 0;
     const oldById = {};
     oldGroups.forEach((group) => {
@@ -1318,10 +1280,7 @@ Page({
     const deletedGroupIds = Object.keys(oldById).filter((groupId) => !draftIds[groupId]);
 
     // 先按座位合并，保留 scorePlayerId（LIVE 换人继承）
-    let nextGroups = sanitized.map((group, index) => {
-      const groupId = group && group.groupId ? String(group.groupId) : '';
-      return this._buildLiveGroupFromDraft(groupId ? oldById[groupId] : null, group, index);
-    });
+    let nextGroups = applyLiveGroupsFromDraft(oldGroups, sanitized);
 
     const nextScoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
       ? Object.assign({}, match.scoreData)
@@ -1330,7 +1289,7 @@ Page({
       delete nextScoreData[groupId];
     });
 
-    const matchId = match && match.matchId != null ? String(match.matchId).trim() : '';
+    const matchId = match.matchId != null ? String(match.matchId).trim() : '';
     const gameMode = String(match.gameMode || this.data.gameMode || '');
     const isG4Stroke = isG4FamilyMode(gameMode);
     const isG2G3Stroke = isG2G3FamilyMode(gameMode);
@@ -1339,7 +1298,7 @@ Page({
     // 与报名一致：座位规范化；再回填 LIVE scorePlayerId（G5 复用现有 normalize，不进组合逻辑）
     if (!isClear && (isG4Stroke || isG2G3Stroke || isG5MatchPlay)) {
       const beforeNormalize = nextGroups;
-      nextGroups = this._rematerializeLivePlayersAfterNormalize(
+      nextGroups = rematerializeLivePlayersAfterNormalize(
         normalizeFormalGroupSeats(nextGroups, match),
         beforeNormalize
       );
@@ -1401,21 +1360,501 @@ Page({
     }
 
     // Series：补齐 registerInfo 后与普通共用 validateStrokeEntities（不另设 2+2/4+0 门闩）
-    next = this._withSeriesRegisterInfoForSave(next);
+    return this._withSeriesRegisterInfoForSave(next);
+  },
+
+  /**
+   * LIVE：校验 + sync stroke entities。成功返回最终候选；失败不写盘。
+   */
+  _finalizeLiveCandidate(baseCandidate) {
+    const next = baseCandidate && typeof baseCandidate === 'object'
+      ? Object.assign({}, baseCandidate)
+      : {};
+    const check = validateStrokeEntities(next);
+    if (!check || check.valid !== true) {
+      return {
+        ok: false,
+        valid: false,
+        reason: (check && check.reason) || 'invalid',
+        message: STROKE_ENTITY_INVALID_TIP,
+        check: check
+      };
+    }
+    next.scoreEntities = syncStrokeEntities(next);
+    return { ok: true, valid: true, candidate: next };
+  },
+
+  _seriesLivePlayerId(raw) {
+    return livePlayerIdOf(raw);
+  },
+
+  _findEditedLiveGroupId(beforeMatch, sanitizedDraft) {
+    const before = Array.isArray(beforeMatch && beforeMatch.groups) ? beforeMatch.groups : [];
+    const after = Array.isArray(sanitizedDraft) ? sanitizedDraft : [];
+    const beforeById = {};
+    before.forEach((g) => {
+      const gid = g && g.groupId != null ? String(g.groupId).trim() : '';
+      if (gid) beforeById[gid] = g;
+    });
+    const changed = [];
+    after.forEach((g) => {
+      const gid = g && g.groupId != null ? String(g.groupId).trim() : '';
+      if (!gid) return;
+      const old = beforeById[gid];
+      const oldPlayers = old && Array.isArray(old.players) ? old.players : [];
+      const newPlayers = g && Array.isArray(g.players) ? g.players : [];
+      const oldMap = {};
+      oldPlayers.forEach((p) => {
+        const pos = Number(p && (p.position != null ? p.position : p.slotIndex)) || 0;
+        if (pos) oldMap[pos] = this._seriesLivePlayerId(p);
+      });
+      let diff = false;
+      newPlayers.forEach((p) => {
+        const pos = Number(p && (p.position != null ? p.position : p.slotIndex)) || 0;
+        if (!pos) return;
+        const nid = this._seriesLivePlayerId(p);
+        if ((oldMap[pos] || '') !== nid) diff = true;
+      });
+      if (oldPlayers.length !== newPlayers.length) diff = true;
+      if (diff) changed.push(gid);
+    });
+    if (changed.length === 1) return changed[0];
+    if (before.length === 1 && before[0] && before[0].groupId) {
+      return String(before[0].groupId).trim();
+    }
+    return changed[0] || '';
+  },
+
+  _resolveSeriesLiveIncomingPlayer(latestMatch, series, sanitizedDraft) {
+    const before = Array.isArray(latestMatch && latestMatch.groups) ? latestMatch.groups : [];
+    const after = Array.isArray(sanitizedDraft) ? sanitizedDraft : [];
+    const beforeById = {};
+    before.forEach((g) => {
+      const gid = g && g.groupId != null ? String(g.groupId).trim() : '';
+      if (gid) beforeById[gid] = g;
+    });
+    const incomingIds = [];
+    after.forEach((g) => {
+      const gid = g && g.groupId != null ? String(g.groupId).trim() : '';
+      const oldPlayers = ((beforeById[gid] && beforeById[gid].players) || []);
+      const oldMap = {};
+      oldPlayers.forEach((p) => {
+        const pos = Number(p && (p.position != null ? p.position : p.slotIndex)) || 0;
+        if (pos) oldMap[pos] = this._seriesLivePlayerId(p);
+      });
+      (Array.isArray(g && g.players) ? g.players : []).forEach((p) => {
+        const pos = Number(p && (p.position != null ? p.position : p.slotIndex)) || 0;
+        const nid = this._seriesLivePlayerId(p);
+        const oid = oldMap[pos] || '';
+        if (nid && nid !== oid) incomingIds.push(nid);
+      });
+    });
+    const unique = [];
+    const seen = {};
+    incomingIds.forEach((id) => {
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      unique.push(id);
+    });
+    const incomingId = unique.length === 1 ? unique[0] : '';
+    if (!incomingId) return null;
+    const roster = series && Array.isArray(series.roster) ? series.roster : [];
+    const rows = roster.filter((row) => {
+      const pid = this._seriesLivePlayerId(row);
+      return pid === incomingId && isRegisteredRosterStatus(row && row.registrationStatus);
+    });
+    if (rows.length !== 1) return null;
+    const row = rows[0];
+    const draftHit = (function findDraft() {
+      for (let i = 0; i < after.length; i++) {
+        const players = Array.isArray(after[i] && after[i].players) ? after[i].players : [];
+        for (let j = 0; j < players.length; j++) {
+          if (livePlayerIdOf(players[j]) === incomingId) return players[j];
+        }
+      }
+      return null;
+    })();
+    return Object.assign({}, row || {}, {
+      userId: incomingId,
+      playerId: incomingId,
+      id: incomingId,
+      displayName:
+        (row && (row.playerNameSnapshot || row.displayName)) ||
+        (draftHit && draftHit.displayName) ||
+        incomingId,
+      seriesParticipantId: row && row.seriesParticipantId,
+      registrationStatus: row && row.registrationStatus
+    });
+  },
+
+  _reloadSeriesLiveReplaceContext(sanitizedDraft) {
+    const matchId = String((this.data && this.data.matchId) || '').trim();
+    const latestMatch = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const matchCtx =
+      latestMatch && latestMatch.seriesContext && typeof latestMatch.seriesContext === 'object'
+        ? latestMatch.seriesContext
+        : {};
+    const indexRow = matchId ? seriesStationIndex.getByMatchId(matchId) : null;
+    const seriesId = String(
+      (indexRow && indexRow.seriesId) || matchCtx.seriesId || ''
+    ).trim();
+    const series = seriesId ? seriesStore.getSeriesById(seriesId) : null;
+    const roundId = String(
+      (indexRow && indexRow.roundId) || matchCtx.roundId || ''
+    ).trim();
+    const publishToken = String(
+      matchCtx.publishToken || (series && series.publishToken) || ''
+    ).trim();
+    const rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+    let round = null;
+    for (let i = 0; i < rounds.length; i++) {
+      if (String((rounds[i] && rounds[i].roundId) || '').trim() === roundId) {
+        round = rounds[i];
+        break;
+      }
+    }
+    const stationIndex = {
+      seriesId: seriesId,
+      roundId: roundId,
+      matchId: String((indexRow && indexRow.matchId) || matchCtx.matchId || (latestMatch && latestMatch.matchId) || matchId).trim(),
+      publishToken: publishToken
+    };
+    const incomingPlayer = this._resolveSeriesLiveIncomingPlayer(
+      latestMatch,
+      series,
+      sanitizedDraft
+    );
+    const currentUser = gameStore.getCurrentUser() || {};
+    return {
+      series: series,
+      latestSeries: series,
+      currentSeries: series,
+      match: latestMatch,
+      latestMatch: latestMatch,
+      currentMatch: latestMatch,
+      beforeMatch: latestMatch,
+      stationIndex: stationIndex,
+      incomingPlayer: incomingPlayer,
+      currentUser: currentUser,
+      editedGroupId: this._findEditedLiveGroupId(latestMatch, sanitizedDraft),
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
+      }
+    };
+  },
+
+  _buildSeriesLiveCandidateFromLatestMatch(latestMatch, currentDraft, pairingDraft) {
+    const sanitized = Array.isArray(currentDraft) ? currentDraft : [];
+    const pairings =
+      pairingDraft != null
+        ? pairingDraft
+        : (this._seriesLivePendingPairings != null
+          ? this._seriesLivePendingPairings
+          : (this.data && this.data.pairingDraft) || {});
+    const base = this._buildLiveCandidateBase(latestMatch, sanitized, pairings);
+    const finalized = this._finalizeLiveCandidate(base);
+    if (finalized && finalized.ok && finalized.candidate) return finalized.candidate;
+    return base;
+  },
+
+  _validateSeriesLiveCandidate(payload) {
+    const src = payload && typeof payload === 'object' ? payload : {};
+    const matchId = String((this.data && this.data.matchId) || '').trim();
+    const latest = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const trial = Object.assign({}, latest || {}, {
+      groups: src.groups,
+      pairings: src.pairings != null ? src.pairings : (latest && latest.pairings)
+    });
+    if (src.series && src.series.publishToken && trial.seriesContext) {
+      trial.seriesContext = Object.assign({}, trial.seriesContext);
+    }
+    const stroke = validateStrokeEntities(trial);
+    if (!stroke || stroke.valid !== true) {
+      return {
+        ok: false,
+        valid: false,
+        reason: (stroke && stroke.reason) || 'invalid',
+        message: STROKE_ENTITY_INVALID_TIP
+      };
+    }
+    const gameMode = String(trial.gameMode || (this.data && this.data.gameMode) || '');
+    const groups = Array.isArray(trial.groups) ? trial.groups : [];
+    for (let i = 0; i < groups.length; i++) {
+      const gCheck = validateGroupForTargetGameMode(gameMode, groups[i], trial);
+      if (!gCheck || gCheck.valid !== true) {
+        return {
+          ok: false,
+          valid: false,
+          reason: (gCheck && gCheck.reason) || 'invalid',
+          message: STROKE_ENTITY_INVALID_TIP
+        };
+      }
+    }
+    return { ok: true, valid: true };
+  },
+
+  _mapSeriesLiveRejectMessage(code) {
+    const c = String(code || '').trim();
+    if (
+      c === 'multiple_replacements' ||
+      c === 'seat_swap' ||
+      c === 'player_move' ||
+      c === 'player_addition' ||
+      c === 'player_removal' ||
+      c === 'incoming_already_in_round'
+    ) {
+      return SERIES_LIVE_ONE_SEAT_MSG;
+    }
+    if (c === 'no_live_group_change') return SERIES_LIVE_NO_CHANGE_MSG;
+    if (c === 'group_finished') return SERIES_LIVE_GROUP_FINISHED_MSG;
+    if (c === 'match_completed') return teamMatchFinish.MATCH_FINISHED_TOAST;
+    if (c === 'round_cancelled') return SERIES_LIVE_ROUND_CANCELLED_MSG;
+    if (c === 'series_locked') return SERIES_LIVE_SERIES_LOCKED_MSG;
+    if (c === 'permission_denied') return SERIES_LIVE_PERMISSION_MSG;
+    if (
+      c === 'pairing_only_change' ||
+      c === 'pairing_structure_drift' ||
+      c === 'pairing_identity_drift' ||
+      c === 'entity_only_change' ||
+      c === 'entity_structure_drift' ||
+      c === 'score_owner_drift' ||
+      c === 'ambiguous_group' ||
+      c === 'ambiguous_position'
+    ) {
+      return SERIES_LIVE_SINGLE_REPLACE_ONLY_MSG;
+    }
+    if (c === 'stale_confirmation' || c === 'confirmation_fingerprint_conflict') {
+      return SERIES_LIVE_STALE_MSG;
+    }
+    return SERIES_LIVE_SINGLE_REPLACE_ONLY_MSG;
+  },
+
+  _seriesLiveConfirmCopy(flowResult, incomingPlayer) {
+    const display = (flowResult && flowResult.confirmationDisplay) || {};
+    const part = display.participant && typeof display.participant === 'object' ? display.participant : {};
+    const incomingName =
+      String(
+        (incomingPlayer && (incomingPlayer.displayName || incomingPlayer.playerNameSnapshot)) ||
+          display.incomingUserId ||
+          ''
+      ).trim() || '该球员';
+    const teamName = String(part.shortName || part.name || '').trim() || '目标方';
+    return {
+      title: '调整参赛归属',
+      content:
+        '将 ' +
+        incomingName +
+        ' 在本系列赛的归属调整为 ' +
+        teamName +
+        ' 对应的球队/分队，并完成本次换人？',
+      confirmText: '确认调整并替换',
+      cancelText: '取消'
+    };
+  },
+
+  _hasSeriesLiveManagePermission(info) {
+    const src = info && typeof info === 'object' ? info : {};
+    const match = src.match;
+    const user = src.user || gameStore.getCurrentUser() || {};
+    const perm = src.permission || 'edit_groups';
+    return (
+      matchManageAccess.hasMatchManagePermission(match, user, perm) ||
+      matchManageAccess.hasMatchManagePermission(match, user, 'manage_groups')
+    );
+  },
+
+  _executeSeriesLiveSingleReplaceFlow(input) {
+    return seriesLiveSingleReplaceFlow.executeSeriesLiveSingleReplaceFlow(input);
+  },
+
+  _buildSeriesLiveFlowInput(sanitized, pairingDraft, acceptedFingerprint) {
+    const self = this;
+    const draft = Array.isArray(sanitized) ? sanitized : [];
+    const pairings = pairingDraft != null ? pairingDraft : {};
+    this._seriesLivePendingSanitized = draft;
+    this._seriesLivePendingPairings = pairings;
+    return {
+      currentDraft: draft,
+      editedGroupId: '',
+      acceptedConfirmationFingerprint: acceptedFingerprint == null ? '' : String(acceptedFingerprint),
+      reloadContext: function () {
+        const ctx = self._reloadSeriesLiveReplaceContext(draft);
+        return ctx;
+      },
+      buildCandidateFromLatestMatch: function (latestMatch, currentDraft) {
+        return self._buildSeriesLiveCandidateFromLatestMatch(
+          latestMatch,
+          currentDraft != null ? currentDraft : draft,
+          pairings
+        );
+      },
+      validateCandidate: function (payload) {
+        return self._validateSeriesLiveCandidate(payload);
+      },
+      prepareJournal: function (input) {
+        return seriesLiveMutationJournal.prepareJournal(input);
+      },
+      prepareNextAttemptAfterRollback: function (input) {
+        return seriesLiveMutationJournal.prepareNextAttemptAfterRollback(input);
+      },
+      getJournal: function (planKey) {
+        return seriesLiveMutationJournal.getJournal(planKey);
+      },
+      inspectRecovery: function (input) {
+        return seriesLiveMutationRecovery.inspectSeriesLiveMutationRecovery(input);
+      },
+      executeForward: function (args) {
+        return seriesLiveReplaceExecute.executeSeriesLiveReplace(args);
+      },
+      executeRollback: function (args) {
+        return seriesLiveRollbackExecute.executeSeriesLiveRollback(args);
+      },
+      currentUser: gameStore.getCurrentUser() || {},
+      hasManagePermission: function (info) {
+        return self._hasSeriesLiveManagePermission(info);
+      },
+      storeAdapters: {}
+    };
+  },
+
+  _seriesLivePageAlive() {
+    return this._pageAlive !== false;
+  },
+
+  _showSeriesLiveConfirmModal(flowResult, session) {
+    const copy = this._seriesLiveConfirmCopy(flowResult, session && session.incomingPlayer);
+    const fingerprint = String(
+      (flowResult && (flowResult.confirmationFingerprint || (flowResult.plan && flowResult.plan.confirmationFingerprint))) ||
+        ''
+    );
+    const self = this;
+    wx.showModal({
+      title: copy.title,
+      content: copy.content,
+      confirmText: copy.confirmText,
+      cancelText: copy.cancelText,
+      success(res) {
+        if (!self._seriesLivePageAlive()) return;
+        if (res && res.confirm) {
+          self.setData({ saving: true });
+          self._runSeriesLiveSingleReplaceFlow(
+            session.sanitized,
+            session.pairingDraft,
+            fingerprint,
+            { staleReprompted: !!session.staleReprompted }
+          );
+          return;
+        }
+        self.setData({ saving: false });
+      }
+    });
+  },
+
+  _handleSeriesLiveFlowResult(result, session) {
+    if (!this._seriesLivePageAlive()) return;
+    const out = result && typeof result === 'object' ? result : {};
+    const status = String(out.status || '');
+    if (status === 'confirmation_required') {
+      this._showSeriesLiveConfirmModal(out, Object.assign({}, session, { staleReprompted: false }));
+      return;
+    }
+    if (status === 'stale_confirmation') {
+      if (!session.staleReprompted && (out.confirmationDisplay || out.confirmationFingerprint || out.plan)) {
+        this._showSeriesLiveConfirmModal(out, Object.assign({}, session, { staleReprompted: true }));
+        return;
+      }
+      this.setData({ saving: false });
+      wx.showToast({ title: SERIES_LIVE_STALE_MSG, icon: 'none' });
+      return;
+    }
+    if (status === 'completed') {
+      this.setData({ saving: false });
+      this._leavingConfirmed = true;
+      this._touchSeriesReturnContext();
+      wx.showToast({ title: SERIES_LIVE_UPDATED_MSG, icon: 'success' });
+      setTimeout(() => {
+        if (!this._seriesLivePageAlive()) return;
+        wx.navigateBack({ delta: 1 });
+      }, 400);
+      return;
+    }
+    if (status === 'failed_before_write') {
+      this.setData({ saving: false });
+      wx.showToast({ title: SERIES_LIVE_SAVE_FAIL_RETRY_MSG, icon: 'none' });
+      return;
+    }
+    if (status === 'failed_rolled_back') {
+      this.setData({ saving: false });
+      wx.showToast({ title: SERIES_LIVE_ROLLED_BACK_MSG, icon: 'none' });
+      return;
+    }
+    if (status === 'manual_review' || status === 'retry_not_safe') {
+      this.setData({ saving: false });
+      wx.showModal({
+        title: '',
+        content: SERIES_LIVE_MANUAL_REVIEW_MSG,
+        showCancel: false
+      });
+      return;
+    }
+    this.setData({ saving: false });
+    wx.showToast({
+      title: this._mapSeriesLiveRejectMessage(out.code || out.status),
+      icon: 'none'
+    });
+  },
+
+  _runSeriesLiveSingleReplaceFlow(sanitized, pairingDraft, acceptedFingerprint, extras) {
+    const extra = extras || {};
+    const ctxPreview = this._reloadSeriesLiveReplaceContext(sanitized);
+    const input = this._buildSeriesLiveFlowInput(sanitized, pairingDraft, acceptedFingerprint);
+    input.editedGroupId = ctxPreview.editedGroupId || '';
+    input.currentUser = ctxPreview.currentUser || input.currentUser;
+    let result;
+    try {
+      result = this._executeSeriesLiveSingleReplaceFlow(input);
+    } catch (eRun) {
+      result = { ok: false, status: 'failed_before_write', code: 'flow_prepare_failed' };
+    }
+    this._handleSeriesLiveFlowResult(result, {
+      sanitized: sanitized,
+      pairingDraft: pairingDraft,
+      incomingPlayer: ctxPreview.incomingPlayer,
+      staleReprompted: !!extra.staleReprompted
+    });
+    return result;
+  },
+
+  _confirmLiveGroups(match, rawDraft, pairingDraft) {
+    const sanitized = this._sanitizeGroupDraft(rawDraft);
+    const isClear = sanitized.length === 0;
+
+    let next = this._buildLiveCandidateBase(match, sanitized, pairingDraft);
 
     // 与报名一致：stroke entity 校验 + sync（不碰 teamScoresByEntity）
     if (!isClear) {
-      const check = validateStrokeEntities(next);
-      if (!check || check.valid !== true) {
-        console.warn('[stroke-entity-validate]', check && check.reason ? check.reason : 'invalid');
+      const finalized = this._finalizeLiveCandidate(next);
+      if (!finalized.ok) {
+        console.warn('[stroke-entity-validate]', finalized.reason || 'invalid');
         this.setData({ saving: false });
         wx.showToast({ title: STROKE_ENTITY_INVALID_TIP, icon: 'none' });
         return;
       }
-      next.scoreEntities = syncStrokeEntities(next);
+      next = finalized.candidate;
     }
 
-    teamMatchStore.saveMatch(next);
+    if (this._fromSeries === true && this.data.mode === 'live') {
+      this._runSeriesLiveSingleReplaceFlow(sanitized, pairingDraft, '');
+      return;
+    }
+
+    const persisted = this._persistLiveMatchWithReadback(next, match);
+    if (!persisted.ok) {
+      this.setData({ saving: false });
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+
     this._leavingConfirmed = true;
     this._touchSeriesReturnContext();
     wx.showToast({ title: isClear ? '分组已清空' : '分组已保存', icon: 'success' });

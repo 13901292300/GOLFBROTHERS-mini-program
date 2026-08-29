@@ -11,6 +11,7 @@ var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesRoundInfoText = require('./seriesRoundInfoText.js');
 var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
+var seriesStandingsViewModel = require('./seriesStandingsViewModel.js');
 var tournamentGroupDraft = require('../../utils/tournamentGroupDraft.js');
 var tournamentGroupCardView = require('../../utils/tournamentGroupCardView.js');
 var teeSheetManage = require('../../../../utils/teeSheetManage.js');
@@ -89,6 +90,11 @@ function buildScheduleRoundSelector(series, roundStates, getMatchById) {
         (displayLabels && displayLabels[rid]) ||
         asString(st.label) ||
         'R' + index,
+      displayText: seriesStandingsViewModel.buildRoundSelectorDisplayText(
+        round,
+        st,
+        index
+      ),
       state: visual.state,
       stateClass: visual.stateClass,
       statusLabel: visual.statusLabel,
@@ -373,6 +379,7 @@ function emptyScheduleViewModel() {
     selectedKey: '',
     roundSelectorItems: [],
     roundSelector: [],
+    roundSelectorMode: 'dropdown',
     roundInfoText: '',
     roundVisualState: '',
     roundStatusBadge: '',
@@ -439,6 +446,7 @@ function attachRoundDock(vm, roundStates, series, getMatchById) {
   var items = Array.isArray(out.roundSelectorItems) ? out.roundSelectorItems : [];
   out.roundSelectorItems = items;
   out.roundSelector = items;
+  out.roundSelectorMode = 'dropdown';
   var labeled = labeledStatesForScheduleDock(series, roundStates);
   var baseInfo = seriesRoundInfoText.buildSeriesRoundInfoText(
     out.selectedKey,

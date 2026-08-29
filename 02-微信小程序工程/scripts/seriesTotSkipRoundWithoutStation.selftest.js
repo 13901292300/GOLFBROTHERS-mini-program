@@ -7,6 +7,7 @@
  */
 
 var path = require('path');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -17,8 +18,8 @@ var createDir = path.join(mini, 'subpackages', 'create', 'pages', 'series');
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStoreMod = require(path.join(utilsDir, 'seriesStore.js'));
 var seriesStationIndexMod = require(path.join(utilsDir, 'seriesStationIndex.js'));
-var seriesPublishJournalMod = require(path.join(utilsDir, 'seriesPublishJournal.js'));
-var seriesPublish = require(path.join(utilsDir, 'seriesPublish.js'));
+var seriesPublishJournalMod = require(seriesTestPaths.util('seriesPublishJournal.js'));
+var seriesPublish = require(seriesTestPaths.util('seriesPublish.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
 var strokeEntityBuilder = require(path.join(utilsDir, 'strokeEntityBuilder.js'));
 var participantDraft = require(path.join(createDir, 'participantDraft.js'));
@@ -87,7 +88,7 @@ function buildDraft(gameMode) {
   var s = seriesModel.createEmptySeriesDraft({
     hostMode: 'team',
     templateId: 'division_series',
-    seriesName: '分队 skip-no-station',
+    seriesName: '分队跳过轮',
     createdBy: 'creator-div-skip',
     hostTeam: { teamId: 'team-host-1', teamName: '星途俱乐部', teamLogo: '' }
   });

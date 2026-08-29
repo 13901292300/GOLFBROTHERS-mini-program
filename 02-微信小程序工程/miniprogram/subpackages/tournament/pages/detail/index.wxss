@@ -1,6 +1,6 @@
 /* Phase1-A: 共用样式见 styles/tournament-common.wxss（本文件暂保留完整副本） */
 @import "/styles/tournament-common.wxss";
-@import "/styles/match-play-scoreboard.wxss";
+@import "../../styles/match-play-scoreboard.wxss";
 
 /* 赛事详情页（球队赛 / 队内赛正在进行中）—— 复刻 队内赛正在进行中.html */
 
@@ -23,7 +23,7 @@
 }
 /* LIVE：信息蓝（--data-blue） */
 .registered-chip--live {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   border-color: rgba(255, 255, 255, 0.18);
   color: #ffffff;
 }
@@ -458,7 +458,7 @@
   padding: 0 10rpx;
   border-radius: 8rpx;
   background: rgba(0, 174, 239, 0.12);
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
   border: 1px solid rgba(0, 174, 239, 0.32);
   font-size: 20rpx;
   font-weight: 800;
@@ -768,7 +768,7 @@
   line-height: 1.2;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--data-blue, #00aeef);
+  color: var(--data-blue, #00AEEF);
 }
 
 .manual-sheet__title {

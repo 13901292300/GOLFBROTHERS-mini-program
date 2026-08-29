@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var createPageDir = path.join(
@@ -28,7 +29,7 @@ var seriesDetailDir = path.join(
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var seriesInfoUpdate = require(path.join(utilsDir, 'seriesInfoUpdate.js'));
+var seriesInfoUpdate = require(seriesTestPaths.util('seriesInfoUpdate.js'));
 var seriesStationManageGate = require(path.join(utilsDir, 'seriesStationManageGate.js'));
 var sheetVm = require(path.join(seriesDetailDir, 'seriesManageSheetViewModel.js'));
 

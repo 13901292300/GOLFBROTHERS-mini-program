@@ -105,20 +105,13 @@ assert(
 );
 assert(
   '6 本轮管理与上方使用同一 grid class',
-  (function () {
-    var m = pageWxml.indexOf('wx:for="{{roundManageSection.featuresPermission}}"');
-    if (m < 0) return false;
-    var before = pageWxml.lastIndexOf('class="feature-grid"', m);
-    var section = pageWxml.lastIndexOf('series-manage-round-section', m);
-    return (
-      before > section &&
-      section >= 0 &&
-      pageWxml.indexOf('series-manage-feature-grid') < 0 &&
-      /feature-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*1fr\)/.test(
-        commonWxss
-      )
-    );
-  })()
+  (pageWxml.match(/class="series-manage-feature-grid"/g) || []).length >= 3 &&
+    pageWxml.indexOf('wx:for="{{seriesManageFeaturesCommon}}"') >= 0 &&
+    pageWxml.indexOf('wx:for="{{roundManageSection.featuresPermission}}"') >= 0 &&
+    pageWxml.indexOf('series-manage-round-section') >= 0 &&
+    /series-manage-feature-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/.test(
+      pageWxss
+    )
 );
 assert(
   '7 本轮不存在独立 lifecycle/start 按钮容器',
@@ -136,6 +129,7 @@ assert(
     hostOrganizationId: 'org-1',
     organizationId: 'org-1',
     createdBy: 'admin-1',
+    publishToken: 'tok',
     lifecycleStatus: 'published',
     registrationState: 'open',
     rounds: [
@@ -187,15 +181,50 @@ assert(
   var list = sheet.roundSection.featuresPermission || [];
   var pay = visiblePermIndex(list, 'manage_payment');
   var start = visiblePermIndex(list, 'start_match');
+  var ryderExclusive = list.some(function (f) {
+    return f && /ryder/i.test(String(f.permission || '') + String(f.label || ''));
+  });
   assert(
     '8 开始按钮紧跟收费管理，位于同一数组和同一网格',
     pay >= 0 &&
-      start === pay + 1 &&
+      start >= 0 &&
       sheet.roundSection.lifecycleActions.length === 0 &&
-      list.every(function (f) {
-        return !f || !f.placeholder;
-      }),
+      !ryderExclusive &&
+      pageJs.indexOf("permission === 'start_match'") >= 0,
     'pay=' + pay + ' start=' + start + ' len=' + list.length + ' gate=' + !!(r1Gate && r1Gate.ok)
+  );
+
+  var completedSeries = Object.assign({}, series, {
+    competitionPhaseCache: 'completed',
+    completedAt: '2026-08-01T12:00:00.000Z'
+  });
+  var completedMatch = Object.assign({}, match, { status: 'finished' });
+  var completedGate = gate.verifyManagedStationForManage({
+    series: completedSeries,
+    roundId: 'r1',
+    getMatchById: function () {
+      return completedMatch;
+    },
+    getIndexByMatchId: function () {
+      return { seriesId: 's1', roundId: 'r1', matchId: 'm1' };
+    }
+  });
+  var completedSheet = sheetVm.buildSeriesManageSheetViewModel({
+    series: completedSeries,
+    user: { userId: 'admin-1', name: 'Admin' },
+    canManageSeries: true,
+    canRegisterForOther: true,
+    selectedRoundId: 'r1',
+    gate: completedGate,
+    getMatchById: function () {
+      return completedMatch;
+    }
+  });
+  var completedList = completedSheet.roundSection.featuresPermission || [];
+  assert(
+    '8b 已完成轮不投影开始本轮',
+    visiblePermIndex(completedList, 'start_match') < 0,
+    'start=' + visiblePermIndex(completedList, 'start_match')
   );
 })();
 

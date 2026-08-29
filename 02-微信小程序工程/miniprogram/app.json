@@ -3,8 +3,6 @@
     "pages/home/index",
     "pages/index/index",
     "pages/match/join/index",
-    "pages/team/select/index",
-    "pages/course/select/index",
     "pages/game/hub/index",
     "pages/feedback/index",
     "pages/profile/footprints/index",
@@ -21,7 +19,9 @@
         "pages/normal/index",
         "pages/team-internal/index",
         "pages/team-inter/index",
-        "pages/series/index"
+        "pages/series/index",
+        "pages/team/select/index",
+        "pages/course/select/index"
       ]
     },
     {
@@ -36,7 +36,12 @@
         "pages/moment-publish/index",
         "pages/moment-detail/index",
         "pages/my-moments/index",
-        "pages/moments/index"
+        "pages/moments/index",
+        "pages/me/footprints/index",
+        "pages/me/contacts/index",
+        "pages/me/statistics/index",
+        "pages/me/edit/index",
+        "pages/me/history/index"
       ]
     },
     {
@@ -44,20 +49,27 @@
       "name": "scoring",
       "pages": [
         "pages/score/index",
-        "pages/hub/index"
+        "pages/hub/index",
+        "pages/match/join/index"
       ]
     },
     {
       "root": "subpackages/tournament",
       "name": "tournament",
       "pages": [
-        "pages/stats/index",
-        "pages/scorecard/index",
-        "pages/peoria/index",
         "pages/group-editor/index",
         "pages/group-pick/index",
         "pages/detail/index",
         "pages/series-detail/index"
+      ]
+    },
+    {
+      "root": "subpackages/tournament-tools",
+      "name": "tournament-tools",
+      "pages": [
+        "pages/stats/index",
+        "pages/scorecard/index",
+        "pages/peoria/index"
       ]
     },
     {

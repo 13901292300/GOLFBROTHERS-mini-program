@@ -6,9 +6,10 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..', 'miniprogram');
-var expandId = require(path.join(root, 'utils', 'seriesStandingsExpandIdentity.js'));
+var expandId = require(seriesTestPaths.util('seriesStandingsExpandIdentity.js'));
 var personalBoard = require(path.join(root, 'utils', 'personalLeaderboardBoard.js'));
 var seriesStationMatch = require(path.join(root, 'utils', 'seriesStationMatch.js'));
 var openPlayerProfileUtil = require(path.join(root, 'utils', 'openPlayerProfile.js'));
@@ -191,7 +192,7 @@ assert(
     /leaderboard-player-profile-panel/.test(personalJson) &&
     totIdentity.indexOf('<leaderboard-player-profile-panel') >= 0 &&
     personalWxml.indexOf('<leaderboard-player-profile-panel') >= 0 &&
-    /sc-team-stack-wrap[\s\S]*<leaderboard-player-identity/.test(teamWrap) &&
+    /sc-team-stack-wrap[\s\S]*<leaderboard-player-profile-panel/.test(teamWrap) &&
     totIdentity.indexOf('<leaderboard-player-identity') < 0 &&
     personalWxml.indexOf('<leaderboard-player-identity') < 0 &&
     personalWxml.indexOf('class="scorecard-profile"') < 0 &&

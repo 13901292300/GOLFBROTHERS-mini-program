@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -19,7 +20,7 @@ var pageDir = path.join(
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var lineup = require(path.join(utilsDir, 'seriesNoRepeatLineup.js'));
+var lineup = require(seriesTestPaths.util('seriesNoRepeatLineup.js'));
 var labels = require(path.join(utilsDir, 'seriesRoundDisplayLabels.js'));
 var pickRoster = require(path.join(pageDir, 'seriesGroupPickRoster.js'));
 var scheduleWrite = require(path.join(pageDir, 'seriesScheduleGroupWrite.js'));
@@ -489,7 +490,7 @@ function lockInput(series, roundId, harness) {
 })();
 
 (function testFilterAndSaveShareModule() {
-  var src = fs.readFileSync(path.join(utilsDir, 'seriesNoRepeatLineup.js'), 'utf8');
+  var src = fs.readFileSync(seriesTestPaths.util('seriesNoRepeatLineup.js'), 'utf8');
   var rosterSrc = fs.readFileSync(path.join(pageDir, 'seriesGroupPickRoster.js'), 'utf8');
   var writeSrc = fs.readFileSync(path.join(pageDir, 'seriesScheduleGroupWrite.js'), 'utf8');
   var editorSrc = fs.readFileSync(

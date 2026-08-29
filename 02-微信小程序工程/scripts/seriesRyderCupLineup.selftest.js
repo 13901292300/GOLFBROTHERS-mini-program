@@ -4,8 +4,9 @@
  */
 
 var path = require('path');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
-var lineup = require(path.join(utilsDir, 'seriesNoRepeatLineup.js'));
+var lineup = require(seriesTestPaths.util('seriesNoRepeatLineup.js'));
 var seriesRyderCup = require(path.join(utilsDir, 'seriesRyderCup.js'));
 
 var passed = 0;
@@ -23,7 +24,7 @@ function assert(name, cond, detail) {
   }
 }
 
-var tournamentGroupDraft = require(path.join(utilsDir, 'tournamentGroupDraft.js'));
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 var seriesValidators = require(path.join(utilsDir, 'seriesValidators.js'));
 
 var ryder = {

@@ -109,7 +109,7 @@
   color: var(--text-primary, #333);
 }
 .phone-bind-sheet__confirm {
-  background: var(--data-blue, #00aeef);
+  background: var(--data-blue, #00AEEF);
   color: #fff;
 }
 .phone-bind-sheet__confirm.is-disabled {

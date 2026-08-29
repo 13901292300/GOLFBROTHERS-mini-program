@@ -268,8 +268,12 @@ var gmR = standingsVm.buildSeriesStandingsViewModel({
 });
 
 assert(
-  'global_m TOT 文案不变',
-  gmTot.leaderboardViewLabel === '本榜取全队前 6 名最好成绩进行排行'
+  'global_m TOT 文案进入下拉第一项',
+  gmTot.selectedKey === 'total' &&
+    gmTot.leaderboardViewLabel === '' &&
+    gmTot.roundSelectorItems[0].key === 'total' &&
+    String(gmTot.roundSelectorItems[0].displayText) ===
+      'TOTAL · 取全队前6名最好成绩进行排序'
 );
 assert(
   'global_m Rn 球队 VM 写赛制、不写 TOT 说明',
@@ -281,7 +285,8 @@ assert(
   '复用 DOM：仅既有 leaderboard-view-label',
   pageWxml.indexOf('class="leaderboard-view-label"') >= 0 &&
     pageWxml.indexOf('{{standings.leaderboardViewLabel}}') >= 0 &&
-    (pageWxml.split('class="leaderboard-view-label"').length - 1) === 1
+    (pageWxml.split('class="leaderboard-view-label"').length - 1) === 2 &&
+    pageWxml.indexOf("standings.selectedKey === 'total'") >= 0
 );
 assert(
   '页面不重复维护赛制映射',
@@ -296,7 +301,7 @@ assert(
 );
 assert(
   'global_m 说明自测仍覆盖 TOT/R',
-  totDescSrc.indexOf("totVm(seriesWithM(6)).leaderboardViewLabel ===") >= 0 &&
+  totDescSrc.indexOf("totVm(seriesWithM(6)).selectedKey === 'total'") >= 0 &&
     totDescSrc.indexOf("'R 不出现 TOT 说明'") >= 0 &&
     totDescSrc.indexOf("'VM R 不写 TOT 说明'") >= 0
 );

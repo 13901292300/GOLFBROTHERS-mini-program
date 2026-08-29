@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -26,10 +27,7 @@ var pageDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-deta
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 var friendsDir = path.join(mini, 'subpackages', 'player', 'pages', 'friends');
 
-var registrationInteractionModel = require(path.join(
-  utilsDir,
-  'registrationInteractionModel.js'
-));
+var registrationInteractionModel = require(seriesTestPaths.util('registrationInteractionModel.js'));
 var proxyRegistrationState = require(path.join(utilsDir, 'proxyRegistrationState.js'));
 var seriesRegistration = require(path.join(utilsDir, 'seriesRegistration.js'));
 var proxyVm = require(path.join(pageDir, 'seriesProxyRegisterViewModel.js'));

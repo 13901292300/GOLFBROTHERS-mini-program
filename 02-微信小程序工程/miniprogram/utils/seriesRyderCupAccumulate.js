@@ -349,8 +349,6 @@ function buildNextValidRoundHint(series, deps) {
  */
 function decoratePlazaSeriesCard(card, series, listPhase, options) {
   if (!card || !seriesRyderCup.isRyderCupSeries(series)) return card;
-  var projected = buildRyderCupDisplaySubtitle(series, options);
-  card.titleSub = projected.text;
   var phase = asString(listPhase);
   if (phase === 'live' || phase === 'finished') {
     var totals = accumulateSeriesMatchPlayScores(series, {

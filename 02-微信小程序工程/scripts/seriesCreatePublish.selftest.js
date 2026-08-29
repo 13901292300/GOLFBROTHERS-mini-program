@@ -265,7 +265,7 @@ assert(
 assert(
   '页面 require adapter 与 seriesPublish',
   pageJs.indexOf("require('./seriesPublishAdapter.js')") >= 0 &&
-    pageJs.indexOf("require('../../../../utils/seriesPublish.js')") >= 0
+    pageJs.indexOf("require('../../utils/seriesPublish.js')") >= 0
 );
 assert(
   'Step6 走 _onStep6CreateOrPublish',

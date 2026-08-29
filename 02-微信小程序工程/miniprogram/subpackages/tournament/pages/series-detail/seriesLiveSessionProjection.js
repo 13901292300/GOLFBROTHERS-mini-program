@@ -90,7 +90,7 @@ function resolveSessionSelectedRoundId(input) {
   var current = asString(src.currentKey);
   var userPicked = !!src.userPicked;
   var visited = !!src.visited;
-  var def = resolveDefaultTargetRoundId(roundStates);
+  var def = asString(src.defaultKey) || resolveDefaultTargetRoundId(roundStates);
 
   if (
     userPicked &&

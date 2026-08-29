@@ -8,6 +8,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -16,10 +17,10 @@ var seriesDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-de
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 var liveDir = path.join(mini, 'components', 'live-leaderboard-board');
 
-var liveLeaderboardBoard = require(path.join(utilsDir, 'liveLeaderboardBoard.js'));
+var liveLeaderboardBoard = require(seriesTestPaths.util('liveLeaderboardBoard.js'));
 var personalLeaderboardBoard = require(path.join(utilsDir, 'personalLeaderboardBoard.js'));
-var teamLeaderboardView = require(path.join(utilsDir, 'teamLeaderboardView.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardView = require(seriesTestPaths.util('teamLeaderboardView.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 var liveAdapter = require(path.join(seriesDir, 'seriesLiveLeaderboardAdapter.js'));
 var teamAdapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
@@ -53,7 +54,7 @@ var liveWxml = read(path.join(liveDir, 'index.wxml'));
 var liveJs = read(path.join(liveDir, 'index.js'));
 var liveJson = read(path.join(liveDir, 'index.json'));
 var liveWxss = read(path.join(liveDir, 'index.wxss'));
-var liveUtil = read(path.join(utilsDir, 'liveLeaderboardBoard.js'));
+var liveUtil = read(seriesTestPaths.util('liveLeaderboardBoard.js'));
 var totSrc = read(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 
 assert(
@@ -105,10 +106,10 @@ assert(
 assert(
   '页面 overlay：Rn 走 live adapter，TOT 仍走球队 adapter',
   /projectSeriesRnLiveLeaderboard/.test(seriesJs) &&
-    /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,800}projectSeriesStandingsTeamBoard/.test(
+    /isCumulativeStandingsKey\(selectedKey\)[\s\S]{0,1200}useLiveLeaderboard: false/.test(
       seriesJs
     ) &&
-    /useLiveLeaderboard: false/.test(seriesJs)
+    /projectSeriesStandingsTeamBoard/.test(seriesJs)
 );
 
 assert(

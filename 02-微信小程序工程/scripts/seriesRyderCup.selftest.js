@@ -5,11 +5,12 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var createDir = path.join(__dirname, '..', 'miniprogram', 'subpackages', 'create', 'pages', 'series');
 var seriesRyderCup = require(path.join(utilsDir, 'seriesRyderCup.js'));
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
-var lineup = require(path.join(utilsDir, 'seriesNoRepeatLineup.js'));
+var lineup = require(seriesTestPaths.util('seriesNoRepeatLineup.js'));
 var participantDraft = require(path.join(createDir, 'participantDraft.js'));
 var basicInfoDraft = require(path.join(createDir, 'basicInfoDraft.js'));
 

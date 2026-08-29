@@ -74,8 +74,13 @@ assert(
   '日期 nowrap 仅日期节点',
   /white-space:\s*nowrap/.test(dateRule) &&
     pageWxss.indexOf('.event-date--lg') >= 0 &&
-    pageWxml.indexOf('class="event-date {{hero.dateRangeSizeClass}}"') >= 0 &&
-    !/white-space:\s*nowrap/.test(introRule)
+    /<text\s+class="event-date[^"]*\{\{hero\.dateRangeSizeClass\}\}/.test(pageWxml) &&
+    pageWxml.indexOf('hero.dateText.length') < 0 &&
+    !/white-space:\s*nowrap/.test(introRule) &&
+    !/white-space:\s*nowrap/.test(titleRule) &&
+    !/white-space:\s*nowrap/.test(titleLineRule) &&
+    !/white-space:\s*nowrap/.test(contentRule) &&
+    !/white-space:\s*nowrap/.test(textRule)
 );
 
 assert(
@@ -114,6 +119,27 @@ assert(
   hero.titleMain === '湘鹰队际系列赛超长中文名称测试' &&
     hero.dateText === 'DEC 31 2026-JAN 02 2027' &&
     hero.dateRangeSizeClass === 'event-date--lg'
+);
+
+var titled = viewModel.buildHeroView(
+  {
+    seriesName: '湘鹰队际系列赛超长中文名称测试仍须完整换行',
+    seriesSubtitle: '第二行正式副标题允许自然换行不截断',
+    hostMode: 'organization',
+    organization: { organizationName: '主办' },
+    rounds: [{ dateTime: '2026-08-11 08:00' }]
+  },
+  { ok: true, lifecycleLabel: '已发布', lifecycleStatus: 'published', isDraftPreview: false }
+);
+assert(
+  '主副标题分字段投影，不拼接、不省略',
+  titled.titleMain === '湘鹰队际系列赛超长中文名称测试仍须完整换行' &&
+    titled.titleSub === '第二行正式副标题允许自然换行不截断' &&
+    titled.titleMain.indexOf(titled.titleSub) < 0 &&
+    pageWxml.indexOf('{{hero.titleMain}}') >= 0 &&
+    pageWxml.indexOf('{{hero.titleSub}}') >= 0 &&
+    pageWxml.indexOf('hero.titleMain +') < 0 &&
+    !/text-overflow:\s*ellipsis/.test(titleLineRule)
 );
 
 assert(

@@ -130,9 +130,12 @@ function normalizeProfile(raw) {
     if (hit) regionCountryName = hit.name;
   }
 
+  let nickname = src.nickname != null ? String(src.nickname) : base.nickname;
+  if (String(nickname).trim() === 'TIGERHOODS') nickname = base.nickname;
+
   return {
     userId: src.userId || base.userId,
-    nickname: src.nickname != null ? String(src.nickname) : base.nickname,
+    nickname: nickname,
     gender: _normalizeGender(
       src.gender != null && src.gender !== '' ? src.gender : base.gender,
       base.gender
@@ -170,14 +173,33 @@ function normalizeProfile(raw) {
 
 /** 读取用户资料（storage + gameStore 默认）；旧数据缺字段自动补空 */
 function loadProfile() {
-  return normalizeProfile(_readRaw());
+  const raw = _readRaw();
+  const next = normalizeProfile(raw);
+  if (raw && String(raw.nickname || '').trim() === 'TIGERHOODS' && next.nickname !== raw.nickname) {
+    _writeRaw(next);
+  }
+  return next;
 }
 
-/** 保存完整用户资料（更新 updatedAt） */
+/** 保存完整用户资料（更新 updatedAt），并同步当前用户身份与已有 GAME */
 function saveProfile(profile) {
   const next = normalizeProfile(profile);
   next.updatedAt = new Date().toISOString();
   _writeRaw(next);
+  try {
+    const currentUserIdentity = require('./currentUserIdentity.js');
+    currentUserIdentity.applySavedProfile(next);
+  } catch (e) {
+    try {
+      gameStore.applyCurrentUserIdentity({
+        name: String(next.nickname || '').trim(),
+        avatar: next.avatar,
+        gender: next.gender
+      });
+    } catch (err) {
+      /* ignore */
+    }
+  }
   return next;
 }
 

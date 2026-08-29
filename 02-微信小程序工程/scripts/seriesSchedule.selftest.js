@@ -12,6 +12,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var pageDir = path.join(
   __dirname,
@@ -27,7 +28,7 @@ var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var scheduleVm = require(path.join(pageDir, 'seriesScheduleViewModel.js'));
 var scheduleWrite = require(path.join(pageDir, 'seriesScheduleGroupWrite.js'));
 var scheduleCandidates = require(path.join(pageDir, 'seriesScheduleCandidates.js'));
-var tournamentGroupDraft = require(path.join(utilsDir, 'tournamentGroupDraft.js'));
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
@@ -165,15 +166,52 @@ function roundStates() {
   assert(
     'page has startStationRound / enterScorePage；分组写入走 group-editor',
     pageJs.indexOf('saveStationGroups') < 0 &&
-      pageJs.indexOf('startStationRound') >= 0 &&
-      pageJs.indexOf('enterScorePage') >= 0
+      pageJs.indexOf('seriesScheduleGroupWrite.startStationRound') >= 0 &&
+      pageJs.indexOf('openScheduleGroupEditor') >= 0 &&
+      pageJs.indexOf('/subpackages/tournament/pages/group-editor') >= 0 &&
+      pageJs.indexOf('fromSeries=1') >= 0 &&
+      pageJs.indexOf('teamMatchEnterGroupScore.enterViewerGroupScore') >= 0
   );
   assert(
     'schedule CTA navigates to independent group-editor (G2-R)',
     pageJs.indexOf('/subpackages/tournament/pages/group-editor') >= 0 &&
       pageJs.indexOf('fromSeries=1') >= 0 &&
-      pageJs.indexOf('openScheduleGroupEditor') >= 0
+      pageJs.indexOf('openScheduleGroupEditor') >= 0 &&
+      /&roundId=' \+[\s\S]{0,80}encodeURIComponent\(roundId\)/.test(pageJs)
   );
+  (function () {
+    var enterMod = require(seriesTestPaths.util('teamMatchEnterGroupScore.js'));
+    var calls = [];
+    var match = {
+      matchId: 'm-sched',
+      gameMode: '个人比杆赛',
+      groups: [
+        {
+          groupId: 'g1',
+          players: [{ userId: 'p1', playerId: 'p1', name: '球员一' }]
+        }
+      ]
+    };
+    var res = enterMod.enterViewerGroupScore(match, 'p1', {
+      groupsStore: {
+        ensureInitialized: function () {},
+        getGroups: function () {
+          return [];
+        }
+      },
+      setMatchState: function () {},
+      emptyScores: function () {
+        return [];
+      },
+      enterScorePage: function (opts) {
+        calls.push(opts);
+      }
+    });
+    assert(
+      '赛程记分权威入口 enterViewerGroupScore 默认不 replace',
+      res.ok === true && calls.length === 1 && calls[0] == null
+    );
+  })();
   // onEnterRound 已 no-op；赛程方法体不得 navigateTo detail
   var teeStart = pageJs.indexOf('onScheduleTeeGroupTap: function');
   var backStart = pageJs.indexOf('onBack: function');

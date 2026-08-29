@@ -329,7 +329,7 @@ assert(
 
 assert(
   '18 同行点击可收起',
-  /onStandingsPersonalLeaderboardRowTap[\s\S]{0,800}current === idx/.test(seriesJs) &&
+  /onStandingsPersonalLeaderboardRowTap[\s\S]{0,2500}current === idx/.test(seriesJs) &&
     /_standingsPersonalOpenIndex = -1/.test(seriesJs)
 );
 

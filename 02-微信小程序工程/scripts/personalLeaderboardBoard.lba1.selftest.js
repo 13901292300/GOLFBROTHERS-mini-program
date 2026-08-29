@@ -15,6 +15,7 @@ var mini = path.join(root, 'miniprogram');
 var utilsDir = path.join(mini, 'utils');
 var detailDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'detail');
 var baselinePath = path.join(__dirname, 'personalLeaderboardBoard.lba1.baseline.json');
+var mockAvatars = require(path.join(mini, 'utils', 'mockAvatars.js'));
 
 var passed = 0;
 var failed = 0;
@@ -43,8 +44,8 @@ function fillScores(n, stroke) {
 
 function teamGroups() {
   return [
-    { id: 'red', name: '红队', sourceTeamLogo: '/assets/mock-avatars/mock-avatar-01.jpg' },
-    { id: 'blue', name: '蓝队', sourceTeamLogo: '/assets/mock-avatars/mock-avatar-02.jpg' }
+    { id: 'red', name: '红队', sourceTeamLogo: mockAvatars.avatarByIndex(0) },
+    { id: 'blue', name: '蓝队', sourceTeamLogo: mockAvatars.avatarByIndex(1) }
   ];
 }
 
@@ -393,6 +394,12 @@ function firstDiff(a, b, prefix) {
     return p + ' ' + JSON.stringify(a) + ' !== ' + JSON.stringify(b);
   }
   if (typeof a !== 'object') {
+    if (
+      /(^|\.)avatar$/.test(p) &&
+      mockAvatars.resolveAvatar(a, '') === mockAvatars.resolveAvatar(b, '')
+    ) {
+      return '';
+    }
     return p + ' ' + JSON.stringify(a) + ' !== ' + JSON.stringify(b);
   }
   if (Array.isArray(a) !== Array.isArray(b)) {
@@ -586,6 +593,11 @@ assert(
 assert(
   'shared has no Series special-case',
   !/seriesContext|seriesId|isSeries/.test(sharedSrc)
+);
+
+assert(
+  'page and shared map avatars via mockAvatars.resolveAvatar',
+  sharedSrc.indexOf('mockAvatars.resolveAvatar') >= 0
 );
 
 assert(

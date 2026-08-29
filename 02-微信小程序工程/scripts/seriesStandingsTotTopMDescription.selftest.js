@@ -58,8 +58,9 @@ assert(
   'TOT M=6',
   standingsVm.buildTotTopMDescription(seriesWithM(6)) ===
     '本榜取全队前 6 名最好成绩进行排行' &&
-    totVm(seriesWithM(6)).leaderboardViewLabel ===
-      '本榜取全队前 6 名最好成绩进行排行'
+    totVm(seriesWithM(6)).selectedKey === 'total' &&
+    String(totVm(seriesWithM(6)).roundSelectorItems[0].displayText) ===
+      'TOTAL · 取全队前6名最好成绩进行排序'
 );
 
 assert(
@@ -130,8 +131,10 @@ var rVm = standingsVm.buildSeriesStandingsViewModel({
 });
 assert(
   'VM R 不写 TOT 说明',
-  rVm.leaderboardViewLabel !== totVm(seriesWithM(6)).leaderboardViewLabel &&
-    String(rVm.leaderboardViewLabel).indexOf('本榜取全队前') < 0
+  rVm.selectedKey === 'r1' &&
+    totVm(seriesWithM(6)).selectedKey === 'total' &&
+    String(rVm.leaderboardViewLabel).indexOf('本榜取全队前') < 0 &&
+    String(totVm(seriesWithM(6)).roundSelectorItems[0].displayText).indexOf('TOTAL ·') === 0
 );
 
 var seriesJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
@@ -151,11 +154,12 @@ assert(
   '沿用现有 leaderboard-view-label',
   seriesWxml.indexOf('class="leaderboard-view-label"') >= 0 &&
     seriesWxml.indexOf('{{standings.leaderboardViewLabel}}') >= 0 &&
-    (seriesWxml.split('leaderboard-view-label').length - 1) === 1
+    (seriesWxml.split('class="leaderboard-view-label"').length - 1) === 2 &&
+    seriesWxml.indexOf("standings.selectedKey === 'total'") >= 0
 );
 assert(
   'overlay TOT 写入动态说明',
-  /CUMULATIVE_KEY\) \{[\s\S]{0,600}buildTotTopMDescription/.test(seriesJs)
+  /isCumulativeStandingsKey\(selectedKey\)[\s\S]{0,800}buildTotTopMDescription/.test(seriesJs)
 );
 assert(
   '不改 ST-JUMP-4 字段',

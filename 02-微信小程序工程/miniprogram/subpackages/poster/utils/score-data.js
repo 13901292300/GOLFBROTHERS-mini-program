@@ -25,8 +25,8 @@ const SAMPLE = {
   source: 'sample',
   gameId: '',
   playerId: 'me',
-  playerName: 'TIGERHOODS',
-  nickname: 'TIGERHOODS',
+  playerName: 'Ken Duan',
+  nickname: 'Ken Duan',
   courseName: 'Pinehurst No. 2',
   course: 'Pinehurst No. 2',
   date: '2026-08-17',
@@ -186,6 +186,51 @@ function findPlayerSlot(group, playerId) {
 
 const DEFAULT_NICKNAME = '球员';
 
+function currentUserId() {
+  try {
+    const me = gameStore.getCurrentUser();
+    return String((me && me.userId) || 'me').trim() || 'me';
+  } catch (e) {
+    return 'me';
+  }
+}
+
+function resolveSelfNickname() {
+  try {
+    const userProfileStore = require('../../../utils/userProfileStore.js');
+    const p = userProfileStore.loadProfile() || {};
+    const nick = String(p.nickname || p.displayName || p.competitionName || '').trim();
+    if (nick) return nick;
+  } catch (e) {
+    /* ignore */
+  }
+  try {
+    const me = gameStore.getCurrentUser();
+    const n = me && me.name ? String(me.name).trim() : '';
+    if (n) return n;
+  } catch (e) {
+    /* ignore */
+  }
+  return DEFAULT_NICKNAME;
+}
+
+function isCurrentUserId(id) {
+  const pid = String(id || '').trim();
+  if (!pid) return false;
+  const meId = currentUserId();
+  return pid === meId || pid === 'me';
+}
+
+function posterDisplayName(id, fallbackName) {
+  const selfName = resolveSelfNickname();
+  const n = String(fallbackName || '').replace(/TIGERHOODS/g, selfName).trim();
+  if (isCurrentUserId(id)) {
+    if (n.indexOf('&') >= 0) return n || selfName;
+    return selfName;
+  }
+  return n;
+}
+
 const COMBO_GAME_MODES = {
   最好成绩赛: true,
   最佳球位赛: true,
@@ -268,19 +313,19 @@ function namesFromMembers(host, group, members) {
   const names = [];
   for (let i = 0; i < list.length; i++) {
     const raw = list[i];
+    const id = memberIdOf(raw);
     const fromObj = memberNameOf(raw);
     if (fromObj) {
-      names.push(fromObj);
+      names.push(posterDisplayName(id, fromObj));
       continue;
     }
-    const id = memberIdOf(raw);
     const fromSlot = slotNameById(group, id);
     if (fromSlot) {
-      names.push(fromSlot);
+      names.push(posterDisplayName(id, fromSlot));
       continue;
     }
     const fromRegister = registerNameById(host, id);
-    if (fromRegister) names.push(fromRegister);
+    if (fromRegister) names.push(posterDisplayName(id, fromRegister));
   }
   return names;
 }
@@ -469,11 +514,16 @@ function resolveComboNickname(host, group, groupIndex, playerId, fallbackName) {
 }
 
 /**
- * 当前用户展示名：槽位 name → 当前用户 name → 「球员」。
+ * 「我」生成海报时用个人资料昵称；他人仍用槽位 name。
  */
 function resolvePlayerDisplayName(found, playerId) {
+  const slotId = memberIdOf(found && found.slot) || playerId;
+  if (isCurrentUserId(playerId) || isCurrentUserId(slotId)) {
+    return resolveSelfNickname();
+  }
+
   const slotName = memberNameOf(found && found.slot);
-  if (slotName) return slotName;
+  if (slotName) return posterDisplayName(slotId, slotName);
 
   let userName = '';
   try {
@@ -487,7 +537,7 @@ function resolvePlayerDisplayName(found, playerId) {
       playerId: playerId,
       slotIndex: found && found.slotIndex
     });
-    return userName;
+    return posterDisplayName(playerId, userName);
   }
 
   console.warn('[score-data] nickname missing, fallback 球员', {
@@ -639,6 +689,17 @@ function buildScoreDataFromGame(game, gameId, groupIndex, playerId) {
   };
 }
 
+function cloneSampleScoreData() {
+  const name = resolveSelfNickname();
+  return Object.assign({}, SAMPLE, {
+    playerName: name,
+    nickname: name,
+    scores: SAMPLE_STROKES.slice(),
+    strokes: SAMPLE_STROKES.slice(),
+    relative: SAMPLE_RELATIVE.slice()
+  });
+}
+
 /**
  * 获取海报用成绩数据。
  * @param {string} [roundId] 页面参数中的场次 ID（即 gameId）
@@ -649,7 +710,7 @@ function getScoreData(roundId) {
     const me = gameStore.getCurrentUser();
     const playerId = (me && me.userId) || 'me';
     const gameId = resolveGameId(roundId);
-    if (!gameId) return Object.assign({}, SAMPLE);
+    if (!gameId) return cloneSampleScoreData();
 
     const game = gameStore.getGame(gameId) || gameStore.getGameById(gameId);
     let host = game;
@@ -661,15 +722,15 @@ function getScoreData(roundId) {
         host = null;
       }
     }
-    if (!host) return Object.assign({}, SAMPLE);
+    if (!host) return cloneSampleScoreData();
 
     const groupIndex = resolveGroupIndex();
     const data = buildScoreDataFromGame(host, gameId, groupIndex, playerId);
-    if (!data) return Object.assign({}, SAMPLE);
+    if (!data) return cloneSampleScoreData();
     return data;
   } catch (e) {
     console.warn('[score-data] getScoreData failed, fallback sample', e);
-    return Object.assign({}, SAMPLE);
+    return cloneSampleScoreData();
   }
 }
 
@@ -677,12 +738,13 @@ function getScoreData(roundId) {
  * 将成绩数据写入海报 Canvas 模型（identity / scoreSets）。
  */
 function applyScoreData(model, scoreData) {
-  const src = scoreData || SAMPLE;
+  const src = scoreData || cloneSampleScoreData();
   if (!model || typeof model !== 'object') return model;
 
   const strokes = padScores(src.strokes || src.scores);
   const relative = padScores(src.relative);
-  const playerName = String(src.nickname || src.playerName || src.name || '').trim() || DEFAULT_NICKNAME;
+  const playerName =
+    posterDisplayName(src.playerId, src.nickname || src.playerName || src.name) || DEFAULT_NICKNAME;
   if (!String(src.nickname || src.playerName || src.name || '').trim()) {
     console.warn('[score-data] applyScoreData nickname empty, fallback 球员', src.gameId, src.playerId);
   }

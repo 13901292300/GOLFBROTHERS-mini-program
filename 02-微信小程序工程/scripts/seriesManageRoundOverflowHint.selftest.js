@@ -16,7 +16,7 @@ var pageDir = path.join(
   'pages',
   'series-detail'
 );
-var dockDir = path.join(mini, 'components', 'series-round-selector-dock');
+var dockDir = path.join(mini, 'subpackages', 'tournament', 'components', 'series-round-selector-dock');
 var overflow = require(path.join(dockDir, 'overflowArrows.js'));
 
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
@@ -155,7 +155,7 @@ assert(
     dockJs.indexOf("require('./overflowArrows.js')") >= 0 &&
     pageWxml.indexOf('series-round-selector-dock') >= 0 &&
     pageJs.indexOf(
-      "require('../../../../components/series-round-selector-dock/overflowArrows.js')"
+      "require('../../components/series-round-selector-dock/overflowArrows.js')"
     ) >= 0 &&
     pageWxml.indexOf('onManageRoundPick') >= 0 &&
     manageSlice.indexOf('round-selector-item--suggested') >= 0 &&

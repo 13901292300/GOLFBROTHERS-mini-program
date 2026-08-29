@@ -12,10 +12,10 @@ var bannerConfig = require('../../../../utils/bannerConfig.js');
 var participantDraft = require('./participantDraft.js');
 var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 var seriesSameDayMultiCourse = require('../../../../utils/seriesSameDayMultiCourse.js');
+var matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
 
-var SERIES_NAME_MAX = 40;
-// 副标题：对照主标题 40 与 375px Hero 第二行可视宽度，取 28（单行省略，独立校验）
-var SERIES_SUBTITLE_MAX = 28;
+var SERIES_NAME_MAX = matchTitlePolicy.SERIES_NAME_MAX;
+var SERIES_SUBTITLE_MAX = matchTitlePolicy.SERIES_SUBTITLE_MAX;
 var LOCAL_DT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/;
 var ACCESS_CODE_PATTERN = /^\d{6}$/;
 
@@ -110,31 +110,20 @@ function buildSeriesNamePlaceholder(ctx) {
 /**
  * @returns {{ ok: boolean, value?: string, reason?: string }}
  */
-function normalizeSeriesNameInput(raw) {
-  var text = asString(raw).trim();
-  if (text === '') return { ok: false, reason: 'empty', value: '' };
-  var chars = Array.from(text);
-  if (chars.length < 1 || chars.length > SERIES_NAME_MAX) {
-    return { ok: false, reason: 'length', value: text };
-  }
-  return { ok: true, value: text };
+function normalizeSeriesNameInput(raw, options) {
+  return matchTitlePolicy.normalizeSeriesNameInput(raw, options);
 }
 
 /**
- * 副标题选填：清除换行后 trim；空串合法；不从主标题拆分
+ * 副标题选填：清除换行后 trim；空串合法；不从主标题拆分；不写入系统 · Rx
  * @returns {{ ok: boolean, value: string, reason?: string }}
  */
-function normalizeSeriesSubtitleInput(raw) {
-  var text = asString(raw).replace(/[\r\n\u2028\u2029]+/g, '').trim();
-  var chars = Array.from(text);
-  if (chars.length > SERIES_SUBTITLE_MAX) {
-    return { ok: false, reason: 'length', value: text };
-  }
-  return { ok: true, value: text };
+function normalizeSeriesSubtitleInput(raw, options) {
+  return matchTitlePolicy.normalizeSeriesSubtitleInput(raw, options);
 }
 
 function countInputChars(raw) {
-  return Array.from(asString(raw).replace(/[\r\n\u2028\u2029]+/g, '')).length;
+  return matchTitlePolicy.countTypingChars(raw);
 }
 
 function parseLocalDateTime(raw) {
@@ -506,11 +495,21 @@ function scoringStructureOk(draft) {
   return true;
 }
 
+function readTitleBaselinePrevious(options, field) {
+  var baseline = options && options.titleBaseline;
+  if (!baseline || typeof baseline !== 'object') return undefined;
+  if (field === 'seriesName') return baseline.seriesName;
+  if (field === 'seriesSubtitle') return baseline.seriesSubtitle;
+  return undefined;
+}
+
 /**
  * Step6 完整门闩
+ * @param {object} draft
+ * @param {{ titleBaseline?: { seriesName?: string, seriesSubtitle?: string } }} [options]
  * @returns {{ ok: boolean, message?: string, code?: string }}
  */
-function canEnterStep6(draft) {
+function canEnterStep6(draft, options) {
   var d = draft || {};
   if (!participantDraft.isFirstWaveTemplate(d.hostMode, d.templateId)) {
     return { ok: false, code: 'template', message: '该类型将在后续阶段开放' };
@@ -541,9 +540,17 @@ function canEnterStep6(draft) {
     return { ok: false, code: 'host_mode', message: '请选择主办场景' };
   }
 
-  var nameCheck = normalizeSeriesNameInput(d.seriesName);
+  var nameCheck = normalizeSeriesNameInput(d.seriesName, {
+    previous: readTitleBaselinePrevious(options, 'seriesName')
+  });
   if (!nameCheck.ok) {
-    return { ok: false, code: 'series_name', message: '请填写 1～40 字系列赛名称' };
+    return { ok: false, code: 'series_name', message: '请填写 1～18 字系列赛名称' };
+  }
+  var subCheck = normalizeSeriesSubtitleInput(d.seriesSubtitle, {
+    previous: readTitleBaselinePrevious(options, 'seriesSubtitle')
+  });
+  if (!subCheck.ok) {
+    return { ok: false, code: 'series_subtitle', message: '副标题最多 12 个字符' };
   }
 
   var vis = d.visibility === 'private' ? 'private' : d.visibility === 'public' ? 'public' : '';

@@ -19,10 +19,10 @@ const G4_MODES = {
   四人两球比杆赛: true
 };
 
-/** G6/G7 比洞：复用 G2/G3 UI/Entity 构建，合法性见专用校验（不改变 G2/G3 原规则） */
+/** G6/G7 比洞：复用 G2/G3 UI/Entity 构建。最好成绩比洞赛为历史别名，仅识别已有数据。 */
 const G6_G7_MATCH_PLAY_MODES = {
   最好成绩比洞赛: true,
-  四人四球比洞赛: true, // 创建页现用名，与 G6 最好成绩比洞同规则
+  四人四球比洞赛: true,
   最佳球位比洞赛: true
 };
 

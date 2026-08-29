@@ -14,8 +14,15 @@ var playerManage = require('../../../../utils/playerManage.js');
 var seriesStandingsExpandIdentity = require('../../utils/seriesStandingsExpandIdentity.js');
 var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
 var seriesRoundDisplayLabels = require('../../../../utils/seriesRoundDisplayLabels.js');
+var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 
 var CUMULATIVE_KEY = 'cumulative';
+var TOTAL_KEY = 'total';
+
+function isCumulativeStandingsKey(key) {
+  var k = asString(key).trim();
+  return k === CUMULATIVE_KEY || k === TOTAL_KEY;
+}
 
 var COUNTING = {
   counted: true,
@@ -40,7 +47,29 @@ function formatTotRowSubLabel(roundLabel, groupLabel) {
  * 只读 scoringRule.globalM 作文案；不计算 Top M，不改成绩。
  * 合法 M：有限整数且 >= 1。
  */
+function isStrokePlaySeries(series) {
+  if (seriesRyderCup.isRyderCupSeries(series)) return false;
+  var fmt = asString(
+    series && (series.format || series.playFormat || series.gameFormat)
+  )
+    .trim()
+    .toLowerCase();
+  if (fmt === 'match' || fmt === 'match_play' || fmt === 'matchplay') return false;
+  return true;
+}
+
+function resolveBestOfRoundsM(series) {
+  var cfg = series && series.scoringConfig;
+  var best = cfg && Number(cfg.bestOfRounds);
+  if (Number.isFinite(best) && best >= 1) return Math.floor(best);
+  var g = series && series.scoringRule && Number(series.scoringRule.globalM);
+  if (Number.isFinite(g) && g >= 1) return Math.floor(g);
+  return null;
+}
+
 function resolveTotDisplayGlobalM(series) {
+  var fromBest = resolveBestOfRoundsM(series);
+  if (fromBest != null) return fromBest;
   var rule = series && series.scoringRule && typeof series.scoringRule === 'object'
     ? series.scoringRule
     : null;
@@ -70,7 +99,7 @@ function buildTotTopMDescription(series) {
  */
 function resolveRoundGameModeLabel(series, selectedKey) {
   var key = asString(selectedKey).trim();
-  if (!key || key === CUMULATIVE_KEY) return '';
+  if (!key || isCumulativeStandingsKey(key)) return '';
   var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
   var raw = '';
   for (var i = 0; i < rounds.length; i++) {
@@ -99,6 +128,45 @@ function parseRoundInfoDateParts(input) {
 
 function formatRoundInfoMonthDay(parts) {
   return seriesRoundInfoText.formatRoundInfoMonthDay(parts);
+}
+
+function formatRoundSelectorDate(dateTime) {
+  return seriesRoundInfoText.formatRoundSelectorDate(dateTime);
+}
+
+function resolveStandingsRoundFormatName(round, stateRow) {
+  return seriesRoundInfoText.resolveRoundSelectorFormatName(round, stateRow);
+}
+
+function findSeriesRoundById(series, roundId) {
+  var rid = asString(roundId).trim();
+  if (!rid) return null;
+  var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+  for (var i = 0; i < rounds.length; i++) {
+    if (asString(rounds[i] && rounds[i].roundId).trim() === rid) return rounds[i];
+  }
+  return null;
+}
+
+/** 默认轮名 ROUND 1 / ROUND1 / R1 / C1，不能当作赛制中间段 */
+function isGenericRoundTitle(name, roundNum) {
+  var s = asString(name).trim();
+  if (!s) return true;
+  if (/^ROUND\s*\d+$/i.test(s)) return true;
+  if (/^R\d+$/i.test(s) || /^C\d+$/i.test(s)) return true;
+  if (roundNum > 0 && s === '第' + roundNum + '轮') return true;
+  return false;
+}
+
+/**
+ * Rx · AUG 20 · 赛制。TOTAL 不得调用。
+ */
+function buildRoundSelectorDisplayText(round, stateRow, fallbackIndex) {
+  return seriesRoundInfoText.buildSeriesRoundSelectorDisplayText(
+    round,
+    stateRow,
+    fallbackIndex
+  );
 }
 
 function buildStandingsRoundInfoText(selectedKey, roundStates, series) {
@@ -166,9 +234,19 @@ function projectRoundStatesFromRoundCards(roundCards) {
     var index = c.index != null && Number.isFinite(Number(c.index)) ? Number(c.index) : i + 1;
     var roundStatus = asString(c.roundStatus).trim() || 'scheduled';
     var stationStatusLabel = asString(c.stationStatusLabel).trim();
+    var identityOk = c.stationIdentityOk !== false;
+    if (!identityOk) {
+      stationStatusLabel = '';
+      if (roundStatus === 'live' || roundStatus === 'ongoing') {
+        roundStatus = 'scheduled';
+      }
+    }
     var matchProxy = {
-      status: asString(c.matchStatus).trim() || inferMatchStatusFromStationLabel(stationStatusLabel),
-      groups: c.hasFormalGroups
+      status: identityOk
+        ? asString(c.matchStatus).trim() ||
+          inferMatchStatusFromStationLabel(stationStatusLabel)
+        : '',
+      groups: identityOk && c.hasFormalGroups
         ? [{ players: [{ userId: '__formal__' }] }]
         : []
     };
@@ -232,10 +310,26 @@ function normalizeCounting(raw) {
   return COUNTING[c] ? c : 'n/a';
 }
 
-function buildTotalSelectorChip(isSelected) {
+function resolveBestOfDisplayCount(series) {
+  var g = series && series.scoringRule && Number(series.scoringRule.globalM);
+  if (Number.isFinite(g) && g >= 1) return Math.floor(g);
+  var cfg = series && series.scoringConfig;
+  var best = cfg && Number(cfg.bestOfRounds);
+  if (Number.isFinite(best) && best >= 1) return Math.floor(best);
+  var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+  return rounds.length || 0;
+}
+
+function buildTotalSelectorDisplayText(series) {
+  var bestOf = resolveBestOfDisplayCount(series);
+  return 'TOTAL · 取全队前' + bestOf + '名最好成绩进行排序';
+}
+
+function buildTotalSelectorChip(isSelected, series) {
   return {
-    key: CUMULATIVE_KEY,
-    label: 'TOT',
+    key: TOTAL_KEY,
+    label: 'TOTAL',
+    displayText: buildTotalSelectorDisplayText(series),
     statusToken: 'none',
     state: 'none',
     stateClass: 'round-selector-state--tot',
@@ -251,6 +345,54 @@ function buildTotalSelectorChip(isSelected) {
  * roundSelector 保留完整列表以兼容旧读法，禁止页面直接 splice
  * R-STATE：stateClass 只来自状态投影；isSelected 不改写 stateClass
  */
+/**
+ * 总榜默认选中：有 LIVE → 第一个 LIVE；无 LIVE 且有 TOTAL → TOTAL；否则首个未取消轮。
+ */
+function resolveFirstLiveRoundId(roundStates, series) {
+  var list = Array.isArray(roundStates) ? roundStates : [];
+  var i;
+  for (i = 0; i < list.length; i++) {
+    var row = list[i] || {};
+    var rid = asString(row.roundId).trim();
+    if (!rid) continue;
+    if (seriesRoundVisualState.normalizeRoundVisualFromStateRow(row).state === 'live') {
+      return rid;
+    }
+  }
+  var rounds = series && Array.isArray(series.rounds) ? series.rounds : [];
+  for (i = 0; i < rounds.length; i++) {
+    var r = rounds[i] || {};
+    var id = asString(r.roundId).trim();
+    if (!id) continue;
+    var st = asString(r.state || r.roundStatus || r.status).trim().toLowerCase();
+    if (st === 'live') return id;
+  }
+  return '';
+}
+
+function resolveFirstAvailableRoundId(roundStates) {
+  var list = Array.isArray(roundStates) ? roundStates : [];
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i] || {};
+    var rid = asString(row.roundId).trim();
+    if (!rid) continue;
+    if (seriesRoundVisualState.normalizeRoundVisualFromStateRow(row).state === 'cancelled') {
+      continue;
+    }
+    return rid;
+  }
+  return '';
+}
+
+function resolveDefaultStandingsSelectedKey(roundStates, options) {
+  var opts = options && typeof options === 'object' ? options : {};
+  var includeTot = opts.includeTot === true;
+  var liveId = resolveFirstLiveRoundId(roundStates, opts.series);
+  if (liveId) return liveId;
+  if (includeTot) return TOTAL_KEY;
+  return resolveFirstAvailableRoundId(roundStates);
+}
+
 /**
  * per_round_n 默认 Rx：LIVE → 已分组即将开始 → 最近完成 → 首个未取消。
  * 多 LIVE 时沿用 roundStates 既有顺序，不另做时间比较。取消轮永不默认。
@@ -273,7 +415,9 @@ function buildStandingsRoundDisplayLabels(series, roundStates) {
 
 function resolveStandingsRoundDisplayLabel(series, roundStates, roundId) {
   var rid = asString(roundId).trim();
-  if (!rid || rid === CUMULATIVE_KEY) return rid === CUMULATIVE_KEY ? 'TOT' : '';
+  if (!rid || isCumulativeStandingsKey(rid)) {
+    return isCumulativeStandingsKey(rid) ? 'TOTAL' : '';
+  }
   var map = buildStandingsRoundDisplayLabels(series, roundStates);
   return map[rid] || '';
 }
@@ -285,28 +429,47 @@ function applyStandingsDisplayLabelsToStates(roundStates, displayLabels) {
   );
 }
 
+function scoringRuleMode(series) {
+  return asString(series && series.scoringRule && series.scoringRule.mode).trim();
+}
+
+/** TOTAL 仅 global_m；莱德杯 / per_round_n 不显示 */
+function shouldIncludeTotalSelector(series) {
+  if (seriesRyderCup.isRyderCupSeries(series)) return false;
+  return scoringRuleMode(series) === 'global_m';
+}
+
 function buildRoundSelectorParts(roundStates, selectedKey, options) {
   var opts = options && typeof options === 'object' ? options : {};
-  var includeTot = opts.includeTot !== false;
+  var series = opts.series && typeof opts.series === 'object' ? opts.series : null;
+  var includeTot = shouldIncludeTotalSelector(series);
+  var totInDropdown = includeTot;
   var displayLabels = opts.displayLabels && typeof opts.displayLabels === 'object' ? opts.displayLabels : null;
   var key = asString(selectedKey).trim();
+  if (includeTot && key === CUMULATIVE_KEY) key = TOTAL_KEY;
   var roundSelectorItems = [];
   var list = Array.isArray(roundStates) ? roundStates : [];
   var valid = Object.create(null);
-  if (includeTot) valid[CUMULATIVE_KEY] = true;
+  if (includeTot) {
+    valid[TOTAL_KEY] = true;
+    valid[CUMULATIVE_KEY] = true;
+  }
   for (var i = 0; i < list.length; i++) {
     var r = list[i] || {};
     var rid = asString(r.roundId).trim();
     if (!rid) continue;
     var visual = seriesRoundVisualState.normalizeRoundVisualFromStateRow(r);
+    var orderIndex = r.index != null && Number.isFinite(Number(r.index)) ? Number(r.index) : i + 1;
     var label =
       (displayLabels && displayLabels[rid]) ||
       asString(r.label).trim() ||
-      'R' + (r.index != null ? r.index : i + 1);
+      'R' + orderIndex;
+    var seriesRound = findSeriesRoundById(series, rid);
     valid[rid] = true;
     roundSelectorItems.push({
       key: rid,
       label: label,
+      displayText: buildRoundSelectorDisplayText(seriesRound, r, orderIndex),
       state: visual.state,
       stateClass: visual.stateClass,
       statusLabel: visual.statusLabel,
@@ -317,30 +480,42 @@ function buildRoundSelectorParts(roundStates, selectedKey, options) {
       showSelectedCheck: false
     });
   }
-  var fallbackKey = resolveDefaultPerRoundSelectedKey(roundStates);
-  if (!fallbackKey && includeTot) fallbackKey = CUMULATIVE_KEY;
+  var fallbackKey =
+    scoringRuleMode(series) === 'per_round_n'
+      ? resolveDefaultPerRoundSelectedKey(roundStates) ||
+        resolveFirstAvailableRoundId(roundStates)
+      : resolveDefaultStandingsSelectedKey(roundStates, {
+          includeTot: includeTot,
+          series: series
+        });
+  if (!fallbackKey && includeTot) fallbackKey = TOTAL_KEY;
+  if (!fallbackKey) fallbackKey = resolveFirstAvailableRoundId(roundStates);
   var effectiveKey = valid[key] ? key : fallbackKey;
-  if (!includeTot && (!effectiveKey || !valid[effectiveKey])) {
-    effectiveKey = fallbackKey;
+  if (includeTot && isCumulativeStandingsKey(effectiveKey)) effectiveKey = TOTAL_KEY;
+  if (!includeTot && isCumulativeStandingsKey(effectiveKey)) {
+    effectiveKey = fallbackKey || resolveFirstAvailableRoundId(roundStates);
   }
-  var totalSelector = includeTot
-    ? buildTotalSelectorChip(effectiveKey === CUMULATIVE_KEY)
-    : null;
+  var totSelected = includeTot && isCumulativeStandingsKey(effectiveKey);
+  var totalChip = includeTot ? buildTotalSelectorChip(totSelected, series) : null;
+  if (totInDropdown && totalChip) {
+    roundSelectorItems.unshift(totalChip);
+  }
   for (var k = 0; k < roundSelectorItems.length; k++) {
-    var selected =
-      roundSelectorItems[k].key === effectiveKey &&
-      (includeTot ? effectiveKey !== CUMULATIVE_KEY : true);
+    var selected = roundSelectorItems[k].key === effectiveKey;
     roundSelectorItems[k].isSelected = selected;
     roundSelectorItems[k].showSelectedCheck = selected;
   }
-  var roundSelector = includeTot
-    ? [totalSelector].concat(roundSelectorItems)
-    : roundSelectorItems.slice();
+  var roundSelector = totInDropdown
+    ? roundSelectorItems.slice()
+    : includeTot
+      ? [totalChip].concat(roundSelectorItems)
+      : roundSelectorItems.slice();
   return {
-    totalSelector: totalSelector,
+    totalSelector: totInDropdown ? null : totalChip,
     roundSelectorItems: roundSelectorItems,
     roundSelector: roundSelector,
-    selectedKey: effectiveKey
+    selectedKey: effectiveKey,
+    includeTot: includeTot
   };
 }
 
@@ -803,7 +978,7 @@ function mergeTotTeamExpandSource(
 function resolveStandingsScorecardRoundId(player, selectedKey) {
   var rowRound = asString(player && player.roundId).trim();
   var selected = asString(selectedKey).trim();
-  if (selected && selected !== CUMULATIVE_KEY) {
+  if (selected && !isCumulativeStandingsKey(selected)) {
     if (rowRound && rowRound !== selected) return '';
     return rowRound || selected;
   }
@@ -832,7 +1007,7 @@ function buildRoundStateById(roundStates) {
 }
 
 function resolveExpandEmptyHint(selectedKey, roundStateById, roundMetaById) {
-  if (selectedKey === CUMULATIVE_KEY) {
+  if (isCumulativeStandingsKey(selectedKey)) {
     return '暂无累计成绩';
   }
   var st = roundStateById[selectedKey];
@@ -903,7 +1078,7 @@ function parseRoundInfoClock(input) {
 
 function occurrenceRoundSeqLabel(round, series, roundId) {
   var mapped = resolveStandingsRoundDisplayLabel(series, null, roundId);
-  if (mapped && mapped !== 'TOT') return mapped;
+  if (mapped && mapped !== 'TOT' && mapped !== 'TOTAL') return mapped;
   var idx = round && round.index != null ? Number(round.index) : null;
   if (idx != null && Number.isFinite(idx) && idx > 0) return 'R' + Math.floor(idx);
   var rid = asString(roundId).trim();
@@ -943,7 +1118,7 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
   for (var i = 0; i < source.length; i++) {
     var e = source[i];
     if (!e || typeof e !== 'object') continue;
-    if (selectedKey !== CUMULATIVE_KEY) {
+    if (!isCumulativeStandingsKey(selectedKey)) {
       if (asString(e.roundId).trim() !== selectedKey) continue;
     }
     filtered.push(e);
@@ -952,7 +1127,7 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
   var indexed = filtered.map(function (e, idx) {
     return { e: e, idx: idx };
   });
-  var sortByGross = selectedKey === CUMULATIVE_KEY;
+  var sortByGross = isCumulativeStandingsKey(selectedKey);
   // 展示序：counted → pending → excluded（对齐 PK 计入段在上）；
   // TOT 段内按累计总杆；单轮段内按 toPar。不改写 counting，不形成 Top M。
   function countingTier(c) {
@@ -982,13 +1157,13 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
     return a.idx - b.idx;
   });
 
-  var showRoundTag = selectedKey === CUMULATIVE_KEY && allowRepeat === true;
+  var showRoundTag = isCumulativeStandingsKey(selectedKey) && allowRepeat === true;
   var roundMeta =
-    selectedKey !== CUMULATIVE_KEY && roundMetaById
+    !isCumulativeStandingsKey(selectedKey) && roundMetaById
       ? roundMetaById[selectedKey]
       : null;
   var roundUnstarted =
-    selectedKey !== CUMULATIVE_KEY &&
+    !isCumulativeStandingsKey(selectedKey) &&
     !!roundMeta &&
     roundMeta.stationStarted !== true &&
     roundMeta.hasFormalGroups === true;
@@ -1054,12 +1229,12 @@ function projectExpandPlayers(entries, selectedKey, roundStateById, roundMetaByI
     // TOT/R：有轮次上下文且具备真实球员或组合 ID 即可打开该轮详情
     var canOpenScorecard = !!roundId && (!!playerId || !!entityId);
     var scorecardKey =
-      selectedKey === CUMULATIVE_KEY
+      isCumulativeStandingsKey(selectedKey)
         ? occurrenceKey || asString(entry.entryId).trim() || 'entry-' + j
         : asString(entry.entryId).trim() || occurrenceKey || 'entry-' + j;
 
     var genderPack = resolveRowGenderDisplay(entry);
-    var isTot = selectedKey === CUMULATIVE_KEY;
+    var isTot = isCumulativeStandingsKey(selectedKey);
     var subLabel = isTot ? formatTotRowSubLabel(roundLabel, groupLabel) : '';
     if (
       isTot &&
@@ -1177,23 +1352,113 @@ function readSelectedRoundToPar(resultRow, roundId) {
   for (var i = 0; i < breakdown.length; i++) {
     var b = breakdown[i];
     if (!b || asString(b.roundId).trim() !== rid) continue;
-    return sumEntryToParList(b.selectedEntries);
+    return readRoundBreakdownScore(b);
   }
   return null;
 }
 
+function readRoundBreakdownScore(b) {
+  if (!b) return null;
+  var fromEntries = sumEntryToParList(b.selectedEntries);
+  if (fromEntries != null) return fromEntries;
+  var sub = Number(b.subtotal);
+  return Number.isFinite(sub) ? sub : null;
+}
+
+function collectRoundScoresForTotal(resultRow) {
+  var scores = [];
+  var breakdown = resultRow && Array.isArray(resultRow.roundBreakdown) ? resultRow.roundBreakdown : [];
+  if (breakdown.length) {
+    for (var i = 0; i < breakdown.length; i++) {
+      var s = readRoundBreakdownScore(breakdown[i]);
+      if (s != null) scores.push(s);
+    }
+    return scores;
+  }
+  var byRound = Object.create(null);
+  var entries = resultRow && Array.isArray(resultRow.allEntries) ? resultRow.allEntries : [];
+  for (var e = 0; e < entries.length; e++) {
+    var row = entries[e];
+    var rid = asString(row && row.roundId).trim();
+    if (!rid) continue;
+    var t = readEntryToPar(row);
+    if (t == null) continue;
+    if (byRound[rid] == null) byRound[rid] = 0;
+    byRound[rid] += t;
+  }
+  var ids = Object.keys(byRound);
+  for (var k = 0; k < ids.length; k++) scores.push(byRound[ids[k]]);
+  return scores;
+}
+
+/** 最好 M 轮相加（低→高取前 M）；M 空则全部轮次。不足 M 轮视为不完整。 */
+function computeBestOfRoundsTotal(resultRow, m) {
+  var scores = collectRoundScoresForTotal(resultRow);
+  if (!scores.length) {
+    return { sum: null, complete: false, count: 0 };
+  }
+  scores.sort(function (a, b) {
+    return a - b;
+  });
+  var take =
+    m != null && Number.isFinite(Number(m)) && Number(m) >= 1
+      ? Math.min(Math.floor(Number(m)), scores.length)
+      : scores.length;
+  var sum = 0;
+  for (var i = 0; i < take; i++) sum += scores[i];
+  var complete = m == null || scores.length >= Math.floor(Number(m));
+  return { sum: sum, complete: complete, count: scores.length };
+}
+
+function applyBestOfRoundsRanking(teamRows) {
+  var list = Array.isArray(teamRows) ? teamRows.slice() : [];
+  list.sort(function (a, b) {
+    var ac = a && a._totComplete === true;
+    var bc = b && b._totComplete === true;
+    if (ac && !bc) return -1;
+    if (!ac && bc) return 1;
+    var as = a && a._totSum;
+    var bs = b && b._totSum;
+    var aHas = as != null && Number.isFinite(Number(as));
+    var bHas = bs != null && Number.isFinite(Number(bs));
+    if (aHas && bHas && Number(as) !== Number(bs)) return Number(as) - Number(bs);
+    if (aHas && !bHas) return -1;
+    if (!aHas && bHas) return 1;
+    return (a && a._totIdx != null ? a._totIdx : 0) - (b && b._totIdx != null ? b._totIdx : 0);
+  });
+  var pos = 0;
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i];
+    if (!row) continue;
+    var has = row._totSum != null && Number.isFinite(Number(row._totSum));
+    if (has) {
+      pos += 1;
+      row.pos = formatPos(pos);
+      row.hasScore = true;
+    } else {
+      row.pos = formatDash();
+      row.hasScore = false;
+    }
+    delete row._totSum;
+    delete row._totComplete;
+    delete row._totIdx;
+  }
+  return list;
+}
+
 function buildUnavailableStandings(mode) {
-  var tot = buildTotalSelectorChip(true);
+  var tot = buildTotalSelectorChip(true, null);
   return {
     ok: true,
     mode: mode || 'per_round_n',
     available: false,
     unavailableTitle: '每轮前 N 名总榜将在后续开放',
     unavailableMessage: '当前系列赛为每轮前 N 名模式，总榜将在对应批次接入',
-    selectedKey: CUMULATIVE_KEY,
+    selectedKey: TOTAL_KEY,
     totalSelector: tot,
     roundSelectorItems: [],
     roundSelector: [tot],
+    roundSelectorMode: 'dropdown',
     roundInfoText: '',
     teamRows: [],
     leaderboardViewLabel: '',
@@ -1230,11 +1495,14 @@ function buildSeriesStandingsViewModel(input) {
 
   var displayLabels = buildStandingsRoundDisplayLabels(series, roundStates);
   var labeledStates = applyStandingsDisplayLabelsToStates(roundStates, displayLabels);
+  var includeTot = shouldIncludeTotalSelector(series);
   var parts = buildRoundSelectorParts(roundStates, selectedKey, {
-    includeTot: !isPerRoundN,
-    displayLabels: displayLabels
+    displayLabels: displayLabels,
+    series: series
   });
   var effectiveKey = parts.selectedKey;
+  var isTotView = includeTot && isCumulativeStandingsKey(effectiveKey);
+  var bestOfM = resolveBestOfRoundsM(series);
   var totalSelector = parts.totalSelector;
   var roundSelectorItems = parts.roundSelectorItems;
   var roundSelector = parts.roundSelector;
@@ -1261,7 +1529,14 @@ function buildSeriesStandingsViewModel(input) {
     var totalDisplay;
     var scoreDisplay;
     var scoreClass;
-    if (isPerRoundN) {
+    var totPack =
+      isTotView && includeTot ? computeBestOfRoundsTotal(resultRow, bestOfM) : null;
+    if (totPack) {
+      hasScore = totPack.sum != null;
+      totalDisplay = hasScore ? formatToParDiff(totPack.sum) : formatDash();
+      scoreDisplay = totalDisplay;
+      scoreClass = hasScore ? resolveToParScoreClass(totPack.sum) : 'score-even';
+    } else if (isPerRoundN) {
       totalDisplay = toPar != null ? formatToParDiff(toPar) : formatDash();
       var rxToPar = readSelectedRoundToPar(resultRow, effectiveKey);
       scoreDisplay = rxToPar != null ? formatToParDiff(rxToPar) : formatDash();
@@ -1272,9 +1547,8 @@ function buildSeriesStandingsViewModel(input) {
       scoreClass = hasScore && toPar != null ? resolveToParScoreClass(toPar) : 'score-even';
     }
     // TOT ← allEntries ∪ roundLineups；R ← roundLineups（阵容⊕成绩）
-    var expandSource =
-      effectiveKey === CUMULATIVE_KEY
-        ? fillTotExpandGenderDisplay(
+    var expandSource = isTotView
+      ? fillTotExpandGenderDisplay(
             mergeTotTeamExpandSource(
               resultRow && resultRow.allEntries,
               resultRow && resultRow.roundLineups,
@@ -1306,7 +1580,7 @@ function buildSeriesStandingsViewModel(input) {
       // 对齐队际赛 teamLeaderboard 行
       teamId: pid,
       seriesParticipantId: pid,
-      pos: hasScore ? formatPos(resultRow.rank) : formatDash(),
+      pos: hasScore ? formatPos(resultRow && resultRow.rank) : formatDash(),
       teamName: resolveParticipantName(p),
       grossTotal: totalDisplay,
       grossTotalDisplay: totalDisplay,
@@ -1317,17 +1591,31 @@ function buildSeriesStandingsViewModel(input) {
       scoringPlayersCount: expand.scoringPlayersCount,
       players: expand.players,
       expandEmptyHint: expand.expandEmptyHint,
-      expandStatusHint: expand.expandStatusHint || ''
+      expandStatusHint: expand.expandStatusHint || '',
+      _totSum: totPack ? totPack.sum : null,
+      _totComplete: totPack ? totPack.complete : false,
+      _totIdx: i
     });
   }
 
+  if (isTotView && includeTot) {
+    teamRows = applyBestOfRoundsRanking(teamRows);
+  } else {
+    for (var c = 0; c < teamRows.length; c++) {
+      delete teamRows[c]._totSum;
+      delete teamRows[c]._totComplete;
+      delete teamRows[c]._totIdx;
+    }
+  }
+
   var roundScoreHeader = isPerRoundN
-    ? resolveRoundChipLabel(roundStates, effectiveKey, displayLabels)
+    ? isTotView
+      ? 'TO PAR'
+      : resolveRoundChipLabel(roundStates, effectiveKey, displayLabels)
     : 'TO PAR';
-  var selectedRoundDisplayLabel =
-    effectiveKey === CUMULATIVE_KEY
-      ? 'TOT'
-      : displayLabels[effectiveKey] || resolveRoundChipLabel(roundStates, effectiveKey);
+  var selectedRoundDisplayLabel = isTotView
+    ? 'TOTAL'
+    : displayLabels[effectiveKey] || resolveRoundChipLabel(roundStates, effectiveKey);
 
   return {
     ok: true,
@@ -1337,18 +1625,19 @@ function buildSeriesStandingsViewModel(input) {
     unavailableMessage: '',
     selectedKey: effectiveKey,
     selectedRoundDisplayLabel: selectedRoundDisplayLabel,
-    showTot: !isPerRoundN,
+    bestOf: resolveBestOfDisplayCount(series),
+    showTot: !!totalSelector,
     headThruLabel: 'TOTAL',
     headScoreLabel: roundScoreHeader,
     roundScoreHeader: roundScoreHeader,
     totalSelector: totalSelector,
     roundSelectorItems: roundSelectorItems,
     roundSelector: roundSelector,
+    roundSelectorMode: 'dropdown',
     roundInfoText: buildStandingsRoundInfoText(effectiveKey, labeledStates, series),
-    leaderboardViewLabel:
-      !isPerRoundN && effectiveKey === CUMULATIVE_KEY
-        ? buildTotTopMDescription(series)
-        : resolveRoundGameModeLabel(series, effectiveKey),
+    leaderboardViewLabel: isTotView
+      ? ''
+      : resolveRoundGameModeLabel(series, effectiveKey),
     teamRows: teamRows,
     totExpandErrors: totExpandErrors,
     mainBoardInvariant: true,
@@ -1377,6 +1666,11 @@ function mainBoardSignature(standingsVm) {
 
 module.exports = {
   CUMULATIVE_KEY: CUMULATIVE_KEY,
+  TOTAL_KEY: TOTAL_KEY,
+  isCumulativeStandingsKey: isCumulativeStandingsKey,
+  isStrokePlaySeries: isStrokePlaySeries,
+  shouldIncludeTotalSelector: shouldIncludeTotalSelector,
+  resolveBestOfRoundsM: resolveBestOfRoundsM,
   emptyStandingsResult: emptyStandingsResult,
   projectRoundStatesFromRoundCards: projectRoundStatesFromRoundCards,
   resolveRoundStatusToken: resolveRoundStatusToken,
@@ -1400,8 +1694,12 @@ module.exports = {
   resolvePerRoundNTeamGameModeLabel: resolvePerRoundNTeamGameModeLabel,
   formatTotRowSubLabel: formatTotRowSubLabel,
   resolveDefaultPerRoundSelectedKey: resolveDefaultPerRoundSelectedKey,
+  resolveDefaultStandingsSelectedKey: resolveDefaultStandingsSelectedKey,
+  resolveFirstLiveRoundId: resolveFirstLiveRoundId,
   resolveDefaultTargetRoundId: seriesLiveSession.resolveDefaultTargetRoundId,
   buildStandingsRoundDisplayLabels: buildStandingsRoundDisplayLabels,
   resolveStandingsRoundDisplayLabel: resolveStandingsRoundDisplayLabel,
-  resolveRoundChipLabel: resolveRoundChipLabel
+  resolveRoundChipLabel: resolveRoundChipLabel,
+  formatRoundDate: formatRoundSelectorDate,
+  buildRoundSelectorDisplayText: buildRoundSelectorDisplayText
 };

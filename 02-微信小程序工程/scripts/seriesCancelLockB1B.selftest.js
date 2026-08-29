@@ -7,6 +7,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.Page !== 'function') {
   global.Page = function (cfg) {
@@ -37,10 +38,7 @@ var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var pageWxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
 var detailJs = fs.readFileSync(path.join(detailDir, 'index.js'), 'utf8');
 var pageIndex = require(path.join(pageDir, 'index.js'));
-var registrationInteractionModel = require(path.join(
-  utilsDir,
-  'registrationInteractionModel.js'
-));
+var registrationInteractionModel = require(seriesTestPaths.util('registrationInteractionModel.js'));
 var seriesStationManageGate = require(path.join(utilsDir, 'seriesStationManageGate.js'));
 
 var passed = 0;

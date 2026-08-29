@@ -96,7 +96,7 @@
       </view>
 
       <view class="event-intro">
-        <text class="event-date {{hero.dateRangeSizeClass}}">{{hero.dateText}}</text>
+        <text class="event-date {{hero.dateRangeSizeClass}} {{hero.entryContext === 'registration' ? 'event-date--gold' : (hero.dateTone === 'live' ? 'event-date--live' : '')}}">{{hero.dateText}}</text>
         <view class="event-title">
           <text class="event-title__line event-title__line--main">{{hero.titleMain}}</text>
           <text wx:if="{{hero.titleSub}}" class="event-title__line event-title__line--sub">{{hero.titleSub}}</text>
@@ -134,7 +134,7 @@
                   <view
                     wx:for="{{heroTeamLogoStack.items}}"
                     wx:key="participantId"
-                    class="hero-logo-stack__item"
+                    class="hero-logo-stack__item {{item.color ? 'hero-logo-stack__item--division' : ''}}"
                     style="left:{{item.leftPx}}px;width:{{heroTeamLogoStack.logoSizePx}}px;height:{{heroTeamLogoStack.logoSizePx}}px;z-index:{{item.zIndex}};{{item.backgroundStyle}}"
                   >
                     <image
@@ -143,7 +143,8 @@
                       src="{{item.logo}}"
                       mode="aspectFill"
                     />
-                    <view wx:else class="hero-logo-stack__fallback {{item.color ? 'series-division-logo-glyph' : ''}}">{{item.fallbackText}}</view>
+                    <view wx:elif="{{item.color}}" class="series-division-logo-mark">{{item.fallbackText}}</view>
+                    <view wx:else class="hero-logo-stack__fallback">{{item.fallbackText}}</view>
                   </view>
                 </view>
               </view>
@@ -179,8 +180,8 @@
         </view>
       </view>
 
-      <view class="section-divider">
-        <text class="section-divider__text">{{hero.dividerText}}</text>
+      <view class="section-divider {{hero.entryContext === 'registration' ? 'section-divider--gold' : (hero.isLive ? 'section-divider--live' : '')}}">
+        <text class="section-divider__text {{hero.entryContext === 'registration' ? 'org-text--gold' : (hero.isLive ? 'org-text--live' : '')}}">{{hero.hostMode === 'team' ? 'CLUB' : 'ORG'}}</text>
       </view>
 
       <!-- Tabs：流内占位；吸顶由页外固定克隆接管（对齐 detail） -->
@@ -208,7 +209,7 @@
       <!-- 二级流内 round dock：文档流占位 + offset 测量；吸顶后 covered，不承担 fixed -->
       <view
         wx:if="{{activeTab === 'standings' && standings.available}}"
-        class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}}"
+        class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}} {{standings.roundSelectorMode === 'dropdown' || standings.useRyderCupScoreboard ? 'series-round-dock--dropdown' : ''}}"
       >
         <view class="series-round-dock__inner">
           <view wx:if="{{standings.useRyderCupScoreboard}}" class="series-round-dock__scorebar">
@@ -220,6 +221,7 @@
           </view>
           <series-round-selector-dock
             mode="inflow"
+            selector-mode="{{standings.roundSelectorMode || (standings.useRyderCupScoreboard ? 'dropdown' : 'chip')}}"
             sticky="{{isStickyRoundSelector}}"
             top="{{stickyRoundSelectorTop}}"
             show-tot="{{standings.showTot}}"
@@ -249,11 +251,12 @@
       <!-- 出发表二级流内 round dock：无 TOT，仅 R/C；与总榜同一组件 -->
       <view
         wx:if="{{activeTab === 'schedule' && schedule.roundSelector.length}}"
-        class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}}"
+        class="series-round-dock series-round-dock--inflow {{isStickyRoundSelector ? 'series-round-dock--covered' : ''}} {{schedule.roundSelectorMode === 'dropdown' ? 'series-round-dock--dropdown' : ''}}"
       >
         <view class="series-round-dock__inner">
           <series-round-selector-dock
             mode="inflow"
+            selector-mode="{{schedule.roundSelectorMode || 'chip'}}"
             sticky="{{isStickyRoundSelector}}"
             top="{{stickyRoundSelectorTop}}"
             show-tot="{{false}}"
@@ -296,7 +299,7 @@
                 class="participant-row__logo"
                 style="{{item.colorMark.backgroundStyle}}"
               >
-                <view class="hero-logo-stack__fallback series-division-logo-glyph">{{item.colorMark.fallbackText}}</view>
+                <view class="series-division-logo-mark">{{item.colorMark.fallbackText}}</view>
               </view>
               <view wx:else class="participant-row__logo"></view>
               <text class="participant-row__name">{{item.name}}</text>
@@ -431,7 +434,14 @@
             </view>
 
             <view wx:else class="leaderboard-table-wrap">
-              <view class="leaderboard-view-label">{{standings.leaderboardViewLabel}}</view>
+              <view
+                wx:if="{{standings.selectedKey === 'total' || standings.selectedKey === 'cumulative'}}"
+                class="leaderboard-view-label"
+              >当球队满 {{standings.bestOf}} 个有效成绩时才进行排行</view>
+              <view
+                wx:elif="{{standings.leaderboardViewLabel}}"
+                class="leaderboard-view-label"
+              >{{standings.leaderboardViewLabel}}</view>
 
               <!-- 球队榜：主榜固定序 + R/TOT 展开 -->
 
@@ -517,7 +527,7 @@
                       class="scorecard-row"
                     >
                       <view wx:if="{{player.isEntity && player.members && player.members.length}}" class="sc-team-stack-wrap">
-                        <leaderboard-player-identity
+                        <leaderboard-player-profile-panel
                           wx:for="{{player.members}}"
                           wx:for-item="mem"
                           wx:key="playerId"
@@ -883,7 +893,7 @@
 
     <!-- 二级 fixed round dock：页根级、主 scroll-view 外；只负责纵向吸顶；常驻 + show/hide（不因 sticky 卸载） -->
     <view
-      class="series-round-dock series-round-dock--fixed {{activeTab === 'standings' && standings.available && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}}"
+      class="series-round-dock series-round-dock--fixed {{activeTab === 'standings' && standings.available && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}} {{standings.roundSelectorMode === 'dropdown' || standings.useRyderCupScoreboard ? 'series-round-dock--dropdown' : ''}}"
       style="top:{{stickyRoundSelectorTop}}px;"
     >
       <view class="series-round-dock__inner">
@@ -896,6 +906,7 @@
         </view>
         <series-round-selector-dock
           mode="fixed"
+          selector-mode="{{standings.roundSelectorMode || (standings.useRyderCupScoreboard ? 'dropdown' : 'chip')}}"
           sticky="{{isStickyRoundSelector}}"
           top="{{stickyRoundSelectorTop}}"
           show-tot="{{standings.showTot}}"
@@ -913,12 +924,13 @@
 
     <!-- 出发表 fixed dock：与总榜互斥 TAB；始终挂载，只 show/hide -->
     <view
-      class="series-round-dock series-round-dock--fixed {{activeTab === 'schedule' && schedule.roundSelector.length && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}}"
+      class="series-round-dock series-round-dock--fixed {{activeTab === 'schedule' && schedule.roundSelector.length && isStickyRoundSelector ? 'series-round-dock--show' : 'series-round-dock--hide'}} {{schedule.roundSelectorMode === 'dropdown' ? 'series-round-dock--dropdown' : ''}}"
       style="top:{{stickyRoundSelectorTop}}px;"
     >
       <view class="series-round-dock__inner">
         <series-round-selector-dock
           mode="fixed"
+          selector-mode="{{schedule.roundSelectorMode || 'chip'}}"
           sticky="{{isStickyRoundSelector}}"
           top="{{stickyRoundSelectorTop}}"
           show-tot="{{false}}"

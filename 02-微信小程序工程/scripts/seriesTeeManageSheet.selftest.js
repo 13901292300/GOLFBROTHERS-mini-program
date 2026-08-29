@@ -85,9 +85,12 @@ assert(
     pageJs.indexOf("navigateTo") >= 0 /* retained elsewhere */
 );
 assert(
-  '6 payment/half deep-link retained',
-  /_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs) &&
-    /_openSeriesDetailSheetDeepLink\('payment'\)/.test(pageJs)
+  '6 payment/half 原页打开，deep-link 函数仅兼容保留',
+  pageJs.indexOf('_openSeriesHalfCourseSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesPaymentManageSheet') >= 0 &&
+    pageJs.indexOf('_openSeriesDetailSheetDeepLink') >= 0 &&
+    !/_openSeriesDetailSheetDeepLink\('half'\)/.test(pageJs) &&
+    !/_openSeriesDetailSheetDeepLink\('payment'\)/.test(pageJs)
 );
 assert(
   '7 detail still has shared tee sheet + empty subtitle',
@@ -315,6 +318,13 @@ function makeHost() {
       this._manageSelectedRoundId = '';
       this._manageSelectedMatchId = '';
     },
+    _syncStickyByScroll: function () {},
+    _clearManageRoundOverflowRuntime: methods._clearManageRoundOverflowRuntime,
+    _buildCloseMoreSheetPatch: methods._buildCloseMoreSheetPatch,
+    _resolveBottomDockVisibilityPatch: methods._resolveBottomDockVisibilityPatch,
+    _commitManageOverlayPatch: methods._commitManageOverlayPatch,
+    _openFromManageSheet: methods._openFromManageSheet,
+    _closeManageSecondaryPatch: methods._closeManageSecondaryPatch,
     _buildTempAdminRoundSubtitle: methods._buildTempAdminRoundSubtitle,
     _openSeriesTeeSheetManageSheet: methods._openSeriesTeeSheetManageSheet,
     onTeeSheetManageSheetClose: methods.onTeeSheetManageSheetClose,

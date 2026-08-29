@@ -37,7 +37,16 @@ function resolveSeriesGameModeLabel(rawMode) {
   return label;
 }
 
+/** 轮次选择器 / 广场 LIVE 副标题：比杆家族统一为「比杆赛」 */
+function resolveRoundSelectorModeLabel(rawMode) {
+  var label = resolveSeriesGameModeLabel(rawMode);
+  if (!label) return '';
+  if (label.indexOf('比杆') >= 0) return '比杆赛';
+  return label;
+}
+
 module.exports = {
   GAME_MODE_DISPLAY_LABELS: GAME_MODE_DISPLAY_LABELS,
-  resolveSeriesGameModeLabel: resolveSeriesGameModeLabel
+  resolveSeriesGameModeLabel: resolveSeriesGameModeLabel,
+  resolveRoundSelectorModeLabel: resolveRoundSelectorModeLabel
 };

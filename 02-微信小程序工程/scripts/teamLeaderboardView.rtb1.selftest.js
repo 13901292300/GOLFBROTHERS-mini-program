@@ -6,6 +6,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -319,8 +320,8 @@ function makePage() {
   return ctx;
 }
 
-var teamLeaderboardView = require(path.join(utilsDir, 'teamLeaderboardView.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
+var teamLeaderboardView = require(seriesTestPaths.util('teamLeaderboardView.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
 var adapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 
@@ -478,7 +479,7 @@ var totVm2 = standingsVm.buildSeriesStandingsViewModel({
     ]
   }
 });
-assert('TOT signature stable', totSig === standingsVm.mainBoardSignature(totVm2) && totSig.indexOf('200') >= 0);
+assert('TOT signature stable', totSig === standingsVm.mainBoardSignature(totVm2) && totVm.selectedKey === 'total');
 
 var rLive = seriesTeams(fixtureG1Live(), 'r1');
 assert(
@@ -561,11 +562,11 @@ assert(
   'overlay wires live board for R; adapter remains for TOT',
   seriesJs.indexOf('seriesLiveLeaderboardAdapter.projectSeriesRnLiveLeaderboard') >= 0 &&
     seriesJs.indexOf('seriesTeamLeaderboardAdapter.projectSeriesStandingsTeamBoard') >= 0 &&
-    /selectedKey === standingsViewModel.CUMULATIVE_KEY\)/.test(seriesJs)
+    /isCumulativeStandingsKey\(selectedKey\)/.test(seriesJs)
 );
 assert(
   'TOT overlay still page-private',
-  /selectedKey === standingsViewModel.CUMULATIVE_KEY\) \{[\s\S]{0,500}buildTotTopMDescription/.test(seriesJs)
+  /isCumulativeStandingsKey\(selectedKey\)[\s\S]{0,800}buildTotTopMDescription/.test(seriesJs)
 );
 assert('adapter has no storage write', !/setStorageSync/.test(adapterSrc));
 assert(

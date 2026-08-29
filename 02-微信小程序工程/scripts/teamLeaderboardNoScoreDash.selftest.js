@@ -9,6 +9,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -20,9 +21,9 @@ var liveWxml = fs.readFileSync(
 );
 var seriesWxml = fs.readFileSync(path.join(seriesDir, 'index.wxml'), 'utf8');
 
-var teamLeaderboardView = require(path.join(utilsDir, 'teamLeaderboardView.js'));
-var teamLeaderboardHost = require(path.join(utilsDir, 'teamLeaderboardHost.js'));
-var liveLeaderboardBoard = require(path.join(utilsDir, 'liveLeaderboardBoard.js'));
+var teamLeaderboardView = require(seriesTestPaths.util('teamLeaderboardView.js'));
+var teamLeaderboardHost = require(seriesTestPaths.util('teamLeaderboardHost.js'));
+var liveLeaderboardBoard = require(seriesTestPaths.util('liveLeaderboardBoard.js'));
 var adapter = require(path.join(seriesDir, 'seriesTeamLeaderboardAdapter.js'));
 var standingsVm = require(path.join(seriesDir, 'seriesStandingsViewModel.js'));
 

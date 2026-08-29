@@ -230,7 +230,20 @@ function hasOrdinary(cards) {
   var d = deps(series, matches);
   assert('零个有效轮次 hasValidRounds=false', aggregate.hasValidRounds(series, d.getMatchById) === false);
   assert('零有效轮不得误判全部已开赛', aggregate.allValidRoundsStartedOrCompleted(series, d.getMatchById) === false);
-  assert('零有效轮仍可留在报名（不误移除）', hasSeriesCard(adapter.buildRegistrationAllCards(d)));
+  assert(
+    '零有效轮不进入可报名列表',
+    adapter.showInRegistration(series, { getMatchById: d.getMatchById }) === false &&
+      !hasSeriesCard(adapter.buildRegistrationAllCards(d))
+  );
+  var emptyRounds = makeSeries({ rounds: [] });
+  var emptyDeps = deps(emptyRounds, []);
+  assert(
+    '无 rounds 也不进入可报名列表',
+    aggregate.hasValidRounds(emptyRounds, emptyDeps.getMatchById) === false &&
+      adapter.showInRegistration(emptyRounds, { getMatchById: emptyDeps.getMatchById }) ===
+        false &&
+      !hasSeriesCard(adapter.buildRegistrationAllCards(emptyDeps))
+  );
 })();
 
 (function testLastRoundStartThenHide() {

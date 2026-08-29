@@ -7,6 +7,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 if (typeof global.wx === 'undefined') {
   global.wx = {
@@ -21,7 +22,7 @@ if (typeof global.wx === 'undefined') {
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var utilsDir = path.join(mini, 'utils');
-var srcPath = path.join(utilsDir, 'removePlayerFromMatchCompetitionStructure.js');
+var srcPath = seriesTestPaths.util('removePlayerFromMatchCompetitionStructure.js');
 var storePath = path.join(utilsDir, 'teamMatchStore.js');
 
 var fnMod = require(srcPath);

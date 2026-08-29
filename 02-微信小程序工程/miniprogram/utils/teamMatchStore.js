@@ -732,7 +732,7 @@ const FORMAL_SLOT_COUNT = 4;
 const PAIRING_STROKE_FORMAT_SET = {
   '四人四球比杆赛': true,
   '最佳球位比杆赛': true,
-  // G6/G7：报名分组走 G2/G3 composition UI
+  // G6/G7：报名分组走 G2/G3 composition UI；最好成绩比洞赛为历史别名
   '最好成绩比洞赛': true,
   '四人四球比洞赛': true,
   '最佳球位比洞赛': true
@@ -741,7 +741,7 @@ const PAIRING_STROKE_FORMAT_SET = {
 const PAIRING_STROKE_LABELS = {
   '四人四球比杆赛': '四人四球组合',
   '最佳球位比杆赛': '最佳球位组合',
-  '最好成绩比洞赛': '最好成绩组合',
+  '最好成绩比洞赛': '四人四球组合',
   '四人四球比洞赛': '四人四球组合',
   '最佳球位比洞赛': '最佳球位组合'
 };

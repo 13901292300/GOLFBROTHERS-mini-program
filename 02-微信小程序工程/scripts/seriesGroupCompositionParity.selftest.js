@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -27,7 +28,7 @@ var groupEditorPath = path.join(
   'index.js'
 );
 
-var tournamentGroupDraft = require(path.join(utilsDir, 'tournamentGroupDraft.js'));
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 var strokeEntityValidator = require(path.join(utilsDir, 'strokeEntityValidator.js'));
 var strokeEntityBuilder = require(path.join(utilsDir, 'strokeEntityBuilder.js'));
 var strokeCompositionResolver = require(path.join(

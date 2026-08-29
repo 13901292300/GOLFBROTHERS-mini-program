@@ -207,7 +207,10 @@ assert(
   parts.roundSelectorItems.filter(function (it) {
     return it.isSelected;
   }).length === 1 &&
-    parts.totalSelector.isSelected === false
+    parts.totalSelector == null &&
+    !(parts.roundSelectorItems || []).some(function (it) {
+      return it && it.key === 'total';
+    })
 );
 
 assert(

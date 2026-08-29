@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 var createPageDir = path.join(
@@ -28,7 +29,7 @@ var seriesDetailDir = path.join(
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var seriesRoundUpdate = require(path.join(utilsDir, 'seriesRoundUpdate.js'));
+var seriesRoundUpdate = require(seriesTestPaths.util('seriesRoundUpdate.js'));
 var seriesStationManageGate = require(path.join(utilsDir, 'seriesStationManageGate.js'));
 var sheetVm = require(path.join(seriesDetailDir, 'seriesManageSheetViewModel.js'));
 var moreMenu = require(path.join(utilsDir, 'teamMatchMoreMenu.js'));
@@ -831,7 +832,7 @@ function createHarness(opts) {
       wizardJs.indexOf('matchHasGroupingStructure') >= 0
   );
   var roundUpdateSrc = fs.readFileSync(
-    path.join(utilsDir, 'seriesRoundUpdate.js'),
+    seriesTestPaths.util('seriesRoundUpdate.js'),
     'utf8'
   );
   var gameModeLockBlock = roundUpdateSrc.match(

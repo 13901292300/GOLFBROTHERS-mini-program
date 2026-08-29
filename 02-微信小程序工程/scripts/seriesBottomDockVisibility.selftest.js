@@ -301,6 +301,112 @@ assert(
   );
 })();
 
+(function discussionParity() {
+  var disc = { showInputBar: true };
+  var geoHide = geo({
+    tabOffsetTop: 500,
+    isStickyTab: false,
+    scrollTop: 0
+  });
+  var hideReg = dock.resolveSeriesBottomDockVisibility(
+    Object.assign({}, geoHide, {
+      activeTab: 'register',
+      register: { cta: { label: '立即报名' } },
+      discussion: disc
+    })
+  );
+  var hideDisc = dock.resolveSeriesBottomDockVisibility(
+    Object.assign({}, geoHide, {
+      activeTab: 'discussion',
+      discussion: disc
+    })
+  );
+  var showDisc = dock.resolveSeriesBottomDockVisibility(
+    geo({
+      activeTab: 'discussion',
+      isStickyTab: false,
+      scrollTop: 120,
+      tabOffsetTop: 500,
+      discussion: disc
+    })
+  );
+  var stickyDisc = dock.resolveSeriesBottomDockVisibility(
+    geo({
+      activeTab: 'discussion',
+      isStickyTab: true,
+      scrollTop: 500,
+      tabOffsetTop: 500,
+      discussion: disc
+    })
+  );
+  var backDisc = dock.resolveSeriesBottomDockVisibility(
+    Object.assign({}, geoHide, { activeTab: 'discussion', discussion: disc })
+  );
+  var overlayDisc = dock.resolveSeriesBottomDockVisibility(
+    geo({
+      activeTab: 'discussion',
+      isStickyTab: true,
+      scrollTop: 500,
+      tabOffsetTop: 500,
+      isManageOverlayActive: true,
+      discussion: disc
+    })
+  );
+  var tabsHide = ['info', 'standings', 'register', 'schedule'].every(function (tab) {
+    return (
+      dock.resolveSeriesBottomDockVisibility(
+        geo({
+          activeTab: tab,
+          isStickyTab: true,
+          scrollTop: 500,
+          tabOffsetTop: 500,
+          discussion: disc,
+          register: { cta: { label: '立即报名' } }
+        })
+      ).showDiscussionInput === false
+    );
+  });
+  var unmeasured = dock.resolveSeriesBottomDockVisibility(
+    geo({
+      activeTab: 'discussion',
+      tabOffsetTop: 0,
+      scrollTop: 0,
+      discussion: disc
+    })
+  );
+  var a = dock.resolveSeriesBottomDockVisibility(
+    geo({
+      activeTab: 'discussion',
+      scrollTop: 120,
+      tabOffsetTop: 500,
+      discussion: disc
+    })
+  );
+  var b = dock.resolveSeriesBottomDockVisibility(
+    geo({
+      activeTab: 'discussion',
+      scrollTop: 120,
+      tabOffsetTop: 500,
+      discussion: disc
+    })
+  );
+  assert(
+    'Discussion：与报名共用 hideBottomCta；资格×几何×overlay',
+    hideReg.hideBottomCta === hideDisc.hideBottomCta &&
+      hideDisc.showDiscussionInput === false &&
+      showDisc.showDiscussionInput === true &&
+      stickyDisc.showDiscussionInput === true &&
+      backDisc.showDiscussionInput === false &&
+      overlayDisc.showDiscussionInput === false &&
+      tabsHide &&
+      unmeasured.hideBottomCta === false &&
+      unmeasured.showDiscussionInput === true &&
+      JSON.stringify(a) === JSON.stringify(b) &&
+      pageWxml.indexOf('show-input-bar="{{showDiscussionInput}}"') >= 0 &&
+      dockSrc.indexOf('scrollTop >= 100') < 0
+  );
+})();
+
 console.log('');
 console.log('C3-D dock selftest: passed=' + passed + ' failed=' + failed);
 if (failed) {

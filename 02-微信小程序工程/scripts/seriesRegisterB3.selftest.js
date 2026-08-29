@@ -144,12 +144,12 @@ function baseOrgSeries(overrides) {
     playerId: 'me'
   });
   assert(
-    'org+管理员：交集 1/2，多队不默认',
-    asAdmin.eligibleParticipantIds.length === 2 &&
+    'org+管理员：全部参赛队，多队不默认',
+    asAdmin.eligibleParticipantIds.length === 3 &&
       asAdmin.defaultSheetParticipantId === '' &&
       asAdmin.eligibleParticipantIds.indexOf('team:1') >= 0 &&
       asAdmin.eligibleParticipantIds.indexOf('team:2') >= 0 &&
-      asAdmin.eligibleParticipantIds.indexOf('team:4') < 0
+      asAdmin.eligibleParticipantIds.indexOf('team:4') >= 0
   );
 
   var asMember = eligibility.resolveSeriesRegistrationEligibility({
@@ -157,19 +157,25 @@ function baseOrgSeries(overrides) {
     playerId: 'tm-1001'
   });
   assert(
-    'org+普通成员：仅球队1，可预选',
-    asMember.eligibleParticipantIds.join(',') === 'team:1' &&
-      asMember.defaultSheetParticipantId === 'team:1'
+    'org+普通成员：全部参赛队，多队不默认',
+    asMember.eligibleParticipantIds.length === 3 &&
+      asMember.defaultSheetParticipantId === '' &&
+      asMember.eligibleParticipantIds.indexOf('team:1') >= 0 &&
+      asMember.eligibleParticipantIds.indexOf('team:2') >= 0 &&
+      asMember.eligibleParticipantIds.indexOf('team:4') >= 0
   );
 
   var outsider = eligibility.resolveSeriesRegistrationEligibility({
     series: series,
     playerId: 'tm-2001'
   });
-  // tm-2001 在球队2花名册；应命中 team:2
+  // 不按花名册过滤：3 个配置参赛队均可选
   assert(
-    'org+另一队成员命中球队2',
-    outsider.eligibleParticipantIds.join(',') === 'team:2'
+    'org+另一队成员可选全部参赛队',
+    outsider.eligibleParticipantIds.length === 3 &&
+      outsider.eligibleParticipantIds.indexOf('team:2') >= 0 &&
+      outsider.eligibleParticipantIds.indexOf('team:4') >= 0 &&
+      outsider.defaultSheetParticipantId === ''
   );
 
   var noHit = eligibility.resolveSeriesRegistrationEligibility({
@@ -177,9 +183,10 @@ function baseOrgSeries(overrides) {
     playerId: 'tm-9999'
   });
   assert(
-    'org 无交集文案',
-    noHit.eligibleParticipantIds.length === 0 &&
-      noHit.ineligibleMessage === eligibility.MSG_NOT_PARTICIPANT_TEAM
+    'org 无俱乐部球队仍可选全部参赛队',
+    noHit.eligibleParticipantIds.length === 3 &&
+      noHit.ineligibleMessage === '' &&
+      noHit.defaultSheetParticipantId === ''
   );
 })();
 
@@ -220,10 +227,10 @@ function baseOrgSeries(overrides) {
     playerId: 'tm-2001'
   });
   assert(
-    'team 非主办文案',
-    guest.eligibleParticipantIds.length === 0 &&
-      guest.reason === 'not_host_member' &&
-      guest.ineligibleMessage === eligibility.MSG_NOT_HOST_MEMBER
+    'team 非主办仍可选分队',
+    guest.eligibleParticipantIds.length === 2 &&
+      guest.reason === '' &&
+      guest.ineligibleMessage === ''
   );
 })();
 

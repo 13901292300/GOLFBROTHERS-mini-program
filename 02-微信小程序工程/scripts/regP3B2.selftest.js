@@ -7,6 +7,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -18,7 +19,7 @@ var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
 var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var pageJson = JSON.parse(fs.readFileSync(path.join(pageDir, 'index.json'), 'utf8'));
 var detailJs = fs.readFileSync(path.join(detailDir, 'index.js'), 'utf8');
-var model = require(path.join(utilsDir, 'registrationInteractionModel.js'));
+var model = require(seriesTestPaths.util('registrationInteractionModel.js'));
 
 var passed = 0;
 var failed = 0;

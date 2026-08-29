@@ -1,4 +1,5 @@
 <!-- 自定义导航栏 -->
+<view class="poster-page {{themeClass}}">
 <view class="gb-header" style="{{headerRootStyle}}">
   <view class="gb-header__inner" style="{{headerBarStyle}}">
     <view class="gb-header__left">
@@ -21,4 +22,5 @@
     bind:export="onPosterExport"
     bind:share="onPosterShare"
   />
+</view>
 </view>

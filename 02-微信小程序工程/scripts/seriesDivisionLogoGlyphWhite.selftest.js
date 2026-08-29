@@ -7,13 +7,14 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
 var pageDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail');
 
 var viewModel = require(path.join(pageDir, 'seriesDetailViewModel.js'));
-var seriesColorMark = require(path.join(mini, 'utils', 'seriesColorMark.js'));
+var seriesColorMark = require(seriesTestPaths.util('seriesColorMark.js'));
 
 var pageWxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var pageWxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
@@ -30,7 +31,7 @@ var liveWxml = fs.readFileSync(
   path.join(mini, 'components', 'live-leaderboard-board', 'index.wxml'),
   'utf8'
 );
-var colorMarkSrc = fs.readFileSync(path.join(mini, 'utils', 'seriesColorMark.js'), 'utf8');
+var colorMarkSrc = fs.readFileSync(seriesTestPaths.util('seriesColorMark.js'), 'utf8');
 var vmSrc = fs.readFileSync(path.join(pageDir, 'seriesDetailViewModel.js'), 'utf8');
 
 var passed = 0;
@@ -65,39 +66,34 @@ function isOpaqueWhite(decl) {
   );
 }
 
-var sharedGlyphRule = extractRule(
-  commonWxss,
-  '.hero-logo-stack__fallback.series-division-logo-glyph,\n.sc-flag__text'
-);
-if (!sharedGlyphRule) {
+var sharedGlyphRule = extractRule(pageWxss, '.series-division-logo-mark');
+if (!/color:\s*#FFFFFF/i.test(sharedGlyphRule)) {
   sharedGlyphRule = extractRule(
     commonWxss.replace(/\r\n/g, '\n'),
-    '.hero-logo-stack__fallback.series-division-logo-glyph,\n.sc-flag__text'
+    '.series-division-logo-mark,\n.sc-flag__text'
   );
 }
 
 assert(
   '共用样式把 Hero/列表与展开角标首字符定为纯白',
-  /hero-logo-stack__fallback\.series-division-logo-glyph/.test(commonWxss) &&
-    /color:\s*#FFFFFF/.test(commonWxss) &&
+  /series-division-logo-mark/.test(pageWxss) &&
+    /color:\s*#FFFFFF/.test(pageWxss) &&
     commonWxss.indexOf('.sc-flag__text') >= 0 &&
-    isOpaqueWhite(sharedGlyphRule || commonWxss.slice(
-      commonWxss.indexOf('.hero-logo-stack__fallback.series-division-logo-glyph'),
-      commonWxss.indexOf('.hero-logo-stack__fallback.series-division-logo-glyph') + 280
-    ))
+    isOpaqueWhite(sharedGlyphRule || pageWxss)
 );
 
 assert(
-  'Hero 色块首字符挂上共用纯白类',
-  pageWxml.indexOf(
-    'hero-logo-stack__fallback {{item.color ? \'series-division-logo-glyph\' : \'\'}}'
-  ) >= 0
+  'Hero 色块首字符挂上共享分队 mark class',
+  pageWxml.indexOf('series-division-logo-mark') >= 0 &&
+    /item\.color \? 'hero-logo-stack__item--division'/.test(pageWxml) &&
+    /wx:elif="\{\{item\.color\}\}" class="series-division-logo-mark"/.test(pageWxml)
 );
 
 assert(
-  '参赛分队列表色块首字符挂上共用纯白类',
-  /hero-logo-stack__fallback series-division-logo-glyph/.test(pageWxml) &&
-    pageWxml.indexOf('item.colorMark.fallbackText') >= 0
+  '参赛分队列表色块首字符挂上共享分队 mark class',
+  /colorMark[\s\S]{0,280}series-division-logo-mark/.test(pageWxml) &&
+    pageWxml.indexOf('item.colorMark.fallbackText') >= 0 &&
+    pageWxml.indexOf('hero-logo-stack__fallback series-division-logo-glyph') < 0
 );
 
 var identityFlagText = extractRule(identityWxss, '.sc-flag__text');
@@ -108,8 +104,8 @@ assert(
     liveWxml.indexOf('sc-flag__text') >= 0
 );
 
-var glyphSliceStart = commonWxss.indexOf('.hero-logo-stack__fallback.series-division-logo-glyph');
-var glyphSlice = glyphSliceStart >= 0 ? commonWxss.slice(glyphSliceStart, glyphSliceStart + 280) : '';
+var glyphSliceStart = pageWxss.indexOf('.series-division-logo-mark');
+var glyphSlice = glyphSliceStart >= 0 ? pageWxss.slice(glyphSliceStart, glyphSliceStart + 320) : '';
 assert(
   '不按底色切换深色字、不降低白色透明度',
   colorMarkSrc.indexOf('luminance') < 0 &&
@@ -133,12 +129,13 @@ assert(
     colorMarkSrc.indexOf('colorSnapshot') < 0
 );
 
-var fallbackRule = extractRule(pageWxss, '.hero-logo-stack__fallback');
+var markRule = extractRule(pageWxss, '.series-division-logo-mark');
 assert(
-  '尺寸字重布局保持：fallback 仍 22rpx/700，队际无图走次级灰字',
-  /font-size:\s*22rpx/.test(fallbackRule) &&
-    /font-weight:\s*700/.test(fallbackRule) &&
-    /color:\s*var\(--text-secondary/.test(fallbackRule)
+  '尺寸字重布局保持：分队 mark 22rpx/700/纯白，队际无图走次级灰字',
+  /font-size:\s*22rpx/.test(markRule) &&
+    /font-weight:\s*700/.test(markRule) &&
+    /color:\s*#FFFFFF/i.test(markRule) &&
+    /color:\s*var\(--text-secondary/.test(extractRule(pageWxss, '.hero-logo-stack__fallback'))
 );
 
 var org = viewModel.buildHeroParticipantDisplay({
@@ -166,13 +163,14 @@ var orgList = viewModel.buildParticipantsView({
   ]
 });
 assert(
-  '队际系列赛仍走球队 LOGO，不套分队纯白字类',
+  '队际系列赛仍走球队 LOGO，不套分队 mark class',
   org.mode === 'team_logos' &&
     org.teamItems[0].logo === 'https://cdn/red.png' &&
     !org.teamItems[0].color &&
     orgList.items[0].logo === 'https://cdn/red.png' &&
     !orgList.items[0].colorMark &&
-    pageWxml.indexOf("item.color ? 'series-division-logo-glyph'") >= 0
+    pageWxml.indexOf('hero-logo-stack__item--division') >= 0 &&
+    pageWxml.indexOf('series-division-logo-glyph') < 0
 );
 
 if (failed) {

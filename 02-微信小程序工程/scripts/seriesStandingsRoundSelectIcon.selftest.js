@@ -18,7 +18,7 @@ var pageDir = path.join(
 
 var wxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8');
 var wxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8');
-var dockDir = path.join(root, 'miniprogram', 'components', 'series-round-selector-dock');
+var dockDir = path.join(root, 'miniprogram', 'subpackages', 'tournament', 'components', 'series-round-selector-dock');
 var dockWxml = fs.readFileSync(path.join(dockDir, 'index.wxml'), 'utf8');
 var dockWxss = fs.readFileSync(path.join(dockDir, 'index.wxss'), 'utf8');
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');

@@ -7,10 +7,11 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..', 'miniprogram');
 var playerManage = require(path.join(root, 'utils', 'playerManage.js'));
-var assembler = require(path.join(root, 'utils', 'seriesStandingsAssembler.js'));
+var assembler = require(seriesTestPaths.util('seriesStandingsAssembler.js'));
 var standingsVm = require(path.join(
   root,
   'subpackages',
@@ -35,7 +36,7 @@ var seriesJson = read('subpackages/tournament/pages/series-detail/index.json');
 var personalWxml = read('components/personal-leaderboard-board/index.wxml');
 var personalJson = read('components/personal-leaderboard-board/index.json');
 var assemblerSrc = fs.readFileSync(
-  path.join(root, 'utils', 'seriesStandingsAssembler.js'),
+  seriesTestPaths.util('seriesStandingsAssembler.js'),
   'utf8'
 );
 
@@ -150,10 +151,11 @@ assert(
 
 assert(
   '装配层走 getGenderDisplay，不再手写 ♀/♂ 映射',
-  assemblerSrc.indexOf("require('./playerManage.js')") >= 0 &&
-    assemblerSrc.indexOf('getGenderDisplay') >= 0 &&
+  /require\(['"][^'"]*playerManage\.js['"]\)/.test(assemblerSrc) &&
+    assemblerSrc.indexOf('playerManage.getGenderDisplay') >= 0 &&
     assemblerSrc.indexOf("gender === 'F'") < 0 &&
-    assemblerSrc.indexOf("genderIcon === '♀'") < 0
+    assemblerSrc.indexOf("genderIcon === '♀'") < 0 &&
+    assemblerSrc.indexOf("genderIcon === '♂'") < 0
 );
 
 (function () {

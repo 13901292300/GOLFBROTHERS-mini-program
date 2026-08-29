@@ -142,7 +142,7 @@
   --text-muted: #888888;
   --border-color: #222222;
   --golf-blue: #002d62;
-  --data-blue: #00aeef;
+  --data-blue: #00AEEF;
   --champion-gold: #ce9224;
   background: var(--bg-card);
   color: var(--text-primary);

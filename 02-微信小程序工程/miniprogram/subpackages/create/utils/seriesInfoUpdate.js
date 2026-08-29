@@ -11,6 +11,7 @@ var seriesStationMatch = require('../../../utils/seriesStationMatch.js');
 var seriesStationIndex = require('../../../utils/seriesStationIndex.js');
 var seriesManageAccess = require('../../../utils/seriesManageAccess.js');
 var seriesFinishLock = require('../../../utils/seriesFinishLock.js');
+var matchTitlePolicy = require('../../../utils/matchTitlePolicy.js');
 
 var JOURNAL_KEY = 'gb_series_info_edit_journal_v1';
 var PUBLISHED_STRUCTURE_LOCKED_MSG = '系列赛发布后暂不支持修改此项';
@@ -343,18 +344,25 @@ function createSeriesInfoUpdateService(deps) {
 
     // 名称校验
     if (Object.prototype.hasOwnProperty.call(visNorm.patch, 'seriesName')) {
-      var name = asString(visNorm.patch.seriesName);
-      if (!name || Array.from(name).length > 40) {
+      var nameCheck = matchTitlePolicy.normalizeTitleInput(visNorm.patch.seriesName, {
+        required: true,
+        max: matchTitlePolicy.SERIES_NAME_MAX,
+        previous: series.seriesName
+      });
+      if (!nameCheck.ok) {
         return { ok: false, reason: 'series_name_invalid' };
       }
-      visNorm.patch.seriesName = name;
+      visNorm.patch.seriesName = nameCheck.value;
     }
     if (Object.prototype.hasOwnProperty.call(visNorm.patch, 'seriesSubtitle')) {
-      var sub = asString(visNorm.patch.seriesSubtitle).replace(/[\r\n\u2028\u2029]+/g, '');
-      if (Array.from(sub).length > 40) {
+      var subCheck = matchTitlePolicy.normalizeSubtitleInput(visNorm.patch.seriesSubtitle, {
+        max: matchTitlePolicy.SERIES_SUBTITLE_MAX,
+        previous: series.seriesSubtitle
+      });
+      if (!subCheck.ok) {
         return { ok: false, reason: 'series_subtitle_invalid' };
       }
-      visNorm.patch.seriesSubtitle = sub;
+      visNorm.patch.seriesSubtitle = subCheck.value;
     }
 
     var nextSeries = applyInfoPatch(series, visNorm.patch);

@@ -153,18 +153,31 @@ function fakeTeamsByUserId(map) {
     { getTeamsByUserId: fakeTeamsByUserId({ me: [] }) }
   );
   assert(
-    'org 无交集 → 无资格',
-    none.eligibleParticipantIds.length === 0 &&
-      none.ineligibleMessage === eligibility.MSG_NOT_PARTICIPANT_TEAM &&
+    'org 无俱乐部球队仍可选全部参赛队',
+    none.eligibleParticipantIds.length === 2 &&
+      none.ineligibleMessage === '' &&
       none.defaultSheetParticipantId === ''
   );
 
+  var singleTeamSeries = baseOrgSeries({
+    lifecycleStatus: 'published',
+    registrationState: 'open',
+    participants: [
+      {
+        seriesParticipantId: 'p-team-a',
+        kind: 'team',
+        sourceTeamId: 't1',
+        nameSnapshot: '阿尔法高尔夫俱乐部',
+        shortNameSnapshot: '阿尔法'
+      }
+    ]
+  });
   var one = eligibility.resolveSeriesRegistrationEligibility(
-    { series: series, playerId: 'me' },
+    { series: singleTeamSeries, playerId: 'me' },
     { getTeamsByUserId: fakeTeamsByUserId({ me: ['t1'] }) }
   );
   assert(
-    'org 单一资格默认选中',
+    'org 单一参赛队默认选中',
     one.eligibleParticipantIds.join(',') === 'p-team-a' &&
       one.defaultSheetParticipantId === 'p-team-a' &&
       one.options.length === 1
@@ -175,7 +188,7 @@ function fakeTeamsByUserId(map) {
     { getTeamsByUserId: fakeTeamsByUserId({ me: ['t1', 't2', 't9'] }) }
   );
   assert(
-    'org 多资格必须手选且仅 eligible',
+    'org 多参赛队必须手选',
     multi.eligibleParticipantIds.length === 2 &&
       multi.defaultSheetParticipantId === '' &&
       multi.options.every(function (o) {
@@ -191,10 +204,10 @@ function fakeTeamsByUserId(map) {
     { getTeamsByUserId: fakeTeamsByUserId({ me: ['other'] }) }
   );
   assert(
-    'team 非主办禁止',
-    notHost.eligibleParticipantIds.length === 0 &&
-      notHost.reason === 'not_host_member' &&
-      notHost.ineligibleMessage === eligibility.MSG_NOT_HOST_MEMBER
+    'team 非主办仍可选全部分队',
+    notHost.eligibleParticipantIds.length === 2 &&
+      notHost.reason === '' &&
+      notHost.ineligibleMessage === ''
   );
 
   var host = eligibility.resolveSeriesRegistrationEligibility(
@@ -224,9 +237,33 @@ function fakeTeamsByUserId(map) {
     { getTeamsByUserId: fakeTeamsByUserId({ me: ['host-1'] }) }
   );
   assert(
-    'team 单分队仍不默认',
+    'team 单分队默认选中',
     singleDiv.eligibleParticipantIds.length === 1 &&
-      singleDiv.defaultSheetParticipantId === ''
+      singleDiv.defaultSheetParticipantId === 'p-only'
+  );
+
+  var withCancelled = eligibility.resolveSeriesRegistrationEligibility({
+    series: baseOrgSeries({
+      participants: [
+        {
+          seriesParticipantId: 'p-team-a',
+          kind: 'team',
+          nameSnapshot: '阿尔法'
+        },
+        {
+          seriesParticipantId: 'p-dead',
+          kind: 'team',
+          nameSnapshot: '已取消',
+          cancelled: true
+        }
+      ]
+    }),
+    playerId: 'me'
+  });
+  assert(
+    'cancelled 主体不进入 eligible IDs',
+    withCancelled.eligibleParticipantIds.join(',') === 'p-team-a' &&
+      withCancelled.defaultSheetParticipantId === 'p-team-a'
   );
 })();
 
@@ -453,15 +490,15 @@ function fakeTeamsByUserId(map) {
     }).label === eligibility.MSG_IDENTITY
   );
   assert(
-    'published+open+非主办 CTA',
+    'published+open+无参赛主体 CTA',
     registerVm.resolveRegisterCta({
       lifecycleAccess: { lifecycleStatus: 'published' },
       registrationState: 'open',
       identityOk: true,
       isRegistered: false,
       eligibleCount: 0,
-      ineligibleMessage: eligibility.MSG_NOT_HOST_MEMBER
-    }).label === eligibility.MSG_NOT_HOST_MEMBER
+      ineligibleMessage: eligibility.MSG_NO_TEAM_PARTICIPANTS
+    }).label === eligibility.MSG_NO_TEAM_PARTICIPANTS
   );
   assert(
     'published+open+有资格 CTA',

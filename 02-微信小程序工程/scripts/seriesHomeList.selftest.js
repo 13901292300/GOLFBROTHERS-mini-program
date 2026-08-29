@@ -6,6 +6,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var adapter = require(path.join(
   __dirname,
@@ -14,13 +15,7 @@ var adapter = require(path.join(
   'utils',
   'seriesListCardAdapter.js'
 ));
-var gate = require(path.join(
-  __dirname,
-  '..',
-  'miniprogram',
-  'utils',
-  'seriesAccessGate.js'
-));
+var gate = require(seriesTestPaths.util('seriesAccessGate.js'));
 
 var homeJs = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'pages', 'home', 'index.js'),
@@ -185,8 +180,9 @@ assert(
   assert('8 轮 → 0 张托管分站卡', managedCards.length === 0);
   assert('普通 registering 仍在报名列表', ordinaryCards.length === 1);
   assert(
-    '报名卡 navUrl 含 tab=register 且无 preview',
+    '报名卡 navUrl 含 tab=register/from=registration 且无 preview',
     seriesCards[0].navUrl.indexOf('tab=register') >= 0 &&
+      seriesCards[0].navUrl.indexOf('from=registration') >= 0 &&
       seriesCards[0].navUrl.indexOf('preview=') < 0 &&
       seriesCards[0].navUrl.indexOf('seriesId=series-8') >= 0
   );
@@ -194,6 +190,7 @@ assert(
     '卡片含 titleSub / tagLine，无 accessCode 字段泄露',
     seriesCards[0].titleSub === '副标题' &&
       seriesCards[0].tagLine.indexOf('系列赛') >= 0 &&
+      Array.isArray(seriesCards[0].courseList) &&
       !Object.prototype.hasOwnProperty.call(seriesCards[0], 'accessCode')
   );
   assert(
@@ -403,16 +400,22 @@ assert(
     });
     var reg = adapter.buildRegistrationAllCards(d);
     var plaza = adapter.buildPlazaTournamentCards(d);
-    var regHit = reg.some(function (c) {
+    var regCard = reg.filter(function (c) {
       return c && c.seriesId === 'series-8';
-    });
-    var liveHit = plaza.some(function (c) {
+    })[0];
+    var plazaCard = plaza.filter(function (c) {
       return c && c.seriesId === 'series-8' && c.statusLabel === 'LIVE';
-    });
+    })[0];
     var plazaManaged = plaza.filter(function (c) {
       return c && String(c.id).indexOf('m-') === 0;
     });
-    return regHit && liveHit && plazaManaged.length === 0;
+    return (
+      !!regCard &&
+      regCard.titleSub === '副标题' &&
+      !!plazaCard &&
+      plazaCard.titleSub === '副标题 · R1' &&
+      plazaManaged.length === 0
+    );
   })()
 );
 
@@ -523,6 +526,78 @@ assert(
   })()
 );
 
+assert(
+  'courseList 含半场；同场不同半场不合并；>1 为 stack',
+  (function () {
+    var sameHalf = adapter.buildSeriesCourseList([
+      { courseName: '清河湾', front9Course: 'A', back9Course: 'B' },
+      { courseName: '清河湾', courseHalfText: '（A/B）' }
+    ]);
+    var diffHalf = adapter.buildSeriesCourseList([
+      { courseName: '清河湾', front9Course: 'A', back9Course: 'B' },
+      { courseName: '清河湾', front9Course: 'C', back9Course: 'D' }
+    ]);
+    var three = adapter.buildSeriesCourseList([
+      { courseName: '一号场' },
+      { courseName: '二号场' },
+      { courseName: '三号场' }
+    ]);
+    var card = adapter.toSeriesClubCard(
+      {
+        seriesId: 's-course',
+        seriesName: '测',
+        hostMode: 'team',
+        hostTeam: { teamName: '湘鹰' },
+        rounds: [
+          { roundId: 'r1', gameMode: 'fourball', courseName: '一号场' },
+          { roundId: 'r2', gameMode: 'fourball', courseName: '二号场' },
+          { roundId: 'r3', gameMode: 'fourball', courseName: '三号场' }
+        ]
+      },
+      'registration'
+    );
+    var halfCard = adapter.toSeriesClubCard(
+      {
+        seriesId: 's-half',
+        seriesName: '测半场',
+        hostMode: 'team',
+        hostTeam: { teamName: '湘鹰' },
+        rounds: [
+          {
+            roundId: 'r1',
+            gameMode: 'fourball',
+            courseName: '清河湾',
+            front9Course: 'A',
+            back9Course: 'B'
+          },
+          {
+            roundId: 'r2',
+            gameMode: 'fourball',
+            courseName: '清河湾',
+            front9Course: 'C',
+            back9Course: 'D'
+          }
+        ]
+      },
+      'registration'
+    );
+    return (
+      sameHalf.length === 1 &&
+      sameHalf[0] === '清河湾（A/B）' &&
+      diffHalf.length === 2 &&
+      diffHalf[0] === '清河湾（A/B）' &&
+      diffHalf[1] === '清河湾（C/D）' &&
+      three.length === 3 &&
+      card.courseLayout === 'stack' &&
+      card.courseList.join(',') === '一号场,二号场,三号场' &&
+      halfCard.courseLayout === 'stack' &&
+      halfCard.courseList.join('|') === '清河湾（A/B）|清河湾（C/D）' &&
+      halfCard.courseFirstName === '清河湾（A/B）' &&
+      card.gameModeText.indexOf('四人四球') >= 0
+    );
+  })()
+);
+
 // ----- 接线 -----
 assert(
   'home require seriesListCardAdapter / seriesStore',
@@ -540,7 +615,9 @@ assert(
   'wxml 可选 titleSub/tagLine/privacyLabel',
   homeWxml.indexOf('titleSub') >= 0 &&
     homeWxml.indexOf('tagLine') >= 0 &&
-    homeWxml.indexOf('privacyLabel') >= 0
+    homeWxml.indexOf('privacyLabel') >= 0 &&
+    homeWxml.indexOf('dsCardClubSeriesMeta') >= 0 &&
+    homeWxml.indexOf('courseList') >= 0
 );
 
 assert(

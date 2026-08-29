@@ -43,7 +43,7 @@ page {
 
 .gb-header {
   background: #002d62;
-  border-bottom: 2px solid #c8a24a;
+  border-bottom: 2px solid #CE9224;
   color: #fff;
   flex-shrink: 0;
 }
@@ -93,7 +93,7 @@ page {
   text-align: center;
   padding: 26rpx 0;
   border-radius: 16rpx;
-  background: var(--champion-gold, #c8a24a);
+  background: var(--champion-gold, #CE9224);
   color: #ffffff;
   font-size: 32rpx;
   font-weight: 900;
@@ -162,9 +162,9 @@ page {
   border-color: var(--error, #ef4444);
 }
 .editor-dialog__btn--primary {
-  background: var(--champion-gold, #c8a24a);
+  background: var(--champion-gold, #CE9224);
   color: #fff;
-  border-color: var(--champion-gold, #c8a24a);
+  border-color: var(--champion-gold, #CE9224);
 }
 
 .pairing-edit-sheet {
@@ -214,8 +214,8 @@ page {
   flex-shrink: 0;
 }
 .pairing-edit-check.is-on {
-  background: var(--champion-gold, #c8a24a);
-  border-color: var(--champion-gold, #c8a24a);
+  background: var(--champion-gold, #CE9224);
+  border-color: var(--champion-gold, #CE9224);
 }
 .pairing-edit-avatar {
   width: 64rpx;

@@ -504,7 +504,7 @@ function buildMatchPlayScoreboard(match, opts) {
       return Object.assign({}, board, teamScores, {
         finishedMatches: 0,
         totalMatches: 0,
-        matchesCompleteText: '0/0 MATCHES COMPLETE',
+        matchesCompleteText: '-/-',
         matches: [],
         redScore: summary.redScore,
         blueScore: summary.blueScore

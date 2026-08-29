@@ -4,7 +4,7 @@
 .create-page {
   --tour-blue: #002d62;
   --champion-gold: #ce9224;
-  --data-blue: #00aeef;
+  --data-blue: #00AEEF;
   --error: #ef4444;
 }
 .create-page.dark-mode {

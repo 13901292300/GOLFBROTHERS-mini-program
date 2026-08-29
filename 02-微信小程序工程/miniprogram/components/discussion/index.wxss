@@ -9,7 +9,7 @@
   box-sizing: border-box;
   /* 品牌色（与主题无关，单一来源对齐 app.wxss） */
   --cloud-blue: #002d62;
-  --data-blue: #00aeef;
+  --data-blue: #00AEEF;
   --champion-gold: #ce9224;
 }
 /* 主题 token：组件内自定义，避免宿主缺失 --border/--bg-subtle/--text-muted 等导致样式失效 */

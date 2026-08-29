@@ -265,7 +265,10 @@ function toFormalGroups(list) {
           ? g.players.find((p) => Number(p && p.position) === position)
           : null;
         const userId = found && found.userId ? String(found.userId).trim() : '';
-        const entry = { position: position, userId: userId };
+        const entry = withScorePlayerFields(
+          { position: position, userId: userId },
+          found
+        );
         if (userId && found) {
           entry.tPosition = tPosition.resolve(found);
           const displayName =
@@ -1128,6 +1131,155 @@ function validateGroupDraft(draft, pairingDraft, options) {
   return '';
 }
 
+function findPlayerEntryByPosition(group, position) {
+  const pos = Number(position) || 0;
+  const players = Array.isArray(group && group.players) ? group.players : [];
+  return (
+    players.find((player) =>
+      Number(player && (player.position != null ? player.position : player.slotIndex)) === pos
+    ) || null
+  );
+}
+
+function resolveDraftLiveUserId(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const id = entry.userId || entry.playerId || entry.id;
+  return id != null ? String(id).trim() : '';
+}
+
+/**
+ * LIVE 换人：按座位合并。当前身份写 userId/playerId；成绩身份保留 scorePlayerId。
+ */
+function buildLivePlayerEntry(oldEntry, draftEntry, position) {
+  const oldUserId = resolveDraftLiveUserId(oldEntry);
+  const nextUserId = resolveDraftLiveUserId(draftEntry);
+  const scorePlayerId =
+    resolveScorePlayerId(oldEntry) ||
+    resolveScorePlayerId(draftEntry) ||
+    oldUserId ||
+    nextUserId;
+  if (!nextUserId) {
+    const empty = { position: position, userId: '', playerId: '', id: '' };
+    if (scorePlayerId) empty.scorePlayerId = scorePlayerId;
+    return empty;
+  }
+  const next = Object.assign({}, oldEntry || {}, {
+    position: position,
+    userId: nextUserId,
+    playerId: nextUserId,
+    id: nextUserId
+  });
+  if (draftEntry && draftEntry.avatar) next.avatar = draftEntry.avatar;
+  if (draftEntry && draftEntry.displayName) next.displayName = draftEntry.displayName;
+  if (draftEntry && draftEntry.gender) next.gender = draftEntry.gender;
+  if (draftEntry && (draftEntry.tPosition || draftEntry.tee || draftEntry.gender)) {
+    next.tPosition = tPosition.resolve(draftEntry);
+    next.tee = next.tPosition;
+  } else if (oldEntry && (oldEntry.tPosition || oldEntry.tee)) {
+    next.tPosition = tPosition.resolve(oldEntry);
+    next.tee = next.tPosition;
+  }
+  if (scorePlayerId) next.scorePlayerId = scorePlayerId;
+  return next;
+}
+
+function buildLiveGroupFromDraft(oldGroup, draftGroup, index) {
+  const base = oldGroup || {};
+  const groupId =
+    draftGroup && draftGroup.groupId
+      ? String(draftGroup.groupId)
+      : base.groupId
+        ? String(base.groupId)
+        : 'group-tab-' + Date.now() + '-' + (index + 1);
+  const next = Object.assign({}, base, {
+    groupId: groupId,
+    groupName:
+      draftGroup && draftGroup.groupName
+        ? String(draftGroup.groupName)
+        : base.groupName || '第' + (index + 1) + '组',
+    players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
+      const position = i + 1;
+      const oldEntry = findPlayerEntryByPosition(base, position);
+      const draftEntry = findPlayerEntryByPosition(draftGroup, position);
+      return buildLivePlayerEntry(oldEntry, draftEntry, position);
+    })
+  });
+  const teeTime =
+    draftGroup && draftGroup.teeTime != null ? String(draftGroup.teeTime).trim() : '';
+  if (teeTime) next.teeTime = teeTime;
+  const startHole = Number(draftGroup && draftGroup.startHole);
+  if (Number.isFinite(startHole) && startHole >= 1 && startHole <= 18) {
+    next.startHole = Math.floor(startHole);
+  }
+  return next;
+}
+
+function applyLiveGroupsFromDraft(oldGroups, draftGroups) {
+  const oldList = Array.isArray(oldGroups) ? oldGroups : [];
+  const draftList = Array.isArray(draftGroups) ? draftGroups : [];
+  const oldById = {};
+  oldList.forEach((group) => {
+    const groupId = group && group.groupId ? String(group.groupId) : '';
+    if (groupId) oldById[groupId] = group;
+  });
+  return draftList.map((group, index) => {
+    const groupId = group && group.groupId ? String(group.groupId) : '';
+    return buildLiveGroupFromDraft(groupId ? oldById[groupId] : null, group, index);
+  });
+}
+
+function rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore) {
+  const byGroupUser = {};
+  const byGroupPos = {};
+  (Array.isArray(liveGroupsBefore) ? liveGroupsBefore : []).forEach((g) => {
+    const gid = g && g.groupId != null ? String(g.groupId) : '';
+    if (!gid) return;
+    if (!byGroupUser[gid]) byGroupUser[gid] = {};
+    if (!byGroupPos[gid]) byGroupPos[gid] = {};
+    (Array.isArray(g.players) ? g.players : []).forEach((p) => {
+      if (!p) return;
+      const pos = Number(p.position) || 0;
+      const uid = p.userId != null ? String(p.userId).trim() : '';
+      if (uid) {
+        byGroupUser[gid][uid] = p;
+      } else if (pos >= 1) {
+        byGroupPos[gid][pos] = p;
+      }
+    });
+  });
+
+  return (Array.isArray(normalizedGroups) ? normalizedGroups : []).map((g) => {
+    const gid = g && g.groupId != null ? String(g.groupId) : '';
+    const players = (Array.isArray(g.players) ? g.players : []).map((slot) => {
+      const position = Number(slot && slot.position) || 0;
+      const uid = slot && slot.userId != null ? String(slot.userId).trim() : '';
+      if (uid) {
+        const prev = (byGroupUser[gid] && byGroupUser[gid][uid]) || {};
+        return withScorePlayerFields(
+          Object.assign({}, prev, slot, {
+            position: position,
+            userId: uid,
+            playerId: uid,
+            id: uid
+          }),
+          prev
+        );
+      }
+      const prevEmpty = (byGroupPos[gid] && byGroupPos[gid][position]) || {};
+      return withScorePlayerFields(
+        {
+          position: position,
+          userId: '',
+          playerId: '',
+          id: ''
+        },
+        prevEmpty
+      );
+    });
+    return Object.assign({}, g, { players: players });
+  });
+}
+
 module.exports = {
   PLAYER_SLOTS: PLAYER_SLOTS,
   DEFAULT_REGISTER_GROUPS: DEFAULT_REGISTER_GROUPS,
@@ -1141,6 +1293,11 @@ module.exports = {
   hydrateDraftPlayers: hydrateDraftPlayers,
   cloneTournamentGroups: cloneTournamentGroups,
   toFormalGroups: toFormalGroups,
+  findPlayerEntryByPosition: findPlayerEntryByPosition,
+  buildLivePlayerEntry: buildLivePlayerEntry,
+  buildLiveGroupFromDraft: buildLiveGroupFromDraft,
+  applyLiveGroupsFromDraft: applyLiveGroupsFromDraft,
+  rematerializeLivePlayersAfterNormalize: rematerializeLivePlayersAfterNormalize,
   pickSeatAffiliationFields: pickSeatAffiliationFields,
   buildG4RegisterTeamMap: buildG4RegisterTeamMap,
   listG4TeamOrder: listG4TeamOrder,

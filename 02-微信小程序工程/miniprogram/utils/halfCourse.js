@@ -49,11 +49,22 @@ function findCourseById(courseId) {
 function findCourseByName(courseName) {
   const name = (courseName || '').trim();
   if (!name) return null;
-  return (
-    COURSE_DB.find((c) => c.courseName === name) ||
-    COURSE_DB.find((c) => name.indexOf(c.courseName) >= 0 || c.courseName.indexOf(name) >= 0) ||
-    null
-  );
+  const exact = COURSE_DB.find((c) => c.courseName === name);
+  if (exact) return exact;
+  // 模糊时取最长命中，避免「清河湾 A&B」抢掉「清河湾 C&D」
+  let best = null;
+  let bestLen = 0;
+  COURSE_DB.forEach((c) => {
+    const cn = String(c.courseName || '').trim();
+    if (!cn) return;
+    if (name.indexOf(cn) >= 0 || cn.indexOf(name) >= 0) {
+      if (cn.length > bestLen) {
+        best = c;
+        bestLen = cn.length;
+      }
+    }
+  });
+  return best;
 }
 
 function formatHalfCombo(front9, back9) {

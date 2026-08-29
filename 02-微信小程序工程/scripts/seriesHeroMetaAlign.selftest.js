@@ -214,9 +214,59 @@ assert(
     /border:\s*1\.5px solid/.test(extractRule(pageWxss, '.hero-logo-stack__item'))
 );
 
+var accessOk = {
+  ok: true,
+  lifecycleLabel: '已发布',
+  lifecycleStatus: 'published',
+  isDraftPreview: false
+};
+var orgHero = viewModel.buildHeroView(
+  {
+    hostMode: 'organization',
+    organization: { organizationName: '湘鹰高球' },
+    participants: [
+      { kind: 'team', seriesParticipantId: 't1', nameSnapshot: '甲队', logoSnapshot: 'a.png' },
+      { kind: 'team', seriesParticipantId: 't2', nameSnapshot: '乙队', logoSnapshot: 'b.png' }
+    ],
+    rounds: [
+      { courseId: 'c1', courseName: '球场一' },
+      { courseId: 'c2', courseName: '球场二' }
+    ]
+  },
+  accessOk
+);
+var clubHero = viewModel.buildHeroView(
+  {
+    hostMode: 'team',
+    templateId: 'intra_team_series',
+    hostTeam: { teamName: '主办队', teamLogo: 'host.png' },
+    participants: [
+      { kind: 'division', seriesParticipantId: 'd1', nameSnapshot: '红队', colorSnapshot: '#f00' }
+    ]
+  },
+  accessOk
+);
+assert(
+  'infoRows 主办→参赛主体→球场，ORG/CLUB 分流',
+  orgHero.infoRows[0].label === '主办' &&
+    orgHero.infoRows[0].value === '湘鹰高球' &&
+    orgHero.infoRows[1].kind === 'team_logos' &&
+    orgHero.infoRows[2].kind === 'courses' &&
+    orgHero.infoRows[2].courseLines[0] === '球场一' &&
+    orgHero.infoRows[2].courseLines[1] === '球场二' &&
+    orgHero.dividerText === 'ORG' &&
+    clubHero.dividerText === 'CLUB' &&
+    clubHero.infoRows[1].kind === 'division_tags' &&
+    clubHero.participantDisplay.teamItems.length === 0 &&
+    pageWxml.indexOf("hero.hostMode === 'team' ? 'CLUB' : 'ORG'") >= 0
+);
+
 assert(
   '日期自适应接线仍存在',
-  pageWxml.indexOf('class="event-date {{hero.dateRangeSizeClass}}"') >= 0 &&
+  /<text\s+class="event-date[^"]*\{\{hero\.dateRangeSizeClass\}\}/.test(pageWxml) &&
+    pageWxml.indexOf('hero.dateText.length') < 0 &&
+    pageWxml.indexOf('dateText.length') < 0 &&
+    pageWxss.indexOf('.event-date--md') >= 0 &&
     pageWxss.indexOf('.event-date--lg') >= 0
 );
 assert(
