@@ -73,7 +73,10 @@
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "scripts" },
-      { "type": "folder", "value": "subpackages/poster/fonts" }
+      { "type": "folder", "value": "subpackages/poster/fonts" },
+      { "type": "folder", "value": "assets/footprints" },
+      { "type": "file", "value": "subpackages/reaction/assets/sounds/bucket_start.wav" },
+      { "type": "file", "value": "subpackages/reaction/assets/sounds/bucket_end.wav" }
     ],
     "include": []
   },

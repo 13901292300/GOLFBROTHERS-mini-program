@@ -666,6 +666,7 @@
 
   <!-- Schedule day list sheet -->
   <schedule-day-sheet
+    wx:if="{{scheduleDaySheetVisible}}"
     id="schedule-day-sheet"
     visible="{{scheduleDaySheetVisible}}"
     date="{{scheduleDaySheetDate}}"
@@ -680,6 +681,7 @@
 
   <!-- Schedule editor sheet -->
   <schedule-editor-sheet
+    wx:if="{{scheduleEditorVisible}}"
     id="schedule-editor-sheet"
     visible="{{scheduleEditorVisible}}"
     date="{{scheduleEditorDate}}"
