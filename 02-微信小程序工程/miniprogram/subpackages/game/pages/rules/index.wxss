@@ -1,0 +1,10 @@
+﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/game-ui.wxss";
+
+.gb-body--with-cta {
+  padding-bottom: 160rpx;
+}
+
+.page-top-hint {
+  margin: 0 0 20rpx;
+}

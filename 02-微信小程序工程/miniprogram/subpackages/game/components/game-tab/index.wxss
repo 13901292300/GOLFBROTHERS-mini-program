@@ -1,0 +1,307 @@
+﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/game-ui.wxss";
+
+.game-tab--fill {
+  position: relative;
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: 100%;
+}
+
+.board-stack {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+}
+
+.board-pin {
+  position: relative;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  z-index: 20;
+  overflow: visible;
+}
+
+.board-game-mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 18;
+  background: transparent;
+}
+
+/* ——— ≤4：简单整表 ——— */
+.board-simple-head,
+.board-simple-foot {
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+}
+
+.board-simple-head {
+  border-top: 1px solid var(--border);
+}
+
+.board-simple-foot {
+  border-top: 2px solid var(--cloud-blue);
+}
+
+.board-row--pot {
+  border-top: 1px solid var(--border);
+}
+
+.board-simple-head .board-row,
+.board-simple-foot .board-row {
+  border-bottom: 0;
+}
+
+.board-simple-body {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.board-simple-head .board-cell--player,
+.board-simple-body .board-cell--player,
+.board-simple-foot .board-cell--player {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.board-simple-head .board-player-cell {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.board-simple-body .board-row {
+  align-items: stretch;
+  border-bottom: 0;
+}
+
+/* 球员表头：独立样式，避免被 .board-cell 的 nowrap/overflow 裁切 */
+.board-player-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 120rpx;
+  min-height: 120rpx;
+  padding: 8rpx 4rpx;
+  gap: 6rpx;
+  overflow: visible;
+  white-space: normal;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
+.board-player-cell:last-child {
+  border-right: 0;
+}
+
+.board-player__avatar {
+  display: block;
+  width: 52rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  border-radius: 50%;
+  background: #002d62;
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 800;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.board-player__name {
+  max-width: 100%;
+  font-size: 20rpx;
+  line-height: 1.2;
+  color: var(--text-muted);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* ——— >4：分栏横滑 ——— */
+.board-frame {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  overflow: hidden;
+}
+
+.board-left {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-primary);
+  z-index: 2;
+}
+
+.board-left__head {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 120rpx;
+  min-height: 120rpx;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-weight: 800;
+}
+
+.board-left__foot {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 80rpx;
+  min-height: 80rpx;
+  background: var(--bg-subtle);
+  border-top: 2px solid var(--cloud-blue);
+  font-weight: 800;
+}
+
+.board-left__foot-wrap {
+  flex-shrink: 0;
+}
+
+.board-left__foot--pot {
+  border-top: 1px solid var(--border);
+}
+
+.board-left__clip {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board-left__track {
+  will-change: transform;
+}
+
+.board-right {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+  height: 100%;
+}
+
+.board-right__sheet {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.board-h-track {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 80rpx;
+  background: var(--bg-subtle);
+}
+
+.board-h-track--head {
+  height: 120rpx;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.board-h-track--foot {
+  height: 80rpx;
+  border-top: 2px solid var(--cloud-blue);
+}
+
+.board-h-track--pot {
+  border-top: 1px solid var(--border);
+}
+
+.board-h-track .board-cell--axis {
+  font-weight: 800;
+  border-bottom: 0;
+}
+
+.board-right__body {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.board-score-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  height: 80rpx;
+  box-sizing: border-box;
+}
+
+.board-cell--axis {
+  height: 80rpx;
+  min-height: 80rpx;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.board-cell--row {
+  height: 80rpx;
+  min-height: 80rpx;
+  max-height: 80rpx;
+}
+
+.board-cell--head {
+  height: 120rpx;
+  min-height: 120rpx;
+  max-height: 120rpx;
+  border-bottom: 0;
+}
+
+.board-simple-head .board-cell--axis,
+.board-simple-foot .board-cell--axis {
+  border-bottom: 0;
+  font-weight: 800;
+}
+
+.board-simple-head .board-cell--head {
+  height: 120rpx;
+  min-height: 120rpx;
+  max-height: 120rpx;
+}
+
+.board-left .board-cell--hole {
+  width: 100%;
+  flex: none;
+}
+
+.board-left__head.board-cell--head {
+  border-bottom: 1px solid var(--border);
+}
+
+.board-left__foot {
+  border-bottom: 0;
+}

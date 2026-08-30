@@ -1,0 +1,7 @@
+﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/game-ui.wxss";
+
+page,
+.gb-page {
+  height: 100%;
+}

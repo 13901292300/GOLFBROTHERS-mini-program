@@ -1,0 +1,25 @@
+﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/game-ui.wxss";
+@import "../config/index.wxss";
+@import "../pick-players/index.wxss";
+
+.score-top {
+  flex-shrink: 0;
+  padding: 16rpx 32rpx;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.score-top__meta {
+  font-size: 24rpx;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.score-body {
+  padding-bottom: 160rpx;
+}
+
+.pick-group .player-slot .score-val {
+  margin-top: 8rpx;
+}

@@ -1,0 +1,23 @@
+<view class="gb-page bright-mode">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
+        <view>
+          <text class="gb-header__eyebrow">RULES</text>
+          <text class="gb-header__title">我的规则库</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="gb-body gb-body--with-cta" scroll-y>
+    <view class="page-pad">
+      <view wx:if="{{!hasMatchContext}}" class="empty">{{emptyHint}}</view>
+      <view wx:else class="empty">{{emptyHint}}</view>
+    </view>
+  </scroll-view>
+  <view wx:if="{{hasMatchContext}}" class="bottom-bar">
+    <view class="cta-gold" bindtap="onAdd">添加规则</view>
+  </view>
+</view>

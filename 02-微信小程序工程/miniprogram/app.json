@@ -93,6 +93,20 @@
       "pages": [
         "pages/create/index"
       ]
+    },
+    {
+      "root": "subpackages/game",
+      "name": "game",
+      "pages": [
+        "pages/list/index",
+        "pages/catalog/index",
+        "pages/rules/index",
+        "pages/config/index",
+        "pages/edit-rule/index",
+        "pages/pick-players/index",
+        "pages/score-config/index",
+        "pages/detail/index"
+      ]
     }
   ],
   "window": {

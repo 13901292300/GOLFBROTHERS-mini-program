@@ -1,0 +1,6 @@
+<view class="game-tab">
+  <view class="empty-tab">
+    <text class="empty-tab__title">{{emptyHint}}</text>
+    <text class="empty-tab__desc">正式记分页、Scoring Hub 与赛事详情尚未挂载本组件。接入宿主上下文后才会显示逐洞输赢。</text>
+  </view>
+</view>

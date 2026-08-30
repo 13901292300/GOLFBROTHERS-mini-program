@@ -1,0 +1,64 @@
+﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/game-ui.wxss";
+@import "../config/index.wxss";
+
+.pick-top {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 32rpx;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.pick-top__meta {
+  font-size: 24rpx;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.pick-top__actions {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.pick-link {
+  font-size: 26rpx;
+  color: var(--cloud-blue);
+  font-weight: 700;
+  padding: 8rpx 4rpx;
+}
+
+.pick-body {
+  padding-bottom: 160rpx;
+}
+
+.pick-group {
+  padding: 0 24rpx 8rpx;
+}
+
+.pick-letter {
+  margin: 20rpx 8rpx 12rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.pick-group .player-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12rpx;
+  margin-top: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pick-group .player-slot {
+  width: auto;
+  max-width: none;
+  flex: none;
+  min-width: 0;
+  box-sizing: border-box;
+}

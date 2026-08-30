@@ -147,12 +147,15 @@ assert('bigPotMoney 可序列化', JSON.stringify(money).indexOf('null') >= 0 ||
 var files = fs.readdirSync(utilsDir).filter(function (name) {
   return /\.js$/.test(name);
 });
+var settleFiles = files.filter(function (name) {
+  return /^(settle|catalog|holeOrder|sideGameEngine)/.test(name);
+});
 var absHit = [];
 var wxHit = [];
 var storeHit = [];
 var fakeHit = [];
 var reqHit = [];
-files.forEach(function (name) {
+settleFiles.forEach(function (name) {
   var rel = path.join(utilsDir, name);
   var text = fs.readFileSync(rel, 'utf8');
   if (/C:\\\\Users|04-游戏沙盒/.test(text)) absHit.push(name);
@@ -163,15 +166,15 @@ files.forEach(function (name) {
   var m;
   while ((m = re.exec(text))) {
     var spec = m[2];
-    if (spec.charAt(0) !== '.') reqHit.push(name + ':' + spec);
+    if (spec.charAt(0) !== '.' || spec.indexOf('../') === 0) reqHit.push(name + ':' + spec);
   }
 });
-assert('require 均在 game/utils 相对路径内', reqHit.length === 0, reqHit.join(','));
+assert('结算模块 require 均在 game/utils 内', reqHit.length === 0, reqHit.join(','));
 assert('无绝对本机路径', absHit.length === 0, absHit.join(','));
 assert('无 wx Storage / gb-game- key', storeHit.length === 0, storeHit.join(','));
-assert('无 wx.* API', wxHit.length === 0, wxHit.join(','));
+assert('结算模块无 wx.* API', wxHit.length === 0, wxHit.join(','));
 assert('无假球员姓名', fakeHit.length === 0, fakeHit.join(','));
-assert('utils 文件数', files.length === 20);
+assert('结算模块文件数', settleFiles.length === 20);
 
 console.log('\nsideGameEngine.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

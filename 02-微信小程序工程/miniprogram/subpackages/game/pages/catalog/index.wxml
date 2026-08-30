@@ -1,0 +1,37 @@
+<view class="gb-page bright-mode">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
+        <view>
+          <text class="gb-header__eyebrow">ADD RULE</text>
+          <text class="gb-header__title">选择玩法</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="gb-body" scroll-y>
+    <view wx:if="{{!hasMatchContext}}" class="page-pad">
+      <view class="empty">{{emptyHint}}</view>
+    </view>
+    <view wx:else class="page-pad catalog-page">
+      <view class="sec-hint catalog-hint">选一种玩法，把今天的约定配进新规则。本场名单与成绩由宿主注入，不会生成演示数据。</view>
+      <view wx:for="{{catalogGroups}}" wx:key="groupId" class="ds-card catalog-group">
+        <view class="catalog-group__head">{{item.group}} 游戏</view>
+        <view
+          wx:for="{{item.items}}"
+          wx:for-item="rule"
+          wx:key="id"
+          class="catalog-row"
+          hover-class="catalog-row--on"
+          catchtap="onCatalogTap"
+          data-rule-id="{{rule.id}}"
+        >
+          <text class="catalog-name">{{rule.name}}</text>
+          <text class="catalog-action">去配置 ›</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

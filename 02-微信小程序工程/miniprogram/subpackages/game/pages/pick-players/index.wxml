@@ -1,0 +1,18 @@
+<view class="gb-page bright-mode">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
+        <view>
+          <text class="gb-header__eyebrow">PLAYERS</text>
+          <text class="gb-header__title">选择球员</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <scroll-view class="gb-body" scroll-y>
+    <view class="page-pad">
+      <view class="empty">{{emptyHint}}</view>
+    </view>
+  </scroll-view>
+</view>

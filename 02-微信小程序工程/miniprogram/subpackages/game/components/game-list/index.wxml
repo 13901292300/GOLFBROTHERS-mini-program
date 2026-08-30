@@ -1,0 +1,53 @@
+<view class="game-list">
+  <view wx:if="{{showGlobalSettings}}" class="ds-card {{settingsLocked ? 'setting-head--disabled' : ''}}">
+    <view class="setting-head" bindtap="toggleSettings">
+      <text class="setting-label">全局设置</text>
+      <text class="setting-chev">{{global.settingsOpen ? "⌃" : "⌄"}}</text>
+    </view>
+    <view wx:if="{{global.settingsOpen}}" class="setting-body">
+      <view class="setting-row setting-row--privacy">
+        <text class="setting-k">公开范围</text>
+        <view class="radio-row radio-row--privacy">
+          <view class="radio-item {{global.privacy === 'public' ? 'on' : ''}}" bindtap="setPrivacy" data-value="public">
+            <view class="radio-dot"></view>
+            <text>完全可见</text>
+          </view>
+          <view
+            wx:if="{{showMatchPrivacy}}"
+            class="radio-item {{global.privacy === 'event' ? 'on' : ''}}"
+            bindtap="setPrivacy"
+            data-value="event"
+          >
+            <view class="radio-dot"></view>
+            <text>本赛事可见</text>
+          </view>
+          <view class="radio-item {{global.privacy === 'group' ? 'on' : ''}}" bindtap="setPrivacy" data-value="group">
+            <view class="radio-dot"></view>
+            <text>本组可见</text>
+          </view>
+        </view>
+      </view>
+      <view class="setting-row" bindtap="onDonate">
+        <text class="setting-k">捐锅规则</text>
+        <text class="setting-v hole-order-preview">{{potRuleText || '待接入'}}</text>
+        <text class="setting-chev">›</text>
+      </view>
+      <view class="setting-row" bindtap="onHoleOrder">
+        <text class="setting-k">全程洞序</text>
+        <text class="setting-v hole-order-preview">{{holeOrderText || '待接入'}}</text>
+        <text class="setting-chev">›</text>
+      </view>
+      <view class="setting-row" bindtap="onWind">
+        <text class="setting-k">大风吹</text>
+        <text class="setting-v hole-order-preview">{{windRuleText || '待接入'}}</text>
+        <text class="setting-chev">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty">{{emptyHint}}</view>
+
+  <view class="bottom-bar">
+    <view class="cta-gold" bindtap="onSelectRule">添加游戏</view>
+  </view>
+</view>
