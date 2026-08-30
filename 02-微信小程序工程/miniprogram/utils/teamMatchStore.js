@@ -1201,6 +1201,8 @@ function buildSlotId(groupId, position) {
 
 function resolveSlotScorePlayerId(source) {
   if (!source || typeof source !== 'object') return '';
+  const current = resolveGroupSlotPlayerId(source);
+  if (current) return current;
   const id = source.scorePlayerId || source.slotScorePlayerId || source.scoreOwnerId || '';
   return id != null ? String(id).trim() : '';
 }
@@ -1222,7 +1224,7 @@ function keepSlotScorePlayerFields(target, source) {
 function createResolvedSlot(position, groupId, source) {
   const raw = source && typeof source === 'object' ? source : {};
   const userId = resolveGroupSlotPlayerId(source);
-  return keepSlotScorePlayerFields({
+  const slot = keepSlotScorePlayerFields({
     slotId: raw.slotId != null && String(raw.slotId).trim()
       ? String(raw.slotId).trim()
       : buildSlotId(groupId, position),
@@ -1230,6 +1232,8 @@ function createResolvedSlot(position, groupId, source) {
     userId: userId,
     playerId: userId
   }, source);
+  if (userId) slot.scorePlayerId = userId;
+  return slot;
 }
 
 /**

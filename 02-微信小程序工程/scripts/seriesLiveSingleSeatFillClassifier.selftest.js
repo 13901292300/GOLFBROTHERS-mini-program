@@ -170,22 +170,22 @@ function run(before, after, editedGroupId, targetPosition) {
   });
   before.scoreEntities.g1 = [{ entityId: 'ent-hist', members: [], scoreOwnerId: 'own-a' }];
   var after = fillSeat(before, 'g1', 2, 'B', {
-    scorePlayerId: 'A',
+    scorePlayerId: 'B',
     entityId: 'ent-hist',
     entityIndex: 0
   });
   var r = run(before, after, 'g1', 2);
   assert('3 历史空座加入 B', r.ok === true && r.fill.scoreIdentityMode === 'inherited');
-  assert('4 历史 scorePlayerId=A 保留', r.fill.afterScoreIdentity.scorePlayerId === 'A');
+  assert('4 历史成绩归属为当前球员 B', r.fill.afterScoreIdentity.scorePlayerId === 'B');
 })();
 
-(function historyMutatedToB() {
+(function historyMutatedKeepA() {
   var before = baseMatch('个人比洞赛', {
     g1Players: [player('C', 1), emptySeat(2, { scorePlayerId: 'A' })]
   });
-  var after = fillSeat(before, 'g1', 2, 'B', { scorePlayerId: 'B' });
+  var after = fillSeat(before, 'g1', 2, 'B', { scorePlayerId: 'A' });
   var r = run(before, after, 'g1', 2);
-  assert('5 历史成绩身份改成 B 拒绝', r.ok === false && r.code === 'score_identity_drift');
+  assert('5 成绩归属仍为原占位人则拒绝', r.ok === false && r.code === 'score_identity_drift');
 })();
 
 (function replacementNotFill() {
@@ -352,7 +352,7 @@ function run(before, after, editedGroupId, targetPosition) {
   });
   hist.scoreEntities.g1 = [{ entityId: 'ent-hist', members: [], scoreOwnerId: 'own-a' }];
   var afterE = fillSeat(hist, 'g1', 2, 'B', {
-    scorePlayerId: 'A',
+    scorePlayerId: 'B',
     skipEntityMember: true,
     newEntity: { entityId: 'ent-new', members: ['B'], scoreOwnerId: 'own-b' }
   });

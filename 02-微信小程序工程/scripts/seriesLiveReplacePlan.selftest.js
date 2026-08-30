@@ -495,17 +495,17 @@ function hasPre(plan, id) {
   });
   var score = plan.operations[0].scoreIdentity;
   assert(
-    '8 A 的成绩身份完整保留',
-    score.scorePlayerId === 'A' &&
+    '8 成绩归属为当前球员 B，技术位置标识保留',
+    score.scorePlayerId === 'B' &&
       score.slotScorePlayerId === 'A-slot' &&
       score.scoreOwnerId === 'A-own' &&
       score.entityId === 'ent-a' &&
       score.slotId === 'slot-a' &&
       score.pairingId === 'p1' &&
       score.hasHistoryScore === true &&
-      plan.identity.scorePlayerId === 'A' &&
+      plan.identity.scorePlayerId === 'B' &&
       plan.identity.entityId === 'ent-a' &&
-      plan.identity.incomingUserId !== plan.identity.scorePlayerId
+      plan.identity.incomingUserId === plan.identity.scorePlayerId
   );
 })();
 
@@ -579,10 +579,10 @@ function hasPre(plan, id) {
   });
   var score = plan.operations[0].scoreIdentity;
   assert(
-    '10 不存在的成绩字段不被伪造',
-    !Object.prototype.hasOwnProperty.call(score, 'scorePlayerId') &&
+    '10 成绩归属为当前球员，不伪造技术位置字段',
+    score.scorePlayerId === 'B' &&
       !Object.prototype.hasOwnProperty.call(score, 'entityId') &&
-      !Object.prototype.hasOwnProperty.call(plan.identity, 'scorePlayerId') &&
+      plan.identity.scorePlayerId === 'B' &&
       plan.identity.incomingUserId === 'B'
   );
 })();

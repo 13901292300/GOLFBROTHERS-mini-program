@@ -41,15 +41,14 @@ function resolveAnyPlayerId(raw) {
 }
 
 /**
- * 与详情页 _resolveSlotScorePlayerId / teamMatchStore.resolveSlotScorePlayerId 一致：
- * scorePlayerId || slotScorePlayerId || scoreOwnerId || currentPlayerId
+ * 成绩归属为当前座位球员；旧 scorePlayerId 不得覆盖当前身份
  */
 function resolveSlotScorePlayerId(slotPlayer, currentPlayerId) {
+  const current = currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  if (current) return current;
   const p = slotPlayer || {};
   const scorePlayerId = p.scorePlayerId || p.slotScorePlayerId || p.scoreOwnerId;
-  const resolved = scorePlayerId != null ? String(scorePlayerId).trim() : '';
-  if (resolved) return resolved;
-  return currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  return scorePlayerId != null ? String(scorePlayerId).trim() : '';
 }
 
 /** 与详情页 _resolveScoresByPlayerRecord 一致 */

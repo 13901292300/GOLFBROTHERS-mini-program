@@ -136,11 +136,11 @@ function replaceSeat(match, groupId, position, fromId, toId, extra) {
         displayName: e.displayName != null ? e.displayName : '球员' + toId,
         seriesParticipantId: e.seriesParticipantId != null ? e.seriesParticipantId : p.seriesParticipantId,
         matchTeamId: e.matchTeamId != null ? e.matchTeamId : p.matchTeamId,
-        affiliationId: e.affiliationId != null ? e.affiliationId : p.affiliationId
+        affiliationId: e.affiliationId != null ? e.affiliationId : p.affiliationId,
+        scorePlayerId: e.scorePlayerId != null ? e.scorePlayerId : toId
       });
       if (e.tee != null) row.tee = e.tee;
       if (e.tPosition != null) row.tPosition = e.tPosition;
-      if (e.scorePlayerId != null) row.scorePlayerId = e.scorePlayerId;
       if (e.nickname != null) row.nickname = e.nickname;
       return row;
     });
@@ -161,6 +161,8 @@ function replaceSeat(match, groupId, position, fromId, toId, extra) {
     next.scoreEntities[groupId] = next.scoreEntities[groupId].map(function (row) {
       var r = clone(row);
       if (Array.isArray(r.members)) r.members = r.members.map(rewrite);
+      if (r.scoreOwnerId === fromId) r.scoreOwnerId = toId;
+      if (r.scorePlayerId === fromId) r.scorePlayerId = toId;
       if (e.entityId != null) r.entityId = e.entityId;
       if (e.scoreOwnerId != null) r.scoreOwnerId = e.scoreOwnerId;
       return r;
@@ -185,6 +187,7 @@ function run(before, after, editedGroupId) {
     '1 严格单座位 G5 A→B',
     out.ok &&
       out.kind === KIND.single_replacement &&
+      out.replacementCount === 1 &&
       out.recommendedRoute === ROUTE.single_replace_journal &&
       out.replacement.outgoingUserId === 'A' &&
       out.replacement.incomingUserId === 'B'
@@ -212,18 +215,18 @@ function run(before, after, editedGroupId) {
     out.ok && out.kind === KIND.single_replacement && out.replacement.incomingUserId === 'B'
   );
   assert(
-    '5 成绩身份继承',
+    '5 成绩归属为当前球员',
     out.ok &&
-      JSON.stringify(out.replacement.beforeScoreIdentity) === JSON.stringify(out.replacement.afterScoreIdentity) &&
-      out.replacement.afterScoreIdentity.scorePlayerId === 'A'
+      out.replacement.afterScoreIdentity.scorePlayerId === 'B' &&
+      out.replacement.afterScoreIdentity.entityId === out.replacement.beforeScoreIdentity.entityId
   );
 })();
 
 (function score_drift() {
   var b = g5();
-  var a = replaceSeat(b, 'g1', 1, 'A', 'B', { scorePlayerId: 'B' });
+  var a = replaceSeat(b, 'g1', 1, 'A', 'B', { scorePlayerId: 'A' });
   var out = run(b, a);
-  assert('6 成绩身份漂移拒绝', out.ok === false && out.code === 'score_identity_drift');
+  assert('6 成绩归属仍为原占位人则拒绝', out.ok === false && out.code === 'score_identity_drift');
 })();
 
 (function g8_pairing_members() {
@@ -298,7 +301,13 @@ function run(before, after, editedGroupId) {
   var a = replaceSeat(b, 'g1', 1, 'A', 'B');
   a = replaceSeat(a, 'g1', 2, 'C', 'D');
   var out = run(b, a);
-  assert('14 两处 replacement 拒绝', out.ok === false && out.code === 'multiple_replacements');
+  assert(
+    '14 两处 replacement 为 batch',
+    out.ok === true &&
+      out.kind === KIND.batch_replacement &&
+      out.replacementCount === 2 &&
+      out.recommendedRoute === ROUTE.batch_persist
+  );
 })();
 
 (function swap_same() {
@@ -311,7 +320,15 @@ function run(before, after, editedGroupId) {
   a.groups[0].players[1].playerId = 'A';
   a.groups[0].players[1].id = 'A';
   var out = run(b, a);
-  assert('15 同组 swap', out.ok === false && out.code === 'seat_swap' && out.kind === KIND.seat_swap);
+  assert(
+    '15 同组 swap',
+    out.ok === true &&
+      out.kind === KIND.rearrangement &&
+      out.code === 'rearrangement' &&
+      out.replacementCount === 0 &&
+      out.replacement == null &&
+      out.recommendedRoute === ROUTE.rearrangement_persist
+  );
 })();
 
 (function swap_cross() {
@@ -324,7 +341,13 @@ function run(before, after, editedGroupId) {
   a.groups[1].players[0].playerId = 'A';
   a.groups[1].players[0].id = 'A';
   var out = run(b, a);
-  assert('16 跨组 swap', out.ok === false && out.code === 'seat_swap');
+  assert(
+    '16 跨组 swap',
+    out.ok === true &&
+      out.kind === KIND.rearrangement &&
+      out.replacementCount === 0 &&
+      out.recommendedRoute === ROUTE.rearrangement_persist
+  );
 })();
 
 (function move_same() {
@@ -340,7 +363,10 @@ function run(before, after, editedGroupId) {
   a.groups[0].players[1].playerId = 'A';
   a.groups[0].players[1].id = 'A';
   var out = run(b, a);
-  assert('17 同组 move', out.ok === false && out.code === 'player_move');
+  assert(
+    '17 同组 move',
+    out.ok === true && out.kind === KIND.rearrangement && out.replacementCount === 0
+  );
 })();
 
 (function move_cross() {
@@ -356,7 +382,10 @@ function run(before, after, editedGroupId) {
   a.groups[1].players[0].playerId = 'A';
   a.groups[1].players[0].id = 'A';
   var out = run(b, a);
-  assert('18 跨组 move', out.ok === false && out.code === 'player_move');
+  assert(
+    '18 跨组 move',
+    out.ok === true && out.kind === KIND.rearrangement && out.replacementCount === 0
+  );
 })();
 
 (function addition() {
@@ -369,7 +398,14 @@ function run(before, after, editedGroupId) {
   a.groups[0].players[1].playerId = 'D';
   a.groups[0].players[1].id = 'D';
   var out = run(b, a);
-  assert('19 addition', out.ok === false && out.code === 'player_addition');
+  assert(
+    '19 addition',
+    out.ok === true &&
+      out.kind === KIND.player_addition &&
+      out.recommendedRoute === ROUTE.batch_persist &&
+      out.incomingUserIds &&
+      out.incomingUserIds.indexOf('D') >= 0
+  );
 })();
 
 (function removal() {
@@ -379,7 +415,10 @@ function run(before, after, editedGroupId) {
   a.groups[0].players[1].playerId = '';
   a.groups[0].players[1].id = '';
   var out = run(b, a);
-  assert('20 removal', out.ok === false && out.code === 'player_removal');
+  assert(
+    '20 removal',
+    out.ok === true && out.kind === KIND.player_removal && out.recommendedRoute === ROUTE.batch_persist
+  );
 })();
 
 (function rep_and_removal() {
@@ -389,7 +428,12 @@ function run(before, after, editedGroupId) {
   a.groups[0].players[3].playerId = '';
   a.groups[0].players[3].id = '';
   var out = run(b, a);
-  assert('21 replacement + removal', out.ok === false && (out.code === 'player_removal' || out.code === 'player_addition'));
+  assert(
+    '21 replacement + removal',
+    out.ok === true &&
+      (out.kind === KIND.player_removal || out.kind === KIND.player_addition || out.kind === KIND.batch_replacement) &&
+      out.recommendedRoute === ROUTE.batch_persist
+  );
 })();
 
 (function b_elsewhere() {
@@ -491,21 +535,138 @@ function run(before, after, editedGroupId) {
   );
 })();
 
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
+
+function rosterCReplaceA(match) {
+  var dirtyDraft = [
+    Object.assign({}, match.groups[0], {
+      groupName: '草稿改名',
+      order: 99,
+      teeTime: '23:59',
+      status: 'draft',
+      _uiCache: true,
+      players: [
+        Object.assign({}, match.groups[0].players[0], {
+          userId: 'C',
+          playerId: 'C',
+          id: 'C',
+          displayName: '报名C',
+          tee: '蓝T',
+          gender: 'M',
+          scorePlayerId: 'C'
+        })
+      ].concat(match.groups[0].players.slice(1))
+    }),
+    Object.assign({}, match.groups[1], { groupName: '草稿组2' })
+  ];
+  var next = clone(match);
+  next.groups = tournamentGroupDraft.rematerializeLivePlayersAfterNormalize(
+    tournamentGroupDraft.applyLiveGroupsFromDraft(match.groups, dirtyDraft),
+    match.groups
+  );
+  next.groups[0].players.forEach(function (p) {
+    if (String(p.userId) === 'C') p.scorePlayerId = 'C';
+  });
+  if (next.scoreEntities && next.scoreEntities.g1) {
+    next.scoreEntities.g1 = next.scoreEntities.g1.map(function (row) {
+      var r = clone(row);
+      if (Array.isArray(r.members)) {
+        r.members = r.members.map(function (id) {
+          return id === 'A' ? 'C' : id;
+        });
+      }
+      return r;
+    });
+  }
+  return next;
+}
+
+(function roster_c_replace_a_existing_series() {
+  var b = g5();
+  b.groups[0].players = [player('A', 1), player('P', 2)];
+  b.groups[0].order = 1;
+  b.groups[0].teeTime = '08:00';
+  b.groups[0].status = 'ongoing';
+  b.scoreEntities.g1 = [{ entityId: 'ent-1', members: ['A', 'P'], scoreOwnerId: 'own-1' }];
+  var a = rosterCReplaceA(b);
+  var out = run(b, a);
+  assert(
+    '35 已有系列赛报名区替换场上不产生 metadata_change',
+    out.ok === true && out.kind === KIND.single_replacement && out.code !== 'metadata_change'
+  );
+  assert(
+    '36 已有系列赛 group metadata 保持',
+    a.groups[0].groupName === b.groups[0].groupName &&
+      a.groups[0].order === b.groups[0].order &&
+      a.groups[0].teeTime === b.groups[0].teeTime &&
+      a.groups[0].status === b.groups[0].status
+  );
+})();
+
+(function roster_c_replace_a_new_series() {
+  var b = g5();
+  b.groups[0].players = [player('A', 1), player('P', 2)];
+  b.scoreEntities.g1 = [{ entityId: 'ent-1', members: ['A', 'P'], scoreOwnerId: 'own-1' }];
+  delete b.seriesContext;
+  b.groups[0].order = 0;
+  b.groups[0].teeTime = '';
+  b.groups[0].status = 'LIVE';
+  b.status = 'LIVE';
+  var a = rosterCReplaceA(b);
+  delete a.seriesContext;
+  var out = run(b, a);
+  assert(
+    '37 新建系列赛报名区替换场上不产生 metadata_change',
+    out.ok === true && out.kind === KIND.single_replacement && out.code !== 'metadata_change'
+  );
+})();
+
+(function real_group_meta_still_rejects() {
+  var b = g5();
+  var a = replaceSeat(b, 'g1', 1, 'A', 'B');
+  a.groups[0].groupName = '改名';
+  assert('38 真改 groupName', run(b, a).code === 'metadata_change');
+  a = replaceSeat(b, 'g1', 1, 'A', 'B');
+  a.groups[0].order = 7;
+  assert('39 真改 order', run(b, a).code === 'metadata_change');
+  a = replaceSeat(b, 'g1', 1, 'A', 'B');
+  a.groups[0].teeTime = '09:30';
+  assert('40 真改 teeTime', run(b, a).code === 'metadata_change');
+  a = replaceSeat(b, 'g1', 1, 'A', 'B');
+  a.groups[0].status = 'closed';
+  assert('41 真改 status', run(b, a).code === 'metadata_change');
+})();
+
+(function empty_normalize_not_meta() {
+  var b = g5();
+  b.groups[0].teeTime = '';
+  b.groups[0]._uiCache = 1;
+  var a = replaceSeat(b, 'g1', 1, 'A', 'B');
+  delete a.groups[0].teeTime;
+  delete a.groups[0]._uiCache;
+  a.groups[0].updatedAt = Date.now();
+  var out = run(b, a);
+  assert(
+    '42 空字符串/临时字段规范化不是 metadata_change',
+    out.ok === true && out.kind === KIND.single_replacement
+  );
+})();
+
 (function isolation() {
   var editor = fs.readFileSync(
     path.join(__dirname, '..', 'miniprogram', 'subpackages', 'tournament', 'pages', 'group-editor', 'index.js'),
     'utf8'
   );
   var draft = fs.readFileSync(
-    path.join(__dirname, '..', 'miniprogram', 'subpackages', 'tournament', 'utils', 'tournamentGroupDraft.js'),
+    seriesTestPaths.util('tournamentGroupDraft.js'),
     'utf8'
   );
-  var clsSrc = fs.readFileSync(
+    var clsSrc = fs.readFileSync(
     path.join(__dirname, '..', 'miniprogram', 'subpackages', 'tournament', 'utils', 'seriesLiveSingleReplaceClassifier.js'),
     'utf8'
   );
   assert(
-    '34 普通单场生产路径未引用本模块',
+    '43 普通单场生产路径未引用本模块',
     editor.indexOf('seriesLiveSingleReplaceClassifier') < 0 &&
       draft.indexOf('seriesLiveSingleReplaceClassifier') < 0 &&
       clsSrc.indexOf('saveMatch') < 0 &&

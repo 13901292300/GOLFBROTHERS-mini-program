@@ -35,10 +35,7 @@ const seriesStore = require('../../../../utils/seriesStore.js');
 const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
 const seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
-const seriesLiveSingleReplaceFlow = require('../../utils/seriesLiveSingleReplaceFlow.js');
-const seriesLiveReplaceExecute = require('../../utils/seriesLiveReplaceExecute.js');
-const seriesLiveRollbackExecute = require('../../utils/seriesLiveRollbackExecute.js');
-const seriesLiveMutationJournal = require('../../utils/seriesLiveMutationJournal.js');
+const seriesLiveIdentityCorrection = require('../../utils/seriesLiveIdentityCorrection.js');
 const seriesLiveMutationRecovery = require('../../utils/seriesLiveMutationRecovery.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 const {
@@ -84,24 +81,28 @@ const {
   createEmptyPairing,
   buildAutoPairingsForGroup,
   applyLiveGroupsFromDraft,
-  rematerializeLivePlayersAfterNormalize
+  rematerializeLivePlayersAfterNormalize,
+  rebindLiveScoreDataToSeatPlayers
 } = tournamentGroupDraft;
 
 // 页面方法内原调用 this._validateGroupDraft / _validatePairingDraft / _sanitizeGroupDraft
 // 改为薄封装，语义与抽出前一致
 
-const SERIES_LIVE_ONE_SEAT_MSG = '系列赛 LIVE 每次只能更换一名球员，请分次操作';
-const SERIES_LIVE_SINGLE_REPLACE_ONLY_MSG = '系列赛 LIVE 当前仅支持单个座位换人';
 const SERIES_LIVE_NO_CHANGE_MSG = '未检测到可保存的换人';
 const SERIES_LIVE_GROUP_FINISHED_MSG = '当前分组已结束，无法修改';
 const SERIES_LIVE_ROUND_CANCELLED_MSG = '本轮已取消，无法修改分组';
 const SERIES_LIVE_SERIES_LOCKED_MSG = '系列赛已经结束。';
 const SERIES_LIVE_PERMISSION_MSG = '暂无分组管理权限';
-const SERIES_LIVE_STALE_MSG = '分组状态已变化，请重新操作';
+const SERIES_LIVE_STALE_MSG = '数据已被其他管理员更新';
 const SERIES_LIVE_MANUAL_REVIEW_MSG = '保存状态需要管理员检查，请勿重复操作';
 const SERIES_LIVE_SAVE_FAIL_RETRY_MSG = '保存失败，请重试';
 const SERIES_LIVE_ROLLED_BACK_MSG = '保存失败，已恢复原分组';
 const SERIES_LIVE_UPDATED_MSG = '分组已更新';
+const SERIES_LIVE_DUPLICATE_MSG = '球员重复';
+const SERIES_LIVE_NOT_ON_ROSTER_MSG = '球员不在系列赛名单';
+const SERIES_LIVE_AFFILIATION_MSG = '球队归属不符';
+const SERIES_LIVE_OVER_CAPACITY_MSG = '分组人数超限';
+const SERIES_LIVE_ROUND_ENDED_MSG = '轮次已结束';
 
 function livePlayerIdOf(raw) {
   if (raw == null) return '';
@@ -172,6 +173,10 @@ Page({
         ? decodeURIComponent(String(options.roundId))
         : ''
     };
+    if (this._fromSeries && matchId) {
+      const peek = teamMatchStore.getMatchById(matchId);
+      if (peek) this._lastBatchRecovery = this._recoverIncompleteLiveBatchMutations(peek);
+    }
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     if (match && teamMatchFinish.isMatchCompleted(match)) {
       wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
@@ -1232,10 +1237,36 @@ Page({
   },
 
   /**
-   * normalize 后按 userId / 座位回填 LIVE 的 scorePlayerId 等字段（normalize 只产出 position+userId）
+   * 按座位把洞成绩留在原位置，球员身份（含 scorePlayerId）改为当前正确球员。
    */
   _rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore) {
     return rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore);
+  },
+
+  _recoverIncompleteLiveBatchMutations(match) {
+    const ctx = (match && match.seriesContext) || {};
+    const self = this;
+    try {
+      return seriesLiveMutationRecovery.recoverSeriesLiveBatchBeforeRead({
+        matchId: match && match.matchId,
+        seriesId: ctx.seriesId,
+        roundId: ctx.roundId,
+        persistMatch: function (next, previousMatch) {
+          return self._persistLiveMatchWithReadback(next, previousMatch || next);
+        },
+        persistSeries: function (next, expectedRev) {
+          return seriesStore.upsertSeriesChecked(next, expectedRev);
+        },
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getSeriesById: function (id) {
+          return seriesStore.getSeriesById(id);
+        }
+      });
+    } catch (eRec) {
+      return { ok: false, conflict: false, results: [] };
+    }
   },
 
   _persistLiveMatchWithReadback(next, previousMatch) {
@@ -1279,12 +1310,19 @@ Page({
     });
     const deletedGroupIds = Object.keys(oldById).filter((groupId) => !draftIds[groupId]);
 
-    // 先按座位合并，保留 scorePlayerId（LIVE 换人继承）
-    let nextGroups = applyLiveGroupsFromDraft(oldGroups, sanitized);
+    // 按座位合并：数值留在座位，userId/playerId/scorePlayerId 均为当前正确球员
+    let nextGroups = rematerializeLivePlayersAfterNormalize(
+      applyLiveGroupsFromDraft(oldGroups, sanitized),
+      oldGroups
+    );
 
-    const nextScoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
-      ? Object.assign({}, match.scoreData)
-      : {};
+    const nextScoreData = rebindLiveScoreDataToSeatPlayers(
+      oldGroups,
+      nextGroups,
+      match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+        ? Object.assign({}, match.scoreData)
+        : {}
+    );
     deletedGroupIds.forEach((groupId) => {
       delete nextScoreData[groupId];
     });
@@ -1292,17 +1330,8 @@ Page({
     const matchId = match.matchId != null ? String(match.matchId).trim() : '';
     const gameMode = String(match.gameMode || this.data.gameMode || '');
     const isG4Stroke = isG4FamilyMode(gameMode);
-    const isG2G3Stroke = isG2G3FamilyMode(gameMode);
-    const isG5MatchPlay = isG5MatchPlayMode(gameMode);
 
-    // 与报名一致：座位规范化；再回填 LIVE scorePlayerId（G5 复用现有 normalize，不进组合逻辑）
-    if (!isClear && (isG4Stroke || isG2G3Stroke || isG5MatchPlay)) {
-      const beforeNormalize = nextGroups;
-      nextGroups = rematerializeLivePlayersAfterNormalize(
-        normalizeFormalGroupSeats(nextGroups, match),
-        beforeNormalize
-      );
-    }
+    // LIVE 位置不动：不再 normalizeFormalGroupSeats（会按分队重排座位并带动成绩）
 
     // 与报名一致：G4/G8 按座位重建 pairings（复用 slot id）
     const shouldPersistPairings = this.data.showPairingSection || isG4Stroke;
@@ -1347,7 +1376,13 @@ Page({
       scoreData: nextScoreData,
       updatedAt: Date.now()
     });
-    if (this.data.showCompositionMode) {
+    const persistedStroke =
+      match.strokeCompositionMode != null && String(match.strokeCompositionMode).trim() !== ''
+        ? match.strokeCompositionMode
+        : '';
+    if (persistedStroke) {
+      next.strokeCompositionMode = persistedStroke;
+    } else if (this.data.showCompositionMode) {
       next.strokeCompositionMode = this.data.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
     } else if (isG6G7MatchPlayMode(gameMode) && !isClear) {
       // G6/G7：不依赖用户选择；双方分队结构对应 2+2 Entity 切分
@@ -1553,18 +1588,43 @@ Page({
           : (this.data && this.data.pairingDraft) || {});
     const base = this._buildLiveCandidateBase(latestMatch, sanitized, pairings);
     const finalized = this._finalizeLiveCandidate(base);
-    if (finalized && finalized.ok && finalized.candidate) return finalized.candidate;
-    return base;
+    const candidate = finalized && finalized.ok && finalized.candidate ? finalized.candidate : base;
+    this._seriesLiveLastCandidate = candidate;
+    return candidate;
   },
 
   _validateSeriesLiveCandidate(payload) {
     const src = payload && typeof payload === 'object' ? payload : {};
     const matchId = String((this.data && this.data.matchId) || '').trim();
     const latest = matchId ? teamMatchStore.getMatchById(matchId) : null;
-    const trial = Object.assign({}, latest || {}, {
-      groups: src.groups,
-      pairings: src.pairings != null ? src.pairings : (latest && latest.pairings)
-    });
+    const fromCandidate =
+      src.candidateMatch && typeof src.candidateMatch === 'object'
+        ? src.candidateMatch
+        : this._seriesLiveLastCandidate && typeof this._seriesLiveLastCandidate === 'object'
+          ? this._seriesLiveLastCandidate
+          : src;
+    const trial = Object.assign({}, latest || {}, fromCandidate || {});
+    delete trial.series;
+    delete trial.candidateMatch;
+    delete trial.kind;
+    delete trial.affiliationId;
+    delete trial.playerId;
+    delete trial.target;
+    if (src.groups != null) trial.groups = src.groups;
+    if (src.pairings != null) trial.pairings = src.pairings;
+    if (fromCandidate && fromCandidate.strokeCompositionMode != null) {
+      trial.strokeCompositionMode = fromCandidate.strokeCompositionMode;
+    } else if (src.strokeCompositionMode != null) {
+      trial.strokeCompositionMode = src.strokeCompositionMode;
+    }
+    if (fromCandidate && fromCandidate.registerInfo != null) trial.registerInfo = fromCandidate.registerInfo;
+    if (fromCandidate && fromCandidate.scoreEntities != null) trial.scoreEntities = fromCandidate.scoreEntities;
+    if (fromCandidate && fromCandidate.scoreData != null) trial.scoreData = fromCandidate.scoreData;
+    if (fromCandidate && fromCandidate.teamScores != null) trial.teamScores = fromCandidate.teamScores;
+    if (fromCandidate && fromCandidate.teamScoresByEntity != null) {
+      trial.teamScoresByEntity = fromCandidate.teamScoresByEntity;
+    }
+    if (fromCandidate && fromCandidate.gameMode != null) trial.gameMode = fromCandidate.gameMode;
     if (src.series && src.series.publishToken && trial.seriesContext) {
       trial.seriesContext = Object.assign({}, trial.seriesContext);
     }
@@ -1595,38 +1655,44 @@ Page({
 
   _mapSeriesLiveRejectMessage(code) {
     const c = String(code || '').trim();
+    if (c === 'incoming_already_in_round' || c === 'duplicate') return SERIES_LIVE_DUPLICATE_MSG;
+    if (c === 'player_not_on_roster') return SERIES_LIVE_NOT_ON_ROSTER_MSG;
+    if (c === 'affiliation_mismatch' || c === 'affiliation') return SERIES_LIVE_AFFILIATION_MSG;
     if (
-      c === 'multiple_replacements' ||
-      c === 'seat_swap' ||
-      c === 'player_move' ||
       c === 'player_addition' ||
       c === 'player_removal' ||
-      c === 'incoming_already_in_round'
+      c === 'group_over_capacity' ||
+      c === 'player_count'
     ) {
-      return SERIES_LIVE_ONE_SEAT_MSG;
+      return SERIES_LIVE_OVER_CAPACITY_MSG;
     }
     if (c === 'no_live_group_change') return SERIES_LIVE_NO_CHANGE_MSG;
-    if (c === 'group_finished') return SERIES_LIVE_GROUP_FINISHED_MSG;
-    if (c === 'match_completed') return teamMatchFinish.MATCH_FINISHED_TOAST;
+    if (c === 'group_finished' || c === 'match_completed' || c === 'station_not_live') {
+      return c === 'group_finished' ? SERIES_LIVE_GROUP_FINISHED_MSG : SERIES_LIVE_ROUND_ENDED_MSG;
+    }
     if (c === 'round_cancelled') return SERIES_LIVE_ROUND_CANCELLED_MSG;
     if (c === 'series_locked') return SERIES_LIVE_SERIES_LOCKED_MSG;
     if (c === 'permission_denied') return SERIES_LIVE_PERMISSION_MSG;
     if (
-      c === 'pairing_only_change' ||
-      c === 'pairing_structure_drift' ||
-      c === 'pairing_identity_drift' ||
-      c === 'entity_only_change' ||
-      c === 'entity_structure_drift' ||
-      c === 'score_owner_drift' ||
-      c === 'ambiguous_group' ||
-      c === 'ambiguous_position'
+      c === 'revision_conflict' ||
+      c === 'stale_confirmation' ||
+      c === 'confirmation_fingerprint_conflict' ||
+      c === 'payload_conflict'
     ) {
-      return SERIES_LIVE_SINGLE_REPLACE_ONLY_MSG;
-    }
-    if (c === 'stale_confirmation' || c === 'confirmation_fingerprint_conflict') {
       return SERIES_LIVE_STALE_MSG;
     }
-    return SERIES_LIVE_SINGLE_REPLACE_ONLY_MSG;
+    if (
+      c === 'save_failed' ||
+      c === 'journal_write_failed' ||
+      c === 'roster_save_failed' ||
+      c === 'batch_persist_throw' ||
+      c === 'seat_score_moved' ||
+      c === 'seat_anchor_damaged' ||
+      c === 'restore_failed'
+    ) {
+      return SERIES_LIVE_ROLLED_BACK_MSG;
+    }
+    return SERIES_LIVE_SAVE_FAIL_RETRY_MSG;
   },
 
   _seriesLiveConfirmCopy(flowResult, incomingPlayer) {
@@ -1663,11 +1729,11 @@ Page({
     );
   },
 
-  _executeSeriesLiveSingleReplaceFlow(input) {
-    return seriesLiveSingleReplaceFlow.executeSeriesLiveSingleReplaceFlow(input);
+  _executeSeriesLiveIdentityCorrection(input) {
+    return seriesLiveIdentityCorrection.executeSeriesLiveIdentityCorrection(input);
   },
 
-  _buildSeriesLiveFlowInput(sanitized, pairingDraft, acceptedFingerprint) {
+  _buildSeriesLiveIdentityCorrectionInput(sanitized, pairingDraft) {
     const self = this;
     const draft = Array.isArray(sanitized) ? sanitized : [];
     const pairings = pairingDraft != null ? pairingDraft : {};
@@ -1675,11 +1741,9 @@ Page({
     this._seriesLivePendingPairings = pairings;
     return {
       currentDraft: draft,
-      editedGroupId: '',
-      acceptedConfirmationFingerprint: acceptedFingerprint == null ? '' : String(acceptedFingerprint),
+      expectedRevision: '',
       reloadContext: function () {
-        const ctx = self._reloadSeriesLiveReplaceContext(draft);
-        return ctx;
+        return self._reloadSeriesLiveReplaceContext(draft);
       },
       buildCandidateFromLatestMatch: function (latestMatch, currentDraft) {
         return self._buildSeriesLiveCandidateFromLatestMatch(
@@ -1689,31 +1753,30 @@ Page({
         );
       },
       validateCandidate: function (payload) {
-        return self._validateSeriesLiveCandidate(payload);
+        const extra = payload && typeof payload === 'object' ? payload : {};
+        return self._validateSeriesLiveCandidate(
+          Object.assign(
+            {},
+            extra,
+            extra.candidateMatch || self._seriesLiveLastCandidate
+              ? { candidateMatch: extra.candidateMatch || self._seriesLiveLastCandidate }
+              : {}
+          )
+        );
       },
-      prepareJournal: function (input) {
-        return seriesLiveMutationJournal.prepareJournal(input);
+      persistMatch: function (next, previousMatch) {
+        return self._persistLiveMatchWithReadback(next, previousMatch);
       },
-      prepareNextAttemptAfterRollback: function (input) {
-        return seriesLiveMutationJournal.prepareNextAttemptAfterRollback(input);
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
       },
-      getJournal: function (planKey) {
-        return seriesLiveMutationJournal.getJournal(planKey);
-      },
-      inspectRecovery: function (input) {
-        return seriesLiveMutationRecovery.inspectSeriesLiveMutationRecovery(input);
-      },
-      executeForward: function (args) {
-        return seriesLiveReplaceExecute.executeSeriesLiveReplace(args);
-      },
-      executeRollback: function (args) {
-        return seriesLiveRollbackExecute.executeSeriesLiveRollback(args);
+      getSeriesById: function (id) {
+        return seriesStore.getSeriesById(id);
       },
       currentUser: gameStore.getCurrentUser() || {},
       hasManagePermission: function (info) {
         return self._hasSeriesLiveManagePermission(info);
-      },
-      storeAdapters: {}
+      }
     };
   },
 
@@ -1737,7 +1800,7 @@ Page({
         if (!self._seriesLivePageAlive()) return;
         if (res && res.confirm) {
           self.setData({ saving: true });
-          self._runSeriesLiveSingleReplaceFlow(
+          self._runSeriesLiveIdentityCorrection(
             session.sanitized,
             session.pairingDraft,
             fingerprint,
@@ -1754,6 +1817,7 @@ Page({
     if (!this._seriesLivePageAlive()) return;
     const out = result && typeof result === 'object' ? result : {};
     const status = String(out.status || '');
+    const code = String(out.code || out.reason || '');
     if (status === 'confirmation_required') {
       this._showSeriesLiveConfirmModal(out, Object.assign({}, session, { staleReprompted: false }));
       return;
@@ -1804,17 +1868,24 @@ Page({
     });
   },
 
-  _runSeriesLiveSingleReplaceFlow(sanitized, pairingDraft, acceptedFingerprint, extras) {
+  _runSeriesLiveIdentityCorrection(sanitized, pairingDraft, extras) {
     const extra = extras || {};
     const ctxPreview = this._reloadSeriesLiveReplaceContext(sanitized);
-    const input = this._buildSeriesLiveFlowInput(sanitized, pairingDraft, acceptedFingerprint);
-    input.editedGroupId = ctxPreview.editedGroupId || '';
+    const input = this._buildSeriesLiveIdentityCorrectionInput(sanitized, pairingDraft);
     input.currentUser = ctxPreview.currentUser || input.currentUser;
+    input.expectedRevision = String((ctxPreview.match && ctxPreview.match.updatedAt) || input.expectedRevision || '');
     let result;
     try {
-      result = this._executeSeriesLiveSingleReplaceFlow(input);
+      result = this._executeSeriesLiveIdentityCorrection(input);
     } catch (eRun) {
       result = { ok: false, status: 'failed_before_write', code: 'flow_prepare_failed' };
+      this._handleSeriesLiveFlowResult(result, {
+        sanitized: sanitized,
+        pairingDraft: pairingDraft,
+        incomingPlayer: ctxPreview.incomingPlayer,
+        staleReprompted: !!extra.staleReprompted
+      });
+      return result;
     }
     this._handleSeriesLiveFlowResult(result, {
       sanitized: sanitized,
@@ -1844,7 +1915,7 @@ Page({
     }
 
     if (this._fromSeries === true && this.data.mode === 'live') {
-      this._runSeriesLiveSingleReplaceFlow(sanitized, pairingDraft, '');
+      this._runSeriesLiveIdentityCorrection(sanitized, pairingDraft);
       return;
     }
 

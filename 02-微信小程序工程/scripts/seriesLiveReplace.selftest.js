@@ -11,15 +11,8 @@ var seriesLiveReplace = require(path.join(
   'utils',
   'seriesLiveReplace.js'
 ));
-var tournamentGroupDraft = require(path.join(
-  __dirname,
-  '..',
-  'miniprogram',
-  'subpackages',
-  'tournament',
-  'utils',
-  'tournamentGroupDraft.js'
-));
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
+var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 var strokeEntityValidator = require(path.join(
   __dirname,
   '..',
@@ -318,7 +311,7 @@ function liveG5(bPart) {
   assert(plan.ok && plan.action === 'replaceOnly', '1/9 replaceOnly LIVE no/with scores');
   var seatB = plan.seat;
   assert(seatB.userId === 'B' && seatB.playerId === 'B' && seatB.id === 'B', '3 current identity B');
-  assert(seatB.scorePlayerId === 'A', '4 scorePlayerId stays A');
+  assert(seatB.scorePlayerId === 'B', '4 scorePlayerId is current occupant B');
   assert(seatB.seriesParticipantId === 'part-red', '13 B affiliation from B');
   assert(seatB.matchTeamName !== '蓝队' || fx.series.roster[1].seriesParticipantId === 'part-red', '12 no leftover A blue');
   var origScore = clone(fx.match.scoreData);
@@ -338,7 +331,7 @@ function liveG5(bPart) {
     : null;
   var shown = seriesLiveReplace.playerIdOf(committed.match.groups[0].players[0]);
   assert(shown === 'B', '6 tee sheet current B');
-  assert(committed.match.groups[0].players[0].scorePlayerId === 'A', '7 inherit score identity');
+  assert(committed.match.groups[0].players[0].scorePlayerId === 'B', '7 score identity is current occupant');
 })();
 
 (function case10_11_diff_affil_legal() {
@@ -778,7 +771,7 @@ function liveG5(bPart) {
 (function case41_43_g5g8() {
   var fx = liveG5('part-red');
   var plan = decideG5(fx);
-  assert(plan.seat.scorePlayerId === 'A', '41 G5 inherit');
+  assert(plan.seat.scorePlayerId === 'B', '41 G5 scorePlayerId is current occupant');
   var g6 = clone(fx.match);
   g6.gameMode = '四人四球比洞赛';
   g6.groups[0].players = [
@@ -843,7 +836,7 @@ function liveG5(bPart) {
     { position: 1, userId: 'B', playerId: 'B', displayName: 'B' },
     1
   );
-  assert(ordinary.userId === 'B' && ordinary.scorePlayerId === 'A', '49 ordinary LIVE inherit');
+  assert(ordinary.userId === 'B' && ordinary.scorePlayerId === 'B', '49 ordinary LIVE score owner is current occupant');
 })();
 
 (function case50_51_station_idempotent() {

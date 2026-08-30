@@ -126,14 +126,26 @@ function participantDisplayName(part) {
 function copyScoreIdentity(fromSeat, into) {
   var src = fromSeat && typeof fromSeat === 'object' ? fromSeat : {};
   var out = into && typeof into === 'object' ? into : {};
-  for (var i = 0; i < SCORE_IDENTITY_KEYS.length; i++) {
-    var k = SCORE_IDENTITY_KEYS[i];
+  var uid = playerIdOf(out);
+  var oldId = playerIdOf(src);
+  var tech = ['entityId', 'slotId', 'pairingId'];
+  for (var i = 0; i < tech.length; i++) {
+    var k = tech[i];
     if (src[k] != null && src[k] !== '') out[k] = src[k];
   }
-  if (!out.scorePlayerId) {
-    var oldId = playerIdOf(src);
-    if (oldId) out.scorePlayerId = oldId;
+  if (src.hasHistoryScore != null) out.hasHistoryScore = !!src.hasHistoryScore;
+  if (Object.prototype.hasOwnProperty.call(src, 'holes')) {
+    out.holes = Array.isArray(src.holes) ? src.holes.slice() : src.holes;
   }
+  if (!uid) {
+    out.scorePlayerId = '';
+    return out;
+  }
+  out.scorePlayerId = uid;
+  var slotScore = asString(src.slotScorePlayerId);
+  var owner = asString(src.scoreOwnerId);
+  out.slotScorePlayerId = slotScore && oldId && slotScore === oldId ? uid : slotScore || uid;
+  out.scoreOwnerId = owner && oldId && owner === oldId ? uid : owner || uid;
   return out;
 }
 
@@ -230,11 +242,50 @@ function remapId(id, from, to) {
   return asString(id) === from ? to : id;
 }
 
+function remapPairingRow(pairing, from, to, apply) {
+  if (!pairing || typeof pairing !== 'object') return pairing;
+  if (!apply || !from || !to || from === to) return pairing;
+  var next = Object.assign({}, pairing);
+  if (Array.isArray(next.playerIds)) {
+    next.playerIds = next.playerIds.map(function (id) {
+      return remapId(id, from, to);
+    });
+  }
+  if (Array.isArray(next.memberUserIds)) {
+    next.memberUserIds = next.memberUserIds.map(function (id) {
+      return remapId(id, from, to);
+    });
+  }
+  if (Array.isArray(next.memberIds)) {
+    next.memberIds = next.memberIds.map(function (id) {
+      return remapId(id, from, to);
+    });
+  }
+  if (Array.isArray(next.members)) {
+    next.members = next.members.map(function (m) {
+      if (m && typeof m === 'object') {
+        var mm = Object.assign({}, m);
+        if (asString(mm.userId) === from) mm.userId = to;
+        if (asString(mm.playerId) === from) mm.playerId = to;
+        if (asString(mm.id) === from) mm.id = to;
+        return mm;
+      }
+      return remapId(m, from, to);
+    });
+  }
+  return next;
+}
+
 function remapPairings(pairings, groupId, fromId, toId) {
-  var src = pairings && typeof pairings === 'object' && !Array.isArray(pairings) ? pairings : {};
   var gid = asString(groupId);
   var from = asString(fromId);
   var to = asString(toId);
+  if (Array.isArray(pairings)) {
+    return pairings.map(function (pairing) {
+      return remapPairingRow(pairing, from, to, true);
+    });
+  }
+  var src = pairings && typeof pairings === 'object' ? pairings : {};
   var out = {};
   var keys = Object.keys(src);
   for (var i = 0; i < keys.length; i++) {
@@ -244,34 +295,9 @@ function remapPairings(pairings, groupId, fromId, toId) {
       out[k] = list;
       continue;
     }
+    var apply = asString(k) === gid;
     out[k] = list.map(function (pairing) {
-      if (!pairing || typeof pairing !== 'object') return pairing;
-      var next = Object.assign({}, pairing);
-      if (asString(k) === gid && from && to && from !== to) {
-        if (Array.isArray(next.playerIds)) {
-          next.playerIds = next.playerIds.map(function (id) {
-            return remapId(id, from, to);
-          });
-        }
-        if (Array.isArray(next.memberUserIds)) {
-          next.memberUserIds = next.memberUserIds.map(function (id) {
-            return remapId(id, from, to);
-          });
-        }
-        if (Array.isArray(next.members)) {
-          next.members = next.members.map(function (m) {
-            if (m && typeof m === 'object') {
-              var mm = Object.assign({}, m);
-              if (asString(mm.userId) === from) mm.userId = to;
-              if (asString(mm.playerId) === from) mm.playerId = to;
-              if (asString(mm.id) === from) mm.id = to;
-              return mm;
-            }
-            return remapId(m, from, to);
-          });
-        }
-      }
-      return next;
+      return remapPairingRow(pairing, from, to, apply);
     });
   }
   return out;

@@ -30,13 +30,13 @@ function isFilledScore(score) {
   return score !== null && score !== undefined && score !== '' && !Number.isNaN(Number(score));
 }
 
-/** 与 teamMatchScorecard.resolveSlotScorePlayerId 同语义（该函数未 export） */
+/** 成绩归属为当前座位球员；旧 scorePlayerId 不得覆盖当前身份 */
 function resolveSlotScorePlayerId(slotPlayer, currentPlayerId) {
+  var current = currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  if (current) return current;
   var p = slotPlayer || {};
   var scorePlayerId = p.scorePlayerId || p.slotScorePlayerId || p.scoreOwnerId;
-  var resolved = scorePlayerId != null ? String(scorePlayerId).trim() : '';
-  if (resolved) return resolved;
-  return currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  return scorePlayerId != null ? String(scorePlayerId).trim() : '';
 }
 
 function resolveScoresByPlayerRecord(scoresByPlayer, slotPlayer, currentPlayerId) {

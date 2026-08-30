@@ -412,16 +412,24 @@ var j = makeJournal(box);
   );
 })();
 
-(function corrupted_not_overwritten() {
+(function corrupted_discarded_current_wins() {
   var cbox = { data: { 'k-bad': { not: 'a journal' } } };
   var jc = makeJournal(cbox);
-  var prep = jc.prepareJournal(prepareArgs(fakePlan({ planKey: 'k-bad' })));
   var got = jc.getJournal('k-bad');
+  var prep = jc.prepareJournal(prepareArgs(fakePlan({ planKey: 'k-bad' })));
+  var hist = cbox.data['k-bad'] && cbox.data['k-bad'].history;
   assert(
-    '26 corrupted journal 不被覆盖',
-    prep.reason === 'journal_corrupted' &&
-      got.reason === 'journal_corrupted' &&
-      cbox.data['k-bad'].not === 'a journal'
+    '26 损坏 journal 终态化后可继续 prepare',
+    got.ok &&
+      got.journal.phase === PHASE.corrupted_discarded &&
+      got.journal.resolution === journalMod.RESOLUTION_CURRENT_PERSISTED_STATE_WINS &&
+      got.journal.corruptionCode &&
+      prep.ok &&
+      prep.journal.phase === PHASE.prepared &&
+      Array.isArray(hist) &&
+      hist[0] &&
+      hist[0].phase === PHASE.corrupted_discarded &&
+      !Object.prototype.hasOwnProperty.call(hist[0], 'before')
   );
 })();
 
@@ -696,6 +704,89 @@ var j = makeJournal(box);
       got.journal.phase === PHASE.prepared &&
       cbox.data['k-legacy'].phase === PHASE.prepared &&
       cbox.data['k-legacy'].current == null
+  );
+})();
+
+(function bucket_rebuild_and_neighbor() {
+  var keep = {
+    journalVersion: 1,
+    planKey: 'k-keep',
+    phase: PHASE.prepared,
+    fingerprints: { plan: 'keep' },
+    mutationKind: 'batch',
+    batchId: 'keep-1'
+  };
+  var boxKeep = { data: { 'k-keep': keep, 'k-bad': { phase: 'prepared' } } };
+  var jk = makeJournal(boxKeep);
+  var listed = jk.listUnfinishedJournals();
+  var keepGot = jk.getJournal('k-keep');
+  var badGot = jk.getJournal('k-bad');
+  assert(
+    '41 损坏记录隔离且不影响正常 journal',
+    listed.ok &&
+      listed.journals.some(function (j) {
+        return j.planKey === 'k-keep' && j.phase === PHASE.prepared;
+      }) &&
+      !listed.journals.some(function (j) {
+        return j.planKey === 'k-bad';
+      }) &&
+      keepGot.ok &&
+      keepGot.journal.phase === PHASE.prepared &&
+      badGot.ok &&
+      badGot.journal.phase === PHASE.corrupted_discarded
+  );
+})();
+
+(function whole_bucket_rebuild() {
+  var boxArr = { data: ['not-a-map'] };
+  var ja = makeJournal(boxArr);
+  var listed = ja.listUnfinishedJournals();
+  var q = boxArr.data && boxArr.data[journalMod.QUARANTINE_MAP_KEY];
+  assert(
+    '42 整桶无法解析则重建空桶',
+    listed.ok &&
+      listed.journals.length === 0 &&
+      q &&
+      q.current &&
+      q.current.phase === PHASE.corrupted_discarded &&
+      q.current.corruptionCode.indexOf('bucket_not_object') === 0
+  );
+})();
+
+(function discarded_replay_forbidden() {
+  var planKey = 'k-replay';
+  var boxR = { data: {} };
+  var jr = makeJournal(boxR);
+  var written = jr.writePreparedBatchJournal({
+    planKey: planKey,
+    batchId: 'batch-old',
+    matchId: 'm1',
+    seriesId: 'ser-1',
+    roundId: 'r1',
+    identity: { seriesId: 'ser-1', roundId: 'r1', matchId: 'm1', publishToken: 'tok' },
+    fingerprints: { matchBefore: 'x' }
+  });
+  boxR.data[planKey] = { not: 'journal', mutationKind: 'batch', batchId: 'batch-old' };
+  jr.getJournal(planKey);
+  var replay = jr.writePreparedBatchJournal({
+    planKey: planKey,
+    batchId: 'batch-old',
+    matchId: 'm1',
+    fingerprints: { matchBefore: 'x' }
+  });
+  var fresh = jr.writePreparedBatchJournal({
+    planKey: planKey,
+    batchId: 'batch-new',
+    matchId: 'm1',
+    fingerprints: { matchBefore: 'y' }
+  });
+  assert(
+    '43 原损坏 batch 不可重放，新 batch 可写',
+    written.ok &&
+      replay.ok === false &&
+      replay.reason === 'journal_replay_forbidden' &&
+      fresh.ok &&
+      fresh.journal.batchId === 'batch-new'
   );
 })();
 

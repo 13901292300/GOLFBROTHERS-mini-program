@@ -141,7 +141,8 @@ function replaceSeat(match, groupId, position, fromId, toId) {
         userId: toId,
         playerId: toId,
         id: toId,
-        displayName: '球员' + toId
+        displayName: '球员' + toId,
+        scorePlayerId: toId || ''
       });
     });
   });
@@ -239,7 +240,7 @@ function runPreview(cfg) {
 (function classifier_rejected() {
   var before = matchOf();
   var after = replaceSeat(before, 'g1', 1, 'A', 'B');
-  after.groups[0].players[0].scorePlayerId = 'B';
+  after.groups[0].players[0].scorePlayerId = 'A';
   var out = runPreview({
     beforeMatch: before,
     candidateMatch: after,
@@ -529,7 +530,7 @@ function rosterRepairPreview() {
       beforeSeat.userId === 'A' &&
       afterSeat &&
       afterSeat.userId === 'B' &&
-      afterSeat.scorePlayerId === 'A' &&
+      afterSeat.scorePlayerId === 'B' &&
       journalMod.fingerprintOf(out.prepareInput.before.station) ===
         journalMod.fingerprintOf(journalMod.freezeStation(out.prepareInput.before.station))
   );
@@ -804,7 +805,7 @@ function runPrepare(world, extra) {
 (function prepare_rejected_no_journal() {
   var world = makeWorld('direct');
   var bad = clone(world.candidate);
-  bad.groups[0].players[0].scorePlayerId = 'B';
+  bad.groups[0].players[0].scorePlayerId = 'A';
   var r = runPrepare(world, { candidate: bad });
   assert(
     '21 rejected 零 journal',
@@ -1055,7 +1056,7 @@ function runExecute(world, extra) {
 (function execute_rejected_no_forward() {
   var world = makeWorld('direct');
   var bad = clone(world.candidate);
-  bad.groups[0].players[0].scorePlayerId = 'B';
+  bad.groups[0].players[0].scorePlayerId = 'A';
   var r = runExecute(world, { candidate: bad });
   assert('31 prepare rejected → 不调 forward', r.out.status === 'rejected' && r.stats.forward === 0 && r.stats.rollback === 0);
 })();

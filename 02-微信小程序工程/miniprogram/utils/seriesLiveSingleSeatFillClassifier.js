@@ -809,28 +809,18 @@ function classifySeriesLiveSingleSeatFill(input) {
   var scoreIdentityMode = inherited ? 'inherited' : 'new';
 
   if (inherited) {
-    for (var fi = 0; fi < FROZEN_SCORE_KEYS.length; fi++) {
-      var fk = FROZEN_SCORE_KEYS[fi];
-      var bv = asString(beforePlayer && beforePlayer[fk]);
-      if (!bv) continue;
-      if (asString(afterPlayer && afterPlayer[fk]) !== bv) {
-        return reject('score_identity_drift', {
-          traces: traces,
-          fill: {
-            groupId: editedGroupId,
-            position: targetPosition,
-            incomingUserId: incomingUserId,
-            scoreIdentityMode: scoreIdentityMode,
-            beforeScoreIdentity: beforeScore,
-            afterScoreIdentity: afterScore
-          }
-        });
-      }
-    }
-    if (asString(afterPlayer && afterPlayer.scorePlayerId) === incomingUserId &&
-        asString(beforePlayer && beforePlayer.scorePlayerId) &&
-        asString(beforePlayer.scorePlayerId) !== incomingUserId) {
-      return reject('score_identity_drift', { traces: traces });
+    if (asString(afterPlayer && afterPlayer.scorePlayerId) !== incomingUserId) {
+      return reject('score_identity_drift', {
+        traces: traces,
+        fill: {
+          groupId: editedGroupId,
+          position: targetPosition,
+          incomingUserId: incomingUserId,
+          scoreIdentityMode: scoreIdentityMode,
+          beforeScoreIdentity: beforeScore,
+          afterScoreIdentity: afterScore
+        }
+      });
     }
     if (asString(beforePlayer && beforePlayer.entityId) &&
         asString(afterPlayer && afterPlayer.entityId) !== asString(beforePlayer.entityId)) {

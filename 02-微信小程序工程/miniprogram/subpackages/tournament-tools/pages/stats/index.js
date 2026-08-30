@@ -682,7 +682,7 @@ Page({
       ? groupScore.scoresByPlayer
       : null;
     if (!byPlayer) return false;
-    const record = (scorePlayerId && byPlayer[scorePlayerId]) || (playerId && byPlayer[playerId]) || null;
+    const record = (playerId && byPlayer[playerId]) || (scorePlayerId && byPlayer[scorePlayerId]) || null;
     return !!(record && Array.isArray(record.scores));
   },
 
@@ -716,7 +716,7 @@ Page({
       const byPlayer = groupScore.scoresByPlayer;
       const scorePlayerId = String(row.scorePlayerId || '').trim();
       const playerId = String(row.playerId || '').trim();
-      const record = (scorePlayerId && byPlayer[scorePlayerId]) || (playerId && byPlayer[playerId]) || null;
+      const record = (playerId && byPlayer[playerId]) || (scorePlayerId && byPlayer[scorePlayerId]) || null;
       scores = record && Array.isArray(record.scores) ? record.scores : [];
     }
 

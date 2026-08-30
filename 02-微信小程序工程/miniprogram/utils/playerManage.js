@@ -920,10 +920,17 @@ function enrichSlotsWithHistory(group, slots, scoreData) {
     : {};
   return (Array.isArray(slots) ? slots : []).map((slot) => {
     const entry = findGroupPlayerEntryByPosition(group, slot && slot.position);
-    const historyPlayerId = slotHistoryPlayerIdFromEntry(entry);
-    const hasHistoryScore = !!(historyPlayerId && hasFilledScoreRecord(scoresByPlayer[historyPlayerId]));
+    const occupantId =
+      (slot && slot.userId) || (entry && (entry.userId || entry.playerId || entry.id)) || '';
+    const leftoverId = slotHistoryPlayerIdFromEntry(entry) || slotHistoryPlayerIdFromEntry(slot);
+    const hasHistoryScore = !!(
+      (occupantId && hasFilledScoreRecord(scoresByPlayer[occupantId])) ||
+      (leftoverId && hasFilledScoreRecord(scoresByPlayer[leftoverId])) ||
+      (slot && slot.hasHistoryScore) ||
+      (entry && entry.hasHistoryScore)
+    );
     return Object.assign({}, slot, {
-      scorePlayerId: historyPlayerId,
+      scorePlayerId: occupantId ? String(occupantId).trim() : '',
       hasHistoryScore: hasHistoryScore
     });
   });
@@ -933,9 +940,11 @@ function slotsToPlayersWithHistory(slots) {
   const players = teamMatchStore.slotsToPlayers(slots);
   return players.map((player, index) => {
     const slot = (Array.isArray(slots) ? slots : [])[index] || {};
-    const historyPlayerId = slot.scorePlayerId ? String(slot.scorePlayerId) : '';
-    if (!historyPlayerId) return player;
-    return Object.assign({}, player, { scorePlayerId: historyPlayerId });
+    const occupant = player && player.userId ? String(player.userId) : '';
+    return Object.assign({}, player, {
+      scorePlayerId: occupant,
+      hasHistoryScore: !!slot.hasHistoryScore
+    });
   });
 }
 
@@ -951,7 +960,8 @@ function releasePlayerFromGroupSlots(group, userId, scoreData) {
     return Object.assign({}, slot, {
       userId: '',
       playerId: '',
-      scorePlayerId: slot.scorePlayerId || uid
+      scorePlayerId: '',
+      hasHistoryScore: !!(slot.hasHistoryScore || uid)
     });
   });
   return {
@@ -1059,7 +1069,8 @@ function addPlayerToGroupSlots(group, player, options) {
     if (Number(slot && slot.position) !== targetPosition) return slot;
     return Object.assign({}, slot, {
       userId: userId,
-      playerId: userId
+      playerId: userId,
+      scorePlayerId: userId
     });
   });
   const nextGroup = Object.assign({}, group, {
@@ -1321,7 +1332,7 @@ function verifySlotAddPlayerScenarios() {
       expectedSlots: ['A', 'B', '', 'E'],
       expectedAvailable: [3, 4],
       expectedTarget: 4,
-      expectedScorePlayerId: 'D'
+      expectedScorePlayerId: 'E'
     }
   ];
 

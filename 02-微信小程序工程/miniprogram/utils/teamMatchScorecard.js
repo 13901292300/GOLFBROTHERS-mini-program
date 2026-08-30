@@ -34,11 +34,11 @@ function isFilledScore(score) {
 }
 
 function resolveSlotScorePlayerId(slotPlayer, currentPlayerId) {
+  var current = currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  if (current) return current;
   var p = slotPlayer || {};
   var scorePlayerId = p.scorePlayerId || p.slotScorePlayerId || p.scoreOwnerId;
-  var resolved = scorePlayerId != null ? String(scorePlayerId).trim() : '';
-  if (resolved) return resolved;
-  return currentPlayerId != null ? String(currentPlayerId).trim() : '';
+  return scorePlayerId != null ? String(scorePlayerId).trim() : '';
 }
 
 function resolveScoresByPlayerRecord(scoresByPlayer, slotPlayer, currentPlayerId) {

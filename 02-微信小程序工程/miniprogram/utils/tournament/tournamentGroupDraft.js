@@ -7,12 +7,12 @@
 const {
   isTeamMatchFamily,
   isInterTeamMatch
-} = require('../../../utils/teamMatchCapabilities.js');
-const playerManage = require('../../../utils/playerManage.js');
-const mockAvatars = require('../../../utils/mockAvatars.js');
-const playerDirectory = require('../../../utils/playerDirectory.js');
-const tPosition = require('../../../utils/tPosition.js');
-const teamMatchStore = require('../../../utils/teamMatchStore.js');
+} = require('../teamMatchCapabilities.js');
+const playerManage = require('../playerManage.js');
+const mockAvatars = require('../mockAvatars.js');
+const playerDirectory = require('../playerDirectory.js');
+const tPosition = require('../tPosition.js');
+const teamMatchStore = require('../teamMatchStore.js');
 const {
   buildRegisterTeamMap,
   isG5MatchPlayMode,
@@ -23,7 +23,7 @@ const {
   validateG5MatchPlayPlayers,
   validateG6G7MatchPlayPlayers,
   validateG8MatchPlayPlayers
-} = require('../../../utils/strokeEntityValidator.js');
+} = require('../strokeEntityValidator.js');
 
 function resolveSideUnitLabel(matchLike) {
   return isInterTeamMatch(matchLike) ? '球队' : '分队';
@@ -47,6 +47,154 @@ function withScorePlayerFields(target, source) {
   if (scorePlayerId) out.scorePlayerId = scorePlayerId;
   if (source && source.hasHistoryScore != null) out.hasHistoryScore = !!source.hasHistoryScore;
   return out;
+}
+
+function copyPositionScoreValues(target, source) {
+  const out = target || {};
+  const src = source && typeof source === 'object' ? source : {};
+  ['entityId', 'slotId', 'pairingId'].forEach((k) => {
+    if (src[k] != null && src[k] !== '') out[k] = src[k];
+  });
+  if (src.hasHistoryScore != null) out.hasHistoryScore = !!src.hasHistoryScore;
+  if (Object.prototype.hasOwnProperty.call(src, 'holes')) {
+    out.holes = Array.isArray(src.holes) ? src.holes.slice() : src.holes;
+  }
+  return out;
+}
+
+function assignSeatPlayerScoreOwner(target, currentUserId, oldEntry) {
+  const out = target || {};
+  const uid = currentUserId != null ? String(currentUserId).trim() : '';
+  const oldId = resolveDraftLiveUserId(oldEntry) || resolveScorePlayerId(oldEntry);
+  if (!uid) {
+    out.scorePlayerId = '';
+    out.slotScorePlayerId = '';
+    out.scoreOwnerId = '';
+    return out;
+  }
+  out.scorePlayerId = uid;
+  const slotScore = oldEntry && oldEntry.slotScorePlayerId != null ? String(oldEntry.slotScorePlayerId).trim() : '';
+  const owner = oldEntry && oldEntry.scoreOwnerId != null ? String(oldEntry.scoreOwnerId).trim() : '';
+  out.slotScorePlayerId = slotScore && oldId && slotScore === oldId ? uid : slotScore && slotScore !== oldId ? slotScore : uid;
+  out.scoreOwnerId = owner && oldId && owner === oldId ? uid : owner && owner !== oldId ? owner : uid;
+  return out;
+}
+
+function indexSeatsByGroupPosition(groups) {
+  const out = {};
+  (Array.isArray(groups) ? groups : []).forEach((g) => {
+    const gid = g && g.groupId != null ? String(g.groupId) : '';
+    if (!gid) return;
+    out[gid] = {};
+    (Array.isArray(g.players) ? g.players : []).forEach((p) => {
+      const pos = Number(p && (p.position != null ? p.position : p.slotIndex)) || 0;
+      if (pos) out[gid][pos] = p;
+    });
+  });
+  return out;
+}
+
+function applyIncomingOccupantIdentity(target, draftEntry) {
+  const out = target || {};
+  const src = draftEntry && typeof draftEntry === 'object' ? draftEntry : {};
+  if (src.avatar) out.avatar = src.avatar;
+  if (src.displayName) out.displayName = src.displayName;
+  if (src.gender) out.gender = src.gender;
+  const aff = pickSeatAffiliationFields(src);
+  Object.keys(aff).forEach(function (k) {
+    out[k] = aff[k];
+  });
+  return out;
+}
+
+function overlayLiveIdentityKeepSeatScore(oldEntry, nextEntry, position) {
+  const nextUserId = resolveDraftLiveUserId(nextEntry);
+  const oldUserId = resolveDraftLiveUserId(oldEntry);
+  if (oldEntry && typeof oldEntry === 'object' && nextUserId && oldUserId === nextUserId) {
+    return Object.assign({}, oldEntry, { position: position });
+  }
+  const scoreSrc = oldEntry && typeof oldEntry === 'object' ? oldEntry : {};
+  if (!nextUserId) {
+    const empty = { position: position, userId: '', playerId: '', id: '' };
+    copyPositionScoreValues(empty, scoreSrc);
+    assignSeatPlayerScoreOwner(empty, '', scoreSrc);
+    return empty;
+  }
+  const next = Object.assign({}, scoreSrc, {
+    position: position,
+    userId: nextUserId,
+    playerId: nextUserId,
+    id: nextUserId
+  });
+  applyIncomingOccupantIdentity(next, nextEntry);
+  copyPositionScoreValues(next, scoreSrc);
+  assignSeatPlayerScoreOwner(next, nextUserId, scoreSrc);
+  return next;
+}
+
+function bindLiveScoreIdentityToSeats(oldGroups, nextGroups) {
+  const oldIdx = indexSeatsByGroupPosition(oldGroups);
+  return (Array.isArray(nextGroups) ? nextGroups : []).map((g) => {
+    const gid = g && g.groupId != null ? String(g.groupId) : '';
+    const players = (Array.isArray(g && g.players) ? g.players : []).map((slot) => {
+      const pos = Number(slot && (slot.position != null ? slot.position : slot.slotIndex)) || 0;
+      const oldSeat = gid && oldIdx[gid] ? oldIdx[gid][pos] : null;
+      return overlayLiveIdentityKeepSeatScore(oldSeat, slot, pos);
+    });
+    return Object.assign({}, g, { players: players });
+  });
+}
+
+function cloneScoreRecord(rec) {
+  if (rec == null || typeof rec !== 'object') return rec;
+  try {
+    return JSON.parse(JSON.stringify(rec));
+  } catch (e) {
+    return rec;
+  }
+}
+
+function rebindLiveScoreDataToSeatPlayers(oldGroups, nextGroups, scoreData) {
+  if (!scoreData || typeof scoreData !== 'object' || Array.isArray(scoreData)) {
+    return scoreData && typeof scoreData === 'object' ? scoreData : {};
+  }
+  const oldIdx = indexSeatsByGroupPosition(oldGroups);
+  const next = Object.assign({}, scoreData);
+  (Array.isArray(nextGroups) ? nextGroups : []).forEach((g) => {
+    const gid = g && g.groupId != null ? String(g.groupId) : '';
+    if (!gid || !next[gid] || typeof next[gid] !== 'object' || Array.isArray(next[gid])) return;
+    const bucket = next[gid];
+    const byPlayer =
+      bucket.scoresByPlayer && typeof bucket.scoresByPlayer === 'object' && !Array.isArray(bucket.scoresByPlayer)
+        ? bucket.scoresByPlayer
+        : null;
+    if (!byPlayer) return;
+    const rebuilt = {};
+    const mappedOld = {};
+    (Array.isArray(g.players) ? g.players : []).forEach((slot) => {
+      const pos = Number(slot && (slot.position != null ? slot.position : slot.slotIndex)) || 0;
+      const oldSeat = oldIdx[gid] ? oldIdx[gid][pos] : null;
+      const oldKeys = [];
+      const sp = resolveScorePlayerId(oldSeat);
+      const uid = resolveDraftLiveUserId(oldSeat);
+      if (sp) oldKeys.push(sp);
+      if (uid && oldKeys.indexOf(uid) < 0) oldKeys.push(uid);
+      let oldKey = '';
+      for (let i = 0; i < oldKeys.length; i++) {
+        if (Object.prototype.hasOwnProperty.call(byPlayer, oldKeys[i])) {
+          oldKey = oldKeys[i];
+          break;
+        }
+      }
+      const newKey = resolveDraftLiveUserId(slot);
+      if (!oldKey) return;
+      mappedOld[oldKey] = true;
+      if (!newKey) return;
+      rebuilt[newKey] = cloneScoreRecord(byPlayer[oldKey]);
+    });
+    next[gid] = Object.assign({}, bucket, { scoresByPlayer: rebuilt });
+  });
+  return next;
 }
 
 function createEmptyGroupPlayer(position, source) {
@@ -1148,19 +1296,18 @@ function resolveDraftLiveUserId(entry) {
 }
 
 /**
- * LIVE 换人：按座位合并。当前身份写 userId/playerId；成绩身份保留 scorePlayerId。
+ * LIVE：按座位合并。洞成绩数值留在座位；userId/playerId/scorePlayerId 均为当前正确球员。
  */
 function buildLivePlayerEntry(oldEntry, draftEntry, position) {
-  const oldUserId = resolveDraftLiveUserId(oldEntry);
   const nextUserId = resolveDraftLiveUserId(draftEntry);
-  const scorePlayerId =
-    resolveScorePlayerId(oldEntry) ||
-    resolveScorePlayerId(draftEntry) ||
-    oldUserId ||
-    nextUserId;
+  const oldUserId = resolveDraftLiveUserId(oldEntry);
+  if (oldEntry && typeof oldEntry === 'object' && nextUserId && oldUserId === nextUserId) {
+    return Object.assign({}, oldEntry, { position: position });
+  }
   if (!nextUserId) {
     const empty = { position: position, userId: '', playerId: '', id: '' };
-    if (scorePlayerId) empty.scorePlayerId = scorePlayerId;
+    copyPositionScoreValues(empty, oldEntry || {});
+    assignSeatPlayerScoreOwner(empty, '', oldEntry || {});
     return empty;
   }
   const next = Object.assign({}, oldEntry || {}, {
@@ -1169,34 +1316,26 @@ function buildLivePlayerEntry(oldEntry, draftEntry, position) {
     playerId: nextUserId,
     id: nextUserId
   });
-  if (draftEntry && draftEntry.avatar) next.avatar = draftEntry.avatar;
-  if (draftEntry && draftEntry.displayName) next.displayName = draftEntry.displayName;
-  if (draftEntry && draftEntry.gender) next.gender = draftEntry.gender;
-  if (draftEntry && (draftEntry.tPosition || draftEntry.tee || draftEntry.gender)) {
-    next.tPosition = tPosition.resolve(draftEntry);
-    next.tee = next.tPosition;
-  } else if (oldEntry && (oldEntry.tPosition || oldEntry.tee)) {
+  applyIncomingOccupantIdentity(next, draftEntry);
+  if (oldEntry && (oldEntry.tPosition || oldEntry.tee)) {
     next.tPosition = tPosition.resolve(oldEntry);
     next.tee = next.tPosition;
   }
-  if (scorePlayerId) next.scorePlayerId = scorePlayerId;
+  copyPositionScoreValues(next, oldEntry || {});
+  assignSeatPlayerScoreOwner(next, nextUserId, oldEntry || {});
   return next;
 }
 
 function buildLiveGroupFromDraft(oldGroup, draftGroup, index) {
-  const base = oldGroup || {};
+  const base = oldGroup && typeof oldGroup === 'object' ? oldGroup : {};
   const groupId =
-    draftGroup && draftGroup.groupId
-      ? String(draftGroup.groupId)
-      : base.groupId
-        ? String(base.groupId)
-        : 'group-tab-' + Date.now() + '-' + (index + 1);
+    (oldGroup && oldGroup.groupId
+      ? String(oldGroup.groupId)
+      : draftGroup && draftGroup.groupId
+        ? String(draftGroup.groupId)
+        : '') || 'group-tab-' + Date.now() + '-' + (index + 1);
   const next = Object.assign({}, base, {
     groupId: groupId,
-    groupName:
-      draftGroup && draftGroup.groupName
-        ? String(draftGroup.groupName)
-        : base.groupName || '第' + (index + 1) + '组',
     players: Array.from({ length: PLAYER_SLOTS }, (_, i) => {
       const position = i + 1;
       const oldEntry = findPlayerEntryByPosition(base, position);
@@ -1204,6 +1343,16 @@ function buildLiveGroupFromDraft(oldGroup, draftGroup, index) {
       return buildLivePlayerEntry(oldEntry, draftEntry, position);
     })
   });
+  if (oldGroup && typeof oldGroup === 'object') {
+    Object.keys(base).forEach(function (k) {
+      if (k === 'players') return;
+      next[k] = base[k];
+    });
+    next.groupId = groupId;
+    return next;
+  }
+  if (draftGroup && draftGroup.groupName) next.groupName = String(draftGroup.groupName);
+  else if (!next.groupName) next.groupName = '第' + (index + 1) + '组';
   const teeTime =
     draftGroup && draftGroup.teeTime != null ? String(draftGroup.teeTime).trim() : '';
   if (teeTime) next.teeTime = teeTime;
@@ -1228,56 +1377,15 @@ function applyLiveGroupsFromDraft(oldGroups, draftGroups) {
   });
 }
 
-function rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore) {
-  const byGroupUser = {};
-  const byGroupPos = {};
-  (Array.isArray(liveGroupsBefore) ? liveGroupsBefore : []).forEach((g) => {
-    const gid = g && g.groupId != null ? String(g.groupId) : '';
-    if (!gid) return;
-    if (!byGroupUser[gid]) byGroupUser[gid] = {};
-    if (!byGroupPos[gid]) byGroupPos[gid] = {};
-    (Array.isArray(g.players) ? g.players : []).forEach((p) => {
-      if (!p) return;
-      const pos = Number(p.position) || 0;
-      const uid = p.userId != null ? String(p.userId).trim() : '';
-      if (uid) {
-        byGroupUser[gid][uid] = p;
-      } else if (pos >= 1) {
-        byGroupPos[gid][pos] = p;
-      }
-    });
-  });
+/**
+ * 历史导出名。LIVE 成绩按座位保留，不再按 playerId 搬运。
+ */
+function remapLiveScoreIdentityByPlayerId(oldGroups, nextGroups) {
+  return bindLiveScoreIdentityToSeats(oldGroups, nextGroups);
+}
 
-  return (Array.isArray(normalizedGroups) ? normalizedGroups : []).map((g) => {
-    const gid = g && g.groupId != null ? String(g.groupId) : '';
-    const players = (Array.isArray(g.players) ? g.players : []).map((slot) => {
-      const position = Number(slot && slot.position) || 0;
-      const uid = slot && slot.userId != null ? String(slot.userId).trim() : '';
-      if (uid) {
-        const prev = (byGroupUser[gid] && byGroupUser[gid][uid]) || {};
-        return withScorePlayerFields(
-          Object.assign({}, prev, slot, {
-            position: position,
-            userId: uid,
-            playerId: uid,
-            id: uid
-          }),
-          prev
-        );
-      }
-      const prevEmpty = (byGroupPos[gid] && byGroupPos[gid][position]) || {};
-      return withScorePlayerFields(
-        {
-          position: position,
-          userId: '',
-          playerId: '',
-          id: ''
-        },
-        prevEmpty
-      );
-    });
-    return Object.assign({}, g, { players: players });
-  });
+function rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore) {
+  return bindLiveScoreIdentityToSeats(liveGroupsBefore, normalizedGroups);
 }
 
 module.exports = {
@@ -1297,6 +1405,9 @@ module.exports = {
   buildLivePlayerEntry: buildLivePlayerEntry,
   buildLiveGroupFromDraft: buildLiveGroupFromDraft,
   applyLiveGroupsFromDraft: applyLiveGroupsFromDraft,
+  bindLiveScoreIdentityToSeats: bindLiveScoreIdentityToSeats,
+  rebindLiveScoreDataToSeatPlayers: rebindLiveScoreDataToSeatPlayers,
+  remapLiveScoreIdentityByPlayerId: remapLiveScoreIdentityByPlayerId,
   rematerializeLivePlayersAfterNormalize: rematerializeLivePlayersAfterNormalize,
   pickSeatAffiliationFields: pickSeatAffiliationFields,
   buildG4RegisterTeamMap: buildG4RegisterTeamMap,

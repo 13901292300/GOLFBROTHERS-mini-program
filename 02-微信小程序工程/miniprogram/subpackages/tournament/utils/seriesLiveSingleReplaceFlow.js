@@ -1,7 +1,6 @@
 /**
- * Series LIVE 单座位换人流程
- * - 6.2A-1 Preview：classifier → evidence → decision → plan
- * - 6.2A-2 只构造 journal 入参，不写 storage、不调用 executor
+ * LEGACY：真实中途换人模型。正式 group-editor LIVE 保存已改走 seriesLiveIdentityCorrection。
+ * 本模块仅保留给历史 journal 恢复与隔离测试，不得再接入正式保存入口。
  */
 
 var classifierMod = require('./seriesLiveSingleReplaceClassifier.js');
@@ -9,6 +8,11 @@ var evidenceMod = require('./seriesLiveAffiliationEvidence.js');
 var decisionMod = require('./seriesLiveReplaceDecision.js');
 var planMod = require('./seriesLiveReplacePlan.js');
 var journalMod = require('./seriesLiveMutationJournal.js');
+var batchMod = require('./seriesLiveBatchReplace.js');
+var seriesFinishLock = require('../../../utils/seriesFinishLock.js');
+var teamMatchFinish = require('../../../utils/teamMatchFinish.js');
+var matchStatus = require('../../../utils/matchStatus.js');
+var seriesRoundVisualState = require('../../../utils/seriesRoundVisualState.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -22,6 +26,98 @@ function playerIdOf(raw) {
 
 function rejected(code) {
   return { ok: false, status: 'rejected', code: asString(code) };
+}
+
+function liveCandidateValidatePayload(candidateMatch, series) {
+  return {
+    candidateMatch: candidateMatch,
+    groups: candidateMatch && candidateMatch.groups,
+    pairings: candidateMatch && candidateMatch.pairings,
+    series: series,
+    strokeCompositionMode: candidateMatch && candidateMatch.strokeCompositionMode,
+    registerInfo: candidateMatch && candidateMatch.registerInfo,
+    scoreEntities: candidateMatch && candidateMatch.scoreEntities,
+    scoreData: candidateMatch && candidateMatch.scoreData,
+    gameMode: candidateMatch && candidateMatch.gameMode,
+    teamScores: candidateMatch && candidateMatch.teamScores,
+    teamScoresByEntity: candidateMatch && candidateMatch.teamScoresByEntity
+  };
+}
+
+function groupOccupancySig(group) {
+  var players = Array.isArray(group && group.players) ? group.players : [];
+  return players
+    .map(function (p) {
+      var pos = Number(p && (p.position != null ? p.position : p.slotIndex)) || 0;
+      return String(pos) + ':' + playerIdOf(p);
+    })
+    .sort()
+    .join('|');
+}
+
+function findRound(series, roundId) {
+  var rid = asString(roundId);
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  for (var i = 0; i < rounds.length; i++) {
+    if (asString(rounds[i] && rounds[i].roundId) === rid) return rounds[i];
+  }
+  return null;
+}
+
+function assertRearrangementWritable(src, series, match, candidateMatch, stationIndex) {
+  var user = src.currentUser || src.user;
+  if (typeof src.hasManagePermission !== 'function') return rejected('permission_denied');
+  var allowed = !!src.hasManagePermission({
+    series: series,
+    match: match,
+    round: findRound(series, stationIndex && stationIndex.roundId),
+    permission: 'edit_groups',
+    user: user
+  });
+  if (!allowed) {
+    return rejected('permission_denied');
+  }
+  if (!series) return rejected('series_identity_conflict');
+  var life = asString(series.lifecycleStatus).toLowerCase();
+  if (life === 'cancelled' || life === 'canceled' || life === 'archived') {
+    return rejected('series_locked');
+  }
+  var seriesLock = seriesFinishLock.assertSeriesWritable(series);
+  if (!seriesLock || seriesLock.ok !== true) return rejected('series_locked');
+  if (teamMatchFinish.isMatchCompleted(match)) return rejected('match_completed');
+  var round = findRound(series, stationIndex && stationIndex.roundId);
+  if (round) {
+    var visual = seriesRoundVisualState.resolveSeriesRoundVisualState(round, match);
+    if (visual && visual.state === seriesRoundVisualState.STATE.cancelled) {
+      return rejected('round_cancelled');
+    }
+    if (visual && visual.state !== seriesRoundVisualState.STATE.live) {
+      return rejected('station_not_live');
+    }
+  }
+  var beforeById = {};
+  (Array.isArray(match && match.groups) ? match.groups : []).forEach(function (g) {
+    var gid = asString(g && g.groupId);
+    if (gid) beforeById[gid] = g;
+  });
+  var afterList = Array.isArray(candidateMatch && candidateMatch.groups) ? candidateMatch.groups : [];
+  for (var i = 0; i < afterList.length; i++) {
+    var afterG = afterList[i];
+    var gid = asString(afterG && afterG.groupId);
+    var beforeG = beforeById[gid];
+    if (!beforeG) continue;
+    if (groupOccupancySig(beforeG) === groupOccupancySig(afterG)) continue;
+    if (matchStatus.isGroupConfirmedFinished(beforeG.status) || matchStatus.isGroupConfirmedFinished(afterG && afterG.status)) {
+      return rejected('group_finished');
+    }
+  }
+  if (typeof src.validateCandidate === 'function') {
+    var check = src.validateCandidate(liveCandidateValidatePayload(candidateMatch, series));
+    if (check && check.ok === false) {
+      return rejected(check.reason || check.code || 'invalid');
+    }
+  }
+  return { ok: true };
 }
 
 function findSeat(groups, groupId, position) {
@@ -95,7 +191,36 @@ function previewSeriesLiveSingleReplace(input) {
     candidateMatch: candidateMatch,
     editedGroupId: editedGroupId
   });
-  if (!classification || classification.ok !== true || classification.kind !== classifierMod.KIND.single_replacement) {
+  if (classifierMod.isPersistableIdentityCorrection(classification)) {
+    var rosterGate = batchMod.preflightNewlyBound(series, beforeMatch, candidateMatch);
+    if (!rosterGate.ok) {
+      return rejected(rosterGate.code);
+    }
+    if (typeof src.validateCandidate === 'function') {
+      var batchValid = src.validateCandidate(liveCandidateValidatePayload(candidateMatch, series));
+      if (batchValid && batchValid.ok === false) {
+        return rejected(batchValid.reason || batchValid.code || 'invalid');
+      }
+    }
+    if (classification.kind === classifierMod.KIND.rearrangement) {
+      return {
+        ok: true,
+        status: 'rearrangement_ready',
+        classification: classification,
+        replacementCount: 0,
+        recommendedRoute: classifierMod.ROUTE.rearrangement_persist
+      };
+    }
+    if (classification.kind !== classifierMod.KIND.single_replacement) {
+      return {
+        ok: true,
+        status: 'batch_ready',
+        classification: classification,
+        replacementCount: classification.replacementCount,
+        recommendedRoute: classifierMod.ROUTE.batch_persist
+      };
+    }
+  } else {
     return rejected(classification && classification.code);
   }
 
@@ -203,10 +328,43 @@ function seatsByPosition(group, position) {
 
 function sliceGroupField(src, groupId) {
   var gid = asString(groupId);
-  if (src == null) return null;
+  if (src == null) return [];
   if (Array.isArray(src)) return src;
-  if (typeof src === 'object' && hasOwn(src, gid)) return src[gid];
-  return null;
+  if (typeof src !== 'object') return null;
+  if (hasOwn(src, gid)) {
+    if (src[gid] == null) return null;
+    return src[gid];
+  }
+  return [];
+}
+
+function assertUniquePositionPairing(list, seat) {
+  var rows = Array.isArray(list) ? list : [];
+  if (!rows.length) return { ok: true };
+  var pairingId = asString(seat && seat.pairingId);
+  var slotId = asString(seat && seat.slotId);
+  if (!pairingId && !slotId) return { ok: true };
+  var hits = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (!row || typeof row !== 'object') continue;
+    var rid = asString(row.pairingId || row.id);
+    var sid = asString(row.slotId);
+    if ((pairingId && rid === pairingId) || (slotId && sid === slotId)) hits.push(row);
+  }
+  if (!hits.length) return failPrepare('pairing_snapshot_missing');
+  if (hits.length > 1) return failPrepare('pairing_snapshot_missing');
+  return { ok: true };
+}
+
+function ownerlessScoreTemplate(template) {
+  var src = template && typeof template === 'object' ? template : {};
+  var out = {};
+  Object.keys(src).forEach(function (k) {
+    if (k === 'scorePlayerId' || k === 'slotScorePlayerId' || k === 'scoreOwnerId') return;
+    out[k] = src[k];
+  });
+  return out;
 }
 
 function scoreSummary(player, template) {
@@ -268,8 +426,9 @@ function freezeBeforeStation(match, identity, scoreTemplate) {
   if (playerIdOf(seatRes.player) !== identity.outgoingUserId) {
     return failPrepare('stale_outgoing_person');
   }
-  var currentScore = scoreSummary(seatRes.player, scoreTemplate);
-  if (scoreTemplate && Object.keys(scoreTemplate).length && !sameFingerprint(currentScore, scoreTemplate)) {
+  var techTemplate = ownerlessScoreTemplate(scoreTemplate);
+  var currentScore = scoreSummary(seatRes.player, techTemplate);
+  if (techTemplate && Object.keys(techTemplate).length && !sameFingerprint(currentScore, techTemplate)) {
     return failPrepare('score_identity_changed');
   }
   return {
@@ -325,7 +484,12 @@ function freezeAfterStation(match, identity, stationOp) {
     return failPrepare('score_identity_changed');
   }
   var pairings = sliceGroupField(stationOp.pairings, identity.groupId);
+  if (pairings == null) {
+    pairings = sliceGroupField(match && match.pairings, identity.groupId);
+  }
   if (pairings == null) return failPrepare('pairing_snapshot_missing');
+  var pairGuard = assertUniquePositionPairing(pairings, seatRes.player);
+  if (!pairGuard.ok) return pairGuard;
   var entities = hasOwn(stationOp, 'scoreEntities')
     ? sliceGroupField(stationOp.scoreEntities, identity.groupId)
     : [];
@@ -548,6 +712,46 @@ function prepareSeriesLiveSingleReplaceExecution(input) {
     };
   }
 
+  if (preview.status === 'rearrangement_ready') {
+    var gate = assertRearrangementWritable(src, latestSeries, latestMatch, candidateMatch, stationIndex);
+    if (!gate || gate.ok !== true) {
+      return {
+        ok: false,
+        status: 'rejected',
+        code: gate && gate.code
+      };
+    }
+    return {
+      ok: true,
+      status: 'rearrangement_prepared',
+      classification: preview.classification,
+      candidateMatch: candidateMatch,
+      beforeMatch: latestMatch,
+      replacementCount: 0
+    };
+  }
+
+  if (preview.status === 'batch_ready') {
+    var batchGate = assertRearrangementWritable(src, latestSeries, latestMatch, candidateMatch, stationIndex);
+    if (!batchGate || batchGate.ok !== true) {
+      return {
+        ok: false,
+        status: 'rejected',
+        code: batchGate && batchGate.code
+      };
+    }
+    return {
+      ok: true,
+      status: 'batch_prepared',
+      classification: preview.classification,
+      candidateMatch: candidateMatch,
+      beforeMatch: latestMatch,
+      series: latestSeries,
+      stationIndex: stationIndex,
+      replacementCount: preview.replacementCount
+    };
+  }
+
   var accepted = asString(src.acceptedConfirmationFingerprint);
   if (preview.status === 'confirmation_required') {
     if (!accepted) {
@@ -706,6 +910,43 @@ function mapRollback(prepared, forward, rollbackRes) {
 
 function executeSeriesLiveSingleReplaceFlow(input) {
   var src = input && typeof input === 'object' ? input : {};
+  try {
+    if (typeof src.reloadContext === 'function') {
+      var recCtx = src.reloadContext() || {};
+      var recSeries = contextField(recCtx, ['series', 'latestSeries', 'currentSeries']);
+      var recMatch = contextField(recCtx, ['match', 'latestMatch', 'currentMatch', 'beforeMatch']);
+      var recIndex = contextField(recCtx, ['stationIndex']) || {};
+      batchMod.recoverIncompleteLiveBatchMutations({
+        matchId: asString(recMatch && recMatch.matchId) || asString(recIndex.matchId),
+        seriesId: asString(recSeries && recSeries.seriesId) || asString(recIndex.seriesId),
+        roundId: asString(recIndex.roundId),
+        persistMatch: src.persistMatch,
+        persistSeries: src.persistSeries,
+        getMatchById: src.getMatchById,
+        getSeriesById:
+          src.getSeriesById ||
+          function (id) {
+            if (recSeries && asString(recSeries.seriesId) === asString(id)) return recSeries;
+            return null;
+          },
+        journalApi: src.journalApi,
+        listUnfinishedJournals: src.listUnfinishedJournals
+      });
+      var journalApi = src.journalApi || journalMod;
+      var blockMatchId = asString(recMatch && recMatch.matchId) || asString(recIndex.matchId);
+      if (blockMatchId && typeof journalApi.listBlockingBatchJournals === 'function') {
+        var blocked = journalApi.listBlockingBatchJournals(blockMatchId);
+        var rows = (blocked && blocked.journals) || [];
+        for (var bi = 0; bi < rows.length; bi++) {
+          if (rows[bi].phase === journalMod.PHASE.recovery_conflict) continue;
+          return { ok: false, status: 'rejected', code: 'incomplete_batch_exists' };
+        }
+      }
+    }
+  } catch (eRec) {
+    if (eRec && eRec.processCrash) throw eRec;
+    /* 恢复失败不得阻断后续单人路径；rollback_failed 保留在 journal */
+  }
   var prepared;
   try {
     prepared = prepareSeriesLiveSingleReplaceExecution(src);
@@ -717,6 +958,68 @@ function executeSeriesLiveSingleReplaceFlow(input) {
   }
   if (PREPARE_PASS_THROUGH[prepared.status]) {
     return prepared;
+  }
+  if (prepared.status === 'rearrangement_prepared') {
+    if (typeof src.persistMatch !== 'function') {
+      return { ok: false, status: 'failed_before_write', code: 'persist_match_required' };
+    }
+    var persistRes;
+    try {
+      persistRes = src.persistMatch(prepared.candidateMatch, prepared.beforeMatch);
+    } catch (ePersist) {
+      try {
+        src.persistMatch(prepared.beforeMatch, prepared.beforeMatch);
+      } catch (eRestore) {
+        return {
+          ok: false,
+          status: 'manual_review',
+          requiresManualReview: true,
+          code: 'rearrangement_persist_throw'
+        };
+      }
+      return {
+        ok: false,
+        status: 'failed_rolled_back',
+        rollbackCompleted: true,
+        code: 'rearrangement_persist_throw'
+      };
+    }
+    if (persistRes && persistRes.ok === true) {
+      return {
+        ok: true,
+        status: 'completed',
+        replacementCount: 0,
+        recommendedRoute: classifierMod.ROUTE.rearrangement_persist
+      };
+    }
+    return {
+      ok: false,
+      status: persistRes && persistRes.reason === 'save_failed' ? 'failed_before_write' : 'failed_before_write',
+      code: (persistRes && persistRes.reason) || 'save_failed'
+    };
+  }
+  if (prepared.status === 'batch_prepared') {
+    var batchOut = batchMod.executeBatchReplace({
+      classification: prepared.classification,
+      beforeMatch: prepared.beforeMatch,
+      candidateMatch: prepared.candidateMatch,
+      series: prepared.series,
+      stationIndex: prepared.stationIndex,
+      persistMatch: src.persistMatch,
+      persistSeries: src.persistSeries,
+      writeBatchJournal: src.writeBatchJournal,
+      writePreparedBatchJournal: src.writePreparedBatchJournal,
+      journalApi: src.journalApi,
+      getSeriesById: src.getSeriesById,
+      listUnfinishedJournals: src.listUnfinishedJournals,
+      __crashAfter: src.__crashAfter,
+      getMatchById: src.getMatchById || (src.reloadContext && function () {
+        var ctx = src.reloadContext() || {};
+        return ctx.match || ctx.latestMatch;
+      }),
+      validateCandidate: src.validateCandidate
+    });
+    return batchOut;
   }
   if (prepared.status === 'already_committed') {
     return {

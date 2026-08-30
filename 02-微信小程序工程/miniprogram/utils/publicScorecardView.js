@@ -534,15 +534,15 @@ function _findGroup(match, groupId) {
 function _resolveScoresByPlayer(scoresByPlayer, userId, slotPlayer) {
   if (!scoresByPlayer || typeof scoresByPlayer !== 'object') return null;
   const slot = slotPlayer || {};
+  const id = _canon(userId);
   const scorePlayerId = _trim(
     slot.scorePlayerId || slot.slotScorePlayerId || slot.scoreOwnerId || ''
   );
-  if (scorePlayerId && scoresByPlayer[scorePlayerId]) return scoresByPlayer[scorePlayerId];
-  const id = _canon(userId);
   if (id && scoresByPlayer[id]) return scoresByPlayer[id];
+  if (scorePlayerId && scoresByPlayer[scorePlayerId]) return scoresByPlayer[scorePlayerId];
   const keys = Object.keys(scoresByPlayer);
   for (let i = 0; i < keys.length; i++) {
-    if (_sameUser(keys[i], userId) || (scorePlayerId && _sameUser(keys[i], scorePlayerId))) {
+    if ((id && _sameUser(keys[i], userId)) || (scorePlayerId && _sameUser(keys[i], scorePlayerId))) {
       return scoresByPlayer[keys[i]];
     }
   }

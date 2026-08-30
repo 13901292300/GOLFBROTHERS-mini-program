@@ -1,9 +1,7 @@
 /**
- * 普通单场 LIVE 换人继承成绩：权威口径回归 + Series 同构
- * - 新 userId 替换旧 userId
- * - 稳定 scorePlayerId 不变
- * - 展示当前 userId；成绩读取 scorePlayerId
- * - Series 只多 seriesId/roundId/matchId/publishToken
+ * LIVE 分组调整：纠正座位从开赛起绑错的球员 ID。
+ * - 洞成绩数值留在座位
+ * - userId / playerId / scorePlayerId 均为当前正确球员
  *
  * 运行：node scripts/liveReplaceScoreIdentity.selftest.js
  */
@@ -132,7 +130,7 @@ var addHistoryOk = addHistory.every(function (row) {
   return row && row.ok;
 });
 assert(
-  '普通槽位加人事例（含历史成绩位继承 scorePlayerId）',
+  '普通槽位加人事例（含历史成绩位纠正为当前球员）',
   addHistoryOk,
   JSON.stringify(addHistory.filter(function (r) { return !r.ok; }))
 );
@@ -165,10 +163,10 @@ var inheritEntry =
     return Number(p && p.position) === 4;
   });
 assert(
-  '普通加到历史位：userId=E 且 scorePlayerId=D',
+  '普通加到历史位：userId=E 且 scorePlayerId=E',
   !!(inheritSeat && inheritSeat.ok) &&
     String(inheritEntry && inheritEntry.userId) === 'E' &&
-    String(inheritEntry && inheritEntry.scorePlayerId) === 'D'
+    String(inheritEntry && inheritEntry.scorePlayerId) === 'E'
 );
 
 var ordinaryLive = tournamentGroupDraft.applyLiveGroupsFromDraft(
@@ -181,17 +179,27 @@ assert(
   String(ordinarySeat.userId) === NEW_ID && String(ordinarySeat.playerId) === NEW_ID
 );
 assert(
-  '普通 LIVE 换人：scorePlayerId 仍为旧成绩身份',
-  String(ordinarySeat.scorePlayerId) === OLD_ID
+  '普通 LIVE 纠正绑定：scorePlayerId 为当前正确球员',
+  String(ordinarySeat.scorePlayerId) === NEW_ID
 );
 
-var scoresByPlayer = {};
-scoresByPlayer[OLD_ID] = { scores: [4, 5, 3] };
+var scoresByPlayerBefore = {};
+scoresByPlayerBefore[OLD_ID] = { scores: [4, 5, 3] };
+var rebound = tournamentGroupDraft.rebindLiveScoreDataToSeatPlayers(
+  clone(ordinaryOldGroups),
+  ordinaryLive,
+  { 'g-live-1': { scoresByPlayer: scoresByPlayerBefore } }
+);
+var reboundByPlayer = rebound['g-live-1'].scoresByPlayer;
 var readId = tournamentGroupDraft.resolveScorePlayerId(ordinarySeat) || ordinarySeat.userId;
 assert(
-  '成绩读取稳定成绩身份',
-  readId === OLD_ID && !!(scoresByPlayer[readId] && scoresByPlayer[readId].scores)
+  '成绩数值留在座位且归属当前球员',
+  readId === NEW_ID &&
+    !!(reboundByPlayer[NEW_ID] && reboundByPlayer[NEW_ID].scores) &&
+    !reboundByPlayer[OLD_ID]
 );
+
+var scoresByPlayer = reboundByPlayer;
 
 var seriesOldGroups = clone(ordinaryOldGroups);
 var seriesLive = tournamentGroupDraft.applyLiveGroupsFromDraft(seriesOldGroups, clone(liveDraft));
@@ -249,15 +257,15 @@ assert(
 
 var slots = teamMatchStore.resolveGroupSlots(ordinaryLive[0]);
 assert(
-  'slots 当前身份为新 userId，成绩身份仍为旧 ID',
-  String(slots[0].userId) === NEW_ID && String(slots[0].scorePlayerId) === OLD_ID
+  'slots 当前身份与成绩归属均为新球员',
+  String(slots[0].userId) === NEW_ID && String(slots[0].scorePlayerId) === NEW_ID
 );
 
 var formal = tournamentGroupDraft.toFormalGroups(clone(ordinaryLive));
 assert(
-  'toFormalGroups 不再丢掉 LIVE scorePlayerId',
+  'toFormalGroups 成绩归属为当前球员',
   String(formal[0].players[0].userId) === NEW_ID &&
-    String(formal[0].players[0].scorePlayerId) === OLD_ID
+    String(formal[0].players[0].scorePlayerId) === NEW_ID
 );
 
 console.log('');

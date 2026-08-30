@@ -1,7 +1,7 @@
 /**
  * Series LIVE 换人：跨轮归属证据 / 有效归属 / replaceOnly·replaceAndReaffiliate（纯函数）
  * - 不读写 storage
- * - 当前身份 ≠ 成绩身份
+ * - 当前身份 = 成绩所属球员（纠正座位绑定，不保留错误 ID）
  * - 构建 B 时不得整座复制 A 的归属快照
  */
 
@@ -75,14 +75,26 @@ function samePlayerId(a, b) {
 function copyScoreIdentity(from, into) {
   var out = into && typeof into === 'object' ? into : {};
   var src = from && typeof from === 'object' ? from : {};
-  for (var i = 0; i < SCORE_IDENTITY_KEYS.length; i++) {
-    var k = SCORE_IDENTITY_KEYS[i];
+  var uid = playerIdOf(out);
+  var oldId = playerIdOf(src);
+  var tech = ['entityId', 'slotId', 'pairingId'];
+  for (var i = 0; i < tech.length; i++) {
+    var k = tech[i];
     if (src[k] != null && src[k] !== '') out[k] = src[k];
   }
-  if (!out.scorePlayerId) {
-    var oldId = playerIdOf(src);
-    if (oldId) out.scorePlayerId = oldId;
+  if (src.hasHistoryScore != null) out.hasHistoryScore = !!src.hasHistoryScore;
+  if (Object.prototype.hasOwnProperty.call(src, 'holes')) {
+    out.holes = Array.isArray(src.holes) ? src.holes.slice() : src.holes;
   }
+  if (!uid) {
+    out.scorePlayerId = '';
+    return out;
+  }
+  out.scorePlayerId = uid;
+  var slotScore = asString(src.slotScorePlayerId);
+  var owner = asString(src.scoreOwnerId);
+  out.slotScorePlayerId = slotScore && oldId && slotScore === oldId ? uid : slotScore || uid;
+  out.scoreOwnerId = owner && oldId && owner === oldId ? uid : owner || uid;
   return out;
 }
 
@@ -744,7 +756,7 @@ function decideLiveReplace(input) {
       writesRoster: false,
       seat: seatOnly,
       currentIdentity: identityOnly,
-      scoreIdentity: copyScoreIdentity(replacement.oldEntry, {}),
+      scoreIdentity: copyScoreIdentity(replacement.oldEntry, Object.assign({}, identityOnly)),
       replacement: replacement,
       constraint: effective.constraint
     };
@@ -807,7 +819,7 @@ function decideLiveReplace(input) {
     confirm: buildConfirmCopy(playerName, teamName),
     seat: seatRe,
     currentIdentity: identityRe,
-    scoreIdentity: copyScoreIdentity(replacement.oldEntry, {}),
+    scoreIdentity: copyScoreIdentity(replacement.oldEntry, Object.assign({}, identityRe)),
     replacement: replacement,
     targetAffiliation: aAff,
     constraint: effective.constraint,
@@ -942,6 +954,67 @@ function scoresUnchanged(beforeScoreData, afterScoreData) {
   }
 }
 
+function scoreRecordPayload(rec) {
+  if (!rec || typeof rec !== 'object') return '';
+  try {
+    return JSON.stringify({
+      scores: rec.scores,
+      putts: rec.putts,
+      fairways: rec.fairways,
+      penalties: rec.penalties,
+      sands: rec.sands
+    });
+  } catch (e) {
+    return '';
+  }
+}
+
+function seatScoreValuesUnchanged(beforeMatch, afterMatch) {
+  var beforeGroups = Array.isArray(beforeMatch && beforeMatch.groups) ? beforeMatch.groups : [];
+  var afterGroups = Array.isArray(afterMatch && afterMatch.groups) ? afterMatch.groups : [];
+  var beforeData =
+    beforeMatch && beforeMatch.scoreData && typeof beforeMatch.scoreData === 'object'
+      ? beforeMatch.scoreData
+      : {};
+  var afterData =
+    afterMatch && afterMatch.scoreData && typeof afterMatch.scoreData === 'object'
+      ? afterMatch.scoreData
+      : {};
+  for (var i = 0; i < beforeGroups.length; i++) {
+    var bg = beforeGroups[i];
+    var gid = asString(bg && bg.groupId);
+    var ag = null;
+    for (var j = 0; j < afterGroups.length; j++) {
+      if (asString(afterGroups[j] && afterGroups[j].groupId) === gid) {
+        ag = afterGroups[j];
+        break;
+      }
+    }
+    var bPlayers = Array.isArray(bg && bg.players) ? bg.players : [];
+    var aPlayers = Array.isArray(ag && ag.players) ? ag.players : [];
+    var bBy = (beforeData[gid] && beforeData[gid].scoresByPlayer) || {};
+    var aBy = (afterData[gid] && afterData[gid].scoresByPlayer) || {};
+    for (var p = 0; p < bPlayers.length; p++) {
+      var bp = bPlayers[p];
+      var pos = Number(bp && (bp.position != null ? bp.position : bp.slotIndex)) || 0;
+      var ap = null;
+      for (var q = 0; q < aPlayers.length; q++) {
+        var pp = Number(aPlayers[q] && (aPlayers[q].position != null ? aPlayers[q].position : aPlayers[q].slotIndex)) || 0;
+        if (pp === pos) {
+          ap = aPlayers[q];
+          break;
+        }
+      }
+      var oldKey = asString((bp && (bp.scorePlayerId || bp.userId || bp.playerId)) || '');
+      var newKey = asString((ap && (ap.userId || ap.playerId || ap.scorePlayerId)) || '');
+      if (!oldKey || !bBy[oldKey]) continue;
+      if (!newKey) continue;
+      if (scoreRecordPayload(bBy[oldKey]) !== scoreRecordPayload(aBy[newKey])) return false;
+    }
+  }
+  return true;
+}
+
 function rollbackSeries(stores, previousSeries) {
   if (!previousSeries || !stores || typeof stores.upsertSeriesChecked !== 'function') return;
   try {
@@ -1027,6 +1100,12 @@ function commitLiveReplace(input) {
       replacement.position,
       plan.seat
     );
+    var tournamentGroupDraft = require('./tournament/tournamentGroupDraft.js');
+    nextMatch.scoreData = tournamentGroupDraft.rebindLiveScoreDataToSeatPlayers(
+      match && match.groups,
+      nextMatch.groups,
+      nextMatch.scoreData
+    );
     nextMatch.registerInfo = overlayRegisterUser(
       nextMatch.registerInfo,
       plan.currentIdentity
@@ -1059,7 +1138,7 @@ function commitLiveReplace(input) {
       replacement.groupId,
       replacement.position,
       replacement.toUserId,
-      plan.scoreIdentity && plan.scoreIdentity.scorePlayerId
+      replacement.toUserId
     );
     if (!ident.ok) {
       rollbackMatch(stores, prevMatch);
@@ -1072,7 +1151,7 @@ function commitLiveReplace(input) {
       if (wroteRoster) rollbackSeries(stores, prevSeries);
       return { ok: false, reason: 'save_failed', writes: false };
     }
-    if (!scoresUnchanged(prevMatch.scoreData, readMatch.scoreData)) {
+    if (!seatScoreValuesUnchanged(prevMatch, readMatch)) {
       rollbackMatch(stores, prevMatch);
       if (wroteRoster) rollbackSeries(stores, prevSeries);
       return { ok: false, reason: 'save_failed', detail: 'score_mutated', writes: false };

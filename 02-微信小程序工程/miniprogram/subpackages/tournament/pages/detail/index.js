@@ -5405,11 +5405,11 @@ Page({
   },
 
   _resolveSlotScorePlayerId(slotPlayer, currentPlayerId) {
+    const current = currentPlayerId != null ? String(currentPlayerId).trim() : '';
+    if (current) return current;
     const p = slotPlayer || {};
     const scorePlayerId = p.scorePlayerId || p.slotScorePlayerId || p.scoreOwnerId;
-    const resolved = scorePlayerId != null ? String(scorePlayerId).trim() : '';
-    if (resolved) return resolved;
-    return currentPlayerId != null ? String(currentPlayerId).trim() : '';
+    return scorePlayerId != null ? String(scorePlayerId).trim() : '';
   },
 
   _resolveScoresByPlayerRecord(scoresByPlayer, slotPlayer, currentPlayerId) {

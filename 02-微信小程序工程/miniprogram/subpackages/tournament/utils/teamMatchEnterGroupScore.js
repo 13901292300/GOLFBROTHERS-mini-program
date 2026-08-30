@@ -60,6 +60,22 @@ function mapGroupPlayers(group) {
 
 function enterTeamMatchGroupScore(match, groupId, options) {
   var opts = options && typeof options === 'object' ? options : {};
+  var recoveryMod = require('./seriesLiveMutationRecovery.js');
+  var ctx = (match && match.seriesContext) || {};
+  var rec = null;
+  if (ctx.managed === true && asString(match && match.matchId)) {
+    rec = recoveryMod.recoverSeriesLiveBatchBeforeRead({
+      seriesId: asString(ctx.seriesId),
+      matchId: asString(match.matchId),
+      roundId: asString(ctx.roundId),
+      persistMatch: opts.persistMatch,
+      persistSeries: opts.persistSeries,
+      getMatchById: opts.getMatchById,
+      getSeriesById: opts.getSeriesById,
+      journalApi: opts.journalApi
+    });
+    if (rec && rec.match) match = rec.match;
+  }
   var gid = asString(groupId);
   if (!match || !asString(match.matchId) || !gid) {
     return { ok: false, reason: 'missing' };
@@ -130,7 +146,16 @@ function enterTeamMatchGroupScore(match, groupId, options) {
     groupCount: groupCount
   });
   enterScorePage();
-  return { ok: true, matchId: asString(match.matchId), groupId: gid, mode: mode };
+  return {
+    ok: true,
+    matchId: asString(match.matchId),
+    groupId: gid,
+    mode: mode,
+    match: match,
+    recoveryConflict: false,
+    conflictResolved: !!(rec && rec.conflictResolved),
+    scoreEntryAllowed: true
+  };
 }
 
 function enterViewerGroupScore(match, viewerUserId, options) {

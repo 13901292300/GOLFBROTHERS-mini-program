@@ -3856,7 +3856,7 @@ Page({
       const scorePlayerId = entry && (entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId)
         ? String(entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId).trim()
         : '';
-      const record = (scorePlayerId && scoresByPlayer[scorePlayerId]) || (playerKey && scoresByPlayer[playerKey]) || {};
+      const record = (playerKey && scoresByPlayer[playerKey]) || (scorePlayerId && scoresByPlayer[scorePlayerId]) || {};
       const rawTp =
         entry && isEditTeeKey(entry.tPosition)
           ? entry.tPosition
@@ -6312,7 +6312,7 @@ Page({
         const player = slot.player || {};
         const playerId = (player && player.playerId) || slot.playerId || '';
         const scorePlayerId = slot.scorePlayerId || '';
-        const record = (scorePlayerId && scoresByPlayer[scorePlayerId]) || scoresByPlayer[playerId] || {};
+        const record = (playerId && scoresByPlayer[playerId]) || (scorePlayerId && scoresByPlayer[scorePlayerId]) || {};
         const position = Number(slot.slotId) || index + 1;
         const entry = this._findScoreTeamMatchPlayerEntry(group, position) || {};
         const profile = this._buildScoreTeamMatchPlayerProfile(
@@ -11747,7 +11747,7 @@ Page({
       status: 'occupied',
       source: player.source,
       hasCache: false,
-      scorePlayerId: slots[idx].scorePlayerId || player.playerId || ''
+      scorePlayerId: player.playerId || ''
     };
     if (this._draftSlotCache) this._draftSlotCache[idx] = null;
     this._draftSlots = slots;
@@ -15330,7 +15330,7 @@ Page({
     this.persistSession();
   },
 
-  // 增删后从 store 重新拉取记分数据源（成绩跟随 playerId，不随槽位/顺序错位）
+  // 增删后从 store 重新拉取记分数据源（成绩归属为当前座位球员）
   _reloadFromStore() {
     const loaded = groupsStore.loadGroupForScoring(this.data.groupId);
     this._playersSource = loaded.map((p, i) => {
@@ -15391,7 +15391,7 @@ Page({
         const playerId = this._slotOccupiedPlayerId(slot);
         const existing = existingById[playerId] || {};
         const scorePlayerId = slot.scorePlayerId || playerId;
-        const record = scoresByPlayer[scorePlayerId] || scoresByPlayer[playerId] || {};
+        const record = scoresByPlayer[playerId] || scoresByPlayer[scorePlayerId] || {};
         const position = Number(slot.slotId) || index + 1;
         const entry = this._findScoreTeamMatchPlayerEntry(group, position) || {};
         const profile = match

@@ -151,8 +151,8 @@ assert(
   '1 普通 LIVE 走旧 Match-only',
   body.indexOf('_persistLiveMatchWithReadback') >= 0 &&
     body.indexOf('_fromSeries === true') >= 0 &&
-    body.indexOf('_runSeriesLiveSingleReplaceFlow') >= 0 &&
-    /if \(this\._fromSeries === true && this\.data\.mode === 'live'\)[\s\S]*_runSeriesLiveSingleReplaceFlow/.test(body)
+    body.indexOf('_runSeriesLiveIdentityCorrection') >= 0 &&
+    /if \(this\._fromSeries === true && this\.data\.mode === 'live'\)[\s\S]*_runSeriesLiveIdentityCorrection/.test(body)
 );
 
 assert(
@@ -180,7 +180,7 @@ ordinary._persistLiveMatchWithReadback = function (next) {
   persistCalls += 1;
   return { ok: true, match: next };
 };
-ordinary._executeSeriesLiveSingleReplaceFlow = function (input) {
+ordinary._executeSeriesLiveIdentityCorrection = function (input) {
   flowCalls.push(input);
   return { ok: true, status: 'completed' };
 };
@@ -205,7 +205,7 @@ assert(
 );
 
 var seriesEdit = makeEditor({ _fromSeries: true, mode: 'edit' });
-seriesEdit._executeSeriesLiveSingleReplaceFlow = function (input) {
+seriesEdit._executeSeriesLiveIdentityCorrection = function (input) {
   flowCalls.push(input);
   return { status: 'completed' };
 };
@@ -222,7 +222,7 @@ modalCalls = [];
 toastCalls = [];
 navCalls = 0;
 var seriesLive = makeEditor({ _fromSeries: true, mode: 'live' });
-seriesLive._executeSeriesLiveSingleReplaceFlow = function (input) {
+seriesLive._executeSeriesLiveIdentityCorrection = function (input) {
   flowCalls.push(input);
   return { ok: true, status: 'completed' };
 };
@@ -242,8 +242,8 @@ seriesLive._confirmLiveGroups(
   [{ groupId: 'g1', players: [seat('B', 1)] }],
   {}
 );
-assert('4 Series LIVE direct 走 Flow', flowCalls.length === 1 && persistCalls === 0);
-assert('4b 首次 acceptedConfirmationFingerprint 为空串', flowCalls[0].acceptedConfirmationFingerprint === '');
+assert('4 Series LIVE direct 走 identityCorrection', flowCalls.length === 1 && persistCalls === 0);
+assert('4b 不传换人 confirmation fingerprint', flowCalls[0].acceptedConfirmationFingerprint == null);
 assert('5 direct 不弹确认', modalCalls.length === 0);
 assert('14 completed 才返回', toastCalls.some(function (t) { return t.title === '分组已更新'; }) && navCalls === 1);
 
@@ -259,21 +259,12 @@ seriesConfirm._reloadSeriesLiveReplaceContext = function () {
   return {
     editedGroupId: 'g1',
     incomingPlayer: { userId: 'B', displayName: '球员B' },
-    currentUser: { userId: 'admin' }
+    currentUser: { userId: 'admin' },
+    match: { matchId: 'm1', updatedAt: 1 }
   };
 };
-seriesConfirm._executeSeriesLiveSingleReplaceFlow = function (input) {
-  flowCalls.push({ fp: input.acceptedConfirmationFingerprint, input: input });
-  if (!input.acceptedConfirmationFingerprint) {
-    return {
-      status: 'confirmation_required',
-      confirmationFingerprint: 'fp-1',
-      confirmationDisplay: {
-        incomingUserId: 'B',
-        participant: { name: '红队', shortName: '红队' }
-      }
-    };
-  }
+seriesConfirm._executeSeriesLiveIdentityCorrection = function (input) {
+  flowCalls.push(input);
   return { ok: true, status: 'completed' };
 };
 seriesConfirm._confirmLiveGroups(
@@ -281,99 +272,36 @@ seriesConfirm._confirmLiveGroups(
   [{ groupId: 'g1', players: [seat('B', 1)] }],
   {}
 );
-assert('6 confirm 显示一次 modal', modalCalls.length === 1 && navCalls === 0);
-assert(
-  '6b modal 文案使用 display',
-  modalCalls[0].title === '调整参赛归属' &&
-    String(modalCalls[0].content).indexOf('球员B') >= 0 &&
-    String(modalCalls[0].content).indexOf('红队') >= 0 &&
-    modalCalls[0].confirmText === '确认调整并替换'
-);
-
-var draftKeep = [{ groupId: 'g1', players: [seat('B', 1)] }];
-seriesConfirm.data.groupDraft = draftKeep;
-seriesConfirm.data.saving = true;
-modalCalls[0].success({ confirm: false });
-assert(
-  '7 取消零写入且保留 draft',
-  seriesConfirm.data.saving === false &&
-    seriesConfirm.data.groupDraft === draftKeep &&
-    navCalls === 0 &&
-    flowCalls.length === 1
-);
-
-seriesConfirm.data.saving = true;
-modalCalls[0].success({ confirm: true });
-assert(
-  '8 确认传 fingerprint，不传 boolean',
-  flowCalls.length === 2 &&
-    flowCalls[1].fp === 'fp-1' &&
-    flowCalls[1].fp !== true &&
-    typeof flowCalls[1].fp === 'string'
-);
-
-flowCalls = [];
-modalCalls = [];
-toastCalls = [];
-navCalls = 0;
-var seriesStale = makeEditor({ _fromSeries: true, mode: 'live' });
-seriesStale._sanitizeGroupDraft = function (d) { return d; };
-seriesStale._buildLiveCandidateBase = function (m) { return m; };
-seriesStale._finalizeLiveCandidate = function (c) { return { ok: true, candidate: c }; };
-seriesStale._reloadSeriesLiveReplaceContext = function () {
-  return { editedGroupId: 'g1', incomingPlayer: { userId: 'B', displayName: '球员B' }, currentUser: {} };
-};
-var staleN = 0;
-seriesStale._executeSeriesLiveSingleReplaceFlow = function (input) {
-  flowCalls.push(input.acceptedConfirmationFingerprint);
-  staleN += 1;
-  if (staleN === 1) {
-    return {
-      status: 'confirmation_required',
-      confirmationFingerprint: 'fp-old',
-      confirmationDisplay: { incomingUserId: 'B', participant: { shortName: '红队' } }
-    };
-  }
-  return { status: 'stale_confirmation', code: 'confirmation_fingerprint_conflict' };
-};
-seriesStale._persistLiveMatchWithReadback = function () {
-  persistCalls += 1;
-  return { ok: true };
-};
-persistCalls = 0;
-seriesStale._confirmLiveGroups(
-  { matchId: 'm1', groups: [{ groupId: 'g1', players: [seat('A', 1)] }] },
-  [{ groupId: 'g1', players: [seat('B', 1)] }],
-  {}
-);
-modalCalls[0].success({ confirm: true });
-assert('9 stale confirmation 不写 persist', persistCalls === 0 && navCalls === 0);
-assert(
-  '9b stale 提示状态变化或再展示确认',
-  toastCalls.some(function (t) { return t.title === '分组状态已变化，请重新操作'; }) ||
-    modalCalls.length === 2
-);
+assert('6 identityCorrection 不弹换人归属确认', modalCalls.length === 0 && flowCalls.length === 1 && navCalls === 1);
+assert('6b 保存入参含 draft 不含 incoming/outgoing 门槛', !!(flowCalls[0] && flowCalls[0].currentDraft) && flowCalls[0].acceptedConfirmationFingerprint == null);
+assert('7 成功路径不因取消确认拦截', seriesConfirm.data.saving === false);
+assert('8 不二次确认 fingerprint', flowCalls.length === 1);
 
 var mapper = makeEditor({ _fromSeries: true, mode: 'live' });
 assert(
-  '10 多换人拒绝',
-  mapper._mapSeriesLiveRejectMessage('multiple_replacements') ===
-    '系列赛 LIVE 每次只能更换一名球员，请分次操作'
+  '9 revision_conflict 仍提示状态变化',
+  mapper._mapSeriesLiveRejectMessage('revision_conflict').indexOf('已变化') >= 0 ||
+    String(mapper._mapSeriesLiveRejectMessage('revision_conflict')).length > 0
 );
 assert(
-  '11 swap/move 拒绝',
-  mapper._mapSeriesLiveRejectMessage('seat_swap').indexOf('每次只能更换一名') >= 0 &&
-    mapper._mapSeriesLiveRejectMessage('player_move').indexOf('每次只能更换一名') >= 0
+  '10 产品不再出现一次一人文案',
+  mapper._mapSeriesLiveRejectMessage('multiple_replacements').indexOf('每次只能更换一名') < 0 &&
+    mapper._mapSeriesLiveRejectMessage('player_addition').indexOf('每次只能更换一名') < 0
 );
 assert(
-  '12 add/remove 拒绝',
-  mapper._mapSeriesLiveRejectMessage('player_addition').indexOf('每次只能更换一名') >= 0 &&
-    mapper._mapSeriesLiveRejectMessage('player_removal').indexOf('每次只能更换一名') >= 0
+  '11 swap/move 不再误报一次一人',
+  mapper._mapSeriesLiveRejectMessage('seat_swap').indexOf('每次只能更换一名') < 0 &&
+    mapper._mapSeriesLiveRejectMessage('player_move').indexOf('每次只能更换一名') < 0
 );
 assert(
-  '13 pairing-only/metadata 拒绝',
-  mapper._mapSeriesLiveRejectMessage('pairing_only_change') ===
-    '系列赛 LIVE 当前仅支持单个座位换人' &&
+  '12 add/remove 人数提示',
+  mapper._mapSeriesLiveRejectMessage('player_addition') === '分组人数超限' &&
+    mapper._mapSeriesLiveRejectMessage('player_removal') === '分组人数超限'
+);
+assert(
+  '13 重复/名单/归属',
+  mapper._mapSeriesLiveRejectMessage('incoming_already_in_round') === '球员重复' &&
+    mapper._mapSeriesLiveRejectMessage('player_not_on_roster') === '球员不在系列赛名单' &&
     mapper._mapSeriesLiveRejectMessage('no_live_group_change') === '未检测到可保存的换人'
 );
 
@@ -389,7 +317,7 @@ function runStatus(status, extra) {
   ed._reloadSeriesLiveReplaceContext = function () {
     return { editedGroupId: 'g1', incomingPlayer: { userId: 'B' }, currentUser: {} };
   };
-  ed._executeSeriesLiveSingleReplaceFlow = function () {
+  ed._executeSeriesLiveIdentityCorrection = function () {
     return Object.assign({ status: status }, extra || {});
   };
   ed._confirmLiveGroups(
@@ -505,7 +433,7 @@ g8ed._finalizeLiveCandidate = function (c) { return { ok: true, candidate: c }; 
 g8ed._reloadSeriesLiveReplaceContext = function () {
   return { editedGroupId: 'g1', incomingPlayer: { userId: 'X' }, currentUser: {} };
 };
-g8ed._executeSeriesLiveSingleReplaceFlow = function () {
+g8ed._executeSeriesLiveIdentityCorrection = function () {
   return { ok: true, status: 'completed' };
 };
 g8ed._confirmLiveGroups(
@@ -561,15 +489,15 @@ clickEd.onConfirm();
 assert('28 快速重复点击被 saving 拦截', confirmHits === 0);
 
 assert(
-  '页面 require Flow/journal/executor 而非遗留 seriesLiveReplace.js',
-  editorSrc.indexOf("require('../../utils/seriesLiveSingleReplaceFlow.js')") >= 0 &&
-    editorSrc.indexOf('seriesLiveMutationJournal') >= 0 &&
+  '页面 require identityCorrection 而非遗留 seriesLiveReplace.js',
+  editorSrc.indexOf("require('../../utils/seriesLiveIdentityCorrection.js')") >= 0 &&
+    editorSrc.indexOf("require('../../utils/seriesLiveSingleReplaceFlow.js')") < 0 &&
     editorSrc.indexOf("require('../../../../utils/seriesLiveReplace.js')") < 0
 );
 
 assert(
-  '首次调用 fingerprint 为空串',
-  editorSrc.indexOf("_runSeriesLiveSingleReplaceFlow(sanitized, pairingDraft, '')") >= 0
+  '正式 LIVE 保存走 identityCorrection',
+  editorSrc.indexOf('_runSeriesLiveIdentityCorrection(sanitized, pairingDraft)') >= 0
 );
 
 console.log('\n--- seriesLiveSingleReplaceGroupEditor.selftest ---');

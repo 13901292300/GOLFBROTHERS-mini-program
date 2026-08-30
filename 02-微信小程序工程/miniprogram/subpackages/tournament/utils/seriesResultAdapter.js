@@ -149,11 +149,11 @@ function buildPlayerLookup(match) {
 
 function resolveScoresByPlayerRecord(scoresByPlayer, player, playerId) {
   if (!scoresByPlayer || typeof scoresByPlayer !== 'object') return null;
+  var id = asString(playerId).trim();
+  if (id && scoresByPlayer[id]) return scoresByPlayer[id];
   var scorePlayerId =
     player && player.scorePlayerId != null ? asString(player.scorePlayerId).trim() : '';
   if (scorePlayerId && scoresByPlayer[scorePlayerId]) return scoresByPlayer[scorePlayerId];
-  var id = asString(playerId).trim();
-  if (id && scoresByPlayer[id]) return scoresByPlayer[id];
   return null;
 }
 

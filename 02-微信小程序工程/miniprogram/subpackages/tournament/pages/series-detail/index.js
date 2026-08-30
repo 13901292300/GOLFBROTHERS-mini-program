@@ -62,6 +62,7 @@ var liveLeaderboardScorecard = require('../../../../utils/liveLeaderboardScoreca
 var seriesBottomDockVisibility = require('./seriesBottomDockVisibility.js');
 var seriesLayerStack = require('./seriesLayerStack.js');
 var teamMatchEnterGroupScore = require('../../utils/teamMatchEnterGroupScore.js');
+var seriesLiveMutationRecovery = require('../../utils/seriesLiveMutationRecovery.js');
 var manageRoundOverflowArrows = require('../../components/series-round-selector-dock/overflowArrows.js');
 var teamDirectory = require('../../../../utils/teamDirectory.js');
 var mockAvatars = require('../../../../utils/mockAvatars.js');
@@ -2647,6 +2648,12 @@ Page({
     this.setData({ discussionChat: this._discussionChat.slice() });
   },
 
+  _recoverIncompleteLiveBatchesBeforeRead: function () {
+    return seriesLiveMutationRecovery.recoverSeriesLiveBatchBeforeRead({
+      seriesId: this._seriesId
+    });
+  },
+
   reloadViewModel: function (options) {
     var opts = options || {};
     this._registerRenderEpoch = registerViewModel.bumpRegisterRenderEpoch(
@@ -2664,6 +2671,8 @@ Page({
       this._safeSetData({ loadError: '缺少系列赛参数' });
       return;
     }
+    var beforeRead = this._recoverIncompleteLiveBatchesBeforeRead();
+    this._lastBatchRecovery = beforeRead;
     var series = seriesStore.getSeriesById(this._seriesId);
     if (!series) {
       this._safeSetData({ loadError: '无法加载系列赛' });

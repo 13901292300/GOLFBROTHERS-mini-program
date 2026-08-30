@@ -405,8 +405,8 @@ function applyUsedMap(users, usedIds) {
     ) && scoreSrc.indexOf('_openJoinMatchTeamSheet') >= 0
   );
   assert(
-    'draft 绑定仍用空座 scorePlayerId || player.playerId',
-    /scorePlayerId:\s*slots\[idx\]\.scorePlayerId\s*\|\|\s*player\.playerId/.test(scoreSrc)
+    'draft 绑定用当前球员 playerId 作为 scorePlayerId',
+    /scorePlayerId:\s*player\.playerId/.test(scoreSrc)
   );
 })();
 
@@ -414,7 +414,7 @@ function existingDraftBind(slot, playerId) {
   return {
     playerId: playerId,
     status: 'occupied',
-    scorePlayerId: (slot && slot.scorePlayerId) || playerId || ''
+    scorePlayerId: playerId || ''
   };
 }
 
@@ -459,7 +459,7 @@ function existingDraftBind(slot, playerId) {
   var vacuum = existingDraftBind({ scorePlayerId: '' }, 'p-new');
   assert('10 真空位 scorePlayerId=B', vacuum.scorePlayerId === 'p-new');
   var history = existingDraftBind({ scorePlayerId: 'p-A' }, 'p-new');
-  assert('11 历史空座保留 A', history.scorePlayerId === 'p-A');
+  assert('11 历史空座归属当前球员', history.scorePlayerId === 'p-new');
 })();
 
 (function testSeriesRosterClickRejects() {

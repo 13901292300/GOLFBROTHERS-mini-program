@@ -70,10 +70,13 @@ assert(
   )
 );
 assert(
-  '4 edit_groups still schedule round',
-  /permission === 'edit_groups'[\s\S]{0,120}_goSeriesManageScheduleRound/.test(
+  '4 edit_groups opens group-editor for current manage round',
+  /permission === 'edit_groups'[\s\S]{0,280}_openSeriesGroupEditorForRound/.test(
     pageJs
-  )
+  ) &&
+    !/permission === 'edit_groups'[\s\S]{0,120}_goSeriesManageScheduleRound/.test(
+      pageJs
+    )
 );
 assert(
   '5 no tee deep-link / schedule-only pseudo',

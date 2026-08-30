@@ -204,12 +204,17 @@ function isBlockedDecisionAction(action) {
 }
 
 function pairingStableList(pairings, groupId) {
-  var list = pairings && pairings[asString(groupId)];
+  var gid = asString(groupId);
+  var list;
+  if (Array.isArray(pairings)) list = pairings;
+  else if (pairings && typeof pairings === 'object' && hasOwn(pairings, gid)) list = pairings[gid];
+  else list = [];
   if (!Array.isArray(list)) return [];
   return list.map(function (p) {
     var row = {};
     if (p && hasOwn(p, 'id')) row.id = p.id;
     if (p && hasOwn(p, 'pairingId')) row.pairingId = p.pairingId;
+    if (p && hasOwn(p, 'slotId')) row.slotId = p.slotId;
     if (p && hasOwn(p, 'entityId')) row.entityId = p.entityId;
     if (p && Array.isArray(p.playerIds)) row.playerIds = p.playerIds.slice();
     return row;
@@ -522,9 +527,12 @@ function buildSeriesLiveReplacePlan(input) {
     });
   }
 
-  var scoreIdentity = pickPresentScoreIdentity(located.player);
   var replacementSeatLocated = findSeat(decision.candidateGroups, groupId, position);
   var replacementSeat = replacementSeatLocated.player;
+  var scoreIdentity = pickPresentScoreIdentity(replacementSeat || located.player);
+  if (incomingUserId) {
+    scoreIdentity = Object.assign({}, scoreIdentity || {}, { scorePlayerId: incomingUserId });
+  }
   var groupsSnapshot = deepClone(decision.candidateGroups);
   var pairingsSnapshot = deepClone(
     decision.candidatePairings != null ? decision.candidatePairings : pairingDraft || {}
@@ -589,7 +597,7 @@ function buildSeriesLiveReplacePlan(input) {
     replacementSeat: replacementSeat
       ? {
           currentIdentity: currentIdentityOf(replacementSeat),
-          scoreIdentity: pickPresentScoreIdentity(replacementSeat),
+          scoreIdentity: scoreIdentity,
           affiliationProjection: pickSeatAffiliationProjection(replacementSeat)
         }
       : null,

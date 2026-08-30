@@ -23,12 +23,37 @@ var PHASE = {
   rollback_pending: 'rollback_pending',
   rolling_back: 'rolling_back',
   rolled_back: 'rolled_back',
-  manual_review: 'manual_review'
+  manual_review: 'manual_review',
+  match_written: 'match_written',
+  series_written: 'series_written',
+  rollback_failed: 'rollback_failed',
+  recovery_conflict: 'recovery_conflict',
+  recovered: 'recovered',
+  conflict_resolved: 'conflict_resolved',
+  corrupted_discarded: 'corrupted_discarded'
 };
+
+var JOURNAL_MAX_BYTES = 900 * 1024;
 
 var TERMINAL = {};
 TERMINAL[PHASE.committed] = true;
 TERMINAL[PHASE.rolled_back] = true;
+TERMINAL[PHASE.recovered] = true;
+TERMINAL[PHASE.conflict_resolved] = true;
+TERMINAL[PHASE.corrupted_discarded] = true;
+
+var BATCH_PRUNABLE_PHASE = {};
+BATCH_PRUNABLE_PHASE[PHASE.committed] = true;
+BATCH_PRUNABLE_PHASE[PHASE.rolled_back] = true;
+BATCH_PRUNABLE_PHASE[PHASE.recovered] = true;
+BATCH_PRUNABLE_PHASE[PHASE.conflict_resolved] = true;
+
+var BATCH_BLOCKING_PHASE = {};
+BATCH_BLOCKING_PHASE[PHASE.prepared] = true;
+BATCH_BLOCKING_PHASE[PHASE.match_written] = true;
+BATCH_BLOCKING_PHASE[PHASE.series_written] = true;
+BATCH_BLOCKING_PHASE[PHASE.rollback_failed] = true;
+BATCH_BLOCKING_PHASE[PHASE.recovery_conflict] = true;
 
 var IMMUTABLE_KEYS = [
   'journalVersion',
@@ -56,6 +81,8 @@ var IMMUTABLE_KEYS = [
 ];
 
 var RECOVERY_IDEMPOTENT_ROLLED_BACK = 'idempotent_rolled_back';
+var RESOLUTION_CURRENT_PERSISTED_STATE_WINS = 'current_persisted_state_wins';
+var QUARANTINE_MAP_KEY = '__gb_journal_quarantine__';
 
 var ROSTER_FREEZE_KEYS = [
   'rosterEntryId',
@@ -250,6 +277,52 @@ function immutableFingerprint(record) {
   return fingerprintOf(slice);
 }
 
+function isReservedMapKey(k) {
+  return asString(k) === QUARANTINE_MAP_KEY;
+}
+
+function diagnoseRow(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return 'current_not_object';
+  if (Number(row.journalVersion) !== JOURNAL_VERSION) return 'journal_version_invalid';
+  if (!asString(row.planKey)) return 'plan_key_missing';
+  if (!asString(row.phase)) return 'phase_missing';
+  if (!row.fingerprints || typeof row.fingerprints !== 'object') return 'fingerprints_missing';
+  return '';
+}
+
+function diagnoseCorruption(raw) {
+  if (raw == null) return 'record_null';
+  if (Array.isArray(raw)) return 'record_is_array';
+  if (typeof raw !== 'object') return 'record_not_object';
+  if (isBucket(raw)) {
+    return diagnoseRow(raw.current) || 'bucket_current_invalid';
+  }
+  return diagnoseRow(raw) || 'unrecognized_shape';
+}
+
+function isCorruptedDiscarded(row) {
+  return !!(row && asString(row.phase) === PHASE.corrupted_discarded);
+}
+
+function buildDiscardedRecord(planKey, raw, corruptionCode) {
+  var src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  var cur = src.current && typeof src.current === 'object' && !Array.isArray(src.current) ? src.current : src;
+  return {
+    journalVersion: JOURNAL_VERSION,
+    planKey: asString(planKey),
+    phase: PHASE.corrupted_discarded,
+    resolution: RESOLUTION_CURRENT_PERSISTED_STATE_WINS,
+    mutationKind: asString(cur && cur.mutationKind),
+    batchId: asString(cur && cur.batchId),
+    fingerprints: {},
+    corruptionCode: asString(corruptionCode) || 'unrecognized_shape',
+    resolvedAt: nowIso(),
+    replayForbidden: true,
+    attemptNumber: 1,
+    journalAttemptKey: attemptKeyOf(planKey, 1)
+  };
+}
+
 function isValidJournal(row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return false;
   if (Number(row.journalVersion) !== JOURNAL_VERSION) return false;
@@ -362,8 +435,53 @@ function allowedNextPhases(phase, requiresRoster) {
   return next;
 }
 
-function canTransition(from, to, requiresRoster) {
+function allowedBatchNextPhases(phase) {
+  var next = [];
+  if (phase === PHASE.prepared) {
+    next.push(
+      PHASE.match_written,
+      PHASE.rolled_back,
+      PHASE.recovered,
+      PHASE.rollback_failed,
+      PHASE.recovery_conflict
+    );
+  }
+  if (phase === PHASE.match_written) {
+    next.push(
+      PHASE.series_written,
+      PHASE.rolled_back,
+      PHASE.recovered,
+      PHASE.rollback_failed,
+      PHASE.recovery_conflict
+    );
+  }
+  if (phase === PHASE.series_written) {
+    next.push(
+      PHASE.committed,
+      PHASE.rolled_back,
+      PHASE.recovered,
+      PHASE.rollback_failed,
+      PHASE.recovery_conflict
+    );
+  }
+  if (phase === PHASE.rollback_failed) {
+    next.push(PHASE.rolled_back, PHASE.recovered, PHASE.rollback_failed, PHASE.recovery_conflict);
+  }
+  if (phase === PHASE.recovery_conflict) {
+    next.push(PHASE.conflict_resolved);
+  }
+  return next;
+}
+
+function canTransition(from, to, requiresRoster, record) {
   if (from === to) return true;
+  if (record && asString(record.mutationKind) === 'batch') {
+    var batchAllowed = allowedBatchNextPhases(from);
+    for (var b = 0; b < batchAllowed.length; b++) {
+      if (batchAllowed[b] === to) return true;
+    }
+    return false;
+  }
   var allowed = allowedNextPhases(from, requiresRoster);
   for (var i = 0; i < allowed.length; i++) {
     if (allowed[i] === to) return true;
@@ -418,7 +536,24 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     var raw = res.value;
     if (raw == null) return { ok: true, map: {} };
     if (typeof raw !== 'object' || Array.isArray(raw)) {
-      return { ok: false, reason: 'journal_corrupted', map: null };
+      var rebuilt = {};
+      rebuilt[QUARANTINE_MAP_KEY] = {
+        current: {
+          journalVersion: JOURNAL_VERSION,
+          planKey: QUARANTINE_MAP_KEY,
+          phase: PHASE.corrupted_discarded,
+          resolution: RESOLUTION_CURRENT_PERSISTED_STATE_WINS,
+          fingerprints: {},
+          corruptionCode: Array.isArray(raw) ? 'bucket_not_object_array' : 'bucket_not_object',
+          resolvedAt: nowIso(),
+          replayForbidden: true,
+          rawType: Array.isArray(raw) ? 'array' : typeof raw
+        },
+        history: []
+      };
+      var wrote = writeMap(rebuilt);
+      if (!wrote.ok) return { ok: false, reason: wrote.reason || 'journal_write_failed', map: null };
+      return { ok: true, map: rebuilt, rebuilt: true };
     }
     return { ok: true, map: raw };
   }
@@ -431,9 +566,37 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     return { ok: true };
   }
 
+  function isolateCorruptedKey(map, planKey, raw, code) {
+    var discarded = buildDiscardedRecord(planKey, raw, code);
+    var saved = persistBucket(map, planKey, { current: discarded, history: [] });
+    if (saved.ok) {
+      var nextMap = {};
+      Object.keys(map || {}).forEach(function (k) {
+        nextMap[k] = map[k];
+      });
+      nextMap[planKey] = saved.bucket;
+      return {
+        ok: true,
+        map: nextMap,
+        bucket: saved.bucket,
+        journal: saved.journal,
+        discarded: true
+      };
+    }
+    var next = {};
+    Object.keys(map || {}).forEach(function (k) {
+      if (k !== planKey) next[k] = map[k];
+    });
+    var wrote = writeMap(next);
+    if (!wrote.ok) {
+      return { ok: false, reason: wrote.reason || 'journal_write_failed' };
+    }
+    return { ok: true, dropped: true, absent: true, map: next, bucket: null, journal: null, discarded: true };
+  }
+
   function loadBucket(planKey) {
     var key = asString(planKey);
-    if (!key) return { ok: false, reason: 'plan_key_required' };
+    if (!key || isReservedMapKey(key)) return { ok: false, reason: 'plan_key_required' };
     var read = readMap();
     if (!read.ok) return { ok: false, reason: read.reason };
     if (!Object.prototype.hasOwnProperty.call(read.map, key)) {
@@ -442,7 +605,7 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     var raw = read.map[key];
     var bucket = normalizeBucket(raw, key);
     if (!bucket || !isValidJournal(bucket.current)) {
-      return { ok: false, reason: 'journal_corrupted', map: read.map, raw: raw };
+      return isolateCorruptedKey(read.map, key, raw, diagnoseCorruption(raw));
     }
     return { ok: true, map: read.map, bucket: bucket, journal: bucket.current, storedRaw: raw };
   }
@@ -452,12 +615,25 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     Object.keys(map).forEach(function (k) {
       next[k] = map[k];
     });
-    next[planKey] = {
-      current: deepClone(bucket.current),
-      history: Array.isArray(bucket.history) ? deepClone(bucket.history) : []
-    };
+    try {
+      next[planKey] = {
+        current: deepClone(bucket.current),
+        history: Array.isArray(bucket.history) ? deepClone(bucket.history) : []
+      };
+    } catch (eClone) {
+      return { ok: false, reason: 'journal_serialize_failed' };
+    }
+    var serialized;
+    try {
+      serialized = JSON.stringify(next);
+    } catch (eSer) {
+      return { ok: false, reason: 'journal_serialize_failed' };
+    }
+    if (typeof serialized !== 'string' || serialized.length > JOURNAL_MAX_BYTES) {
+      return { ok: false, reason: 'journal_too_large' };
+    }
     var wrote = writeMap(next);
-    if (!wrote.ok) return { ok: false, reason: wrote.reason };
+    if (!wrote.ok) return { ok: false, reason: wrote.reason || 'journal_write_failed' };
     return { ok: true, journal: deepClone(bucket.current), bucket: next[planKey] };
   }
 
@@ -475,6 +651,7 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     if (!read.ok) return { ok: false, reason: read.reason, journal: null };
     var keys = Object.keys(read.map);
     for (var i = 0; i < keys.length; i++) {
+      if (isReservedMapKey(keys[i])) continue;
       var bucket = normalizeBucket(read.map[keys[i]], keys[i]);
       if (!bucket) continue;
       if (bucket.current && asString(bucket.current.journalAttemptKey) === want) {
@@ -490,26 +667,90 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     return { ok: true, reason: 'absent', journal: null };
   }
 
+  function discardedBatchIdSet(bucket) {
+    var ids = Object.create(null);
+    function add(row) {
+      var id = asString(row && row.batchId);
+      if (id && isCorruptedDiscarded(row)) ids[id] = true;
+    }
+    if (bucket && bucket.current) add(bucket.current);
+    var hist = bucket && Array.isArray(bucket.history) ? bucket.history : [];
+    for (var i = 0; i < hist.length; i++) add(hist[i]);
+    return ids;
+  }
+
   function listUnfinishedJournals() {
     var read = readMap();
     if (!read.ok) return { ok: false, reason: read.reason, journals: [] };
     var out = [];
     Object.keys(read.map).forEach(function (k) {
+      if (isReservedMapKey(k)) return;
       var raw = read.map[k];
       var bucket = normalizeBucket(raw, k);
       if (!bucket || !isValidJournal(bucket.current)) {
-        out.push({
-          planKey: k,
-          phase: PHASE.manual_review,
-          corrupted: true
-        });
+        isolateCorruptedKey(read.map, k, raw, diagnoseCorruption(raw));
         return;
       }
       var row = bucket.current;
-      if (row.phase === PHASE.committed || row.phase === PHASE.rolled_back) return;
+      if (TERMINAL[row.phase] || row.phase === PHASE.recovery_conflict) return;
       out.push(deepClone(row));
     });
     return { ok: true, journals: out };
+  }
+
+  function pruneTerminalBatchFromMap(map) {
+    var next = {};
+    Object.keys(map || {}).forEach(function (k) {
+      if (isReservedMapKey(k)) {
+        next[k] = map[k];
+        return;
+      }
+      var bucket = normalizeBucket(map[k], k);
+      if (
+        bucket &&
+        bucket.current &&
+        asString(bucket.current.mutationKind) === 'batch' &&
+        BATCH_PRUNABLE_PHASE[bucket.current.phase]
+      ) {
+        return;
+      }
+      next[k] = map[k];
+    });
+    return next;
+  }
+
+  function listBlockingBatchJournals(matchIdOrOpts) {
+    var wantMatch = '';
+    var wantSeries = '';
+    if (matchIdOrOpts && typeof matchIdOrOpts === 'object') {
+      wantMatch = asString(matchIdOrOpts.matchId);
+      wantSeries = asString(matchIdOrOpts.seriesId);
+    } else {
+      wantMatch = asString(matchIdOrOpts);
+    }
+    var read = readMap();
+    if (!read.ok) return { ok: false, reason: read.reason, journals: [] };
+    var out = [];
+    Object.keys(read.map).forEach(function (k) {
+      if (isReservedMapKey(k)) return;
+      var bucket = normalizeBucket(read.map[k], k);
+      if (!bucket || !isValidJournal(bucket.current)) return;
+      var row = bucket.current;
+      if (asString(row.mutationKind) !== 'batch') return;
+      if (wantMatch && asString(row.matchId) !== wantMatch) return;
+      if (wantSeries && asString(row.seriesId) !== wantSeries) return;
+      if (!BATCH_BLOCKING_PHASE[row.phase]) return;
+      out.push(deepClone(row));
+    });
+    return { ok: true, journals: out };
+  }
+
+  function estimateMapBytes(map) {
+    try {
+      return JSON.stringify(map || {}).length;
+    } catch (e) {
+      return -1;
+    }
   }
 
   function buildCandidate(src, identity, kinds, requiresRoster, conf, attemptNumber) {
@@ -589,15 +830,26 @@ function createSeriesLiveMutationJournal(storageAdapter) {
 
     var loaded = loadBucket(parsed.identity.planKey);
     if (!loaded.ok) {
-      if (loaded.reason === 'journal_corrupted') {
-        return { ok: false, reason: 'journal_corrupted' };
-      }
       return { ok: false, reason: loaded.reason };
     }
 
     var built = buildCandidate(parsed.src, parsed.identity, parsed.kinds, parsed.requiresRoster, parsed.conf, 1);
     if (!built.ok) return { ok: false, reason: built.reason };
     var candidate = built.candidate;
+
+    if (!loaded.absent && loaded.journal && isCorruptedDiscarded(loaded.journal)) {
+      var discardedHistory = (loaded.bucket && loaded.bucket.history ? loaded.bucket.history : []).slice();
+      discardedHistory.push(deepClone(loaded.journal));
+      var stampDiscard = nowIso();
+      candidate.createdAt = stampDiscard;
+      candidate.updatedAt = stampDiscard;
+      var savedDiscard = persistBucket(loaded.map, parsed.identity.planKey, {
+        current: candidate,
+        history: discardedHistory
+      });
+      if (!savedDiscard.ok) return { ok: false, reason: savedDiscard.reason };
+      return { ok: true, idempotent: false, journal: savedDiscard.journal, replacedDiscarded: true };
+    }
 
     if (!loaded.absent) {
       var existing = loaded.journal;
@@ -717,7 +969,7 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     if (current.phase === PHASE.manual_review) {
       return { ok: false, reason: 'journal_manual_review', journal: deepClone(current) };
     }
-    if (!canTransition(current.phase, next, !!current.requiresRosterMutation)) {
+    if (!canTransition(current.phase, next, !!current.requiresRosterMutation, current)) {
       return { ok: false, reason: 'journal_illegal_transition', journal: deepClone(current) };
     }
 
@@ -738,14 +990,208 @@ function createSeriesLiveMutationJournal(storageAdapter) {
     return { ok: true, idempotent: false, journal: saved.journal };
   }
 
+  function buildBatchJournalCandidate(src, phase, stamp) {
+    var planKey = asString(src.planKey);
+    var identity = src.identity && typeof src.identity === 'object' ? src.identity : {};
+    return {
+      journalVersion: JOURNAL_VERSION,
+      mutationKind: 'batch',
+      batchId: asString(src.batchId) || planKey,
+      planKey: planKey,
+      attemptNumber: 1,
+      journalAttemptKey: attemptKeyOf(planKey, 1),
+      identity: {
+        seriesId: asString(identity.seriesId) || asString(src.seriesId),
+        roundId: asString(identity.roundId) || asString(src.roundId),
+        matchId: asString(identity.matchId) || asString(src.matchId),
+        publishToken: asString(identity.publishToken) || asString(src.publishToken)
+      },
+      seriesId: asString(identity.seriesId) || asString(src.seriesId),
+      roundId: asString(identity.roundId) || asString(src.roundId),
+      matchId: asString(identity.matchId) || asString(src.matchId),
+      groupId: '*',
+      position: 0,
+      publishToken: asString(identity.publishToken) || asString(src.publishToken),
+      action: 'batch_replace',
+      incomingUserId: asString(src.incomingUserId),
+      outgoingUserId: asString(src.outgoingUserId),
+      targetAffiliationId: '',
+      requiresConfirmation: false,
+      confirmationFingerprint: null,
+      confirmationAcceptedFingerprint: null,
+      phase: phase,
+      operationKinds: ['batch_station_persist'],
+      requiresRosterMutation: !!src.requiresRosterMutation,
+      replacements: Array.isArray(src.replacements) ? deepClone(src.replacements) : [],
+      rearrangements: Array.isArray(src.rearrangements) ? deepClone(src.rearrangements) : [],
+      rosterAffiliationChanges: Array.isArray(src.rosterAffiliationChanges)
+        ? deepClone(src.rosterAffiliationChanges)
+        : [],
+      before: src.before != null ? deepClone(src.before) : {},
+      expectedAfter: src.expectedAfter != null ? deepClone(src.expectedAfter) : {},
+      fingerprints: src.fingerprints && typeof src.fingerprints === 'object' ? deepClone(src.fingerprints) : {},
+      phasePayloadFingerprint: fingerprintOf({ failure: null, recovery: null }),
+      createdAt: stamp,
+      updatedAt: stamp
+    };
+  }
+
+  function writePreparedBatchJournal(input) {
+    var src = input && typeof input === 'object' ? input : {};
+    var planKey = asString(src.planKey);
+    if (!planKey) return { ok: false, reason: 'plan_key_required' };
+    var loaded = loadBucket(planKey);
+    if (!loaded.ok) return { ok: false, reason: loaded.reason };
+    if (!loaded.absent && loaded.journal) {
+      var existing = loaded.journal;
+      var replayIds = discardedBatchIdSet(loaded.bucket);
+      if (asString(src.batchId) && replayIds[asString(src.batchId)]) {
+        return { ok: false, reason: 'journal_replay_forbidden', journal: deepClone(existing) };
+      }
+      if (existing.phase === PHASE.manual_review) {
+        return { ok: false, reason: 'journal_manual_review', journal: deepClone(existing) };
+      }
+      if (existing.phase === PHASE.committed) {
+        return { ok: true, alreadyCommitted: true, journal: deepClone(existing) };
+      }
+      if (existing.phase === PHASE.conflict_resolved) {
+        return { ok: false, reason: 'batch_superseded', journal: deepClone(existing) };
+      }
+      if (existing.phase === PHASE.recovery_conflict) {
+        return { ok: false, reason: 'recovery_conflict', journal: deepClone(existing) };
+      }
+      if (existing.phase === PHASE.rollback_failed) {
+        return { ok: false, reason: 'journal_incomplete', journal: deepClone(existing) };
+      }
+      if (isCorruptedDiscarded(existing)) {
+        existing = null;
+      } else if (
+        existing.phase !== PHASE.rolled_back &&
+        existing.phase !== PHASE.recovered &&
+        asString(existing.mutationKind) === 'batch'
+      ) {
+        return { ok: false, reason: 'journal_incomplete', journal: deepClone(existing) };
+      }
+    }
+    var matchId = asString(src.matchId) || asString(src.identity && src.identity.matchId);
+    if (matchId) {
+      var blocking = listBlockingBatchJournals(matchId);
+      if (blocking.ok) {
+        for (var bi = 0; bi < blocking.journals.length; bi++) {
+          if (asString(blocking.journals[bi].planKey) === planKey) continue;
+          return {
+            ok: false,
+            reason:
+              blocking.journals[bi].phase === PHASE.recovery_conflict
+                ? 'recovery_conflict'
+                : 'incomplete_batch_exists',
+            journal: blocking.journals[bi]
+          };
+        }
+      }
+    }
+    var stamp = nowIso();
+    var candidate;
+    try {
+      candidate = buildBatchJournalCandidate(src, PHASE.prepared, stamp);
+    } catch (eBuild) {
+      return { ok: false, reason: 'journal_serialize_failed' };
+    }
+    var history = [];
+    if (!loaded.absent) {
+      history = (loaded.bucket.history || []).slice();
+      if (loaded.journal) history.push(deepClone(loaded.journal));
+    }
+    var map = pruneTerminalBatchFromMap(loaded.map);
+    var saved = persistBucket(map, planKey, { current: candidate, history: history });
+    if (!saved.ok && (saved.reason === 'journal_too_large' || saved.reason === 'journal_serialize_failed')) {
+      return { ok: false, reason: saved.reason };
+    }
+    if (!saved.ok) return { ok: false, reason: saved.reason };
+    return { ok: true, journal: saved.journal, prunedTerminal: Object.keys(loaded.map).length !== Object.keys(map).length };
+  }
+
+  function writeCommittedBatchJournal(input) {
+    var prepared = writePreparedBatchJournal(input);
+    if (!prepared.ok) return prepared;
+    if (prepared.alreadyCommitted) return prepared;
+    var stepped = transitionJournal(prepared.journal.planKey, PHASE.prepared, PHASE.match_written, null);
+    if (!stepped.ok) return stepped;
+    stepped = transitionJournal(planKeyOf(prepared), PHASE.match_written, PHASE.series_written, null);
+    if (!stepped.ok) return stepped;
+    stepped = transitionJournal(planKeyOf(prepared), PHASE.series_written, PHASE.committed, null);
+    if (!stepped.ok) return stepped;
+    return { ok: true, journal: stepped.journal };
+  }
+
+  function planKeyOf(res) {
+    return res && res.journal && res.journal.planKey;
+  }
+
+  function markBatchRolledBack(planKey, terminalPhase) {
+    var loaded = loadBucket(planKey);
+    if (!loaded.ok) return { ok: false, reason: loaded.reason };
+    if (loaded.absent) return { ok: false, reason: 'journal_missing' };
+    var current = deepClone(loaded.journal);
+    if (asString(current.mutationKind) !== 'batch') {
+      return { ok: false, reason: 'not_batch_journal', journal: current };
+    }
+    var next = asString(terminalPhase) || PHASE.rolled_back;
+    if (next !== PHASE.rolled_back && next !== PHASE.recovered) next = PHASE.rolled_back;
+    current.phase = next;
+    current.updatedAt = nowIso();
+    current.rolledBackAt = current.updatedAt;
+    var saved = persistBucket(loaded.map, current.planKey, {
+      current: current,
+      history: loaded.bucket.history || []
+    });
+    if (!saved.ok) return { ok: false, reason: saved.reason };
+    return { ok: true, journal: saved.journal };
+  }
+
+  function markBatchConflictResolved(planKey, resolution) {
+    var loaded = loadBucket(planKey);
+    if (!loaded.ok) return { ok: false, reason: loaded.reason };
+    if (loaded.absent) return { ok: false, reason: 'journal_missing' };
+    var current = deepClone(loaded.journal);
+    if (asString(current.mutationKind) !== 'batch') {
+      return { ok: false, reason: 'not_batch_journal', journal: current };
+    }
+    if (current.phase === PHASE.conflict_resolved) {
+      return { ok: true, idempotent: true, journal: current };
+    }
+    if (current.phase !== PHASE.recovery_conflict) {
+      return { ok: false, reason: 'journal_phase_conflict', journal: current };
+    }
+    current.phase = PHASE.conflict_resolved;
+    current.updatedAt = nowIso();
+    current.resolvedAt = current.updatedAt;
+    current.resolvedBy = asString(resolution && resolution.resolvedBy);
+    current.resolution = asString(resolution && (resolution.kind || resolution.resolution)) || 'latest_persisted_state_wins';
+    current.resolutionMeta = resolution && typeof resolution === 'object' ? deepClone(resolution) : {};
+    var saved = persistBucket(loaded.map, current.planKey, {
+      current: current,
+      history: loaded.bucket.history || []
+    });
+    if (!saved.ok) return { ok: false, reason: saved.reason };
+    return { ok: true, journal: saved.journal };
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
     prepareJournal: prepareJournal,
     prepareNextAttemptAfterRollback: prepareNextAttemptAfterRollback,
     transitionJournal: transitionJournal,
+    writePreparedBatchJournal: writePreparedBatchJournal,
+    writeCommittedBatchJournal: writeCommittedBatchJournal,
+    markBatchRolledBack: markBatchRolledBack,
+    markBatchConflictResolved: markBatchConflictResolved,
     getJournal: getJournal,
     getJournalByAttemptKey: getJournalByAttemptKey,
-    listUnfinishedJournals: listUnfinishedJournals
+    listUnfinishedJournals: listUnfinishedJournals,
+    listBlockingBatchJournals: listBlockingBatchJournals,
+    pruneTerminalBatchFromMap: pruneTerminalBatchFromMap,
+    estimateMapBytes: estimateMapBytes
   };
 }
 
@@ -754,7 +1200,10 @@ var defaultJournal = createSeriesLiveMutationJournal(createWxStorageAdapter());
 module.exports = {
   STORAGE_KEY: STORAGE_KEY,
   JOURNAL_VERSION: JOURNAL_VERSION,
+  JOURNAL_MAX_BYTES: JOURNAL_MAX_BYTES,
   PHASE: PHASE,
+  RESOLUTION_CURRENT_PERSISTED_STATE_WINS: RESOLUTION_CURRENT_PERSISTED_STATE_WINS,
+  QUARANTINE_MAP_KEY: QUARANTINE_MAP_KEY,
   IMMUTABLE_KEYS: IMMUTABLE_KEYS,
   RECOVERY_IDEMPOTENT_ROLLED_BACK: RECOVERY_IDEMPOTENT_ROLLED_BACK,
   createSeriesLiveMutationJournal: createSeriesLiveMutationJournal,
@@ -778,7 +1227,23 @@ module.exports = {
   getJournalByAttemptKey: function (journalAttemptKey) {
     return defaultJournal.getJournalByAttemptKey(journalAttemptKey);
   },
+  writePreparedBatchJournal: function (input) {
+    return defaultJournal.writePreparedBatchJournal(input);
+  },
+  writeCommittedBatchJournal: function (input) {
+    return defaultJournal.writeCommittedBatchJournal(input);
+  },
+  markBatchRolledBack: function (planKey, terminalPhase) {
+    return defaultJournal.markBatchRolledBack(planKey, terminalPhase);
+  },
+  markBatchConflictResolved: function (planKey, resolution) {
+    return defaultJournal.markBatchConflictResolved(planKey, resolution);
+  },
   listUnfinishedJournals: function () {
     return defaultJournal.listUnfinishedJournals();
-  }
+  },
+  listBlockingBatchJournals: function (matchId) {
+    return defaultJournal.listBlockingBatchJournals(matchId);
+  },
+  JOURNAL_MAX_BYTES: JOURNAL_MAX_BYTES
 };

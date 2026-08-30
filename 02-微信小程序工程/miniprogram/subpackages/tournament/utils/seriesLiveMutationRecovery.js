@@ -426,11 +426,44 @@ function recommend(phase, combined, requiresRoster) {
   return { action: ACTION.manual_review };
 }
 
+function inspectBatchJournal(journal) {
+  var phase = journal && journal.phase;
+  var action = ACTION.eligible_to_rollback_station_after_revalidation;
+  var code;
+  if (phase === PHASE.committed) action = ACTION.idempotent_committed;
+  else if (phase === PHASE.rolled_back || phase === PHASE.recovered || phase === PHASE.conflict_resolved) {
+    action = ACTION.idempotent_rolled_back;
+  }
+  else if (phase === PHASE.recovery_conflict) {
+    action = ACTION.manual_review;
+    code = 'recovery_conflict';
+  } else if (phase === PHASE.rollback_failed) {
+    action = ACTION.eligible_to_finish_rollback_record;
+    code = 'rollback_failed';
+  }
+  return {
+    ok: true,
+    mutationKind: 'batch',
+    journalPhase: phase,
+    stationState: STATION_STATE.unknown,
+    rosterState: journal && journal.requiresRosterMutation ? ROSTER_STATE.unknown : ROSTER_STATE.not_required,
+    combinedState: COMBINED.unknown,
+    recommendedAction: action,
+    requiresDomainRevalidation: true,
+    executionAllowed: false,
+    code: code,
+    traces: { batch: true }
+  };
+}
+
 function inspectSeriesLiveMutationRecovery(input) {
   var src = input && typeof input === 'object' ? input : {};
   var journal = src.journal;
   var series = src.currentSeries;
   var match = src.currentMatch;
+  if (journal && asString(journal.mutationKind) === 'batch') {
+    return inspectBatchJournal(journal);
+  }
 
   function finish(extra) {
     var out = Object.assign(
@@ -481,10 +514,83 @@ function inspectSeriesLiveMutationRecovery(input) {
   });
 }
 
+function recoverSeriesLiveBatchBeforeRead(input) {
+  var src = input && typeof input === 'object' ? input : {};
+  var batchMod = require('./seriesLiveBatchReplace.js');
+  var teamMatchStore = src.teamMatchStore || require('../../../utils/teamMatchStore.js');
+  var seriesStore = src.seriesStore || require('../../../utils/seriesStore.js');
+  var persistMatch =
+    typeof src.persistMatch === 'function'
+      ? src.persistMatch
+      : function (next) {
+          try {
+            teamMatchStore.saveMatch(next);
+            return { ok: true };
+          } catch (eSave) {
+            return { ok: false, reason: 'save_failed' };
+          }
+        };
+  var persistSeries =
+    typeof src.persistSeries === 'function'
+      ? src.persistSeries
+      : function (next, rev) {
+          return seriesStore.upsertSeriesChecked(next, rev);
+        };
+  var getMatchById =
+    typeof src.getMatchById === 'function'
+      ? src.getMatchById
+      : function (id) {
+          return teamMatchStore.getMatchById(id);
+        };
+  var getSeriesById =
+    typeof src.getSeriesById === 'function'
+      ? src.getSeriesById
+      : function (id) {
+          return seriesStore.getSeriesById(id);
+        };
+  var rec = batchMod.recoverIncompleteLiveBatchMutations({
+    seriesId: src.seriesId,
+    matchId: src.matchId,
+    roundId: src.roundId,
+    persistMatch: persistMatch,
+    persistSeries: persistSeries,
+    getMatchById: getMatchById,
+    getSeriesById: getSeriesById,
+    journalApi: src.journalApi,
+    listUnfinishedJournals: src.listUnfinishedJournals
+  });
+  var results = (rec && rec.results) || [];
+  var conflictResolved = false;
+  var recovered = false;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i] && results[i].autoResolved) conflictResolved = true;
+    if (results[i] && (results[i].status === PHASE.recovered || results[i].status === PHASE.rolled_back)) {
+      recovered = true;
+    }
+  }
+  return {
+    ok: rec && rec.ok !== false,
+    skipped: !!(rec && rec.skipped),
+    conflict: false,
+    conflictResolved: conflictResolved,
+    recovered: recovered,
+    results: results,
+    series: src.seriesId ? getSeriesById(src.seriesId) : null,
+    match: src.matchId ? getMatchById(src.matchId) : null
+  };
+}
+
 module.exports = {
   STATION_STATE: STATION_STATE,
   ROSTER_STATE: ROSTER_STATE,
   COMBINED: COMBINED,
   ACTION: ACTION,
-  inspectSeriesLiveMutationRecovery: inspectSeriesLiveMutationRecovery
+  inspectSeriesLiveMutationRecovery: inspectSeriesLiveMutationRecovery,
+  recoverIncompleteLiveBatchMutations: function (input) {
+    return require('./seriesLiveBatchReplace.js').recoverIncompleteLiveBatchMutations(input);
+  },
+  recoverSeriesLiveBatchBeforeRead: recoverSeriesLiveBatchBeforeRead,
+  resolveRecoveryConflict: function (input) {
+    return require('./seriesLiveBatchReplace.js').resolveRecoveryConflict(input);
+  }
 };

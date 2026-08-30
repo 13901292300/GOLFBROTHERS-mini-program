@@ -22,7 +22,6 @@ var groupEditorPath = path.join(
 var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 var strokeEntityValidator = require(path.join(utilsDir, 'strokeEntityValidator.js'));
 var strokeEntityBuilder = require(path.join(utilsDir, 'strokeEntityBuilder.js'));
-var strokeGroupSeatNormalizer = require(path.join(utilsDir, 'strokeGroupSeatNormalizer.js'));
 var teamMatchStore = require(path.join(utilsDir, 'teamMatchStore.js'));
 var seriesStore = require(path.join(utilsDir, 'seriesStore.js'));
 
@@ -236,18 +235,12 @@ function draftFromPlayers(players) {
 
 function expectedOrdinaryPayload(match, sanitized, pageData) {
   var oldGroups = Array.isArray(match.groups) ? match.groups : [];
-  var nextGroups = tournamentGroupDraft.applyLiveGroupsFromDraft(oldGroups, sanitized);
+  var nextGroups = tournamentGroupDraft.rematerializeLivePlayersAfterNormalize(
+    tournamentGroupDraft.applyLiveGroupsFromDraft(oldGroups, sanitized),
+    oldGroups
+  );
   var gameMode = String(match.gameMode || '');
   var isG4Stroke = strokeEntityValidator.isG4FamilyMode(gameMode);
-  var isG2G3Stroke = strokeEntityValidator.isG2G3FamilyMode(gameMode);
-  var isG5MatchPlay = strokeEntityValidator.isG5MatchPlayMode(gameMode);
-  if (isG4Stroke || isG2G3Stroke || isG5MatchPlay) {
-    var beforeNormalize = nextGroups;
-    nextGroups = tournamentGroupDraft.rematerializeLivePlayersAfterNormalize(
-      strokeGroupSeatNormalizer.normalizeFormalGroupSeats(nextGroups, match),
-      beforeNormalize
-    );
-  }
   var shouldPersistPairings = !!(pageData && pageData.showPairingSection) || isG4Stroke;
   var next = Object.assign({}, match, {
     groups: nextGroups,
@@ -281,6 +274,11 @@ function expectedOrdinaryPayload(match, sanitized, pageData) {
     });
     next.pairings = teamMatchStore.sanitizePairings(rebuilt);
   }
+  next.scoreData = tournamentGroupDraft.rebindLiveScoreDataToSeatPlayers(
+    oldGroups,
+    nextGroups,
+    next.scoreData
+  );
   var check = origValidate(next);
   if (!check || check.valid !== true) {
     return { ok: false, reason: (check && check.reason) || 'invalid' };
@@ -348,7 +346,7 @@ var seat0 = baseOrd.groups[0].players.filter(function (p) {
 })[0];
 assert(
   '3 score identity 保留',
-  !!(seat0 && String(seat0.scorePlayerId) === 'A' && String(seat0.userId) === 'X')
+  !!(seat0 && String(seat0.scorePlayerId) === 'X' && String(seat0.userId) === 'X')
 );
 
 var g5Match = makeMatch('个人比洞赛', [A, C]);
@@ -362,7 +360,7 @@ assert(
   '4 G5 base',
   String(baseG5.gameMode) === '个人比洞赛' &&
     snapshot(baseG5.pairings) === '{}' &&
-    !!(g5X && String(g5X.scorePlayerId) === 'A') &&
+    !!(g5X && String(g5X.scorePlayerId) === 'X') &&
     Number(g5X.position) >= 1
 );
 
@@ -434,10 +432,10 @@ var confirmEnd = editorSrc.indexOf('Series 入口：返回前刷新来源标记'
 var confirmBody = editorSrc.slice(confirmStart, confirmEnd < 0 ? editorSrc.length : confirmEnd);
 var iBase = confirmBody.indexOf('_buildLiveCandidateBase');
 var iFin = confirmBody.indexOf('_finalizeLiveCandidate');
-var iFlow = confirmBody.indexOf('_runSeriesLiveSingleReplaceFlow');
+var iFlow = confirmBody.indexOf('_runSeriesLiveIdentityCorrection');
 var iPersist = confirmBody.indexOf('_persistLiveMatchWithReadback');
 assert(
-  '11 LIVE confirm 顺序：base→finalize；Series LIVE 走 Flow，普通走 Match persist',
+  '11 LIVE confirm 顺序：base→finalize；Series LIVE 走 identityCorrection，普通走 Match persist',
   iBase >= 0 &&
     iFin > iBase &&
     iFlow > iFin &&
@@ -451,6 +449,42 @@ assert(
   '12 候选构造不直接 require classifier',
   editorSrc.indexOf('seriesLiveSingleReplaceClassifier') < 0
 );
+
+(function live_c_replace_keeps_group_meta() {
+  var persisted = makeMatch('个人比洞赛', [A, { userId: 'P', team: 'red', scorePlayerId: 'P' }], {
+    matchExtra: { seriesContext: { managed: true, seriesId: 'ser-1', roundId: 'r1', matchId: 'm-live-1', publishToken: 'tok' } }
+  });
+  persisted.groups[0].order = 2;
+  persisted.groups[0].teeTime = '07:40';
+  persisted.groups[0].status = 'LIVE';
+  persisted.groups[0].groupName = '第1组';
+  var dirty = draftFromPlayers([{ userId: 'C', team: 'blue' }, { userId: 'P', team: 'red' }]);
+  dirty[0].groupName = '草稿组名';
+  dirty[0].order = 88;
+  dirty[0].teeTime = '22:00';
+  dirty[0].status = 'draft';
+  dirty[0]._pageTmp = 1;
+  var editor = makeEditor({ gameMode: '个人比洞赛' });
+  var cand = editor._buildLiveCandidateBase(persisted, dirty, {});
+  assert(
+    '13 C替换A 沿用持久化 group metadata',
+    cand.groups[0].groupName === '第1组' &&
+      cand.groups[0].order === 2 &&
+      cand.groups[0].teeTime === '07:40' &&
+      cand.groups[0].status === 'LIVE' &&
+      String(cand.groups[0].players[0].userId) === 'C' &&
+      String(cand.groups[0].players[0].scorePlayerId) === 'C'
+  );
+  var newSeries = clone(persisted);
+  delete newSeries.seriesContext;
+  var candNew = editor._buildLiveCandidateBase(newSeries, dirty, {});
+  assert(
+    '14 新建系列赛同样沿用 group metadata',
+    candNew.groups[0].groupName === persisted.groups[0].groupName &&
+      candNew.groups[0].order === 2 &&
+      candNew.groups[0].teeTime === '07:40'
+  );
+})();
 
 assert(
   'base/finalize 自身不 persist / 不弹窗',

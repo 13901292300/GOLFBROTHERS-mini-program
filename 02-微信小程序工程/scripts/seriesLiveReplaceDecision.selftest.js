@@ -202,7 +202,7 @@ var g5Groups = [
   });
   assert('1 同归属replaceOnly合法→direct', out.ok && out.action === ACTION.direct_replace);
   assert('14 B当前userId更新', out.candidateGroups[0].players[0].userId === 'B');
-  assert('15 A稳定scorePlayerId保持', out.candidateGroups[0].players[0].scorePlayerId === 'A');
+  assert('15 scorePlayerId 为当前球员 B', out.candidateGroups[0].players[0].scorePlayerId === 'B');
   assert(
     '16 entityId/groupId/position保持',
     out.candidateGroups[0].players[0].entityId === 'm1__g1__1' &&
@@ -568,7 +568,7 @@ var g5Groups = [
       filled[1].userId === 'C' &&
       filled[0].position === 1 &&
       filled[1].position === 2 &&
-      b.scorePlayerId === 'A' &&
+      b.scorePlayerId === 'B' &&
       b.entityId === 'm1__g1__1'
   );
 })();
@@ -610,7 +610,7 @@ var g5Groups = [
       ps.length === 4 &&
       ps[0].entityId === 'ent-keep' &&
       ps[0].userId === 'B' &&
-      ps[0].scorePlayerId === 'A' &&
+      ps[0].scorePlayerId === 'B' &&
       ps[0].slotScorePlayerId === 'A-slot' &&
       ps[0].scoreOwnerId === 'A-own' &&
       ps[0].slotId === 'slot-1' &&
@@ -678,7 +678,7 @@ var g5Groups = [
       p1.playerIds[1] === 'C2' &&
       out.candidatePairings.g1.length === 2 &&
       b.userId === 'B' &&
-      b.scorePlayerId === 'A' &&
+      b.scorePlayerId === 'B' &&
       b.entityId === 'ent-a' &&
       b.pairingId === 'p1' &&
       JSON.stringify(groups) === JSON.stringify(groupsFrozen) &&
@@ -914,7 +914,7 @@ var g5Groups = [
       pair.entityId === 'pair-ent-1' &&
       pair.id === 'pair-ent-1' &&
       b.userId === 'B' &&
-      b.scorePlayerId === 'A' &&
+      b.scorePlayerId === 'B' &&
       b.entityId === 'ent-a' &&
       b.pairingId === 'p1' &&
       out.candidatePairings.g1[1].playerIds.join(',') === 'C,C2' &&
@@ -943,7 +943,7 @@ var g5Groups = [
       out.needsRosterRepair === false &&
       out.candidateGroups[0].players[0].seriesParticipantId === 'part-red' &&
       out.candidateGroups[0].players[0].userId === 'B' &&
-      out.candidateGroups[0].players[0].scorePlayerId === 'A'
+      out.candidateGroups[0].players[0].scorePlayerId === 'B'
   );
 
   var missingTarget = decideWith({
