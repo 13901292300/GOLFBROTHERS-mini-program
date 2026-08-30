@@ -664,7 +664,7 @@ Page({
   /**
    * 弹窗列表状态：
    * checked  = 是否在当前 slots（临时选中）
-   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人 / 其他轮次 no-repeat
+   * disabled 仅：满 4 席且未勾选（结构上限）。占用/赛制/no-repeat 只做展示，不在草稿阶段拦截。
    */
   _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
@@ -673,23 +673,7 @@ Page({
     const selectedMap = this._buildSelectedMap(slots || []);
     const occupiedMap = this._buildOccupiedMap(editId, editIdx);
     const selectedCount = Object.keys(selectedMap).length;
-    const applyG5Cap1 = this._isG5MatchPlayTeamCap1Mode();
-    const groupFull = applyG5Cap1 ? selectedCount >= 2 : selectedCount >= 4;
-
-    const apply40TeamLock =
-      !!this._showCompositionMode && this._strokeCompositionMode === '4+0';
-    const applyMatchPlayTeamCap2 = this._isMatchPlayTeamCap2Mode();
-    const needTeamMap = apply40TeamLock || applyMatchPlayTeamCap2 || applyG5Cap1;
-    const teamMap = needTeamMap
-      ? buildRegisterTeamMap({ registerInfo: registerInfo || { users: [] } })
-      : null;
-    const lockedTeamId = apply40TeamLock
-      ? this._resolveLockedTeamIdFor40(slots, teamMap)
-      : '';
-    const teamSelectedCounts =
-      applyMatchPlayTeamCap2 || applyG5Cap1
-        ? this._countSelectedByTeam(slots, teamMap)
-        : {};
+    const groupFull = selectedCount >= 4;
     const noRepeatLock = this._collectNoRepeatLock();
 
     return users
@@ -700,33 +684,8 @@ Page({
         const checked = !!selectedMap[uid];
         const occupiedGroupName = occupiedMap[uid] || '';
         const isOccupied = !!occupiedGroupName;
-        let isDisabled = false;
-        if (isOccupied) {
-          isDisabled = true;
-        } else if (!checked && groupFull) {
-          isDisabled = true;
-        } else if (!checked && lockedTeamId) {
-          const candTeam =
-            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
-          if (candTeam !== lockedTeamId) {
-            isDisabled = true;
-          }
-        } else if (!checked && applyG5Cap1) {
-          // G5：某分队已选 1 人后，同队其余不可再选；满 2 人由 groupFull 禁用全部
-          const candTeam =
-            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
-          if (candTeam && (teamSelectedCounts[candTeam] || 0) >= 1) {
-            isDisabled = true;
-          }
-        } else if (!checked && applyMatchPlayTeamCap2) {
-          // G6/G7/G8：某分队已选满 2 人后，同队其余球员不可再选（已选中的仍可取消）
-          const candTeam =
-            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
-          if (candTeam && (teamSelectedCounts[candTeam] || 0) >= 2) {
-            isDisabled = true;
-          }
-        }
-        return seriesGroupPickRoster.mergeNoRepeatLockFields(
+        const isDisabled = !checked && groupFull;
+        const merged = seriesGroupPickRoster.mergeNoRepeatLockFields(
           Object.assign({}, u, {
             isSelected: checked,
             checked: checked,
@@ -737,6 +696,8 @@ Page({
           }),
           noRepeatLock
         );
+        merged.isDisabled = isDisabled;
+        return merged;
       })
       .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en', { sensitivity: 'base' }));
   },
@@ -793,81 +754,9 @@ Page({
   },
 
   /**
-   * 确定前校验；失败 toast 并 return false（不 navigateBack、不改用户选择）
+   * 选人确定只回写草稿，不在此处做赛制/人数/报名合法性校验。
    */
   _validateBeforeCommit() {
-    const payload = this._buildConfirmPayload();
-    const teamMap = buildRegisterTeamMap({
-      registerInfo: this._registerInfo || { users: [] }
-    });
-    const gameMode = String(this._gameMode || '');
-
-    if (this._fromSeries) {
-      const lock = this._collectNoRepeatLock();
-      const ids = seriesGroupPickRoster.collectPlayerIdsFromSlots(this.data.slots);
-      const check = seriesGroupPickRoster.assertPlayersNotPlayedPriorRound(ids, lock);
-      if (!check.ok) {
-        wx.showToast({
-          title: check.message || seriesGroupPickRoster.NO_REPEAT_SAVE_MSG,
-          icon: 'none'
-        });
-        return false;
-      }
-    }
-
-    // G5：跨分队恰好 1v1
-    if (isG5MatchPlayMode(gameMode)) {
-      const err = validateG5MatchPlayPlayers(payload.players, teamMap);
-      if (err) {
-        wx.showToast({ title: err, icon: 'none' });
-        return false;
-      }
-      return true;
-    }
-
-    // G6/G7：双方分队各 1–2 人（不改变 G2/G3 原规则）
-    if (isG6G7MatchPlayMode(gameMode)) {
-      const err = validateG6G7MatchPlayPlayers(payload.players, teamMap);
-      if (err) {
-        wx.showToast({ title: err, icon: 'none' });
-        return false;
-      }
-      return true;
-    }
-
-    // G8：仅红2+蓝2；G4 比杆保持原 2/4 人规则
-    if (isG8MatchPlayMode(gameMode)) {
-      const err = validateG8MatchPlayPlayers(payload.players, teamMap);
-      if (err) {
-        wx.showToast({ title: err, icon: 'none' });
-        return false;
-      }
-      return true;
-    }
-
-    const sideUnit = resolvePickSideUnit(this._match);
-    if (isG4FamilyMode(gameMode) || gameMode === '四人两球比杆赛') {
-      const err = validateG4GroupStructurePlayers(payload.players, teamMap, sideUnit);
-      if (err) {
-        wx.showToast({ title: err, icon: 'none' });
-        return false;
-      }
-      return true;
-    }
-
-    // G2/G3：先生成组合结构，再验每个成绩组合内部是否同队
-    if (this._showCompositionMode) {
-      const err = validateStrokeCompositionPlayers(
-        payload.players,
-        this._strokeCompositionMode,
-        teamMap,
-        sideUnit
-      );
-      if (err) {
-        wx.showToast({ title: err, icon: 'none' });
-        return false;
-      }
-    }
     return true;
   },
 
@@ -921,8 +810,7 @@ Page({
   },
 
   /**
-   * 勾选/取消：只改 slots（临时选中），再重建列表。
-   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 / G6-G8 分队上限 / 最新 no-repeat 判断。
+   * 勾选/取消：只改 slots（临时选中），再重建列表。赛制与重复合法性在 editor 确定时校验。
    */
   onTogglePlayer(e) {
     const user = e.currentTarget.dataset.user || null;
@@ -933,10 +821,6 @@ Page({
     const slots = (this.data.slots || []).slice();
     const editingGroupId = this.data.groupId;
     const editingGroupIndex = this.data.editingGroupIndex;
-    const occupiedMap = this._buildOccupiedMap(editingGroupId, editingGroupIndex);
-
-    // 其它出发组占用：不可选
-    if (occupiedMap[pickedUserId]) return;
 
     const selectedIndex = slots.findIndex((s) => String((s && s.userId) || '') === pickedUserId);
 
@@ -955,83 +839,13 @@ Page({
       return;
     }
 
-    if (this._fromSeries) {
-      const lock = this._collectNoRepeatLock();
-      const blocked = seriesGroupPickRoster.shouldBlockNoRepeatAdd(pickedUserId, lock);
-      if (blocked && blocked.blocked) {
-        wx.showToast({
-          title: blocked.message || seriesGroupPickRoster.NO_REPEAT_TOGGLE_MSG,
-          icon: 'none'
-        });
-        return;
-      }
-    }
-
-    // 4+0：已有球员时禁止跨分队入座
-    if (this._showCompositionMode && this._strokeCompositionMode === '4+0') {
-      const teamMap = buildRegisterTeamMap({
-        registerInfo: this._registerInfo || { users: [] }
-      });
-      const lockedTeamId = this._resolveLockedTeamIdFor40(slots, teamMap);
-      if (lockedTeamId) {
-        const candTeam =
-          teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
-        if (candTeam !== lockedTeamId) return;
-      }
-    }
-
-    // G5：单分队已选 1 人则禁止继续选同队；全组最多 2 人
-    if (this._isG5MatchPlayTeamCap1Mode()) {
-      const teamMap = buildRegisterTeamMap({
-        registerInfo: this._registerInfo || { users: [] }
-      });
-      const candTeam =
-        teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
-      const teamCounts = this._countSelectedByTeam(slots, teamMap);
-      if (candTeam && (teamCounts[candTeam] || 0) >= 1) {
-        return;
-      }
-      if (this._countFilledSlots(slots) >= 2) {
-        wx.showToast({ title: '个人比洞赛每组必须有且只有两名球员', icon: 'none' });
-        return;
-      }
-    }
-
-    // G6/G7/G8：单分队已选满 2 人则禁止继续选同队
-    if (this._isMatchPlayTeamCap2Mode()) {
-      const teamMap = buildRegisterTeamMap({
-        registerInfo: this._registerInfo || { users: [] }
-      });
-      const candTeam =
-        teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
-      const teamCounts = this._countSelectedByTeam(slots, teamMap);
-      if (candTeam && (teamCounts[candTeam] || 0) >= 2) {
-        return;
-      }
-    }
-
-    if (this._countFilledSlots(slots) >= 4) {
-      wx.showToast({ title: '每组最多4人', icon: 'none' });
-      return;
-    }
-
     const emptyIndex = slots.findIndex((s) => !String((s && s.userId) || ''));
     if (emptyIndex < 0) {
-      wx.showToast({ title: '每组最多4人', icon: 'none' });
       return;
     }
 
     const gender = user.gender || '';
     const teeFields = teeDisplayFields(defaultTeeFromRegisterGender(gender));
-    // Series roster：直接沿用归属，不弹球队/分队选择、不默认第一支
-    if (
-      this._fromSeries &&
-      this._seriesForPick &&
-      seriesGroupPickRoster.needsAffiliationSelection(user, this._seriesForPick)
-    ) {
-      wx.showToast({ title: '请选择所属球队/分队', icon: 'none' });
-      return;
-    }
     slots[emptyIndex] = Object.assign({}, slots[emptyIndex], {
       userId: pickedUserId,
       avatar: user.avatar || '',

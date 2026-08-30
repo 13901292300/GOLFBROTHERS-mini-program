@@ -91,17 +91,20 @@ const SERIES_LIVE_NO_CHANGE_MSG = '未检测到可保存的换人';
 const SERIES_LIVE_GROUP_FINISHED_MSG = '当前分组已结束，无法修改';
 const SERIES_LIVE_ROUND_CANCELLED_MSG = '本轮已取消，无法修改分组';
 const SERIES_LIVE_SERIES_LOCKED_MSG = '系列赛已经结束。';
-const SERIES_LIVE_PERMISSION_MSG = '暂无分组管理权限';
-const SERIES_LIVE_STALE_MSG = '数据已被其他管理员更新';
+const SERIES_LIVE_STALE_MSG = '数据已被其他管理员更新，请重新确认';
 const SERIES_LIVE_MANUAL_REVIEW_MSG = '保存状态需要管理员检查，请勿重复操作';
-const SERIES_LIVE_SAVE_FAIL_RETRY_MSG = '保存失败，请重试';
-const SERIES_LIVE_ROLLED_BACK_MSG = '保存失败，已恢复原分组';
+const SERIES_LIVE_SAVE_FAIL_RETRY_MSG = '保存时发生异常，请稍后重试';
+const SERIES_LIVE_ROLLED_BACK_MSG = '保存时发生异常，请稍后重试';
 const SERIES_LIVE_UPDATED_MSG = '分组已更新';
-const SERIES_LIVE_DUPLICATE_MSG = '球员重复';
-const SERIES_LIVE_NOT_ON_ROSTER_MSG = '球员不在系列赛名单';
-const SERIES_LIVE_AFFILIATION_MSG = '球队归属不符';
-const SERIES_LIVE_OVER_CAPACITY_MSG = '分组人数超限';
-const SERIES_LIVE_ROUND_ENDED_MSG = '轮次已结束';
+const SERIES_LIVE_DUPLICATE_MSG = '同一球员重复出现在多个位置';
+const SERIES_LIVE_NOT_ON_ROSTER_MSG = '有球员未报名';
+const SERIES_LIVE_AFFILIATION_MSG = '2+2 队伍组合不合法';
+const SERIES_LIVE_OVER_CAPACITY_MSG = '分组人数不符合当前赛制';
+const SERIES_LIVE_ROUND_ENDED_MSG = '场次或系列赛已结束';
+const SERIES_LIVE_PERMISSION_MSG = '无管理权限';
+const SERIES_LIVE_SEAT_SCORE_MSG = '位置成绩数据异常，无法安全保存';
+const GROUP_SAVE_REJECT_TITLE = '分组无法保存';
+const GROUP_SAVE_SYSTEM_FAIL_MSG = '保存时发生异常，请稍后重试';
 
 function livePlayerIdOf(raw) {
   if (raw == null) return '';
@@ -617,79 +620,12 @@ Page({
   },
 
   onStrokeCompositionModeTap(e) {
-    // G6/G7 不展示该入口；仅 G2/G3 比杆可切换
     if (!this.data.showCompositionMode) return;
     const mode = String(eventField(e, 'mode') || '');
     if (mode !== '4+0' && mode !== '2+2') return;
     if (mode === this.data.strokeCompositionMode) return;
-
-    // 切到 2+2：直接切换
-    if (mode !== '4+0') {
-      this.setData({ strokeCompositionMode: mode }, () => {
-        this._refreshCards();
-      });
-      return;
-    }
-
-    // 2+2 → 4+0：同组必须同一分队/球队；非法组需确认后清空球员
-    const sideUnit = resolveSideUnitLabel(this._matchSnapshot);
-    const teamMap = buildRegisterTeamMap({
-      registerInfo: this._registerInfo || { users: [] }
-    });
-    const draft = this.data.groupDraft || [];
-    const illegal = [];
-    draft.forEach((g, i) => {
-      const err = validateStrokeCompositionPlayers(
-        g && g.players,
-        '4+0',
-        teamMap,
-        sideUnit
-      );
-      if (!err) return;
-      illegal.push({
-        groupId: g && g.groupId != null ? String(g.groupId) : '',
-        label: (g && g.groupName) ? String(g.groupName) : ('第' + (i + 1) + '组')
-      });
-    });
-
-    if (!illegal.length) {
-      this.setData({ strokeCompositionMode: '4+0' }, () => {
-        this._refreshCards();
-      });
-      return;
-    }
-
-    const names = illegal.map((x) => x.label).join('、');
-    wx.showModal({
-      title: '提示',
-      content:
-        '4+0模式下，同组球员必须来自同一' + sideUnit + '。\n当前' +
-        names +
-        '不符合要求，是否清除该组重新配置？',
-      confirmText: '确定',
-      cancelText: '取消',
-      success: (res) => {
-        if (!res.confirm) {
-          // 取消：保持 2+2，不改分组
-          return;
-        }
-        const illegalIds = {};
-        illegal.forEach((x) => {
-          if (x.groupId) illegalIds[x.groupId] = true;
-        });
-        const next = draft.map((g) => {
-          const gid = g && g.groupId != null ? String(g.groupId) : '';
-          if (!gid || !illegalIds[gid]) return g;
-          return Object.assign({}, g, {
-            players: Array.from({ length: PLAYER_SLOTS }, (_, i) =>
-              createEmptyGroupPlayer(i + 1)
-            )
-          });
-        });
-        this.setData({ strokeCompositionMode: '4+0' }, () => {
-          this._setGroupDraft(next);
-        });
-      }
+    this.setData({ strokeCompositionMode: mode }, () => {
+      this._refreshCards();
     });
   },
 
@@ -872,41 +808,6 @@ Page({
         fromSeriesRoster: !!(found.fromSeriesRoster || src.fromSeriesRoster)
       }, previous || found);
     });
-
-    // Series：roster 球员沿用归属；非 roster / 归属失效不得默认第一支球队
-    if (this._fromSeries && this._seriesForPick) {
-      for (let pi = 0; pi < players.length; pi++) {
-        const seat = players[pi];
-        if (!seat || !seat.userId) continue;
-        if (
-          seriesGroupPickRoster.needsAffiliationSelection(seat, this._seriesForPick)
-        ) {
-          wx.showToast({ title: '请选择所属球队/分队', icon: 'none' });
-          return;
-        }
-      }
-    }
-
-    // 报名期：坐入前校验（与 group-pick 同规则）；失败则禁止写回
-    const pickTeamMap = buildRegisterTeamMap({
-      registerInfo: this._registerInfo || { users: [] }
-    });
-    const gameMode = String(this.data.gameMode || '');
-    const pickErr = validatePlayersForRegisterGameMode(
-      players,
-      gameMode,
-      this.data.strokeCompositionMode,
-      pickTeamMap,
-      {
-        useComposition: true,
-        showCompositionMode: !!this.data.showCompositionMode,
-        sideUnit: resolveSideUnitLabel(this._matchSnapshot)
-      }
-    );
-    if (pickErr) {
-      wx.showToast({ title: pickErr, icon: 'none' });
-      return;
-    }
 
     draft[idx] = Object.assign({}, draft[idx], {
       groupName: result.groupName || draft[idx].groupName,
@@ -1168,6 +1069,214 @@ Page({
   _validatePairingDraft(groups, pairingDraft) {
     return tournamentGroupDraft.validatePairingDraft(groups, pairingDraft);
   },
+
+  _normalizeGroupSaveRejectMessage(raw) {
+    const t = String(raw || '').trim();
+    if (!t) return '';
+    const c = t;
+    if (
+      c === 'player_not_on_roster' ||
+      t.indexOf('不在系列赛名单') >= 0 ||
+      t.indexOf('未报名') >= 0 ||
+      t.indexOf('未归属') >= 0 ||
+      t.indexOf('请先完成报名') >= 0
+    ) {
+      return '有球员未报名';
+    }
+    if (
+      c === 'duplicate' ||
+      c === 'incoming_already_in_round' ||
+      t.indexOf('重复球员') >= 0 ||
+      t.indexOf('球员重复') >= 0
+    ) {
+      return '同一球员重复出现在多个位置';
+    }
+    if (t.indexOf('2+2') >= 0 || c === 'affiliation' || c === 'affiliation_mismatch') {
+      return '2+2 队伍组合不合法';
+    }
+    if (t.indexOf('4+0') >= 0 || t.indexOf('4_0') >= 0 || c === '4_0_multi_team') {
+      return '4+0 组合不合法';
+    }
+    if (
+      t.indexOf('必须有且只有') >= 0 ||
+      t.indexOf('未填') >= 0 ||
+      c === 'empty_group'
+    ) {
+      return '存在未填的必要位置';
+    }
+    if (
+      c === 'player_count' ||
+      c === 'group_over_capacity' ||
+      c === 'player_addition' ||
+      c === 'player_removal' ||
+      t.indexOf('人数超过') >= 0 ||
+      t.indexOf('人数超限') >= 0 ||
+      t.indexOf('每组最多') >= 0 ||
+      t.indexOf('赛制要求') >= 0
+    ) {
+      return '分组人数不符合当前赛制';
+    }
+    if (
+      c === 'match_completed' ||
+      c === 'group_finished' ||
+      c === 'station_not_live' ||
+      c === 'series_locked' ||
+      c === 'round_cancelled' ||
+      t.indexOf('已结束') >= 0 ||
+      t.indexOf('已经结束') >= 0 ||
+      t.indexOf('已取消') >= 0
+    ) {
+      return '场次或系列赛已结束';
+    }
+    if (
+      c === 'revision_conflict' ||
+      c === 'stale_confirmation' ||
+      c === 'confirmation_fingerprint_conflict' ||
+      c === 'payload_conflict' ||
+      t.indexOf('其他管理员') >= 0
+    ) {
+      return '数据已被其他管理员更新，请重新确认';
+    }
+    if (
+      c === 'seat_score_moved' ||
+      c === 'seat_anchor_damaged' ||
+      t.indexOf('位置成绩') >= 0
+    ) {
+      return '位置成绩数据异常，无法安全保存';
+    }
+    if (c === 'permission_denied' || t.indexOf('权限') >= 0) {
+      return '无管理权限';
+    }
+    if (
+      c === 'save_failed' ||
+      c === 'restore_failed' ||
+      c === 'flow_prepare_failed' ||
+      t.indexOf('保存失败') >= 0
+    ) {
+      return GROUP_SAVE_SYSTEM_FAIL_MSG;
+    }
+    if (/^[a-z0-9_]+$/i.test(t) && t.indexOf(' ') < 0) {
+      return GROUP_SAVE_SYSTEM_FAIL_MSG;
+    }
+    return t;
+  },
+
+  _mapStrokeRejectMessage(reason, fallback) {
+    const r = String(reason || '');
+    if (r.indexOf('2_2') >= 0 || r.indexOf('g2g3') >= 0 || r.indexOf('illegal_split') >= 0) {
+      return '2+2 队伍组合不合法';
+    }
+    if (r.indexOf('4_0') >= 0 || r.indexOf('4+0') >= 0) {
+      return '4+0 组合不合法';
+    }
+    if (r.indexOf('player_missing') >= 0 || r.indexOf('player_not_on_roster') >= 0) {
+      return '有球员未报名';
+    }
+    if (r.indexOf('g5') >= 0 || r.indexOf('player_count') >= 0) {
+      return '分组人数不符合当前赛制';
+    }
+    return this._normalizeGroupSaveRejectMessage(fallback || STROKE_ENTITY_INVALID_TIP);
+  },
+
+  _showGroupSaveRejectModal(messages, debugCode) {
+    const list = Array.isArray(messages)
+      ? messages.filter(function (m) {
+          return String(m || '').trim();
+        })
+      : [String(messages || '').trim()];
+    const unique = [];
+    const seen = {};
+    list.forEach((item) => {
+      const mapped = this._normalizeGroupSaveRejectMessage(item);
+      if (!mapped || seen[mapped]) return;
+      seen[mapped] = true;
+      unique.push(mapped);
+    });
+    if (debugCode) {
+      console.warn('[group-save-reject]', debugCode, unique);
+    }
+    this.setData({ saving: false });
+    const content = unique.length ? unique.join('\n') : GROUP_SAVE_SYSTEM_FAIL_MSG;
+    wx.showModal({
+      title: GROUP_SAVE_REJECT_TITLE,
+      content: content,
+      showCancel: false,
+      confirmText: '知道了'
+    });
+  },
+
+  _collectGroupSaveRejectIssues(rawDraft, pairingDraft, match) {
+    const issues = [];
+    if (!match) {
+      issues.push(GROUP_SAVE_SYSTEM_FAIL_MSG);
+      return issues;
+    }
+    const user = gameStore.getCurrentUser() || {};
+    const canEdit =
+      matchManageAccess.hasMatchManagePermission(match, user, 'edit_groups') ||
+      matchManageAccess.hasMatchManagePermission(match, user, 'manage_groups');
+    if (!canEdit) issues.push('无管理权限');
+    const finishedGuard = teamMatchFinish.assertWritable(match);
+    if (!finishedGuard.ok) {
+      issues.push('场次或系列赛已结束');
+    }
+    const draftErr = this._validateGroupDraft(rawDraft, pairingDraft);
+    if (draftErr) issues.push(draftErr);
+    if (this._fromSeries) {
+      const sanitizedForLock = this._sanitizeGroupDraft(rawDraft);
+      const ids = seriesNoRepeatLineup.collectDraftMemberIds(sanitizedForLock, pairingDraft);
+      const seriesId = (this._seriesReturnMeta && this._seriesReturnMeta.seriesId) || '';
+      const check = seriesNoRepeatLineup.assertPlayersNotOccupied(ids, {
+        fromSeries: true,
+        seriesId: seriesId,
+        series: (seriesId ? seriesStore.getSeriesById(seriesId) : null) || this._seriesForPick,
+        currentRoundId: (this._seriesReturnMeta && this._seriesReturnMeta.roundId) || '',
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        }
+      });
+      if (!check.ok) {
+        issues.push(check.message || '有球员未报名');
+      }
+    }
+    const rosterUsers =
+      (this._registerInfo && Array.isArray(this._registerInfo.users) && this._registerInfo.users) ||
+      (match.registerInfo && Array.isArray(match.registerInfo.users) && match.registerInfo.users) ||
+      [];
+    const rosterSet = {};
+    rosterUsers.forEach((u) => {
+      const id = String((u && (u.userId || u.playerId)) || '').trim();
+      if (id) rosterSet[id] = true;
+    });
+    if (Object.keys(rosterSet).length) {
+      const groups = Array.isArray(rawDraft) ? rawDraft : [];
+      for (let gi = 0; gi < groups.length; gi++) {
+        const players = Array.isArray(groups[gi] && groups[gi].players) ? groups[gi].players : [];
+        for (let pi = 0; pi < players.length; pi++) {
+          const id = String((players[pi] && players[pi].userId) || '').trim();
+          if (id && !rosterSet[id]) {
+            issues.push('有球员未报名');
+            gi = groups.length;
+            break;
+          }
+        }
+      }
+    }
+    if (
+      this._matchSnapshot &&
+      match &&
+      this._matchSnapshot.updatedAt != null &&
+      match.updatedAt != null &&
+      String(this._matchSnapshot.updatedAt) !== String(match.updatedAt)
+    ) {
+      issues.push('数据已被其他管理员更新，请重新确认');
+    }
+    return issues;
+  },
+
 
   _clearGroupDerivedFields(matchPatch) {
     const next = matchPatch || {};
@@ -1650,14 +1759,14 @@ Page({
     ) {
       return SERIES_LIVE_STALE_MSG;
     }
-    if (
-      c === 'save_failed' ||
-      c === 'seat_score_moved' ||
-      c === 'seat_anchor_damaged' ||
-      c === 'restore_failed'
-    ) {
+    if (c === 'seat_score_moved' || c === 'seat_anchor_damaged') {
+      return SERIES_LIVE_SEAT_SCORE_MSG;
+    }
+    if (c === 'save_failed' || c === 'restore_failed' || c === 'flow_prepare_failed') {
       return SERIES_LIVE_ROLLED_BACK_MSG;
     }
+    const mapped = this._normalizeGroupSaveRejectMessage(c);
+    if (mapped && mapped !== c) return mapped;
     return SERIES_LIVE_SAVE_FAIL_RETRY_MSG;
   },
 
@@ -1743,29 +1852,27 @@ Page({
       return;
     }
     if (status === 'failed_before_write') {
-      this.setData({ saving: false });
-      wx.showToast({ title: SERIES_LIVE_SAVE_FAIL_RETRY_MSG, icon: 'none' });
+      this._showGroupSaveRejectModal(GROUP_SAVE_SYSTEM_FAIL_MSG, out.code || status);
       return;
     }
     if (status === 'failed_rolled_back') {
-      this.setData({ saving: false });
-      wx.showToast({ title: SERIES_LIVE_ROLLED_BACK_MSG, icon: 'none' });
+      this._showGroupSaveRejectModal(GROUP_SAVE_SYSTEM_FAIL_MSG, out.code || status);
       return;
     }
     if (status === 'manual_review' || status === 'retry_not_safe') {
       this.setData({ saving: false });
       wx.showModal({
-        title: '',
+        title: GROUP_SAVE_REJECT_TITLE,
         content: SERIES_LIVE_MANUAL_REVIEW_MSG,
-        showCancel: false
+        showCancel: false,
+        confirmText: '知道了'
       });
       return;
     }
-    this.setData({ saving: false });
-    wx.showToast({
-      title: this._mapSeriesLiveRejectMessage(out.code || out.status),
-      icon: 'none'
-    });
+    this._showGroupSaveRejectModal(
+      this._mapSeriesLiveRejectMessage(out.code || out.status),
+      out.code || out.status
+    );
   },
 
   _runSeriesLiveIdentityCorrection(sanitized, pairingDraft) {
@@ -1796,8 +1903,10 @@ Page({
       const finalized = this._finalizeLiveCandidate(next);
       if (!finalized.ok) {
         console.warn('[stroke-entity-validate]', finalized.reason || 'invalid');
-        this.setData({ saving: false });
-        wx.showToast({ title: STROKE_ENTITY_INVALID_TIP, icon: 'none' });
+        this._showGroupSaveRejectModal(
+          this._mapStrokeRejectMessage(finalized.reason, finalized.message),
+          finalized.reason
+        );
         return;
       }
       next = finalized.candidate;
@@ -1810,8 +1919,7 @@ Page({
 
     const persisted = this._persistLiveMatchWithReadback(next, match);
     if (!persisted.ok) {
-      this.setData({ saving: false });
-      wx.showToast({ title: '保存失败', icon: 'none' });
+      this._showGroupSaveRejectModal(GROUP_SAVE_SYSTEM_FAIL_MSG, persisted.reason);
       return;
     }
 
@@ -1867,46 +1975,12 @@ Page({
     if (this.data.saving) return;
     const rawDraft = Array.isArray(this.data.groupDraft) ? this.data.groupDraft : [];
     const pairingDraft = this.data.pairingDraft || {};
-    // create / edit / live：同一套分组校验（含 G4）
-    const err = this._validateGroupDraft(rawDraft, pairingDraft);
-    if (err) {
-      wx.showToast({ title: err, icon: 'none' });
-      return;
-    }
     const matchId = this.data.matchId || '';
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
-    if (!match) {
-      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
+    const issues = this._collectGroupSaveRejectIssues(rawDraft, pairingDraft, match);
+    if (issues.length) {
+      this._showGroupSaveRejectModal(issues, 'confirm_validate');
       return;
-    }
-    var finishedGuard = teamMatchFinish.assertWritable(match);
-    if (!finishedGuard.ok) {
-      wx.showToast({ title: finishedGuard.message, icon: 'none' });
-      return;
-    }
-    if (this._fromSeries) {
-      const sanitizedForLock = this._sanitizeGroupDraft(rawDraft);
-      const ids = seriesNoRepeatLineup.collectDraftMemberIds(sanitizedForLock, pairingDraft);
-      const seriesId = (this._seriesReturnMeta && this._seriesReturnMeta.seriesId) || '';
-      const check = seriesNoRepeatLineup.assertPlayersNotOccupied(ids, {
-        fromSeries: true,
-        seriesId: seriesId,
-        series: (seriesId ? seriesStore.getSeriesById(seriesId) : null) || this._seriesForPick,
-        currentRoundId: (this._seriesReturnMeta && this._seriesReturnMeta.roundId) || '',
-        getMatchById: function (id) {
-          return teamMatchStore.getMatchById(id);
-        },
-        getIndexByMatchId: function (id) {
-          return seriesStationIndex.getByMatchId(id);
-        }
-      });
-      if (!check.ok) {
-        wx.showToast({
-          title: check.message || seriesGroupPickRoster.NO_REPEAT_SAVE_MSG,
-          icon: 'none'
-        });
-        return;
-      }
     }
     this.setData({ saving: true });
     if (this.data.mode === 'live') {
@@ -1990,8 +2064,10 @@ Page({
       const check = validateStrokeEntities(next);
       if (!check || check.valid !== true) {
         console.warn('[stroke-entity-validate]', check && check.reason ? check.reason : 'invalid');
-        this.setData({ saving: false });
-        wx.showToast({ title: STROKE_ENTITY_INVALID_TIP, icon: 'none' });
+        this._showGroupSaveRejectModal(
+          this._mapStrokeRejectMessage(check && check.reason, STROKE_ENTITY_INVALID_TIP),
+          check && check.reason
+        );
         return;
       }
       next.scoreEntities = syncStrokeEntities(next);

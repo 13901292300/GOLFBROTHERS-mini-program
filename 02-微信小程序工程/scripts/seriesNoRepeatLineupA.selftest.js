@@ -472,23 +472,17 @@ function lockInput(series, roundId, harness) {
     pickWxml.indexOf('noRepeatHint') >= 0 && pickWxml.indexOf('noRepeatLocked') >= 0
   );
   assert(
-    '点击不信任旧 isDisabled 并重新核验',
-    /onTogglePlayer[\s\S]*_collectNoRepeatLock[\s\S]*shouldBlockNoRepeatAdd/.test(pickJs) &&
-      pickJs.indexOf('不信任 data-user') >= 0
-  );
-  assert(
-    '当前 slot 先允许取消再拦截重选',
-    /selectedIndex >= 0[\s\S]*createEmptySlot[\s\S]*shouldBlockNoRepeatAdd/.test(pickJs)
-  );
-  assert(
-    '确认前二次校验',
-    /_validateBeforeCommit[\s\S]*assertPlayersNotPlayedPriorRound/.test(pickJs)
+    '选人确定不在 pick 内做上场合法性校验',
+    /_validateBeforeCommit\(\) \{\s*return true;/.test(pickJs)
   );
   assert(
     '最终保存前二次校验且在 saveMatch 之前',
-    /onConfirm\(\) \{[\s\S]*assertPlayersNotOccupied[\s\S]*this\.setData\(\{\s*saving:\s*true\s*\}\)/.test(
+    /onConfirm\(\) \{[\s\S]*_collectGroupSaveRejectIssues[\s\S]*this\.setData\(\{\s*saving:\s*true\s*\}\)/.test(
       editorJs
-    )
+    ) &&
+      /_collectGroupSaveRejectIssues[\s\S]*assertPlayersNotOccupied[\s\S]*this\.setData\(\{\s*saving:\s*true\s*\}\)/.test(
+        editorJs
+      )
   );
   assert(
     '普通路径仍跳过 fromSeries',

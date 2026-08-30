@@ -280,8 +280,7 @@ assert('8 不二次确认 fingerprint', flowCalls.length === 1);
 var mapper = makeEditor({ _fromSeries: true, mode: 'live' });
 assert(
   '9 revision_conflict 仍提示状态变化',
-  mapper._mapSeriesLiveRejectMessage('revision_conflict').indexOf('已变化') >= 0 ||
-    String(mapper._mapSeriesLiveRejectMessage('revision_conflict')).length > 0
+  mapper._mapSeriesLiveRejectMessage('revision_conflict') === '数据已被其他管理员更新，请重新确认'
 );
 assert(
   '10 产品不再出现一次一人文案',
@@ -295,13 +294,13 @@ assert(
 );
 assert(
   '12 add/remove 人数提示',
-  mapper._mapSeriesLiveRejectMessage('player_addition') === '分组人数超限' &&
-    mapper._mapSeriesLiveRejectMessage('player_removal') === '分组人数超限'
+  mapper._mapSeriesLiveRejectMessage('player_addition') === '分组人数不符合当前赛制' &&
+    mapper._mapSeriesLiveRejectMessage('player_removal') === '分组人数不符合当前赛制'
 );
 assert(
   '13 重复/名单/归属',
-  mapper._mapSeriesLiveRejectMessage('incoming_already_in_round') === '球员重复' &&
-    mapper._mapSeriesLiveRejectMessage('player_not_on_roster') === '球员不在系列赛名单' &&
+  mapper._mapSeriesLiveRejectMessage('incoming_already_in_round') === '同一球员重复出现在多个位置' &&
+    mapper._mapSeriesLiveRejectMessage('player_not_on_roster') === '有球员未报名' &&
     mapper._mapSeriesLiveRejectMessage('no_live_group_change') === '未检测到可保存的换人'
 );
 
@@ -333,7 +332,9 @@ assert(
   '15 failed_before 保留页面',
   navCalls === 0 &&
     failBefore.data.groupDraft[0].keep === true &&
-    toastCalls.some(function (t) { return t.title === '保存失败，请重试'; }) &&
+    modalCalls.some(function (t) {
+      return t.title === '分组无法保存' && String(t.content).indexOf('请稍后重试') >= 0;
+    }) &&
     failBefore.data.saving === false
 );
 
@@ -342,7 +343,9 @@ assert(
   '16 failed_rolled_back 保留页面',
   navCalls === 0 &&
     rolled.data.groupDraft[0].keep === true &&
-    toastCalls.some(function (t) { return t.title === '保存失败，已恢复原分组'; })
+    modalCalls.some(function (t) {
+      return t.title === '分组无法保存' && String(t.content).indexOf('请稍后重试') >= 0;
+    })
 );
 
 var review = runStatus('manual_review');
@@ -364,7 +367,7 @@ assert(
 );
 assert(
   '20 权限丢失',
-  mapper._mapSeriesLiveRejectMessage('permission_denied') === '暂无分组管理权限'
+  mapper._mapSeriesLiveRejectMessage('permission_denied') === '无管理权限'
 );
 
 var reloadFn = editorSrc.slice(
