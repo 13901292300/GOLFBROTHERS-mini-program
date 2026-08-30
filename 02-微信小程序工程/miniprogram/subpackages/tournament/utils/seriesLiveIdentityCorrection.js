@@ -8,12 +8,6 @@ var tournamentGroupDraft = require('../../../utils/tournament/tournamentGroupDra
 var teamMatchFinish = require('../../../utils/teamMatchFinish.js');
 
 var SAVE_KIND = 'identity_correction';
-var PHASE = {
-  prepared: 'prepared',
-  committed: 'committed',
-  rolled_back: 'rolled_back',
-  discarded: 'discarded'
-};
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -228,15 +222,6 @@ function applyScoreOwnership(beforeMatch, candidateMatch) {
   return next;
 }
 
-function snapshotPhase(storageApi, record) {
-  if (!storageApi || typeof storageApi.write !== 'function') return;
-  try {
-    storageApi.write(record);
-  } catch (eWrite) {
-    /* 损坏记录不得阻止保存 */
-  }
-}
-
 function executeSeriesLiveIdentityCorrection(input) {
   var src = input && typeof input === 'object' ? input : {};
   var ctx = {};
@@ -310,15 +295,6 @@ function executeSeriesLiveIdentityCorrection(input) {
 
   if (typeof src.persistMatch !== 'function') return failedBefore('persist_match_required');
 
-  snapshotPhase(src.saveSnapshotApi, {
-    kind: SAVE_KIND,
-    phase: PHASE.prepared,
-    matchId: latestId,
-    seriesId: asString(series && series.seriesId) || asString(stationIndex.seriesId),
-    roundId: asString(stationIndex.roundId),
-    expectedRevision: expectedRevision
-  });
-
   var persistRes;
   try {
     persistRes = src.persistMatch(candidate, beforeMatch);
@@ -334,11 +310,6 @@ function executeSeriesLiveIdentityCorrection(input) {
         kind: SAVE_KIND
       };
     }
-    snapshotPhase(src.saveSnapshotApi, {
-      kind: SAVE_KIND,
-      phase: PHASE.rolled_back,
-      matchId: latestId
-    });
     return {
       ok: false,
       status: 'failed_rolled_back',
@@ -359,11 +330,6 @@ function executeSeriesLiveIdentityCorrection(input) {
         kind: SAVE_KIND
       };
     }
-    snapshotPhase(src.saveSnapshotApi, {
-      kind: SAVE_KIND,
-      phase: PHASE.rolled_back,
-      matchId: latestId
-    });
     return {
       ok: false,
       status: 'failed_rolled_back',
@@ -427,11 +393,6 @@ function executeSeriesLiveIdentityCorrection(input) {
     return rejected('readback_identity_mismatch');
   }
 
-  snapshotPhase(src.saveSnapshotApi, {
-    kind: SAVE_KIND,
-    phase: PHASE.committed,
-    matchId: latestId
-  });
   return {
     ok: true,
     status: 'completed',
@@ -443,7 +404,6 @@ function executeSeriesLiveIdentityCorrection(input) {
 
 module.exports = {
   SAVE_KIND: SAVE_KIND,
-  PHASE: PHASE,
   executeSeriesLiveIdentityCorrection: executeSeriesLiveIdentityCorrection,
   assertSeatFacts: assertSeatFacts,
   applyScoreOwnership: applyScoreOwnership

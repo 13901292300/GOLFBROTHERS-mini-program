@@ -363,9 +363,71 @@ function run(before, after, series, extras) {
   assert(
     '生产入口已切换',
     src.indexOf('executeSeriesLiveIdentityCorrection') >= 0 &&
+      src.indexOf('_runSeriesLiveIdentityCorrection') >= 0 &&
       src.indexOf('seriesLiveSingleReplaceFlow') < 0 &&
+      src.indexOf('seriesLiveMutationJournal') < 0 &&
+      src.indexOf('seriesLiveMutationRecovery') < 0 &&
+      src.indexOf('recoverSeriesLiveBatchBeforeRead') < 0 &&
+      src.indexOf('gb_series_live_mutation_journal') < 0 &&
       src.indexOf('[LIVE_CORRECTION_RESULT]') < 0 &&
-      src.indexOf('[LIVE_CORRECTION_THROW]') < 0
+      src.indexOf('[LIVE_CORRECTION_THROW]') < 0 &&
+      src.indexOf('_showSeriesLiveConfirmModal') < 0 &&
+      src.indexOf('confirmation_required') < 0 &&
+      /require\([^)]*seriesLiveSingleReplaceFlow/.test(src) === false
+  );
+  var miniRoot = path.join(__dirname, '..', 'miniprogram');
+  function walkJs(dir, acc) {
+    acc = acc || [];
+    fs.readdirSync(dir).forEach(function (name) {
+      if (name === 'node_modules') return;
+      var abs = path.join(dir, name);
+      if (fs.statSync(abs).isDirectory()) {
+        walkJs(abs, acc);
+        return;
+      }
+      if (!/\.js$/i.test(name)) return;
+      acc.push(abs);
+    });
+    return acc;
+  }
+  var banned = [
+    'seriesLiveSingleReplaceFlow',
+    'seriesLiveSingleReplaceClassifier',
+    'seriesLiveSingleSeatFillClassifier',
+    'seriesLiveReplaceDecision',
+    'seriesLiveReplacePlan',
+    'seriesLiveReplaceExecute',
+    'seriesLiveReplacePreflight',
+    'seriesLiveRollbackExecute',
+    'seriesLiveRollbackPreflight',
+    'seriesLiveBatchReplace',
+    'seriesLiveMutationJournal',
+    'seriesLiveMutationRecovery',
+    'seriesLiveAffiliationEvidence',
+    'recoverSeriesLiveBatchBeforeRead',
+    'recoverIncompleteLiveBatch',
+    'gb_series_live_mutation_journal_v1',
+    'executeSeriesLiveReplace',
+    'executeSeriesLiveBatchReplace'
+  ];
+  var hits = [];
+  walkJs(miniRoot).forEach(function (abs) {
+    var text = fs.readFileSync(abs, 'utf8');
+    banned.forEach(function (token) {
+      if (text.indexOf(token) >= 0) hits.push(path.relative(miniRoot, abs) + ':' + token);
+    });
+  });
+  assert('生产不存在旧换人/journal 入口', hits.length === 0);
+  var identitySrc = fs.readFileSync(
+    path.join(miniRoot, 'subpackages', 'tournament', 'utils', 'seriesLiveIdentityCorrection.js'),
+    'utf8'
+  );
+  assert(
+    '身份纠正独立于旧 journal',
+    identitySrc.indexOf('saveSnapshotApi') < 0 &&
+      identitySrc.indexOf('seriesLiveMutationJournal') < 0 &&
+      identitySrc.indexOf('persistMatch(beforeMatch') >= 0 &&
+      identitySrc.indexOf('executeSeriesLiveIdentityCorrection') >= 0
   );
 })();
 

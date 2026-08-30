@@ -36,7 +36,6 @@ const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');
 const seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
 const seriesLiveIdentityCorrection = require('../../utils/seriesLiveIdentityCorrection.js');
-const seriesLiveMutationRecovery = require('../../utils/seriesLiveMutationRecovery.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
 const {
   PLAYER_SLOTS,
@@ -173,10 +172,6 @@ Page({
         ? decodeURIComponent(String(options.roundId))
         : ''
     };
-    if (this._fromSeries && matchId) {
-      const peek = teamMatchStore.getMatchById(matchId);
-      if (peek) this._lastBatchRecovery = this._recoverIncompleteLiveBatchMutations(peek);
-    }
     const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
     if (match && teamMatchFinish.isMatchCompleted(match)) {
       wx.showToast({ title: teamMatchFinish.MATCH_FINISHED_TOAST, icon: 'none' });
@@ -1243,32 +1238,6 @@ Page({
     return rematerializeLivePlayersAfterNormalize(normalizedGroups, liveGroupsBefore);
   },
 
-  _recoverIncompleteLiveBatchMutations(match) {
-    const ctx = (match && match.seriesContext) || {};
-    const self = this;
-    try {
-      return seriesLiveMutationRecovery.recoverSeriesLiveBatchBeforeRead({
-        matchId: match && match.matchId,
-        seriesId: ctx.seriesId,
-        roundId: ctx.roundId,
-        persistMatch: function (next, previousMatch) {
-          return self._persistLiveMatchWithReadback(next, previousMatch || next);
-        },
-        persistSeries: function (next, expectedRev) {
-          return seriesStore.upsertSeriesChecked(next, expectedRev);
-        },
-        getMatchById: function (id) {
-          return teamMatchStore.getMatchById(id);
-        },
-        getSeriesById: function (id) {
-          return seriesStore.getSeriesById(id);
-        }
-      });
-    } catch (eRec) {
-      return { ok: false, conflict: false, results: [] };
-    }
-  },
-
   _persistLiveMatchWithReadback(next, previousMatch) {
     const prev = previousMatch;
     try {
@@ -1683,9 +1652,6 @@ Page({
     }
     if (
       c === 'save_failed' ||
-      c === 'journal_write_failed' ||
-      c === 'roster_save_failed' ||
-      c === 'batch_persist_throw' ||
       c === 'seat_score_moved' ||
       c === 'seat_anchor_damaged' ||
       c === 'restore_failed'
@@ -1693,29 +1659,6 @@ Page({
       return SERIES_LIVE_ROLLED_BACK_MSG;
     }
     return SERIES_LIVE_SAVE_FAIL_RETRY_MSG;
-  },
-
-  _seriesLiveConfirmCopy(flowResult, incomingPlayer) {
-    const display = (flowResult && flowResult.confirmationDisplay) || {};
-    const part = display.participant && typeof display.participant === 'object' ? display.participant : {};
-    const incomingName =
-      String(
-        (incomingPlayer && (incomingPlayer.displayName || incomingPlayer.playerNameSnapshot)) ||
-          display.incomingUserId ||
-          ''
-      ).trim() || '该球员';
-    const teamName = String(part.shortName || part.name || '').trim() || '目标方';
-    return {
-      title: '调整参赛归属',
-      content:
-        '将 ' +
-        incomingName +
-        ' 在本系列赛的归属调整为 ' +
-        teamName +
-        ' 对应的球队/分队，并完成本次换人？',
-      confirmText: '确认调整并替换',
-      cancelText: '取消'
-    };
   },
 
   _hasSeriesLiveManagePermission(info) {
@@ -1784,53 +1727,10 @@ Page({
     return this._pageAlive !== false;
   },
 
-  _showSeriesLiveConfirmModal(flowResult, session) {
-    const copy = this._seriesLiveConfirmCopy(flowResult, session && session.incomingPlayer);
-    const fingerprint = String(
-      (flowResult && (flowResult.confirmationFingerprint || (flowResult.plan && flowResult.plan.confirmationFingerprint))) ||
-        ''
-    );
-    const self = this;
-    wx.showModal({
-      title: copy.title,
-      content: copy.content,
-      confirmText: copy.confirmText,
-      cancelText: copy.cancelText,
-      success(res) {
-        if (!self._seriesLivePageAlive()) return;
-        if (res && res.confirm) {
-          self.setData({ saving: true });
-          self._runSeriesLiveIdentityCorrection(
-            session.sanitized,
-            session.pairingDraft,
-            fingerprint,
-            { staleReprompted: !!session.staleReprompted }
-          );
-          return;
-        }
-        self.setData({ saving: false });
-      }
-    });
-  },
-
   _handleSeriesLiveFlowResult(result, session) {
     if (!this._seriesLivePageAlive()) return;
     const out = result && typeof result === 'object' ? result : {};
     const status = String(out.status || '');
-    const code = String(out.code || out.reason || '');
-    if (status === 'confirmation_required') {
-      this._showSeriesLiveConfirmModal(out, Object.assign({}, session, { staleReprompted: false }));
-      return;
-    }
-    if (status === 'stale_confirmation') {
-      if (!session.staleReprompted && (out.confirmationDisplay || out.confirmationFingerprint || out.plan)) {
-        this._showSeriesLiveConfirmModal(out, Object.assign({}, session, { staleReprompted: true }));
-        return;
-      }
-      this.setData({ saving: false });
-      wx.showToast({ title: SERIES_LIVE_STALE_MSG, icon: 'none' });
-      return;
-    }
     if (status === 'completed') {
       this.setData({ saving: false });
       this._leavingConfirmed = true;
@@ -1868,8 +1768,7 @@ Page({
     });
   },
 
-  _runSeriesLiveIdentityCorrection(sanitized, pairingDraft, extras) {
-    const extra = extras || {};
+  _runSeriesLiveIdentityCorrection(sanitized, pairingDraft) {
     const ctxPreview = this._reloadSeriesLiveReplaceContext(sanitized);
     const input = this._buildSeriesLiveIdentityCorrectionInput(sanitized, pairingDraft);
     input.currentUser = ctxPreview.currentUser || input.currentUser;
@@ -1879,20 +1778,10 @@ Page({
       result = this._executeSeriesLiveIdentityCorrection(input);
     } catch (eRun) {
       result = { ok: false, status: 'failed_before_write', code: 'flow_prepare_failed' };
-      this._handleSeriesLiveFlowResult(result, {
-        sanitized: sanitized,
-        pairingDraft: pairingDraft,
-        incomingPlayer: ctxPreview.incomingPlayer,
-        staleReprompted: !!extra.staleReprompted
-      });
+      this._handleSeriesLiveFlowResult(result);
       return result;
     }
-    this._handleSeriesLiveFlowResult(result, {
-      sanitized: sanitized,
-      pairingDraft: pairingDraft,
-      incomingPlayer: ctxPreview.incomingPlayer,
-      staleReprompted: !!extra.staleReprompted
-    });
+    this._handleSeriesLiveFlowResult(result);
     return result;
   },
 

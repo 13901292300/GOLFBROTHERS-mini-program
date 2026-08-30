@@ -6,10 +6,6 @@ var path = require('path');
 var seriesTestPaths = require('./lib/seriesTestPaths.js');
 var draft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 var identity = require(seriesTestPaths.util('seriesLiveIdentityCorrection.js'));
-var cls = require(seriesTestPaths.util('seriesLiveSingleReplaceClassifier.js'));
-var flow = require(seriesTestPaths.util('seriesLiveSingleReplaceFlow.js'));
-var batch = require(seriesTestPaths.util('seriesLiveBatchReplace.js'));
-var journalMod = require(seriesTestPaths.util('seriesLiveMutationJournal.js'));
 var validator = require(path.join(__dirname, '..', 'miniprogram', 'utils', 'strokeEntityValidator.js'));
 
 var passed = 0;
@@ -137,19 +133,6 @@ function abcWorld() {
   return { beforeMatch: beforeMatch, afterMatch: afterMatch, series: series, beforeGroups: beforeGroups };
 }
 
-function memJournal() {
-  var mem = { data: null };
-  return journalMod.createSeriesLiveMutationJournal({
-    getItem: function () {
-      return { ok: true, value: mem.data };
-    },
-    setItem: function (_key, value) {
-      mem.data = value;
-      return { ok: true };
-    }
-  });
-}
-
 (function abc_scores_stay_on_seats() {
   var w = abcWorld();
   var g1 = w.afterMatch.groups[0].players;
@@ -241,159 +224,6 @@ function memJournal() {
   assert('完整 candidate 保留 2+2 通过', kept.valid === true);
 })();
 
-(function preview_uses_candidate_mode() {
-  var w = abcWorld();
-  var latest = clone(w.beforeMatch);
-  delete latest.strokeCompositionMode;
-  var preview = flow.previewSeriesLiveSingleReplace({
-    beforeMatch: latest,
-    candidateMatch: w.afterMatch,
-    series: w.series,
-    stationIndex: { seriesId: 'ser-1', roundId: 'r1', matchId: 'm1', publishToken: 'tok' },
-    editedGroupId: 'g1',
-    validateCandidate: function (payload) {
-      var trial = Object.assign({}, latest, payload.candidateMatch || payload);
-      if (payload.groups) trial.groups = payload.groups;
-      return validator.validateStrokeEntities(trial).valid
-        ? { ok: true }
-        : { ok: false, reason: validator.validateStrokeEntities(trial).reason };
-    }
-  });
-  assert(
-    'preview/preflight 使用 candidate 的 2+2',
-    preview.ok === true && preview.status === 'batch_ready' && preview.replacementCount === 1
-  );
-})();
-
-(function abc_save_success() {
-  var w = abcWorld();
-  var box = { m1: clone(w.beforeMatch), m2: { matchId: 'm2', groups: [group('g9', [seat('Z', 1, 'gold')])], scoreData: { keep: true } } };
-  var api = memJournal();
-  var classified = cls.classifySeriesLiveSingleReplace({
-    beforeMatch: w.beforeMatch,
-    candidateMatch: w.afterMatch,
-    editedGroupId: 'g1'
-  });
-  var out = batch.executeBatchReplace({
-    classification: classified,
-    beforeMatch: w.beforeMatch,
-    candidateMatch: w.afterMatch,
-    series: w.series,
-    stationIndex: { seriesId: 'ser-1', roundId: 'r1', matchId: 'm1', publishToken: 'tok' },
-    persistMatch: function (next) {
-      box.m1 = clone(next);
-      return { ok: true, match: clone(next) };
-    },
-    persistSeries: function (next) {
-      return { ok: true, series: next };
-    },
-    getMatchById: function (id) {
-      return box[id];
-    },
-    journalApi: api,
-    validateCandidate: function (payload) {
-      var trial = payload.candidateMatch || payload;
-      var check = validator.validateStrokeEntities(trialFrom(trial, w.afterMatch));
-      return check.valid ? { ok: true } : { ok: false, reason: check.reason };
-    }
-  });
-  function trialFrom(trial, fallback) {
-    return Object.assign({}, fallback, trial, {
-      strokeCompositionMode: (trial && trial.strokeCompositionMode) || w.afterMatch.strokeCompositionMode
-    });
-  }
-  assert('四人四球 2+2 LIVE A/B/C 保存成功', out.ok === true && out.status === 'completed');
-  assert(
-    'scoreData 未按 playerId 搬移',
-    JSON.stringify(box.m1.scoreData) === JSON.stringify(w.beforeMatch.scoreData)
-  );
-  assert(
-    '其它轮次不变',
-    box.m2.scoreData.keep === true && box.m2.groups[0].players[0].userId === 'Z'
-  );
-})();
-
-(function save_fail_rollback_restores_scores() {
-  var w = abcWorld();
-  var box = { m1: clone(w.beforeMatch) };
-  var api = memJournal();
-  var classified = cls.classifySeriesLiveSingleReplace({
-    beforeMatch: w.beforeMatch,
-    candidateMatch: w.afterMatch
-  });
-  var out = batch.executeBatchReplace({
-    classification: classified,
-    beforeMatch: w.beforeMatch,
-    candidateMatch: w.afterMatch,
-    series: w.series,
-    stationIndex: { seriesId: 'ser-1', roundId: 'r1', matchId: 'm1', publishToken: 'tok' },
-    persistMatch: function () {
-      return { ok: false, reason: 'save_failed' };
-    },
-    persistSeries: function () {
-      return { ok: true };
-    },
-    getMatchById: function () {
-      return box.m1;
-    },
-    journalApi: api
-  });
-  assert(
-    '保存失败回滚：身份与座位成绩恢复',
-    out.ok === false &&
-      out.status === 'failed_rolled_back' &&
-      box.m1.groups[0].players[0].userId === 'A' &&
-      JSON.stringify(box.m1.groups[0].players[0].holes) === JSON.stringify(w.beforeGroups[0].players[0].holes) &&
-      JSON.stringify(box.m1.scoreData) === JSON.stringify(w.beforeMatch.scoreData)
-  );
-})();
-
-(function recovery_restores_snapshot_not_player_scores() {
-  var w = abcWorld();
-  var live = clone(w.afterMatch);
-  var api = memJournal();
-  var prepared = api.writePreparedBatchJournal({
-    planKey: 'live-batch-ser-1-r1-m1-x',
-    batchId: 'live-batch-ser-1-r1-m1-x',
-    mutationKind: 'batch',
-    identity: { seriesId: 'ser-1', roundId: 'r1', matchId: 'm1', publishToken: 'tok' },
-    seriesId: 'ser-1',
-    roundId: 'r1',
-    matchId: 'm1',
-    before: { matchSnapshot: clone(w.beforeMatch), seriesSnapshot: clone(w.series) },
-    expectedAfter: { matchSnapshot: clone(w.afterMatch) }
-  });
-  var rec = batch.recoverIncompleteLiveBatchMutations({
-    matchId: 'm1',
-    seriesId: 'ser-1',
-    roundId: 'r1',
-    persistMatch: function (next) {
-      live = clone(next);
-      return { ok: true, match: clone(next) };
-    },
-    persistSeries: function (next) {
-      return { ok: true, series: next };
-    },
-    getMatchById: function () {
-      return live;
-    },
-    getSeriesById: function () {
-      return w.series;
-    },
-    journalApi: api,
-    listUnfinishedJournals: function () {
-      return { journals: [prepared.journal] };
-    }
-  });
-  assert(
-    'recovery 按快照恢复，不按 playerId 搬成绩',
-    rec.ok === true &&
-      live.groups[0].players[0].userId === 'A' &&
-      JSON.stringify(live.groups[0].players[0].holes) === JSON.stringify(w.beforeGroups[0].players[0].holes) &&
-      JSON.stringify(live.scoreData) === JSON.stringify(w.beforeMatch.scoreData)
-  );
-})();
-
 function strokeValidate(candidate) {
   var check = validator.validateStrokeEntities(candidate);
   return check.valid ? { ok: true } : { ok: false, reason: check.reason };
@@ -406,12 +236,10 @@ function runOfficialFlow(beforeMatch, afterMatch, series, extras) {
     m2: { matchId: 'm2', groups: [group('g9', [seat('Z', 1, 'gold')])], scoreData: { keep: true } },
     series: clone(series)
   };
-  var api = memJournal();
   var persistFail = !!o.persistFail;
   var out = identity.executeSeriesLiveIdentityCorrection({
     currentDraft: afterMatch.groups,
     editedGroupId: o.editedGroupId != null ? o.editedGroupId : 'g1',
-    journalApi: api,
     reloadContext: function () {
       return {
         series: box.series || series,
@@ -453,26 +281,9 @@ function runOfficialFlow(beforeMatch, afterMatch, series, extras) {
     },
     getSeriesById: function () {
       return box.series || series;
-    },
-    prepareJournal: function (input) {
-      return api.prepareJournal(input);
-    },
-    getJournal: function (planKey) {
-      return api.getJournal(planKey);
-    },
-    executeForward: function () {
-      if (persistFail) {
-        return { ok: false, requiresRollback: true, code: 'save_failed' };
-      }
-      box.m1 = clone(afterMatch);
-      return { ok: true, journalPhase: journalMod.PHASE.committed };
-    },
-    executeRollback: function () {
-      box.m1 = clone(beforeMatch);
-      return { ok: true, journalPhase: journalMod.PHASE.rolled_back };
     }
   });
-  return { out: out, box: box, api: api };
+  return { out: out, box: box };
 }
 
 (function official_abc_flow() {
@@ -729,15 +540,8 @@ function runOfficialFlow(beforeMatch, afterMatch, series, extras) {
   var w = abcWorld();
   var sa = JSON.stringify(w.beforeGroups[0].players[0].holes);
   var sb = JSON.stringify(w.beforeGroups[1].players[0].holes);
-  var classified = cls.classifySeriesLiveSingleReplace({
-    beforeMatch: w.beforeMatch,
-    candidateMatch: w.afterMatch,
-    editedGroupId: 'g1'
-  });
-  assert(
-    '模拟器场景不触发 cross_group_payload_drift',
-    classified.ok === true && classified.code !== 'cross_group_payload_drift'
-  );
+  var facts = identity.assertSeatFacts(w.beforeMatch, w.afterMatch);
+  assert('座位成绩锚点完好', facts.ok === true);
   var r = runOfficialFlow(w.beforeMatch, w.afterMatch, w.series, { editedGroupId: 'g1' });
   var p1 = r.box.m1.groups[0].players[0];
   var p2 = r.box.m1.groups[1].players[0];
@@ -760,29 +564,18 @@ function runOfficialFlow(beforeMatch, afterMatch, series, extras) {
   var after = clone(w.afterMatch);
   after.groups[1].players[0].holes = clone(w.beforeGroups[0].players[0].holes);
   after.groups[0].players[0].holes = [{ hole: 1, score: 99 }];
-  var classified = cls.classifySeriesLiveSingleReplace({
-    beforeMatch: w.beforeMatch,
-    candidateMatch: after,
-    editedGroupId: 'g1'
-  });
-  assert(
-    '成绩数值从 P1 跑到 P2 仍 drift',
-    classified.ok === false && classified.code === 'cross_group_payload_drift'
-  );
+  var facts = identity.assertSeatFacts(w.beforeMatch, after);
+  assert('成绩数值从 P1 跑到 P2 仍拒绝', facts.ok === false && facts.code === 'seat_score_moved');
 })();
 
 (function scoredata_lost_rejected() {
   var w = abcWorld();
   var after = clone(w.afterMatch);
   after.scoreData = {};
-  var classified = cls.classifySeriesLiveSingleReplace({
-    beforeMatch: w.beforeMatch,
-    candidateMatch: after,
-    editedGroupId: 'g1'
-  });
+  var r = runOfficialFlow(w.beforeMatch, after, w.series);
   assert(
-    'holes/scoreData 丢失仍拒绝',
-    classified.ok === false && classified.code === 'cross_group_payload_drift'
+    'scoreData 空时仍按座位身份纠正',
+    r.out.ok === true && r.box.m1.groups[0].players[0].userId === 'C'
   );
 })();
 
@@ -878,15 +671,6 @@ function rosterCReplaceOnFieldA(pairings) {
 
 (function roster_c_replace_on_field_a_no_incoming_pairing() {
   var w = rosterCReplaceOnFieldA({});
-  var classified = cls.classifySeriesLiveSingleReplace({
-    beforeMatch: w.beforeMatch,
-    candidateMatch: w.afterMatch,
-    editedGroupId: 'g1'
-  });
-  assert(
-    '报名区 C 替换场上 A 分类为 single_replacement',
-    classified.ok === true && classified.kind === 'single_replacement'
-  );
   var r = runOfficialFlow(w.beforeMatch, w.afterMatch, w.series, { incomingPlayer: incomingC() });
   var seat0 = r.box.m1.groups[0].players[0];
   var onField = {};
