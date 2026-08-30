@@ -165,21 +165,7 @@
 
       <!-- 游戏 -->
       <block wx:if="{{activeTab === 'game'}}">
-        <view class="ds-card info-card">
-          <view class="info-row"><text class="info-row-label">状态</text><text class="info-row-value">{{statusText}}</text></view>
-          <view class="info-row"><text class="info-row-label">球场</text><text class="info-row-value">{{courseName}}</text></view>
-          <view class="info-row"><text class="info-row-label">赛制</text><text class="info-row-value">{{gameFormat}}</text></view>
-          <view class="info-row"><text class="info-row-label">分组</text><text class="info-row-value">{{groupCards.length}} 组</text></view>
-        </view>
-
-        <view class="hub-section-title">按组继续记分</view>
-        <view wx:for="{{groupCards}}" wx:key="groupId" class="hub-game-row">
-          <view class="hub-game-row__left">
-            <text class="hub-game-row__name">{{item.name}}</text>
-            <text class="hub-group-status hub-group-status--{{item.statusKey}}">{{item.statusText}} · {{item.playerCount}}人</text>
-          </view>
-          <view bindtap="onEnterGroup" data-index="{{item.groupIndex}}" class="hub-enter-btn">进入记分</view>
-        </view>
+        <game-tab host-snapshot="{{hostSnapshot}}"></game-tab>
       </block>
 
     </view>

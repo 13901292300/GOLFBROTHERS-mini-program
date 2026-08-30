@@ -305,3 +305,15 @@
 .board-left__foot {
   border-bottom: 0;
 }
+
+.empty-tab__summary {
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.empty-tab__line {
+  font-size: 24rpx;
+  color: var(--text-muted);
+}

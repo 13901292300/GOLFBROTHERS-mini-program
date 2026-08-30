@@ -50,7 +50,7 @@
   <!-- Main Content -->
   <view class="score-main">
     <!-- Score Tab Panel -->
-    <view wx:if="{{activeTab !== 'discussion'}}" class="score-tab-panel">
+    <view wx:if="{{activeTab === 'score'}}" class="score-tab-panel">
       <!-- Course & Game Info：TAB 与 HOLE 之间的可下拉信息栏（轻量 Context Panel 入口） -->
       <view id="course-game-info" class="course-game-info">
         <view class="course-game-info__head score-info-row">
@@ -1401,6 +1401,8 @@
       </scroll-view>
     </view>
 
+    <game-tab wx:if="{{activeTab === 'game'}}" host-snapshot="{{hostSnapshot}}"></game-tab>
+
     <!-- Discussion Tab Panel -->
     <!-- 讨论区：复用全局唯一 Discussion Chat System 组件（围观行 + 聊天流 + emoji + 输入栏，禁止本页单独实现） -->
     <view wx:if="{{activeTab === 'discussion'}}" id="discussion-tab-panel" class="score-discussion-panel">
@@ -1418,7 +1420,7 @@
   </view>
 
   <!-- Floating Actions -->
-  <view wx:if="{{activeTab !== 'discussion'}}" id="score-actions" class="score-actions">
+  <view wx:if="{{activeTab === 'score'}}" id="score-actions" class="score-actions">
     <view
       bindtap="openGroupManagePage"
       data-disabled="{{addDeleteDisabled}}"
@@ -1461,7 +1463,7 @@
   </view>
 
   <!-- Score Input Sheet -->
-  <view wx:if="{{showScoreSheet}}" id="score-input-sheet" class="score-input-sheet {{scorePanelMode === 'quick' ? 'quick-mode' : ''}} {{isReadOnlyScore ? 'is-readonly' : ''}}">
+  <view wx:if="{{showScoreSheet && activeTab === 'score'}}" id="score-input-sheet" class="score-input-sheet {{scorePanelMode === 'quick' ? 'quick-mode' : ''}} {{isReadOnlyScore ? 'is-readonly' : ''}}">
     <view class="score-input-sheet__mask" bindtap="closeScoreInput"></view>
     <view class="score-input-sheet__panel {{scoreSheetOpen ? 'score-input-sheet__panel--open' : ''}}">
       <view class="score-input-sheet__handle"></view>

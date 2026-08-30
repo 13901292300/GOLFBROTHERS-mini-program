@@ -18,9 +18,11 @@
     "leaderboard-player-identity": "/components/leaderboard-player-identity/index",
     "follow-action-btn": "/components/follow-action-btn/index",
     "player-action-modal": "/components/player-action-modal/index",
-    "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index"
+    "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index",
+    "game-tab": "/subpackages/game/components/game-tab/index"
   },
   "componentPlaceholder": {
-    "player-reaction-overlay": "view"
+    "player-reaction-overlay": "view",
+    "game-tab": "view"
   }
 }

@@ -42,6 +42,7 @@ const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
 const tempAdminAccess = require('../../../../utils/tempAdminAccess.js');
 const qrAccessAuth = require('../../../../utils/qrAccessAuth.js');
 const playerManage = require('../../../../utils/playerManage.js');
+const sideGameHostSnapshot = require('../../utils/sideGameHostSnapshot.js');
 const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const paymentManage = require('../../../../utils/paymentManage.js');
 const registrationInteractionModel = require('../../utils/registrationInteractionModel.js');
@@ -917,6 +918,7 @@ Page({
 
     // 顶部赛事信息（来自 teamMatchStore，非硬编码）
     matchId: '',
+    hostSnapshot: {},
     match: EMPTY_MATCH_VIEW,
     matchStatus: EMPTY_MATCH_LIFECYCLE,
     eventInfoList: [],
@@ -1858,6 +1860,10 @@ Page({
     this._preferredActiveTab = '';
     this.setData(Object.assign({
       matchId: matchId,
+      hostSnapshot: sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(matchId), {
+        scope: 'match',
+        allowBigPot: false
+      }),
       match: this._mapMatchToView(match),
       courseName: (match && match.courseName) || '',
       scorecardCourseTitle: scorecardCourseTitle,
@@ -1938,6 +1944,10 @@ Page({
     );
     this.setData(Object.assign({
       match: this._mapMatchToView(match),
+      hostSnapshot: sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(matchId), {
+        scope: 'match',
+        allowBigPot: false
+      }),
       courseName: match.courseName || '',
       scorecardCourseTitle: scorecardCourseTitle,
       matchStatus: lifecycle,
@@ -5157,6 +5167,14 @@ Page({
       patch.hideRegisterCTA = false;
     }
     this.setData(patch);
+    if (tab === 'game') {
+      this.setData({
+        hostSnapshot: sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(this.data.matchId), {
+          scope: 'match',
+          allowBigPot: false
+        })
+      });
+    }
     wx.nextTick(() => {
       this.updateTabContentSpacer();
       if (tab === 'discussion') this.measureWatchersTop();

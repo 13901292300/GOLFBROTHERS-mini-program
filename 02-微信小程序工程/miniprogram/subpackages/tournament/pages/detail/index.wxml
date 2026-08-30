@@ -537,17 +537,7 @@
 
       <!-- 游戏 -->
       <block wx:if="{{activeTab === 'game'}}">
-        <view class="game-tab-panel ds-card">
-          <view class="pad-card game-tab-body">
-            <text class="card-title">游戏</text>
-            <text class="card-text card-text--mt">游戏内容将在下一步接入。当前页面已预留该 TAB 容器。</text>
-          </view>
-          <view
-            wx:if="{{contentSpacerHeight > 0}}"
-            class="game-tab-spacer"
-            style="height:{{contentSpacerHeight}}px;"
-          ></view>
-        </view>
+        <game-tab host-snapshot="{{hostSnapshot}}"></game-tab>
       </block>
 
     </view>

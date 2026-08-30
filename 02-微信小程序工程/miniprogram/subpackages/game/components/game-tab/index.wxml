@@ -1,6 +1,9 @@
 <view class="game-tab">
   <view class="empty-tab">
     <text class="empty-tab__title">{{emptyHint}}</text>
-    <text class="empty-tab__desc">正式记分页、Scoring Hub 与赛事详情尚未挂载本组件。接入宿主上下文后才会显示逐洞输赢。</text>
+    <text class="empty-tab__desc">游戏尚未接入共享仓库，当前只展示只读比赛上下文，不会生成对局或假结果。</text>
+    <view wx:if="{{summaryLines.length}}" class="empty-tab__summary">
+      <text wx:for="{{summaryLines}}" wx:key="*this" class="empty-tab__line">{{item}}</text>
+    </view>
   </view>
 </view>

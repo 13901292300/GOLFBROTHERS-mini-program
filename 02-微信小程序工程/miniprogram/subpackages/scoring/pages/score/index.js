@@ -10,6 +10,7 @@ const teamDirectory = require('../../../../utils/teamDirectory.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const weatherService = require('../../utils/weatherService.js');
 const matchState = require('../../../../utils/matchState.js');
+const sideGameHostSnapshot = require('../../utils/sideGameHostSnapshot.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const matchStatus = require('../../../../utils/matchStatus.js');
 const teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
@@ -2190,6 +2191,7 @@ Page({
     fontScale: 'normal',
     fontScaleClass: 'font-normal',
     activeTab: 'score',
+    hostSnapshot: {},
     // 记分格主数字显示方式：'gross'=总杆 | 'diff'=本洞杆差（仅 UI 展示）
     scoreDisplayMode: 'gross',
     // 模式分流（仅记录元信息，不改动原有记分结构/逻辑）
@@ -2499,7 +2501,8 @@ Page({
         isScoreClassicDemo: false,
         isScoreEliteDemo: false,
         showScoreStyleSetting: false,
-        pageScoreStyle: 'elite'
+        pageScoreStyle: 'elite',
+        hostSnapshot: sideGameHostSnapshot.emptySnapshot({ scope: 'group', allowBigPot: true })
       });
       wx.showToast({ title: '暂无比赛数据', icon: 'none' });
       return;
@@ -2571,6 +2574,7 @@ Page({
     this._syncMoreMenuItems();
     this._syncFontScale();
     this._syncPageScoreStyle(gameId);
+    this._syncGameHostContext();
     wx.nextTick(() => this._tryApplyPendingMatchJoinBind());
   },
 
@@ -5050,6 +5054,8 @@ Page({
       }
     }
 
+    this._syncGameHostContext();
+
     // 未改备注时不做讨论区作者名大投影
     if (remarkChanged) {
       const ctx = this._getScoreViewerRemarkContext();
@@ -7246,6 +7252,12 @@ Page({
       this._clearDiscussionReactionDetach();
     }
     this.setData({ activeTab: tab });
+    if (tab === 'game') this._syncGameHostContext();
+  },
+
+  _syncGameHostContext() {
+    const ms = this._matchState || matchState.getMatchState();
+    this.setData({ hostSnapshot: sideGameHostSnapshot.buildForScorePage(ms) });
   },
 
   /** Phase1 shell：将纵滑位置同步到另一侧（scroll-top 需变值才生效） */

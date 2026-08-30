@@ -6,9 +6,11 @@
     "player-source-sheet": "/components/player-source-sheet/index",
     "caddie-scoring-sheet": "/subpackages/scoring/components/caddie-scoring-sheet/index",
     "player-action-modal": "/components/player-action-modal/index",
-    "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index"
+    "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index",
+    "game-tab": "/subpackages/game/components/game-tab/index"
   },
   "componentPlaceholder": {
-    "player-reaction-overlay": "view"
+    "player-reaction-overlay": "view",
+    "game-tab": "view"
   }
 }

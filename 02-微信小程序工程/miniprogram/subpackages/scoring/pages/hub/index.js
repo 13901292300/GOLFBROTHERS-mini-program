@@ -24,6 +24,7 @@ const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const contactFollowAction = require('../../../../utils/contactFollowAction.js');
 const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+const sideGameHostSnapshot = require('../../utils/sideGameHostSnapshot.js');
 
 /** 开发诊断：普通多组进组/返回栈；默认关闭 */
 const HUB_NAV_DEBUG = false;
@@ -383,6 +384,7 @@ Page({
     // 讨论区聊天数据：传入统一 discussion 组件（聊天/输入/表情逻辑全部由组件承载）
     chat: CHAT,
     currentUserId: '',
+    hostSnapshot: {},
     followMap: {},
     /** none | following | friend — 与通讯录关系状态一致 */
     relationMap: {}
@@ -671,7 +673,8 @@ Page({
         hubReady: false,
         leaderboard: [],
         groupCards: [],
-        groups: []
+        groups: [],
+        hostSnapshot: sideGameHostSnapshot.emptySnapshot({ scope: 'match', allowBigPot: false })
       });
       return;
     }
@@ -694,7 +697,8 @@ Page({
       hasComposition: gameLeaderboard.gameHasComposition(game),
       leaderboard: this._buildLeaderboard(game),
       groupCards: groupCards,
-      userGroupIndex: this._resolveUserGroupIndex(game)
+      userGroupIndex: this._resolveUserGroupIndex(game),
+      hostSnapshot: sideGameHostSnapshot.buildForHub(gameId)
     });
     this._hubDebug('refreshGame');
     // 已展开的逐洞详情随数据刷新（成绩可能变化）

@@ -148,7 +148,9 @@ files.forEach(function (abs) {
     }
   }
   if (/\.js$/.test(abs) && /gameId/.test(text) && rel.indexOf('utils/settle') !== 0 && rel.indexOf('utils/catalog') !== 0) {
-    if (rel.indexOf('utils/sideGameEngine') !== 0) gameIdHits.push(rel);
+    if (rel.indexOf('utils/sideGameEngine') !== 0 && rel.indexOf('utils/gameHostContext') !== 0) {
+      gameIdHits.push(rel);
+    }
   }
 });
 
@@ -214,11 +216,44 @@ otherRoots.forEach(function (name) {
     if (!/\.(js|wxss|json|wxml)$/.test(abs)) return;
     var text = fs.readFileSync(abs, 'utf8');
     if (/subpackages\/game\//.test(text) && abs.indexOf(path.join('subpackages', 'game')) < 0) {
+      if (/\.json$/i.test(abs) && /usingComponents|componentPlaceholder/.test(text)) return;
       leak.push(path.relative(mini, abs));
     }
   });
 });
 assert('其它分包不引用 game JS/WXSS', leak.length === 0, leak.join(','));
+
+var scoreWxml = read('subpackages/scoring/pages/score/index.wxml');
+var hubWxml = read('subpackages/scoring/pages/hub/index.wxml');
+var detailWxml = read('subpackages/tournament/pages/detail/index.wxml');
+var seriesWxml = read('subpackages/tournament/pages/series-detail/index.wxml');
+assert(
+  '记分页 inactive 才实例化 game-tab',
+  /wx:if="\{\{activeTab === 'game'\}\}"/.test(scoreWxml) && /host-snapshot="\{\{hostSnapshot\}\}"/.test(scoreWxml)
+);
+assert(
+  'Hub inactive 才实例化 game-tab',
+  /wx:if="\{\{activeTab === 'game'\}\}"/.test(hubWxml) && /host-snapshot="\{\{hostSnapshot\}\}"/.test(hubWxml)
+);
+assert(
+  '赛事详情 inactive 才实例化 game-tab',
+  /wx:if="\{\{activeTab === 'game'\}\}"/.test(detailWxml) && /host-snapshot="\{\{hostSnapshot\}\}"/.test(detailWxml)
+);
+assert('series-detail 不加游戏 TAB', seriesWxml.indexOf('game-tab') < 0);
+
+var scoreJs = read('subpackages/scoring/pages/score/index.js');
+var hubJs = read('subpackages/scoring/pages/hub/index.js');
+var detailJs = read('subpackages/tournament/pages/detail/index.js');
+assert(
+  '宿主不 require game 分包 JS',
+  scoreJs.indexOf('subpackages/game/') < 0 &&
+    hubJs.indexOf('subpackages/game/') < 0 &&
+    detailJs.indexOf('subpackages/game/') < 0
+);
+
+var tabJs = fs.readFileSync(path.join(gameRoot, 'components', 'game-tab', 'index.js'), 'utf8');
+assert('game-tab 观察 hostSnapshot', /hostSnapshot/.test(tabJs) && /buildFromHostSnapshot/.test(tabJs));
+assert('game-tab 无仓库仍 EMPTY_HINT', /EMPTY_HINT/.test(tabJs));
 
 console.log('\ngameSubpackage.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);
