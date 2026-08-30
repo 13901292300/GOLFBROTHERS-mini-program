@@ -5355,6 +5355,7 @@ Page({
   /**
    * Series 赛程：跳转独立 group-editor（G2-R）
    * 前序轮未分组时先确认；确认后仍进用户点击的当前轮。
+   * LIVE 轮次赛程 CTA 为「进入自己小组」，不走本入口。
    */
   openScheduleGroupEditor: function () {
     if (this._scheduleGroupEditorNavLock) return;
@@ -5366,6 +5367,17 @@ Page({
     var series = this._lastSeriesForSchedule;
     var roundId = String(schedule.selectedKey || this._scheduleSelectedKey || '').trim();
     var matchId = schedule.matchId ? String(schedule.matchId).trim() : '';
+    this._openSeriesGroupEditorForRound(series, roundId, matchId);
+  },
+
+  /**
+   * 管理核验通过后的分组编辑跳转（M 面板「修改分组」与赛程 CTA 共用）。
+   * 使用调用方给出的 roundId/matchId，不依赖赛程 CTA 是否展示。
+   */
+  _openSeriesGroupEditorForRound: function (series, roundId, matchId) {
+    if (this._scheduleGroupEditorNavLock) return;
+    roundId = roundId != null ? String(roundId).trim() : '';
+    matchId = matchId != null ? String(matchId).trim() : '';
     if (!series || !roundId || !matchId) {
       if (typeof wx !== 'undefined' && wx.showToast) {
         wx.showToast({ title: '本轮比赛数据异常', icon: 'none' });
@@ -5479,6 +5491,9 @@ Page({
 
     if (typeof wx === 'undefined' || typeof wx.navigateTo !== 'function') {
       unlock();
+      if (typeof wx !== 'undefined' && wx.showToast) {
+        wx.showToast({ title: '无法打开分组编辑', icon: 'none' });
+      }
       return;
     }
     wx.navigateTo({
@@ -5486,9 +5501,14 @@ Page({
       complete: function () {
         unlock();
       },
-      fail: function () {
+      fail: function (err) {
+        var detail =
+          err && err.errMsg != null ? String(err.errMsg).trim() : '';
         if (typeof wx !== 'undefined' && wx.showToast) {
-          wx.showToast({ title: '无法打开分组编辑', icon: 'none' });
+          wx.showToast({
+            title: detail || '无法打开分组编辑',
+            icon: 'none'
+          });
         }
       }
     });
@@ -8440,7 +8460,11 @@ Page({
       return;
     }
     if (permission === 'edit_groups') {
-      this._goSeriesManageScheduleRound(gate.roundId);
+      this.closeMoreSheetFully();
+      var seriesForGroups =
+        this._lastSeriesForSchedule ||
+        (this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null);
+      this._openSeriesGroupEditorForRound(seriesForGroups, gate.roundId, gate.matchId);
       return;
     }
     if (permission === 'leaderboard' || permission === 'stats') {
