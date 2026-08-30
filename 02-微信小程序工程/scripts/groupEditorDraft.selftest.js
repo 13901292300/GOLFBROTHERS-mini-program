@@ -151,6 +151,10 @@ assert(
     editorSrc.indexOf('tournamentGroupDraft') >= 0
 );
 assert(
+  'group-editor requires main-package unique tournamentGroupDraft',
+  /require\(['"][^'"]*utils\/tournament\/tournamentGroupDraft\.js['"]\)/.test(editorSrc)
+);
+assert(
   'group-editor keeps group-pick navigate path',
   editorSrc.indexOf('/subpackages/tournament/pages/group-pick/index') >= 0
 );
@@ -191,6 +195,131 @@ assert(
   'group-editor does not introduce plaza redirect for save',
   editorSrc.indexOf('section=plaza&tab=tournament') < 0
 );
+
+(function assertUniqueMainDomainModules() {
+  var mini = path.join(__dirname, '..', 'miniprogram');
+  var names = [
+    'tournamentGroupDraft.js',
+    'seriesScheduleGroupWrite.js',
+    'seriesScheduleCandidates.js'
+  ];
+  var expectedExports = {
+    'tournamentGroupDraft.js': [
+      'PLAYER_SLOTS',
+      'DEFAULT_REGISTER_GROUPS',
+      'STROKE_ENTITY_INVALID_TIP',
+      'resolveSideUnitLabel',
+      'resolveScorePlayerId',
+      'withScorePlayerFields',
+      'createEmptyGroupPlayer',
+      'createEmptyGroup',
+      'buildRegisterPlayerLookup',
+      'hydrateDraftPlayers',
+      'cloneTournamentGroups',
+      'toFormalGroups',
+      'findPlayerEntryByPosition',
+      'buildLivePlayerEntry',
+      'buildLiveGroupFromDraft',
+      'applyLiveGroupsFromDraft',
+      'rematerializeLivePlayersAfterNormalize',
+      'pickSeatAffiliationFields',
+      'buildG4RegisterTeamMap',
+      'listG4TeamOrder',
+      'hasFormalGroups',
+      'buildInitialGroupDraft',
+      'resolvePlayerDisplayName',
+      'shouldShowAvatarTeamLabel',
+      'mapPlayersForCard',
+      'resolveRegisterInfo',
+      'buildRegisterTeamGroupMap',
+      'resolvePlayerTeamGroupId',
+      'listFilledPickPlayers',
+      'ensurePlayersHaveTeam',
+      'allMembersSameTeam',
+      'generatePairCompositionsByTeam',
+      'validateGeneratedCompositions',
+      'validateG2G3TwoPlusTwoPlayers',
+      'validateStrokeCompositionPlayers',
+      'validateG4GroupStructurePlayers',
+      'validatePlayersForRegisterGameMode',
+      'resolveRegisterTeamId',
+      'buildPreviewRegisterMaps',
+      'buildMatchPlayTeamPreview',
+      'buildCompositionPreview',
+      'buildG4CompositionPreviewFromSeats',
+      'resolveRegisterSubTabs',
+      'buildPairingSlotId',
+      'resolvePairingSlotNo',
+      'createEmptyPairing',
+      'buildAutoPairingsForGroup',
+      'sanitizeGroupDraft',
+      'validatePairingDraft',
+      'validateGroupDraft'
+    ],
+    'seriesScheduleGroupWrite.js': [
+      'STATION_DATA_INVALID_MSG',
+      'verifySeriesContext',
+      'buildSyntheticRegisterInfoFromDraft',
+      'validateSeriesSeatAffiliation',
+      'saveStationGroups',
+      'startStationRound'
+    ],
+    'seriesScheduleCandidates.js': [
+      'listScheduleCandidatePlayers',
+      'listAffiliationOptions',
+      'assertAffiliationChoice',
+      'resolveHostParticipantKind'
+    ]
+  };
+
+  function walkNamed(dir, fileName, acc) {
+    acc = acc || [];
+    if (!fs.existsSync(dir)) return acc;
+    fs.readdirSync(dir).forEach(function (n) {
+      if (n === 'node_modules') return;
+      var abs = path.join(dir, n);
+      var st = fs.statSync(abs);
+      if (st.isDirectory()) {
+        walkNamed(abs, fileName, acc);
+        return;
+      }
+      if (n === fileName) acc.push(abs);
+    });
+    return acc;
+  }
+
+  names.forEach(function (name) {
+    var mainPath = seriesTestPaths.util(name);
+    var expected = path.join(seriesTestPaths.MAIN_TOURNAMENT_UTILS, name);
+    assert(name + ' util() resolves only to miniprogram/utils/tournament', mainPath === expected);
+    assert(name + ' exists in main tournament utils', fs.existsSync(mainPath));
+    assert(
+      name + ' old tournament/utils copy gone',
+      !fs.existsSync(path.join(mini, 'subpackages', 'tournament', 'utils', name))
+    );
+    assert(
+      name + ' old series-detail copy gone',
+      !fs.existsSync(
+        path.join(mini, 'subpackages', 'tournament', 'pages', 'series-detail', name)
+      )
+    );
+    var hits = walkNamed(mini, name, []);
+    assert(name + ' has exactly one production copy', hits.length === 1, hits.join(' | '));
+    var src = fs.readFileSync(mainPath, 'utf8');
+    assert(
+      name + ' requires stay in main package',
+      src.indexOf('subpackages/tournament') < 0
+    );
+    var mod = require(mainPath);
+    (expectedExports[name] || []).forEach(function (key) {
+      assert(
+        name + ' still exports ' + key,
+        mod[key] != null,
+        typeof (mod && mod[key])
+      );
+    });
+  });
+})();
 
 console.log('');
 console.log('groupEditorDraft.selftest: ' + passed + ' passed, ' + failed + ' failed');

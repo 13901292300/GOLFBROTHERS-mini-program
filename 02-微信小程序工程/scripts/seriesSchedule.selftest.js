@@ -26,8 +26,8 @@ var pageDir = path.join(
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
 
 var scheduleVm = require(path.join(pageDir, 'seriesScheduleViewModel.js'));
-var scheduleWrite = require(path.join(pageDir, 'seriesScheduleGroupWrite.js'));
-var scheduleCandidates = require(path.join(pageDir, 'seriesScheduleCandidates.js'));
+var scheduleWrite = require(seriesTestPaths.util('seriesScheduleGroupWrite.js'));
+var scheduleCandidates = require(seriesTestPaths.util('seriesScheduleCandidates.js'));
 var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 
 var pageJs = fs.readFileSync(path.join(pageDir, 'index.js'), 'utf8');
@@ -161,7 +161,9 @@ function roundStates() {
   assert(
     'page wires schedule modules',
     pageJs.indexOf("require('./seriesScheduleViewModel.js')") >= 0 &&
-      pageJs.indexOf("require('./seriesScheduleGroupWrite.js')") >= 0
+      /require\(['"][^'"]*utils\/tournament\/seriesScheduleGroupWrite\.js['"]\)/.test(
+        pageJs
+      )
   );
   assert(
     'page has startStationRound / enterScorePage；分组写入走 group-editor',
@@ -471,6 +473,37 @@ function roundStates() {
     { useComposition: false, showCompositionMode: false }
   );
   assert('G1 single player still accepted or soft-checked', g1Err == null || typeof g1Err === 'string');
+})();
+
+(function () {
+  assert(
+    'schedule write lives in main tournament utils',
+    seriesTestPaths.util('seriesScheduleGroupWrite.js') ===
+      path.join(seriesTestPaths.MAIN_TOURNAMENT_UTILS, 'seriesScheduleGroupWrite.js') &&
+      fs.existsSync(seriesTestPaths.util('seriesScheduleGroupWrite.js'))
+  );
+  assert(
+    'schedule candidates live in main tournament utils',
+    seriesTestPaths.util('seriesScheduleCandidates.js') ===
+      path.join(seriesTestPaths.MAIN_TOURNAMENT_UTILS, 'seriesScheduleCandidates.js') &&
+      fs.existsSync(seriesTestPaths.util('seriesScheduleCandidates.js'))
+  );
+  assert(
+    'series-detail no longer hosts write/candidates files',
+    !fs.existsSync(path.join(pageDir, 'seriesScheduleGroupWrite.js')) &&
+      !fs.existsSync(path.join(pageDir, 'seriesScheduleCandidates.js'))
+  );
+  assert(
+    'write exports saveStationGroups / startStationRound / verifySeriesContext',
+    typeof scheduleWrite.saveStationGroups === 'function' &&
+      typeof scheduleWrite.startStationRound === 'function' &&
+      typeof scheduleWrite.verifySeriesContext === 'function'
+  );
+  assert(
+    'candidates export listAffiliationOptions / listScheduleCandidatePlayers',
+    typeof scheduleCandidates.listAffiliationOptions === 'function' &&
+      typeof scheduleCandidates.listScheduleCandidatePlayers === 'function'
+  );
 })();
 
 console.log('');

@@ -30,7 +30,7 @@ const {
 const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
 const { normalizeFormalGroupSeats } = require('../../../../utils/strokeGroupSeatNormalizer.js');
 
-const tournamentGroupDraft = require('../../utils/tournamentGroupDraft.js');
+const tournamentGroupDraft = require('../../../../utils/tournament/tournamentGroupDraft.js');
 const seriesStore = require('../../../../utils/seriesStore.js');
 const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesGroupPickRoster = require('../series-detail/seriesGroupPickRoster.js');

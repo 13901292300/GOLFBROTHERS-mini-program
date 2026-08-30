@@ -5,7 +5,7 @@
  * - 不通过错误文案判断是否归属问题：仅当「只改归属」的第二候选通过
  */
 
-var tournamentGroupDraft = require('./tournamentGroupDraft.js');
+var tournamentGroupDraft = require('../../../utils/tournament/tournamentGroupDraft.js');
 var affiliationEvidence = require('./seriesLiveAffiliationEvidence.js');
 
 var STATE = affiliationEvidence.STATE;

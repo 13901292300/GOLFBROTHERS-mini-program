@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -33,7 +34,7 @@ var detailDir = path.join(
   'detail'
 );
 
-var scheduleWrite = require(path.join(pageDir, 'seriesScheduleGroupWrite.js'));
+var scheduleWrite = require(seriesTestPaths.util('seriesScheduleGroupWrite.js'));
 var scheduleVm = require(path.join(pageDir, 'seriesScheduleViewModel.js'));
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));

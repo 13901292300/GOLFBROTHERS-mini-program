@@ -4,24 +4,24 @@
  * - 不开赛跳转；不写 series.roster
  */
 
-var teamMatchStore = require('../../../../utils/teamMatchStore.js');
-var seriesStationMatch = require('../../../../utils/seriesStationMatch.js');
-var tournamentGroupDraft = require('../../utils/tournamentGroupDraft.js');
-var seriesNoRepeatLineup = require('../../../../utils/seriesNoRepeatLineup.js');
-var teamMatchFinish = require('../../../../utils/teamMatchFinish.js');
-var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
-var teeSheetManage = require('../../../../utils/teeSheetManage.js');
-var { normalizeFormalGroupSeats } = require('../../../../utils/strokeGroupSeatNormalizer.js');
+var teamMatchStore = require('../teamMatchStore.js');
+var seriesStationMatch = require('../seriesStationMatch.js');
+var tournamentGroupDraft = require('./tournamentGroupDraft.js');
+var seriesNoRepeatLineup = require('../seriesNoRepeatLineup.js');
+var teamMatchFinish = require('../teamMatchFinish.js');
+var seriesFinishLock = require('../seriesFinishLock.js');
+var teeSheetManage = require('../teeSheetManage.js');
+var { normalizeFormalGroupSeats } = require('../strokeGroupSeatNormalizer.js');
 var {
   validateStrokeEntities,
   isG2G3FamilyMode,
   isG4FamilyMode,
   isG5MatchPlayMode,
   isG6G7MatchPlayMode
-} = require('../../../../utils/strokeEntityValidator.js');
-var { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
+} = require('../strokeEntityValidator.js');
+var { syncStrokeEntities } = require('../strokeEntityBuilder.js');
 var seriesScheduleCandidates = require('./seriesScheduleCandidates.js');
-var seriesRoundPhaseAggregate = require('../../../../utils/seriesRoundPhaseAggregate.js');
+var seriesRoundPhaseAggregate = require('../seriesRoundPhaseAggregate.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();

@@ -37,7 +37,7 @@ var REG_SELF_CANCEL_GROUPED = registrationInteractionModel.buildSelfCancelDialog
 });
 var scheduleViewModel = require('./seriesScheduleViewModel.js');
 var seriesLiveSession = require('./seriesLiveSessionProjection.js');
-var seriesScheduleGroupWrite = require('./seriesScheduleGroupWrite.js');
+var seriesScheduleGroupWrite = require('../../../../utils/tournament/seriesScheduleGroupWrite.js');
 var discussionViewModel = require('./seriesDiscussionViewModel.js');
 var matchManageAccess = require('../../../../utils/matchManageAccess.js');
 var playerManage = require('../../../../utils/playerManage.js');

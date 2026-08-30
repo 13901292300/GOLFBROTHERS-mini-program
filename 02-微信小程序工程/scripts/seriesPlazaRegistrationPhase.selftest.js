@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -20,12 +21,15 @@ var seriesDir = path.join(
 var aggregate = require(path.join(utilsDir, 'seriesRoundPhaseAggregate.js'));
 var adapter = require(path.join(utilsDir, 'seriesListCardAdapter.js'));
 var plazaSub = require(path.join(utilsDir, 'seriesPlazaLiveSubtitle.js'));
-var scheduleWrite = require(path.join(seriesDir, 'seriesScheduleGroupWrite.js'));
+var scheduleWrite = require(seriesTestPaths.util('seriesScheduleGroupWrite.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 
 var pageJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
-var writeJs = fs.readFileSync(path.join(seriesDir, 'seriesScheduleGroupWrite.js'), 'utf8');
+var writeJs = fs.readFileSync(
+  seriesTestPaths.util('seriesScheduleGroupWrite.js'),
+  'utf8'
+);
 var adapterJs = fs.readFileSync(path.join(utilsDir, 'seriesListCardAdapter.js'), 'utf8');
 var homeJs = fs.readFileSync(path.join(root, 'miniprogram', 'pages', 'home', 'index.js'), 'utf8');
 var detailJs = fs.readFileSync(

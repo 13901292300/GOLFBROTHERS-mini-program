@@ -9,15 +9,7 @@ var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
-var seriesWritePath = path.join(
-  root,
-  'miniprogram',
-  'subpackages',
-  'tournament',
-  'pages',
-  'series-detail',
-  'seriesScheduleGroupWrite.js'
-);
+var seriesWritePath = seriesTestPaths.util('seriesScheduleGroupWrite.js');
 var groupEditorPath = path.join(
   root,
   'miniprogram',
