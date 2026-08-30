@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -20,7 +21,7 @@ var groupPickDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-pick'
 );
@@ -28,14 +29,14 @@ var groupEditorDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor'
 );
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var pickRoster = require(path.join(pageDir, 'seriesGroupPickRoster.js'));
+var pickRoster = require(seriesTestPaths.util('seriesGroupPickRoster.js'));
 
 var passed = 0;
 var failed = 0;

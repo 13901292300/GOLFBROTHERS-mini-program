@@ -26,7 +26,7 @@ var groupPickDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-pick'
 );
@@ -34,7 +34,7 @@ var groupEditorDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor'
 );
@@ -56,7 +56,7 @@ var tournamentGroupCardView = require(seriesTestPaths.util('tournamentGroupCardV
 var strokeGroupSeatNormalizer = require(path.join(utilsDir, 'strokeGroupSeatNormalizer.js'));
 var teamMatchStore = require(path.join(utilsDir, 'teamMatchStore.js'));
 var tPosition = require(path.join(utilsDir, 'tPosition.js'));
-var seriesGroupPickRoster = require(path.join(pageDir, 'seriesGroupPickRoster.js'));
+var seriesGroupPickRoster = require(seriesTestPaths.util('seriesGroupPickRoster.js'));
 
 var passed = 0;
 var failed = 0;

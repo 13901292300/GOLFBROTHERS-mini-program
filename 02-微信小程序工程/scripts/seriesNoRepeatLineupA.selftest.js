@@ -21,7 +21,7 @@ var groupPickDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-pick'
 );
@@ -29,14 +29,14 @@ var groupEditorDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor'
 );
 
 var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
-var pickRoster = require(path.join(pageDir, 'seriesGroupPickRoster.js'));
+var pickRoster = require(seriesTestPaths.util('seriesGroupPickRoster.js'));
 
 var passed = 0;
 var failed = 0;
@@ -454,7 +454,7 @@ function lockInput(series, roundId, harness) {
   var pickJs = read(path.join(groupPickDir, 'index.js'));
   var pickWxml = read(path.join(groupPickDir, 'index.wxml'));
   var editorJs = read(path.join(groupEditorDir, 'index.js'));
-  var rosterJs = read(path.join(pageDir, 'seriesGroupPickRoster.js'));
+  var rosterJs = read(seriesTestPaths.util('seriesGroupPickRoster.js'));
 
   assert(
     '锁定集合认正式 groups / pairings 成员',

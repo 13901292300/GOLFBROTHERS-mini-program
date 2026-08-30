@@ -1,5 +1,5 @@
 /**
- * M 面板「修改分组」：当前 LIVE 轮次必须 navigateTo 旧 group-editor。
+ * M 面板「修改分组」：当前 LIVE 轮次必须 navigateTo tournament-manage group-editor。
  * 运行：node scripts/seriesManageEditGroupsLive.selftest.js
  */
 
@@ -14,7 +14,7 @@ var pageDir = path.join(mini, 'subpackages', 'tournament', 'pages', 'series-deta
 var groupEditorPath = path.join(
   mini,
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor',
   'index.js'
@@ -331,8 +331,8 @@ function resetIO() {
   assert('LIVE M 修改分组调用一次 navigateTo', navs.length === 1, 'navs=' + navs.length);
   var parsed = parseNavUrl(navs[0] && navs[0].url);
   assert(
-    '路径为当前旧 group-editor',
-    parsed.pathname === '/subpackages/tournament/pages/group-editor/index'
+    '路径为 tournament-manage group-editor',
+    parsed.pathname === '/subpackages/tournament-manage/pages/group-editor/index'
   );
   assert(
     'query 含 matchId/mode/fromSeries/seriesId/roundId',

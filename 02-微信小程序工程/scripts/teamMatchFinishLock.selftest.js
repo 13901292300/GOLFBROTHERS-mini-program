@@ -49,7 +49,7 @@ var detailJs = fs.readFileSync(
 );
 var seriesPageJs = fs.readFileSync(path.join(seriesDir, 'index.js'), 'utf8');
 var groupEditorJs = fs.readFileSync(
-  path.join(root, 'miniprogram', 'subpackages', 'tournament', 'pages', 'group-editor', 'index.js'),
+  path.join(root, 'miniprogram', 'subpackages', 'tournament-manage', 'pages', 'group-editor', 'index.js'),
   'utf8'
 );
 var moreMenuJs = fs.readFileSync(path.join(utilsDir, 'teamMatchMoreMenu.js'), 'utf8');

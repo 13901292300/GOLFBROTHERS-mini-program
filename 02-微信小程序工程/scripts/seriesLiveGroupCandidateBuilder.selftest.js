@@ -13,7 +13,7 @@ var groupEditorPath = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor',
   'index.js'

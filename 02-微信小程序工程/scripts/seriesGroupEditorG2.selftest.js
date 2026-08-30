@@ -21,7 +21,7 @@ var groupEditorDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor'
 );
@@ -170,7 +170,7 @@ function buildVm(series, match, canManage) {
   assert(
     'CTA 导航到 group-editor 并带 Series 来源参数',
     pageJs.indexOf('openScheduleGroupEditor') >= 0 &&
-      pageJs.indexOf('/subpackages/tournament/pages/group-editor/index') >= 0 &&
+      pageJs.indexOf('/subpackages/tournament-manage/pages/group-editor/index') >= 0 &&
       pageJs.indexOf('fromSeries=1') >= 0 &&
       pageJs.indexOf('gb_series_group_editor_return_v1') >= 0 &&
       pageJs.indexOf('_verifyScheduleStationForGroupEditor') >= 0 &&
@@ -187,13 +187,13 @@ function buildVm(series, match, canManage) {
     'group-editor 识别 fromSeries 且仍走 group-pick',
     editorJs.indexOf('_fromSeries') >= 0 &&
       editorJs.indexOf('_touchSeriesReturnContext') >= 0 &&
-      editorJs.indexOf('/subpackages/tournament/pages/group-pick/') >= 0 &&
+      editorJs.indexOf('/subpackages/tournament-manage/pages/group-pick/') >= 0 &&
       editorJs.indexOf('teamMatchStore.saveMatch') >= 0
   );
   assert(
     '普通队际赛仍走独立 group-editor',
     detailJs.indexOf('onOpenGroupEditor') >= 0 &&
-      detailJs.indexOf('/subpackages/tournament/pages/group-editor/index') >= 0
+      detailJs.indexOf('/subpackages/tournament-manage/pages/group-editor/index') >= 0
   );
   assert(
     'Series 页不再直接 saveStationGroups',

@@ -29,7 +29,7 @@ var groupEditorDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor'
 );
@@ -47,7 +47,7 @@ var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
 var tournamentGroupDraft = require(seriesTestPaths.util('tournamentGroupDraft.js'));
 var tPosition = require(path.join(utilsDir, 'tPosition.js'));
 var scheduleVm = require(path.join(pageDir, 'seriesScheduleViewModel.js'));
-var seriesGroupPickRoster = require(path.join(pageDir, 'seriesGroupPickRoster.js'));
+var seriesGroupPickRoster = require(seriesTestPaths.util('seriesGroupPickRoster.js'));
 
 var passed = 0;
 var failed = 0;

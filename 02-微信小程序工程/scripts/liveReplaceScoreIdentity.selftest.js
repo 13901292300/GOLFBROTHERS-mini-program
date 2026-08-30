@@ -33,7 +33,7 @@ var editorSrc = fs.readFileSync(
     '..',
     'miniprogram',
     'subpackages',
-    'tournament',
+    'tournament-manage',
     'pages',
     'group-editor',
     'index.js'

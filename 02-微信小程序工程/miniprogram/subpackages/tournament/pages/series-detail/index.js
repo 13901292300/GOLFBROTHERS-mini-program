@@ -5479,7 +5479,7 @@ Page({
     }
 
     var url =
-      '/subpackages/tournament/pages/group-editor/index?matchId=' +
+      '/subpackages/tournament-manage/pages/group-editor/index?matchId=' +
       encodeURIComponent(matchId) +
       '&mode=' +
       encodeURIComponent(mode) +

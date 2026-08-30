@@ -17,7 +17,7 @@ var groupEditorPath = path.join(
   '..',
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor',
   'index.js'
@@ -156,11 +156,11 @@ assert(
 );
 assert(
   'group-editor keeps group-pick navigate path',
-  editorSrc.indexOf('/subpackages/tournament/pages/group-pick/index') >= 0
+  editorSrc.indexOf('/subpackages/tournament-manage/pages/group-pick/index') >= 0
 );
 assert(
   'group-editor may require seriesGroupPickRoster',
-  /require\(['"]\.\.\/series-detail\/seriesGroupPickRoster\.js['"]\)/.test(editorSrc)
+  /require\(['"]\.\.\/\.\.\/utils\/seriesGroupPickRoster\.js['"]\)/.test(editorSrc)
 );
 
 function wxNavUrlHitsSeriesDetail(src) {

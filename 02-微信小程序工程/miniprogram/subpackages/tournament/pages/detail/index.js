@@ -3296,7 +3296,7 @@ Page({
       ? 'live'
       : (this.data.hasFormalGroups ? 'edit' : 'create');
     wx.navigateTo({
-      url: '/subpackages/tournament/pages/group-editor/index?matchId=' + encodeURIComponent(matchId) +
+      url: '/subpackages/tournament-manage/pages/group-editor/index?matchId=' + encodeURIComponent(matchId) +
         '&mode=' + encodeURIComponent(mode)
     });
   },

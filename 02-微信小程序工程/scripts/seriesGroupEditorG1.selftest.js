@@ -20,7 +20,7 @@ var groupEditorDir = path.join(
   root,
   'miniprogram',
   'subpackages',
-  'tournament',
+  'tournament-manage',
   'pages',
   'group-editor'
 );
@@ -214,7 +214,7 @@ function makeMatch(series, withGroups) {
   );
   assert(
     'group-editor 仍导航 group-pick 且保存逻辑仍在页内',
-    editorJs.indexOf('/subpackages/tournament/pages/group-pick/') >= 0 &&
+    editorJs.indexOf('/subpackages/tournament-manage/pages/group-pick/') >= 0 &&
       editorJs.indexOf('onConfirm') >= 0 &&
       editorJs.indexOf('teamMatchStore.saveMatch') >= 0 &&
       editorJs.indexOf('eventField') >= 0

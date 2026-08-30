@@ -40,6 +40,7 @@ var MINI = path.join(__dirname, '..', '..', 'miniprogram');
 var MAIN_UTILS = path.join(MINI, 'utils');
 var MAIN_TOURNAMENT_UTILS = path.join(MAIN_UTILS, 'tournament');
 var TOUR_UTILS = path.join(MINI, 'subpackages', 'tournament', 'utils');
+var MANAGE_UTILS = path.join(MINI, 'subpackages', 'tournament-manage', 'utils');
 var TOUR_COMPONENTS = path.join(MINI, 'subpackages', 'tournament', 'components');
 var TOUR_STYLES = path.join(MINI, 'subpackages', 'tournament', 'styles');
 var TOUR_TOOLS_UTILS = path.join(MINI, 'subpackages', 'tournament-tools', 'utils');
@@ -57,7 +58,14 @@ function util(name) {
   if (MAIN_TOURNAMENT_DOMAIN[file]) {
     return path.join(MAIN_TOURNAMENT_UTILS, file);
   }
-  var candidates = [TOUR_UTILS, TOUR_TOOLS_UTILS, SCORING_UTILS, CREATE_UTILS, MAIN_UTILS];
+  var candidates = [
+    MANAGE_UTILS,
+    TOUR_UTILS,
+    TOUR_TOOLS_UTILS,
+    SCORING_UTILS,
+    CREATE_UTILS,
+    MAIN_UTILS
+  ];
   var i;
   for (i = 0; i < candidates.length; i++) {
     var abs = path.join(candidates[i], file);
@@ -71,6 +79,7 @@ module.exports = {
   MAIN_UTILS: MAIN_UTILS,
   MAIN_TOURNAMENT_UTILS: MAIN_TOURNAMENT_UTILS,
   TOUR_UTILS: TOUR_UTILS,
+  MANAGE_UTILS: MANAGE_UTILS,
   TOUR_COMPONENTS: TOUR_COMPONENTS,
   TOUR_STYLES: TOUR_STYLES,
   TOUR_TOOLS_UTILS: TOUR_TOOLS_UTILS,

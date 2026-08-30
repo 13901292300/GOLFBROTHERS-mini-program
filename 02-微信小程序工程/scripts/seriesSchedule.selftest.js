@@ -170,13 +170,13 @@ function roundStates() {
     pageJs.indexOf('saveStationGroups') < 0 &&
       pageJs.indexOf('seriesScheduleGroupWrite.startStationRound') >= 0 &&
       pageJs.indexOf('openScheduleGroupEditor') >= 0 &&
-      pageJs.indexOf('/subpackages/tournament/pages/group-editor') >= 0 &&
+      pageJs.indexOf('/subpackages/tournament-manage/pages/group-editor') >= 0 &&
       pageJs.indexOf('fromSeries=1') >= 0 &&
       pageJs.indexOf('teamMatchEnterGroupScore.enterViewerGroupScore') >= 0
   );
   assert(
     'schedule CTA navigates to independent group-editor (G2-R)',
-    pageJs.indexOf('/subpackages/tournament/pages/group-editor') >= 0 &&
+    pageJs.indexOf('/subpackages/tournament-manage/pages/group-editor') >= 0 &&
       pageJs.indexOf('fromSeries=1') >= 0 &&
       pageJs.indexOf('openScheduleGroupEditor') >= 0 &&
       /&roundId=' \+[\s\S]{0,80}encodeURIComponent\(roundId\)/.test(pageJs)

@@ -1,0 +1,1078 @@
+const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const teamMatchStore = require('../../../../utils/teamMatchStore.js');
+const seriesStore = require('../../../../utils/seriesStore.js');
+const playerManage = require('../../../../utils/playerManage.js');
+const {
+  isInterTeamMatch,
+  isTeamMatchFamily
+} = require('../../../../utils/teamMatchCapabilities.js');
+const {
+  buildRegisterTeamMap,
+  isG5MatchPlayMode,
+  isG6G7MatchPlayMode,
+  isG8MatchPlayMode,
+  isG4FamilyMode,
+  validateG5MatchPlayPlayers,
+  validateG6G7MatchPlayPlayers,
+  validateG8MatchPlayPlayers
+} = require('../../../../utils/strokeEntityValidator.js');
+const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
+const seriesGroupPickRoster = require('../../utils/seriesGroupPickRoster.js');
+
+const TEE_BLUE = 'BLUE_T';
+const TEE_RED = 'RED_T';
+
+function resolvePickSideUnit(matchLike) {
+  return isInterTeamMatch(matchLike) ? '球队' : '分队';
+}
+
+function listFilledPickPlayers(players) {
+  return (Array.isArray(players) ? players : [])
+    .map((p) => ({
+      userId: p && p.userId != null ? String(p.userId).trim() : '',
+      position: Number(p && p.position) || 0
+    }))
+    .filter((p) => p.userId)
+    .sort((a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId)));
+}
+
+function ensurePlayersHaveTeam(filled, teamMap, sideUnit) {
+  const unit = sideUnit || '分队';
+  for (let i = 0; i < filled.length; i++) {
+    const uid = filled[i].userId;
+    const teamId = teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+    if (!teamId) {
+      return '存在未归属' + unit + '的球员，请先完成报名' + unit;
+    }
+  }
+  return '';
+}
+
+function isSameTeamMembers(userIds, teamMap) {
+  let first = '';
+  for (let i = 0; i < userIds.length; i++) {
+    const tid = teamMap && teamMap[userIds[i]] != null ? String(teamMap[userIds[i]]).trim() : '';
+    if (!tid) return false;
+    if (!first) first = tid;
+    else if (tid !== first) return false;
+  }
+  return true;
+}
+
+/**
+ * 按分队分桶后桶内每 2 人切成成绩组合（与 2+2 / G4 pair 生成思路一致）
+ * @returns {Array<{ teamId: string, members: string[] }>}
+ */
+function generatePairCompositionsByTeam(filled, teamMap) {
+  const buckets = {};
+  const teamOrder = [];
+  filled.forEach((p) => {
+    const tid = teamMap && teamMap[p.userId] != null ? String(teamMap[p.userId]).trim() : '';
+    const key = tid || '__unknown__';
+    if (!buckets[key]) {
+      buckets[key] = [];
+      teamOrder.push(key);
+    }
+    buckets[key].push(p);
+  });
+
+  const compositions = [];
+  teamOrder.forEach((teamId) => {
+    const list = (buckets[teamId] || []).slice().sort(
+      (a, b) => a.position - b.position || String(a.userId).localeCompare(String(b.userId))
+    );
+    for (let i = 0; i < list.length; i += 2) {
+      const chunk = list.slice(i, i + 2);
+      compositions.push({
+        teamId: teamId === '__unknown__' ? '' : teamId,
+        members: chunk.map((p) => p.userId)
+      });
+    }
+  });
+  return compositions;
+}
+
+/**
+ * 校验每个成绩组合内部同队，且 2 人 pair 无落单
+ */
+function validateGeneratedPairCompositions(compositions, teamMap, expectedPairCount, sideUnit) {
+  if (!Array.isArray(compositions) || compositions.length !== expectedPairCount) {
+    return '无法形成合法的同队两人组合';
+  }
+  for (let i = 0; i < compositions.length; i++) {
+    const members = compositions[i] && Array.isArray(compositions[i].members)
+      ? compositions[i].members
+      : [];
+    if (members.length !== 2) {
+      return '无法形成合法的同队两人组合';
+    }
+    if (!isSameTeamMembers(members, teamMap)) {
+      return '成绩组合不能跨' + (sideUnit || '分队');
+    }
+  }
+  return '';
+}
+
+/**
+ * G4：先按分队/球队生成 2 人 pair，再验每组合内部同队
+ */
+function validateG4GroupStructurePlayers(players, teamMap, sideUnit) {
+  const filled = listFilledPickPlayers(players);
+  if (!filled.length) return '';
+
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap, sideUnit);
+  if (teamErr) return teamErr;
+
+  const n = filled.length;
+  if (n !== 2 && n !== 4) {
+    return '四人两球每组须为 2 人或 4 人';
+  }
+
+  const compositions = generatePairCompositionsByTeam(filled, teamMap);
+  return validateGeneratedPairCompositions(compositions, teamMap, n / 2, sideUnit);
+}
+
+/**
+ * G2/G3 2+2：按分队/球队数量与各队人数判断能否拆成两个组合（每组合最多 2 人）
+ * - 1 侧：永远合法
+ * - 2 侧：各队人数均 ≤2（允许 2+2 / 2+1 / 1+1；禁止 3+1）
+ * - 3+ 侧：非法
+ */
+function validateG2G3TwoPlusTwoPlayers(filled, teamMap, sideUnit) {
+  const unit = sideUnit || '分队';
+  if (!filled.length) return '';
+  if (filled.length > 4) {
+    return '2+2模式下每组最多 4 人';
+  }
+
+  const buckets = {};
+  filled.forEach((p) => {
+    const teamId = teamMap && teamMap[p.userId] != null ? String(teamMap[p.userId]).trim() : '';
+    if (!buckets[teamId]) buckets[teamId] = [];
+    buckets[teamId].push(p.userId);
+  });
+  const teamIds = Object.keys(buckets);
+  const teamCount = teamIds.length;
+
+  if (teamCount === 1) {
+    return '';
+  }
+  if (teamCount === 2) {
+    for (let i = 0; i < teamIds.length; i++) {
+      if (buckets[teamIds[i]].length > 2) {
+        return '2+2模式下每个组合最多 2 人，无法按' + unit + '拆成合法组合';
+      }
+    }
+    return '';
+  }
+  return '2+2模式同组最多来自两个' + unit;
+}
+
+/**
+ * G2/G3：先按模式生成组合，再验每组合内部同队
+ */
+function validateStrokeCompositionPlayers(players, compositionMode, teamMap, sideUnit) {
+  const mode = compositionMode === '2+2' ? '2+2' : '4+0';
+  const unit = sideUnit || '分队';
+  const filled = listFilledPickPlayers(players);
+  if (!filled.length) return '';
+
+  const teamErr = ensurePlayersHaveTeam(filled, teamMap, unit);
+  if (teamErr) return teamErr;
+
+  if (mode === '4+0') {
+    // 一个组合最多 4 人；允许 1–4；整组即一个组合，不可跨分队/球队
+    if (filled.length > 4) {
+      return '4+0模式下每组最多 4 人';
+    }
+    const ids = filled.map((p) => p.userId);
+    if (!isSameTeamMembers(ids, teamMap)) {
+      return '4+0组合不能跨' + unit;
+    }
+    return '';
+  }
+
+  return validateG2G3TwoPlusTwoPlayers(filled, teamMap, unit);
+}
+
+function createEmptySlot(position) {
+  return {
+    position: position,
+    userId: '',
+    avatar: '',
+    displayName: '',
+    gender: '',
+    handicap: '',
+    tee: '',
+    teeLabel: '',
+    teeMarkerClass: '',
+    teamLabel: ''
+  };
+}
+
+function createSlots() {
+  return [1, 2, 3, 4].map((p) => createEmptySlot(p));
+}
+
+/**
+ * 加入分组时的默认 T 台：按报名记录性别写入 player.tee（赛事球员配置，非资料/报名字段）。
+ * 显示侧只读 tee，不再按性别实时计算。
+ */
+function defaultTeeFromRegisterGender(gender) {
+  const g = String(gender || '').trim().toLowerCase();
+  if (g === '女' || g === 'female' || g === 'f') return TEE_RED;
+  if (g === '男' || g === 'male' || g === 'm') return TEE_BLUE;
+  return '';
+}
+
+/** 仅根据已存 player.tee 生成显示字段，禁止用性别回推 */
+function teeDisplayFields(tee) {
+  const value = String(tee || '');
+  if (value === TEE_RED) {
+    return {
+      tee: TEE_RED,
+      teeLabel: '红T',
+      teeText: '红T',
+      teeMarkerClass: 'tee-marker-dot--female'
+    };
+  }
+  if (value === TEE_BLUE) {
+    return {
+      tee: TEE_BLUE,
+      teeLabel: '蓝T',
+      teeText: '蓝T',
+      teeMarkerClass: 'tee-marker-dot--male'
+    };
+  }
+  return {
+    tee: value,
+    teeLabel: value ? String(value) : '',
+    teeText: value ? String(value) : '',
+    teeMarkerClass: ''
+  };
+}
+
+/** 赛事显示名：仅 competitionName / displayName，禁止 nickname */
+function resolveRegisterDisplayName(user) {
+  if (!user) return '';
+  if (user.displayName != null && String(user.displayName).trim()) {
+    return String(user.displayName).trim();
+  }
+  if (user.competitionName != null && String(user.competitionName).trim()) {
+    return String(user.competitionName).trim();
+  }
+  return '';
+}
+
+function normalizeUser(user) {
+  const genderDisplay = playerManage.getGenderDisplay(user);
+  return {
+    userId: user && user.userId ? String(user.userId) : '',
+    avatar: user && user.avatar ? String(user.avatar) : '',
+    displayName: resolveRegisterDisplayName(user),
+    gender: user && user.gender ? String(user.gender) : '',
+    sex: user && user.sex ? String(user.sex) : '',
+    genderIcon: genderDisplay.icon,
+    genderClass: genderDisplay.className,
+    handicap: user && user.handicap != null && user.handicap !== '' ? String(user.handicap) : '-',
+    groupId: user && user.groupId != null ? String(user.groupId) : '',
+    matchTeamId: user && user.matchTeamId != null ? String(user.matchTeamId).trim() : '',
+    matchTeamName: user && user.matchTeamName != null ? String(user.matchTeamName).trim() : '',
+    groupName: user && user.groupName != null ? String(user.groupName).trim() : '',
+    seriesParticipantId:
+      user && user.seriesParticipantId != null ? String(user.seriesParticipantId).trim() : '',
+    affiliationId:
+      user && user.affiliationId != null ? String(user.affiliationId).trim() : '',
+    participantNameSnapshot:
+      user && user.participantNameSnapshot != null
+        ? String(user.participantNameSnapshot).trim()
+        : '',
+    participantShortNameSnapshot:
+      user && user.participantShortNameSnapshot != null
+        ? String(user.participantShortNameSnapshot).trim()
+        : '',
+    participantColorSnapshot:
+      user && user.participantColorSnapshot != null
+        ? String(user.participantColorSnapshot).trim()
+        : '',
+    fromSeriesRoster: !!(user && (user.fromSeriesRoster || user.isSeriesRoster))
+  };
+}
+
+function resolveSlotTeamLabel(raw, matchLike, registerLookup) {
+  if (!isTeamMatchFamily(matchLike)) return '';
+  const teamGroups = matchLike && Array.isArray(matchLike.teamGroups) ? matchLike.teamGroups : [];
+  if (!teamGroups.length) return '';
+  const userId = raw && raw.userId != null ? String(raw.userId).trim() : '';
+  const reg = userId && registerLookup ? registerLookup[userId] || {} : {};
+  const rawForLabel = Object.assign({}, reg, raw || {});
+  return playerManage.resolveAvatarTeamLabel(rawForLabel, teamGroups) || '';
+}
+
+function buildPickRegisterLookup(registerInfo) {
+  const map = {};
+  const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+  users.forEach((u) => {
+    const id = u && u.userId != null ? String(u.userId).trim() : '';
+    if (!id) return;
+    map[id] = {
+      matchTeamId: u.matchTeamId != null ? String(u.matchTeamId).trim() : '',
+      groupId: u.groupId != null ? String(u.groupId).trim() : '',
+      matchTeamName: u.matchTeamName != null ? String(u.matchTeamName).trim() : '',
+      groupName: u.groupName != null ? String(u.groupName).trim() : ''
+    };
+  });
+  return map;
+}
+
+function hydrateSlotsFromPlayers(players, matchLike, registerInfo) {
+  const slots = createSlots();
+  if (!Array.isArray(players)) return slots;
+  const registerLookup = buildPickRegisterLookup(registerInfo);
+  players.forEach((p) => {
+    const pos = Number(p && p.position);
+    if (!(pos >= 1 && pos <= 4)) return;
+    const idx = pos - 1;
+    const teeFields = teeDisplayFields(p.tee);
+    const userId = p.userId ? String(p.userId) : '';
+    slots[idx] = Object.assign({
+      position: pos,
+      userId: userId,
+      avatar: p.avatar ? String(p.avatar) : '',
+      displayName: resolveRegisterDisplayName(p) || (p.displayName ? String(p.displayName) : ''),
+      gender: p.gender ? String(p.gender) : '',
+      handicap: p.handicap != null && p.handicap !== '' ? String(p.handicap) : '-',
+      teamLabel: resolveSlotTeamLabel(p, matchLike, registerLookup),
+      matchTeamId: p.matchTeamId != null ? String(p.matchTeamId).trim() : '',
+      groupId: p.groupId != null ? String(p.groupId).trim() : '',
+      matchTeamName: p.matchTeamName != null ? String(p.matchTeamName).trim() : '',
+      groupName: p.groupName != null ? String(p.groupName).trim() : '',
+      seriesParticipantId:
+        p.seriesParticipantId != null ? String(p.seriesParticipantId).trim() : '',
+      affiliationId: p.affiliationId != null ? String(p.affiliationId).trim() : '',
+      participantNameSnapshot:
+        p.participantNameSnapshot != null ? String(p.participantNameSnapshot).trim() : '',
+      participantShortNameSnapshot:
+        p.participantShortNameSnapshot != null
+          ? String(p.participantShortNameSnapshot).trim()
+          : '',
+      participantColorSnapshot:
+        p.participantColorSnapshot != null ? String(p.participantColorSnapshot).trim() : '',
+      fromSeriesRoster: !!(p.fromSeriesRoster || p.isSeriesRoster)
+    }, teeFields);
+  });
+  return slots;
+}
+
+function snapshotSlots(slots) {
+  return JSON.stringify((slots || []).map((s) => ({
+    position: s.position,
+    userId: String(s.userId || ''),
+    displayName: String(s.displayName || ''),
+    avatar: String(s.avatar || ''),
+    gender: String(s.gender || ''),
+    tee: String(s.tee || '')
+  })));
+}
+
+/** 从 slots 得到临时选中 id 列表（等价 editingGroupSelectedIds） */
+function slotsToSelectedIds(slots) {
+  return (slots || [])
+    .map((s) => String((s && s.userId) || '').trim())
+    .filter(Boolean);
+}
+
+Page({
+  data: {
+    themeClass: 'bright-mode',
+    headerRootStyle: '',
+    headerBarStyle: '',
+    groupId: '',
+    groupName: '',
+    editingGroupIndex: -1,
+    slots: createSlots(),
+    registerSubTabs: [],
+    activeSubTabId: '',
+    displayUsers: [],
+    emptyRosterText: '暂无可选球员'
+  },
+
+  onLoad(options) {
+    this.initHeaderNav();
+    this.applyTheme(getApp().getTheme());
+    const groupId = options && options.groupId ? decodeURIComponent(options.groupId) : '';
+    const groupName = options && options.groupName ? decodeURIComponent(options.groupName) : '';
+    const matchId = options && options.matchId ? decodeURIComponent(options.matchId) : '';
+    const fromSeriesRaw = options && options.fromSeries != null ? String(options.fromSeries) : '';
+    const seriesIdOpt =
+      options && options.seriesId != null ? decodeURIComponent(String(options.seriesId)) : '';
+    const roundIdOpt =
+      options && options.roundId != null ? decodeURIComponent(String(options.roundId)) : '';
+    const payload = this._resolvePayload(matchId);
+    const fromSeries =
+      fromSeriesRaw === '1' ||
+      fromSeriesRaw === 'true' ||
+      !!(payload && payload.fromSeries);
+
+    this._fromSeries = fromSeries;
+    this._seriesId = seriesIdOpt || (payload && payload.seriesId) || '';
+    this._roundId = roundIdOpt || (payload && payload.roundId) || '';
+    this._allGroups = payload.groups || [];
+    this._match = payload.match || null;
+    this._gameMode = String(
+      payload.gameMode
+      || (payload.match && (payload.match.gameMode || payload.match.selectedGameMode))
+      || ''
+    );
+    this._strokeCompositionMode =
+      payload.strokeCompositionMode === '2+2' ? '2+2' : '4+0';
+    this._showCompositionMode = !!payload.showCompositionMode;
+    this._leavingConfirmed = false;
+
+    let registerInfo = payload.registerInfo || { totalCount: 0, users: [] };
+    let registerSubTabs = payload.registerSubTabs || [];
+    let emptyRosterText =
+      (payload && payload.emptyRosterText) || (fromSeries ? '暂无报名人员' : '暂无可选球员');
+
+    if (fromSeries) {
+      const loaded = seriesGroupPickRoster.loadSeriesPickRegisterSource({
+        fromSeries: 1,
+        seriesId: this._seriesId,
+        roundId: this._roundId,
+        matchId: matchId,
+        match: this._match,
+        series: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : null,
+        getMatchById: function (id) {
+          return teamMatchStore.getMatchById(id);
+        },
+        getIndexByMatchId: function (id) {
+          return seriesStationIndex.getByMatchId(id);
+        }
+      });
+      if (!loaded || !loaded.ok) {
+        wx.showToast({
+          title: (loaded && loaded.message) || '本轮比赛数据异常',
+          icon: 'none'
+        });
+        setTimeout(() => {
+          wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/home/index' }) });
+        }, 500);
+        return;
+      }
+      // Series 已报名名单只认 roster 投影，忽略 match.registerInfo
+      registerInfo = loaded.registerInfo || { totalCount: 0, users: [] };
+      registerSubTabs = loaded.registerSubTabs || [];
+      emptyRosterText = loaded.emptyText || '暂无报名人员';
+      this._seriesForPick = loaded.series;
+    }
+
+    this._registerInfo = registerInfo;
+    const editingGroupIndex = (this._allGroups || []).findIndex(
+      (g) => String((g && g.groupId) || '') === String(groupId)
+    );
+
+    const tabs = this._resolveTabs(payload.match, registerSubTabs, registerInfo);
+    const activeSubTabId = tabs.length ? tabs[0].id : '';
+    this._registerLookup = buildPickRegisterLookup(this._registerInfo);
+    const slots = hydrateSlotsFromPlayers(payload.players, this._match, this._registerInfo);
+    this._initialSlotsSnapshot = snapshotSlots(slots);
+    this.setData({
+      groupId: groupId,
+      groupName: groupName || '分组',
+      editingGroupIndex: editingGroupIndex,
+      slots: slots,
+      registerSubTabs: tabs,
+      activeSubTabId: activeSubTabId,
+      emptyRosterText: emptyRosterText,
+      displayUsers: this._buildDisplayUsers(this._registerInfo, activeSubTabId, slots, groupId, editingGroupIndex)
+    });
+  },
+
+  onShow() {
+    this.applyTheme(getApp().getTheme());
+  },
+
+  applyTheme(theme) {
+    this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
+  },
+
+  initHeaderNav() {
+    const header = createHeaderStyle();
+    this.setData({
+      headerRootStyle: header.headerRootStyle,
+      headerBarStyle: header.headerBarStyle
+    });
+  },
+
+  _resolvePayload(matchId) {
+    const app = getApp();
+    const payload = (app && app.globalData && app.globalData.tournamentGroupPickPayload) || null;
+    const match = matchId ? teamMatchStore.getMatchById(matchId) : null;
+    const modeFromPayload = payload && payload.strokeCompositionMode;
+    const modeFromMatch = match && match.strokeCompositionMode;
+    const strokeCompositionMode =
+      modeFromPayload === '2+2' || (!modeFromPayload && modeFromMatch === '2+2')
+        ? '2+2'
+        : '4+0';
+    const fromSeries = !!(payload && (payload.fromSeries === true || payload.fromSeries === 1 || String(payload.fromSeries) === '1'));
+    // 普通比赛：payload.registerInfo → match.registerInfo
+    // Series：此处不取 match.registerInfo；onLoad 会改读 series.roster
+    let registerInfo = { totalCount: 0, users: [] };
+    if (!fromSeries) {
+      registerInfo =
+        payload && payload.registerInfo
+          ? payload.registerInfo
+          : (match && match.registerInfo) || { totalCount: 0, users: [] };
+    } else if (payload && payload.registerInfo) {
+      registerInfo = payload.registerInfo;
+    }
+    return {
+      match: match,
+      gameMode: payload && payload.gameMode != null
+        ? String(payload.gameMode)
+        : (match && (match.gameMode || match.selectedGameMode)) || '',
+      strokeCompositionMode: strokeCompositionMode,
+      showCompositionMode: !!(payload && payload.showCompositionMode),
+      registerInfo: registerInfo,
+      registerSubTabs: payload && Array.isArray(payload.registerSubTabs) ? payload.registerSubTabs : [],
+      players: payload && Array.isArray(payload.players) ? payload.players : [],
+      groups: payload && Array.isArray(payload.groups) ? payload.groups : [],
+      fromSeries: fromSeries,
+      seriesId: payload && payload.seriesId != null ? String(payload.seriesId) : '',
+      roundId: payload && payload.roundId != null ? String(payload.roundId) : '',
+      emptyRosterText: payload && payload.emptyRosterText ? String(payload.emptyRosterText) : ''
+    };
+  },
+
+  _resolveTabs(match, cachedTabs, registerInfo) {
+    if (Array.isArray(cachedTabs) && cachedTabs.length) {
+      return cachedTabs.map((t) => ({
+        id: String(t.id || ''),
+        name: String(t.name || ''),
+        count: Number(t.count || 0)
+      }));
+    }
+    const source = match && Array.isArray(match.teamGroups) && match.teamGroups.length
+      ? match.teamGroups
+      : [{ id: 'team-group-1', name: '正式队员' }, { id: 'team-group-2', name: '嘉宾' }];
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    return source.map((g, idx) => {
+      const id = g && g.id != null ? String(g.id) : ('group-' + (idx + 1));
+      const name = String((g && g.name) || '').trim() || ('分组' + (idx + 1));
+      const count = users.filter((u) => String(u && u.groupId) === id).length;
+      return { id: id, name: name, count: count };
+    });
+  },
+
+  /**
+   * 其它出发组占用表：必须排除当前正在编辑的出发组
+   * 排除条件：group.groupId === editingGroupId 或 index === editingGroupIndex
+   */
+  _buildOccupiedMap(editingGroupId, editingGroupIndex) {
+    const map = {};
+    const groups = this._allGroups || [];
+    const editId = String(editingGroupId || '');
+    const editIdx = editingGroupIndex != null ? Number(editingGroupIndex) : -1;
+
+    groups.forEach((group, index) => {
+      const gid = String((group && group.groupId) || '');
+      const isEditingGroup =
+        (!!editId && gid === editId) ||
+        (editIdx >= 0 && Number(index) === editIdx);
+      if (isEditingGroup) return;
+
+      const groupName = String((group && group.groupName) || '') || ('第' + (index + 1) + '组');
+      const players = Array.isArray(group && group.players) ? group.players : [];
+      players.forEach((player) => {
+        const uid = player && (player.userId != null ? player.userId : player.id);
+        const id = String(uid || '').trim();
+        if (!id || map[id]) return;
+        map[id] = groupName;
+      });
+    });
+    return map;
+  },
+
+  _buildSelectedMap(slots) {
+    const map = {};
+    (slots || []).forEach((slot) => {
+      const uid = String((slot && slot.userId) || '');
+      if (!uid) return;
+      map[uid] = Number(slot.position || 0);
+    });
+    return map;
+  },
+
+  /**
+   * 4+0：当前组已有球员时锁定其 teamGroupId；空组不锁定
+   */
+  _resolveLockedTeamIdFor40(slots, teamMap) {
+    if (!teamMap) return '';
+    const selected = (slots || [])
+      .map((s) => String((s && s.userId) || '').trim())
+      .filter(Boolean);
+    if (!selected.length) return '';
+    for (let i = 0; i < selected.length; i++) {
+      const tid = teamMap[selected[i]] != null ? String(teamMap[selected[i]]).trim() : '';
+      if (tid) return tid;
+    }
+    return '';
+  },
+
+  /** G6/G7/G8：当前组合内各报名分队已选人数 */
+  _countSelectedByTeam(slots, teamMap) {
+    const counts = {};
+    if (!teamMap) return counts;
+    (slots || []).forEach((slot) => {
+      const uid = String((slot && slot.userId) || '').trim();
+      if (!uid) return;
+      const tid = teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+      if (!tid) return;
+      counts[tid] = (counts[tid] || 0) + 1;
+    });
+    return counts;
+  },
+
+  _isMatchPlayTeamCap2Mode() {
+    const mode = String(this._gameMode || '');
+    return isG6G7MatchPlayMode(mode) || isG8MatchPlayMode(mode);
+  },
+
+  _collectNoRepeatLock() {
+    if (!this._fromSeries) {
+      return { ok: true, enabled: false, playerIds: {} };
+    }
+    return seriesGroupPickRoster.collectPriorPlayedPlayerIds({
+      fromSeries: true,
+      seriesId: this._seriesId,
+      series: this._seriesId ? seriesStore.getSeriesById(this._seriesId) : this._seriesForPick,
+      currentRoundId: this._roundId,
+      getMatchById: function (id) {
+        return teamMatchStore.getMatchById(id);
+      },
+      getIndexByMatchId: function (id) {
+        return seriesStationIndex.getByMatchId(id);
+      }
+    });
+  },
+
+  /** G5 个人比洞：每分队最多 1 人（勿与 G6-G8 cap2 混用） */
+  _isG5MatchPlayTeamCap1Mode() {
+    return isG5MatchPlayMode(String(this._gameMode || ''));
+  },
+
+  /**
+   * 弹窗列表状态：
+   * checked  = 是否在当前 slots（临时选中）
+   * disabled = 其它出发组占用 / 满员未选 / 4+0 跨分队 / G6-G8 单分队已满2人 / G5 单分队已满1人 / 其他轮次 no-repeat
+   */
+  _buildDisplayUsers(registerInfo, registerSubTabId, slots, editingGroupId, editingGroupIndex) {
+    const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
+    const editId = editingGroupId != null ? editingGroupId : this.data.groupId;
+    const editIdx = editingGroupIndex != null ? editingGroupIndex : this.data.editingGroupIndex;
+    const selectedMap = this._buildSelectedMap(slots || []);
+    const occupiedMap = this._buildOccupiedMap(editId, editIdx);
+    const selectedCount = Object.keys(selectedMap).length;
+    const applyG5Cap1 = this._isG5MatchPlayTeamCap1Mode();
+    const groupFull = applyG5Cap1 ? selectedCount >= 2 : selectedCount >= 4;
+
+    const apply40TeamLock =
+      !!this._showCompositionMode && this._strokeCompositionMode === '4+0';
+    const applyMatchPlayTeamCap2 = this._isMatchPlayTeamCap2Mode();
+    const needTeamMap = apply40TeamLock || applyMatchPlayTeamCap2 || applyG5Cap1;
+    const teamMap = needTeamMap
+      ? buildRegisterTeamMap({ registerInfo: registerInfo || { users: [] } })
+      : null;
+    const lockedTeamId = apply40TeamLock
+      ? this._resolveLockedTeamIdFor40(slots, teamMap)
+      : '';
+    const teamSelectedCounts =
+      applyMatchPlayTeamCap2 || applyG5Cap1
+        ? this._countSelectedByTeam(slots, teamMap)
+        : {};
+    const noRepeatLock = this._collectNoRepeatLock();
+
+    return users
+      .map(normalizeUser)
+      .filter((u) => String(u.groupId) === String(registerSubTabId || ''))
+      .map((u) => {
+        const uid = String(u.userId || '');
+        const checked = !!selectedMap[uid];
+        const occupiedGroupName = occupiedMap[uid] || '';
+        const isOccupied = !!occupiedGroupName;
+        let isDisabled = false;
+        if (isOccupied) {
+          isDisabled = true;
+        } else if (!checked && groupFull) {
+          isDisabled = true;
+        } else if (!checked && lockedTeamId) {
+          const candTeam =
+            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+          if (candTeam !== lockedTeamId) {
+            isDisabled = true;
+          }
+        } else if (!checked && applyG5Cap1) {
+          // G5：某分队已选 1 人后，同队其余不可再选；满 2 人由 groupFull 禁用全部
+          const candTeam =
+            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+          if (candTeam && (teamSelectedCounts[candTeam] || 0) >= 1) {
+            isDisabled = true;
+          }
+        } else if (!checked && applyMatchPlayTeamCap2) {
+          // G6/G7/G8：某分队已选满 2 人后，同队其余球员不可再选（已选中的仍可取消）
+          const candTeam =
+            teamMap && teamMap[uid] != null ? String(teamMap[uid]).trim() : '';
+          if (candTeam && (teamSelectedCounts[candTeam] || 0) >= 2) {
+            isDisabled = true;
+          }
+        }
+        return seriesGroupPickRoster.mergeNoRepeatLockFields(
+          Object.assign({}, u, {
+            isSelected: checked,
+            checked: checked,
+            selectedSlot: selectedMap[uid] || 0,
+            isOccupied: isOccupied,
+            occupiedGroupName: occupiedGroupName,
+            isDisabled: isDisabled
+          }),
+          noRepeatLock
+        );
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en', { sensitivity: 'base' }));
+  },
+
+  _countFilledSlots(slots) {
+    return (slots || []).filter((s) => !!String((s && s.userId) || '')).length;
+  },
+
+  _refreshDisplayUsers(registerSubTabId, slots) {
+    this.setData({
+      displayUsers: this._buildDisplayUsers(
+        this._registerInfo,
+        registerSubTabId,
+        slots,
+        this.data.groupId,
+        this.data.editingGroupIndex
+      )
+    });
+  },
+
+  _isDirty() {
+    return snapshotSlots(this.data.slots) !== this._initialSlotsSnapshot;
+  },
+
+  _buildConfirmPayload() {
+    return {
+      groupId: this.data.groupId || '',
+      groupName: this.data.groupName || '',
+      players: (this.data.slots || []).map((s) => ({
+        position: Number(s.position) || 0,
+        userId: s.userId ? String(s.userId) : '',
+        displayName: s.displayName ? String(s.displayName) : '',
+        avatar: s.avatar ? String(s.avatar) : '',
+        gender: s.gender ? String(s.gender) : '',
+        tee: s.tee ? String(s.tee) : '',
+        matchTeamId: s.matchTeamId ? String(s.matchTeamId) : '',
+        groupId: s.groupId ? String(s.groupId) : '',
+        matchTeamName: s.matchTeamName ? String(s.matchTeamName) : '',
+        groupName: s.groupName ? String(s.groupName) : '',
+        seriesParticipantId: s.seriesParticipantId ? String(s.seriesParticipantId) : '',
+        affiliationId: s.affiliationId ? String(s.affiliationId) : '',
+        participantNameSnapshot: s.participantNameSnapshot
+          ? String(s.participantNameSnapshot)
+          : '',
+        participantShortNameSnapshot: s.participantShortNameSnapshot
+          ? String(s.participantShortNameSnapshot)
+          : '',
+        participantColorSnapshot: s.participantColorSnapshot
+          ? String(s.participantColorSnapshot)
+          : '',
+        fromSeriesRoster: !!s.fromSeriesRoster
+      }))
+    };
+  },
+
+  /**
+   * 确定前校验；失败 toast 并 return false（不 navigateBack、不改用户选择）
+   */
+  _validateBeforeCommit() {
+    const payload = this._buildConfirmPayload();
+    const teamMap = buildRegisterTeamMap({
+      registerInfo: this._registerInfo || { users: [] }
+    });
+    const gameMode = String(this._gameMode || '');
+
+    if (this._fromSeries) {
+      const lock = this._collectNoRepeatLock();
+      const ids = seriesGroupPickRoster.collectPlayerIdsFromSlots(this.data.slots);
+      const check = seriesGroupPickRoster.assertPlayersNotPlayedPriorRound(ids, lock);
+      if (!check.ok) {
+        wx.showToast({
+          title: check.message || seriesGroupPickRoster.NO_REPEAT_SAVE_MSG,
+          icon: 'none'
+        });
+        return false;
+      }
+    }
+
+    // G5：跨分队恰好 1v1
+    if (isG5MatchPlayMode(gameMode)) {
+      const err = validateG5MatchPlayPlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    // G6/G7：双方分队各 1–2 人（不改变 G2/G3 原规则）
+    if (isG6G7MatchPlayMode(gameMode)) {
+      const err = validateG6G7MatchPlayPlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    // G8：仅红2+蓝2；G4 比杆保持原 2/4 人规则
+    if (isG8MatchPlayMode(gameMode)) {
+      const err = validateG8MatchPlayPlayers(payload.players, teamMap);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    const sideUnit = resolvePickSideUnit(this._match);
+    if (isG4FamilyMode(gameMode) || gameMode === '四人两球比杆赛') {
+      const err = validateG4GroupStructurePlayers(payload.players, teamMap, sideUnit);
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+      return true;
+    }
+
+    // G2/G3：先生成组合结构，再验每个成绩组合内部是否同队
+    if (this._showCompositionMode) {
+      const err = validateStrokeCompositionPlayers(
+        payload.players,
+        this._strokeCompositionMode,
+        teamMap,
+        sideUnit
+      );
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' });
+        return false;
+      }
+    }
+    return true;
+  },
+
+  _commitAndBack() {
+    if (!this._validateBeforeCommit()) return;
+    const app = getApp();
+    app.globalData = app.globalData || {};
+    app.globalData.tournamentGroupPickResult = this._buildConfirmPayload();
+    this._leavingConfirmed = true;
+    this._initialSlotsSnapshot = snapshotSlots(this.data.slots);
+    wx.navigateBack({ delta: 1 });
+  },
+
+  _discardAndBack() {
+    this._leavingConfirmed = true;
+    wx.navigateBack({ delta: 1 });
+  },
+
+  onBack() {
+    if (this._leavingConfirmed || !this._isDirty()) {
+      this._discardAndBack();
+      return;
+    }
+    wx.showModal({
+      title: '提示',
+      content: '是否保存修改？',
+      confirmText: '保存',
+      cancelText: '不保存',
+      success: (res) => {
+        if (res.confirm) {
+          this._commitAndBack();
+        } else if (res.cancel) {
+          this._discardAndBack();
+        }
+      }
+    });
+  },
+
+  onConfirm() {
+    this._commitAndBack();
+  },
+
+  switchSubTab(e) {
+    const id = String((e.currentTarget.dataset.id != null ? e.currentTarget.dataset.id : ''));
+    if (!id || id === this.data.activeSubTabId) return;
+    this.setData({
+      activeSubTabId: id
+    }, () => {
+      this._refreshDisplayUsers(id, this.data.slots);
+    });
+  },
+
+  /**
+   * 勾选/取消：只改 slots（临时选中），再重建列表。
+   * 不信任 data-user 上的旧 isOccupied/isDisabled，按实时 occupiedMap / 4+0 / G6-G8 分队上限 / 最新 no-repeat 判断。
+   */
+  onTogglePlayer(e) {
+    const user = e.currentTarget.dataset.user || null;
+    if (!user) return;
+    const pickedUserId = String(user.userId || '');
+    if (!pickedUserId) return;
+
+    const slots = (this.data.slots || []).slice();
+    const editingGroupId = this.data.groupId;
+    const editingGroupIndex = this.data.editingGroupIndex;
+    const occupiedMap = this._buildOccupiedMap(editingGroupId, editingGroupIndex);
+
+    // 其它出发组占用：不可选
+    if (occupiedMap[pickedUserId]) return;
+
+    const selectedIndex = slots.findIndex((s) => String((s && s.userId) || '') === pickedUserId);
+
+    // 取消勾选：清空该位置（含删光后恢复全部分队可选）
+    // 当前 slot 历史违规球员必须能取消；取消后再选走下面的 no-repeat 核验
+    if (selectedIndex >= 0) {
+      slots[selectedIndex] = createEmptySlot(slots[selectedIndex].position || (selectedIndex + 1));
+      const displayUsers = this._buildDisplayUsers(
+        this._registerInfo,
+        this.data.activeSubTabId,
+        slots,
+        editingGroupId,
+        editingGroupIndex
+      );
+      this.setData({ slots: slots, displayUsers: displayUsers });
+      return;
+    }
+
+    if (this._fromSeries) {
+      const lock = this._collectNoRepeatLock();
+      const blocked = seriesGroupPickRoster.shouldBlockNoRepeatAdd(pickedUserId, lock);
+      if (blocked && blocked.blocked) {
+        wx.showToast({
+          title: blocked.message || seriesGroupPickRoster.NO_REPEAT_TOGGLE_MSG,
+          icon: 'none'
+        });
+        return;
+      }
+    }
+
+    // 4+0：已有球员时禁止跨分队入座
+    if (this._showCompositionMode && this._strokeCompositionMode === '4+0') {
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const lockedTeamId = this._resolveLockedTeamIdFor40(slots, teamMap);
+      if (lockedTeamId) {
+        const candTeam =
+          teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
+        if (candTeam !== lockedTeamId) return;
+      }
+    }
+
+    // G5：单分队已选 1 人则禁止继续选同队；全组最多 2 人
+    if (this._isG5MatchPlayTeamCap1Mode()) {
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const candTeam =
+        teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
+      const teamCounts = this._countSelectedByTeam(slots, teamMap);
+      if (candTeam && (teamCounts[candTeam] || 0) >= 1) {
+        return;
+      }
+      if (this._countFilledSlots(slots) >= 2) {
+        wx.showToast({ title: '个人比洞赛每组必须有且只有两名球员', icon: 'none' });
+        return;
+      }
+    }
+
+    // G6/G7/G8：单分队已选满 2 人则禁止继续选同队
+    if (this._isMatchPlayTeamCap2Mode()) {
+      const teamMap = buildRegisterTeamMap({
+        registerInfo: this._registerInfo || { users: [] }
+      });
+      const candTeam =
+        teamMap[pickedUserId] != null ? String(teamMap[pickedUserId]).trim() : '';
+      const teamCounts = this._countSelectedByTeam(slots, teamMap);
+      if (candTeam && (teamCounts[candTeam] || 0) >= 2) {
+        return;
+      }
+    }
+
+    if (this._countFilledSlots(slots) >= 4) {
+      wx.showToast({ title: '每组最多4人', icon: 'none' });
+      return;
+    }
+
+    const emptyIndex = slots.findIndex((s) => !String((s && s.userId) || ''));
+    if (emptyIndex < 0) {
+      wx.showToast({ title: '每组最多4人', icon: 'none' });
+      return;
+    }
+
+    const gender = user.gender || '';
+    const teeFields = teeDisplayFields(defaultTeeFromRegisterGender(gender));
+    // Series roster：直接沿用归属，不弹球队/分队选择、不默认第一支
+    if (
+      this._fromSeries &&
+      this._seriesForPick &&
+      seriesGroupPickRoster.needsAffiliationSelection(user, this._seriesForPick)
+    ) {
+      wx.showToast({ title: '请选择所属球队/分队', icon: 'none' });
+      return;
+    }
+    slots[emptyIndex] = Object.assign({}, slots[emptyIndex], {
+      userId: pickedUserId,
+      avatar: user.avatar || '',
+      displayName: user.displayName || '',
+      gender: gender,
+      handicap: user.handicap || '-',
+      teamLabel: resolveSlotTeamLabel(user, this._match, this._registerLookup || {}),
+      matchTeamId: user.matchTeamId ? String(user.matchTeamId) : '',
+      groupId: user.groupId != null ? String(user.groupId) : '',
+      matchTeamName: user.matchTeamName ? String(user.matchTeamName) : '',
+      groupName: user.groupName ? String(user.groupName) : '',
+      seriesParticipantId: user.seriesParticipantId ? String(user.seriesParticipantId) : '',
+      affiliationId: user.affiliationId || user.matchTeamId || '',
+      participantNameSnapshot:
+        user.participantNameSnapshot != null
+          ? String(user.participantNameSnapshot)
+          : user.nameSnapshot != null
+            ? String(user.nameSnapshot)
+            : '',
+      participantShortNameSnapshot:
+        user.participantShortNameSnapshot != null
+          ? String(user.participantShortNameSnapshot)
+          : user.shortNameSnapshot != null
+            ? String(user.shortNameSnapshot)
+            : '',
+      participantColorSnapshot:
+        user.participantColorSnapshot != null
+          ? String(user.participantColorSnapshot)
+          : user.colorSnapshot != null
+            ? String(user.colorSnapshot)
+            : '',
+      fromSeriesRoster: !!user.fromSeriesRoster
+    }, teeFields);
+
+    const displayUsers = this._buildDisplayUsers(
+      this._registerInfo,
+      this.data.activeSubTabId,
+      slots,
+      editingGroupId,
+      editingGroupIndex
+    );
+    this.setData({ slots: slots, displayUsers: displayUsers });
+  }
+});

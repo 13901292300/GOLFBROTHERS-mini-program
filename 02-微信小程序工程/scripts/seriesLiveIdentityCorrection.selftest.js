@@ -357,7 +357,7 @@ function run(before, after, series, extras) {
 
 (function editor_wired() {
   var src = fs.readFileSync(
-    path.join(__dirname, '..', 'miniprogram', 'subpackages', 'tournament', 'pages', 'group-editor', 'index.js'),
+    path.join(__dirname, '..', 'miniprogram', 'subpackages', 'tournament-manage', 'pages', 'group-editor', 'index.js'),
     'utf8'
   );
   assert(
@@ -419,7 +419,7 @@ function run(before, after, series, extras) {
   });
   assert('生产不存在旧换人/journal 入口', hits.length === 0);
   var identitySrc = fs.readFileSync(
-    path.join(miniRoot, 'subpackages', 'tournament', 'utils', 'seriesLiveIdentityCorrection.js'),
+    path.join(miniRoot, 'subpackages', 'tournament-manage', 'utils', 'seriesLiveIdentityCorrection.js'),
     'utf8'
   );
   assert(

@@ -64,6 +64,14 @@
       ]
     },
     {
+      "root": "subpackages/tournament-manage",
+      "name": "tournament-manage",
+      "pages": [
+        "pages/group-editor/index",
+        "pages/group-pick/index"
+      ]
+    },
+    {
       "root": "subpackages/tournament-tools",
       "name": "tournament-tools",
       "pages": [

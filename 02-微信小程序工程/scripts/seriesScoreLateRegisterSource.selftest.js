@@ -5,6 +5,7 @@
 
 var path = require('path');
 var fs = require('fs');
+var seriesTestPaths = require('./lib/seriesTestPaths.js');
 
 var root = path.join(__dirname, '..');
 var utilsDir = path.join(root, 'miniprogram', 'utils');
@@ -30,7 +31,7 @@ var seriesModel = require(path.join(utilsDir, 'seriesModel.js'));
 var seriesStationMatch = require(path.join(utilsDir, 'seriesStationMatch.js'));
 var seriesRyderCup = require(path.join(utilsDir, 'seriesRyderCup.js'));
 var src = require(path.join(utilsDir, 'seriesPickRegisterSource.js'));
-var pickRoster = require(path.join(pageDir, 'seriesGroupPickRoster.js'));
+var pickRoster = require(seriesTestPaths.util('seriesGroupPickRoster.js'));
 
 var passed = 0;
 var failed = 0;
@@ -373,7 +374,7 @@ function applyUsedMap(users, usedIds) {
 
 (function testWiring() {
   var scoreSrc = fs.readFileSync(scoreJs, 'utf8');
-  var pickSrc = fs.readFileSync(path.join(pageDir, 'seriesGroupPickRoster.js'), 'utf8');
+  var pickSrc = fs.readFileSync(seriesTestPaths.util('seriesGroupPickRoster.js'), 'utf8');
   assert(
     'scoring 用主包投影且不 require tournament seriesGroupPickRoster',
     scoreSrc.indexOf('seriesPickRegisterSource') >= 0 &&
