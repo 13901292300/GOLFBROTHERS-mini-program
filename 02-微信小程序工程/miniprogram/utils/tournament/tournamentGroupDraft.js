@@ -1229,6 +1229,131 @@ function validatePairingDraft(groups, pairingDraft) {
   return '';
 }
 
+function isAutoOrderedGroupName(name) {
+  return /^第\d+组$/.test(String(name || '').trim());
+}
+
+/**
+ * 页面卡片顺序上的组标签：自定义组名保留；默认「第N组」按当前显示顺序重算。
+ */
+function displayGroupLabel(group, displayIndex) {
+  const name = group && group.groupName != null ? String(group.groupName).trim() : '';
+  if (name && !isAutoOrderedGroupName(name)) return name;
+  return '第' + (Number(displayIndex) + 1) + '组';
+}
+
+function teamSizeSplitText(filled, teamMap) {
+  const buckets = {};
+  (filled || []).forEach((p) => {
+    const uid = p && p.userId != null ? String(p.userId).trim() : '';
+    if (!uid) return;
+    const teamId =
+      teamMap && teamMap[uid] != null && String(teamMap[uid]).trim()
+        ? String(teamMap[uid]).trim()
+        : '__none__';
+    if (!buckets[teamId]) buckets[teamId] = 0;
+    buckets[teamId] += 1;
+  });
+  return Object.keys(buckets)
+    .map((k) => buckets[k])
+    .sort((a, b) => b - a)
+    .join('+');
+}
+
+function formatTwoPlusTwoGroupReject(label, split) {
+  return (
+    String(label || '') +
+    '为' +
+    String(split || '') +
+    '，不符合2+2分组规则；每队应各有2名球员。'
+  );
+}
+
+function isCoveredDraftStructureErr(err) {
+  const t = String(err || '');
+  if (!t) return false;
+  return (
+    t.indexOf('2+2') >= 0 ||
+    t.indexOf('4+0') >= 0 ||
+    t.indexOf('每组最多') >= 0 ||
+    t.indexOf('人数超过') >= 0 ||
+    t.indexOf('须为') >= 0 ||
+    t.indexOf('必须有且只有') >= 0 ||
+    t.indexOf('未填') >= 0 ||
+    t.indexOf('不能跨') >= 0 ||
+    t.indexOf('无法按') >= 0
+  );
+}
+
+/**
+ * 确定时按页面显示顺序收集单组结构问题（不写盘、不去掉空组以免组号错位）。
+ */
+function collectConfirmGroupRejectMessages(draft, options) {
+  const opts = options || {};
+  const groups = Array.isArray(draft) ? draft : [];
+  const teamMap = buildRegisterTeamMap({ registerInfo: opts.registerInfo || { users: [] } });
+  const gameMode = String(opts.gameMode || '');
+  const compositionMode = opts.strokeCompositionMode === '4+0' ? '4+0' : '2+2';
+  const showCompositionMode = !!opts.showCompositionMode;
+  const sideUnit = opts.sideUnit || '分队';
+  const messages = [];
+  const seen = {};
+
+  function push(msg) {
+    const t = String(msg || '').trim();
+    if (!t || seen[t]) return;
+    seen[t] = true;
+    messages.push(t);
+  }
+
+  const checkG2G3 =
+    !isG6G7MatchPlayMode(gameMode) &&
+    (showCompositionMode || isG2G3FamilyMode(gameMode));
+
+  groups.forEach((g, displayIndex) => {
+    const label = displayGroupLabel(g, displayIndex);
+    const filled = listFilledPickPlayers(g && g.players);
+    const n = filled.length;
+    if (!n) return;
+
+    if (isG5MatchPlayMode(gameMode)) {
+      const err = validateG5MatchPlayPlayers(g.players, teamMap);
+      if (!err) return;
+      if (n !== 2) push(label + '：存在未填的必要位置');
+      return;
+    }
+
+    if (isG4FamilyMode(gameMode) || isG8MatchPlayMode(gameMode)) {
+      const err = validateG4GroupStructurePlayers(g.players, teamMap, sideUnit);
+      if (!err) return;
+      push(label + '：分组人数不符合当前赛制');
+      return;
+    }
+
+    if (!checkG2G3) return;
+
+    if (compositionMode === '4+0') {
+      const err = validateStrokeCompositionPlayers(g.players, '4+0', teamMap, sideUnit);
+      if (!err) return;
+      if (n > 4) push(label + '：分组人数不符合当前赛制');
+      else push(label + '：4+0 组合不合法');
+      return;
+    }
+
+    if (n > 4) {
+      push(label + '：分组人数不符合当前赛制');
+      return;
+    }
+    const teamErr = ensurePlayersHaveTeam(filled, teamMap, sideUnit);
+    if (teamErr) return;
+    const structureErr = validateG2G3TwoPlusTwoPlayers(filled, teamMap, sideUnit);
+    if (!structureErr) return;
+    push(formatTwoPlusTwoGroupReject(label, teamSizeSplitText(filled, teamMap)));
+  });
+
+  return messages;
+}
+
 function validateGroupDraft(draft, pairingDraft, options) {
   const opts = options || {};
   const groups = sanitizeGroupDraft(draft);
@@ -1441,5 +1566,9 @@ module.exports = {
   buildAutoPairingsForGroup: buildAutoPairingsForGroup,
   sanitizeGroupDraft: sanitizeGroupDraft,
   validatePairingDraft: validatePairingDraft,
-  validateGroupDraft: validateGroupDraft
+  validateGroupDraft: validateGroupDraft,
+  displayGroupLabel: displayGroupLabel,
+  collectConfirmGroupRejectMessages: collectConfirmGroupRejectMessages,
+  isCoveredDraftStructureErr: isCoveredDraftStructureErr,
+  formatTwoPlusTwoGroupReject: formatTwoPlusTwoGroupReject
 };

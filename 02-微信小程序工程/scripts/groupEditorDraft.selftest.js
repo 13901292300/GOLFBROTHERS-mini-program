@@ -257,7 +257,11 @@ assert(
       'buildAutoPairingsForGroup',
       'sanitizeGroupDraft',
       'validatePairingDraft',
-      'validateGroupDraft'
+      'validateGroupDraft',
+      'displayGroupLabel',
+      'collectConfirmGroupRejectMessages',
+      'isCoveredDraftStructureErr',
+      'formatTwoPlusTwoGroupReject'
     ],
     'seriesScheduleGroupWrite.js': [
       'STATION_DATA_INVALID_MSG',

@@ -751,6 +751,262 @@ assert(
   mapper._normalizeGroupSaveRejectMessage('permission_denied') === '无管理权限'
 );
 
+var extra22Users = g2Users.concat([
+  { userId: 'F', matchTeamId: 'red', groupId: 'red', displayName: '球员F' },
+  { userId: 'G', matchTeamId: 'blue', groupId: 'blue', displayName: '球员G' },
+  { userId: 'H', matchTeamId: 'blue', groupId: 'blue', displayName: '球员H' }
+]);
+putMatch({
+  matchId: 'm-22-label',
+  gameMode: '四人四球比杆赛',
+  strokeCompositionMode: '2+2',
+  registerInfo: { users: extra22Users },
+  groups: []
+});
+
+function confirm22(draft, extra) {
+  resetUi();
+  saveCount = 0;
+  return bindPage(editorCaptured, Object.assign({
+    matchId: 'm-22-label',
+    mode: 'edit',
+    gameMode: '四人四球比杆赛',
+    showCompositionMode: true,
+    strokeCompositionMode: '2+2',
+    _registerInfo: { users: extra22Users },
+    _matchSnapshot: matches['m-22-label'],
+    groupDraft: draft
+  }, extra || {}));
+}
+
+resetUi();
+saveCount = 0;
+var edLabel2 = confirm22([
+  {
+    groupId: 'g1',
+    groupName: '第1组',
+    players: fourSlots(['C', 'D'], { C: 'blue', D: 'blue' })
+  },
+  {
+    groupId: 'g2',
+    groupName: '第2组',
+    players: fourSlots(['A', 'B', 'E', 'G'], { A: 'red', B: 'red', E: 'red', G: 'blue' })
+  }
+]);
+edLabel2._setGroupDraft(edLabel2.data.groupDraft);
+assert(
+  '草稿阶段 3+1 不提前弹窗',
+  saveCount === 0 && toastCalls.length === 0 && modalCalls.length === 0
+);
+edLabel2.onConfirm();
+var content2 = String((modalCalls[0] && modalCalls[0].content) || '');
+assert(
+  '第2组 3+1 文案含组号与 3+1',
+  saveCount === 0 &&
+    navCalls === 0 &&
+    modalCalls.length === 1 &&
+    modalCalls[0].title === '分组无法保存' &&
+    modalCalls[0].confirmText === '知道了' &&
+    modalCalls[0].showCancel === false &&
+    content2.indexOf('第2组') >= 0 &&
+    content2.indexOf('3+1') >= 0 &&
+    content2.indexOf('不符合2+2分组规则') >= 0 &&
+    content2.indexOf('g2') < 0 &&
+    content2.indexOf('2_2') < 0
+);
+
+resetUi();
+saveCount = 0;
+var namedDraft = [
+  {
+    groupId: 'g1',
+    groupName: '冠军组',
+    players: fourSlots(['A', 'B', 'E', 'C'], { A: 'red', B: 'red', E: 'red', C: 'blue' })
+  }
+];
+var edNamed = confirm22(JSON.parse(JSON.stringify(namedDraft)));
+edNamed.onConfirm();
+assert(
+  '自定义组名使用组名',
+  saveCount === 0 &&
+    String(modalCalls[0] && modalCalls[0].content).indexOf('冠军组为3+1，不符合2+2分组规则；每队应各有2名球员。') >= 0 &&
+    JSON.stringify(edNamed.data.groupDraft) === JSON.stringify(namedDraft)
+);
+
+resetUi();
+saveCount = 0;
+var edTwo = confirm22([
+  {
+    groupId: 'ga',
+    groupName: '第1组',
+    players: fourSlots(['A', 'B', 'E', 'C'], { A: 'red', B: 'red', E: 'red', C: 'blue' })
+  },
+  {
+    groupId: 'gb',
+    groupName: '第2组',
+    players: fourSlots(['F', 'D', 'G', 'H'], { F: 'red', D: 'blue', G: 'blue', H: 'blue' })
+  }
+]);
+edTwo.onConfirm();
+var twoContent = String((modalCalls[0] && modalCalls[0].content) || '');
+var twoLines = twoContent.split('\n').filter(Boolean);
+assert(
+  '两组同时不合法分行去重',
+  saveCount === 0 &&
+    twoLines.length === 2 &&
+    twoLines[0].indexOf('第1组') >= 0 &&
+    twoLines[0].indexOf('3+1') >= 0 &&
+    twoLines[1].indexOf('第2组') >= 0 &&
+    twoLines[1].indexOf('3+1') >= 0 &&
+    twoLines[0] !== twoLines[1]
+);
+
+resetUi();
+saveCount = 0;
+var edReorder = confirm22([
+  {
+    groupId: 'g-old-2',
+    groupName: '第2组',
+    players: fourSlots(['A', 'B', 'E', 'C'], { A: 'red', B: 'red', E: 'red', C: 'blue' })
+  },
+  {
+    groupId: 'g-old-1',
+    groupName: '第1组',
+    players: fourSlots(['D', 'G'], { D: 'blue', G: 'blue' })
+  }
+]);
+edReorder.onConfirm();
+var reorderContent = String((modalCalls[0] && modalCalls[0].content) || '');
+assert(
+  '重排后组号跟显示顺序',
+  saveCount === 0 &&
+    reorderContent.indexOf('第1组为3+1') >= 0 &&
+    reorderContent.indexOf('第2组为') < 0
+);
+
+resetUi();
+saveCount = 0;
+var keep31 = [
+  {
+    groupId: 'g-keep',
+    groupName: '第1组',
+    players: fourSlots(['A', 'B', 'E', 'C'], { A: 'red', B: 'red', E: 'red', C: 'blue' })
+  }
+];
+var edKeep = confirm22(JSON.parse(JSON.stringify(keep31)));
+edKeep.onConfirm();
+assert(
+  '弹窗后草稿保留且写入 0',
+  saveCount === 0 &&
+    navCalls === 0 &&
+    JSON.stringify(edKeep.data.groupDraft) === JSON.stringify(keep31)
+);
+
+resetUi();
+saveCount = 0;
+edKeep.data.groupDraft = [
+  {
+    groupId: 'g-keep',
+    groupName: '第1组',
+    players: fourSlots(['A', 'B', 'C', 'D'], { A: 'red', B: 'red', C: 'blue', D: 'blue' })
+  }
+];
+edKeep.onConfirm();
+assert(
+  '改成 2+2 后再确定可保存',
+  saveCount >= 1 &&
+    toastCalls.some(function (t) {
+      return t.title === '分组已保存';
+    })
+);
+
+resetUi();
+saveCount = 0;
+putMatch({
+  matchId: 'm-40',
+  gameMode: '四人四球比杆赛',
+  strokeCompositionMode: '4+0',
+  registerInfo: { users: extra22Users }
+});
+var ed40 = bindPage(editorCaptured, {
+  matchId: 'm-40',
+  mode: 'edit',
+  gameMode: '四人四球比杆赛',
+  showCompositionMode: true,
+  strokeCompositionMode: '4+0',
+  _registerInfo: { users: extra22Users },
+  _matchSnapshot: matches['m-40'],
+  groupDraft: [
+    {
+      groupId: 'g40',
+      groupName: '第1组',
+      players: fourSlots(['A', 'C'], { A: 'red', C: 'blue' })
+    }
+  ]
+});
+ed40.onConfirm();
+assert(
+  '4+0 单组错误带组标签',
+  saveCount === 0 &&
+    String(modalCalls[0] && modalCalls[0].content) === '第1组：4+0 组合不合法'
+);
+
+resetUi();
+saveCount = 0;
+putMatch({
+  matchId: 'm-g4n',
+  gameMode: '四人两球比杆赛',
+  registerInfo: { users: extra22Users }
+});
+var edG4n = bindPage(editorCaptured, {
+  matchId: 'm-g4n',
+  mode: 'edit',
+  gameMode: '四人两球比杆赛',
+  _registerInfo: { users: extra22Users },
+  _matchSnapshot: matches['m-g4n'],
+  groupDraft: [
+    {
+      groupId: 'g4',
+      groupName: '第1组',
+      players: fourSlots(['A', 'B', 'C'], { A: 'red', B: 'red', C: 'blue' })
+    }
+  ]
+});
+edG4n.onConfirm();
+assert(
+  '人数不符带组标签',
+  saveCount === 0 &&
+    String(modalCalls[0] && modalCalls[0].content) === '第1组：分组人数不符合当前赛制'
+);
+
+resetUi();
+saveCount = 0;
+putMatch({
+  matchId: 'm-g5',
+  gameMode: '个人比洞赛',
+  registerInfo: { users: extra22Users }
+});
+var edG5 = bindPage(editorCaptured, {
+  matchId: 'm-g5',
+  mode: 'edit',
+  gameMode: '个人比洞赛',
+  _registerInfo: { users: extra22Users },
+  _matchSnapshot: matches['m-g5'],
+  groupDraft: [
+    {
+      groupId: 'g5',
+      groupName: '第1组',
+      players: fourSlots(['A'], { A: 'red' })
+    }
+  ]
+});
+edG5.onConfirm();
+assert(
+  '必要位置未填带组标签',
+  saveCount === 0 &&
+    String(modalCalls[0] && modalCalls[0].content) === '第1组：存在未填的必要位置'
+);
+
 teamMatchStore.saveMatch = origSave;
 teamMatchStore.getMatchById = origGet;
 matchManageAccess.hasMatchManagePermission = origPerm;

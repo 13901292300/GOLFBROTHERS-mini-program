@@ -81,7 +81,9 @@ const {
   buildAutoPairingsForGroup,
   applyLiveGroupsFromDraft,
   rematerializeLivePlayersAfterNormalize,
-  rebindLiveScoreDataToSeatPlayers
+  rebindLiveScoreDataToSeatPlayers,
+  collectConfirmGroupRejectMessages,
+  isCoveredDraftStructureErr
 } = tournamentGroupDraft;
 
 // 页面方法内原调用 this._validateGroupDraft / _validatePairingDraft / _sanitizeGroupDraft
@@ -1070,9 +1072,53 @@ Page({
     return tournamentGroupDraft.validatePairingDraft(groups, pairingDraft);
   },
 
+  _confirmGroupRejectOptions() {
+    return {
+      gameMode: this.data.gameMode,
+      strokeCompositionMode: this.data.strokeCompositionMode,
+      showCompositionMode: !!this.data.showCompositionMode,
+      registerInfo: this._registerInfo || { users: [] },
+      sideUnit: resolveSideUnitLabel(this._matchSnapshot)
+    };
+  },
+
+  _collectConfirmGroupRejectMessages(rawDraft) {
+    return collectConfirmGroupRejectMessages(rawDraft, this._confirmGroupRejectOptions());
+  },
+
+  _isGroupStructureRejectCode(code) {
+    const c = String(code || '');
+    return (
+      c.indexOf('2_2') >= 0 ||
+      c.indexOf('4_0') >= 0 ||
+      c.indexOf('4+0') >= 0 ||
+      c === 'affiliation' ||
+      c === 'affiliation_mismatch' ||
+      c.indexOf('illegal_split') >= 0 ||
+      c.indexOf('g4_player_count') >= 0 ||
+      c.indexOf('g4_illegal') >= 0 ||
+      c.indexOf('empty_group') >= 0 ||
+      c.indexOf('player_count') >= 0 ||
+      c.indexOf('g5') >= 0
+    );
+  },
+
+  _showStrokeRejectWithGroupContext(reason, fallback) {
+    const scoped = this._collectConfirmGroupRejectMessages(this.data.groupDraft);
+    if (scoped.length) {
+      this._showGroupSaveRejectModal(scoped, reason);
+      return;
+    }
+    this._showGroupSaveRejectModal(this._mapStrokeRejectMessage(reason, fallback), reason);
+  },
+
   _normalizeGroupSaveRejectMessage(raw) {
     const t = String(raw || '').trim();
     if (!t) return '';
+    if (t.indexOf('不符合2+2分组规则') >= 0) return t;
+    if (t.indexOf('：4+0 组合不合法') >= 0) return t;
+    if (t.indexOf('：分组人数不符合当前赛制') >= 0) return t;
+    if (t.indexOf('：存在未填的必要位置') >= 0) return t;
     const c = t;
     if (
       c === 'player_not_on_roster' ||
@@ -1220,8 +1266,12 @@ Page({
     if (!finishedGuard.ok) {
       issues.push('场次或系列赛已结束');
     }
+    const perGroup = this._collectConfirmGroupRejectMessages(rawDraft);
+    perGroup.forEach((msg) => issues.push(msg));
     const draftErr = this._validateGroupDraft(rawDraft, pairingDraft);
-    if (draftErr) issues.push(draftErr);
+    if (draftErr && !(perGroup.length && isCoveredDraftStructureErr(draftErr))) {
+      issues.push(draftErr);
+    }
     if (this._fromSeries) {
       const sanitizedForLock = this._sanitizeGroupDraft(rawDraft);
       const ids = seriesNoRepeatLineup.collectDraftMemberIds(sanitizedForLock, pairingDraft);
@@ -1733,6 +1783,13 @@ Page({
 
   _mapSeriesLiveRejectMessage(code) {
     const c = String(code || '').trim();
+    if (this._isGroupStructureRejectCode(c)) {
+      const scoped = this._collectConfirmGroupRejectMessages(
+        (this.data && this.data.groupDraft) || []
+      );
+      if (scoped.length === 1) return scoped[0];
+      if (scoped.length > 1) return scoped;
+    }
     if (c === 'incoming_already_in_round' || c === 'duplicate') return SERIES_LIVE_DUPLICATE_MSG;
     if (c === 'player_not_on_roster') return SERIES_LIVE_NOT_ON_ROSTER_MSG;
     if (c === 'affiliation_mismatch' || c === 'affiliation') return SERIES_LIVE_AFFILIATION_MSG;
@@ -1903,9 +1960,9 @@ Page({
       const finalized = this._finalizeLiveCandidate(next);
       if (!finalized.ok) {
         console.warn('[stroke-entity-validate]', finalized.reason || 'invalid');
-        this._showGroupSaveRejectModal(
-          this._mapStrokeRejectMessage(finalized.reason, finalized.message),
-          finalized.reason
+        this._showStrokeRejectWithGroupContext(
+          finalized.reason,
+          finalized.message
         );
         return;
       }
@@ -2064,9 +2121,9 @@ Page({
       const check = validateStrokeEntities(next);
       if (!check || check.valid !== true) {
         console.warn('[stroke-entity-validate]', check && check.reason ? check.reason : 'invalid');
-        this._showGroupSaveRejectModal(
-          this._mapStrokeRejectMessage(check && check.reason, STROKE_ENTITY_INVALID_TIP),
-          check && check.reason
+        this._showStrokeRejectWithGroupContext(
+          check && check.reason,
+          STROKE_ENTITY_INVALID_TIP
         );
         return;
       }
