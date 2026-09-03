@@ -220,6 +220,16 @@ function pickTeamBest(ids, rec) {
   return best;
 }
 
+/** 双人队最差成绩（最高调整后杆），斗小地主比较用。 */
+function pickTeamWorst(ids, rec) {
+  let worst = ids[0];
+  ids.forEach(function (id) {
+    if (rec[id].net > rec[worst].net) worst = id;
+    else if (rec[id].net === rec[worst].net && rec[id].rel > rec[worst].rel) worst = id;
+  });
+  return worst;
+}
+
 function applySplit(ledger, solo, mates, sign, unit) {
   addPts(ledger, solo, sign * 2 * unit);
   mates.forEach(function (id) {
@@ -265,16 +275,29 @@ function settleThree(game, ctx, spec) {
   const scores = (ctx && ctx.scores) || {};
   const rule = (game && game.ruleSnapshot) || {};
   const k = pointValue(game);
+  const topHoleTracker = core.createTopHoleTracker();
   let order = initialOrder(game);
-  if (order.length < 3) return core.emptyResults(game, holeOrder);
+  if (order.length < 3) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
   order = order.slice(0, 3);
   let meatPool = 0;
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const holeDebug = {};
+  const orderHistory = [];
   const soloIndex = spec && spec.soloIndex != null ? spec.soloIndex : 0;
+  const autoMeat =
+    spec && spec.autoMeatCount != null && isFinite(Number(spec.autoMeatCount))
+      ? Math.max(0, Number(spec.autoMeatCount))
+      : null;
+  const collectDebug = !!(spec && spec.collectDebug);
   let rankedNext = false;
   let startMarked = false;
+  let prefixBlocked = false;
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
 
@@ -285,10 +308,16 @@ function settleThree(game, ctx, spec) {
       byHole[label] = ledger;
       return;
     }
-    if (!startMarked || rankedNext) orderByHole[label] = order.slice();
+    if (prefixBlocked) {
+      byHole[label] = ledger;
+      return;
+    }
+    const orderBefore = order.slice();
+    if (!startMarked || rankedNext) orderByHole[label] = orderBefore;
     startMarked = true;
     const par = holePar(ctx, label);
     const rec = {};
+    const handicaps = {};
     let ready = true;
     order.forEach(function (id) {
       const rel = readRel(scores, label, id);
@@ -297,11 +326,24 @@ function settleThree(game, ctx, spec) {
         return;
       }
       const n = playerHcapN(playerOf(game, id), label, par);
+      handicaps[id] = n;
       rec[id] = { rel: rel, net: rel - n, pts: 0 };
     });
     if (!ready) {
       rankedNext = false;
+      prefixBlocked = true;
       byHole[label] = ledger;
+      if (collectDebug) {
+        holeDebug[label] = {
+          status: "pending",
+          orderBefore: orderBefore,
+          actualScores: null,
+          handicaps: handicaps,
+          adjustedScores: null,
+          winner: null,
+          finalScores: ledger
+        };
+      }
       return;
     }
 
@@ -313,25 +355,64 @@ function settleThree(game, ctx, spec) {
     const soloNet = rec[solo].net;
     const tied = soloNet === teamNet;
     const isPush = tied && pushEnabled(rule);
+    let winner = "tie";
+    let mul = 1;
+    let meatBefore = meatPool;
+    let meatTaken = 0;
+    let packageTriggers = [false, false];
+    const baseScores = {};
+    const normalScores = {};
+    const meatScores = {};
 
     if (tied) {
       addPts(ledger, solo, 0);
       addPts(ledger, mates[0], 0);
       addPts(ledger, mates[1], 0);
-      if (isPush) meatPool += 1;
+      if (isPush) {
+        meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
+      }
     } else {
       const soloWins = soloNet < teamNet;
+      winner = soloWins ? "A" : "BC";
       const winRel = spec.winRel(rec, soloWins, solo, mates);
-      const mul = winnerMul(rule, winRel);
+      mul = winnerMul(rule, winRel);
       const unit = core.round1(k * mul);
       const sign = soloWins ? 1 : -1;
       applySplit(ledger, solo, mates, sign, unit);
-      if (spec.applyBao && soloWins) spec.applyBao(ledger, solo, mates, rec, par, rule, unit);
+      baseScores[solo] = sign * 2 * unit;
+      baseScores[mates[0]] = -sign * unit;
+      baseScores[mates[1]] = -sign * unit;
+      normalScores[solo] = Number(ledger[solo]) || 0;
+      normalScores[mates[0]] = Number(ledger[mates[0]]) || 0;
+      normalScores[mates[1]] = Number(ledger[mates[1]]) || 0;
+      if (spec.applyBao && soloWins) {
+        packageTriggers = [
+          baoTriggered(rec[mates[0]], rec[mates[1]], rec[solo], par, rule),
+          baoTriggered(rec[mates[1]], rec[mates[0]], rec[solo], par, rule)
+        ];
+        spec.applyBao(ledger, solo, mates, rec, par, rule, unit);
+        normalScores[solo] = Number(ledger[solo]) || 0;
+        normalScores[mates[0]] = Number(ledger[mates[0]]) || 0;
+        normalScores[mates[1]] = Number(ledger[mates[1]]) || 0;
+      }
       if (meatPool > 0) {
-        const eat = core.meatEatCount(meatWanted(rule, winRel, meatPool), meatPool, isLast, windOn);
+        const wanted =
+          autoMeat != null ? autoMeat : meatWanted(rule, winRel, meatPool);
+        const eat = core.meatEatCount(wanted, meatPool, isLast, windOn);
         if (eat > 0) {
           const meatUnit = core.meatPieceValue(rule, unit, k, { includeStyle: true });
+          const beforeMeat = {
+            a: Number(ledger[solo]) || 0,
+            b: Number(ledger[mates[0]]) || 0,
+            c: Number(ledger[mates[1]]) || 0
+          };
           applySplit(ledger, solo, mates, sign, core.round1(eat * meatUnit));
+          meatTaken = eat;
+          meatScores[solo] = core.round1((Number(ledger[solo]) || 0) - beforeMeat.a);
+          meatScores[mates[0]] = core.round1((Number(ledger[mates[0]]) || 0) - beforeMeat.b);
+          meatScores[mates[1]] = core.round1((Number(ledger[mates[1]]) || 0) - beforeMeat.c);
+          core.consumeTopHoles(topHoleTracker, eat);
           meatPool -= eat;
         }
       }
@@ -341,21 +422,74 @@ function settleThree(game, ctx, spec) {
     rec[mates[0]].pts = Number(ledger[mates[0]]) || 0;
     rec[mates[1]].pts = Number(ledger[mates[1]]) || 0;
     hist.push(rec);
-    order = nextOrder(order, rec, hist, game, rule, isPush, spec);
+    const orderAfter = nextOrder(order, rec, hist, game, rule, isPush, spec);
+    orderHistory.push({ hole: label, orderBefore: orderBefore, orderAfter: orderAfter.slice() });
+    order = orderAfter;
     rankedNext = true;
     byHole[label] = ledger;
+    if (collectDebug) {
+      const adjusted = {};
+      const actual = {};
+      orderBefore.forEach(function (id) {
+        actual[id] = rec[id].rel;
+        adjusted[id] = rec[id].net;
+      });
+      holeDebug[label] = {
+        status: "settled",
+        orderBefore: orderBefore,
+        roles: { A: solo, B: mates[0], C: mates[1] },
+        actualScores: actual,
+        handicaps: handicaps,
+        adjustedScores: adjusted,
+        singleCompareScore: soloNet,
+        doubleCompareScore: teamNet,
+        winner: winner,
+        rewardKey: tied ? null : stroke.scoreBand(spec.winRel(rec, winner === "A", solo, mates)),
+        multiplier: mul,
+        baseScores: baseScores,
+        normalScores: normalScores,
+        meatBefore: meatBefore,
+        meatTaken: meatTaken,
+        meatScores: meatScores,
+        packageTriggers: packageTriggers,
+        finalScores: {
+          a: Number(ledger[solo]) || 0,
+          b: Number(ledger[mates[0]]) || 0,
+          c: Number(ledger[mates[1]]) || 0
+        },
+        orderAfter: order.slice()
+      };
+    }
   });
 
-  return {
+  const out = {
     byHole: byHole,
     orderByHole: orderByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: (spec && spec.catalogId) || core.catalogIdOf(game)
+    catalogId: (spec && spec.catalogId) || core.catalogIdOf(game),
+    topHoleStates: topHoleTracker.states
   };
+  if (spec && spec.settleVersion) out.settleVersion = spec.settleVersion;
+  if (spec && spec.returnMeatPool) out.meatPool = meatPool;
+  if (collectDebug) out.holeDebug = holeDebug;
+  if (spec && (spec.settleVersion || spec.returnMeatPool || collectDebug)) {
+    out.orderHistory = orderHistory;
+    const totals = core.emptyLedger(core.playerIdsOf(game));
+    Object.keys(byHole).forEach(function (label) {
+      const led = byHole[label] || {};
+      Object.keys(led).forEach(function (id) {
+        if (id === core.POT_ID) return;
+        addPts(totals, id, Number(led[id]) || 0);
+      });
+    });
+    out.playerTotals = totals;
+  }
+  return out;
 }
 
 module.exports = {
   pickTeamBest,
+  pickTeamWorst,
   applyBao,
   settleThree
 };

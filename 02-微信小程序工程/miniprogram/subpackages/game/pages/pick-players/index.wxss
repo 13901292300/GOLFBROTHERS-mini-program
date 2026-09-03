@@ -1,4 +1,4 @@
-﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
 @import "../config/index.wxss";
 
@@ -39,16 +39,17 @@
   padding: 0 24rpx 8rpx;
 }
 
-.pick-letter {
+.pick-group__label {
   margin: 20rpx 8rpx 12rpx;
   font-size: 28rpx;
   font-weight: 800;
   color: var(--text-muted);
 }
 
-.pick-group .player-grid {
+.pick-group .player-grid,
+.pick-group .player-grid--event {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12rpx;
   margin-top: 0;
   width: 100%;
@@ -60,5 +61,43 @@
   max-width: none;
   flex: none;
   min-width: 0;
+  box-sizing: border-box;
+  opacity: 1;
+  filter: none;
+}
+
+/* 本页：selected 只控边框，不置灰；勿沿用全局 .player-slot.off 的 opacity */
+.pick-group .player-slot--selected {
+  border-color: var(--champion-gold);
+  opacity: 1;
+  filter: none;
+}
+
+.pick-group .player-slot--idle {
+  border-color: var(--border);
+  opacity: 1;
+  filter: none;
+}
+
+.pick-group .player-slot--disabled {
+  opacity: 0.4;
+  filter: none;
+}
+
+.pick-group .player-slot--selected .pick-face,
+.pick-group .player-slot--idle .pick-face,
+.pick-group .player-slot--selected .party-face__name,
+.pick-group .player-slot--idle .party-face__name,
+.pick-group .player-slot--selected .party-face__av,
+.pick-group .player-slot--idle .party-face__av {
+  opacity: 1;
+  filter: none;
+}
+
+.pick-face {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
   box-sizing: border-box;
 }

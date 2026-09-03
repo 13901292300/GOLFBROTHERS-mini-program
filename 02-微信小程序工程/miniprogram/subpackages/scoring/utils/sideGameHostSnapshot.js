@@ -4,6 +4,7 @@
  */
 var gameStore = require('../../../utils/gameStore.js');
 var teamMatchStore = require('../../../utils/teamMatchStore.js');
+var editAccess = require('../../../utils/sideGameEditAccess.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -20,6 +21,20 @@ function safeClone(value) {
   } catch (e) {
     return null;
   }
+}
+
+function stampEditAccess(cloned, src) {
+  if (!cloned) return cloned;
+  if (src && typeof src === 'object') {
+    cloned.createdBy = asString(src.createdBy || src.creatorId || cloned.createdBy);
+    if (src.creatorId) cloned.creatorId = asString(src.creatorId);
+    if (src.tempAdmins) cloned.tempAdmins = src.tempAdmins;
+  }
+  var uid = asString(cloned.currentUserId || currentUserId());
+  cloned.currentUserId = uid;
+  if (!uid) return cloned;
+  cloned.canEditSideGames = editAccess.canEditSideGames(src || cloned, uid);
+  return cloned;
 }
 
 function currentUserId() {
@@ -119,7 +134,7 @@ function fromGame(game, options) {
     groupCompositionMap: g.groupCompositionMap || {},
     composition: g.composition || null
   });
-  return cloned || emptySnapshot({ source: 'gameStore', allowBigPot: !!opts.allowBigPot });
+  return stampEditAccess(cloned, g) || emptySnapshot({ source: 'gameStore', allowBigPot: !!opts.allowBigPot });
 }
 
 function fromTeamMatch(match, options) {
@@ -158,7 +173,7 @@ function fromTeamMatch(match, options) {
     teamGroups: Array.isArray(m.teamGroups) ? m.teamGroups : [],
     registerInfo: m.registerInfo || { users: [] }
   });
-  return cloned || emptySnapshot({ source: 'teamMatch', allowBigPot: !!opts.allowBigPot });
+  return stampEditAccess(cloned, m) || emptySnapshot({ source: 'teamMatch', allowBigPot: !!opts.allowBigPot });
 }
 
 function resolveGameStoreGroupId(game, ms) {

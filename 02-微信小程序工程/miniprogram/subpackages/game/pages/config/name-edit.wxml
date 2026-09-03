@@ -1,0 +1,7 @@
+<view class="game-card__heading">
+  <view class="game-card__title">
+    <text class="game-card__name">{{ruleName}}</text>
+    <view class="rule-edit-btn" wx:if="{{showRuleEdit}}" catchtap="openRuleEdit">编辑</view>
+  </view>
+  <text wx:if="{{ruleSummary && !showLasuoFamily}}" class="game-card__summary">{{ruleSummary}}</text>
+</view>

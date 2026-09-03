@@ -698,13 +698,18 @@ Page({
       leaderboard: this._buildLeaderboard(game),
       groupCards: groupCards,
       userGroupIndex: this._resolveUserGroupIndex(game),
-      hostSnapshot: sideGameHostSnapshot.buildForHub(gameId)
+      hostSnapshot: this._hubHostSnapshot()
     });
     this._hubDebug('refreshGame');
     // 已展开的逐洞详情随数据刷新（成绩可能变化）
     this.updateOpenScorecard();
     // 分组数据变化可能改变内容高度 → 重新计算分组表滚动约束
     wx.nextTick(() => this.updateGroupScrollConstraint());
+  },
+
+  _hubHostSnapshot() {
+    const gameId = this._gameId || this.data.gameId;
+    return sideGameHostSnapshot.buildForHub(gameId);
   },
 
   // 解析当前用户所在组：按 playerId 匹配；找不到则默认第 1 组（创建者所在组）
@@ -798,7 +803,11 @@ Page({
   switchTab(e) {
     const tab = resolveHubActiveTab(e.currentTarget.dataset.tab, this._entryFrom);
     if (tab === this.data.activeTab) return;
-    this.setData({ activeTab: tab });
+    const patch = { activeTab: tab };
+    if (tab === 'game') {
+      patch.hostSnapshot = this._hubHostSnapshot();
+    }
+    this.setData(patch);
     if (tab === 'group') {
       // 进入分组表：DOM 渲染后绑定"第一组卡片"视口观察器（按钮初始隐藏），并计算空间约束型滚动
       wx.nextTick(() => {
@@ -1467,12 +1476,38 @@ Page({
     ) {
       playerManage.ensureRegisterUsersFromGroups(game);
     }
+    const removedIds = Array.isArray(this._playerManageDraft.removedUserIds)
+      ? this._playerManageDraft.removedUserIds.slice()
+      : [];
     const result = playerManage.commitPlayerManageDraft(game, this._playerManageDraft);
     if (!result || !result.ok) {
       wx.showToast({ title: '保存失败', icon: 'none' });
       return;
     }
     gameStore.saveGame(game);
+    if (removedIds.length) {
+      const still = {};
+      ((game.registerInfo && game.registerInfo.users) || []).forEach((u) => {
+        const id = String((u && (u.userId || u.playerId)) || '').trim();
+        if (id) still[id] = true;
+      });
+      const diff = {
+        replaced: [],
+        removed: removedIds
+          .filter((id) => id && !still[String(id)])
+          .map((id) => ({ fromPlayerId: id }))
+      };
+      if (diff.removed.length) {
+        const run = (mod) => {
+          if (mod && typeof mod.applyGroupManageDiff === 'function') {
+            mod.applyGroupManageDiff(gameId, diff, { stillPresentIds: still });
+          }
+        };
+        if (typeof require.async === 'function') {
+          require.async('../../../game/utils/sideGameIdentitySync.js', run, function () {});
+        }
+      }
+    }
     this.closePlayerManageSheet();
     if (typeof this.refreshGame === 'function') this.refreshGame();
     wx.showToast({ title: '选手信息已保存', icon: 'success' });

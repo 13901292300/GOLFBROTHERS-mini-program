@@ -1,18 +1,585 @@
-<view class="gb-page bright-mode">
+<view class="gb-page bright-mode {{pageMode === 'readonly' ? 'gb-page--readonly' : ''}}">
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
       <view class="gb-header__left">
         <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
         <view>
-          <text class="gb-header__eyebrow">CONFIG</text>
-          <text class="gb-header__title">{{ruleName || '配置游戏'}}</text>
+          <text class="gb-header__eyebrow">INSTANCE</text>
+          <text class="gb-header__title">{{isEditing ? '修改实例配置' : '游戏实例配置'}}</text>
+          <text wx:if="{{readonlyHint}}" class="gb-header__readonly">{{readonlyHint}}</text>
         </view>
       </view>
     </view>
   </view>
+
   <scroll-view class="gb-body" scroll-y>
     <view class="page-pad">
-      <view class="empty">{{emptyHint}}</view>
+      <block wx:if="{{showTwoParty}}">
+        <view class="ds-card game-card {{showThreeSet ? 'game-card--three-set' : ''}}">
+          <view class="game-card__top {{showThreeSet ? 'game-card__top--three-set' : ''}}">
+            <block wx:if="{{showThreeSet}}">
+              <view class="three-set-hero">
+                <view class="three-set-hero__left">
+                  <include src="name-edit.wxml" />
+                </view>
+                <view class="three-set-hero__right">
+                  <view class="three-set-seg-row">
+                    <text class="three-set-seg-row__label">前九</text>
+                    <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'segFront' ? numEditDraft : segmentValues.front}}" data-key="front" data-num-field="segFront" data-num-handler="onSegmentValue" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+                  </view>
+                  <view class="three-set-seg-row">
+                    <text class="three-set-seg-row__label">后九</text>
+                    <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'segBack' ? numEditDraft : segmentValues.back}}" data-key="back" data-num-field="segBack" data-num-handler="onSegmentValue" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+                  </view>
+                  <view class="three-set-seg-row">
+                    <text class="three-set-seg-row__label">全场</text>
+                    <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'segOverall' ? numEditDraft : segmentValues.overall}}" data-key="overall" data-num-field="segOverall" data-num-handler="onSegmentValue" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </block>
+            <block wx:else>
+              <include src="name-edit.wxml" />
+              <view class="kv">
+                <text class="kv-k">{{kLabel}}</text>
+                <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'multiplier' ? numEditDraft : multiplier}}" data-num-field="multiplier" data-num-handler="onMultiplier" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+              </view>
+            </block>
+          </view>
+        </view>
+
+        <view class="ds-card game-card">
+          <include src="player-pick-block.wxml" />
+        </view>
+
+        <view class="ds-card game-card">
+          <view class="fold-head" bindtap="togglePairFold">
+            <text class="game-card__name">对决组合</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{pairCount}} 场</text>
+              <text class="rule-lib__chev">{{pairFold ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{pairFold}}" class="fold-body">
+            <block wx:if="{{rosterCompact}}">
+              <view class="sec-hint">人选超过 8 人，已按两两对决自动生成全部组合，不再逐场展示。</view>
+            </block>
+            <block wx:else>
+              <view wx:if="{{!teamedPartyMode}}" class="sec-hint">{{showThreeSet ? handicapHint : (showPairHandicap || showPairHoleHandicap ? handicapHint : '默认全选。可单独取消某场。')}}</view>
+              <view
+                wx:for="{{pairs}}"
+                wx:key="id"
+                class="pair-block"
+              >
+                <view
+                  class="pair-row {{item.on ? 'on' : ''}}"
+                  bindtap="togglePair"
+                  data-id="{{item.id}}"
+                >
+                  <view wx:if="{{!teamedPartyMode}}" class="check-box {{item.on ? 'on' : ''}}"></view>
+                  <view class="pair-side">
+                    <party-face party="{{item.leftFace}}" layout="slot"></party-face>
+                  </view>
+                  <text class="pair-vs">VS</text>
+                  <view class="pair-side">
+                    <party-face party="{{item.rightFace}}" layout="slot"></party-face>
+                  </view>
+                  <view wx:if="{{showPairHandicap && item.on}}" class="pair-strokes" catchtap="stopTap">
+                    <text>让</text>
+                    <input
+                      class="mini-input"
+                      type="text"
+                      value="{{numEditing && numEditList === 'pairs' && numEditId == item.id ? numEditDraft : item.strokes}}"
+                      data-id="{{item.id}}"
+                      data-num-list="pairs"
+                      data-num-prop="strokes"
+                      data-num-handler="onPairStrokes"
+                      bindfocus="onNumFocus"
+                      bindblur="onNumBlur"
+                      bindinput="onNumInput"
+                    />
+                  </view>
+                  <view wx:if="{{showPairHoleHandicap}}" class="pair-hcap-btn {{item.on && !item.hcapAddOff ? '' : 'off'}}" catchtap="openPairHoleHcap" data-id="{{item.id}}">添加让杆</view>
+                  <view wx:if="{{showThreeSet}}" class="pair-hcap-btn {{item.on ? '' : 'off'}}" catchtap="openThreeSetHcap" data-id="{{item.id}}">让杆</view>
+                </view>
+                <block wx:if="{{showMatchHandicap && item.on}}">
+                  <view
+                    wx:for="{{item.hcapList}}"
+                    wx:for-item="hcap"
+                    wx:for-index="hidx"
+                    wx:key="hidx"
+                    class="pair-hcap"
+                    catchtap="openHcapEdit"
+                    data-id="{{item.id}}"
+                    data-index="{{hidx}}"
+                  >{{hcap.hcapText}}</view>
+                </block>
+                <view
+                  wx:if="{{showThreeSet && item.on && item.segHcapSet}}"
+                  class="pair-hcap"
+                  catchtap="openThreeSetHcap"
+                  data-id="{{item.id}}"
+                >{{item.segHcapText}}</view>
+              </view>
+            </block>
+          </view>
+        </view>
+
+        <view wx:if="{{showHoleRange}}" class="ds-card game-card" bindtap="openHoles">
+          <view class="hole-preview">
+            <text class="game-card__name">有效洞</text>
+            <view class="hole-dots">
+              <view wx:for="{{holes}}" wx:key="label" class="hole-dot {{item.on ? 'on' : ''}}"></view>
+            </view>
+            <text class="hole-count">{{holeCount}}/18</text>
+            <text class="setting-chev">›</text>
+          </view>
+        </view>
+
+        <view wx:if="{{showScoreMap}}" class="ds-card game-card">
+          <text class="game-card__name">分值配置</text>
+          <block wx:if="{{rosterCompact}}">
+            <text class="game-card__summary">人选超过 8 人，进入后仅为已选球员配置得分与扣分。</text>
+            <view class="pick-entry" style="margin-top:16rpx;">
+              <text class="pick-entry__count">已选 {{selectedCount || 0}} 人</text>
+              <view class="pick-entry__edit" catchtap="openScoreConfig">去配置</view>
+            </view>
+          </block>
+          <block wx:else>
+          <text class="game-card__summary">规则里的分值是默认兜底。本场按人改过的，以本场为准。</text>
+          <view class="score-grid" style="margin-top:12rpx;">
+            <view
+              wx:for="{{players}}"
+              wx:key="id"
+              wx:if="{{item.selected}}"
+              class="score-chip"
+              catchtap="openScore"
+              data-index="{{index}}"
+            >
+              <party-face party="{{item}}" layout="chip"></party-face>
+              <view class="score-val score-val--{{item.scoreTone}}"><text>{{item.scoreCode}}</text></view>
+            </view>
+          </view>
+          </block>
+        </view>
+      </block>
+
+      <block wx:elif="{{showLasuoFamily}}">
+        <view class="ds-card game-card">
+          <view class="game-card__top">
+            <include src="name-edit.wxml" />
+            <view class="kv">
+              <text class="kv-k">{{kLabel}}</text>
+              <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'multiplier' ? numEditDraft : multiplier}}" data-num-field="multiplier" data-num-handler="onMultiplier" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card game-card">
+          <include src="player-pick-block.wxml" />
+        </view>
+
+        <block wx:if="{{showSetupRest}}">
+          <include src="hole-order-card.wxml" />
+          <include src="lasuo-n-block.wxml" />
+        </block>
+      </block>
+
+      <block wx:elif="{{showLandlordFamily}}">
+        <view class="ds-card game-card">
+          <view class="game-card__top">
+            <include src="name-edit.wxml" />
+            <view class="kv">
+              <text class="kv-k">{{kLabel}}</text>
+              <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'multiplier' ? numEditDraft : multiplier}}" data-num-field="multiplier" data-num-handler="onMultiplier" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card game-card">
+          <include src="player-pick-block.wxml" />
+        </view>
+
+        <block wx:if="{{showSetupRest}}">
+        <include src="hole-order-card.wxml" />
+        <view class="ds-card game-card" bindtap="openHoles">
+          <view class="hole-preview">
+            <text class="game-card__name">有效洞</text>
+            <view class="hole-dots">
+              <view wx:for="{{holes}}" wx:key="label" class="hole-dot {{item.on ? 'on' : ''}}"></view>
+            </view>
+            <text class="hole-count">{{holeCount}}/18</text>
+            <text class="setting-chev">›</text>
+          </view>
+        </view>
+
+        <include src="hcap-lasuo.wxml" />
+
+        <view class="ds-card game-card">
+          <text class="game-card__name">分组配置</text>
+          <view class="sec-label">分组方式</view>
+          <view class="hcap-tags">
+            <view
+              wx:for="{{groupModes}}"
+              wx:key="id"
+              class="hcap-tag {{groupMode === item.id ? 'on' : ''}}"
+              bindtap="setGroupMode"
+              data-id="{{item.id}}"
+            >{{item.label}}</view>
+          </view>
+          <include src="order-board.wxml" />
+        </view>
+
+        <include src="rank-fold.wxml" />
+        </block>
+      </block>
+
+      <block wx:else>
+      <view class="ds-card game-card">
+        <view class="game-card__top">
+          <include src="name-edit.wxml" />
+          <view class="kv">
+            <text class="kv-k">{{kLabel}}</text>
+            <input class="mini-input" type="digit" value="{{numEditing && numEditField === 'multiplier' ? numEditDraft : multiplier}}" data-num-field="multiplier" data-num-handler="onMultiplier" bindfocus="onNumFocus" bindblur="onNumBlur" bindinput="onNumInput" />
+          </view>
+        </view>
+      </view>
+
+      <view class="ds-card game-card">
+        <include src="player-pick-block.wxml" />
+      </view>
+
+      <block wx:if="{{showSetupRest}}">
+      <include src="hole-order-card.wxml" />
+      <view class="ds-card game-card" bindtap="openHoles">
+        <view class="hole-preview">
+          <text class="game-card__name">有效洞</text>
+          <view class="hole-dots">
+            <view wx:for="{{holes}}" wx:key="label" class="hole-dot {{item.on ? 'on' : ''}}"></view>
+          </view>
+          <text class="hole-count">{{holeCount}}/18</text>
+          <text class="setting-chev">›</text>
+        </view>
+      </view>
+
+      <block wx:if="{{showHcapRecv}}">
+        <include src="hcap-lasuo.wxml" />
+      </block>
+
+      <view wx:if="{{showScoreMap}}" class="ds-card game-card">
+        <text class="game-card__name">分值配置</text>
+        <text class="game-card__summary">规则里的分值是默认兜底。本场按人改过的，以本场为准。</text>
+        <view class="score-grid" style="margin-top:12rpx;">
+          <view
+            wx:for="{{players}}"
+            wx:key="id"
+            wx:if="{{item.selected}}"
+            class="score-chip"
+            catchtap="openScore"
+            data-index="{{index}}"
+          >
+            <party-face party="{{item}}" layout="chip"></party-face>
+            <view class="score-val score-val--{{item.scoreTone}}"><text>{{item.scoreCode}}</text></view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{showDizhubo}}" class="ds-card game-card">
+        <text class="game-card__name">模式</text>
+        <view class="hcap-tags" style="margin-top:16rpx;">
+          <view class="hcap-tag {{dizhuboMode === 'big' ? 'on' : ''}}" bindtap="setDizhuboMode" data-id="big">斗大地主婆</view>
+          <view class="hcap-tag {{dizhuboMode === 'mid' ? 'on' : ''}}" bindtap="setDizhuboMode" data-id="mid">斗二地主婆</view>
+        </view>
+        <view class="sec-hint" style="margin-top:16rpx;">
+          {{dizhuboMode === 'mid' ? '第2名与地主婆的最好成绩 VS 第1/3名的平均成绩。' : '第1名与地主婆的最好成绩 VS 第2/3名的最好成绩。'}}
+        </view>
+      </view>
+
+      <view class="ds-card game-card">
+        <text class="game-card__name">分组配置</text>
+        <block wx:if="{{!showThreeVsOne}}">
+          <view class="sec-label">分组方式</view>
+          <view class="hcap-tags">
+            <view
+              wx:for="{{groupModes}}"
+              wx:key="id"
+              class="hcap-tag {{groupMode === item.id ? 'on' : ''}}"
+              bindtap="setGroupMode"
+              data-id="{{item.id}}"
+            >{{item.label}}</view>
+          </view>
+        </block>
+        <include src="order-board.wxml" />
+      </view>
+
+      <include src="rank-fold.wxml" />
+      </block>
+      </block>
     </view>
   </scroll-view>
+
+  <view class="bottom-bar">
+    <view class="cta-ghost" bindtap="onBack">取消</view>
+    <view wx:if="{{canEdit}}" class="cta-gold" bindtap="confirmAdd">{{isEditing ? "确认修改" : "确认添加"}}</view>
+  </view>
+
+  <view wx:if="{{showHoleSheet}}" class="sheet-mask" bindtap="closeHoles">
+    <view class="sheet" catchtap="true">
+      <view class="sheet-title">有效洞</view>
+      <view class="sec-label">有效洞设置</view>
+      <view class="hcap-tags">
+        <view class="hcap-tag {{holeTag === 'all' ? 'on' : ''}}" bindtap="toggleHoleAll">全选</view>
+        <view class="hcap-tag {{holeTag === 'front9' ? 'on' : ''}}" bindtap="setHoleGroup" data-group="front9">前九</view>
+        <view class="hcap-tag {{holeTag === 'back9' ? 'on' : ''}}" bindtap="setHoleGroup" data-group="back9">后九</view>
+        <view class="hcap-tag {{holeTag === 'front6' ? 'on' : ''}}" bindtap="setHoleGroup" data-group="front6">前六</view>
+        <view class="hcap-tag {{holeTag === 'mid6' ? 'on' : ''}}" bindtap="setHoleGroup" data-group="mid6">中六</view>
+        <view class="hcap-tag {{holeTag === 'back6' ? 'on' : ''}}" bindtap="setHoleGroup" data-group="back6">后六</view>
+      </view>
+      <view class="hole-grid">
+        <view
+          wx:for="{{holeDraft}}"
+          wx:key="label"
+          class="hole-cell {{item.on ? '' : 'off'}}"
+          bindtap="toggleHole"
+          data-index="{{index}}"
+        >{{item.label}}</view>
+      </view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeHoles">取消</view>
+        <view class="cta-gold" bindtap="applyHoles">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showHoleOrderSheet}}" class="sheet-mask" bindtap="closeHoleOrder">
+    <view class="sheet" catchtap="true">
+      <view class="sheet-title">调整洞序</view>
+      <view class="sec-hint">请点击起始洞。手工拖拽可调整洞序。</view>
+      <view class="hole-grid hole-order-grid">
+        <view
+          wx:for="{{holeOrderDraft}}"
+          wx:key="*this"
+          class="hole-cell hole-order-cell {{index === 0 ? 'start' : ''}} {{holeOrderDragging && holeOrderDragIndex === index ? 'lift' : ''}}"
+          data-index="{{index}}"
+          data-label="{{item}}"
+          catchtouchstart="onHoleOrderTouchStart"
+          catchtouchmove="onHoleOrderTouchMove"
+          catchtouchend="onHoleOrderTouchEnd"
+          catchtouchcancel="onHoleOrderTouchEnd"
+        >{{item}}</view>
+      </view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeHoleOrder">取消</view>
+        <view class="cta-gold" bindtap="applyHoleOrder">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showScoreSheet}}" class="sheet-mask" bindtap="closeScore">
+    <view class="sheet sheet--tall" catchtap="true">
+      <view class="sheet-title">配置分值</view>
+      <view class="sheet-user">
+        <party-face party="{{scorePlayerFace}}" layout="sheet"></party-face>
+      </view>
+      <view class="sec-label">得分配置</view>
+      <view class="preset-grid">
+        <view
+          wx:for="{{scorePresets}}"
+          wx:key="*this"
+          class="preset-btn {{item === scoreDraft ? 'on' : ''}}"
+          bindtap="pickPreset"
+          data-value="{{item}}"
+        >{{item}}</view>
+        <view class="preset-btn preset-btn--custom {{scoreUsingCustom ? 'on' : ''}}">
+          <input
+            class="preset-custom-input"
+            type="digit"
+            maxlength="5"
+            placeholder="{{customPlaceholder}}"
+            placeholder-class="preset-custom-ph"
+            value="{{customScore}}"
+            bindfocus="onCustomFocus"
+            bindblur="onCustomBlur"
+            bindinput="onCustomScore"
+          />
+        </view>
+      </view>
+      <block wx:if="{{showInstanceDeduct}}">
+        <view class="sec-label">扣分配置</view>
+        <view class="opt opt--fold {{deductMode === 'on' ? 'on' : ''}}">
+          <view class="opt-row" bindtap="setDeductMode" data-value="on">
+            <view class="radio-dot"></view>
+            <text class="opt-title">扣分</text>
+            <view wx:if="{{deductMode === 'on'}}" class="rule-lib__meta" catchtap="toggleFoldDeduct">
+              <text class="rule-lib__count">{{deductText}}</text>
+              <text class="rule-lib__chev">{{foldDeduct ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{deductMode === 'on' && foldDeduct}}" class="opt-fold-body">
+            <view class="sec-label">扣分方式</view>
+            <view class="opt {{deductWay === 'plus-n' ? 'on' : ''}}" bindtap="setDeductWay" data-value="plus-n">
+              <view class="radio-dot"></view>
+              <text class="opt-title">从 +</text>
+              <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'deductPlusN' ? numEditDraft : deductPlusN}}" catchtap="keepDeductWay" data-value="plus-n" data-num-field="deductPlusN" data-num-handler="onDeductPlusN" bindinput="onNumInput" />
+              <text class="opt-title">开始扣</text>
+            </view>
+            <view class="opt {{deductWay === 'doublepar-n' ? 'on' : ''}}" bindtap="setDeductWay" data-value="doublepar-n">
+              <view class="radio-dot"></view>
+              <text class="opt-title">从双帕 +</text>
+              <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'deductDoubleN' ? numEditDraft : deductDoubleN}}" catchtap="keepDeductWay" data-value="doublepar-n" data-num-field="deductDoubleN" data-num-handler="onDeductDoubleN" bindinput="onNumInput" />
+              <text class="opt-title">开始扣</text>
+            </view>
+            <view class="sec-label">扣分封顶</view>
+            <view class="opt {{deductCap === 'none' ? 'on' : ''}}" bindtap="setDeductCap" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不封顶，一直扣</text>
+            </view>
+            <view class="opt {{deductCap === 'cap' ? 'on' : ''}}" bindtap="setDeductCap" data-value="cap">
+              <view class="radio-dot"></view>
+              <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'deductCapN' ? numEditDraft : deductCapN}}" catchtap="keepDeductCap" data-num-field="deductCapN" data-num-handler="onDeductCapN" bindinput="onNumInput" />
+              <text class="opt-title">分封顶</text>
+            </view>
+          </view>
+        </view>
+        <view class="opt {{deductMode === 'none' ? 'on' : ''}}" bindtap="setDeductMode" data-value="none">
+          <view class="radio-dot"></view>
+          <text class="opt-title">不扣分</text>
+        </view>
+      </block>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeScore">取消</view>
+        <view class="cta-gold" bindtap="applyCustomScore">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showHcapSheet}}" class="sheet-mask" bindtap="closeHcap">
+    <view class="sheet {{hcapNoHoles || hcapPickRecv ? '' : 'sheet--tall'}}" catchtap="true">
+      <view class="sheet-title-row">
+        <view class="sheet-title">{{hcapPickRecv ? "选择受让人" : "让杆"}}</view>
+        <text wx:if="{{hcapCanDelete && !hcapPickRecv}}" class="sheet-del" bindtap="confirmDeleteHcap">删除</text>
+      </view>
+      <block wx:if="{{hcapPickRecv}}">
+        <view class="sec-hint">先选受让人，再设置 PAR 与有效洞。正数=其余人让受让人，负数=受让人让其余人。</view>
+        <view class="player-grid player-grid--wrap" style="margin-top:16rpx;">
+          <view
+            wx:for="{{hcapRecvOptions}}"
+            wx:key="id"
+            class="player-slot {{item.hcapAddOff ? 'off' : ''}}"
+            bindtap="pickHcapRecv"
+            data-id="{{item.id}}"
+          >
+            <party-face party="{{item}}" layout="slot"></party-face>
+          </view>
+        </view>
+        <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+          <view class="cta-ghost" bindtap="closeHcap">取消</view>
+        </view>
+      </block>
+      <block wx:else>
+      <block wx:if="{{hcapGroupRecv}}">
+        <view class="recv-hcap-head">受让人：{{hcapLeftName}}</view>
+        <view class="sec-hint recv-hcap-note">当受让杆数为正时，其余选手让受让人；当受让杆数为负时，受让人让其余选手。</view>
+      </block>
+      <view wx:else class="sheet-user">
+        <party-face party="{{hcapLeftFace}}" layout="sheet"></party-face>
+        <block wx:if="{{!hcapPersonal}}">
+          <text class="pair-vs">VS</text>
+          <party-face party="{{hcapRightFace}}" layout="sheet"></party-face>
+        </block>
+      </view>
+      <view class="sec-label">让杆设置</view>
+      <view class="hcap-pars">
+        <view class="hcap-par" bindtap="openHcapWheel" data-key="par3">
+          <text class="hcap-par__label">{{hcapNoHoles ? '前9洞' : 'PAR3'}}</text>
+          <view class="hcap-par__value">{{hcapPar3}}</view>
+        </view>
+        <view class="hcap-par" bindtap="openHcapWheel" data-key="par4">
+          <text class="hcap-par__label">{{hcapNoHoles ? '后9洞' : 'PAR4'}}</text>
+          <view class="hcap-par__value">{{hcapPar4}}</view>
+        </view>
+        <view class="hcap-par" bindtap="openHcapWheel" data-key="par5">
+          <text class="hcap-par__label">{{hcapNoHoles ? '18洞' : 'PAR5'}}</text>
+          <view class="hcap-par__value">{{hcapPar5}}</view>
+        </view>
+      </view>
+      <block wx:if="{{!hcapNoHoles && (!hcapPersonal || hcapGroupRecv)}}">
+      <view class="sec-label">有效洞设置</view>
+      <view class="hcap-tags">
+        <view class="hcap-tag {{hcapTag === 'all' ? 'on' : ''}}" bindtap="toggleHcapAll">全选</view>
+        <view class="hcap-tag {{hcapTag === 'front9' ? 'on' : ''}}" bindtap="setHcapHoleGroup" data-group="front9">前九</view>
+        <view class="hcap-tag {{hcapTag === 'back9' ? 'on' : ''}}" bindtap="setHcapHoleGroup" data-group="back9">后九</view>
+        <view class="hcap-tag {{hcapTag === 'front6' ? 'on' : ''}}" bindtap="setHcapHoleGroup" data-group="front6">前六</view>
+        <view class="hcap-tag {{hcapTag === 'mid6' ? 'on' : ''}}" bindtap="setHcapHoleGroup" data-group="mid6">中六</view>
+        <view class="hcap-tag {{hcapTag === 'back6' ? 'on' : ''}}" bindtap="setHcapHoleGroup" data-group="back6">后六</view>
+      </view>
+      <view class="hole-grid">
+        <view
+          wx:for="{{hcapHoles}}"
+          wx:key="label"
+          class="hole-cell {{item.on ? '' : 'off'}} {{item.locked ? 'lock' : ''}}"
+          bindtap="toggleHcapHole"
+          data-index="{{index}}"
+        >{{item.label}}</view>
+      </view>
+      </block>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeHcap">取消</view>
+        <view class="cta-gold" bindtap="applyHcap">确定</view>
+      </view>
+      </block>
+    </view>
+  </view>
+
+  <view wx:if="{{showThreeSetHcapSheet}}" class="sheet-mask" bindtap="closeThreeSetHcap">
+    <view class="sheet sheet--tall three-set-hcap-sheet" catchtap="true">
+      <view class="sheet-title">让杆</view>
+      <view class="three-set-hcap-scroll">
+        <view class="sheet-user three-set-hcap-vs">
+          <view class="three-set-hcap-vs__side three-set-hcap-vs__side--left">
+            <party-face party="{{hcapLeftFace}}" layout="sheet"></party-face>
+          </view>
+          <text class="three-set-hcap-vs__mark pair-vs">VS</text>
+          <view class="three-set-hcap-vs__side three-set-hcap-vs__side--right">
+            <party-face party="{{hcapRightFace}}" layout="sheet"></party-face>
+          </view>
+        </view>
+        <view class="sec-hint" style="margin-top:8rpx;">正数=左侧让右侧；负数=右侧让左侧。</view>
+        <view class="sec-label">让杆设置</view>
+        <view class="hcap-pars">
+          <view class="hcap-par" bindtap="openThreeSetHcapWheel" data-key="front">
+            <text class="hcap-par__label">前九</text>
+            <view class="hcap-par__value">{{threeSetDraftFront}}</view>
+          </view>
+          <view class="hcap-par" bindtap="openThreeSetHcapWheel" data-key="back">
+            <text class="hcap-par__label">后九</text>
+            <view class="hcap-par__value">{{threeSetDraftBack}}</view>
+          </view>
+          <view class="hcap-par" bindtap="openThreeSetHcapWheel" data-key="overall">
+            <text class="hcap-par__label">全场</text>
+            <view class="hcap-par__value">{{threeSetDraftOverall}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeThreeSetHcap">取消</view>
+        <view class="cta-gold" bindtap="applyThreeSetHcap">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showHcapWheel}}" class="sheet-mask sheet-mask--over" bindtap="closeHcapWheel">
+    <view class="sheet" catchtap="true">
+      <view class="sheet-title">{{hcapWheelTitle}}</view>
+      <picker-view class="hcap-wheel" value="{{hcapWheelIndex}}" indicator-class="hcap-wheel-ind" bindchange="onHcapWheelChange">
+        <picker-view-column>
+          <view wx:for="{{hcapSteps}}" wx:key="*this" class="hcap-wheel-item">{{item}}</view>
+        </picker-view-column>
+      </picker-view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeHcapWheel">取消</view>
+        <view class="cta-gold" bindtap="applyHcapWheel">确定</view>
+      </view>
+    </view>
+  </view>
 </view>

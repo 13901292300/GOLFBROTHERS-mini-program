@@ -193,8 +193,13 @@ function settleThreeVsOne(game, ctx) {
   const rule = (game && game.ruleSnapshot) || {};
   const k = pointValue(game);
   const mode = (rule && rule.tvoCompare) || "best";
+  const topHoleTracker = core.createTopHoleTracker();
   let order = initialOrder(game);
-  if (order.length < 4) return core.emptyResults(game, holeOrder);
+  if (order.length < 4) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
   order = order.slice(0, 4);
   let meatPool = 0;
   const byHole = {};
@@ -238,7 +243,10 @@ function settleThreeVsOne(game, ctx) {
       order.forEach(function (id) {
         addPts(ledger, id, 0);
       });
-      if (pushOn) meatPool += 1;
+      if (pushOn) {
+        meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
+      }
     } else {
       const soloWins = soloNet < teamNet;
       const winRel = winRelOf(rec, solo, mates, mode, soloWins);
@@ -251,6 +259,7 @@ function settleThreeVsOne(game, ctx) {
           const meatUnit =
             (rule && rule.meatInclude) === "yes" ? unit : core.round1(k);
           applyTvo(ledger, solo, mates, soloWins, core.round1(eat * meatUnit));
+          core.consumeTopHoles(topHoleTracker, eat);
           meatPool -= eat;
         }
       }
@@ -262,7 +271,8 @@ function settleThreeVsOne(game, ctx) {
     byHole: byHole,
     orderByHole: orderByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: "three-vs-one"
+    catalogId: "three-vs-one",
+    topHoleStates: topHoleTracker.states
   };
 }
 

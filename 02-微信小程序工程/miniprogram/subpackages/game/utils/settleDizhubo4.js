@@ -230,8 +230,13 @@ function settleDizhubo4(game, ctx) {
   const rule = (game && game.ruleSnapshot) || {};
   const k = pointValue(game);
   const mid = (game && game.dizhuboMode) === "mid";
+  const topHoleTracker = core.createTopHoleTracker();
   let order = initialOrder(game);
-  if (order.length < 4) return core.emptyResults(game, holeOrder);
+  if (order.length < 4) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
   order = order.slice(0, 4);
   let meatPool = 0;
   const hist = [];
@@ -239,6 +244,7 @@ function settleDizhubo4(game, ctx) {
   const orderByHole = {};
   let rankedNext = false;
   let startMarked = false;
+  let prefixBlocked = false;
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
 
@@ -246,6 +252,10 @@ function settleDizhubo4(game, ctx) {
     const ledger = core.holeLedger();
     const isLast = String(label) === lastLabel;
     if (!core.holeOn(game, label)) {
+      byHole[label] = ledger;
+      return;
+    }
+    if (prefixBlocked) {
       byHole[label] = ledger;
       return;
     }
@@ -264,6 +274,7 @@ function settleDizhubo4(game, ctx) {
       rec[id] = { rel: rel, net: rel - n, pts: 0 };
     });
     if (!ready) {
+      prefixBlocked = true;
       rankedNext = false;
       byHole[label] = ledger;
       return;
@@ -284,7 +295,10 @@ function settleDizhubo4(game, ctx) {
       order.forEach(function (id) {
         addPts(ledger, id, 0);
       });
-      if (isPush) meatPool += 1;
+      if (isPush) {
+        meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
+      }
     } else {
       const landWins = landScore < farmScore;
       const win = landWins ? land : farm;
@@ -300,6 +314,7 @@ function settleDizhubo4(game, ctx) {
             (rule && rule.meatInclude) === "yes" ? unit : core.round1(k);
           applySides(ledger, win, lose, core.round1(eat * meatUnit));
           meatPool -= eat;
+          core.consumeTopHoles(topHoleTracker, eat);
         }
       }
     }
@@ -317,7 +332,8 @@ function settleDizhubo4(game, ctx) {
     byHole: byHole,
     orderByHole: orderByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: "dizhubo-4"
+    catalogId: "dizhubo-4",
+    topHoleStates: topHoleTracker.states
   };
 }
 

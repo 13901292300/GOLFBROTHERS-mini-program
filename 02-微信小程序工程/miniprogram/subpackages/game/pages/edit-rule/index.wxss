@@ -1,4 +1,4 @@
-﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
 .field + .rule-lib {
   margin-top: 24rpx;

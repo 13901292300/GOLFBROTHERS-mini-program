@@ -1,4 +1,4 @@
-﻿@import "./gb-shell.wxss";
+@import "./gb-shell.wxss";
 
 .ds-card {
   background: var(--bg-card);
@@ -222,6 +222,13 @@
   font-weight: 800;
   text-align: center;
   line-height: 40rpx;
+  overflow: hidden;
+}
+
+.kv-avatar image {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .game-actions {
@@ -261,6 +268,16 @@
   line-height: 88rpx;
   border-radius: 16rpx;
   text-align: center;
+}
+
+.cta-gold--disabled {
+  background: #9ca3af;
+  color: #f3f4f6;
+  pointer-events: none;
+}
+
+.cta-gold--saving {
+  pointer-events: none;
 }
 
 .cta-ghost {
@@ -468,6 +485,35 @@
   vertical-align: middle;
 }
 
+/* 三局：与其他卡片相同「名称后紧跟系数」；名称可缩省略，系数不拉伸、不靠右 */
+.game-card__head--seg {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  flex: 1;
+  padding-right: 8rpx;
+  box-sizing: border-box;
+}
+
+.game-card__head--seg .game-card__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-card__tag--seg {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+}
+
 .game-card__tag.is-ended {
   color: var(--text-muted);
   border-color: var(--border);
@@ -537,10 +583,17 @@
   font-size: 22rpx;
   font-weight: 800;
   line-height: 56rpx;
+  overflow: hidden;
+}
+
+.avatar image {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .player-name {
-  font-size: 18rpx;
+  font-size: 20rpx;
   color: var(--text-muted);
 }
 
@@ -613,7 +666,7 @@
   height: 32rpx;
   padding: 0 8rpx;
   box-sizing: border-box;
-  font-size: 18rpx;
+  font-size: 20rpx;
   font-weight: 800;
   line-height: 32rpx;
   color: var(--text-muted);
@@ -780,6 +833,13 @@
   font-size: 22rpx;
   font-weight: 800;
   text-align: center;
+  overflow: hidden;
+}
+
+.sheet-user__avatar image {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .sheet-user__name {
@@ -805,7 +865,7 @@
   text-align: center;
   border: 1px solid var(--border);
   border-radius: 8rpx;
-  font-size: 22rpx;
+  font-size: 24rpx;
   font-weight: 800;
 }
 
@@ -909,8 +969,8 @@
   font-size: 22rpx;
 }
 
-.cell.win { color: var(--success); font-weight: 800; }
-.cell.lose { color: var(--error); font-weight: 800; }
+.cell.result-positive { color: var(--error, #DC2626); font-weight: 800; }
+.cell.result-negative { color: var(--success, #16A34A); font-weight: 800; }
 
 .total-bar {
   padding: 24rpx 16rpx calc(24rpx + env(safe-area-inset-bottom));
@@ -1475,8 +1535,8 @@
   font-weight: 800;
 }
 
-.board-cell.win { color: var(--success); font-weight: 800; }
-.board-cell.lose { color: var(--error); font-weight: 800; }
+.board-cell.result-positive { color: var(--error, #DC2626); font-weight: 800; }
+.board-cell.result-negative { color: var(--success, #16A34A); font-weight: 800; }
 
 .board-dots {
   display: flex;

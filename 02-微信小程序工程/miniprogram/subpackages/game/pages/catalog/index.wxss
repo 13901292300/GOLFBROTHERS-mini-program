@@ -1,8 +1,24 @@
-﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
 
+/* 宿主 app.wxss 未设 page height:100%。
+   disableScroll + .gb-page overflow:hidden 时，必须给 page 定高，
+   .gb-body 的 flex:1; height:0; min-height:0 才能形成可滚区域。 */
+page,
+.gb-page {
+  height: 100%;
+}
+
+.catalog-scroll {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
 .catalog-page {
-  padding-bottom: 64rpx;
+  padding-bottom: calc(64rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(64rpx + env(safe-area-inset-bottom));
 }
 
 .catalog-hint {

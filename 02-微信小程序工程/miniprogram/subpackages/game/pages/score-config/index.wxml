@@ -4,15 +4,116 @@
       <view class="gb-header__left">
         <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
         <view>
-          <text class="gb-header__eyebrow">SCORE MAP</text>
-          <text class="gb-header__title">成绩映射</text>
+          <text class="gb-header__eyebrow">SCORE</text>
+          <text class="gb-header__title">分值配置</text>
         </view>
       </view>
     </view>
   </view>
-  <scroll-view class="gb-body" scroll-y>
-    <view class="page-pad">
-      <view class="empty">{{emptyHint}}</view>
+
+  <view class="score-top">
+    <text class="score-top__meta">已选 {{players.length}} 人，点击球员配置得分与扣分</text>
+  </view>
+
+  <scroll-view class="gb-body score-body" scroll-y>
+    <view wx:for="{{groups}}" wx:key="letter" class="pick-group">
+      <view class="pick-letter">{{item.letter}}</view>
+      <view class="player-grid player-grid--wrap">
+        <view
+          wx:for="{{item.players}}"
+          wx:for-item="person"
+          wx:key="id"
+          class="player-slot"
+          bindtap="openScore"
+          data-id="{{person.id}}"
+        >
+          <party-face party="{{person}}" layout="slot"></party-face>
+          <view class="score-val score-val--{{person.scoreTone}}">{{person.scoreCode}}</view>
+        </view>
+      </view>
     </view>
   </scroll-view>
+
+  <view class="bottom-bar">
+    <view class="cta-ghost" bindtap="onBack">取消</view>
+    <view class="cta-gold" bindtap="onConfirm">确定</view>
+  </view>
+
+  <view wx:if="{{showScoreSheet}}" class="sheet-mask" bindtap="closeScore">
+    <view class="sheet sheet--tall" catchtap="true">
+      <view class="sheet-title">配置分值</view>
+      <view class="sheet-user">
+        <party-face party="{{scorePlayerFace}}" layout="sheet"></party-face>
+      </view>
+      <view class="sec-label">得分配置</view>
+      <view class="preset-grid">
+        <view
+          wx:for="{{scorePresets}}"
+          wx:key="*this"
+          class="preset-btn {{item === scoreDraft ? 'on' : ''}}"
+          bindtap="pickPreset"
+          data-value="{{item}}"
+        >{{item}}</view>
+        <view class="preset-btn preset-btn--custom {{scoreUsingCustom ? 'on' : ''}}">
+          <input
+            class="preset-custom-input"
+            type="digit"
+            maxlength="5"
+            placeholder="{{customPlaceholder}}"
+            placeholder-class="preset-custom-ph"
+            value="{{customScore}}"
+            bindfocus="onCustomFocus"
+            bindblur="onCustomBlur"
+            bindinput="onCustomScore"
+          />
+        </view>
+      </view>
+      <block wx:if="{{showInstanceDeduct}}">
+        <view class="sec-label">扣分配置</view>
+        <view class="opt opt--fold {{deductMode === 'on' ? 'on' : ''}}">
+          <view class="opt-row" bindtap="setDeductMode" data-value="on">
+            <view class="radio-dot"></view>
+            <text class="opt-title">扣分</text>
+            <view wx:if="{{deductMode === 'on'}}" class="rule-lib__meta" catchtap="toggleFoldDeduct">
+              <text class="rule-lib__count">{{deductText}}</text>
+              <text class="rule-lib__chev">{{foldDeduct ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{deductMode === 'on' && foldDeduct}}" class="opt-fold-body">
+            <view class="sec-label">扣分方式</view>
+            <view class="opt {{deductWay === 'plus-n' ? 'on' : ''}}" bindtap="setDeductWay" data-value="plus-n">
+              <view class="radio-dot"></view>
+              <text class="opt-title">从 +</text>
+              <input class="mini-input" type="digit" value="{{deductPlusN}}" catchtap="keepDeductWay" data-value="plus-n" bindinput="onDeductPlusN" />
+              <text class="opt-title">开始扣</text>
+            </view>
+            <view class="opt {{deductWay === 'doublepar-n' ? 'on' : ''}}" bindtap="setDeductWay" data-value="doublepar-n">
+              <view class="radio-dot"></view>
+              <text class="opt-title">从双帕 +</text>
+              <input class="mini-input" type="digit" value="{{deductDoubleN}}" catchtap="keepDeductWay" data-value="doublepar-n" bindinput="onDeductDoubleN" />
+              <text class="opt-title">开始扣</text>
+            </view>
+            <view class="sec-label">扣分封顶</view>
+            <view class="opt {{deductCap === 'none' ? 'on' : ''}}" bindtap="setDeductCap" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不封顶，一直扣</text>
+            </view>
+            <view class="opt {{deductCap === 'cap' ? 'on' : ''}}" bindtap="setDeductCap" data-value="cap">
+              <view class="radio-dot"></view>
+              <input class="mini-input" type="digit" value="{{deductCapN}}" catchtap="keepDeductCap" bindinput="onDeductCapN" />
+              <text class="opt-title">分封顶</text>
+            </view>
+          </view>
+        </view>
+        <view class="opt {{deductMode === 'none' ? 'on' : ''}}" bindtap="setDeductMode" data-value="none">
+          <view class="radio-dot"></view>
+          <text class="opt-title">不扣分</text>
+        </view>
+      </block>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeScore">取消</view>
+        <view class="cta-gold" bindtap="applyCustomScore">确定</view>
+      </view>
+    </view>
+  </view>
 </view>

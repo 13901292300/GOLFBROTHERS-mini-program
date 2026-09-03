@@ -3,6 +3,7 @@
  */
 
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
+const comboDisplayName = require('../../../../utils/comboDisplayName.js');
 const groupsStore = require('../../../../utils/groupsStore.js');
 const playerSlots = require('../../utils/playerSlots.js');
 const { getGenderById } = require('../../../../utils/playerDirectory.js');
@@ -25,6 +26,8 @@ const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
+const scoreRankMark = require('../../utils/scoreRankMark.js');
+const groupManageIdentityDiff = require('../../utils/groupManageIdentityDiff.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
 const reactionPanelConfig = require('../../../../utils/reactionPanelConfig.js');
@@ -448,27 +451,119 @@ const PLAYER_SEEDS = [
   }
 ];
 
-const COLUMN_TRIANGLES = columnLabels().map((_, colIdx) => {
-  if (SPECIAL_IDX.includes(colIdx)) return null;
-  const colors = ['triangle-red', 'triangle-red', 'triangle-blue', 'triangle-blue'];
-  const j = (colIdx * 3 + 1) % 4;
-  return [colors[j], colors[(j + 1) % 4], colors[(j + 2) % 4], colors[(j + 3) % 4]];
-});
-
-// 游戏角标名次（视觉测试）：红三角 → 1/4，蓝三角 → 2/3
-function cornerRank(colArr, pIdx) {
-  if (!colArr || !colArr[pIdx]) return null;
-  const cls = colArr[pIdx];
-  let redSeen = 0;
-  let blueSeen = 0;
-  for (let i = 0; i <= pIdx; i++) {
-    if (colArr[i] === 'triangle-red') redSeen += 1;
-    else if (colArr[i] === 'triangle-blue') blueSeen += 1;
-  }
-  if (cls === 'triangle-red') return redSeen === 1 ? 1 : 4;
-  if (cls === 'triangle-blue') return blueSeen === 1 ? 2 : 3;
-  return null;
+function playerIdOfScoreRow(player) {
+  return scoreRankMark.playerIdOf(player);
 }
+
+function rankMarkPlayerIds(page) {
+  const src = (page && page._playersSource) || [];
+  const ids = [];
+  const seen = {};
+  src.forEach(function (p) {
+    const id = scoreRankMark.playerIdOf(p);
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    ids.push(id);
+  });
+  return ids;
+}
+
+function replaceRankMarkProjection(page, raw) {
+  if (!page) return {};
+  page._rankMarkProjection = scoreRankMark.completeProjection(raw || {}, rankMarkPlayerIds(page));
+  return page._rankMarkProjection;
+}
+
+function paintViewRowsTriColor(rows, projection) {
+  (rows || []).forEach(function (row) {
+    if (!row) return;
+    const pid = playerIdOfScoreRow(row);
+    if (row.cells) row.cells = scoreRankMark.blankThenPaintCells(row.cells, pid, projection);
+    if (row.columns) row.columns = scoreRankMark.blankThenPaintCells(row.columns, pid, projection);
+  });
+  return rows;
+}
+
+function rankColorOptions(page, extra) {
+  const ms = (page && (page._matchState || page._readMatchState && page._readMatchState())) || {};
+  const snap = sideGameHostSnapshot.buildForScorePage(ms) || {};
+  const matchId = String(snap.matchId || (ms && (ms.matchId || ms.gameId)) || '');
+  const groupId = String(snap.groupId || '');
+  const scopeKey = matchId + '::' + groupId;
+  if (page) page._rankMarkScopeKey = scopeKey;
+  const need = !!scoreRankMark.hasRankMarkGames({ matchId: matchId, groupId: groupId });
+  if (!need) {
+    if (page) {
+      page._rankMarkNeed = false;
+      page._pendingRankMarkInput = null;
+      page._rankMarkStamp = '';
+      replaceRankMarkProjection(page, {});
+    }
+    activeRankMark = function () {
+      return scoreRankMark.emptyMark();
+    };
+    activeRankColor = function () {
+      return '';
+    };
+    return Object.assign({}, extra || {}, { rankColor: activeRankColor, rankMark: activeRankMark });
+  }
+  const labels = columnLabels();
+  const parsRow = columnPars();
+  const pars = [];
+  for (let i = 0; i < labels.length; i++) {
+    if (!SPECIAL_IDX.includes(i)) pars.push(parsRow[i]);
+  }
+  const official = scoreRankMark.collectOfficialFromScorePage(page);
+  official.pars = pars;
+  official.matchId = matchId;
+  official.groupId = groupId;
+  const holeLabels = [];
+  for (let i = 0; i < labels.length; i++) {
+    if (!SPECIAL_IDX.includes(i)) holeLabels.push(labels[i]);
+  }
+  official.holeLabels = holeLabels;
+  const stamp = scoreRankMark.authoritySignature(
+    { matchId: matchId, groupId: groupId },
+    official
+  );
+  let projection = (page && page._rankMarkProjection) || {};
+  if (!page || page._rankMarkStamp !== stamp || !page._rankMarkProjection) {
+    projection = scoreRankMark.projectFromStorage(official);
+    if (page) {
+      page._rankMarkStamp = stamp;
+      replaceRankMarkProjection(page, projection);
+      projection = page._rankMarkProjection;
+    }
+  }
+  if (page) {
+    page._rankMarkNeed = true;
+    page._pendingRankMarkInput = official;
+  }
+  activeRankMark = function (player, holeIndex) {
+    return scoreRankMark.markFromProjection(projection, playerIdOfScoreRow(player), holeIndex);
+  };
+  activeRankColor = function (player, holeIndex) {
+    return activeRankMark(player, holeIndex).triColor;
+  };
+  return Object.assign({}, extra || {}, {
+    rankColor: activeRankColor,
+    rankMark: activeRankMark
+  });
+}
+
+function cellTriColor(player, holeIndex, options) {
+  return cellTriMark(player, holeIndex, options).triColor;
+}
+
+function cellTriMark(player, holeIndex, options) {
+  const fn = (options && options.rankMark) || activeRankMark;
+  if (typeof fn === 'function') return scoreRankMark.normalizeMark(fn(player, holeIndex));
+  const colorFn = (options && options.rankColor) || activeRankColor;
+  return scoreRankMark.normalizeMark(colorFn ? colorFn(player, holeIndex) : '');
+}
+
+var activeRankColor = null;
+var activeRankMark = null;
 
 /** 多组普通球局 / 球队赛事记分页：更多功能面板（仅此 10 项） */
 const MORE_MENU_ITEMS_COMPACT = [
@@ -2069,6 +2164,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
     const hi = scoreIdx;
     scoreIdx += 1;
     const s = scores[hi];
+    const tri = cellTriMark(player, hi, options);
 
     // 空洞：保持空白，不参与计算；displayHint 预留显示该洞 T 台码数
     if (!isFilledScore(s)) {
@@ -2090,9 +2186,10 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         classicClass: '',
         classicScoreSizeClass: '',
         scoreMainWideClass: '',
-        triangleClass:
-          hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
-        gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
+        triColor: tri.triColor,
+        gameCornerRank: tri.gameCornerRank,
+        triangleClass: tri.triangleClass,
+        hasWaist: tri.hasWaist,
         diffClass: 'diff-even'
       };
     }
@@ -2133,9 +2230,10 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       classicClass: resolveClassicHoleClass(diff),
       classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
       scoreMainWideClass: resolveScoreMainWideClass(mainStr),
-      triangleClass:
-        hideCorners || !COLUMN_TRIANGLES[colIdx] ? '' : COLUMN_TRIANGLES[colIdx][pIdx] || '',
-      gameCornerRank: hideCorners ? null : cornerRank(COLUMN_TRIANGLES[colIdx], pIdx),
+      triColor: tri.triColor,
+      gameCornerRank: tri.gameCornerRank,
+      triangleClass: tri.triangleClass,
+      hasWaist: tri.hasWaist,
       diffClass: diff < 0 ? 'diff-under' : diff > 0 ? 'diff-over' : 'diff-even'
     };
   });
@@ -2153,8 +2251,8 @@ function enrichPlayer(player, pIdx, displayMode, options) {
 }
 
 /** G5：从标准 enrich 结果去掉 OUT/IN，TOT→FINAL，colIdx 重排为 0..18 */
-function enrichPlayerG5(player, pIdx, displayMode) {
-  const enriched = enrichPlayer(player, pIdx, displayMode, { hideCorners: true });
+function enrichPlayerG5(player, pIdx, displayMode, options) {
+  const enriched = enrichPlayer(player, pIdx, displayMode, Object.assign({ hideCorners: true }, options || {}));
   const src = Array.isArray(enriched.cells) ? enriched.cells : [];
   const next = [];
   let holeCol = 0;
@@ -2192,6 +2290,8 @@ Page({
     fontScaleClass: 'font-normal',
     activeTab: 'score',
     hostSnapshot: {},
+    rankMarkEngineOn: false,
+    rankMarkInput: null,
     // 记分格主数字显示方式：'gross'=总杆 | 'diff'=本洞杆差（仅 UI 展示）
     scoreDisplayMode: 'gross',
     // 模式分流（仅记录元信息，不改动原有记分结构/逻辑）
@@ -4387,22 +4487,19 @@ Page({
   _buildEntityDisplayName(entity, index, nameMap) {
     const type = entity && entity.entityType ? String(entity.entityType) : '';
     const members = Array.isArray(entity && entity.members) ? entity.members : [];
-    if (type === 'pair') {
-      const names = members
-        .map((id) => {
-          const key = id != null ? String(id).trim() : '';
-          return (nameMap && nameMap[key]) || key || '球员';
-        })
-        .filter(Boolean);
-      return names.length ? names.join(' + ') : '组合';
-    }
     const names = members
       .map((id) => {
         const key = id != null ? String(id).trim() : '';
-        return (nameMap && nameMap[key]) || key || '';
+        return (nameMap && nameMap[key]) || '';
       })
       .filter(Boolean);
-    return names.length ? names.join(' + ') : '组合';
+    return (
+      comboDisplayName.formatComboDisplayName({
+        savedName: entity && entity.name,
+        members: names,
+        emptyFallback: '组合'
+      }) || '组合'
+    );
   },
 
   /**
@@ -4410,6 +4507,7 @@ Page({
    * 第一列复用 fourball 的 single/pair/team 视觉字段（kind / avatar / pairMembers）
    */
   refreshEntities() {
+    rankColorOptions(this);
     const displayMode = this.data.scoreDisplayMode;
     const nameMap = this._resolveEntityMemberNameMap();
     const ms = this._matchState || this._readMatchState() || {};
@@ -4426,7 +4524,7 @@ Page({
       const members = Array.isArray(entity && entity.members) ? entity.members.slice() : [];
       const kind = this._resolveEntityRowKind(entity, match);
       const memberDisplay = this._buildEntityMemberDisplay(entity, match, nameMap);
-      const memberNamesText = memberDisplay.map((m) => m.name).filter(Boolean).join(' / ');
+      const memberNamesText = comboDisplayName.joinMemberDisplayNames(memberDisplay);
       let pairMembers = [];
       let avatar = '';
       let name = '';
@@ -4460,7 +4558,11 @@ Page({
         kind === 'team'
           ? label
           : kind === 'pair'
-            ? memberDisplay.map((m) => m.name).filter(Boolean).join(' + ') || '组合'
+            ? comboDisplayName.formatComboDisplayName({
+                savedName: entity && entity.name,
+                members: memberDisplay,
+                emptyFallback: '组合'
+              })
             : name;
 
       const scores = Array.isArray(entity && entity.scores) ? entity.scores.slice() : [];
@@ -4584,6 +4686,9 @@ Page({
       patch.fourballTrackInnerStyle = 'transform: translateX(0px);';
       patch.fourballHoleParOffsetX = 0;
     }
+    const painted = this._rankMarkProjection || {};
+    paintViewRowsTriColor(patch.entitiesView, painted);
+    paintViewRowsTriColor(patch.playersView, painted);
     this.setData(this._attachM2ScoreboardToPatch(patch));
   },
 
@@ -5565,8 +5670,54 @@ Page({
     });
   },
 
-  _attachM2ScoreboardToPatch(patch) {
+  _attachRankMarkEngineToPatch(patch) {
     const p = patch || {};
+    if (this._applyingRankMark) return p;
+    const need = !!this._rankMarkNeed;
+    p.rankMarkEngineOn = need;
+    if (need && this._pendingRankMarkInput) {
+      const key = JSON.stringify(this._pendingRankMarkInput);
+      if (this._rankMarkInputKey !== key) {
+        this._rankMarkInputKey = key;
+        p.rankMarkInput = this._pendingRankMarkInput;
+      }
+    } else {
+      this._rankMarkInputKey = '';
+      p.rankMarkInput = null;
+    }
+    return p;
+  },
+
+  onRankMarkChange(e) {
+    const d = (e && e.detail) || {};
+    const ms = this._matchState || this._readMatchState && this._readMatchState() || {};
+    const snap = sideGameHostSnapshot.buildForScorePage(ms) || {};
+    const matchId = String(snap.matchId || (ms && (ms.matchId || ms.gameId)) || '');
+    const groupId = String(snap.groupId || '');
+    if (String(d.matchId || '') !== matchId || String(d.groupId || '') !== groupId) {
+      return;
+    }
+    const nextRaw = d.ok ? d.projection || {} : {};
+    const next = scoreRankMark.completeProjection(nextRaw, rankMarkPlayerIds(this));
+    if (d.ok && JSON.stringify(next) === JSON.stringify(this._rankMarkProjection || {})) {
+      return;
+    }
+    if (!d.ok) {
+      replaceRankMarkProjection(this, {});
+    } else {
+      replaceRankMarkProjection(this, d.projection || {});
+    }
+    this._applyingRankMark = true;
+    try {
+      this.refreshPlayers();
+    } catch (err) {
+      replaceRankMarkProjection(this, {});
+    }
+    this._applyingRankMark = false;
+  },
+
+  _attachM2ScoreboardToPatch(patch) {
+    const p = this._attachRankMarkEngineToPatch(patch || {});
     const m2 = this._buildM2ScoreboardView(p);
     p.m2Scoreboard = m2;
     let sampleTag = 'g1';
@@ -5582,6 +5733,7 @@ Page({
   },
 
   refreshPlayers() {
+    rankColorOptions(this);
     if (this.data.mode === 'stroke_entity') {
       this.refreshEntities();
       return;
@@ -5826,6 +5978,11 @@ Page({
         nameWidth: 96
       });
     }
+    const painted = this._rankMarkProjection || {};
+    paintViewRowsTriColor(patch.playersView, painted);
+    paintViewRowsTriColor(patch.bestTeams, painted);
+    paintViewRowsTriColor(patch.fourballRowsView, painted);
+    paintViewRowsTriColor(patch.matchSidesView, painted);
     this.setData(this._attachM2ScoreboardToPatch(patch));
     this.syncSheetPlayers();
   },
@@ -6225,7 +6382,9 @@ Page({
       const names = members.map((m) => (m && m.name) || '').filter(Boolean);
       const m0 = members[0] || {};
       return {
-        name: names.length ? names.join(' / ') : 'Side ' + key,
+        name: names.length
+          ? comboDisplayName.joinMemberDisplayNames(names)
+          : 'Side ' + key,
         avatar: mockAvatars.resolveAvatar(m0.avatar, m0.playerId || '')
       };
     }
@@ -6372,6 +6531,12 @@ Page({
 
   // 将当前本地 state 写入会话：个人比杆赛 → 出发表 groups；其他模式 → scoreSessions
   persistSession() {
+    const ok = this._persistOfficialScores();
+    if (ok && this.data.activeTab === 'game') this._syncGameHostContext();
+    return ok;
+  },
+
+  _persistOfficialScores() {
     if (this._isGameStoreContext()) {
       const gi = this._gameGroupIndex || 0;
       const dualWriteSlot = this._isGameSingleScoreContext();
@@ -6596,7 +6761,7 @@ Page({
         '';
       return {
         name: names.length
-          ? names.join(' / ')
+          ? comboDisplayName.joinMemberDisplayNames(names)
           : view.name || this._buildEntityDisplayName(entity, index, nameMap) || '组合',
         avatar: avatar
       };
@@ -7251,8 +7416,15 @@ Page({
       this.closePlayerActionSheet && this.closePlayerActionSheet();
       this._clearDiscussionReactionDetach();
     }
+    if (tab === 'game') {
+      const ms = this._matchState || matchState.getMatchState();
+      this.setData({
+        activeTab: tab,
+        hostSnapshot: sideGameHostSnapshot.buildForScorePage(ms)
+      });
+      return;
+    }
     this.setData({ activeTab: tab });
-    if (tab === 'game') this._syncGameHostContext();
   },
 
   _syncGameHostContext() {
@@ -8505,7 +8677,11 @@ Page({
           scoreClass: c.scoreClass || '',
           classicScoreSizeClass: c.classicScoreSizeClass || '',
           scoreMainWideClass: c.scoreMainWideClass || '',
-          holeIndex: c.holeIndex
+          holeIndex: c.holeIndex,
+          triColor: c.triColor || '',
+          gameCornerRank: c.gameCornerRank == null ? null : c.gameCornerRank,
+          triangleClass: c.triangleClass || '',
+          hasWaist: !!c.hasWaist
         };
       });
     };
@@ -11245,6 +11421,39 @@ Page({
     });
   },
 
+  _rebindTeamMatchScoreOwners(match, groupId, idMap) {
+    const map = {};
+    Object.keys(idMap || {}).forEach((key) => {
+      const from = String(key || '').trim();
+      const to = String(idMap[key] || '').trim();
+      if (from && to && from !== to) map[from] = to;
+    });
+    if (!match || !groupId || !Object.keys(map).length) return true;
+    match.scoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
+      ? match.scoreData
+      : {};
+    const groupScoreData = match.scoreData[groupId] && typeof match.scoreData[groupId] === 'object'
+      ? match.scoreData[groupId]
+      : {};
+    const scoresByPlayer = groupScoreData.scoresByPlayer && typeof groupScoreData.scoresByPlayer === 'object'
+      ? groupScoreData.scoresByPlayer
+      : {};
+    const next = {};
+    const keys = Object.keys(scoresByPlayer);
+    for (let i = 0; i < keys.length; i++) {
+      const oldId = keys[i];
+      const newId = map[oldId] || oldId;
+      if (Object.prototype.hasOwnProperty.call(next, newId) && next[newId] !== scoresByPlayer[oldId]) {
+        return false;
+      }
+      next[newId] = scoresByPlayer[oldId];
+    }
+    match.scoreData[groupId] = Object.assign({}, groupScoreData, {
+      scoresByPlayer: next
+    });
+    return true;
+  },
+
   // 显式高级操作预留：LIVE 添加/删除默认只改当前球员绑定，禁止调用此函数迁移成绩 key。
   _rebindTeamMatchScoreOwner(match, groupId, oldPlayerId, newPlayerId, slotPosition) {
     const oldId = String(oldPlayerId || '').trim();
@@ -11878,7 +12087,16 @@ Page({
 
   // footer「确认」：进入 commit（Phase 3B-2A：gameStore/demoSession 真实写盘）
   _onConfirmGroupManage() {
-    this._commitDraftSlots();
+    if (this._groupManageCommitBusy) return;
+    this._groupManageCommitBusy = true;
+    try {
+      this._commitDraftSlots();
+    } catch (err) {
+      console.error('[GROUP_MANAGE_CONFIRM_FAIL]', err);
+      wx.showToast({ title: '提交失败', icon: 'none' });
+    } finally {
+      this._groupManageCommitBusy = false;
+    }
   },
 
   // 槽位 occupied 的 playerId（空位返回 ''）
@@ -12021,13 +12239,13 @@ Page({
       }
     }
 
-    return {
+    return groupManageIdentityDiff.foldIdentityCorrection({
       added: added,
       removed: removed,
       replaced: replaced,
       unchanged: unchanged,
       changeCount: added.length + removed.length + replaced.length
-    };
+    });
   },
 
   /**
@@ -12076,26 +12294,54 @@ Page({
         this._demoSlots[idx] = null;
       });
 
-      // 2) replace：原地替换身份，保留该位成绩（禁止 remove+add）
-      (diff.replaced || []).forEach((ch) => {
-        const idx = ch.slotIndex;
-        if (idx == null || idx < 0 || !ch.toPlayerId) return;
-        const draftSlot = draft[idx] || {};
+      // 2) replace：同一映射表一次改挂成绩，避免 B/C 互换时按旧名单拦截
+      const replaceList = diff.replaced || [];
+      const idMap = groupManageIdentityDiff.buildRemapTable(replaceList);
+      const replaceSnaps = replaceList.map((ch) => {
+        const fromIdx = ch.slotIndex;
+        const toIdx =
+          ch.toSlotIndex != null && Number(ch.toSlotIndex) >= 0 ? Number(ch.toSlotIndex) : fromIdx;
+        const draftSlot = draft[toIdx] || draft[fromIdx] || {};
         const player = draftSlot.player || {};
-        const cur = this._demoSlots[idx] || {};
+        const cur = fromIdx != null && fromIdx >= 0 ? this._demoSlots[fromIdx] || {} : {};
         let scores = (cur.scores || []).slice();
         let putts = (cur.putts || []).slice();
         let fairways = sliceFairways(cur.fairways);
         let penalties = slicePenalties(cur.penalties);
         let sands = sliceSands(cur.sands);
-        if (useSlotScores) {
-          const saved = this._readGameSingleSlotScores(idx, ch.toPlayerId);
-          scores = (saved.scores || []).slice();
-          putts = (saved.putts || []).slice();
-          fairways = sliceFairways(saved.fairways);
-          penalties = slicePenalties(saved.penalties);
-          sands = sliceSands(saved.sands);
+        if (useSlotScores && fromIdx != null && fromIdx >= 0) {
+          const saved = this._readGameSingleSlotScores(fromIdx, ch.fromPlayerId);
+          scores = (saved.scores || scores).slice();
+          putts = (saved.putts || putts).slice();
+          fairways = sliceFairways(saved.fairways || fairways);
+          penalties = slicePenalties(saved.penalties || penalties);
+          sands = sliceSands(saved.sands || sands);
         }
+        return { ch: ch, fromIdx: fromIdx, toIdx: toIdx, draftSlot: draftSlot, player: player, scores: scores, putts: putts, fairways: fairways, penalties: penalties, sands: sands };
+      });
+      if (
+        useSlotScores &&
+        this.data.gameId &&
+        Object.keys(idMap).length &&
+        typeof gameStore.rekeyGroupPlayerScoresMap === 'function' &&
+        gameStore.getGame(this.data.gameId)
+      ) {
+        const rekeyed = gameStore.rekeyGroupPlayerScoresMap(
+          this.data.gameId,
+          this._gameGroupIndex || 0,
+          idMap
+        );
+        if (!rekeyed) {
+          throw new Error('identity_conflict');
+        }
+      }
+      replaceSnaps.forEach((snap) => {
+        const ch = snap.ch;
+        const fromIdx = snap.fromIdx;
+        const toIdx = snap.toIdx;
+        if (fromIdx == null || fromIdx < 0 || !ch.toPlayerId) return;
+        const player = snap.player;
+        const draftSlot = snap.draftSlot;
         const teeFields = applyScorePlayerTeeFields(
           {
             playerId: ch.toPlayerId,
@@ -12103,25 +12349,29 @@ Page({
             gender: player.gender || '',
             matchGender: player.matchGender || ''
           },
-          idx
+          toIdx
         );
-        this._demoSlots[idx] = {
+        this._demoSlots[toIdx] = {
           id: ch.toPlayerId,
           playerId: ch.toPlayerId,
-          slotIndex: idx,
+          slotIndex: toIdx,
           name: player.name || (ch.to && ch.to.name) || '球员',
           avatar: player.avatar || '',
           source: draftSlot.source || (player && player.source) || 'manual',
           gender: teeFields.gender,
           tPosition: teeFields.tPosition,
           colorClass: teeFields.colorClass,
-          scores: scores,
-          putts: putts,
-          fairways: fairways,
-          penalties: penalties,
-          sands: sands
+          scores: snap.scores,
+          putts: snap.putts,
+          fairways: snap.fairways,
+          penalties: snap.penalties,
+          sands: snap.sands
         };
-        if (!useSlotScores) this._demoSlotCache[idx] = null;
+        if (toIdx !== fromIdx) this._demoSlots[fromIdx] = null;
+        if (!useSlotScores) {
+          this._demoSlotCache[toIdx] = null;
+          if (toIdx !== fromIdx) this._demoSlotCache[fromIdx] = null;
+        }
       });
 
       // 3) add
@@ -12212,6 +12462,9 @@ Page({
       return true;
     } catch (err) {
       console.error('[GROUP_MANAGE_COMMIT_FAIL]', err);
+      if (err && err.message === 'identity_conflict') {
+        this._groupManageCommitError = '目标球员已在本场比赛中';
+      }
       return false;
     }
   },
@@ -12233,13 +12486,19 @@ Page({
         existing.scorePlayerId ||
         '';
       if (userId) {
+        const originalId = this._slotOccupiedPlayerId((this._originalSlots || [])[index]);
         const profile = this._buildScoreTeamMatchPlayerProfile(match, userId, slot.player || existing);
-        const scorePlayerId = cachedScorePlayerId || userId;
+        let scorePlayerId = userId;
+        if (originalId && originalId !== userId) {
+          scorePlayerId = userId;
+        } else if (cachedScorePlayerId) {
+          scorePlayerId = cachedScorePlayerId;
+        }
         scoreDebugLog('[score-player-binding]', {
           slotPosition: position,
           currentUserId: userId,
           scorePlayerId: scorePlayerId,
-          migratedScore: false,
+          migratedScore: !!(originalId && originalId !== userId),
           updatedProfile: true
         });
         return Object.assign({}, existing, profile, {
@@ -12522,12 +12781,21 @@ Page({
   },
 
   _applyTeamMatchStoreCommitDiff(diff) {
+    const match = this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(match);
+    if (match && group) {
+      const idMap = groupManageIdentityDiff.buildRemapTable((diff && diff.replaced) || []);
+      if (!this._rebindTeamMatchScoreOwners(match, group.groupId || this.data.groupId, idMap)) {
+        this._groupManageCommitError = '目标球员已在本场比赛中';
+        return false;
+      }
+    }
     const ok = this._syncTeamMatchGroupFromDraftSlots();
     if (!ok) return false;
 
-    const group = this.data.groupId ? groupsStore.getGroup(this.data.groupId) : null;
+    const storeGroup = this.data.groupId ? groupsStore.getGroup(this.data.groupId) : null;
     let groupsStoreSynced = false;
-    if (group && Array.isArray(group.players)) {
+    if (storeGroup && Array.isArray(storeGroup.players)) {
       groupsStoreSynced = this._applyGroupsStoreCommitDiff(diff);
       if (!groupsStoreSynced) {
         console.warn('[score-slot-migration]', {
@@ -12578,24 +12846,32 @@ Page({
         groupsStore.removePlayerSlot(groupId, idx);
       });
 
-      // 2) replace：原地替换身份，保留 holes；不碰 slotCache
+      // 2) replace：A→B 身份纠错，holes 从 A 槽整体改挂 B
       (diff.replaced || []).forEach((ch) => {
-        const idx = ch.slotIndex;
-        if (idx == null || idx < 0 || !ch.toPlayerId) return;
-        if (idx >= group.players.length) return;
-        const existing = group.players[idx];
+        const fromIdx = ch.slotIndex;
+        if (fromIdx == null || fromIdx < 0 || !ch.toPlayerId) return;
+        const toIdx =
+          ch.toSlotIndex != null && Number(ch.toSlotIndex) >= 0 ? Number(ch.toSlotIndex) : fromIdx;
+        if (fromIdx >= group.players.length) return;
+        const existing = group.players[fromIdx];
         if (!existing) return;
-        const draftSlot = draft[idx] || {};
+        const draftSlot = draft[toIdx] || draft[fromIdx] || {};
         const player = draftSlot.player || {};
         const holes = (existing.holes || []).map((h) => Object.assign({}, h));
-        group.players[idx] = Object.assign({}, existing, {
+        const nextPlayer = Object.assign({}, existing, {
           playerId: ch.toPlayerId,
           name: player.name || (ch.to && ch.to.name) || existing.name || '球员',
           avatar: player.avatar != null ? player.avatar : existing.avatar || '',
           source: draftSlot.source || (player && player.source) || existing.source || 'manual',
           holes: holes
         });
-        // slotCache[idx] 故意不清理，满足「保留 slotCache」
+        if (toIdx !== fromIdx) {
+          while (group.players.length <= toIdx) group.players.push(null);
+          group.players[fromIdx] = null;
+          group.players[toIdx] = nextPlayer;
+        } else {
+          group.players[fromIdx] = nextPlayer;
+        }
       });
 
       // 3) add
@@ -12629,6 +12905,199 @@ Page({
       console.error('[GROUP_MANAGE_GROUPS_COMMIT_FAIL]', err);
       return false;
     }
+  },
+
+  _inspectGroupManageIdentity(diff) {
+    const hasWork =
+      ((diff && diff.replaced ? diff.replaced.length : 0) ||
+        (diff && diff.removed ? diff.removed.length : 0)) > 0;
+    if (!hasWork) return { ok: true };
+    const matchId = this._sideGameMatchId();
+    if (!matchId) return { ok: true };
+    let records = [];
+    try {
+      records = wx.getStorageSync('gb_side_games_v1') || [];
+    } catch (err) {
+      return { ok: false, reason: 'storage_read_failed', message: '保存失败' };
+    }
+    return groupManageIdentityDiff.inspectStorageRemap(records, matchId, (diff && diff.replaced) || []);
+  },
+
+  _applyGroupManageIdentityNow(diff) {
+    const hasWork =
+      ((diff && diff.replaced ? diff.replaced.length : 0) ||
+        (diff && diff.removed ? diff.removed.length : 0)) > 0;
+    if (!hasWork) return { ok: true };
+    const matchId = this._sideGameMatchId();
+    if (!matchId) return { ok: true };
+    const extra = {
+      profiles: {},
+      stillPresentIds: this._stillPresentIdsAfterGroupManage(diff)
+    };
+    (diff.replaced || []).forEach((ch) => {
+      const idx =
+        ch.toSlotIndex != null && Number(ch.toSlotIndex) >= 0
+          ? Number(ch.toSlotIndex)
+          : ch.slotIndex;
+      const slot = (this._draftSlots || [])[idx] || (this._draftSlots || [])[ch.slotIndex] || {};
+      const player = slot.player || {};
+      const toId = String(ch.toPlayerId || '').trim();
+      if (!toId) return;
+      extra.profiles[toId] = {
+        displayName: player.name || (ch.to && ch.to.name) || '',
+        name: player.name || (ch.to && ch.to.name) || '',
+        avatar: player.avatar || ''
+      };
+    });
+    try {
+      const out = groupManageIdentityDiff.applyGroupManageStorageDiff(wx, matchId, diff, extra);
+      if (out && out.ok) this._groupManageIdentityApplied = true;
+      return out || { ok: false, message: '保存失败' };
+    } catch (err) {
+      console.error('[GROUP_MANAGE_IDENTITY_APPLY_FAIL]', err);
+      return { ok: false, reason: 'apply_failed', message: '保存失败' };
+    }
+  },
+
+  _toastGroupManageApplyFail() {
+    wx.showToast({
+      title: this._groupManageCommitError || '提交失败',
+      icon: 'none'
+    });
+    this._groupManageCommitError = '';
+  },
+
+  _rollbackGroupManageIdentity(snapshot) {
+    if (snapshot === undefined) return;
+    groupManageIdentityDiff.restoreSideGameSnapshot(wx, snapshot);
+  },
+
+  _sideGameMatchId() {
+    const team = this._scoreTeamMatchSlotsForCurrent();
+    if (team && team.matchId) return String(team.matchId);
+    const ms = this._matchState || {};
+    return String(this.data.matchId || ms.matchId || this.data.gameId || '').trim();
+  },
+
+  _findGroupManageIdentityConflict(diff) {
+    const draftIds = [];
+    (this._draftSlots || []).forEach((slot) => {
+      const pid = this._slotOccupiedPlayerId(slot);
+      if (pid) draftIds.push(String(pid).trim());
+    });
+    const finalCheck = groupManageIdentityDiff.inspectFinalOccupiedIds(draftIds);
+    if (!finalCheck.ok) {
+      return { fromId: '', toId: '', reason: 'identity_conflict' };
+    }
+    const replaced = (diff && diff.replaced) || [];
+    if (!replaced.length) return null;
+    const other = {};
+    (this._otherGroupsUsedIds() || []).forEach((id) => {
+      const k = String(id || '').trim();
+      if (k) other[k] = true;
+    });
+    for (let r = 0; r < replaced.length; r++) {
+      const fromId = String(replaced[r].fromPlayerId || '').trim();
+      const toId = String(replaced[r].toPlayerId || '').trim();
+      if (!fromId || !toId || fromId === toId) continue;
+      if (other[toId]) return { fromId: fromId, toId: toId };
+    }
+    return null;
+  },
+
+  _stillPresentIdsAfterGroupManage(diff) {
+    const ids = {};
+    (this._otherGroupsUsedIds() || []).forEach((id) => {
+      const k = String(id || '').trim();
+      if (k) ids[k] = true;
+    });
+    (this._draftSlots || []).forEach((slot) => {
+      const pid = this._slotOccupiedPlayerId(slot);
+      if (pid) ids[String(pid)] = true;
+    });
+    (diff && diff.removed ? diff.removed : []).forEach((ch) => {
+      const pid = String((ch && ch.fromPlayerId) || '').trim();
+      if (pid && !this._otherGroupsUsedIds().some((id) => String(id) === pid)) {
+        delete ids[pid];
+      }
+    });
+    return ids;
+  },
+
+  _withSideGameIdentitySync(done) {
+    const finish = (mod) => {
+      if (typeof done === 'function') done(mod || null);
+    };
+    if (this._sideGameIdentitySyncMod) {
+      finish(this._sideGameIdentitySyncMod);
+      return;
+    }
+    let settled = false;
+    const once = (mod) => {
+      if (settled) return;
+      settled = true;
+      if (mod) this._sideGameIdentitySyncMod = mod;
+      finish(mod);
+    };
+    if (typeof require.async !== 'function') {
+      once(null);
+      return;
+    }
+    try {
+      const ret = require.async(
+        '../../../game/utils/sideGameIdentitySync.js',
+        (mod) => once(mod),
+        () => once(null)
+      );
+      if (ret && typeof ret.then === 'function') {
+        ret.then((mod) => once(mod)).catch(() => once(null));
+      }
+    } catch (err) {
+      once(null);
+    }
+  },
+
+  _finishGroupManageIdentitySync(diff) {
+    if (this._groupManageIdentityApplied) {
+      this._groupManageIdentityApplied = false;
+      return;
+    }
+    if (!diff || !((diff.replaced || []).length || (diff.removed || []).length)) return;
+    const matchId = this._sideGameMatchId();
+    if (!matchId) return;
+    const profiles = {};
+    (diff.replaced || []).forEach((ch) => {
+      const idx =
+        ch.toSlotIndex != null && Number(ch.toSlotIndex) >= 0
+          ? Number(ch.toSlotIndex)
+          : ch.slotIndex;
+      const slot = (this._draftSlots || [])[idx] || (this._draftSlots || [])[ch.slotIndex] || {};
+      const player = slot.player || {};
+      const toId = String(ch.toPlayerId || '').trim();
+      if (!toId) return;
+      profiles[toId] = {
+        displayName: player.name || (ch.to && ch.to.name) || '',
+        name: player.name || (ch.to && ch.to.name) || '',
+        avatar: player.avatar || ''
+      };
+    });
+    const extra = {
+      profiles: profiles,
+      stillPresentIds: this._stillPresentIdsAfterGroupManage(diff)
+    };
+    const run = (sync) => {
+      if (!sync || typeof sync.applyGroupManageDiff !== 'function') return;
+      try {
+        sync.applyGroupManageDiff(matchId, diff, extra);
+      } catch (err) {
+        console.error('[GROUP_MANAGE_IDENTITY_SYNC_FAIL]', err);
+      }
+    };
+    if (this._pendingIdentitySync) {
+      run(this._pendingIdentitySync);
+      return;
+    }
+    this._withSideGameIdentitySync(run);
   },
 
   /**
@@ -12669,15 +13138,40 @@ Page({
       return plan;
     }
 
+    const identityConflict = this._findGroupManageIdentityConflict(diff);
+    if (identityConflict) {
+      wx.showToast({ title: '目标球员已在本场比赛中', icon: 'none' });
+      return plan;
+    }
+
+    const identityInspect = this._inspectGroupManageIdentity(diff);
+    if (identityInspect && identityInspect.ok === false) {
+      wx.showToast({
+        title: identityInspect.message || '目标球员已在本场比赛中',
+        icon: 'none'
+      });
+      return plan;
+    }
+
     if (commitPath.path === 'teamMatchStore') {
       const compositionErr = this._validateTeamMatchDraftComposition();
       if (compositionErr) {
         wx.showToast({ title: compositionErr, icon: 'none' });
         return plan;
       }
+      const identityOut = this._applyGroupManageIdentityNow(diff);
+      if (!identityOut || identityOut.ok === false) {
+        wx.showToast({
+          title: (identityOut && identityOut.message) || '保存失败',
+          icon: 'none'
+        });
+        return plan;
+      }
+      const identitySnap = identityOut.snapshot;
       const ok = this._applyTeamMatchStoreCommitDiff(diff);
       if (!ok) {
-        wx.showToast({ title: '提交失败', icon: 'none' });
+        this._rollbackGroupManageIdentity(identitySnap);
+        this._toastGroupManageApplyFail();
         return plan;
       }
       plan.deferredWrites = {
@@ -12697,14 +13191,25 @@ Page({
       this.rebindScoreContext();
       this._reloadStrokeEntitiesAfterGroupManage();
       this._finalizeCloseGroupManage();
+      this._finishGroupManageIdentitySync(diff);
       wx.showToast({ title: '已保存', icon: 'success' });
       return plan;
     }
 
     if (commitPath.path === 'groupsStore') {
+      const identityOut = this._applyGroupManageIdentityNow(diff);
+      if (!identityOut || identityOut.ok === false) {
+        wx.showToast({
+          title: (identityOut && identityOut.message) || '保存失败',
+          icon: 'none'
+        });
+        return plan;
+      }
+      const identitySnap = identityOut.snapshot;
       const ok = this._applyGroupsStoreCommitDiff(diff);
       if (!ok) {
-        wx.showToast({ title: '提交失败', icon: 'none' });
+        this._rollbackGroupManageIdentity(identitySnap);
+        this._toastGroupManageApplyFail();
         return plan;
       }
       plan.deferredWrites = {
@@ -12724,6 +13229,7 @@ Page({
       this._reloadFromStore();
       this.rebindScoreContext();
       this._finalizeCloseGroupManage();
+      this._finishGroupManageIdentitySync(diff);
       wx.showToast({ title: '已保存', icon: 'success' });
       return plan;
     }
@@ -12788,9 +13294,19 @@ Page({
       return plan;
     }
 
+    const identityOut = this._applyGroupManageIdentityNow(diff);
+    if (!identityOut || identityOut.ok === false) {
+      wx.showToast({
+        title: (identityOut && identityOut.message) || '保存失败',
+        icon: 'none'
+      });
+      return plan;
+    }
+    const identitySnap = identityOut.snapshot;
     const ok = this._applyGameOrDemoCommitDiff(diff);
     if (!ok) {
-      wx.showToast({ title: '提交失败', icon: 'none' });
+      this._rollbackGroupManageIdentity(identitySnap);
+      this._toastGroupManageApplyFail();
       return plan;
     }
 
@@ -12799,12 +13315,14 @@ Page({
     if (commitPath.path === 'gameStore' && this._isOrdinaryFourball2BallContext()) {
       const synced = this._syncOrdinaryFourball2BallCompositionFromSlots();
       if (!synced) {
+        this._rollbackGroupManageIdentity(identitySnap);
         wx.showToast({ title: '组合同步失败', icon: 'none' });
         return plan;
       }
     } else if (commitPath.path === 'gameStore' && this._isOrdinaryFourballBestCompositionContext()) {
       const synced = this._syncOrdinaryFourballCompositionFromSeats(diff);
       if (!synced) {
+        this._rollbackGroupManageIdentity(identitySnap);
         wx.showToast({ title: '组合同步失败', icon: 'none' });
         return plan;
       }
@@ -12827,6 +13345,7 @@ Page({
     this.persistSession();
     this.rebindScoreContext();
     this._finalizeCloseGroupManage();
+    this._finishGroupManageIdentitySync(diff);
     wx.showToast({ title: '已保存', icon: 'success' });
     return plan;
   },
@@ -13162,6 +13681,7 @@ Page({
         });
         this._finalizeCloseGroupManage();
         this._refreshScorePageFromGame();
+        this._finishGroupManageIdentitySync(diff);
         wx.showToast({ title: '已保存', icon: 'success' });
       },
       fail: () => {
@@ -13366,6 +13886,7 @@ Page({
         });
         this._finalizeCloseGroupManage();
         this._refreshScorePageFromGame();
+        this._finishGroupManageIdentitySync(diff);
         wx.showToast({ title: '已保存', icon: 'success' });
       },
       fail: () => {
@@ -13685,6 +14206,7 @@ Page({
         });
         this._finalizeCloseGroupManage();
         this._refreshScorePageFromGame();
+        this._finishGroupManageIdentitySync(diff);
         wx.showToast({ title: '已保存', icon: 'success' });
       },
       fail: () => {
@@ -14012,6 +14534,7 @@ Page({
         });
         this._finalizeCloseGroupManage();
         this._refreshScorePageFromGame();
+        this._finishGroupManageIdentitySync(diff);
         wx.showToast({ title: '已保存', icon: 'success' });
       },
       fail: () => {
@@ -14655,6 +15178,14 @@ Page({
 
     const memberFromChange = (ch) => {
       if (!ch) return null;
+      const toIdx =
+        ch.toSlotIndex != null && Number(ch.toSlotIndex) >= 0
+          ? Number(ch.toSlotIndex)
+          : ch.slotIndex;
+      if (toIdx != null && toIdx >= 0) {
+        const fromSlot = slotPlayerToFourballMember((this._demoSlots || [])[toIdx]);
+        if (fromSlot && fromSlot.playerId) return fromSlot;
+      }
       const idx = ch.slotIndex;
       if (idx != null && idx >= 0) {
         const fromSlot = slotPlayerToFourballMember((this._demoSlots || [])[idx]);
@@ -14685,7 +15216,8 @@ Page({
       if (seat) clearSeatPlayer(seat);
     });
 
-    // 2) replace：原 seat 原地换人，不改 seatIndex / teamId
+    // 2) replace：按纠错前座位快照一次换人，避免 B/C 互换时 findSeatByPlayerId 命中已改写座位
+    const replaceSeats = [];
     (diff && diff.replaced ? diff.replaced : []).forEach((ch) => {
       const fromId = ch && ch.fromPlayerId != null ? String(ch.fromPlayerId).trim() : '';
       const toId = ch && ch.toPlayerId != null ? String(ch.toPlayerId).trim() : '';
@@ -14694,10 +15226,13 @@ Page({
       const si = ch && ch.seatIndex != null ? Number(ch.seatIndex) : 0;
       if (si > 0) seat = findSeatByIndex(si);
       if (!seat) seat = findSeatByPlayerId(fromId);
-      if (!seat) return;
-      const member = memberFromChange(ch) || slotById[toId];
+      replaceSeats.push({ ch: ch, seat: seat, toId: toId });
+    });
+    replaceSeats.forEach((item) => {
+      if (!item.seat) return;
+      const member = memberFromChange(item.ch) || slotById[item.toId];
       if (!member) return;
-      fillSeatFromMember(seat, member);
+      fillSeatFromMember(item.seat, member);
     });
 
     // 3) add：优先 diff.seatIndex；3+0 / 2+0 / 2+1 缺员按队内容量折位

@@ -1,0 +1,294 @@
+/* 复用正式记分/队际组合身份：双头像并排 + 双昵称；多人轻微叠放 */
+.party-face {
+  display: flex;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.party-face--slot,
+.party-face--chip,
+.party-face--pair,
+.party-face--board {
+  flex-direction: column;
+  align-items: center;
+}
+
+.party-face--board {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  gap: 8rpx;
+}
+
+.party-face--row,
+.party-face--sheet {
+  flex-direction: row;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.party-face--compact {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4rpx;
+  max-width: 120rpx;
+  min-width: 0;
+}
+
+.party-face--compact .party-face__names {
+  width: 100%;
+  max-width: 120rpx;
+}
+
+.party-face--compact .party-face__name {
+  font-size: 20rpx;
+  line-height: 28rpx;
+  text-align: center;
+}
+
+/* compact/folded：组合成员头像折叠叠放 */
+.party-face--compact.party-face--stack .party-face__avatars--stack {
+  height: 40rpx;
+}
+
+.party-face--compact.party-face--stack .party-face__stack-item {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+/* board/spread：列内铺开，不越界 */
+.party-face--board.party-face--pair .party-face__avatars--pair {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  gap: 4rpx;
+  overflow: hidden;
+}
+
+.party-face--board.party-face--pair .party-face__av {
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 1;
+  min-width: 28rpx;
+}
+
+.party-face__avatar,
+.party-face__avatars {
+  flex-shrink: 0;
+}
+
+.party-face__avatars--pair {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.party-face__av {
+  display: block;
+  border-radius: 999rpx;
+  background: var(--tour-blue, #002d62);
+  overflow: hidden;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.party-face--slot.party-face--single .party-face__av,
+.party-face--chip.party-face--single .party-face__av {
+  width: 56rpx;
+  height: 56rpx;
+}
+
+.party-face--slot.party-face--pair .party-face__av,
+.party-face--chip.party-face--pair .party-face__av {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.party-face--pair .party-face__av,
+.party-face--row .party-face__av,
+.party-face--sheet .party-face__av {
+  width: 48rpx;
+  height: 48rpx;
+}
+
+.party-face--sheet.party-face--single .party-face__av {
+  width: 56rpx;
+  height: 56rpx;
+}
+
+.party-face--board .party-face__av {
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.party-face--compact .party-face__av {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.party-face--slot.party-face--single .party-face__avatar,
+.party-face--chip.party-face--single .party-face__avatar {
+  margin-bottom: 8rpx;
+}
+
+.party-face--slot.party-face--pair .party-face__avatars,
+.party-face--chip.party-face--pair .party-face__avatars,
+.party-face--slot.party-face--stack .party-face__avatars,
+.party-face--chip.party-face--stack .party-face__avatars {
+  margin-bottom: 6rpx;
+}
+
+.party-face__names {
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.party-face--board .party-face__names {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.party-face--row .party-face__names,
+.party-face--sheet .party-face__names {
+  flex: 1;
+  text-align: left;
+}
+
+.party-face__names--pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rpx;
+}
+
+.party-face--row .party-face__names--pair,
+.party-face--sheet .party-face__names--pair {
+  align-items: flex-start;
+}
+
+.party-face__name {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 20rpx;
+  line-height: 28rpx;
+  color: var(--text-muted, #6b7280);
+}
+
+.party-face--pair .party-face__name {
+  font-size: 22rpx;
+  line-height: 28rpx;
+}
+
+.party-face--row .party-face__name,
+.party-face--sheet .party-face__name {
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 32rpx;
+  color: var(--text-primary, #111);
+}
+
+.party-face--board .party-face__name {
+  font-size: 22rpx;
+  line-height: 26rpx;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.party-face__avatars--stack {
+  position: relative;
+  height: 40rpx;
+}
+
+.party-face--board .party-face__avatars--stack {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  max-width: 100%;
+  overflow: hidden;
+  gap: 4rpx;
+}
+
+.party-face--board .party-face__avatars--n2,
+.party-face--board .party-face__avatars--n3,
+.party-face--board .party-face__avatars--n4 {
+  width: auto;
+  max-width: 100%;
+}
+
+.party-face--board .party-face__stack-item {
+  position: relative;
+  left: auto !important;
+  top: auto;
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 1;
+  min-width: 28rpx;
+}
+
+.party-face--board .party-face__stack-item:nth-child(2),
+.party-face--board .party-face__stack-item:nth-child(3),
+.party-face--board .party-face__stack-item:nth-child(4) {
+  left: auto;
+}
+
+.party-face__avatars--n2 {
+  width: 58rpx;
+}
+
+.party-face__avatars--n3 {
+  width: 76rpx;
+}
+
+.party-face__avatars--n4 {
+  width: 94rpx;
+}
+
+.party-face__stack-item {
+  position: absolute;
+  top: 0;
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.party-face__stack-item .party-face__av {
+  width: 100%;
+  height: 100%;
+  border: 2rpx solid var(--bg-card, #fff);
+}
+
+.party-face__stack-item:nth-child(1) {
+  left: 0;
+  z-index: 10;
+}
+
+.party-face__stack-item:nth-child(2) {
+  left: 18rpx;
+  z-index: 9;
+}
+
+.party-face__stack-item:nth-child(3) {
+  left: 36rpx;
+  z-index: 8;
+}
+
+.party-face__stack-item:nth-child(4) {
+  left: 54rpx;
+  z-index: 7;
+}

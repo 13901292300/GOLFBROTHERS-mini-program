@@ -706,6 +706,13 @@
   min-height: 100%;
   box-sizing: border-box;
 }
+.detail-game-panel {
+  width: 100%;
+  min-height: 240rpx;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 /* 与 components/discussion .ds-bright/.ds-dark 的 --ds-surface 同色，空态与有会话一致 */
 .detail-page.bright-mode .detail-main--flush {
   background: #ededed;

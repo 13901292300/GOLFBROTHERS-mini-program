@@ -1,0 +1,312 @@
+<view class="ds-card game-card" bindtap="openHoles">
+  <view class="hole-preview">
+    <text class="game-card__name">有效洞</text>
+    <view class="hole-dots">
+      <view wx:for="{{holes}}" wx:key="label" class="hole-dot {{item.on ? 'on' : ''}}"></view>
+    </view>
+    <text class="hole-count">{{holeCount}}/18</text>
+    <text class="setting-chev">›</text>
+  </view>
+</view>
+
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleLasuoNSortFold">
+    <text class="game-card__name">排序规则</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoNSortText}}</text>
+      <text class="rule-lib__chev">{{lasuoNFoldSort ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldSort}}" class="fold-body">
+    <view class="opt opt--fold {{sortUpdate === 'dynamic' ? 'on' : ''}}">
+      <view class="opt-row" bindtap="setLasuoNSortUpdate" data-id="dynamic">
+        <view class="radio-dot"></view>
+        <text class="opt-title">乱拉</text>
+        <view wx:if="{{sortUpdate === 'dynamic'}}" class="rule-lib__meta" catchtap="toggleLasuoNSortRankFold">
+          <text class="rule-lib__count">{{rankFoldText || '按出身成绩排序'}}</text>
+          <text class="rule-lib__chev">{{lasuoNFoldSortRank ? "⌃" : "⌄"}}</text>
+        </view>
+      </view>
+      <view wx:if="{{sortUpdate === 'dynamic' && lasuoNFoldSortRank}}" class="opt-fold-body">
+        <view
+          wx:for="{{lasuoNRankOptions}}"
+          wx:key="id"
+          class="opt {{rankId === item.id ? 'on' : ''}}"
+          bindtap="setRank"
+          data-id="{{item.id}}"
+        >
+          <view class="radio-dot"></view>
+          <text class="opt-title">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="opt {{sortUpdate === 'fixed' ? 'on' : ''}}" bindtap="setLasuoNSortUpdate" data-id="fixed">
+      <view class="radio-dot"></view>
+      <text class="opt-title">固拉</text>
+    </view>
+  </view>
+</view>
+
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleLasuoNFormationFold">
+    <text class="game-card__name">编队规则</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoNFormationText}}</text>
+      <text class="rule-lib__chev">{{lasuoNFoldFormation ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldFormation}}" class="fold-body">
+    <view class="opt {{formation === 'jianghu' ? 'on' : ''}}" bindtap="setLasuoNFormation" data-id="jianghu">
+      <view class="radio-dot"></view>
+      <text class="opt-title">江湖编队规则</text>
+    </view>
+    <view class="opt {{formation === 'haidao' ? 'on' : ''}}" bindtap="setLasuoNFormation" data-id="haidao">
+      <view class="radio-dot"></view>
+      <text class="opt-title">海岛编队规则</text>
+    </view>
+  </view>
+</view>
+
+<view wx:if="{{!showHorn}}" class="ds-card game-card {{sortUpdate === 'fixed' ? 'game-card--disabled' : ''}}">
+  <view class="fold-head" bindtap="toggleLasuoNBandFold">
+    <text class="game-card__name">分档模式</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoNBandText}}</text>
+      <text class="rule-lib__chev">{{lasuoNFoldBand ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldBand}}" class="fold-body">
+    <view class="opt {{bandMode === 'all' ? 'on' : ''}}" bindtap="setLasuoNBandMode" data-id="all">
+      <view class="radio-dot"></view>
+      <text class="opt-title">所有一起</text>
+    </view>
+    <view class="opt opt--fold {{bandMode === 'split-high' ? 'on' : ''}}">
+      <view class="opt-row" bindtap="setLasuoNBandMode" data-id="split-high">
+        <view class="radio-dot"></view>
+        <text class="opt-title">高手不见面</text>
+        <view wx:if="{{bandMode === 'split-high'}}" class="rule-lib__meta" catchtap="toggleLasuoNBandSplitFold">
+          <text class="rule-lib__count">低{{bandLow}} · 高{{bandHigh}}</text>
+          <text class="rule-lib__chev">{{lasuoNFoldBandSplit ? "⌃" : "⌄"}}</text>
+        </view>
+      </view>
+      <view wx:if="{{bandMode === 'split-high' && lasuoNFoldBandSplit}}" class="opt-fold-body">
+        <text class="game-card__summary">输入高手（低差点）人数，将参与人员分为两个集合。集合中人数为单数时，上一轮本集合最后一名本轮轮空。</text>
+        <view class="kv band-count-row">
+          <text class="kv-k">低差点人数</text>
+          <input
+            class="mini-input"
+            type="digit"
+            value="{{numEditing && numEditField === 'bandLow' ? numEditDraft : bandLow}}"
+            data-num-field="bandLow"
+            data-num-handler="onLasuoNBandLow"
+            bindfocus="onNumFocus"
+            bindblur="onNumBlur"
+            bindinput="onNumInput"
+          />
+        </view>
+        <view class="kv band-count-row">
+          <text class="kv-k">高差点人数</text>
+          <text class="band-high-num">{{bandHigh}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<view class="ds-card game-card">
+  <block wx:if="{{lasuoNManyPlayers}}">
+    <view class="fold-head" bindtap="toggleLasuoNOrderFold">
+      <text class="game-card__name">初始排序</text>
+      <view class="rule-lib__meta">
+        <text class="rule-lib__count">共 {{selectedCount || 0}} 人</text>
+        <text class="rule-lib__chev">{{lasuoNFoldOrder ? "⌃" : "⌄"}}</text>
+      </view>
+    </view>
+    <view wx:if="{{lasuoNFoldOrder}}" class="fold-body">
+      <text wx:if="{{showHorn}}" class="game-card__summary">随机打乱，或切到手工后拖拽调整。金三角=喇叭花，蓝三角=A队，红三角=B队。偶数时末位灰三角轮空。</text>
+      <text wx:elif="{{bandMode === 'split-high'}}" class="game-card__summary">前 {{bandLow}} 名标「高手」。随机排序只在高手区 / 低手区内打乱。集合奇数时末位灰三角轮空；高手只与高手 PK，低手只与低手 PK。</text>
+      <text wx:else class="game-card__summary">随机打乱，或切到手工后拖拽调整。蓝三角=A队，红三角=B队。</text>
+      <include src="order-board.wxml" />
+    </view>
+  </block>
+  <block wx:else>
+    <text class="game-card__name">初始排序</text>
+    <text wx:if="{{showHorn}}" class="game-card__summary">随机打乱，或切到手工后拖拽调整。金三角=喇叭花，蓝三角=A队，红三角=B队。偶数时末位灰三角轮空。</text>
+    <text wx:elif="{{bandMode === 'split-high'}}" class="game-card__summary">前 {{bandLow}} 名标「高手」。随机排序只在高手区 / 低手区内打乱。集合奇数时末位灰三角轮空；高手只与高手 PK，低手只与低手 PK。</text>
+    <text wx:else class="game-card__summary">随机打乱，或切到手工后拖拽调整。蓝三角=A队，红三角=B队。</text>
+    <include src="order-board.wxml" />
+  </block>
+</view>
+
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleLasuoNPkFold">
+    <text class="game-card__name">PK系数设置</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoNPkText}}</text>
+      <text class="rule-lib__chev">{{lasuoNFoldPk ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldPk}}" class="fold-body">
+    <view class="sec-label">1V1 PK系数</view>
+    <view wx:for="{{pairCoeffs}}" wx:key="id" class="kv pair-coeff-row">
+      <view class="pair-coeff-label">
+        <text class="pair-coeff-word">第</text>
+        <text class="pair-coeff-no">{{item.aNo}}</text>
+        <text class="pair-coeff-word">名</text>
+        <text class="pair-coeff-vs"> VS </text>
+        <text class="pair-coeff-word">第</text>
+        <text class="pair-coeff-no">{{item.bNo}}</text>
+        <text class="pair-coeff-word">名</text>
+      </view>
+      <view class="pair-coeff-ctrl">
+        <text class="pair-coeff-ki">K{{item.index}}</text>
+        <input
+          class="mini-input"
+          type="digit"
+          value="{{numEditing && numEditList === 'pairCoeffs' && numEditId == item.id ? numEditDraft : item.value}}"
+          data-id="{{item.id}}"
+          data-num-list="pairCoeffs"
+          data-num-prop="value"
+          data-num-handler="onLasuoNPairCoeff"
+          bindfocus="onNumFocus"
+          bindblur="onNumBlur"
+          bindinput="onNumInput"
+        />
+      </view>
+    </view>
+    <block wx:if="{{showHorn}}">
+      <view class="sec-label">喇叭花 PK 系数</view>
+      <view class="kv pair-coeff-row">
+        <view class="pair-coeff-label">喇叭花 VS 其他选手</view>
+        <view class="pair-coeff-ctrl">
+          <text class="pair-coeff-ki">Kf</text>
+          <input
+            class="mini-input"
+            type="digit"
+            value="{{numEditing && numEditField === 'flowerK' ? numEditDraft : flowerK}}"
+            data-num-field="flowerK"
+            data-num-handler="onFlowerK"
+            bindfocus="onNumFocus"
+            bindblur="onNumBlur"
+            bindinput="onNumInput"
+          />
+        </view>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="sec-label">总杆 PK 系数</view>
+      <view class="kv pair-coeff-row">
+        <view class="pair-coeff-label">蓝队 VS 红队</view>
+        <view class="pair-coeff-ctrl">
+          <text class="pair-coeff-ki">Kt</text>
+          <input
+            class="mini-input"
+            type="digit"
+            value="{{numEditing && numEditField === 'totalPkKt' ? numEditDraft : totalPkKt}}"
+            data-num-field="totalPkKt"
+            data-num-handler="onLasuoNTotalPk"
+            bindfocus="onNumFocus"
+            bindblur="onNumBlur"
+            bindinput="onNumInput"
+          />
+        </view>
+      </view>
+    </block>
+  </view>
+</view>
+
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleLasuoNRewardFold">
+    <text class="game-card__name">奖励</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoNRewardText}}</text>
+      <text class="rule-lib__chev">{{lasuoNFoldReward ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldReward}}" class="fold-body">
+    <view class="opt {{!rewardOn ? 'on' : ''}}" bindtap="setLasuoNRewardOn" data-value="0">
+      <view class="radio-dot"></view>
+      <text class="opt-title">无奖励</text>
+    </view>
+    <view class="opt opt--fold {{rewardOn ? 'on' : ''}}">
+      <view class="opt-row" bindtap="setLasuoNRewardOn" data-value="1">
+        <view class="radio-dot"></view>
+        <text class="opt-title">乘法奖励</text>
+        <view wx:if="{{rewardOn}}" class="rule-lib__meta" catchtap="toggleLasuoNMulFold">
+          <text class="rule-lib__count">{{lasuoNRewardText}}</text>
+          <text class="rule-lib__chev">{{lasuoNFoldMul ? "⌃" : "⌄"}}</text>
+        </view>
+      </view>
+      <view wx:if="{{rewardOn && lasuoNFoldMul}}" class="opt-fold-body">
+        <view wx:for="{{lasuoNMulRows}}" wx:key="id" class="reward-row">
+          <text>{{item.label}}</text>
+          <view class="reward-input">
+            <text class="reward-op">✖</text>
+            <input
+              class="mini-input"
+              type="digit"
+              value="{{numEditing && numEditList === 'lasuoNMulRows' && numEditId == item.id ? numEditDraft : item.value}}"
+              data-id="{{item.id}}"
+              data-num-list="lasuoNMulRows"
+              data-num-prop="value"
+              data-num-handler="onLasuoNMulRow"
+              bindfocus="onNumFocus"
+              bindblur="onNumBlur"
+              bindinput="onNumInput"
+            />
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleLasuoNPushFold">
+    <text class="game-card__name">顶洞规则</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoNPushText}}</text>
+      <text class="rule-lib__chev">{{lasuoNFoldPush ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldPush}}" class="fold-body">
+    <block wx:if="{{showHorn}}">
+      <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setHornPush" data-value="none">
+        <view class="radio-dot"></view>
+        <text class="opt-title">禁用</text>
+      </view>
+      <view class="opt {{pushRule !== 'none' ? 'on' : ''}}" bindtap="setHornPush" data-value="all-tie">
+        <view class="radio-dot"></view>
+        <text class="opt-title">启用</text>
+      </view>
+      <view class="sec-hint">启用表示参与对决的所有人杆数相同视为顶洞。顶洞时本洞积分为 0 并累积 1 块肉；非顶洞且有肉时，肉翻倍所有人原始积分。</view>
+    </block>
+    <block wx:else>
+    <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setLasuoNPushMode" data-value="none">
+      <view class="radio-dot"></view>
+      <text class="opt-title">无顶洞</text>
+    </view>
+    <view class="opt opt--fold {{pushRule !== 'none' ? 'on' : ''}}">
+      <view class="opt-row" bindtap="setLasuoNPushMode" data-value="on">
+        <view class="radio-dot"></view>
+        <text class="opt-title">有顶洞</text>
+        <view wx:if="{{pushRule !== 'none'}}" class="rule-lib__meta" catchtap="toggleLasuoNPushKindFold">
+          <text class="rule-lib__count">{{lasuoNPushText}}</text>
+          <text class="rule-lib__chev">{{lasuoNFoldPushKind ? "⌃" : "⌄"}}</text>
+        </view>
+      </view>
+      <view wx:if="{{pushRule !== 'none' && lasuoNFoldPushKind}}" class="opt-fold-body">
+        <view class="opt {{pushRule === 'team-tie' ? 'on' : ''}}" bindtap="setLasuoNPush" data-value="team-tie">
+          <view class="radio-dot"></view>
+          <text class="opt-title">两队积分打平</text>
+        </view>
+        <view class="opt {{pushRule === 'all-tie' ? 'on' : ''}}" bindtap="setLasuoNPush" data-value="all-tie">
+          <view class="radio-dot"></view>
+          <text class="opt-title">所有PK均打平</text>
+        </view>
+      </view>
+    </view>
+    <view class="sec-hint">顶洞时本洞积分为 0 并累积 1 块肉；非顶洞且有肉时，胜队团队总分翻倍一次。</view>
+    </block>
+  </view>
+</view>

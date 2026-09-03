@@ -1,0 +1,69 @@
+<view class="sec-label">起始顺序</view>
+<view wx:if="{{showOrderDrag}}" class="sec-hint">按住球员右侧手柄可手工拖拽调序</view>
+<view class="order-board {{showFixedPairs ? 'order-board--pairs' : ''}}">
+  <view wx:if="{{showFixedPairs}}" class="order-pair-lines {{pairRailSegs.length > 2 ? 'order-pair-lines--weighted' : ''}}">
+    <view
+      wx:for="{{pairRailSegs}}"
+      wx:key="id"
+      class="order-pair-line {{item.cls}}"
+      style="flex:{{item.flex}};"
+    ></view>
+  </view>
+  <block wx:if="{{showOrderDrag}}">
+    <view wx:for="{{orderedPlayers}}" wx:key="index" class="order-line order-line--live">
+      <text class="order-no">{{item.orderNo}}.</text>
+      <view class="order-tri" style="border-top-color: {{item.triColor}};"></view>
+      <view
+        class="order-drag-body {{orderDragging && orderDragId === item.id ? 'order-row--lift' : ''}}"
+        style="{{orderDragging && orderDragId === item.id ? 'transform:translateY(' + orderDragOffset + 'px);' : ''}}"
+      >
+        <view class="order-card">
+          <party-face party="{{item}}" layout="row"></party-face>
+          <text wx:if="{{item.teamRole}}" class="order-role">{{item.teamRole}}</text>
+        </view>
+        <view
+          class="order-grip"
+          data-index="{{index}}"
+          data-id="{{item.id}}"
+          catchtouchstart="onOrderTouchStart"
+          catchtouchmove="onOrderTouchMove"
+          catchtouchend="onOrderTouchEnd"
+          catchtouchcancel="onOrderTouchEnd"
+        >
+          <view class="order-grip__col"></view>
+          <view class="order-grip__col"></view>
+        </view>
+      </view>
+      <text wx:if="{{item.showHigh}}" class="order-tiger">高手</text>
+      <text wx:if="{{item.showTiger}}" class="order-tiger">老虎</text>
+      <text wx:if="{{item.showDizhuboTag}}" class="order-tiger">地主婆</text>
+      <text wx:if="{{item.showFlower}}" class="order-tiger order-tiger--flower">喇叭花</text>
+      <text wx:if="{{item.showBye}}" class="order-tiger">轮空</text>
+    </view>
+  </block>
+  <block wx:else>
+    <view wx:for="{{orderedPlayers}}" wx:key="index" class="order-line">
+      <view class="order-row">
+        <text class="order-no {{item.hideNum ? 'order-no--hide' : ''}}">{{item.orderNo}}.</text>
+        <view class="order-tri" style="border-top-color: {{item.triColor}};"></view>
+        <view class="order-card">
+          <party-face party="{{item}}" layout="row"></party-face>
+          <text wx:if="{{item.teamRole}}" class="order-role">{{item.teamRole}}</text>
+        </view>
+        <view class="order-moves">
+          <text class="order-btn {{item.orderNo === 1 ? 'off' : ''}}" catchtap="moveOrder" data-index="{{item.orderNo - 1}}" data-dir="-1">上</text>
+          <text class="order-btn {{item.orderNo === orderedPlayers.length ? 'off' : ''}}" catchtap="moveOrder" data-index="{{item.orderNo - 1}}" data-dir="1">下</text>
+        </view>
+      </view>
+      <text wx:if="{{item.showHigh}}" class="order-tiger">高手</text>
+      <text wx:if="{{item.showTiger}}" class="order-tiger">老虎</text>
+      <text wx:if="{{item.showDizhuboTag}}" class="order-tiger">地主婆</text>
+      <text wx:if="{{item.showFlower}}" class="order-tiger order-tiger--flower">喇叭花</text>
+      <text wx:if="{{item.showBye}}" class="order-tiger">轮空</text>
+    </view>
+  </block>
+</view>
+  <view wx:if="{{!showThreeVsOne}}" class="sort-actions">
+  <view class="hcap-tag {{orderRolling ? 'stop' : (sortMode === 'random' ? 'on' : '')}}" bindtap="setSortMode" data-id="random">{{orderRolling ? '停止' : '随机排序'}}</view>
+  <view class="hcap-tag {{sortMode === 'hcp' ? 'on' : ''}}" bindtap="setSortMode" data-id="hcp">差点排序</view>
+</view>

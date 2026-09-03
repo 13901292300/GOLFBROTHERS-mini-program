@@ -574,6 +574,65 @@ function isCreatorInGame(game) {
   return findCreatorGroupIndex(game) >= 0;
 }
 
+function permutePlayerScoreMap(scoresByPlayer, idMap) {
+  const src = scoresByPlayer && typeof scoresByPlayer === 'object' ? scoresByPlayer : {};
+  const next = {};
+  const keys = Object.keys(src);
+  for (let i = 0; i < keys.length; i++) {
+    const from = keys[i];
+    const to = idMap && idMap[from] ? String(idMap[from]).trim() : from;
+    if (Object.prototype.hasOwnProperty.call(next, to) && next[to] !== src[from]) {
+      return { ok: false, next: src };
+    }
+    next[to] = src[from];
+  }
+  return { ok: true, next: next };
+}
+
+function rekeyGroupPlayerScoresMap(gameId, groupIndex, idMap) {
+  const map = {};
+  Object.keys(idMap || {}).forEach((key) => {
+    const from = key != null ? String(key).trim() : '';
+    const to = idMap[key] != null ? String(idMap[key]).trim() : '';
+    if (from && to && from !== to) map[from] = to;
+  });
+  if (!Object.keys(map).length) return true;
+  const list = _readAll();
+  const idx = list.findIndex((g) => g && g.gameId === gameId);
+  if (idx < 0) return false;
+  const game = list[idx];
+  const move = (target) => {
+    if (!target) return false;
+    const current = target.scoresByPlayer && typeof target.scoresByPlayer === 'object'
+      ? target.scoresByPlayer
+      : {};
+    const out = permutePlayerScoreMap(current, map);
+    if (!out.ok) return false;
+    target.scoresByPlayer = out.next;
+    return true;
+  };
+  let changed = false;
+  if (!Array.isArray(game.groups) || !game.groups.length) {
+    changed = move(game);
+  } else {
+    const gi = groupIndex || 0;
+    changed = move(game.groups[gi]);
+  }
+  if (!changed) return false;
+  list[idx] = game;
+  _writeAll(list);
+  return true;
+}
+
+function rekeyGroupPlayerScores(gameId, groupIndex, fromId, toId) {
+  const from = fromId != null ? String(fromId).trim() : '';
+  const to = toId != null ? String(toId).trim() : '';
+  if (!from || !to || from === to) return false;
+  const map = {};
+  map[from] = to;
+  return rekeyGroupPlayerScoresMap(gameId, groupIndex, map);
+}
+
 function removeGame(gameId) {
   const list = _readAll().filter((g) => g && g.gameId !== gameId);
   _writeAll(list);
@@ -594,6 +653,8 @@ module.exports = {
   listGroups,
   setGroupPlayerScores,
   setGroupSlotScores,
+  rekeyGroupPlayerScores,
+  rekeyGroupPlayerScoresMap,
   resolveGroupSlotScoreRecord,
   setGroupPlayersSlots,
   setGroupTeamScores,

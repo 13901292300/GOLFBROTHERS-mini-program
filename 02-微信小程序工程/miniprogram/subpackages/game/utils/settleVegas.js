@@ -277,8 +277,13 @@ function settleVegas(game, ctx) {
   const scores = (ctx && ctx.scores) || {};
   const rule = (game && game.ruleSnapshot) || {};
   const k = pointValue(game);
+  const topHoleTracker = core.createTopHoleTracker();
   let order = initialOrder(game);
-  if (order.length < 4) return core.emptyResults(game, holeOrder);
+  if (order.length < 4) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
   order = order.slice(0, 4);
   let meatPool = 0;
   const hist = [];
@@ -286,6 +291,7 @@ function settleVegas(game, ctx) {
   const orderByHole = {};
   let rankedNext = false;
   let startMarked = false;
+  let prefixBlocked = false;
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
 
@@ -293,6 +299,10 @@ function settleVegas(game, ctx) {
     const ledger = core.holeLedger();
     const isLast = String(label) === lastLabel;
     if (!core.holeOn(game, label)) {
+      byHole[label] = ledger;
+      return;
+    }
+    if (prefixBlocked) {
       byHole[label] = ledger;
       return;
     }
@@ -311,6 +321,7 @@ function settleVegas(game, ctx) {
       rec[id] = { rel: rel, net: rel - n, pts: 0 };
     });
     if (!ready) {
+      prefixBlocked = true;
       rankedNext = false;
       byHole[label] = ledger;
       return;
@@ -349,11 +360,15 @@ function settleVegas(game, ctx) {
       order.forEach(function (id) {
         addPts(ledger, id, 0);
       });
-      if (isPush) meatPool += 1;
+      if (isPush) {
+        meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
+      }
     } else {
       applySides(ledger, win, lose, unit);
       if (isPush) {
         meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
       }
       if (meatPool > 0) {
         const eat = core.meatEatCount(
@@ -365,6 +380,7 @@ function settleVegas(game, ctx) {
         if (eat > 0) {
           const piece = core.meatPieceValue(rule, unit, k);
           applySides(ledger, win, lose, core.round1(eat * piece));
+          core.consumeTopHoles(topHoleTracker, eat);
           meatPool -= eat;
         }
       }
@@ -383,7 +399,8 @@ function settleVegas(game, ctx) {
     byHole: byHole,
     orderByHole: orderByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: "vegas"
+    catalogId: "vegas",
+    topHoleStates: topHoleTracker.states
   };
 }
 

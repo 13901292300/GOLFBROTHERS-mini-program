@@ -1,0 +1,114 @@
+<block wx:if="{{showLasuoFamily && lasuoNManyPlayers}}">
+  <view class="fold-head" bindtap="toggleLasuoNPlayersFold">
+    <text class="game-card__name">参与人员</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">已选 {{selectedCount || 0}} 人</text>
+      <text class="rule-lib__chev">{{lasuoNFoldPlayers ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoNFoldPlayers}}" class="fold-body">
+    <text wx:if="{{usePagePick && showHorn}}" class="game-card__summary">点击添加，选出至少 5 人（偶数时每洞末位轮空）。</text>
+    <text wx:elif="{{usePagePick}}" class="game-card__summary">点击添加，选出至少 6 人（奇数时每洞末位轮空）。</text>
+    <text wx:elif="{{playerPickLocked}}" class="game-card__summary">本组人数与玩法相同，全部上场且不可取消。</text>
+    <text wx:elif="{{showHorn}}" class="game-card__summary">选出至少 5 人，选满后显示其余配置。偶数时每洞末位轮空。</text>
+    <text wx:else class="game-card__summary">选出至少 6 人，选满后显示其余配置。奇数时每洞末位轮空。</text>
+    <block wx:if="{{usePagePick}}">
+      <view class="pick-entry">
+        <text class="pick-entry__count">已选 {{selectedCount || 0}} 人</text>
+        <view
+          wx:if="{{selectedCount}}"
+          class="pick-entry__edit"
+          catchtap="openPlayerPick"
+        >编辑</view>
+        <view
+          wx:else
+          class="pick-entry__btn"
+          catchtap="openPlayerPick"
+        >添加</view>
+      </view>
+      <view wx:if="{{!selectedCount}}" class="pick-entry__cta" bindtap="openPlayerPick">+ 添加参与人员</view>
+      <view wx:if="{{selectedCount}}" class="player-grid player-grid--wrap player-grid--lasuo4 pick-entry__selected">
+        <view
+          wx:for="{{players}}"
+          wx:key="id"
+          wx:if="{{item.selected}}"
+          class="player-slot"
+          bindtap="openPlayerPick"
+        >
+          <party-face party="{{item}}" layout="slot"></party-face>
+        </view>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="player-grid player-grid--wrap player-grid--lasuo4">
+        <view
+          wx:for="{{players}}"
+          wx:key="id"
+          class="player-slot {{item.selected ? '' : 'off'}}"
+          bindtap="togglePlayer"
+          data-index="{{index}}"
+        >
+          <view class="check-box {{item.selected ? 'on' : ''}}"></view>
+          <party-face party="{{item}}" layout="slot"></party-face>
+        </view>
+      </view>
+    </block>
+  </view>
+</block>
+<block wx:else>
+  <text class="game-card__name">参与人员</text>
+  <block wx:if="{{usePagePick}}">
+    <text wx:if="{{isThreePlayer}}" class="game-card__summary">点击添加，从赛事球员中选出 {{needPlayers}} 人。</text>
+    <text wx:elif="{{showHorn}}" class="game-card__summary">点击添加，选出至少 5 人（偶数时每洞末位轮空）。</text>
+    <text wx:elif="{{showLasuoN}}" class="game-card__summary">点击添加，选出至少 6 人（奇数时每洞末位轮空）。</text>
+    <text wx:elif="{{rosterCompact}}" class="game-card__summary">人选较多，仅显示人数；点添加可继续调整。</text>
+    <text wx:else class="game-card__summary">点击添加，从赛事球员中选择本场参与人员。</text>
+    <view class="pick-entry">
+      <text class="pick-entry__count">已选 {{selectedCount || 0}} 人</text>
+      <view
+        wx:if="{{selectedCount}}"
+        class="pick-entry__edit"
+        catchtap="openPlayerPick"
+      >编辑</view>
+      <view
+        wx:else
+        class="pick-entry__btn"
+        catchtap="openPlayerPick"
+      >添加</view>
+    </view>
+    <view wx:if="{{!selectedCount}}" class="pick-entry__cta" bindtap="openPlayerPick">+ 添加参与人员</view>
+    <view
+      wx:if="{{selectedCount && !rosterCompact}}"
+      class="player-grid player-grid--wrap pick-entry__selected {{showLasuoFamily ? 'player-grid--lasuo8' : ''}}"
+    >
+      <view
+        wx:for="{{players}}"
+        wx:key="id"
+        wx:if="{{item.selected}}"
+        class="player-slot"
+        bindtap="openPlayerPick"
+      >
+          <party-face party="{{item}}" layout="slot"></party-face>
+      </view>
+    </view>
+  </block>
+  <block wx:else>
+    <text wx:if="{{playerPickLocked && !teamedPartyMode}}" class="game-card__summary">本组人数与玩法相同，全部上场且不可取消。</text>
+    <text wx:if="{{!playerPickLocked && teamedPartyMode}}" class="game-card__summary">从现有编队中选择 {{partyPickExact}} 方参与。</text>
+    <text wx:if="{{!playerPickLocked && showHorn}}" class="game-card__summary">选出至少 5 人，选满后显示其余配置。偶数时每洞末位轮空。</text>
+    <text wx:if="{{!playerPickLocked && showLasuoN}}" class="game-card__summary">选出至少 6 人，选满后显示其余配置。奇数时每洞末位轮空。</text>
+    <text wx:if="{{!playerPickLocked && !teamedPartyMode && !showLasuoFamily && (isThreePlayer || showLandlordFamily)}}" class="game-card__summary">点击从本组选出 {{needPlayers}} 人，选满后显示其余配置。</text>
+    <view wx:if="{{players.length}}" class="player-grid player-grid--wrap {{showLasuoFamily ? 'player-grid--lasuo8' : ''}}">
+      <view
+        wx:for="{{players}}"
+        wx:key="id"
+        class="player-slot {{item.selected ? '' : 'off'}}"
+        bindtap="togglePlayer"
+        data-index="{{index}}"
+      >
+        <view wx:if="{{!item.required && (showTwoParty || showLandlordFamily || showLasuoFamily || teamedPartyMode || isThreePlayer)}}" class="check-box {{item.selected ? 'on' : ''}}"></view>
+        <party-face party="{{item}}" layout="slot"></party-face>
+      </view>
+    </view>
+  </block>
+</block>

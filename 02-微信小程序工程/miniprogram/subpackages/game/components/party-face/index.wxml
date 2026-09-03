@@ -1,0 +1,45 @@
+<view class="party-face party-face--{{resolvedLayout}} party-face--{{kind}}">
+  <block wx:if="{{kind === 'single'}}">
+    <view class="party-face__avatar">
+      <image class="party-face__av" src="{{avatar}}" mode="aspectFill" />
+    </view>
+    <view wx:if="{{showNames}}" class="party-face__names">
+      <text class="party-face__name">{{name}}</text>
+    </view>
+  </block>
+  <block wx:elif="{{kind === 'pair'}}">
+    <view class="party-face__avatars party-face__avatars--pair">
+      <image
+        wx:for="{{members}}"
+        wx:key="playerId"
+        class="party-face__av"
+        src="{{item.avatar}}"
+        mode="aspectFill"
+      />
+    </view>
+    <view wx:if="{{showNames && subjectName}}" class="party-face__names">
+      <text class="party-face__name">{{subjectName}}</text>
+    </view>
+    <view wx:elif="{{showNames}}" class="party-face__names party-face__names--pair">
+      <text
+        wx:for="{{members}}"
+        wx:key="playerId"
+        class="party-face__name"
+      >{{item.displayName}}</text>
+    </view>
+  </block>
+  <block wx:else>
+    <view class="party-face__avatars party-face__avatars--stack party-face__avatars--n{{stackCount}}">
+      <view
+        wx:for="{{stackMembers}}"
+        wx:key="playerId"
+        class="party-face__stack-item"
+      >
+        <image class="party-face__av" src="{{item.avatar}}" mode="aspectFill" />
+      </view>
+    </view>
+    <view wx:if="{{showNames}}" class="party-face__names">
+      <text class="party-face__name">{{subjectName || stackName}}</text>
+    </view>
+  </block>
+</view>

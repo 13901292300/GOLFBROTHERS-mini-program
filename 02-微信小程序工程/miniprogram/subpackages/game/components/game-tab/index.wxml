@@ -1,9 +1,367 @@
-<view class="game-tab">
-  <view class="empty-tab">
-    <text class="empty-tab__title">{{emptyHint}}</text>
-    <text class="empty-tab__desc">游戏尚未接入共享仓库，当前只展示只读比赛上下文，不会生成对局或假结果。</text>
-    <view wx:if="{{summaryLines.length}}" class="empty-tab__summary">
-      <text wx:for="{{summaryLines}}" wx:key="*this" class="empty-tab__line">{{item}}</text>
+<view class="game-tab {{hasGames && !layoutIsFlow ? 'game-tab--fill' : ''}} {{layoutIsFlow ? 'game-tab--flow' : ''}}">
+  <block wx:if="{{!hasGames}}">
+    <view class="empty-tab">
+      <text class="empty-tab__title">{{loadError ? "加载失败，请重试" : emptyTitle}}</text>
+      <text class="empty-tab__desc">围观者只能看到这句话。本组球员可以添加游戏，约定本场赌球规则后再回到这里看逐洞输赢。</text>
+      <view wx:if="{{canCreate}}" class="cta-gold empty-tab__btn" bindtap="onAddGame">添加游戏</view>
     </view>
-  </view>
+  </block>
+
+  <block wx:else>
+    <view wx:if="{{gameMenuOpen}}" class="board-game-mask" catchtap="toggleGameMenu"></view>
+    <view
+      class="js-pin-slot"
+      style="{{layoutIsFlow && flowPinStuck ? 'height:' + flowPinH + 'px;' : ''}}"
+    >
+    <view
+      class="board-pin {{layoutIsFlow && flowPinStuck ? 'board-pin--stuck' : ''}}"
+      style="{{layoutIsFlow && flowPinStuck ? 'top:' + flowPinTop + 'px;' : ''}}"
+    >
+      <view class="board-toolbar js-board-toolbar">
+        <view
+          class="board-toolbar__pick {{gameSelectEnabled ? '' : 'board-toolbar__pick--plain'}}"
+          catchtap="toggleGameMenu"
+        >
+          <text class="board-toolbar__game">{{activeGameName}}</text>
+          <text wx:if="{{gameSelectEnabled}}" class="board-toolbar__chev">{{gameMenuOpen ? "⌃" : "⌄"}}</text>
+        </view>
+        <view wx:if="{{canCreate}}" class="board-toolbar__actions" catchtap="onManage">
+          <text class="board-toolbar__cfg">配置</text>
+          <text class="board-toolbar__go">›</text>
+        </view>
+      </view>
+      <view wx:if="{{gameSelectEnabled && gameMenuOpen}}" class="board-game-menu">
+        <block wx:for="{{gameOptions}}" wx:key="id">
+          <view
+            class="board-game-menu__item {{item.isAll ? 'board-game-menu__item--all' : ''}} {{item.id === activeGameId && !activePairId ? 'on' : ''}} {{item.hasPairs || item.hasChildren ? 'board-game-menu__item--parent' : ''}}"
+            catchtap="onSelectGame"
+            data-id="{{item.id}}"
+          >
+            <text class="board-game-menu__name">{{item.name}}</text>
+            <text
+              wx:if="{{item.hasPairs || item.hasChildren}}"
+              class="board-game-menu__chev"
+              catchtap="toggleFold"
+              data-id="{{item.id}}"
+            >{{item.pairFold || item.fold ? "⌃" : "›"}}</text>
+          </view>
+          <block wx:if="{{item.hasChildren && item.fold}}">
+            <block wx:for="{{item.children}}" wx:for-item="child" wx:key="id">
+              <view
+                class="board-game-menu__item board-game-menu__item--sub {{child.hasPairs ? 'board-game-menu__item--parent' : ''}} {{child.id === activeGameId && !activePairId ? 'on' : ''}}"
+                catchtap="onSelectGame"
+                data-id="{{child.id}}"
+              >
+                <text class="board-game-menu__name">{{child.name}}</text>
+                <text
+                  wx:if="{{child.hasPairs}}"
+                  class="board-game-menu__chev"
+                  catchtap="toggleFold"
+                  data-id="{{child.id}}"
+                >{{child.pairFold ? "⌃" : "›"}}</text>
+              </view>
+              <block wx:if="{{child.hasPairs && child.pairFold}}">
+                <view
+                  wx:for="{{child.pairs}}"
+                  wx:for-item="pair"
+                  wx:key="id"
+                  class="board-game-menu__item board-game-menu__item--sub2 {{pair.on ? 'on' : ''}}"
+                  catchtap="onSelectPair"
+                  data-gid="{{child.id}}"
+                  data-pid="{{pair.id}}"
+                >{{pair.name}}</view>
+              </block>
+            </block>
+          </block>
+          <block wx:if="{{item.hasPairs && item.pairFold}}">
+            <view
+              wx:for="{{item.pairs}}"
+              wx:for-item="pair"
+              wx:key="id"
+              class="board-game-menu__item board-game-menu__item--sub {{pair.on ? 'on' : ''}}"
+              catchtap="onSelectPair"
+              data-gid="{{item.id}}"
+              data-pid="{{pair.id}}"
+            >{{pair.name}}</view>
+          </block>
+        </block>
+      </view>
+    </view>
+    </view>
+
+    <view class="board-stack js-game-results">
+    <!-- ≤4 人：整表同列，只竖滑，洞/成绩/汇总天然对齐 -->
+    <block wx:if="{{!needHScroll}}">
+      <view
+        class="js-head-slot"
+        style="{{layoutIsFlow && flowHeadStuck ? 'height:' + flowHeadH + 'px;' : ''}}"
+      >
+      <view
+        class="board-simple-head js-board-head {{layoutIsFlow && flowHeadStuck ? 'board-head--stuck' : ''}}"
+        style="{{layoutIsFlow && flowHeadStuck ? 'top:' + flowHeadTop + 'px;' : ''}}"
+      >
+        <view class="board-row board-row--head board-row--players">
+          <view class="board-cell board-cell--hole board-cell--axis board-cell--head">洞</view>
+          <view
+            wx:for="{{board.players}}"
+            wx:key="id"
+            class="board-player-cell"
+          >
+            <party-face class="board-player-face" party="{{item}}" layout="board"></party-face>
+          </view>
+        </view>
+      </view>
+      </view>
+
+      <scroll-view
+        wx:if="{{!layoutIsFlow}}"
+        class="board-simple-body"
+        scroll-y
+        bounces="{{false}}"
+        show-scrollbar="{{false}}"
+      >
+        <view wx:for="{{board.holes}}" wx:key="label" class="board-row">
+          <view class="board-cell board-cell--hole board-cell--axis">
+            <text class="board-cell--hole-badge">{{item.label}}<text wx:if="{{item.topHoleState}}" class="board-hole-dot board-hole-dot--{{item.topHoleState}}"></text></text>
+          </view>
+          <view
+            wx:for="{{item.cells}}"
+            wx:for-item="cell"
+            wx:key="index"
+            class="board-cell board-cell--player board-cell--axis {{cell.cls}}"
+            style="{{cell.fitStyle}}"
+          >{{cell.text}}</view>
+        </view>
+      </scroll-view>
+      <view wx:else class="board-simple-body">
+        <view wx:for="{{board.holes}}" wx:key="label" class="board-row">
+          <view class="board-cell board-cell--hole board-cell--axis">
+            <text class="board-cell--hole-badge">{{item.label}}<text wx:if="{{item.topHoleState}}" class="board-hole-dot board-hole-dot--{{item.topHoleState}}"></text></text>
+          </view>
+          <view
+            wx:for="{{item.cells}}"
+            wx:for-item="cell"
+            wx:key="index"
+            class="board-cell board-cell--player board-cell--axis {{cell.cls}}"
+            style="{{cell.fitStyle}}"
+          >{{cell.text}}</view>
+        </view>
+      </view>
+
+      <view wx:if="{{!layoutIsFlow}}" class="board-simple-foot js-native-foot">
+        <view class="board-row board-row--total">
+          <view class="board-cell board-cell--hole board-cell--axis">汇总</view>
+          <view
+            wx:for="{{board.totals}}"
+            wx:key="index"
+            class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+            style="{{item.fitStyle}}"
+          >{{item.text}}</view>
+        </view>
+        <view wx:if="{{board.showPot}}" class="board-row board-row--total board-row--pot">
+          <view class="board-cell board-cell--hole board-cell--axis">{{board.potRowLabel}}</view>
+          <view
+            wx:for="{{board.pots}}"
+            wx:key="index"
+            class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+            style="{{item.fitStyle}}"
+          >{{item.text}}</view>
+        </view>
+      </view>
+    </block>
+
+    <!-- >4 人：洞列锁左，右侧横滑；汇总钉底并跟横滑；洞列 transform 跟竖滑 -->
+    <block wx:else>
+      <view
+        wx:if="{{layoutIsFlow}}"
+        class="js-head-slot board-flow-head-slot"
+        style="{{flowHeadStuck ? 'height:' + flowHeadH + 'px;' : ''}}"
+      >
+        <view
+          class="board-flow-head js-board-head {{flowHeadStuck ? 'board-head--stuck' : ''}}"
+          style="{{flowHeadStuck ? 'top:' + flowHeadTop + 'px;' : ''}}"
+        >
+          <view class="board-cell board-cell--hole board-cell--axis board-cell--head board-left__head" style="width:{{holePx}}px;flex:0 0 {{holePx}}px;">洞</view>
+          <scroll-view
+            class="board-flow-head__right"
+            scroll-x
+            enhanced
+            bounces="{{false}}"
+            show-scrollbar="{{false}}"
+            enable-flex
+            scroll-left="{{boardHScrollLeft}}"
+            bindscroll="onBoardHScroll"
+          >
+            <view class="board-h-track board-h-track--head" style="width:{{bodyWidthPx}}px;">
+              <view
+                wx:for="{{board.players}}"
+                wx:key="id"
+                class="board-player-cell"
+                style="width:{{colPx}}px;flex:0 0 {{colPx}}px;"
+              >
+                <party-face class="board-player-face" party="{{item}}" layout="board"></party-face>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+    <view class="board-frame">
+      <view class="board-left" style="width:{{holePx}}px;flex:0 0 {{holePx}}px;">
+        <view wx:if="{{!layoutIsFlow}}" class="board-cell board-cell--hole board-cell--axis board-cell--head board-left__head">洞</view>
+        <view class="board-left__clip">
+          <view
+            class="board-left__track"
+            style="transform:translate3d(0,-{{holeY}}px,0);"
+          >
+            <view
+              wx:for="{{board.holes}}"
+              wx:key="label"
+              class="board-cell board-cell--hole board-cell--axis board-cell--row"
+            >
+              <text class="board-cell--hole-badge">{{item.label}}<text wx:if="{{item.topHoleState}}" class="board-hole-dot board-hole-dot--{{item.topHoleState}}"></text></text>
+            </view>
+          </view>
+        </view>
+        <view wx:if="{{!layoutIsFlow}}" class="board-left__foot-wrap js-native-foot">
+          <view class="board-cell board-cell--hole board-cell--axis board-left__foot">汇总</view>
+          <view wx:if="{{board.showPot}}" class="board-cell board-cell--hole board-cell--axis board-left__foot board-left__foot--pot">{{board.potRowLabel}}</view>
+        </view>
+      </view>
+
+      <scroll-view
+        class="board-right"
+        scroll-x
+        enhanced
+        bounces="{{false}}"
+        show-scrollbar="{{false}}"
+        enable-flex
+        scroll-left="{{boardHScrollLeft}}"
+        bindscroll="onBoardHScroll"
+      >
+        <view class="board-right__sheet" style="width:{{bodyWidthPx}}px;">
+          <view wx:if="{{!layoutIsFlow}}" class="board-h-track board-h-track--head">
+            <view
+              wx:for="{{board.players}}"
+              wx:key="id"
+              class="board-player-cell"
+              style="width:{{colPx}}px;flex:0 0 {{colPx}}px;"
+            >
+              <party-face class="board-player-face" party="{{item}}" layout="board"></party-face>
+            </view>
+          </view>
+
+          <scroll-view
+            wx:if="{{!layoutIsFlow}}"
+            class="board-right__body"
+            scroll-y
+            bounces="{{false}}"
+            show-scrollbar="{{false}}"
+            bindscroll="onBodyVScroll"
+          >
+            <view wx:for="{{board.holes}}" wx:key="label" class="board-score-row">
+              <view
+                wx:for="{{item.cells}}"
+                wx:for-item="cell"
+                wx:key="index"
+                class="board-cell board-cell--player board-cell--axis board-cell--row {{cell.cls}}"
+                style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{cell.fitStyle}}"
+              >{{cell.text}}</view>
+            </view>
+          </scroll-view>
+          <view wx:else class="board-right__body">
+            <view wx:for="{{board.holes}}" wx:key="label" class="board-score-row">
+              <view
+                wx:for="{{item.cells}}"
+                wx:for-item="cell"
+                wx:key="index"
+                class="board-cell board-cell--player board-cell--axis board-cell--row {{cell.cls}}"
+                style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{cell.fitStyle}}"
+              >{{cell.text}}</view>
+            </view>
+          </view>
+
+          <view wx:if="{{!layoutIsFlow}}" class="board-h-track board-h-track--foot">
+            <view
+              wx:for="{{board.totals}}"
+              wx:key="index"
+              class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+              style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
+            >{{item.text}}</view>
+          </view>
+          <view wx:if="{{!layoutIsFlow && board.showPot}}" class="board-h-track board-h-track--foot board-h-track--pot">
+            <view
+              wx:for="{{board.pots}}"
+              wx:key="index"
+              class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+              style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
+            >{{item.text}}</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+    </block>
+    </view>
+
+    <view wx:if="{{layoutIsFlow && hasGames}}" class="board-flow-foot-spacer" style="height:{{flowFootSpacerPx}}px;"></view>
+
+    <view wx:if="{{layoutIsFlow && dockFootVisible}}" class="register-cta-bar game-cta-bar">
+      <block wx:if="{{!needHScroll}}">
+        <view class="board-simple-foot">
+          <view class="board-row board-row--total">
+            <view class="board-cell board-cell--hole board-cell--axis">汇总</view>
+            <view
+              wx:for="{{board.totals}}"
+              wx:key="index"
+              class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+              style="{{item.fitStyle}}"
+            >{{item.text}}</view>
+          </view>
+          <view wx:if="{{board.showPot}}" class="board-row board-row--total board-row--pot">
+            <view class="board-cell board-cell--hole board-cell--axis">{{board.potRowLabel}}</view>
+            <view
+              wx:for="{{board.pots}}"
+              wx:key="index"
+              class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+              style="{{item.fitStyle}}"
+            >{{item.text}}</view>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="board-dock-h">
+        <view class="board-dock-h__hole" style="width:{{holePx}}px;flex:0 0 {{holePx}}px;">
+          <view class="board-cell board-cell--hole board-cell--axis board-left__foot">汇总</view>
+          <view wx:if="{{board.showPot}}" class="board-cell board-cell--hole board-cell--axis board-left__foot board-left__foot--pot">{{board.potRowLabel}}</view>
+        </view>
+        <scroll-view
+          class="board-dock-h__right"
+          scroll-x
+          enhanced
+          bounces="{{false}}"
+          show-scrollbar="{{false}}"
+          enable-flex
+          scroll-left="{{boardHScrollLeft}}"
+          bindscroll="onBoardHScroll"
+        >
+          <view class="board-right__sheet" style="width:{{bodyWidthPx}}px;">
+            <view class="board-h-track board-h-track--foot">
+              <view
+                wx:for="{{board.totals}}"
+                wx:key="index"
+                class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+                style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
+              >{{item.text}}</view>
+            </view>
+            <view wx:if="{{board.showPot}}" class="board-h-track board-h-track--foot board-h-track--pot">
+              <view
+                wx:for="{{board.pots}}"
+                wx:key="index"
+                class="board-cell board-cell--player board-cell--axis {{item.cls}}"
+                style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
+              >{{item.text}}</view>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+  </block>
 </view>

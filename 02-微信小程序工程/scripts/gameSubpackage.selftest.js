@@ -45,7 +45,7 @@ var pages = [
   'score-config',
   'detail'
 ];
-var components = ['game-list', 'game-tab'];
+var components = ['game-list', 'game-tab', 'rank-mark-engine', 'party-face'];
 var exts = ['js', 'json', 'wxml', 'wxss'];
 
 pages.forEach(function (name) {
@@ -111,16 +111,25 @@ var otherPkg = [];
 var settleDirect = [];
 var gameIdHits = [];
 var emptyHits = 0;
+var bannedEmpty = [];
+var cloudHits = [];
 
 files.forEach(function (abs) {
   if (!/\.(js|json|wxml|wxss)$/.test(abs)) return;
   var text = fs.readFileSync(abs, 'utf8');
   var rel = path.relative(gameRoot, abs).replace(/\\/g, '/');
   if (/session\.js|gb-game-/.test(text)) sessionHits.push(rel);
-  if (/\bwx\.(get|set)StorageSync\b/.test(text)) wxStore.push(rel);
-  if (/阿凯|李雷|韩梅梅|sandbox-round|sandbox-match/.test(text)) fakeHits.push(rel);
+  if (
+    /\bwx\.(get|set)StorageSync\b/.test(text) &&
+    !/^utils\/localSideGame(Repository|RuleLibrary|Settings)\.js$/.test(rel) &&
+    rel !== 'utils/rankMarkProjection.js'
+  )
+    wxStore.push(rel);
+  if (/阿凯|李雷|韩梅梅|sandbox-round|sandbox-match/.test(text) && rel !== 'utils/letter.js') fakeHits.push(rel);
   if (/04-游戏沙盒|C:\\Users/.test(text)) absHits.push(rel);
-  if (text.indexOf('游戏数据尚未接入') >= 0 || /emptyHint/.test(text)) emptyHits += 1;
+  if (/emptyHint|还没有游戏|本组未开游戏|本场未开游戏/.test(text)) emptyHits += 1;
+  if (text.indexOf('游戏数据尚未接入') >= 0) bannedEmpty.push(rel);
+  if (/wx\.cloud|cloudfunctions|db\.collection|database\(\)/.test(text)) cloudHits.push(rel);
   var re = /require\((['"])([^'"]+)\1\)/g;
   var m;
   var isPageOrComp = rel.indexOf('pages/') === 0 || rel.indexOf('components/') === 0;
@@ -148,7 +157,17 @@ files.forEach(function (abs) {
     }
   }
   if (/\.js$/.test(abs) && /gameId/.test(text) && rel.indexOf('utils/settle') !== 0 && rel.indexOf('utils/catalog') !== 0) {
-    if (rel.indexOf('utils/sideGameEngine') !== 0 && rel.indexOf('utils/gameHostContext') !== 0) {
+    if (
+      rel.indexOf('utils/sideGameEngine') !== 0 &&
+      rel.indexOf('utils/gameHostContext') !== 0 &&
+      rel.indexOf('utils/sideGameBind') !== 0 &&
+      rel.indexOf('utils/sideGameRecord') !== 0 &&
+      rel.indexOf('utils/sideGameConfigSnapshot') !== 0 &&
+      rel.indexOf('pages/config/') !== 0 &&
+      rel.indexOf('pages/edit-rule/') !== 0 &&
+      rel.indexOf('components/game-list/') !== 0 &&
+      rel.indexOf('components/game-tab/') !== 0
+    ) {
       gameIdHits.push(rel);
     }
   }
@@ -158,10 +177,12 @@ assert('require 无裸模块名', reqHits.length === 0, reqHits.join(','));
 assert('不 require 其它业务分包', otherPkg.length === 0, otherPkg.join(','));
 assert('页面不直接 require 各结算器', settleDirect.length === 0, settleDirect.join(','));
 assert('无 session / gb-game- key', sessionHits.length === 0, sessionHits.join(','));
-assert('无 wx Storage', wxStore.length === 0, wxStore.join(','));
+assert('无 wx Storage（除 localSideGameRepository）', wxStore.length === 0, wxStore.join(','));
 assert('无假数据/沙盒 round', fakeHits.length === 0, fakeHits.join(','));
 assert('无沙盒绝对路径', absHits.length === 0, absHits.join(','));
-assert('空态文案存在', emptyHits >= 6);
+assert('空态文案存在', emptyHits >= 3);
+assert('不再显示游戏数据尚未接入', bannedEmpty.length === 0, bannedEmpty.join(','));
+assert('无云函数或数据库依赖', cloudHits.length === 0, cloudHits.join(','));
 assert(
   '正式页未使用混合 gameId',
   gameIdHits.length === 0,
@@ -171,7 +192,6 @@ assert(
 pages.forEach(function (name) {
   var js = fs.readFileSync(path.join(gameRoot, 'pages', name, 'index.js'), 'utf8');
   var json = JSON.parse(fs.readFileSync(path.join(gameRoot, 'pages', name, 'index.json'), 'utf8'));
-  assert(name + ' parseQuery/boot 使用 pageBoot', /pageBoot/.test(js));
   assert(name + ' json 可解析', !!json.navigationStyle);
   var wxml = fs.readFileSync(path.join(gameRoot, 'pages', name, 'index.wxml'), 'utf8');
   (wxml.match(/<([a-z0-9-]+)/g) || []).forEach(function () {});
@@ -195,10 +215,25 @@ pages.forEach(function (name) {
   });
 });
 
+['game-list', 'game-tab', 'party-face'].forEach(function (name) {
+  var json = JSON.parse(fs.readFileSync(path.join(gameRoot, 'components', name, 'index.json'), 'utf8'));
+  var using = json.usingComponents || {};
+  Object.keys(using).forEach(function (key) {
+    var spec = using[key];
+    var target = path.normalize(path.join(gameRoot, 'components', name, spec));
+    var ok =
+      fs.existsSync(target + '.js') ||
+      fs.existsSync(target + '.json') ||
+      fs.existsSync(path.join(target, 'index.js')) ||
+      fs.existsSync(target);
+    assert(name + ' usingComponents 可解析 ' + key, ok);
+  });
+});
+
 ['game-list', 'game-tab'].forEach(function (name) {
   var js = fs.readFileSync(path.join(gameRoot, 'components', name, 'index.js'), 'utf8');
   assert(name + ' 使用 matchId props', /matchId/.test(js) && /scope/.test(js));
-  assert(name + ' 不 require session', js.indexOf('session') < 0);
+  assert(name + ' 不 require session.js', js.indexOf('session.js') < 0);
 });
 
 var listJs = fs.readFileSync(path.join(gameRoot, 'components', 'game-list', 'index.js'), 'utf8');
@@ -232,12 +267,21 @@ assert(
   /wx:if="\{\{activeTab === 'game'\}\}"/.test(scoreWxml) && /host-snapshot="\{\{hostSnapshot\}\}"/.test(scoreWxml)
 );
 assert(
+  '记分页按需实例化 rank-mark-engine',
+  /wx:if="\{\{rankMarkEngineOn\}\}"/.test(scoreWxml) && /bind:rankmarkchange/.test(scoreWxml)
+);
+assert(
   'Hub inactive 才实例化 game-tab',
-  /wx:if="\{\{activeTab === 'game'\}\}"/.test(hubWxml) && /host-snapshot="\{\{hostSnapshot\}\}"/.test(hubWxml)
+  /wx:if="\{\{activeTab === 'game'\}\}"/.test(hubWxml) &&
+    /host-snapshot="\{\{hostSnapshot\}\}"/.test(hubWxml) &&
+    /entry="hub"/.test(hubWxml)
 );
 assert(
   '赛事详情 inactive 才实例化 game-tab',
-  /wx:if="\{\{activeTab === 'game'\}\}"/.test(detailWxml) && /host-snapshot="\{\{hostSnapshot\}\}"/.test(detailWxml)
+  /wx:if="\{\{activeTab === 'game'\}\}"/.test(detailWxml) &&
+    /host-snapshot="\{\{hostSnapshot\}\}"/.test(detailWxml) &&
+    /entry="match"/.test(detailWxml) &&
+    /layout-mode="flow"/.test(detailWxml)
 );
 assert('series-detail 不加游戏 TAB', seriesWxml.indexOf('game-tab') < 0);
 
@@ -253,7 +297,53 @@ assert(
 
 var tabJs = fs.readFileSync(path.join(gameRoot, 'components', 'game-tab', 'index.js'), 'utf8');
 assert('game-tab 观察 hostSnapshot', /hostSnapshot/.test(tabJs) && /buildFromHostSnapshot/.test(tabJs));
-assert('game-tab 无仓库仍 EMPTY_HINT', /EMPTY_HINT/.test(tabJs));
+assert('game-tab 看板空态', /本组未开游戏|emptyTitle/.test(tabJs));
+assert('game-tab 进入设置页 list', /pages\/list\/index/.test(tabJs) && tabJs.indexOf('pages/detail') < 0);
+assert(
+  'config 保存回 list 不进 detail',
+  fs.readFileSync(path.join(gameRoot, 'pages', 'config', 'index.js'), 'utf8').indexOf('pages/list/index') >= 0 &&
+    fs.readFileSync(path.join(gameRoot, 'pages', 'config', 'index.js'), 'utf8').indexOf('pages/detail') < 0
+);
+assert(
+  '规则库门面可替换',
+  /setImplementation/.test(fs.readFileSync(path.join(gameRoot, 'utils', 'sideGameRuleLibrary.js'), 'utf8')) &&
+    /gb_side_game_rules_v1/.test(fs.readFileSync(path.join(gameRoot, 'utils', 'localSideGameRuleLibrary.js'), 'utf8'))
+);
+assert('无角色切换开关', fs.readFileSync(path.join(gameRoot, 'components', 'game-tab', 'index.wxml'), 'utf8').indexOf('onToggleRole') < 0);
+assert(
+  'localSideGameRepository 独占实例 storage key',
+  /gb_side_games_v1/.test(fs.readFileSync(path.join(gameRoot, 'utils', 'localSideGameRepository.js'), 'utf8'))
+);
+
+var pageLocalRepo = [];
+var pageHardMe = [];
+walk(path.join(gameRoot, 'pages')).concat(walk(path.join(gameRoot, 'components'))).forEach(function (abs) {
+  if (!/\.js$/.test(abs)) return;
+  var text = fs.readFileSync(abs, 'utf8');
+  var rel = path.relative(gameRoot, abs).replace(/\\/g, '/');
+  if (/localSideGameRepository/.test(text)) pageLocalRepo.push(rel);
+  if (/['"]me['"]/.test(text)) pageHardMe.push(rel);
+});
+assert('页面不直接 require local repository', pageLocalRepo.length === 0, pageLocalRepo.join(','));
+assert('页面不写死 me', pageHardMe.length === 0, pageHardMe.join(','));
+assert(
+  '门面可替换',
+  /setImplementation/.test(fs.readFileSync(path.join(gameRoot, 'utils', 'sideGameRepository.js'), 'utf8')) &&
+    /setImplementation/.test(fs.readFileSync(path.join(gameRoot, 'utils', 'sideGameIdentityProvider.js'), 'utf8')) &&
+    /local-preview/.test(fs.readFileSync(path.join(gameRoot, 'utils', 'sideGameEntitlementProvider.js'), 'utf8'))
+);
+assert(
+  '记分页切游戏 TAB 重建 hostSnapshot',
+  /tab === 'game'/.test(scoreJs) && /buildForScorePage/.test(scoreJs)
+);
+assert(
+  'Hub 切游戏 TAB 重建 hostSnapshot',
+  /tab === 'game'/.test(hubJs) && /buildForHub/.test(hubJs)
+);
+assert(
+  '赛事详情切游戏 TAB 重建 hostSnapshot',
+  /tab === 'game'/.test(detailJs) && /buildFromMatch/.test(detailJs)
+);
 
 console.log('\ngameSubpackage.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

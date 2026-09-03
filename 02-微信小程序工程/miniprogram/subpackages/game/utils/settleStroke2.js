@@ -1,15 +1,13 @@
 /**
- * 两人比杆（V53 §4.1.1）
+ * 两人比杆（V53 §4.1.1，行 199–232）
  *
- * 每洞比较真实杆数（沙盒记分为相对标准杆，杆差 = 相对杆差）。
- * 让杆为总杆让杆：只进入初始分，不改逐洞杆数。
- *   N>0 前者让后者：前者初始 -N×K，后者 +N×K
- *   N<0 后者让前者：后者初始 -|N|×K，前者 +|N|×K
- * 累计 = 初始分 + 各洞损益。
- * 奖励只作用在胜者成绩上，用来调整杆差（加法加在杆差上，乘法乘杆差）。
- * 每对对决零和，多对叠加后整局仍零和。
+ * 每洞比较真实杆数，不应用逐洞让杆。
+ * 让杆为组合级总杆让杆，只进入初始分。
+ * 奖励只看胜者真实成绩：加在杆差上（加法）或乘杆差（乘法），再乘每杆分值 K。
  */
 const core = require("./settleCore.js");
+
+const STROKE2_SETTLE_VERSION = "v53-4.1.1";
 
 const ADD_DEFAULTS = { hio: 10, m2: 4, m1: 1, par: 0, p1: 0, ge2: 0 };
 const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
@@ -58,18 +56,60 @@ function addPts(ledger, id, n) {
   ledger[id] = core.round1((Number(ledger[id]) || 0) + n);
 }
 
+function unwrapGameplaySnapshot(raw) {
+  if (raw == null || typeof raw !== "object") return raw == null ? {} : raw;
+  let cur = JSON.parse(JSON.stringify(raw));
+  let hops = 0;
+  while (
+    hops < 4 &&
+    cur &&
+    typeof cur === "object" &&
+    cur.reward == null &&
+    !(Array.isArray(cur.mulRows) && cur.mulRows.length) &&
+    !(Array.isArray(cur.addRows) && cur.addRows.length) &&
+    cur.ruleSnapshot &&
+    typeof cur.ruleSnapshot === "object"
+  ) {
+    cur = JSON.parse(JSON.stringify(cur.ruleSnapshot));
+    hops += 1;
+  }
+  return cur && typeof cur === "object" ? cur : {};
+}
+
+function mergeRuleSnapshot(capability, gameplay) {
+  const cap = capability && typeof capability === "object" ? JSON.parse(JSON.stringify(capability)) : {};
+  const play = unwrapGameplaySnapshot(gameplay);
+  const capPlay = unwrapGameplaySnapshot(cap);
+  const out = Object.assign({}, cap, play);
+  if (out.reward == null && capPlay.reward != null) Object.assign(out, capPlay);
+  return unwrapGameplaySnapshot(out);
+}
+
+function stroke2RewardState(rule) {
+  const snap = unwrapGameplaySnapshot(rule || {});
+  if (snap.reward === "mul") return "mul";
+  if (snap.reward === "add") return "add";
+  if (snap.reward === "none") return "none";
+  return "missing";
+}
+
+function rewardMul(rule, winnerRel) {
+  if (stroke2RewardState(rule) !== "mul") return 1;
+  const m = lookup(rowMap(rule && rule.mulRows), scoreBand(winnerRel), MUL_DEFAULTS);
+  if (!isFinite(m) || !(m > 0)) return 1;
+  return m;
+}
+
+function rewardAdd(rule, winnerRel) {
+  const n = lookup(rowMap(rule && rule.addRows), scoreBand(winnerRel), ADD_DEFAULTS);
+  return isFinite(n) ? n : 0;
+}
+
 function applyReward(rawDiff, winnerRel, rule) {
-  const mode = (rule && rule.reward) || "none";
-  if (!(rawDiff > 0) || mode === "none") return rawDiff;
-  const band = scoreBand(winnerRel);
-  if (mode === "mul") {
-    const mul = lookup(rowMap(rule.mulRows), band, MUL_DEFAULTS);
-    return rawDiff * (isFinite(mul) ? mul : 1);
-  }
-  if (mode === "add") {
-    const add = lookup(rowMap(rule.addRows), band, ADD_DEFAULTS);
-    return rawDiff + (isFinite(add) ? add : 0);
-  }
+  const mode = stroke2RewardState(rule);
+  if (!(rawDiff > 0) || mode === "none" || mode === "missing") return rawDiff;
+  if (mode === "mul") return rawDiff * rewardMul(rule, winnerRel);
+  if (mode === "add") return rawDiff + rewardAdd(rule, winnerRel);
   return rawDiff;
 }
 
@@ -82,11 +122,155 @@ function readRel(scores, hole, playerId) {
   return isFinite(n) ? n : null;
 }
 
+function holePar(ctx, label) {
+  const map = (ctx && ctx.pars) || {};
+  const n = Number(map[label]);
+  if (n === 3 || n === 4 || n === 5) return n;
+  return 4;
+}
+
+function emptyHoleResult() {
+  return {
+    winner: "",
+    baseGap: 0,
+    winnerActualDiff: 0,
+    rewardMode: "none",
+    rewardKey: "par",
+    rewardValue: 0,
+    adjustedGap: 0,
+    finalValue: 0,
+    leftValue: 0,
+    rightValue: 0,
+    settleVersion: STROKE2_SETTLE_VERSION
+  };
+}
+
+function calculateStrokePlayHoleResult(input) {
+  input = input || {};
+  const rule = unwrapGameplaySnapshot(input.ruleSnapshot || input.ruleConfig || {});
+  const k = pointValue({
+    multiplier: input.pointPerStroke != null ? input.pointPerStroke : input.pointValue != null ? input.pointValue : 1
+  });
+  const parRaw = Number(input.par);
+  const par = parRaw === 3 || parRaw === 4 || parRaw === 5 ? parRaw : 4;
+  let actualA;
+  let actualB;
+  if (
+    input.leftActualScore != null &&
+    input.leftActualScore !== "" &&
+    input.rightActualScore != null &&
+    input.rightActualScore !== ""
+  ) {
+    actualA = Number(input.leftActualScore);
+    actualB = Number(input.rightActualScore);
+  } else if (
+    input.leftScore != null &&
+    input.leftScore !== "" &&
+    input.rightScore != null &&
+    input.rightScore !== ""
+  ) {
+    actualA = Number(input.leftScore) + par;
+    actualB = Number(input.rightScore) + par;
+  } else if (
+    input.playerActual != null &&
+    input.playerActual !== "" &&
+    input.opponentActual != null &&
+    input.opponentActual !== ""
+  ) {
+    actualA = Number(input.playerActual);
+    actualB = Number(input.opponentActual);
+  } else if (
+    input.playerScore != null &&
+    input.playerScore !== "" &&
+    input.opponentScore != null &&
+    input.opponentScore !== ""
+  ) {
+    actualA = Number(input.playerScore) + par;
+    actualB = Number(input.opponentScore) + par;
+  } else {
+    return emptyHoleResult();
+  }
+  if (!isFinite(actualA) || !isFinite(actualB)) return emptyHoleResult();
+  const relA = actualA - par;
+  const relB = actualB - par;
+  const baseGap = Math.abs(actualA - actualB);
+  const rewardMode = stroke2RewardState(rule);
+  if (actualA === actualB) {
+    return {
+      winner: "",
+      baseGap: 0,
+      winnerActualDiff: relA,
+      rewardMode: rewardMode === "missing" ? "none" : rewardMode,
+      rewardKey: scoreBand(relA),
+      rewardValue: 0,
+      adjustedGap: 0,
+      finalValue: 0,
+      leftValue: 0,
+      rightValue: 0,
+      settleVersion: STROKE2_SETTLE_VERSION
+    };
+  }
+  const leftWins = actualA < actualB;
+  const winnerActualDiff = leftWins ? relA : relB;
+  const rewardKey = scoreBand(winnerActualDiff);
+  let rewardValue = 0;
+  let adjustedGap = baseGap;
+  if (rewardMode === "mul") {
+    rewardValue = rewardMul(rule, winnerActualDiff);
+    adjustedGap = baseGap * rewardValue;
+  } else if (rewardMode === "add") {
+    rewardValue = rewardAdd(rule, winnerActualDiff);
+    adjustedGap = baseGap + rewardValue;
+  }
+  const finalValue = core.round1(adjustedGap * k);
+  return {
+    winner: leftWins ? "left" : "right",
+    baseGap: baseGap,
+    winnerActualDiff: winnerActualDiff,
+    rewardMode: rewardMode === "missing" ? "none" : rewardMode,
+    rewardKey: rewardKey,
+    rewardValue: rewardMode === "none" || rewardMode === "missing" ? 0 : rewardValue,
+    adjustedGap: adjustedGap,
+    finalValue: finalValue,
+    leftValue: leftWins ? finalValue : core.round1(-finalValue),
+    rightValue: leftWins ? core.round1(-finalValue) : finalValue,
+    settleVersion: STROKE2_SETTLE_VERSION
+  };
+}
+
+function resolveStroke2RuleSnapshot(game, librarySnap) {
+  const merged = mergeRuleSnapshot((game && game.ruleSnapshot) || {}, librarySnap || {});
+  const snap = unwrapGameplaySnapshot(merged);
+  const state = stroke2RewardState(snap);
+  if (state !== "missing") return { ruleSnapshot: snap, rewardState: state };
+  if (librarySnap && typeof librarySnap === "object") {
+    const fromLib = mergeRuleSnapshot(snap, librarySnap);
+    const next = stroke2RewardState(fromLib);
+    if (next !== "missing") return { ruleSnapshot: unwrapGameplaySnapshot(fromLib), rewardState: next };
+  }
+  return {
+    ruleSnapshot: Object.assign({}, snap, { reward: "none" }),
+    rewardState: "none"
+  };
+}
+
 function settleStroke2(game, ctx) {
   const ids = core.playerIdsOf(game);
   const holeOrder = (ctx && ctx.holeOrder) || [];
   const scores = (ctx && ctx.scores) || {};
-  const rule = (game && game.ruleSnapshot) || {};
+  const resolved = resolveStroke2RuleSnapshot(game, ctx && ctx.libraryRuleSnapshot);
+  if (resolved.rewardState === "missing") {
+    return {
+      byHole: {},
+      initial: core.emptyLedger(ids),
+      catalogId: "stroke-2",
+      settleVersion: STROKE2_SETTLE_VERSION,
+      rewardMissing: true,
+      rewardState: "missing",
+      resultSource: "reward_config_missing"
+    };
+  }
+  const rule = resolved.ruleSnapshot || {};
   const k = pointValue(game);
   const pairs = ((game && game.pairings) || []).filter(function (pair) {
     return pair && pair.leftId && pair.rightId && pair.on !== false;
@@ -108,45 +292,73 @@ function settleStroke2(game, ctx) {
     }
   });
 
+  let firstTrace = null;
   const byHole = {};
   holeOrder.forEach(function (label) {
     const ledger = core.holeLedger();
     if (core.holeOn(game, label)) {
+      const par = holePar(ctx, label);
       pairs.forEach(function (pair) {
         const left = String(pair.leftId);
         const right = String(pair.rightId);
         const leftRel = readRel(scores, label, left);
         const rightRel = readRel(scores, label, right);
         if (leftRel == null || rightRel == null) return;
-        const raw = rightRel - leftRel;
-        if (!raw) {
-          addPts(ledger, left, 0);
-          addPts(ledger, right, 0);
-          return;
+        const holeRes = calculateStrokePlayHoleResult({
+          leftScore: leftRel,
+          rightScore: rightRel,
+          par: par,
+          pointPerStroke: k,
+          ruleSnapshot: rule
+        });
+        if (!firstTrace) {
+          firstTrace = {
+            settleVersion: STROKE2_SETTLE_VERSION,
+            resultSource: "settleStroke2",
+            reward: rule.reward || "",
+            mulRows: rule.mulRows || null,
+            addRows: rule.addRows || null,
+            pair: { leftId: left, rightId: right, strokes: pairStrokeN(pair) },
+            par: par,
+            actualScores: { left: leftRel + par, right: rightRel + par },
+            winner: holeRes.winner === "left" ? left : holeRes.winner === "right" ? right : "",
+            baseGap: holeRes.baseGap,
+            winnerActualDiff: holeRes.winnerActualDiff,
+            rewardMode: holeRes.rewardMode,
+            rewardKey: holeRes.rewardKey,
+            rewardValue: holeRes.rewardValue,
+            adjustedGap: holeRes.adjustedGap,
+            K: k,
+            finalScores: { left: holeRes.leftValue, right: holeRes.rightValue }
+          };
         }
-        if (raw > 0) {
-          const pts = core.round1(applyReward(raw, leftRel, rule) * k);
-          addPts(ledger, left, pts);
-          addPts(ledger, right, -pts);
-        } else {
-          const pts = core.round1(applyReward(-raw, rightRel, rule) * k);
-          addPts(ledger, right, pts);
-          addPts(ledger, left, -pts);
-        }
+        addPts(ledger, left, holeRes.leftValue);
+        addPts(ledger, right, holeRes.rightValue);
       });
     }
     byHole[label] = ledger;
   });
 
+  if (typeof global !== "undefined" && global.__STROKE2_DEBUG__ && firstTrace) {
+    global.__STROKE2_LAST_TRACE__ = firstTrace;
+  }
+
   return {
     byHole: byHole,
     initial: initial,
-    catalogId: "stroke-2"
+    catalogId: "stroke-2",
+    settleVersion: STROKE2_SETTLE_VERSION,
+    rewardState: resolved.rewardState
   };
 }
 
 module.exports = {
+  STROKE2_SETTLE_VERSION,
   settle: settleStroke2,
   scoreBand,
-  applyReward
+  applyReward,
+  rewardMul,
+  stroke2RewardState,
+  resolveStroke2RuleSnapshot,
+  calculateStrokePlayHoleResult
 };

@@ -52,7 +52,7 @@ var ALL_RULE_IDS = [
   'horn'
 ];
 
-var UNSUPPORTED_SETTLE_IDS = ['three-set', 'youcai', 'landlord-small', 'skins'];
+var UNSUPPORTED_SETTLE_IDS = ['skins'];
 
 function inputOf(name) {
   var map = {
@@ -122,6 +122,20 @@ function inputOf(name) {
         ruleSnapshot: { reward: 'none', pushRule: 'none' }
       },
       scores: scoresN(3, HOLES2, [[0, -1, 1], [1, 0, 1]])
+    },
+    'landlord-small': {
+      matchId: 'm1',
+      sideGameId: 'sg-landlord-small',
+      ruleId: 'landlord-small',
+      holeOrder: HOLES2,
+      sideGame: {
+        players: ids(3),
+        playerOrder: order(3),
+        groupMode: 'fixed',
+        multiplier: 1,
+        ruleSnapshot: { reward: 'none', pushRule: 'none' }
+      },
+      scores: scoresN(3, HOLES2, [[-1, 0, 1], [0, 0, 1]])
     },
     '8421-3': {
       matchId: 'm1',
@@ -285,7 +299,9 @@ var EXPECTED = {
       A2: { __pot__: 0, p1: 0, p2: 0 }
     },
     initial: { p1: 0, p2: 0, __pot__: 0 },
-    catalogId: 'stroke-2'
+    catalogId: 'stroke-2',
+    settleVersion: 'v53-4.1.1',
+    rewardState: 'none'
   },
   'match-2': {
     byHole: {
@@ -293,7 +309,10 @@ var EXPECTED = {
       A2: { __pot__: 0, p2: 1, p1: -1 }
     },
     initial: { p1: 0, p2: 0, __pot__: 0 },
-    catalogId: 'match-2'
+    catalogId: 'match-2',
+    settleVersion: 'v53-4.1.2',
+    mulState: 'none',
+    topHoleStates: {}
   },
   '8421-2': {
     byHole: {
@@ -301,7 +320,9 @@ var EXPECTED = {
       A2: { __pot__: 0, p1: 2, p2: -2 }
     },
     initial: { p1: 0, p2: 0, __pot__: 0 },
-    catalogId: '8421-2'
+    catalogId: '8421-2',
+    settleVersion: 'v53-4.1.3',
+    topHoleStates: {}
   },
   'landlord-big': {
     byHole: {
@@ -310,7 +331,8 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3'], A2: ['p1', 'p2', 'p3'] },
     initial: { p1: 0, p2: 0, p3: 0, __pot__: 0 },
-    catalogId: 'landlord-big'
+    catalogId: 'landlord-big',
+    topHoleStates: {}
   },
   'landlord-mid': {
     byHole: {
@@ -319,7 +341,25 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3'], A2: ['p1', 'p2', 'p3'] },
     initial: { p1: 0, p2: 0, p3: 0, __pot__: 0 },
-    catalogId: 'landlord-mid'
+    catalogId: 'landlord-mid',
+    topHoleStates: {}
+  },
+  'landlord-small': {
+    byHole: {
+      A1: { __pot__: 0, p3: -2, p1: 1, p2: 1 },
+      A2: { __pot__: 0, p3: -2, p1: 1, p2: 1 }
+    },
+    orderByHole: { A1: ['p1', 'p2', 'p3'], A2: ['p1', 'p2', 'p3'] },
+    initial: { p1: 0, p2: 0, p3: 0, __pot__: 0 },
+    catalogId: 'landlord-small',
+    topHoleStates: {},
+    settleVersion: 'v53-4.2.3',
+    meatPool: 0,
+    orderHistory: [
+      { hole: 'A1', orderBefore: ['p1', 'p2', 'p3'], orderAfter: ['p1', 'p2', 'p3'] },
+      { hole: 'A2', orderBefore: ['p1', 'p2', 'p3'], orderAfter: ['p1', 'p2', 'p3'] }
+    ],
+    playerTotals: { p1: 2, p2: 2, p3: -4, __pot__: 0 }
   },
   '8421-3': {
     byHole: {
@@ -328,7 +368,9 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3'], A2: ['p1', 'p2', 'p3'] },
     initial: { p1: 0, p2: 0, p3: 0, __pot__: 0 },
-    catalogId: '8421-3'
+    catalogId: '8421-3',
+    settleVersion: 'v53-4.1.3',
+    topHoleStates: {}
   },
   'lasuo-4': {
     byHole: {
@@ -337,7 +379,45 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3', 'p4'], A2: ['p1', 'p2', 'p3', 'p4'] },
     initial: { p1: 0, p2: 0, p3: 0, p4: 0, __pot__: 0 },
-    catalogId: 'lasuo-4'
+    catalogId: 'lasuo-4',
+    settleVersion: 'v53-4.3.1',
+    topHoleStates: {},
+    holeDebug: {
+      A1: {
+        selectedIndicators: { better: true, worse: false, total: false },
+        indicatorWeights: { better: 1, worse: 0, total: 0 },
+        indicatorResults: { better: 1, worse: 0, total: 0, sum: 1 },
+        baseTeamScore: 1,
+        rewardMode: 'none',
+        addRewardA: 0,
+        addRewardB: 0,
+        winningTeam: 'A',
+        multiplierSource: 'none',
+        multiplier: 1,
+        rewardedTeamScore: 1,
+        K: 1,
+        finalTeamScore: 1,
+        settleVersion: 'v53-4.3.1',
+        personalScores: { p1: 1, p2: 1, p3: -1, p4: -1 }
+      },
+      A2: {
+        selectedIndicators: { better: true, worse: false, total: false },
+        indicatorWeights: { better: 1, worse: 0, total: 0 },
+        indicatorResults: { better: 1, worse: 0, total: 0, sum: 1 },
+        baseTeamScore: 1,
+        rewardMode: 'none',
+        addRewardA: 0,
+        addRewardB: 0,
+        winningTeam: 'A',
+        multiplierSource: 'none',
+        multiplier: 1,
+        rewardedTeamScore: 1,
+        K: 1,
+        finalTeamScore: 1,
+        settleVersion: 'v53-4.3.1',
+        personalScores: { p1: 1, p2: 1, p3: -1, p4: -1 }
+      }
+    }
   },
   '8421-4': {
     byHole: {
@@ -346,7 +426,9 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3', 'p4'], A2: ['p1', 'p2', 'p3', 'p4'] },
     initial: { p1: 0, p2: 0, p3: 0, p4: 0, __pot__: 0 },
-    catalogId: '8421-4'
+    catalogId: '8421-4',
+    settleVersion: 'v53-4.1.3',
+    topHoleStates: {}
   },
   'three-vs-one': {
     byHole: {
@@ -355,7 +437,8 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3', 'p4'], A2: ['p1', 'p2', 'p3', 'p4'] },
     initial: { p1: 0, p2: 0, p3: 0, p4: 0, __pot__: 0 },
-    catalogId: 'three-vs-one'
+    catalogId: 'three-vs-one',
+    topHoleStates: {}
   },
   'dizhubo-4': {
     byHole: {
@@ -364,7 +447,8 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3', 'p4'], A2: ['p1', 'p2', 'p3', 'p4'] },
     initial: { p1: 0, p2: 0, p3: 0, p4: 0, __pot__: 0 },
-    catalogId: 'dizhubo-4'
+    catalogId: 'dizhubo-4',
+    topHoleStates: {}
   },
   vegas: {
     byHole: {
@@ -373,7 +457,8 @@ var EXPECTED = {
     },
     orderByHole: { A1: ['p1', 'p2', 'p3', 'p4'], A2: ['p1', 'p2', 'p3', 'p4'] },
     initial: { p1: 0, p2: 0, p3: 0, p4: 0, __pot__: 0 },
-    catalogId: 'vegas'
+    catalogId: 'vegas',
+    topHoleStates: {}
   },
   horn: {
     byHole: { A1: { __pot__: 0 }, A2: { __pot__: 0 } },
@@ -382,7 +467,8 @@ var EXPECTED = {
       A1: ['p1', 'p2', 'p3', 'p4', 'p5'],
       A2: ['p1', 'p2', 'p3', 'p4', 'p5']
     },
-    meatEatCount: 0
+    meatEatCount: 0,
+    topHoleStates: {}
   },
   'lasuo-n': {
     byHole: {
@@ -394,7 +480,8 @@ var EXPECTED = {
       A1: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
       A2: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
     },
-    meatEatCount: 0
+    meatEatCount: 0,
+    topHoleStates: {}
   }
 };
 

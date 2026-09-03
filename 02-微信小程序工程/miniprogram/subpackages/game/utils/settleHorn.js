@@ -90,7 +90,12 @@ function triColor(game, order, playerId) {
 function settle(game, payload) {
   const ids = core.playerIdsOf(game);
   const holeOrder = (payload && payload.holeOrder) || [];
-  if (ids.length < 5) return core.emptyResults(game, holeOrder);
+  const topHoleTracker = core.createTopHoleTracker();
+  if (ids.length < 5) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
 
   const scores = (payload && payload.scores) || {};
   const rewardOn = game && game.rewardOn !== false;
@@ -113,12 +118,15 @@ function settle(game, payload) {
   const isFixed = (game && game.sortUpdate) === "fixed";
   let rankedNext = false;
   let startMarked = false;
+  let prefixBlocked = false;
 
   holeOrder.forEach(function (label) {
     const hole = String(label);
     const holeBook = core.holeLedger();
     byHole[hole] = holeBook;
     if (!core.holeOn(game, hole)) return;
+    if (prefixBlocked) return;
+
     if (isFixed || !startMarked || rankedNext) {
       orderByHole[hole] = order.slice();
     }
@@ -135,6 +143,7 @@ function settle(game, payload) {
       rec[id] = { rel: rel, pts: 0 };
     });
     if (!ready) {
+      prefixBlocked = true;
       rankedNext = false;
       return;
     }
@@ -152,6 +161,7 @@ function settle(game, payload) {
     const isPush = meatOn && allSameRel(rec, lay.active);
     if (isPush) {
       meatPool += 1;
+      core.enqueueTopHole(topHoleTracker, hole);
       hist.push(rec);
       order = lasuo.nextOrder(order, rec, hist, game, true);
       rankedNext = true;
@@ -186,13 +196,16 @@ function settle(game, payload) {
     let factor = 1;
     if (meatPool > 0) {
       if (windOn && lastOn && hole === lastOn) {
-        meatEaten += meatPool;
-        factor = Math.pow(2, meatPool);
+        const eat = meatPool;
+        meatEaten += eat;
+        factor = Math.pow(2, eat);
         meatPool = 0;
+        core.consumeTopHoles(topHoleTracker, eat);
       } else {
         meatEaten += 1;
         factor = 2;
         meatPool -= 1;
+        core.consumeTopHoles(topHoleTracker, 1);
       }
     }
 
@@ -212,7 +225,8 @@ function settle(game, payload) {
     byHole: byHole,
     totals: ledger,
     orderByHole: orderByHole,
-    meatEatCount: meatEaten
+    meatEatCount: meatEaten,
+    topHoleStates: topHoleTracker.states
   };
 }
 

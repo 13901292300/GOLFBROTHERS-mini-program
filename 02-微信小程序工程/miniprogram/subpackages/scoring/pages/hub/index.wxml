@@ -22,7 +22,7 @@
         <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
         <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
         <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
-        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">大游戏</view>
       </scroll-view>
     </view>
 
@@ -163,10 +163,7 @@
 
       <!-- 讨论区内容由页面根级 .ds-fullscreen 统一组件承载，scroll 容器内不再渲染聊天 -->
 
-      <!-- 游戏 -->
-      <block wx:if="{{activeTab === 'game'}}">
-        <game-tab host-snapshot="{{hostSnapshot}}"></game-tab>
-      </block>
+      <!-- 游戏 TAB 使用页面根级全屏层，此处不占 scroll 内容 -->
 
     </view>
   </scroll-view>
@@ -177,8 +174,28 @@
       <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
       <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
       <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
-      <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+      <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">大游戏</view>
     </scroll-view>
+  </view>
+
+  <!-- 游戏全屏层：TAB + 沙盒 game-tab。不进入 scroll-view，避免 hasGames 时 height:0 把看板压没 -->
+  <view wx:if="{{activeTab === 'game'}}" class="ds-fullscreen" style="top:{{headerTotalHeight}}px;">
+    <view class="tab-scroll-wrap">
+      <scroll-view class="gb-tabs" scroll-x enable-flex>
+        <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
+        <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
+        <view bindtap="switchTab" data-tab="interaction" class="tab-btn {{activeTab === 'interaction' ? 'active' : ''}}">讨论区</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn active">大游戏</view>
+      </scroll-view>
+    </view>
+    <view class="hub-game-tab-host ds-fill">
+      <game-tab
+        entry="hub"
+        layout-mode="fill"
+        max-players="{{0}}"
+        host-snapshot="{{hostSnapshot}}"
+      ></game-tab>
+    </view>
   </view>
 
   <!-- 讨论区全屏层：TAB（固定）+ 统一讨论区组件（围观/聊天/输入自包含）。与球队比赛完全一致的复用方式 -->
@@ -188,7 +205,7 @@
         <view bindtap="switchTab" data-tab="leaderboard" class="tab-btn {{activeTab === 'leaderboard' ? 'active' : ''}}">领先榜</view>
         <view bindtap="switchTab" data-tab="group" class="tab-btn {{activeTab === 'group' ? 'active' : ''}}">出发表</view>
         <view bindtap="switchTab" data-tab="interaction" class="tab-btn active">讨论区</view>
-        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">游戏</view>
+        <view bindtap="switchTab" data-tab="game" class="tab-btn {{activeTab === 'game' ? 'active' : ''}}">大游戏</view>
       </scroll-view>
     </view>
     <discussion

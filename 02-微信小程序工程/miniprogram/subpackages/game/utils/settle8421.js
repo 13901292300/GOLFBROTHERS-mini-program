@@ -8,8 +8,9 @@
  * 「分值翻倍」：每块肉 = 本洞分值（不是本洞×2）。
  */
 const core = require("./settleCore.js");
+const scoreMapUtil = require("./sideGameScoreMap.js");
 
-const MAP_DEFAULTS = { hio: 32, m2: 16, m1: 8, par: 4, p1: 2, p2: 1, p3: 0 };
+const SETTLE_8421_VERSION = scoreMapUtil.SETTLE_VERSION_2;
 const MEAT_DEFAULTS = { "le-2": 1, m1: 1, par: 1, p1: 1, "ge-2": 1 };
 
 function rowMap(rows) {
@@ -59,44 +60,33 @@ function playerOf(game, id) {
 }
 
 function expandScoreCode(code) {
-  const digits = String(code || "")
-    .replace(/\D/g, "")
-    .split("")
-    .map(function (ch) {
-      return Number(ch);
-    })
-    .filter(function (n) {
-      return isFinite(n);
-    });
-  if (!digits.length) return null;
-  const m1 = digits[0];
-  return {
-    hio: m1 * 4,
-    m2: m1 * 2,
-    m1: m1,
-    par: digits[1] != null ? digits[1] : 0,
-    p1: digits[2] != null ? digits[2] : 0,
-    p2: digits[3] != null ? digits[3] : 0,
-    p3: digits[4] != null ? digits[4] : 0
-  };
+  return scoreMapUtil.expandScoreCode(code);
 }
 
 function fromScoreRows(rows) {
-  const map = rowMap(rows);
-  const out = {};
-  Object.keys(MAP_DEFAULTS).forEach(function (key) {
-    out[key] = map[key] != null ? map[key] : MAP_DEFAULTS[key];
-  });
-  return out;
+  return scoreMapUtil.mapFromLegacyRows(rows);
 }
 
-function scoreMapFor(player, rule) {
-  const code = String((player && player.scoreCode) || (rule && rule.scoreCode) || "8421");
-  const defCode = String((rule && rule.scoreCode) || "8421");
-  if (code === defCode && rule && rule.scoreRows && rule.scoreRows.length) {
-    return fromScoreRows(rule.scoreRows);
+function unwrapRule(rule) {
+  let snap = rule && typeof rule === "object" ? rule : {};
+  let hops = 0;
+  while (
+    hops < 4 &&
+    snap &&
+    typeof snap === "object" &&
+    !scoreMapUtil.hasExplicitRows(snap.scoreRows) &&
+    snap.reward == null &&
+    snap.ruleSnapshot &&
+    typeof snap.ruleSnapshot === "object"
+  ) {
+    snap = snap.ruleSnapshot;
+    hops += 1;
   }
-  return expandScoreCode(code) || fromScoreRows(rule && rule.scoreRows);
+  return snap || {};
+}
+
+function scoreMapFor(player, rule, game) {
+  return scoreMapUtil.resolveScoreMap(game || {}, player || {}, unwrapRule(rule));
 }
 
 function deductCfg(player, rule) {
@@ -129,20 +119,13 @@ function deductScore(diff, deduct, par) {
 }
 
 function mappedAt(diff, map) {
-  if (diff <= -3) return map.hio;
-  if (diff === -2) return map.m2;
-  if (diff === -1) return map.m1;
-  if (diff === 0) return map.par;
-  if (diff === 1) return map.p1;
-  if (diff === 2) return map.p2;
-  if (diff === 3) return map.p3;
-  return null;
+  return scoreMapUtil.mappedAt(diff, map);
 }
 
 function personalScore(diff, map, deduct, par) {
   if (diff <= 3) {
-    const raw = Number(mappedAt(diff, map));
-    if (isFinite(raw) && raw > 0) return raw;
+    const raw = mappedAt(diff, map);
+    if (raw != null && raw > 0) return raw;
     return deductScore(diff, deduct, par);
   }
   return deductScore(diff, deduct, par);
@@ -200,16 +183,19 @@ function bumpPush(allDouble, comboMul, meatPool, key, skipMeat) {
 function settle8421(game, ctx) {
   const holeOrder = (ctx && ctx.holeOrder) || [];
   const scores = (ctx && ctx.scores) || {};
-  const rule = (game && game.ruleSnapshot) || {};
+  const rule = unwrapRule((game && game.ruleSnapshot) || {});
   const k = pointValue(game);
   const pairs = ((game && game.pairings) || []).filter(function (pair) {
     return pair && pair.leftId && pair.rightId && pair.on !== false;
   });
   const meatPool = {};
   const comboMul = {};
+  const topHoleTrackers = {};
   pairs.forEach(function (pair, i) {
-    meatPool[pair.id || i] = 0;
-    comboMul[pair.id || i] = 1;
+    const key = pair.id || i;
+    meatPool[key] = 0;
+    comboMul[key] = 1;
+    topHoleTrackers[key] = core.createTopHoleTracker();
   });
   const kind = pushKind(rule);
   const allDouble = (rule && rule.meatEatMode) === "all-double";
@@ -233,13 +219,13 @@ function settle8421(game, ctx) {
         const rightP = playerOf(game, right);
         const leftScore = personalScore(
           leftRel,
-          scoreMapFor(leftP, rule),
+          scoreMapFor(leftP, rule, game),
           deductCfg(leftP, rule),
           par
         );
         const rightScore = personalScore(
           rightRel,
-          scoreMapFor(rightP, rule),
+          scoreMapFor(rightP, rule, game),
           deductCfg(rightP, rule),
           par
         );
@@ -251,7 +237,10 @@ function settle8421(game, ctx) {
         if (spread === 0) {
           addPts(ledger, left, 0);
           addPts(ledger, right, 0);
-          if (flag.push) bumpPush(allDouble, comboMul, meatPool, key, skipMeat);
+          if (flag.push) {
+            bumpPush(allDouble, comboMul, meatPool, key, skipMeat);
+            if (!skipMeat) core.enqueueTopHole(topHoleTrackers[key], label);
+          }
           return;
         }
 
@@ -265,11 +254,13 @@ function settle8421(game, ctx) {
 
         if (flag.push) {
           bumpPush(allDouble, comboMul, meatPool, key, skipMeat);
+          if (!skipMeat) core.enqueueTopHole(topHoleTrackers[key], label);
           if (!(windOn && isLast && !allDouble && spread !== 0)) return;
         }
 
         if (allDouble) {
           comboMul[key] = 1;
+          core.consumeAllTopHoles(topHoleTrackers[key]);
           return;
         }
 
@@ -281,6 +272,7 @@ function settle8421(game, ctx) {
             addPts(ledger, winner, meatPts);
             addPts(ledger, loser, -meatPts);
             meatPool[key] = pool - eat;
+            core.consumeTopHoles(topHoleTrackers[key], eat);
           }
         }
       });
@@ -288,18 +280,28 @@ function settle8421(game, ctx) {
     byHole[label] = ledger;
   });
 
+  const topHoleStates = {};
+  pairs.forEach(function (pair, i) {
+    const key = pair.id || i;
+    core.mergeTopHoleStates(topHoleStates, topHoleTrackers[key].states);
+  });
+
   return {
     byHole: byHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: "8421-2"
+    catalogId: "8421-2",
+    settleVersion: SETTLE_8421_VERSION,
+    topHoleStates: topHoleStates
   };
 }
 
 module.exports = {
+  SETTLE_8421_VERSION,
   settle: settle8421,
   personalScore,
   expandScoreCode,
   scoreMapFor,
+  fromScoreRows,
   deductCfg,
   meatWanted,
   meatUnit,

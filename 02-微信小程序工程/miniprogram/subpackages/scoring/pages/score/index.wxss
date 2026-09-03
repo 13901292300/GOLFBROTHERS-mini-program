@@ -4642,7 +4642,8 @@ page {
 }
 
 .triangle-red,
-.triangle-blue {
+.triangle-blue,
+.triangle-gold {
   position: absolute;
   top: 0;
   right: 0;
@@ -4653,9 +4654,15 @@ page {
   z-index: 5;
   pointer-events: none;
 }
-
-.triangle-red { border-color: transparent #ef4444 transparent transparent; }
-.triangle-blue { border-color: transparent #3b82f6 transparent transparent; }
+.triangle-red {
+  border-color: transparent #ef4444 transparent transparent;
+}
+.triangle-blue {
+  border-color: transparent #3b82f6 transparent transparent;
+}
+.triangle-gold {
+  border-color: transparent #ce9224 transparent transparent;
+}
 
 /* 名次腰线（第三/第四名）：在右上三角内部画一条白色斜线（左上→右下），裁剪于三角形内不外溢。
    三角尺寸/位置不变（仍为 28rpx 角标），本元素只叠加白线，颜色由下层 triangle 提供。 */

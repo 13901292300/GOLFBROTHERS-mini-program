@@ -174,7 +174,7 @@ assert('无绝对本机路径', absHit.length === 0, absHit.join(','));
 assert('无 wx Storage / gb-game- key', storeHit.length === 0, storeHit.join(','));
 assert('结算模块无 wx.* API', wxHit.length === 0, wxHit.join(','));
 assert('无假球员姓名', fakeHit.length === 0, fakeHit.join(','));
-assert('结算模块文件数', settleFiles.length === 20);
+assert('结算模块文件数', settleFiles.length === 23);
 
 console.log('\nsideGameEngine.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

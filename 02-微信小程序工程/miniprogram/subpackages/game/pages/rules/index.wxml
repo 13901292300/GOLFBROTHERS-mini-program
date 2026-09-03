@@ -13,11 +13,52 @@
 
   <scroll-view class="gb-body gb-body--with-cta" scroll-y>
     <view class="page-pad">
-      <view wx:if="{{!hasMatchContext}}" class="empty">{{emptyHint}}</view>
-      <view wx:else class="empty">{{emptyHint}}</view>
+      <view class="sec-hint page-top-hint">长按规则可删除。</view>
+      <view wx:if="{{myRules.length === 0}}" class="empty">
+        还没有保存的约定。本场开赌前先添加规则，配好后可以起一个好记的名字，下次直接从这里选用。
+      </view>
+      <block wx:else>
+        <view wx:for="{{ruleGroups}}" wx:key="renderKey" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleGroup" data-key="{{item.key}}">
+            <text class="rule-lib__title">{{item.title}}</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{item.count}}条</text>
+              <text class="rule-lib__chev">{{item.open ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{item.open}}" class="rule-list">
+            <view
+              wx:for="{{item.items}}"
+              wx:for-item="rule"
+              wx:key="id"
+              class="rule-row"
+              bindtap="useMine"
+              bindlongpress="startDelete"
+              data-id="{{rule.id}}"
+            >
+              <view class="rule-row__main">
+                <view class="rule-row__title">
+                  <text class="rule-row__name">{{rule.name}}</text>
+                  <text
+                    wx:if="{{!rule.noSettings && !rule.unavailable}}"
+                    class="rule-row__edit"
+                    catchtap="editMine"
+                    data-id="{{rule.id}}"
+                  >✎</text>
+                </view>
+                <text class="rule-row__desc">{{rule.summary}}</text>
+              </view>
+              <view class="rule-row__actions">
+                <text wx:if="{{!rule.unavailable}}" class="rule-row__add" catchtap="useMine" data-id="{{rule.id}}">+</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
     </view>
   </scroll-view>
-  <view wx:if="{{hasMatchContext}}" class="bottom-bar">
-    <view class="cta-gold" bindtap="onAdd">添加规则</view>
+
+  <view class="fab-wrap">
+    <view class="cta-gold" bindtap="onAddRule">＋ 添加规则</view>
   </view>
 </view>

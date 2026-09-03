@@ -1,4 +1,4 @@
-﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
 
 .game-tab--fill {
@@ -102,7 +102,7 @@
   min-height: 120rpx;
   padding: 8rpx 4rpx;
   gap: 6rpx;
-  overflow: visible;
+  overflow: hidden;
   white-space: normal;
   border-right: 1px solid var(--border);
   background: var(--bg-subtle);
@@ -112,11 +112,19 @@
   border-right: 0;
 }
 
+.board-player-face {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+
 .board-player__avatar {
   display: block;
-  width: 52rpx;
-  height: 52rpx;
-  line-height: 52rpx;
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 44rpx;
   border-radius: 50%;
   background: #002d62;
   color: #ffffff;
@@ -124,12 +132,22 @@
   font-weight: 800;
   text-align: center;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.board-player__avatar image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .board-player__name {
   max-width: 100%;
-  font-size: 20rpx;
-  line-height: 1.2;
+  min-width: 0;
+  flex: 1;
+  font-size: 22rpx;
+  line-height: 26rpx;
   color: var(--text-muted);
   font-weight: 700;
   overflow: hidden;
@@ -268,6 +286,30 @@
   border-bottom: 1px solid var(--border);
 }
 
+.board-cell--hole-badge {
+  position: relative;
+  display: block;
+}
+
+.board-hole-dot {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 12rpx;
+  height: 12rpx;
+  margin-left: 8rpx;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.board-hole-dot--pending {
+  background: #ef4444;
+}
+
+.board-hole-dot--consumed {
+  background: #94a3b8;
+}
+
 .board-cell--row {
   height: 80rpx;
   min-height: 80rpx;
@@ -306,14 +348,127 @@
   border-bottom: 0;
 }
 
-.empty-tab__summary {
-  margin-top: 24rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+/* flow：自然撑高，纵向交给宿主 scroll-view，不抢整页竖滑 */
+.game-tab--flow {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 240rpx;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
-.empty-tab__line {
-  font-size: 24rpx;
-  color: var(--text-muted);
+.game-tab--flow .board-stack {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.game-tab--flow .board-simple-body {
+  flex: none;
+  height: auto;
+  min-height: 80rpx;
+  overflow: visible;
+}
+
+.game-tab--flow .board-frame {
+  flex: none;
+  height: auto;
+  min-height: 0;
+}
+
+.game-tab--flow .board-left {
+  height: auto;
+}
+
+.game-tab--flow .board-left__clip {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.game-tab--flow .board-right,
+.game-tab--flow .board-right__sheet {
+  height: auto;
+}
+
+.game-tab--flow .board-right__body {
+  flex: none;
+  height: auto;
+  min-height: 0;
+}
+
+.register-cta-bar.game-cta-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  padding: 16rpx 0 calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--bg-primary, #ffffff);
+  border-top: 2rpx solid var(--border-color, rgba(15, 23, 42, 0.08));
+  box-sizing: border-box;
+}
+
+.board-dock-h {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.board-dock-h__hole {
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+  z-index: 2;
+}
+
+.board-dock-h__right {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+
+.game-tab--flow .board-game-mask {
+  z-index: 121;
+}
+
+.game-tab--flow .board-pin--stuck {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 125;
+  background: var(--bg-primary);
+}
+
+.game-tab--flow .board-head--stuck {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 124;
+  background: var(--bg-subtle);
+}
+
+.board-flow-head-slot {
+  width: 100%;
+}
+
+.board-flow-head {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  background: var(--bg-subtle);
+}
+
+.board-flow-head__right {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+
+.board-flow-foot-spacer {
+  width: 100%;
+  pointer-events: none;
 }

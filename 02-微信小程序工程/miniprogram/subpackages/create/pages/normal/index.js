@@ -1481,8 +1481,48 @@ Page({
       creatorInGame: creatorInGame,
       createdAt: Date.now()
     };
+    // 与空修改确认同源：校验已用 resolveHalfCourses，但创建落盘不得省略半场。
+    // 双半场球场若只回填 courseId（front9/back9 为空），记分页仍能画红蓝三角，
+    // 游戏 Host 的 holeContextReady 为 false，结果不展示。
+    const beforeCourse = {
+      courseId: game.courseId,
+      courseName: game.courseName,
+      front9Course: game.front9Course,
+      back9Course: game.back9Course,
+      courseHalfText: game.courseHalfText
+    };
+    const halfResolved = gameEdit.resolveHalfCourses(
+      game.courseId,
+      game.courseName,
+      game.front9Course,
+      game.back9Course,
+      game.courseHalfText
+    );
+    game.front9Course = halfResolved.front9Course;
+    game.back9Course = halfResolved.back9Course;
     gameStore.saveGame(game);
 
+    const halfResult = halfCourseEdit.apply(
+      {
+        gameId: gameId,
+        mode: 'game',
+        courseId: game.courseId,
+        courseName: game.courseName,
+        front9Course: game.front9Course,
+        back9Course: game.back9Course,
+        beforeCourse: beforeCourse,
+        rollbackGame: game
+      },
+      game.front9Course,
+      game.back9Course
+    );
+    if (halfResult && halfResult.ok === false) {
+      this._startNavLock = false;
+      wx.showToast({ title: halfResult.message || '创建失败', icon: 'none' });
+      return;
+    }
+
+    const persisted = gameStore.getGame(gameId) || game;
     const navPlan = matchStateUtil.planNormalCreateSuccessNav({
       isMulti: isMulti,
       creatorInGame: creatorInGame
@@ -1494,6 +1534,12 @@ Page({
     // 单组：始终 group 0；多组且创建者在赛中：定位到创建者所在组
     const startGroupIndex = isMulti && creatorInGame ? creatorGroupIndex : 0;
     const hubUrl = matchStateUtil.buildNormalCreateHubUrl(gameId, startGroupIndex, creatorInGame);
+    matchStateUtil.setMatchState(
+      Object.assign({}, matchStateUtil.buildFromGame(persisted, startGroupIndex), {
+        fromFlow: navPlan.fromFlow,
+        fromPage: navPlan.fromPage
+      })
+    );
 
     if (navPlan.kind === 'replace_hub') {
       wx.redirectTo({
@@ -1502,49 +1548,6 @@ Page({
       });
       return;
     }
-
-    // 模板映射：最好成绩 / 最佳球位 / 四人两球 → 统一记分引擎 fourball_best；
-    // formatType 四人两球仍为 fourball_2ball；groups 来自 groupCompositionMap（2+2 / 单 pair）。
-    // 个人比杆 → game 模式。
-    const unified =
-      !!COMPOSITION_MODES[this.data.gameMode] || this._isFourball2BallMode();
-
-    // 统一比赛状态对象（页面间唯一数据通道）：球员/球场/赛制/成绩/组数全部由创建页一次性写入。
-    // mode/gameId/groupIndex 一并写入 matchState，记分页只认 matchState，不再依赖 URL 参数。
-    const matchState = {
-      mode: unified ? 'fourball_best' : 'game',
-      gameId: gameId,
-      groupIndex: startGroupIndex,
-      groupId: gameId + ':' + startGroupIndex,
-      // 球员：创建者所在组（或单组第 1 组）已选球员，记分页 HOLE 上方名册直接继承
-      players: (groups[startGroupIndex].playersSlots || []).filter(Boolean).map((p) => ({
-        playerId: p.playerId,
-        name: p.name,
-        avatar: p.avatar || ''
-      })),
-      // 球场信息：球场名称 / 开球时间等，记分页只读继承
-      course: {
-        courseId: courseId,
-        courseName: courseName,
-        courseLocation: this.data.courseLocation || '',
-        halfText: this.data.courseHalfText || '',
-        teeTime: this.data.teeTimeText || '',
-        roundName: finalRoundName,
-        front9Course: this.data.front9Course || null,
-        back9Course: this.data.back9Course || null
-      },
-      // 赛制：驱动记分表第一列标题（四人两球 = fourball_2ball）
-      formatType: this._resolveFormatType(startGroupIndex),
-      // 统一记分引擎分组：composition.teams → pair shell
-      groups: unified ? this._resolveGroups(startGroupIndex) : undefined,
-      // 成绩：18 洞默认空（null），UI 不显示 0 / 假数据
-      scores: matchStateUtil.emptyScores(),
-      // 组数：记分页返回逻辑依赖（1=单组→重启回首页；>1→返回上一页）
-      groupCount: groups.length,
-      fromFlow: navPlan.fromFlow,
-      fromPage: navPlan.fromPage
-    };
-    matchStateUtil.setMatchState(matchState);
 
     // 多组且创建者在赛中：redirect Hub 替换创建页，再进入记分页 → Home → Hub → Score
     if (navPlan.kind === 'replace_hub_then_score') {

@@ -1,4 +1,4 @@
-﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
 @import "../config/index.wxss";
 @import "../pick-players/index.wxss";

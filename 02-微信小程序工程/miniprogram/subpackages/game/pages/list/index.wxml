@@ -1,4 +1,4 @@
-<view class="gb-page bright-mode">
+<view class="gb-page bright-mode {{pageMode === 'readonly' ? 'gb-page--readonly' : ''}}">
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
       <view class="gb-header__left">
@@ -6,16 +6,12 @@
         <view>
           <text class="gb-header__eyebrow">SETUP</text>
           <text class="gb-header__title">游戏设置</text>
+          <text wx:if="{{readonlyHint}}" class="gb-header__readonly">{{readonlyHint}}</text>
         </view>
       </view>
     </view>
   </view>
   <scroll-view class="gb-body" scroll-y>
-    <game-list
-      match-id="{{matchId}}"
-      group-id="{{groupId}}"
-      side-game-id="{{sideGameId}}"
-      scope="{{scope}}"
-    />
-  </scroll-view>
+  <game-list id="gameList" entry="{{entry}}" max-players="{{maxPlayers}}" match-id="{{matchId}}" group-id="{{groupId}}" scope="{{scope}}" can-edit="{{canEdit}}" bind:commit="onCommitSetup"></game-list>
+</scroll-view>
 </view>

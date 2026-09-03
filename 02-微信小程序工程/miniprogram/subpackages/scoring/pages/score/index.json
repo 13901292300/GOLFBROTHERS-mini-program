@@ -7,10 +7,12 @@
     "caddie-scoring-sheet": "/subpackages/scoring/components/caddie-scoring-sheet/index",
     "player-action-modal": "/components/player-action-modal/index",
     "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index",
-    "game-tab": "/subpackages/game/components/game-tab/index"
+    "game-tab": "/subpackages/game/components/game-tab/index",
+    "rank-mark-engine": "/subpackages/game/components/rank-mark-engine/index"
   },
   "componentPlaceholder": {
     "player-reaction-overlay": "view",
-    "game-tab": "view"
+    "game-tab": "view",
+    "rank-mark-engine": "view"
   }
 }

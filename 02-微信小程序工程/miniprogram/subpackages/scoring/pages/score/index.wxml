@@ -42,7 +42,7 @@
       <view wx:if="{{activeTab === 'discussion'}}" class="tab-nav__indicator"></view>
     </view>
     <view bindtap="switchScorecardTab" data-tab="game" class="tab-nav__item {{activeTab === 'game' ? 'tab-nav__item--active' : ''}}">
-      <text class="tab-nav__label {{activeTab === 'game' ? 'tab-active' : 'tab-inactive'}}">游戏</text>
+      <text class="tab-nav__label {{activeTab === 'game' ? 'tab-active' : 'tab-inactive'}}">组内游戏</text>
       <view wx:if="{{activeTab === 'game'}}" class="tab-nav__indicator"></view>
     </view>
   </view>
@@ -281,6 +281,8 @@
                   </view>
                 </block>
                 <block wx:else>
+                  <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+                  <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                   <view class="hole-cell-inner">
                     <view class="{{cell.scoreClass}}">
                       <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{cell.classicScoreSizeClass}} {{cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
@@ -540,6 +542,8 @@
                     </view>
                   </block>
                   <block wx:else>
+                    <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+                  <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                     <view class="hole-cell-inner">
                       <view class="{{cell.scoreClass}}">
                         <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
@@ -777,6 +781,8 @@
                   </view>
                 </block>
                 <block wx:else>
+                  <view wx:if="{{col.triangleClass}}" class="{{col.triangleClass}}"></view>
+                  <view wx:if="{{col.hasWaist}}" class="corner-waist"></view>
                   <view class="hole-cell-inner">
                     <view class="{{col.scoreClass}}">
                       <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}} {{col.scoreMainWideClass}}">{{col.mainStr}}</text>
@@ -897,6 +903,8 @@
                   </view>
                 </block>
                 <block wx:else>
+                  <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+                  <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                   <view class="hole-cell-inner">
                     <view class="{{cell.scoreClass}}">
                       <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
@@ -1089,6 +1097,8 @@
               </block>
 
               <block wx:else>
+                <view wx:if="{{col.triangleClass}}" class="{{col.triangleClass}}"></view>
+                <view wx:if="{{col.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{col.scoreClass}}">
                     <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}} {{col.scoreMainWideClass}}">{{col.mainStr}}</text>
@@ -1194,6 +1204,8 @@
               </block>
 
               <block wx:else>
+                <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+                <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{cell.scoreClass}}">
                     <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
@@ -1287,6 +1299,8 @@
               </block>
 
               <block wx:else>
+                <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+                <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{cell.scoreClass}}">
                     <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
@@ -1383,6 +1397,8 @@
               </block>
 
               <block wx:else>
+                <view wx:if="{{cell.triangleClass}}" class="{{cell.triangleClass}}"></view>
+                <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{cell.scoreClass}}">
                     <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
@@ -1401,6 +1417,11 @@
       </scroll-view>
     </view>
 
+    <rank-mark-engine
+      wx:if="{{rankMarkEngineOn}}"
+      input="{{rankMarkInput}}"
+      bind:rankmarkchange="onRankMarkChange"
+    ></rank-mark-engine>
     <game-tab wx:if="{{activeTab === 'game'}}" host-snapshot="{{hostSnapshot}}"></game-tab>
 
     <!-- Discussion Tab Panel -->

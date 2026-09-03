@@ -187,7 +187,7 @@
     </view>
 
     <!-- Content -->
-    <view class="detail-main {{activeTab === 'discussion' ? 'detail-main--flush' : ''}}" style="{{detailMainMinHeight ? 'min-height:' + detailMainMinHeight + 'px;' : ''}}">
+    <view class="detail-main {{activeTab === 'discussion' || activeTab === 'game' ? 'detail-main--flush' : ''}}" style="{{detailMainMinHeight ? 'min-height:' + detailMainMinHeight + 'px;' : ''}}">
 
       <!-- 赛事详情 -->
       <block wx:if="{{activeTab === 'details'}}">
@@ -535,9 +535,18 @@
         ></discussion>
       </block>
 
-      <!-- 游戏 -->
       <block wx:if="{{activeTab === 'game'}}">
-        <game-tab host-snapshot="{{hostSnapshot}}"></game-tab>
+        <view id="detail-game-panel" class="detail-game-panel">
+          <game-tab
+            id="detail-game-tab"
+            entry="match"
+            layout-mode="flow"
+            max-players="{{0}}"
+            cta-hidden="{{hideRegisterCTA}}"
+            host-snapshot="{{hostSnapshot}}"
+          ></game-tab>
+        </view>
+        <view class="game-tab-spacer" style="height:{{contentSpacerHeight}}px;"></view>
       </block>
 
     </view>
@@ -588,7 +597,7 @@
 
   <!-- MORE FAB（讨论区为聚焦聊天全屏层，隐藏 FAB，避免遮挡输入栏） -->
   <view
-    wx:if="{{activeTab !== 'discussion'}}"
+    wx:if="{{activeTab !== 'discussion' && activeTab !== 'game'}}"
     catchtap="onMoreFabTap"
     bindtouchstart="onMoreFabTouchStart"
     bindtouchmove="onMoreFabTouchMove"

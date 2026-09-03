@@ -103,7 +103,7 @@ function nextOrder(order, rec, hist, game, isPush) {
 
 function mapScore(game, rule, id, rel, par) {
   const player = s8421.playerOf(game, id);
-  return s8421.personalScore(rel, s8421.scoreMapFor(player, rule), s8421.deductCfg(player, rule), par);
+  return s8421.personalScore(rel, s8421.scoreMapFor(player, rule, game), s8421.deductCfg(player, rule), par);
 }
 
 function pickBestOnTeam(ids, rec) {
@@ -163,7 +163,12 @@ function settle8421Four(game, ctx) {
   const rule = (game && game.ruleSnapshot) || {};
   const k = s8421.pointValue(game);
   let order = initialOrder(game);
-  if (order.length < 4) return core.emptyResults(game, holeOrder);
+  const topHoleTracker = core.createTopHoleTracker();
+  if (order.length < 4) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
   order = order.slice(0, 4);
   const kind = s8421.pushKind(rule);
   const allDouble = (rule && rule.meatEatMode) === "all-double";
@@ -174,6 +179,7 @@ function settle8421Four(game, ctx) {
   const orderByHole = {};
   let rankedNext = false;
   let startMarked = false;
+  let prefixBlocked = false;
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
 
@@ -181,6 +187,10 @@ function settle8421Four(game, ctx) {
     const ledger = core.holeLedger();
     const isLast = String(label) === lastLabel;
     if (!core.holeOn(game, label)) {
+      byHole[label] = ledger;
+      return;
+    }
+    if (prefixBlocked) {
       byHole[label] = ledger;
       return;
     }
@@ -199,6 +209,7 @@ function settle8421Four(game, ctx) {
     });
     if (!ready) {
       rankedNext = false;
+      prefixBlocked = true;
       byHole[label] = ledger;
       return;
     }
@@ -223,6 +234,7 @@ function settle8421Four(game, ctx) {
       if (isPush && !skipMeat) {
         if (allDouble) comboMul = comboMul * 2;
         else meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
       }
     } else {
       const win = aWins ? aTeam : bTeam;
@@ -234,6 +246,7 @@ function settle8421Four(game, ctx) {
         if (!skipMeat) {
           if (allDouble) comboMul = comboMul * 2;
           else meatPool += 1;
+          core.enqueueTopHole(topHoleTracker, label);
         }
         if (!(windOn && isLast && !allDouble)) {
           /* 顶洞攒肉，非大风吹不吃 */
@@ -244,10 +257,12 @@ function settle8421Four(game, ctx) {
             const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
             applySides(ledger, win, lose, meatPts);
             meatPool -= eat;
+            core.consumeTopHoles(topHoleTracker, eat);
           }
         }
       } else if (allDouble) {
         comboMul = 1;
+        core.consumeAllTopHoles(topHoleTracker);
       } else if (meatPool > 0) {
         const best = pickBestOnTeam(win, rec);
         const eat = core.meatEatCount(s8421.meatWanted(rule, rec[best].rel, meatPool), meatPool, isLast, windOn);
@@ -255,6 +270,7 @@ function settle8421Four(game, ctx) {
           const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
           applySides(ledger, win, lose, meatPts);
           meatPool -= eat;
+          core.consumeTopHoles(topHoleTracker, eat);
         }
       }
     }
@@ -272,7 +288,9 @@ function settle8421Four(game, ctx) {
     byHole: byHole,
     orderByHole: orderByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: "8421-4"
+    catalogId: "8421-4",
+    settleVersion: s8421.SETTLE_8421_VERSION,
+    topHoleStates: topHoleTracker.states
   };
 }
 

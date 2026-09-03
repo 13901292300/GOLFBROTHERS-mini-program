@@ -5,14 +5,41 @@
         <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
         <view>
           <text class="gb-header__eyebrow">PLAYERS</text>
-          <text class="gb-header__title">选择球员</text>
+          <text class="gb-header__title">选择人员</text>
         </view>
       </view>
     </view>
   </view>
-  <scroll-view class="gb-body" scroll-y>
-    <view class="page-pad">
-      <view class="empty">{{emptyHint}}</view>
+
+  <view class="pick-top">
+    <view class="pick-top__meta">已选 {{selectedCount}}{{maxSelect > 0 ? '/' + maxSelect : ''}} 人</view>
+    <view class="pick-top__actions">
+      <view class="pick-link" bindtap="onSelectAll">全选</view>
+      <view class="pick-link" bindtap="onClear">清除</view>
+    </view>
+  </view>
+
+  <scroll-view class="gb-body pick-body" scroll-y>
+    <view wx:for="{{selectionGroups}}" wx:key="groupId" class="pick-group pick-group--event">
+      <view class="pick-group__label">{{item.groupLabel}}</view>
+      <view class="player-grid player-grid--event">
+        <view
+          wx:for="{{item.members}}"
+          wx:for-item="person"
+          wx:key="id"
+          class="player-slot {{person.selected ? 'player-slot--selected' : 'player-slot--idle'}} {{person.disabled && !person.selected ? 'player-slot--disabled' : ''}}"
+          bindtap="toggleOne"
+          data-id="{{person.id}}"
+        >
+          <view class="check-box {{person.selected ? 'on' : ''}}"></view>
+          <party-face class="pick-face" party="{{person}}" layout="slot"></party-face>
+        </view>
+      </view>
     </view>
   </scroll-view>
+
+  <view class="bottom-bar">
+    <view class="cta-ghost" bindtap="onBack">取消</view>
+    <view class="cta-gold" bindtap="onConfirm">确定</view>
+  </view>
 </view>

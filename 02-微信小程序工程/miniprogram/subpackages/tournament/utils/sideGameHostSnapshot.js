@@ -4,6 +4,7 @@
  */
 var seriesStationIndex = require('../../../utils/seriesStationIndex.js');
 var gameStore = require('../../../utils/gameStore.js');
+var editAccess = require('../../../utils/sideGameEditAccess.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -29,6 +30,20 @@ function currentUserId() {
   } catch (e) {
     return '';
   }
+}
+
+function stampEditAccess(cloned, src) {
+  if (!cloned) return cloned;
+  if (src && typeof src === 'object') {
+    cloned.createdBy = asString(src.createdBy || src.creatorId || cloned.createdBy);
+    if (src.creatorId) cloned.creatorId = asString(src.creatorId);
+    if (src.tempAdmins) cloned.tempAdmins = src.tempAdmins;
+  }
+  var uid = asString(cloned.currentUserId || currentUserId());
+  cloned.currentUserId = uid;
+  if (!uid) return cloned;
+  cloned.canEditSideGames = editAccess.canEditSideGames(src || cloned, uid);
+  return cloned;
 }
 
 function emptySnapshot(patch) {
@@ -119,7 +134,7 @@ function buildFromMatch(match, options) {
     teamGroups: Array.isArray(m.teamGroups) ? m.teamGroups : [],
     registerInfo: m.registerInfo || { users: [] }
   });
-  return cloned || emptySnapshot({ allowBigPot: !!opts.allowBigPot });
+  return stampEditAccess(cloned, m) || emptySnapshot({ allowBigPot: !!opts.allowBigPot });
 }
 
 module.exports = {

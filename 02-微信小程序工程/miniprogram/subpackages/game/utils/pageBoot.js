@@ -1,9 +1,10 @@
 /**
- * 页面 query 与空态。无 Repository / HostContext，不读 Storage。
+ * 页面 query 与空态。页面不读 Storage。
  */
 var headerEngine = require('../../../utils/headerEngine.js');
+var repository = require('./sideGameRepository.js');
 
-var EMPTY_HINT = '游戏数据尚未接入';
+var EMPTY_HINT = '暂无游戏';
 
 function parseQuery(query) {
   var q = query || {};
@@ -23,7 +24,7 @@ function hasMatchContext(ctx) {
 }
 
 function hasRepository() {
-  return false;
+  return repository.hasImplementation();
 }
 
 function headerPatch() {

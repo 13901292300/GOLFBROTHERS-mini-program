@@ -1964,6 +1964,16 @@ Page({
     );
 
     teamMatchStore.saveMatch(updated);
+    const holeSync = require('../../../../utils/matchHoleOrderRebuild.js').syncAfterCourseHalfChange({
+      matchId: updated.matchId,
+      before: existing,
+      after: updated
+    });
+    if (!holeSync.ok) {
+      teamMatchStore.saveMatch(existing);
+      wx.showToast({ title: holeSync.message || '保存失败', icon: 'none' });
+      return;
+    }
     // 改期等基础信息变更后，同步已有报名用户的 team_match 日程 date/content
     this.syncTeamMatchSchedules(updated);
     // 落盘成功后同步「原始赛制」，供下次校验失败回滚

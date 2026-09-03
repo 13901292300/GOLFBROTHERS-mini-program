@@ -1,10 +1,78 @@
-﻿@import "../../styles/gb-shell.wxss";
+@import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
+
+/* 宿主 app.wxss 未设 page height:100%（沙盒 app.wxss 有）。
+   disableScroll + .gb-page overflow:hidden 时，必须给 page 定高，
+   .gb-body 的 flex:1; height:0; min-height:0 才能形成可滚区域。 */
+page,
+.gb-page {
+  height: 100%;
+}
+
 .gb-body { padding-bottom: 160rpx; }
 
 .game-card > .kv {
   margin-top: 16rpx;
   width: 100%;
+}
+
+/* 三局第一张卡片：左文案 + 右三段积分（仅 catalogId=three-set） */
+.game-card__top--three-set {
+  display: block;
+  margin-bottom: 0;
+}
+
+.three-set-hero {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.three-set-hero__left {
+  flex: 1;
+  min-width: 0;
+}
+
+.three-set-hero__left .game-card__heading {
+  padding-right: 0;
+}
+
+.three-set-hero__right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12rpx;
+  width: 220rpx;
+  box-sizing: border-box;
+}
+
+.three-set-seg-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12rpx;
+  height: 56rpx;
+  box-sizing: border-box;
+}
+
+.three-set-seg-row__label {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 56rpx;
+  color: var(--text-muted);
+}
+
+.three-set-seg-row .mini-input {
+  flex-shrink: 0;
 }
 
 .band-count-row {
@@ -213,7 +281,7 @@
 }
 
 .player-grid--lasuo8 .player-name {
-  font-size: 16rpx;
+  font-size: 18rpx;
 }
 
 .player-grid--lasuo8 .check-box {
@@ -327,6 +395,7 @@
   height: 48rpx;
   line-height: 48rpx;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 .pair-name {
@@ -407,6 +476,72 @@
   color: var(--data-blue);
   text-align: center;
   text-decoration: underline;
+}
+
+.three-set-hcap-sheet {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * 三局让杆弹窗裁切根因：
+ * .three-set-hcap-scroll { overflow-y: auto } 作为独立滚动盒，
+ * 其子节点 .sheet-user 继承公共样式 margin-top:-8rpx，
+ * 负 margin 把头像顶出 scrollport，被 overflow 裁掉顶部圆弧。
+ * 普通比洞让杆无此内层滚动盒，故不受影响。
+ * 仅修三局外层：取消负 margin，并为头像视觉高度预留顶部空间。
+ */
+.three-set-hcap-scroll {
+  max-height: 56vh;
+  min-height: 240rpx;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  /* 抵消原 -8rpx，并为圆形头像上缘留余量（避免亚像素/边框再被切） */
+  padding-top: 12rpx;
+}
+
+/* 三局让杆对阵行：VS 固定中线，左右等宽，主体块分别靠 VS 对齐 */
+.three-set-hcap-vs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16rpx;
+  gap: 16rpx;
+  margin-top: 0;
+  margin-bottom: 28rpx;
+  overflow: visible;
+  min-height: 56rpx;
+  justify-content: stretch;
+}
+
+.three-set-hcap-vs__side {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: visible;
+}
+
+.three-set-hcap-vs__side--left {
+  justify-content: flex-end;
+}
+
+.three-set-hcap-vs__side--right {
+  justify-content: flex-start;
+}
+
+.three-set-hcap-vs__mark {
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* 头像+昵称整块参与对齐；限制在半列内以便超长昵称省略 */
+.three-set-hcap-vs party-face {
+  flex: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
 }
 
 .hole-cell.lock {

@@ -1,4 +1,5 @@
 const mockAvatars = require('../../../../utils/mockAvatars.js');
+const comboDisplayName = require('../../../../utils/comboDisplayName.js');
 /**
  * 赛事详情页（球队赛 / 队内赛正在进行中）
  * 1:1 复刻 01-HTML原型/记分页面/队内赛正在进行中.html
@@ -193,14 +194,14 @@ const TOURNAMENT_TABS = {
     { id: 'leaderboard', label: '领先榜' },
     { id: 'tee-sheet', label: '出发表' },
     { id: 'discussion', label: '讨论区' },
-    { id: 'game', label: '游戏' }
+    { id: 'game', label: '大游戏' }
   ],
   completed: [
     { id: 'details', label: '赛事信息' },
     { id: 'leaderboard', label: '成绩表' },
     { id: 'tee-sheet', label: '出发表' },
     { id: 'discussion', label: '讨论区' },
-    { id: 'game', label: '游戏' }
+    { id: 'game', label: '大游戏' }
   ]
 };
 
@@ -1860,10 +1861,7 @@ Page({
     this._preferredActiveTab = '';
     this.setData(Object.assign({
       matchId: matchId,
-      hostSnapshot: sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(matchId), {
-        scope: 'match',
-        allowBigPot: false
-      }),
+      hostSnapshot: this._matchHostSnapshot(matchId),
       match: this._mapMatchToView(match),
       courseName: (match && match.courseName) || '',
       scorecardCourseTitle: scorecardCourseTitle,
@@ -1944,10 +1942,7 @@ Page({
     );
     this.setData(Object.assign({
       match: this._mapMatchToView(match),
-      hostSnapshot: sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(matchId), {
-        scope: 'match',
-        allowBigPot: false
-      }),
+      hostSnapshot: this._matchHostSnapshot(matchId),
       courseName: match.courseName || '',
       scorecardCourseTitle: scorecardCourseTitle,
       matchStatus: lifecycle,
@@ -3074,7 +3069,7 @@ Page({
           teamId === '__unknown__'
             ? sideUnit
             : teamNameById[teamId] || teamId || sideUnit,
-        namesText: names.join(' / ')
+        namesText: comboDisplayName.joinMemberDisplayNames(names)
       });
     });
 
@@ -3135,7 +3130,7 @@ Page({
       comboViews.push({
         id: (pr && pr.id != null && String(pr.id).trim()) || ('g4_pair_' + (idx + 1)),
         label: teamLabel,
-        namesText: names.join(' / '),
+        namesText: comboDisplayName.joinMemberDisplayNames(names),
         members: []
       });
     });
@@ -3184,7 +3179,7 @@ Page({
           );
         })
         .filter(Boolean);
-      const namesText = names.join(' / ');
+      const namesText = comboDisplayName.joinMemberDisplayNames(names);
       const teamName =
         combo && combo.teamName != null && String(combo.teamName).trim()
           ? String(combo.teamName).trim()
@@ -3258,7 +3253,7 @@ Page({
         id: pr.id || ('pairing_' + (idx + 1)),
         label: '组合' + (idx + 1),
         members: members,
-        namesText: members.map((m) => m.name).join(' / ')
+        namesText: comboDisplayName.joinMemberDisplayNames(members)
       };
     }).filter((pr) => pr.members && pr.members.length);
 
@@ -4441,6 +4436,7 @@ Page({
     wx.nextTick(() => {
       this._initMoreFab();
       this.measureTabOverflow();
+      if (this.data.activeTab === 'game') this._syncGameDock();
     });
   },
 
@@ -4511,6 +4507,7 @@ Page({
       wx.nextTick(() => this.measureMpSbSummaryTop());
     }
     if (this.data.activeTab === 'groups') wx.nextTick(() => this.computeGroupsPanelMinHeight());
+    if (this.data.activeTab === 'game') wx.nextTick(() => this._syncGameDock());
     wx.nextTick(() => this._refreshFabHitZones());
   },
 
@@ -4566,6 +4563,7 @@ Page({
       });
     }
     wx.nextTick(() => this.updateTabContentSpacer());
+    if (this.data.activeTab === 'game') wx.nextTick(() => this._syncGameDock());
   },
 
   _initMoreFab() {
@@ -4746,6 +4744,7 @@ Page({
               this.measureMpSbSummaryTop();
             }
             if (this.data.activeTab === 'groups') this.computeGroupsPanelMinHeight();
+            if (this.data.activeTab === 'game') this._syncGameDock();
             wx.nextTick(() => this.measureTabOverflow());
           }
         }
@@ -5033,7 +5032,7 @@ Page({
     if (mpSbSummarySticky !== this.data.isStickyMpSbSummary) {
       patch.isStickyMpSbSummary = mpSbSummarySticky;
     }
-    if (this.data.activeTab === 'register' || this.data.activeTab === 'groups') {
+    if (this.data.activeTab === 'register' || this.data.activeTab === 'groups' || this.data.activeTab === 'game') {
       const hideCTA = this._calcHideRegisterCTA(scrollTop, sticky);
       if (hideCTA !== this.data.hideRegisterCTA) {
         patch.hideRegisterCTA = hideCTA;
@@ -5132,7 +5131,24 @@ Page({
     const scrollTop = e.detail.scrollTop || 0;
     // 先同步吸顶状态；吸顶后再由 _syncStickyByScroll 按内容是否溢出钳制列表
     this._syncStickyByScroll(scrollTop);
+    if (this.data.activeTab === 'game') this._syncGameDock();
     // 注意：scroll 不再控制输入栏显隐（避免错误卸载/消失）；输入栏仅由 activeTab 决定 show/hide
+  },
+
+  _syncGameDock() {
+    if (this.data.activeTab !== 'game') return;
+    try {
+      const tab = this.selectComponent('#detail-game-tab');
+      if (!tab) return;
+      const tabBottom = this.data.isStickyTab
+        ? (this.data.headerTotalHeight || 0) + (this.data.tabBarHeight || 0)
+        : 0;
+      if (typeof tab.setFlowTabBottom === 'function') {
+        tab.setFlowTabBottom(tabBottom);
+      } else if (typeof tab.syncDockFromLayout === 'function') {
+        tab.syncDockFromLayout();
+      }
+    } catch (e) { /* ignore */ }
   },
 
   onBack() {
@@ -5140,6 +5156,14 @@ Page({
   },
 
   /* ===== Tabs ===== */
+  _matchHostSnapshot(matchId) {
+    const id = matchId || this.data.matchId;
+    return sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(id), {
+      scope: 'match',
+      allowBigPot: false
+    });
+  },
+
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab;
     if (tab === this.data.activeTab) return;
@@ -5163,16 +5187,13 @@ Page({
       patch.registrationContentLocked = false;
       patch.registrationStickySpacerHeight = 0;
     }
-    if (tab !== 'register' && tab !== 'groups') {
+    if (tab !== 'register' && tab !== 'groups' && tab !== 'game') {
       patch.hideRegisterCTA = false;
     }
     this.setData(patch);
     if (tab === 'game') {
       this.setData({
-        hostSnapshot: sideGameHostSnapshot.buildFromMatch(teamMatchStore.getMatchById(this.data.matchId), {
-          scope: 'match',
-          allowBigPot: false
-        })
+        hostSnapshot: this._matchHostSnapshot()
       });
     }
     wx.nextTick(() => {
@@ -5190,6 +5211,10 @@ Page({
         this._refreshFormalGroupsDisplay();
         this.computeGroupsPanelMinHeight();
         this._syncStickyByScroll(this.data.scrollYState || 0);
+      }
+      if (tab === 'game') {
+        this._syncStickyByScroll(this.data.scrollYState || 0);
+        this._syncGameDock();
       }
     });
     if (tab === 'tee-sheet') {
@@ -5991,10 +6016,7 @@ Page({
             ? 'pair'
             : 'team';
         // 名称必须来自成员昵称，禁止「第N组组合 / 第一组合」占位
-        const name = memberViews
-          .map((m) => String((m && (m.name || m.displayName)) || '').trim())
-          .filter(Boolean)
-          .join(' / ');
+        const name = comboDisplayName.joinMemberDisplayNames(memberViews);
         if (!name) return;
         const avatar = memberViews[0].avatar || '';
 

@@ -10,9 +10,27 @@
       </view>
     </view>
   </view>
-  <scroll-view class="gb-body" scroll-y>
+  <scroll-view class="gb-body gb-body--with-cta" scroll-y>
     <view class="page-pad">
-      <view class="empty">{{emptyHint}}</view>
+      <view wx:if="{{emptyHint}}" class="empty">{{emptyHint}}</view>
+      <view wx:elif="{{record}}" class="ds-card">
+        <view wx:if="{{stale}}" class="sec-hint">成绩已更新，可重新计算</view>
+        <view class="setting-row">
+          <text class="setting-k">结果</text>
+          <text class="setting-v">{{resultText}}</text>
+        </view>
+        <view class="sec-hint">参与方</view>
+        <view wx:for="{{partyLines}}" wx:key="*this" class="catalog-row">
+          <text class="catalog-name">{{item}}</text>
+        </view>
+      </view>
     </view>
   </scroll-view>
+  <view wx:if="{{record}}" class="bottom-bar">
+    <view class="cta-gold" bindtap="onRefresh">重新计算</view>
+  </view>
+  <view wx:if="{{record}}" class="page-pad">
+    <view class="catalog-row" bindtap="onEdit"><text class="catalog-name">修改</text></view>
+    <view class="catalog-row" bindtap="onDelete"><text class="catalog-name">删除</text></view>
+  </view>
 </view>

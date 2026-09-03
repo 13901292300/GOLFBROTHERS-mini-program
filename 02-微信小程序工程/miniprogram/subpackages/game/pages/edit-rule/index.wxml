@@ -1,18 +1,1278 @@
-<view class="gb-page bright-mode">
+<view class="gb-page bright-mode {{pageMode === 'readonly' ? 'gb-page--readonly' : ''}}">
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
       <view class="gb-header__left">
         <view class="gb-header__back" bindtap="onBack"><text class="gb-header__chevron">‹</text></view>
         <view>
-          <text class="gb-header__eyebrow">EDIT RULE</text>
-          <text class="gb-header__title">{{ruleName || '编辑规则'}}</text>
+          <text class="gb-header__eyebrow">TEMPLATE</text>
+          <text class="gb-header__title">{{headerTitle}}</text>
+          <text wx:if="{{readonlyHint}}" class="gb-header__readonly">{{readonlyHint}}</text>
         </view>
       </view>
     </view>
   </view>
+
   <scroll-view class="gb-body" scroll-y>
     <view class="page-pad">
-      <view class="empty">{{emptyHint}}</view>
+      <view class="sec-label">规则名称</view>
+      <input class="field" value="{{ruleName}}" bindinput="onName" />
+      <view wx:if="{{noSettings}}" class="sec-hint">此玩法没有规则模板。让杆、分值等在开局时再配。</view>
+
+      <block wx:if="{{showLasuo}}">
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="pk">
+            <text class="rule-lib__title">比较指标</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPkText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPk ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPk}}" class="fold-body">
+            <view class="sec-hint">至少选一项。选中项的权重计入本洞团队得分。</view>
+            <view class="pk-card">
+              <checkbox-group wx:if="{{pkBoxShow}}" bindchange="onPkChange">
+                <label class="pk-row">
+                  <checkbox value="better" checked="{{pkBetter}}" color="#002D62" />
+                  <text class="pk-name">较好成绩</text>
+                  <view class="pk-weight" catchtap="stopTap">
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" disabled="{{!pkBetter}}" value="{{numEditing && numEditField === 'pkBetterW' ? numEditDraft : pkBetterW}}" data-key="pkBetterW" data-num-handler="onPkWeight" bindinput="onNumInput" />
+                    <text>分</text>
+                  </view>
+                </label>
+                <label class="pk-row">
+                  <checkbox value="worse" checked="{{pkWorse}}" color="#002D62" />
+                  <text class="pk-name">较差成绩</text>
+                  <view class="pk-weight" catchtap="stopTap">
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" disabled="{{!pkWorse}}" value="{{numEditing && numEditField === 'pkWorseW' ? numEditDraft : pkWorseW}}" data-key="pkWorseW" data-num-handler="onPkWeight" bindinput="onNumInput" />
+                    <text>分</text>
+                  </view>
+                </label>
+                <label class="pk-row">
+                  <checkbox value="total" checked="{{pkTotal}}" color="#002D62" />
+                  <text class="pk-name">{{pkTotalMode === 'product' ? '总成绩积' : '总成绩和'}}</text>
+                  <view class="pk-swap" catchtap="togglePkTotalMode">
+                    <text class="pk-swap__side {{pkTotalMode === 'sum' ? 'on' : ''}}">和</text>
+                    <text class="pk-swap__icon">⇄</text>
+                    <text class="pk-swap__side {{pkTotalMode === 'product' ? 'on' : ''}}">积</text>
+                  </view>
+                  <view class="pk-weight" catchtap="stopTap">
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" disabled="{{!pkTotal}}" value="{{numEditing && numEditField === 'pkTotalW' ? numEditDraft : pkTotalW}}" data-key="pkTotalW" data-num-handler="onPkWeight" bindinput="onNumInput" />
+                    <text>分</text>
+                  </view>
+                </label>
+              </checkbox-group>
+              <view class="pk-total-line">
+                <text class="pk-total-k">选中权重合计</text>
+                <text class="pk-total-v">{{pkWeightTotal}} 分</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="reward">
+            <text class="rule-lib__title">奖励规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoRewardText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldReward ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldReward}}" class="fold-body">
+            <view class="opt {{reward === 'none' ? 'on' : ''}}" bindtap="setReward" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无奖励</text>
+            </view>
+            <view class="opt opt--fold {{reward === 'add' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="add">
+                <view class="radio-dot"></view>
+                <text class="opt-title">加法奖励</text>
+                <view wx:if="{{reward === 'add'}}" class="rule-lib__meta" catchtap="toggleFoldAdd">
+                  <text class="rule-lib__count">{{addText}}</text>
+                  <text class="rule-lib__chev">{{foldAdd ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'add' && foldAdd}}" class="opt-fold-body">
+                <view wx:for="{{addRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">+</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'addRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="addRows" data-num-handler="onAddRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+                <block wx:if="{{pkTotal}}">
+                  <view class="sec-label">加法奖励前置条件</view>
+                  <view class="opt {{addPre === 'win' ? 'on' : ''}}" bindtap="setAddPre" data-value="win">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">总成绩赢才奖</text>
+                  </view>
+                  <view class="opt {{addPre === 'not-lose' ? 'on' : ''}}" bindtap="setAddPre" data-value="not-lose">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">总成绩不输才奖</text>
+                  </view>
+                  <view class="opt {{addPre === 'ignore' ? 'on' : ''}}" bindtap="setAddPre" data-value="ignore">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">与总成绩无关</text>
+                  </view>
+                </block>
+              </view>
+            </view>
+            <view class="opt opt--fold {{reward === 'mul' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="mul">
+                <view class="radio-dot"></view>
+                <text class="opt-title">乘法奖励</text>
+                <view wx:if="{{reward === 'mul'}}" class="rule-lib__meta" catchtap="toggleMatchMulFold">
+                  <text class="rule-lib__count">{{matchMulText}}</text>
+                  <text class="rule-lib__chev">{{matchFoldMul ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'mul' && matchFoldMul}}" class="opt-fold-body">
+                <view class="sec-hint">仅胜队成绩可触发倍数。负队不触发。</view>
+                <view class="sec-label">个人倍数</view>
+                <view wx:for="{{mulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+                <view class="sec-label">组合奖励</view>
+                <view class="sec-hint">按胜队两人成绩配对计倍，只计这三档，倍数可改。</view>
+                <view wx:for="{{comboMulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'comboMulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="comboMulRows" data-num-handler="onComboMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt {{pushRule === 'push' ? 'on' : ''}}" bindtap="setPush" data-value="push">
+              <view class="radio-dot"></view>
+              <text class="opt-title">得分打平</text>
+            </view>
+            <view class="opt {{pushRule === 'within-n' ? 'on' : ''}}" bindtap="setPush" data-value="within-n">
+              <view class="radio-dot"></view>
+              <text class="opt-title">得分 ≤</text>
+              <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'pushWithinN' ? numEditDraft : pushWithinN}}" data-num-field="pushWithinN" catchtap="keepPushWithin" data-num-handler="setPushWithinN" bindinput="onNumInput" />
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPush" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+            <view class="sec-hint">得分≤N 时本洞仍正常计分，并累积 1 块肉。</view>
+            <view class="sec-label">顶洞时是否重新排序</view>
+            <view class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
+              <view class="radio-dot"></view>
+              <text class="opt-title">否（顶洞不换组合）</text>
+            </view>
+            <view class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
+              <view class="radio-dot"></view>
+              <text class="opt-title">是（顶洞也按成绩调整组合）</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoMeatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeat">
+                <text class="opt-title">按成绩吃肉</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeat}}" class="opt-fold-body">
+                <view class="reward-row meat-head">
+                  <text>成绩</text>
+                  <text>吃肉数量</text>
+                </view>
+                <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                  </view>
+                </view>
+                <view class="sec-hint">可填 0～3。按胜队最好成绩查表。</view>
+              </view>
+            </view>
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeatValue">
+                <text class="opt-title">肉的分值</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                  <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                <view class="opt {{meatValueType === 'fixed' ? 'on' : ''}}" bindtap="setLasuoMeatValue" data-type="fixed" data-include="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉算</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'meatValueN' ? numEditDraft : meatValueN}}" data-num-field="meatValueN" catchtap="keepFixedMeat" data-num-handler="onMeatValueN" bindinput="onNumInput" />
+                  <text class="opt-title">分</text>
+                </view>
+                <view class="opt {{meatValueType === 'double' && meatInclude === 'no' ? 'on' : ''}}" bindtap="setLasuoMeatValue" data-type="double" data-include="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">分值翻倍（不含奖励）</text>
+                </view>
+                <view class="opt {{meatValueType === 'double' && meatInclude === 'yes' ? 'on' : ''}}" bindtap="setLasuoMeatValue" data-type="double" data-include="yes">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">分值翻倍（含奖励）</text>
+                </view>
+                <block wx:if="{{meatValueType === 'double'}}">
+                  <view class="sec-label">肉值封顶</view>
+                  <view class="opt {{meatCap === 'none' ? 'on' : ''}}" bindtap="setMeatCap" data-value="none">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">不封顶</text>
+                  </view>
+                  <view class="opt {{meatCap === 'cap' ? 'on' : ''}}" bindtap="setMeatCap" data-value="cap">
+                    <view class="radio-dot"></view>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'meatCapN' ? numEditDraft : meatCapN}}" catchtap="setMeatCap" data-value="cap" data-num-field="meatCapN" data-num-handler="onMeatCapN" bindinput="onNumInput" />
+                    <text class="opt-title">分封顶</text>
+                  </view>
+                </block>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="bao">
+            <text class="rule-lib__title">包洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoBaoText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldBao ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldBao}}" class="fold-body">
+            <view class="sec-hint">仅对队内球员有效。默认不包洞。</view>
+            <view class="opt {{baoMode === 'none' ? 'on' : ''}}" bindtap="setBaoOnOff" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不包洞</text>
+            </view>
+            <view class="opt opt--fold {{baoMode !== 'none' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setBaoOnOff" data-value="on">
+                <view class="radio-dot"></view>
+                <text class="opt-title">包洞</text>
+                <view wx:if="{{baoMode !== 'none'}}" class="rule-lib__meta" catchtap="toggleFoldBao">
+                  <text class="rule-lib__count">{{baoText}}</text>
+                  <text class="rule-lib__chev">{{foldBao ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{baoMode !== 'none' && foldBao}}" class="opt-fold-body">
+                <view class="opt {{baoMode === 'plus-n' ? 'on' : ''}}" bindtap="setBaoMode" data-value="plus-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">从 +</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'baoPlusN' ? numEditDraft : baoPlusN}}" catchtap="keepBaoMode" data-value="plus-n" data-num-field="baoPlusN" data-num-handler="onBaoPlusN" bindinput="onNumInput" />
+                  <text class="opt-title">开始包洞</text>
+                </view>
+                <view class="opt {{baoMode === 'doublepar-n' ? 'on' : ''}}" bindtap="setBaoMode" data-value="doublepar-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">从 DOUBLEPAR +</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'baoDoubleN' ? numEditDraft : baoDoubleN}}" catchtap="keepBaoMode" data-value="doublepar-n" data-num-field="baoDoubleN" data-num-handler="onBaoDoubleN" bindinput="onNumInput" />
+                  <text class="opt-title">开始包洞</text>
+                </view>
+                <view class="opt {{baoMode === 'partner-diff' ? 'on' : ''}}" bindtap="setBaoMode" data-value="partner-diff">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">与同伴杆差</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'baoDiffN' ? numEditDraft : baoDiffN}}" catchtap="keepBaoMode" data-value="partner-diff" data-num-field="baoDiffN" data-num-handler="onBaoDiffN" bindinput="onNumInput" />
+                  <text class="opt-title">杆包洞</text>
+                </view>
+                <view class="sec-label">包洞前置条件</view>
+                <view class="opt {{baoPre === 'ahead' ? 'on' : ''}}" bindtap="setBaoPre" data-value="ahead">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">同伴顶头才包洞</text>
+                </view>
+                <view class="opt {{baoPre === 'ignore' ? 'on' : ''}}" bindtap="setBaoPre" data-value="ignore">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">与同伴成绩无关</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{showReward}}">
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="reward">
+            <text class="rule-lib__title">奖励规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoRewardText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldReward ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldReward}}" class="fold-body">
+            <view class="opt {{reward === 'none' ? 'on' : ''}}" bindtap="setReward" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无奖励</text>
+            </view>
+            <view class="opt opt--fold {{reward === 'add' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="add">
+                <view class="radio-dot"></view>
+                <text class="opt-title">加法奖励</text>
+                <view wx:if="{{reward === 'add'}}" class="rule-lib__meta" catchtap="toggleFoldAdd">
+                  <text class="rule-lib__count">{{addText}}</text>
+                  <text class="rule-lib__chev">{{foldAdd ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'add' && foldAdd}}" class="opt-fold-body">
+                <view wx:for="{{addRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">+</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'addRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="addRows" data-num-handler="onAddRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view class="opt opt--fold {{reward === 'mul' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="mul">
+                <view class="radio-dot"></view>
+                <text class="opt-title">乘法奖励</text>
+                <view wx:if="{{reward === 'mul'}}" class="rule-lib__meta" catchtap="toggleMatchMulFold">
+                  <text class="rule-lib__count">{{matchMulText}}</text>
+                  <text class="rule-lib__chev">{{matchFoldMul ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'mul' && matchFoldMul}}" class="opt-fold-body">
+                <view wx:for="{{mulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{showThreeVsOne}}">
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="compare">
+            <text class="rule-lib__title">比较方式</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{tvoCompareText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldCompare ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldCompare}}" class="fold-body">
+            <view class="sec-hint">每洞用该指标比较单人队与三人队，杆数低者胜。</view>
+            <view class="opt {{tvoCompare === 'best' ? 'on' : ''}}" bindtap="setTvoCompare" data-value="best">
+              <view class="radio-dot"></view>
+              <text class="opt-title">最好成绩</text>
+            </view>
+            <view class="opt {{tvoCompare === 'avg' ? 'on' : ''}}" bindtap="setTvoCompare" data-value="avg">
+              <view class="radio-dot"></view>
+              <text class="opt-title">平均成绩</text>
+            </view>
+            <view class="opt {{tvoCompare === 'worst' ? 'on' : ''}}" bindtap="setTvoCompare" data-value="worst">
+              <view class="radio-dot"></view>
+              <text class="opt-title">最差成绩</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="reward">
+            <text class="rule-lib__title">奖励规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoRewardText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldReward ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldReward}}" class="fold-body">
+            <view class="opt {{reward === 'none' ? 'on' : ''}}" bindtap="setReward" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无奖励</text>
+            </view>
+            <view class="opt opt--fold {{reward === 'mul' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="mul">
+                <view class="radio-dot"></view>
+                <text class="opt-title">乘法奖励</text>
+                <view wx:if="{{reward === 'mul'}}" class="rule-lib__meta" catchtap="toggleMatchMulFold">
+                  <text class="rule-lib__count">{{matchMulText}}</text>
+                  <text class="rule-lib__chev">{{matchFoldMul ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'mul' && matchFoldMul}}" class="opt-fold-body">
+                <view wx:for="{{mulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt {{pushRule === 'push' ? 'on' : ''}}" bindtap="setPush" data-value="push">
+              <view class="radio-dot"></view>
+              <text class="opt-title">得分打平</text>
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPush" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoMeatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeat">
+                <text class="opt-title">按成绩吃肉</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeat}}" class="opt-fold-body">
+                <view class="reward-row meat-head">
+                  <text>成绩</text>
+                  <text>吃肉数量</text>
+                </view>
+                <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeatValue">
+                <text class="opt-title">肉的分值</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                  <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                <view class="opt {{meatInclude === 'no' ? 'on' : ''}}" bindtap="setMeat" data-value="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉不含奖励部分</text>
+                </view>
+                <view class="opt {{meatInclude === 'yes' ? 'on' : ''}}" bindtap="setMeat" data-value="yes">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉含奖励部分</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{showVegas}}">
+        <view class="sec-hint">无奖励、无包洞。翻牌规则固定（双向，有小鸟或更好才翻）。编队、让杆在开局时再配。</view>
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt opt--fold {{pushRule !== 'none' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setPushMode" data-value="on">
+                <view class="radio-dot"></view>
+                <text class="opt-title">有顶洞</text>
+                <view wx:if="{{pushRule !== 'none'}}" class="rule-lib__meta" catchtap="toggleFoldPush">
+                  <text class="rule-lib__count">{{lasuoPushText}}</text>
+                  <text class="rule-lib__chev">{{foldPush ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{pushRule !== 'none' && foldPush}}" class="opt-fold-body">
+                <view class="opt {{pushRule === 'push' ? 'on' : ''}}" bindtap="setPush" data-value="push">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">得分打平</text>
+                </view>
+                <view class="opt {{pushRule === 'within-n' ? 'on' : ''}}" bindtap="setPush" data-value="within-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">分差 ≤</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'pushWithinN' ? numEditDraft : pushWithinN}}" data-num-field="pushWithinN" catchtap="keepPushWithin" data-num-handler="setPushWithinN" bindinput="onNumInput" />
+                </view>
+                <view class="sec-hint">分差≤N 时本洞仍正常计分，并累积 1 块肉。</view>
+                <view class="sec-label">顶洞时是否重新排序</view>
+                <view class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">否（顶洞不换组合）</text>
+                </view>
+                <view class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">是（顶洞也按成绩调整组合）</text>
+                </view>
+              </view>
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPushMode" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoMeatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeat">
+                <text class="opt-title">按成绩吃肉</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeat}}" class="opt-fold-body">
+                <view class="reward-row meat-head">
+                  <text>成绩</text>
+                  <text>吃肉数量</text>
+                </view>
+                <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                  </view>
+                </view>
+                <view class="sec-hint">可填 0～3。按胜队最好成绩查表。</view>
+              </view>
+            </view>
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeatValue">
+                <text class="opt-title">肉的分值</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                  <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                <view class="opt {{meatValueType === 'fixed' ? 'on' : ''}}" bindtap="setMeatValueType" data-value="fixed">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉算</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'meatValueN' ? numEditDraft : meatValueN}}" data-num-field="meatValueN" catchtap="keepFixedMeat" data-num-handler="onMeatValueN" bindinput="onNumInput" />
+                  <text class="opt-title">分</text>
+                </view>
+                <view class="opt opt--fold {{meatValueType === 'double' ? 'on' : ''}}">
+                  <view class="opt-row" bindtap="setMeatValueType" data-value="double">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">分值翻倍</text>
+                  </view>
+                  <view wx:if="{{meatValueType === 'double'}}" class="opt-fold-body">
+                    <view class="opt {{meatCap === 'none' ? 'on' : ''}}" bindtap="setMeatCap" data-value="none">
+                      <view class="radio-dot"></view>
+                      <text class="opt-title">不封顶</text>
+                    </view>
+                    <view class="opt {{meatCap === 'cap' ? 'on' : ''}}" bindtap="setMeatCap" data-value="cap">
+                      <view class="radio-dot"></view>
+                      <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'meatCapN' ? numEditDraft : meatCapN}}" catchtap="keepMeatCap" data-num-field="meatCapN" data-num-handler="onMeatCapN" bindinput="onNumInput" />
+                      <text class="opt-title">分封顶</text>
+                    </view>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="cap">
+            <text class="rule-lib__title">组合分数封顶</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{comboCapText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldCap ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldCap}}" class="fold-body">
+            <view class="opt {{comboCap === 'none' ? 'on' : ''}}" bindtap="setComboCap" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不封顶</text>
+            </view>
+            <view class="opt {{comboCap === 'cap' ? 'on' : ''}}" bindtap="setComboCap" data-value="cap">
+              <view class="radio-dot"></view>
+              <text class="opt-title">封顶至</text>
+              <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'comboCapN' ? numEditDraft : comboCapN}}" catchtap="setComboCap" data-value="cap" data-num-field="comboCapN" data-num-handler="onComboCapN" bindinput="onNumInput" />
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{showLandlordBig}}">
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="reward">
+            <text class="rule-lib__title">奖励规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoRewardText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldReward ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldReward}}" class="fold-body">
+            <view class="opt {{reward === 'none' ? 'on' : ''}}" bindtap="setReward" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无奖励</text>
+            </view>
+            <view class="opt opt--fold {{reward === 'mul' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="mul">
+                <view class="radio-dot"></view>
+                <text class="opt-title">乘法奖励</text>
+                <view wx:if="{{reward === 'mul'}}" class="rule-lib__meta" catchtap="toggleMatchMulFold">
+                  <text class="rule-lib__count">{{matchMulText}}</text>
+                  <text class="rule-lib__chev">{{matchFoldMul ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'mul' && matchFoldMul}}" class="opt-fold-body">
+                <view wx:for="{{mulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt {{pushRule === 'push' ? 'on' : ''}}" bindtap="setPush" data-value="push">
+              <view class="radio-dot"></view>
+              <text class="opt-title">得分打平</text>
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPush" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+            <view wx:if="{{showLandlordReorder}}" class="sec-label">顶洞时是否重新排序</view>
+            <view wx:if="{{showLandlordReorder}}" class="sec-hint">顶洞时是否根据本洞成绩调整组合。</view>
+            <view wx:if="{{showLandlordReorder}}" class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
+              <view class="radio-dot"></view>
+              <text class="opt-title">否（顶洞不换组合）</text>
+            </view>
+            <view wx:if="{{showLandlordReorder}}" class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
+              <view class="radio-dot"></view>
+              <text class="opt-title">是（顶洞也按成绩调整组合）</text>
+            </view>
+            <view wx:if="{{!showLandlordReorder}}" class="sec-hint">顶洞时固定不换组合，此项不可改。</view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoMeatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeat">
+                <text class="opt-title">{{showLandlordAutoMeat ? '每次吃1块肉' : '按成绩吃肉'}}</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeat}}" class="opt-fold-body">
+                <view wx:if="{{showLandlordAutoMeat}}" class="sec-hint">无需成绩表，每次获胜自动吃 1 块肉。</view>
+                <block wx:if="{{!showLandlordAutoMeat}}">
+                  <view class="reward-row meat-head">
+                    <text>成绩</text>
+                    <text>吃肉数量</text>
+                  </view>
+                  <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                    <text>{{item.label}}</text>
+                    <view class="reward-input">
+                      <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                    </view>
+                  </view>
+                </block>
+              </view>
+            </view>
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeatValue">
+                <text class="opt-title">肉的分值</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                  <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                <view class="opt {{meatInclude === 'no' ? 'on' : ''}}" bindtap="setMeat" data-value="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉不含奖励部分</text>
+                </view>
+                <view class="opt {{meatInclude === 'yes' ? 'on' : ''}}" bindtap="setMeat" data-value="yes">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉含奖励部分</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{showBaoHole}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="bao">
+            <text class="rule-lib__title">包洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoBaoText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldBao ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldBao}}" class="fold-body">
+            <view class="sec-hint">仅对双人队有效。</view>
+            <view class="opt {{baoMode === 'none' ? 'on' : ''}}" bindtap="setBaoOnOff" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不包洞</text>
+            </view>
+            <view class="opt opt--fold {{baoMode !== 'none' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setBaoOnOff" data-value="on">
+                <view class="radio-dot"></view>
+                <text class="opt-title">包洞</text>
+                <view wx:if="{{baoMode !== 'none'}}" class="rule-lib__meta" catchtap="toggleFoldBao">
+                  <text class="rule-lib__count">{{baoText}}</text>
+                  <text class="rule-lib__chev">{{foldBao ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{baoMode !== 'none' && foldBao}}" class="opt-fold-body">
+                <view class="opt {{baoMode === 'plus-n' ? 'on' : ''}}" bindtap="setBaoMode" data-value="plus-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">从 +</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'baoPlusN' ? numEditDraft : baoPlusN}}" catchtap="keepBaoMode" data-value="plus-n" data-num-field="baoPlusN" data-num-handler="onBaoPlusN" bindinput="onNumInput" />
+                  <text class="opt-title">开始包洞</text>
+                </view>
+                <view class="opt {{baoMode === 'doublepar-n' ? 'on' : ''}}" bindtap="setBaoMode" data-value="doublepar-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">从 DOUBLEPAR +</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'baoDoubleN' ? numEditDraft : baoDoubleN}}" catchtap="keepBaoMode" data-value="doublepar-n" data-num-field="baoDoubleN" data-num-handler="onBaoDoubleN" bindinput="onNumInput" />
+                  <text class="opt-title">开始包洞</text>
+                </view>
+                <view class="opt {{baoMode === 'partner-diff' ? 'on' : ''}}" bindtap="setBaoMode" data-value="partner-diff">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">与同伴杆差</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'baoDiffN' ? numEditDraft : baoDiffN}}" catchtap="keepBaoMode" data-value="partner-diff" data-num-field="baoDiffN" data-num-handler="onBaoDiffN" bindinput="onNumInput" />
+                  <text class="opt-title">杆包洞</text>
+                </view>
+                <view class="sec-label">包洞前置条件</view>
+                <view class="opt {{baoPre === 'ahead' ? 'on' : ''}}" bindtap="setBaoPre" data-value="ahead">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">同伴顶头才包洞</text>
+                </view>
+                <view class="opt {{baoPre === 'ignore' ? 'on' : ''}}" bindtap="setBaoPre" data-value="ignore">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">与同伴成绩无关</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{showDizhubo}}">
+        <view class="sec-hint">无包洞。大地主婆 / 二地主婆、分组与排序在开局时再配。</view>
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="reward">
+            <text class="rule-lib__title">奖励规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoRewardText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldReward ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldReward}}" class="fold-body">
+            <view class="opt {{reward === 'none' ? 'on' : ''}}" bindtap="setReward" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无奖励</text>
+            </view>
+            <view class="opt opt--fold {{reward === 'mul' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="mul">
+                <view class="radio-dot"></view>
+                <text class="opt-title">乘法奖励</text>
+                <view wx:if="{{reward === 'mul'}}" class="rule-lib__meta" catchtap="toggleMatchMulFold">
+                  <text class="rule-lib__count">{{matchMulText}}</text>
+                  <text class="rule-lib__chev">{{matchFoldMul ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'mul' && matchFoldMul}}" class="opt-fold-body">
+                <view wx:for="{{mulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt {{pushRule === 'push' ? 'on' : ''}}" bindtap="setPush" data-value="push">
+              <view class="radio-dot"></view>
+              <text class="opt-title">得分打平</text>
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPush" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+            <view class="sec-label">顶洞时是否重新排序</view>
+            <view class="sec-hint">顶洞时是否根据本洞成绩调整组合。</view>
+            <view class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
+              <view class="radio-dot"></view>
+              <text class="opt-title">否（顶洞不换组合）</text>
+            </view>
+            <view class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
+              <view class="radio-dot"></view>
+              <text class="opt-title">是（顶洞也按成绩调整组合）</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoMeatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeat">
+                <text class="opt-title">按成绩吃肉</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeat}}" class="opt-fold-body">
+                <view class="reward-row meat-head">
+                  <text>成绩</text>
+                  <text>吃肉数量</text>
+                </view>
+                <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeatValue">
+                <text class="opt-title">肉的分值</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                  <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                <view class="opt {{meatInclude === 'no' ? 'on' : ''}}" bindtap="setMeat" data-value="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉不含奖励部分</text>
+                </view>
+                <view class="opt {{meatInclude === 'yes' ? 'on' : ''}}" bindtap="setMeat" data-value="yes">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉含奖励部分</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{show8421Three}}">
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="score">
+            <text class="rule-lib__title">得分规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{scoreText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldScore ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldScore}}" class="fold-body">
+            <view wx:for="{{scoreRows}}" wx:key="id" class="reward-row">
+              <text>{{item.label}}</text>
+              <view class="reward-input">
+                <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'scoreRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="scoreRows" data-num-handler="onScoreRow" bindinput="onNumInput" />
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="deduct">
+            <text class="rule-lib__title">扣分规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{deductText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldDeduct ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldDeduct}}" class="fold-body">
+            <view class="opt opt--fold {{deductMode === 'on' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setDeductMode" data-value="on">
+                <view class="radio-dot"></view>
+                <text class="opt-title">扣分</text>
+                <view wx:if="{{deductMode === 'on'}}" class="rule-lib__meta" catchtap="toggleFoldDeduct">
+                  <text class="rule-lib__count">{{deductText}}</text>
+                  <text class="rule-lib__chev">{{foldDeduct ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{deductMode === 'on' && foldDeduct}}" class="opt-fold-body">
+                <view class="sec-label">扣分方式</view>
+                <view class="opt {{deductWay === 'plus-n' ? 'on' : ''}}" bindtap="setDeductWay" data-value="plus-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">从 +</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'deductPlusN' ? numEditDraft : deductPlusN}}" catchtap="keepDeductWay" data-value="plus-n" data-num-field="deductPlusN" data-num-handler="onDeductPlusN" bindinput="onNumInput" />
+                  <text class="opt-title">开始扣</text>
+                </view>
+                <view class="opt {{deductWay === 'doublepar-n' ? 'on' : ''}}" bindtap="setDeductWay" data-value="doublepar-n">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">从双帕 +</text>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'deductDoubleN' ? numEditDraft : deductDoubleN}}" catchtap="keepDeductWay" data-value="doublepar-n" data-num-field="deductDoubleN" data-num-handler="onDeductDoubleN" bindinput="onNumInput" />
+                  <text class="opt-title">开始扣</text>
+                </view>
+                <view class="sec-label">扣分封顶</view>
+                <view class="opt {{deductCap === 'none' ? 'on' : ''}}" bindtap="setDeductCap" data-value="none">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">不封顶，一直扣</text>
+                </view>
+                <view class="opt {{deductCap === 'cap' ? 'on' : ''}}" bindtap="setDeductCap" data-value="cap">
+                  <view class="radio-dot"></view>
+                  <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'deductCapN' ? numEditDraft : deductCapN}}" catchtap="keepDeductCap" data-num-field="deductCapN" data-num-handler="onDeductCapN" bindinput="onNumInput" />
+                  <text class="opt-title">分封顶</text>
+                </view>
+              </view>
+            </view>
+            <view class="opt {{deductMode === 'none' ? 'on' : ''}}" bindtap="setDeductMode" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不扣分</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{pushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt opt--fold {{pushRule !== 'none' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setPushMode" data-value="on">
+                <view class="radio-dot"></view>
+                <text class="opt-title">有顶洞</text>
+                <view wx:if="{{pushRule !== 'none'}}" class="rule-lib__meta" catchtap="toggleFoldPush">
+                  <text class="rule-lib__count">{{pushText}}</text>
+                  <text class="rule-lib__chev">{{foldPush ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{pushRule !== 'none' && foldPush}}" class="opt-fold-body">
+                <view class="opt {{pushRule === 'tie' ? 'on' : ''}}" bindtap="setPush" data-value="tie">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">得分相等</text>
+                </view>
+                <view class="opt {{pushRule === 'within-1' ? 'on' : ''}}" bindtap="setPush" data-value="within-1">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">得分≤1分</text>
+                </view>
+                <view class="opt {{pushRule === 'within-2' ? 'on' : ''}}" bindtap="setPush" data-value="within-2">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">得分≤2分</text>
+                </view>
+              </view>
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPushMode" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{meatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold {{meatEatMode === 'by-score' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setMeatEatMode" data-value="by-score">
+                <view class="radio-dot"></view>
+                <text class="opt-title">按成绩吃肉</text>
+                <view wx:if="{{meatEatMode === 'by-score'}}" class="rule-lib__meta" catchtap="toggleFoldMeat">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{meatEatMode === 'by-score' && foldMeat}}" class="opt-fold-body">
+                <view class="reward-row meat-head">
+                  <text>成绩</text>
+                  <text>吃肉数量</text>
+                </view>
+                <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                  </view>
+                </view>
+                <view class="opt opt--fold">
+                  <view class="opt-row" bindtap="toggleFoldMeatValue">
+                    <text class="opt-title">肉的分值</text>
+                    <view class="rule-lib__meta">
+                      <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                      <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                    </view>
+                  </view>
+                  <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                    <view class="opt {{meatValueType === 'fixed' ? 'on' : ''}}" bindtap="setMeatValueType" data-value="fixed">
+                      <view class="radio-dot"></view>
+                      <text class="opt-title">肉算</text>
+                      <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'meatValueN' ? numEditDraft : meatValueN}}" data-num-field="meatValueN" catchtap="keepFixedMeat" data-num-handler="onMeatValueN" bindinput="onNumInput" />
+                      <text class="opt-title">分</text>
+                    </view>
+                    <view class="opt opt--fold {{meatValueType === 'double' ? 'on' : ''}}">
+                      <view class="opt-row" bindtap="setMeatValueType" data-value="double">
+                        <view class="radio-dot"></view>
+                        <text class="opt-title">分值翻倍</text>
+                      </view>
+                      <view wx:if="{{meatValueType === 'double'}}" class="opt-fold-body">
+                        <view class="opt {{meatCap === 'none' ? 'on' : ''}}" bindtap="setMeatCap" data-value="none">
+                          <view class="radio-dot"></view>
+                          <text class="opt-title">不封顶</text>
+                        </view>
+                        <view class="opt {{meatCap === 'cap' ? 'on' : ''}}" bindtap="setMeatCap" data-value="cap">
+                          <view class="radio-dot"></view>
+                          <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditField === 'meatCapN' ? numEditDraft : meatCapN}}" catchtap="keepMeatCap" data-num-field="meatCapN" data-num-handler="onMeatCapN" bindinput="onNumInput" />
+                          <text class="opt-title">分封顶</text>
+                        </view>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view class="opt {{meatEatMode === 'all-double' ? 'on' : ''}}" bindtap="setMeatEatMode" data-value="all-double">
+              <view class="radio-dot"></view>
+              <text class="opt-title">一次全吃，连续翻倍</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{showBaoNeg}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="baoneg">
+            <text class="rule-lib__title">包负分</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{baoNegText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldBaoNeg ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldBaoNeg}}" class="fold-body">
+            <view class="sec-hint">仅对双人队有效。双人队中有且只有一人因扣分得负分时生效。</view>
+            <view class="opt {{baoNeg === 'none' ? 'on' : ''}}" bindtap="setBaoNegOnOff" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">不包负分</text>
+            </view>
+            <view class="opt opt--fold {{baoNeg !== 'none' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setBaoNegOnOff" data-value="on">
+                <view class="radio-dot"></view>
+                <text class="opt-title">包负分</text>
+                <view wx:if="{{baoNeg !== 'none'}}" class="rule-lib__meta" catchtap="toggleFoldBaoNeg">
+                  <text class="rule-lib__count">{{baoNegText}}</text>
+                  <text class="rule-lib__chev">{{foldBaoNeg ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{baoNeg !== 'none' && foldBaoNeg}}" class="opt-fold-body">
+                <view class="opt {{baoNeg === 'ahead' ? 'on' : ''}}" bindtap="setBaoNeg" data-value="ahead">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">同伴顶头才包负分</text>
+                </view>
+                <view class="opt {{baoNeg === 'ignore' ? 'on' : ''}}" bindtap="setBaoNeg" data-value="ignore">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">始终包自己产生的负分</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <block wx:if="{{matchPlay && !showPush8421 && !showLandlord && !showLasuo && !showThreeVsOne && !showVegas}}">
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="reward">
+            <text class="rule-lib__title">奖励规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoRewardText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldReward ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldReward}}" class="fold-body">
+            <view class="opt {{reward === 'none' ? 'on' : ''}}" bindtap="setReward" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无奖励</text>
+            </view>
+            <view class="opt opt--fold {{reward === 'mul' ? 'on' : ''}}">
+              <view class="opt-row" bindtap="setReward" data-value="mul">
+                <view class="radio-dot"></view>
+                <text class="opt-title">乘法奖励</text>
+                <view wx:if="{{reward === 'mul'}}" class="rule-lib__meta" catchtap="toggleMatchMulFold">
+                  <text class="rule-lib__count">{{matchMulText}}</text>
+                  <text class="rule-lib__chev">{{matchFoldMul ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{reward === 'mul' && matchFoldMul}}" class="opt-fold-body">
+                <view wx:for="{{mulRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <text class="reward-op">✖</text>
+                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="push">
+            <text class="rule-lib__title">顶洞规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoPushText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldPush ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldPush}}" class="fold-body">
+            <view class="opt {{pushRule === 'push' ? 'on' : ''}}" bindtap="setPush" data-value="push">
+              <view class="radio-dot"></view>
+              <text class="opt-title">得分打平</text>
+            </view>
+            <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPush" data-value="none">
+              <view class="radio-dot"></view>
+              <text class="opt-title">无顶洞</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{pushRule !== 'none'}}" class="ds-card rule-lib">
+          <view class="rule-lib__head" bindtap="toggleLasuoFold" data-key="meat">
+            <text class="rule-lib__title">吃肉规则</text>
+            <view class="rule-lib__meta">
+              <text class="rule-lib__count">{{lasuoMeatText}}</text>
+              <text class="rule-lib__chev">{{lasuoFoldMeat ? "⌃" : "⌄"}}</text>
+            </view>
+          </view>
+          <view wx:if="{{lasuoFoldMeat}}" class="fold-body">
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeat">
+                <text class="opt-title">按成绩吃肉</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatCountText}}</text>
+                  <text class="rule-lib__chev">{{foldMeat ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeat}}" class="opt-fold-body">
+                <view class="reward-row meat-head">
+                  <text>成绩</text>
+                  <text>吃肉数量</text>
+                </view>
+                <view wx:for="{{meatRows}}" wx:key="id" class="reward-row">
+                  <text>{{item.label}}</text>
+                  <view class="reward-input">
+                    <input class="mini-input" type="number" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'meatRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="meatRows" data-num-handler="onMeatRow" data-num-int="1" bindinput="onNumInput" />
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view class="opt opt--fold">
+              <view class="opt-row" bindtap="toggleFoldMeatValue">
+                <text class="opt-title">肉的分值</text>
+                <view class="rule-lib__meta">
+                  <text class="rule-lib__count">{{lasuoMeatValueText}}</text>
+                  <text class="rule-lib__chev">{{foldMeatValue ? "⌃" : "⌄"}}</text>
+                </view>
+              </view>
+              <view wx:if="{{foldMeatValue}}" class="opt-fold-body">
+                <view class="opt {{meatInclude === 'no' ? 'on' : ''}}" bindtap="setMeat" data-value="no">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉不含奖励部分</text>
+                </view>
+                <view class="opt {{meatInclude === 'yes' ? 'on' : ''}}" bindtap="setMeat" data-value="yes">
+                  <view class="radio-dot"></view>
+                  <text class="opt-title">肉含奖励部分</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
     </view>
   </scroll-view>
+
+  <view class="bottom-bar">
+    <view wx:if="{{canEdit}}" class="cta-ghost" bindtap="saveOnly">{{isEditing ? "保存修改" : "仅保存"}}</view>
+    <view wx:if="{{canEdit}}" class="cta-gold {{isEditing ? 'cta-gold--tight' : ''}}" bindtap="saveAndUse">{{isEditing ? "保存修改并立即应用" : "保存并用于本场"}}</view>
+  </view>
 </view>

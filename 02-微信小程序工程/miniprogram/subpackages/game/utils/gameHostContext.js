@@ -7,6 +7,7 @@ var halfCourse = require('../../../utils/halfCourse.js');
 var matchStatus = require('../../../utils/matchStatus.js');
 var playerManage = require('../../../utils/playerManage.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
+var mockAvatars = require('../../../utils/mockAvatars.js');
 
 var SCORE_FIELDS = ['holes.score'];
 
@@ -79,10 +80,16 @@ function emptyContext(patch) {
     pars: {},
     players: [],
     scoreParties: [],
+    groups: [],
+    createdBy: '',
+    tempAdmins: undefined,
     officialScoresByPartyId: {},
     officialScoresByPlayerId: {},
     allowBigPot: false,
-    scoreKind: 'player'
+    canEditSideGames: undefined,
+    scoreKind: 'player',
+    playerPresentationById: {},
+    partyPresentationById: {}
   };
   if (patch && typeof patch === 'object') {
     Object.keys(patch).forEach(function (key) {
@@ -132,6 +139,46 @@ function holesFromScoreArray(scores, holeOrder) {
   return { holes: holes, filled: filled };
 }
 
+function pickAvatarRaw(obj) {
+  if (!obj || typeof obj !== 'object') return '';
+  var user = obj.user && typeof obj.user === 'object' ? obj.user : null;
+  var profile = obj.profile && typeof obj.profile === 'object' ? obj.profile : null;
+  var player = obj.player && typeof obj.player === 'object' ? obj.player : null;
+  return asString(
+    obj.avatar ||
+      obj.avatarUrl ||
+      obj.headimg ||
+      obj.photo ||
+      (user && (user.avatar || user.avatarUrl || user.headimg || user.photo)) ||
+      (profile && (profile.avatar || profile.avatarUrl || profile.headimg || profile.photo)) ||
+      (player && (player.avatar || player.avatarUrl || player.headimg || player.photo))
+  );
+}
+
+function registerUserById(snap) {
+  var map = {};
+  var users =
+    (snap && snap.registerInfo && Array.isArray(snap.registerInfo.users) && snap.registerInfo.users) || [];
+  users.forEach(function (u) {
+    var id = asString(u && (u.userId || u.playerId || u.id));
+    if (id) map[id] = u;
+  });
+  return map;
+}
+
+function resolveOfficialAvatar(obj, playerId, registerMap) {
+  var id = asString(playerId);
+  var raw = pickAvatarRaw(obj);
+  if (!raw && registerMap && id && registerMap[id]) {
+    raw = pickAvatarRaw(registerMap[id]);
+  }
+  return mockAvatars.resolveAvatar(raw);
+}
+
+function officialDefaultAvatar() {
+  return mockAvatars.DEFAULT_AVATAR;
+}
+
 function playerView(id, name, avatar, groupId, teamId) {
   return {
     playerId: asString(id),
@@ -150,8 +197,72 @@ function makeParty(input) {
     memberPlayerIds: (input.memberPlayerIds || []).map(asString).filter(Boolean),
     groupId: asString(input.groupId),
     teamId: asString(input.teamId),
-    scoreAvailable: !!input.scoreAvailable
+    scoreAvailable: !!input.scoreAvailable,
+    avatar: asString(input.avatar),
+    memberAvatars: Array.isArray(input.memberAvatars) ? input.memberAvatars.slice() : []
   };
+}
+
+function attachPartyAvatars(ctx) {
+  var byId = {};
+  (ctx.players || []).forEach(function (p) {
+    if (p && p.playerId) byId[p.playerId] = p.avatar || mockAvatars.DEFAULT_AVATAR;
+  });
+  (ctx.scoreParties || []).forEach(function (party) {
+    if (!party) return;
+    party.memberAvatars = (party.memberPlayerIds || []).map(function (id) {
+      var pid = asString(id);
+      return byId[pid] || mockAvatars.DEFAULT_AVATAR;
+    });
+    if (party.partyType === 'player') {
+      party.avatar = byId[party.partyId] || party.memberAvatars[0] || mockAvatars.DEFAULT_AVATAR;
+    } else {
+      party.avatar = party.memberAvatars[0] || mockAvatars.DEFAULT_AVATAR;
+    }
+  });
+  return ctx;
+}
+
+function buildPresentation(ctx) {
+  var playerPresentationById = {};
+  var partyPresentationById = {};
+  (ctx.players || []).forEach(function (p) {
+    if (!p || !p.playerId) return;
+    playerPresentationById[p.playerId] = {
+      playerId: p.playerId,
+      displayName: asString(p.displayName) || p.playerId,
+      avatar: asString(p.avatar) || mockAvatars.DEFAULT_AVATAR
+    };
+  });
+  (ctx.scoreParties || []).forEach(function (party) {
+    if (!party || !party.partyId) return;
+    var members = (party.memberPlayerIds || []).map(function (id) {
+      var pid = asString(id);
+      if (playerPresentationById[pid]) return jsonClone(playerPresentationById[pid]);
+      return {
+        playerId: pid,
+        displayName: '',
+        avatar: mockAvatars.DEFAULT_AVATAR
+      };
+    });
+    var face =
+      party.partyType === 'player'
+        ? (playerPresentationById[party.partyId] && playerPresentationById[party.partyId].avatar) ||
+          (members[0] && members[0].avatar) ||
+          mockAvatars.DEFAULT_AVATAR
+        : (members[0] && members[0].avatar) || mockAvatars.DEFAULT_AVATAR;
+    partyPresentationById[party.partyId] = {
+      partyId: party.partyId,
+      partyType: party.partyType || 'player',
+      displayName: asString(party.displayName) || party.partyId,
+      memberPlayerIds: (party.memberPlayerIds || []).map(asString).filter(Boolean),
+      members: members,
+      avatar: face
+    };
+  });
+  ctx.playerPresentationById = jsonClone(playerPresentationById);
+  ctx.partyPresentationById = jsonClone(partyPresentationById);
+  return ctx;
 }
 
 function isTeamStrokeGameMode(mode) {
@@ -186,10 +297,13 @@ function filterScope(ctx, scope, groupId) {
   if (scope !== 'group') {
     ctx.scope = 'match';
     ctx.groupId = '';
-    return ctx;
+    return buildPresentation(ctx);
   }
   ctx.scope = 'group';
   ctx.groupId = gid;
+  ctx.groups = (ctx.groups || []).filter(function (g) {
+    return asString(g && g.groupId) === gid;
+  });
   var occupied = {};
   (ctx.players || []).forEach(function (p) {
     if (p && p.groupId === gid && p.playerId) occupied[p.playerId] = true;
@@ -212,7 +326,7 @@ function filterScope(ctx, scope, groupId) {
   });
   ctx.officialScoresByPartyId = nextScores;
   ctx.officialScoresByPlayerId = nextPlayerScores;
-  return ctx;
+  return buildPresentation(ctx);
 }
 
 function attachHoles(ctx, party, scoreArr) {
@@ -281,20 +395,29 @@ function buildFromGameHostSnapshot(snap) {
     holeContextReady: hole.holeContextReady,
     holeOrder: hole.holeOrder,
     pars: hole.pars,
-    allowBigPot: !!snap.allowBigPot
+    allowBigPot: !!snap.allowBigPot,
+    canEditSideGames: snap.canEditSideGames,
+    createdBy: asString(snap.createdBy || snap.creatorId),
+    tempAdmins: snap.tempAdmins
   });
   var groups = listGameGroups(snap);
+  ctx.groups = jsonClone(groups);
   ctx.matchStatus = asString(snap.matchStatus) || matchStatusFromGroups(groups, 'game');
   var useCombo = isTeamStrokeGameMode(snap.gameMode);
   ctx.scoreKind = useCombo ? 'combination' : 'player';
+  ctx.groupCompositionMap = snap.groupCompositionMap && typeof snap.groupCompositionMap === 'object'
+    ? jsonClone(snap.groupCompositionMap)
+    : {};
+  ctx.composition = snap.composition ? jsonClone(snap.composition) : null;
+  var registerMap = registerUserById(snap);
   groups.forEach(function (group, gi) {
     var gid = asString(group.groupId) || matchId + '-g' + (gi + 1);
-    var slots = Array.isArray(group.playersSlots) ? group.playersSlots : [];
+    var slots = slotsOfGroup(group);
     slots.forEach(function (slot) {
       if (!slot) return;
       var pid = asString(slot.playerId || slot.userId);
       if (!pid) return;
-      ctx.players.push(playerView(pid, slot.name, slot.avatar, gid, ''));
+      ctx.players.push(playerView(pid, slot.name, resolveOfficialAvatar(slot, pid, registerMap), gid, ''));
     });
     if (useCombo) {
       var entities = Array.isArray(group.teamScoresByEntity) ? group.teamScoresByEntity : [];
@@ -335,7 +458,10 @@ function buildFromGameHostSnapshot(snap) {
       ctx.scoreParties.push(party);
     });
   });
-  return jsonClone(filterScope(ctx, snap.scope || 'match', snap.groupId));
+  ctx.registerInfo = snap.registerInfo && typeof snap.registerInfo === 'object'
+    ? jsonClone(snap.registerInfo)
+    : { users: [] };
+  return jsonClone(filterScope(attachPartyAvatars(ctx), snap.scope || 'match', snap.groupId));
 }
 
 function teamNameById(snap, teamId) {
@@ -360,6 +486,23 @@ function occupiedSetOfGroup(group) {
   return set;
 }
 
+function slotsOfGroup(group) {
+  var out = [];
+  var seen = {};
+  function add(slot) {
+    if (!slot) return;
+    var pid = asString(
+      playerManage.resolveUserId(slot) || slot.playerId || slot.userId || slot.id
+    );
+    if (!pid || seen[pid]) return;
+    seen[pid] = true;
+    out.push(slot);
+  }
+  (Array.isArray(group && group.playersSlots) ? group.playersSlots : []).forEach(add);
+  (Array.isArray(group && group.players) ? group.players : []).forEach(add);
+  return out;
+}
+
 function buildFromTeamMatchHostSnapshot(snap) {
   var matchId = asString(snap.matchId);
   if (!matchId) {
@@ -377,9 +520,13 @@ function buildFromTeamMatchHostSnapshot(snap) {
     holeOrder: hole.holeOrder,
     pars: hole.pars,
     allowBigPot: !!snap.allowBigPot,
+    canEditSideGames: snap.canEditSideGames,
+    createdBy: asString(snap.createdBy || snap.creatorId),
+    tempAdmins: snap.tempAdmins,
     scoreKind: partyKindOfMatch(snap.gameMode)
   });
   var groups = Array.isArray(snap.groups) ? snap.groups : [];
+  ctx.groups = jsonClone(groups);
   var scoreData = snap.scoreData && typeof snap.scoreData === 'object' ? snap.scoreData : {};
   ctx.matchStatus = asString(snap.matchStatus) || matchStatusFromGroups(groups, 'match', scoreData);
   var teamMap = {};
@@ -391,6 +538,7 @@ function buildFromTeamMatchHostSnapshot(snap) {
   var kind = ctx.scoreKind;
   var entitiesByGroup = snap.scoreEntities && typeof snap.scoreEntities === 'object' ? snap.scoreEntities : {};
 
+  var registerMap = registerUserById(snap);
   groups.forEach(function (group) {
     var gid = asString(group && group.groupId);
     if (!gid) return;
@@ -401,7 +549,7 @@ function buildFromTeamMatchHostSnapshot(snap) {
         playerView(
           pid,
           playerManage.resolveMatchNickname(p) || pid,
-          p && p.avatar,
+          resolveOfficialAvatar(p, pid, registerMap),
           gid,
           asString(teamMap[pid])
         )
@@ -495,7 +643,10 @@ function buildFromTeamMatchHostSnapshot(snap) {
       ctx.scoreParties.push(party);
     });
   });
-  return jsonClone(filterScope(ctx, snap.scope || 'match', snap.groupId));
+  ctx.registerInfo = snap.registerInfo && typeof snap.registerInfo === 'object'
+    ? jsonClone(snap.registerInfo)
+    : { users: [] };
+  return jsonClone(filterScope(attachPartyAvatars(ctx), snap.scope || 'match', snap.groupId));
 }
 
 function buildFromHostSnapshot(snapshot) {
@@ -695,5 +846,9 @@ module.exports = {
   buildFromGameSnapshot: buildFromGameSnapshot,
   buildFromTeamMatchSnapshot: buildFromTeamMatchSnapshot,
   validatePartySelection: validatePartySelection,
-  scoresToEngineFormat: scoresToEngineFormat
+  scoresToEngineFormat: scoresToEngineFormat,
+  pickAvatarRaw: pickAvatarRaw,
+  resolveOfficialAvatar: resolveOfficialAvatar,
+  officialDefaultAvatar: officialDefaultAvatar,
+  buildPresentation: buildPresentation
 };

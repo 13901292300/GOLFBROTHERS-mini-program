@@ -452,5 +452,74 @@ assert(
     ctxFromSnap.scoreParties[0].displayName === 'A'
 );
 
+var twins = host.buildFromGameSnapshot(
+  {
+    gameId: 'g-twins',
+    gameMode: '个人比杆赛',
+    front9Course: 'C',
+    back9Course: 'D',
+    groups: [
+      {
+        groupId: 'g1',
+        playersSlots: [
+          { playerId: 'id-a', name: '同名', avatar: 'https://example.com/a.jpg' },
+          { playerId: 'id-b', name: '同名', avatar: 'https://example.com/b.jpg' }
+        ],
+        scoresByPlayer: {
+          'id-a': { scores: filled18(4) },
+          'id-b': { scores: filled18(5) }
+        }
+      }
+    ]
+  },
+  { scope: 'group', groupId: 'g1', allowBigPot: true }
+);
+var twinA = twins.players.filter(function (p) { return p.playerId === 'id-a'; })[0];
+var twinB = twins.players.filter(function (p) { return p.playerId === 'id-b'; })[0];
+var partyA = twins.scoreParties.filter(function (p) { return p.partyId === 'id-a'; })[0];
+assert(
+  '同名不同 ID 头像不串',
+  twinA &&
+    twinB &&
+    twinA.avatar.indexOf('a.jpg') >= 0 &&
+    twinB.avatar.indexOf('b.jpg') >= 0 &&
+    twinA.avatar !== twinB.avatar
+);
+assert('player party 头像按 playerId', partyA && partyA.avatar === twinA.avatar);
+
+var comboAv = host.buildFromGameSnapshot(
+  {
+    gameId: 'g-combo-av',
+    gameMode: '最好成绩赛',
+    front9Course: 'C',
+    back9Course: 'D',
+    groupCompositionMap: {
+      g1: {
+        teams: [{ teamId: 't1', members: [{ playerId: 'm1' }, { playerId: 'm2' }] }]
+      }
+    },
+    groups: [
+      {
+        groupId: 'g1',
+        playersSlots: [
+          { playerId: 'm1', name: '甲', avatar: 'https://example.com/m1.jpg' },
+          { playerId: 'm2', name: '乙', avatar: 'https://example.com/m2.jpg' }
+        ],
+        teamScoresByEntity: [{ teamId: 't1', name: '组合1', scores: filled18(4) }]
+      }
+    ]
+  },
+  { scope: 'group', groupId: 'g1', allowBigPot: true }
+);
+var comboParty = comboAv.scoreParties[0];
+assert(
+  'combination 成员头像按 memberPlayerIds',
+  comboParty &&
+    comboParty.partyType === 'combination' &&
+    comboParty.memberAvatars &&
+    comboParty.memberAvatars[0].indexOf('m1.jpg') >= 0 &&
+    comboParty.memberAvatars[1].indexOf('m2.jpg') >= 0
+);
+
 console.log('\ngameHostContext.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

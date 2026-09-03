@@ -3,11 +3,55 @@ const CATALOG = [
     group: "2人",
     groupId: "2",
     items: [
-      { id: "stroke-2", name: "比杆", players: 2, editFirst: true },
-      { id: "match-2", name: "比洞", players: 2, editFirst: true, matchPlay: true },
-      { id: "8421-2", name: "单挂8421", players: 2, editFirst: true, kind: "8421" },
-      { id: "three-set", name: "三局", players: 2, editFirst: false, noSettings: true },
-      { id: "youcai", name: "油菜", players: 2, editFirst: false, noSettings: true }
+      {
+        id: "stroke-2",
+        name: "比杆",
+        players: 2,
+        editFirst: true,
+        matchupMode: "party-matchup",
+        partySizeMode: "one-or-more",
+        minPlayersPerParty: 1
+      },
+      {
+        id: "match-2",
+        name: "比洞",
+        players: 2,
+        editFirst: true,
+        matchPlay: true,
+        matchupMode: "party-matchup",
+        partySizeMode: "one-or-more",
+        minPlayersPerParty: 1
+      },
+      {
+        id: "8421-2",
+        name: "单挂8421",
+        players: 2,
+        editFirst: true,
+        kind: "8421",
+        matchupMode: "party-matchup",
+        partySizeMode: "one-or-more",
+        minPlayersPerParty: 1
+      },
+      {
+        id: "three-set",
+        name: "三局",
+        players: 2,
+        editFirst: false,
+        noSettings: true,
+        matchupMode: "party-matchup",
+        partySizeMode: "one-or-more",
+        minPlayersPerParty: 1
+      },
+      {
+        id: "youcai",
+        name: "油菜",
+        players: 2,
+        editFirst: false,
+        noSettings: true,
+        matchupMode: "party-matchup",
+        partySizeMode: "one-or-more",
+        minPlayersPerParty: 1
+      }
     ]
   },
   {
@@ -26,10 +70,20 @@ const CATALOG = [
     items: [
       { id: "lasuo-4", name: "四人拉丝", players: 4, editFirst: true, kind: "lasuo-4" },
       { id: "8421-4", name: "4人8421", players: 4, editFirst: true, kind: "8421" },
-      { id: "three-vs-one", name: "固定三打一", players: 4, editFirst: true, kind: "three-vs-one" },
+      {
+        id: "three-vs-one",
+        name: "固定三打一",
+        players: 4,
+        editFirst: true,
+        kind: "three-vs-one",
+        matchupMode: "exact-party-shape",
+        partySizeMode: "exact",
+        requiredPartyCount: 2,
+        allowedPartyShapes: [[3, 1]]
+      },
       { id: "dizhubo-4", name: "4人地主婆", players: 4, editFirst: true, kind: "dizhubo-4" },
       { id: "vegas", name: "拉斯维加斯", players: 4, editFirst: true, kind: "vegas" },
-      { id: "skins", name: "狼和羊", players: 4, editFirst: true, hidden: true }
+      { id: "skins", name: "狼和羊", players: 4, editFirst: true, hidden: true, unavailable: true }
     ]
   },
   {
@@ -42,13 +96,12 @@ const CATALOG = [
   }
 ];
 
-/** 结算标签词表（A1–B9）。不是正式球场事实；生产洞序由调用方注入。 */
 const HOLES = [
   "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9",
   "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9"
 ];
 
-/** 测试/缺省 PAR：词表内每洞 4。正式入口应注入 Host 的 pars。 */
+/** 沙盒球场：18 洞标准杆一律 PAR 4，便于对打测试 */
 function defaultHolePars() {
   const map = {};
   HOLES.forEach(function (label) {
@@ -107,6 +160,18 @@ const LANDLORD_RANK_OPTIONS = [
   { id: "gross-result", label: "真实成绩相同按输赢排序" }
 ];
 
+function catalogDesignCap() {
+  var cap = 2;
+  CATALOG.forEach(function (group) {
+    (group.items || []).forEach(function (item) {
+      if (!item || item.hidden || isUnavailableRule(item)) return;
+      var n = Number(item.players) || 0;
+      if (n > cap) cap = n;
+    });
+  });
+  return cap;
+}
+
 function listCatalog(maxPlayers) {
   const cap = Number(maxPlayers);
   if (!(cap > 0)) return [];
@@ -118,6 +183,29 @@ function listCatalog(maxPlayers) {
   }).filter(function (group) {
     return group.items.length > 0;
   });
+}
+
+function listCatalogForDesign() {
+  return CATALOG.map(function (group) {
+    const items = group.items.filter(function (item) {
+      return !item.hidden && !isUnavailableRule(item);
+    });
+    return { group: group.group, groupId: group.groupId, items: items };
+  }).filter(function (group) {
+    return group.items.length > 0;
+  });
+}
+
+const UNAVAILABLE_RULE_IDS = {
+  "skins": true
+};
+
+function isUnavailableRule(idOrItem) {
+  const id =
+    idOrItem && typeof idOrItem === "object"
+      ? String(idOrItem.id || idOrItem.catalogId || idOrItem.ruleId || "")
+      : String(idOrItem || "");
+  return !!UNAVAILABLE_RULE_IDS[id];
 }
 
 function findRule(id) {
@@ -184,6 +272,7 @@ function supportsWindBlow(id) {
     isDizhubo4(id) ||
     isLandlordBig(id) ||
     isLandlordMid(id) ||
+    isLandlordSmall(id) ||
     isLasuoN(id) ||
     isHorn(id)
   );
@@ -658,6 +747,22 @@ function isNoSettings(idOrItem) {
   return !!(hit && (hit.noSettings || hit.editFirst === false));
 }
 
+/** 组合逐洞让杆（比洞 / 油菜）：每洞调整受让方后再判胜负 */
+function supportsPairHoleHandicap(id) {
+  return usesMatchPlayPairSettings(id);
+}
+
+/** 比洞式组合设置（让杆弹窗 / 有效洞 / 保存回显）：比洞与油菜共享 */
+function usesMatchPlayPairSettings(id) {
+  const s = String(id || "");
+  return s === "match-2" || s === "youcai";
+}
+
+/** 组合总杆让杆（比杆）：只进初始总分，不进逐洞 */
+function supportsTotalStrokeHandicap(id) {
+  return String(id || "") === "stroke-2";
+}
+
 module.exports = {
   CATALOG,
   HOLES,
@@ -678,6 +783,8 @@ module.exports = {
   LANDLORD_RANK_OPTIONS,
   listCatalog,
   listCatalog: listCatalog,
+  listCatalogForDesign,
+  catalogDesignCap,
   findRule,
   is8421,
   is8421Three,
@@ -699,6 +806,11 @@ module.exports = {
   lasuoHubSummaries,
   lasuoDefaultName,
   isNoSettings,
+  supportsPairHoleHandicap,
+  usesMatchPlayPairSettings,
+  supportsTotalStrokeHandicap,
+  isUnavailableRule,
+  UNAVAILABLE_RULE_IDS,
   summarizeRule,
   doubleParMark,
   meatCountThumb

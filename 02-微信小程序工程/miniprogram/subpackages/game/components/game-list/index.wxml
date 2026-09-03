@@ -4,7 +4,7 @@
       <text class="setting-label">全局设置</text>
       <text class="setting-chev">{{global.settingsOpen ? "⌃" : "⌄"}}</text>
     </view>
-    <view wx:if="{{global.settingsOpen}}" class="setting-body">
+    <view wx:if="{{global.settingsOpen && !settingsLocked}}" class="setting-body">
       <view class="setting-row setting-row--privacy">
         <text class="setting-k">公开范围</text>
         <view class="radio-row radio-row--privacy">
@@ -29,25 +29,286 @@
       </view>
       <view class="setting-row" bindtap="onDonate">
         <text class="setting-k">捐锅规则</text>
-        <text class="setting-v hole-order-preview">{{potRuleText || '待接入'}}</text>
+        <text class="setting-v hole-order-preview">{{potRuleText}}</text>
         <text class="setting-chev">›</text>
       </view>
       <view class="setting-row" bindtap="onHoleOrder">
         <text class="setting-k">全程洞序</text>
-        <text class="setting-v hole-order-preview">{{holeOrderText || '待接入'}}</text>
+        <text class="setting-v hole-order-preview">{{holeOrderText}}</text>
         <text class="setting-chev">›</text>
       </view>
       <view class="setting-row" bindtap="onWind">
         <text class="setting-k">大风吹</text>
-        <text class="setting-v hole-order-preview">{{windRuleText || '待接入'}}</text>
+        <text class="setting-v hole-order-preview">{{windRuleText}}</text>
         <text class="setting-chev">›</text>
       </view>
     </view>
   </view>
 
-  <view class="empty">{{emptyHint}}</view>
+  <view
+    wx:if="{{!hasDraftGames && canEdit}}"
+    class="add-game-btn"
+    hover-class="add-game-btn--pressed"
+    bindtap="onSelectRule"
+  >
+    <view class="add-game-icon"><text>+</text></view>
+    <text>添加游戏</text>
+  </view>
 
-  <view class="bottom-bar">
-    <view class="cta-gold" bindtap="onSelectRule">添加游戏</view>
+  <view wx:if="{{!hasDraftGames}}" class="empty">还没有游戏。点上方「添加游戏」，用规则库里的约定生成本场实例。</view>
+
+  <view wx:for="{{games}}" wx:key="id" class="ds-card game-card">
+    <view class="game-card__top">
+      <view class="game-card__head {{item.coeffText ? 'game-card__head--seg' : ''}}">
+        <text class="game-card__name">{{item.name}}</text>
+        <text class="game-card__tag {{item.coeffText ? 'game-card__tag--seg' : ''}}">{{item.coeffText || item.multiplier || 1}}</text>
+        <text wx:if="{{item.status === 'ended'}}" class="game-card__tag is-ended">已结束</text>
+        <text wx:if="{{item.unavailable}}" class="game-card__tag">玩法尚未开放</text>
+      </view>
+      <text wx:if="{{canEdit}}" class="game-card__del" catchtap="onDeleteGame" data-id="{{item.id}}">×</text>
+    </view>
+    <view class="kv"><text class="kv-k">方式</text><text class="kv-v">{{item.wayLabel}}</text></view>
+    <view class="kv">
+      <text class="kv-k">参与人</text>
+      <view class="kv-avatars">
+        <view wx:for="{{item.players.list}}" wx:for-item="person" wx:key="id" class="kv-party">
+          <party-face party="{{person}}" layout="avatar-only"></party-face>
+        </view>
+        <text wx:if="{{item.players.overflow}}" class="kv-avatar-more">（共{{item.players.total}}人）</text>
+      </view>
+    </view>
+    <view class="kv"><text class="kv-k">有效洞</text><text class="kv-v">{{item.holeCount}}/18</text></view>
+    <view class="game-actions">
+      <view wx:if="{{item.showKick && canEdit}}" class="game-open" catchtap="onKickGame" data-id="{{item.id}}">踢一脚<text wx:if="{{item.hasKick}}" class="kick-mark">★</text></view>
+      <view wx:if="{{!item.unavailable}}" class="game-open" catchtap="onEditGame" data-id="{{item.id}}">{{canEdit ? '修改' : '查看'}}</view>
+    </view>
+  </view>
+
+  <view
+    wx:if="{{hasDraftGames && canEdit}}"
+    class="add-game-btn"
+    hover-class="add-game-btn--pressed"
+    bindtap="onSelectRule"
+  >
+    <view class="add-game-icon"><text>+</text></view>
+    <text>添加游戏</text>
+  </view>
+
+  <view wx:if="{{canEdit}}" class="bottom-bar">
+    <view
+      class="cta-gold {{canConfirmSetup ? '' : 'cta-gold--disabled'}} {{setupSaving ? 'cta-gold--saving' : ''}}"
+      bindtap="onCommitSetup"
+    >确定</view>
+  </view>
+
+  <view wx:if="{{showDonateSheet}}" class="sheet-mask" bindtap="closeDonate">
+    <view class="sheet sheet--tall" catchtap="stopKickTap">
+      <view class="sheet-title">捐锅规则</view>
+      <view class="sec-label">适用游戏</view>
+      <view class="sec-hint">{{games.length === 1 ? "当前仅一场游戏，已默认勾选。" : "请勾选一个或多个要捐锅的游戏。"}}</view>
+      <view
+        wx:for="{{donateGames}}"
+        wx:key="id"
+        class="opt {{item.on ? 'on' : ''}}"
+        bindtap="toggleDonateGame"
+        data-id="{{item.id}}"
+      >
+        <view class="check-box {{item.on ? 'on' : ''}}"></view>
+        <text class="opt-title">{{item.name}}</text>
+      </view>
+      <view wx:if="{{!donateGames.length}}" class="sec-hint">请先添加游戏。</view>
+
+      <view class="sec-label">捐锅方式</view>
+      <view class="opt {{donateMode === 'none' ? 'on' : ''}}" bindtap="setDonateMode" data-value="none">
+        <view class="radio-dot"></view>
+        <text class="opt-title">不捐锅</text>
+      </view>
+      <view class="opt {{donateMode === 'winner-n' ? 'on' : ''}}" bindtap="setDonateMode" data-value="winner-n">
+        <view class="radio-dot"></view>
+        <view class="donate-line">
+          <text class="opt-title">赢家每洞捐</text>
+          <block wx:if="{{donateMode === 'winner-n'}}">
+            <input
+              class="mini-input"
+              type="digit"
+              bindfocus="onNumFocus"
+              bindblur="onNumBlur"
+              value="{{numEditing && numEditField === 'donateN' ? numEditDraft : donateN}}"
+              data-num-field="donateN"
+              data-num-handler="onDonateN"
+              catchtap="keepDonateMode"
+              data-value="winner-n"
+              bindinput="onNumInput"
+            />
+            <text class="opt-title">积分，捐满</text>
+            <input
+              class="mini-input"
+              type="digit"
+              bindfocus="onNumFocus"
+              bindblur="onNumBlur"
+              value="{{numEditing && numEditField === 'donateM' ? numEditDraft : donateM}}"
+              data-num-field="donateM"
+              data-num-handler="onDonateM"
+              catchtap="keepDonateMode"
+              data-value="winner-n"
+              bindinput="onNumInput"
+            />
+            <text class="opt-title">积分</text>
+          </block>
+          <text wx:else class="opt-title">积分，捐满积分</text>
+        </view>
+      </view>
+      <view class="opt {{donateMode === 'all' ? 'on' : ''}}" bindtap="setDonateMode" data-value="all">
+        <view class="radio-dot"></view>
+        <view class="donate-line">
+          <text class="opt-title">全捐，捐满</text>
+          <block wx:if="{{donateMode === 'all'}}">
+            <input
+              class="mini-input"
+              type="digit"
+              bindfocus="onNumFocus"
+              bindblur="onNumBlur"
+              value="{{numEditing && numEditField === 'donateAllM' ? numEditDraft : donateAllM}}"
+              data-num-field="donateAllM"
+              data-num-handler="onDonateAllM"
+              catchtap="keepDonateMode"
+              data-value="all"
+              bindinput="onNumInput"
+            />
+            <text class="opt-title">积分为止</text>
+          </block>
+          <text wx:else class="opt-title">积分为止</text>
+        </view>
+      </view>
+      <view class="opt {{donateMode === 'big-pot' ? 'on' : ''}}" bindtap="setDonateMode" data-value="big-pot">
+        <view class="radio-dot"></view>
+        <view class="donate-line">
+          <text class="opt-title">大锅饭，基金总额</text>
+          <input
+            wx:if="{{donateMode === 'big-pot'}}"
+            class="mini-input mini-input--wide"
+            type="digit"
+            bindfocus="onNumFocus"
+            bindblur="onNumBlur"
+            value="{{numEditing && numEditField === 'donateS' ? numEditDraft : donateS}}"
+            data-num-field="donateS"
+            data-num-handler="onDonateS"
+            catchtap="keepDonateMode"
+            data-value="big-pot"
+            bindinput="onNumInput"
+          />
+        </view>
+      </view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeDonate">取消</view>
+        <view class="cta-gold" bindtap="applyDonate">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showWindSheet}}" class="sheet-mask" bindtap="closeWind">
+    <view class="sheet" catchtap="stopKickTap">
+      <view class="sheet-title">大风吹</view>
+      <view class="sec-hint">最后一洞将未吃完的肉一次吃完，不按吃肉表、也不看成绩。请勾选要启用的游戏。不勾选即关闭。</view>
+      <view
+        wx:for="{{windGames}}"
+        wx:key="id"
+        class="opt {{item.on ? 'on' : ''}}"
+        bindtap="toggleWindGame"
+        data-id="{{item.id}}"
+      >
+        <view class="check-box {{item.on ? 'on' : ''}}"></view>
+        <text class="opt-title">{{item.name}}</text>
+      </view>
+      <view wx:if="{{!windGames.length}}" class="sec-hint">当前没有支持顶洞吃肉的游戏。</view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeWind">取消</view>
+        <view class="cta-gold" bindtap="applyWind">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showHoleOrderSheet}}" class="sheet-mask" bindtap="closeHoleOrder">
+    <view class="sheet" catchtap="stopKickTap">
+      <view class="sheet-title">调整洞序</view>
+      <view class="sec-hint">请点击起始洞。手工拖拽可调整洞序。</view>
+      <view class="hole-grid hole-order-grid">
+        <view
+          wx:for="{{holeOrderDraft}}"
+          wx:key="*this"
+          class="hole-cell hole-order-cell {{index === 0 ? 'start' : ''}} {{holeOrderDragging && holeOrderDragIndex === index ? 'lift' : ''}}"
+          data-index="{{index}}"
+          data-label="{{item}}"
+          catchtouchstart="onHoleOrderTouchStart"
+          catchtouchmove="onHoleOrderTouchMove"
+          catchtouchend="onHoleOrderTouchEnd"
+          catchtouchcancel="onHoleOrderTouchEnd"
+        >{{item}}</view>
+      </view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeHoleOrder">取消</view>
+        <view class="cta-gold" bindtap="applyHoleOrder">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showKickSheet}}" class="sheet-mask" bindtap="closeKick">
+    <view class="sheet sheet--tall" catchtap="stopKickTap">
+      <view class="sheet-title">踢一脚</view>
+      <view class="kick-game-name">{{kickGameName}}</view>
+      <view class="sec-hint">点有效洞，从该洞起到结束翻倍。灰洞为本场未启用的有效洞。</view>
+      <view class="kick-row__holes">
+        <view
+          wx:for="{{kickHoles}}"
+          wx:key="label"
+          class="kick-hole {{item.on ? '' : 'off'}} {{item.selected ? 'on' : ''}}"
+          bindtap="pickKickHole"
+          data-label="{{item.label}}"
+          data-on="{{item.on}}"
+        >
+          <view class="kick-hole__dot">{{item.label}}</view>
+          <text class="kick-hole__n">{{item.factorText}}</text>
+        </view>
+      </view>
+      <view wx:if="{{kickFromHole}}" class="kick-mults">
+        <view class="kick-mult {{kickMult == 1 && !kickUsingCustom ? 'on' : ''}}" bindtap="pickKickMult" data-value="1">恢复</view>
+        <view
+          wx:for="{{kickMults}}"
+          wx:for-item="mult"
+          wx:key="*this"
+          class="kick-mult {{!kickUsingCustom && kickMult == mult ? 'on' : ''}}"
+          bindtap="pickKickMult"
+          data-value="{{mult}}"
+        >×{{mult}}</view>
+        <view class="kick-mult kick-mult--custom {{kickUsingCustom ? 'on' : ''}}" bindtap="openKickCustom">{{kickUsingCustom && kickCustom ? '×' + kickCustom : '自定义'}}</view>
+      </view>
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeKick">取消</view>
+        <view class="cta-gold" bindtap="confirmKick">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showKickCustom}}" class="sheet-mask sheet-mask--over" catchtap="closeKickCustom">
+    <view class="sheet" catchtap="stopKickTap">
+      <view class="sheet-title">自定义倍数</view>
+      <view class="sec-hint">从 {{kickFromHole}} 起翻倍，输入大于 1 的正整数。</view>
+      <input
+        class="kick-custom-sheet-input"
+        type="digit"
+        maxlength="3"
+        focus="{{kickCustomFocus}}"
+        placeholder="输入倍数"
+        placeholder-class="kick-custom-ph"
+        value="{{kickCustomDraft}}"
+        bindinput="onKickCustomDraft"
+        confirm-type="done"
+        bindconfirm="applyKickCustom"
+      />
+      <view class="bottom-bar" style="position:relative;padding:24rpx 0 0;border:0;">
+        <view class="cta-ghost" bindtap="closeKickCustom">取消</view>
+        <view class="cta-gold" bindtap="applyKickCustom">确定</view>
+      </view>
+    </view>
   </view>
 </view>

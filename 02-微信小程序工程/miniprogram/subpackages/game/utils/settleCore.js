@@ -25,6 +25,25 @@ function formatMoney(n) {
   return v > 0 ? "+" + body : "-" + body;
 }
 
+function scoresToRelative(absByHole, pars, holeOrder) {
+  const out = {};
+  (holeOrder || []).forEach(function (label) {
+    const n = Number(pars && pars[label]);
+    const par = n === 3 || n === 4 || n === 5 ? n : 4;
+    const src = (absByHole && absByHole[label]) || {};
+    const hole = {};
+    Object.keys(src).forEach(function (pid) {
+      const raw = src[pid];
+      if (raw == null || raw === "") return;
+      const v = Number(raw);
+      if (!isFinite(v) || !(v > 0)) return;
+      hole[pid] = v - par;
+    });
+    out[label] = hole;
+  });
+  return out;
+}
+
 function catalogIdOf(game) {
   return String(
     (game && game.catalogId) ||
@@ -103,6 +122,95 @@ function lastOnLabel(game, holeOrder) {
   return labels.length ? String(labels[labels.length - 1]) : "";
 }
 
+function firstOnLabel(game, holeOrder) {
+  const labels = holeOrder || [];
+  let i;
+  for (i = 0; i < labels.length; i++) {
+    if (holeOn(game, labels[i])) return String(labels[i]);
+  }
+  return "";
+}
+
+function initialPlayerOrder(game) {
+  const fromOrder = ((game && game.playerOrder) || [])
+    .map(function (id) {
+      return id == null ? "" : String(id);
+    })
+    .filter(Boolean);
+  if (fromOrder.length) return fromOrder;
+  return playerIdsOf(game);
+}
+
+function holePlayersReady(scores, label, ids) {
+  const hole = (scores && scores[label]) || {};
+  const list = ids || [];
+  if (!list.length) return false;
+  return list.every(function (id) {
+    const v = hole[id];
+    if (v == null || v === "") return false;
+    return isFinite(Number(v));
+  });
+}
+
+/** 新起始洞未完成：只保留起始洞初始分边，不写逐洞/合计分数。 */
+function pendingStartResults(game, holeOrder) {
+  const labels = holeOrder && holeOrder.length ? holeOrder : [];
+  const start = firstOnLabel(game, labels);
+  const byHole = {};
+  labels.forEach(function (label) {
+    byHole[label] = holeLedger();
+  });
+  const orderByHole = {};
+  if (start) orderByHole[start] = initialPlayerOrder(game);
+  return {
+    byHole: byHole,
+    initial: {},
+    catalogId: catalogIdOf(game),
+    orderByHole: orderByHole,
+    pendingStart: true
+  };
+}
+
+function createTopHoleTracker() {
+  return { queue: [], states: {} };
+}
+
+function enqueueTopHole(tracker, holeId) {
+  if (!tracker || holeId == null || holeId === "") return "";
+  const id = String(holeId);
+  tracker.queue.push(id);
+  tracker.states[id] = "pending";
+  return id;
+}
+
+function consumeTopHoles(tracker, count) {
+  if (!tracker) return [];
+  let n = Math.max(0, Math.floor(Number(count) || 0));
+  const consumed = [];
+  while (n > 0 && tracker.queue.length) {
+    const id = tracker.queue.shift();
+    tracker.states[id] = "consumed";
+    consumed.push(id);
+    n -= 1;
+  }
+  return consumed;
+}
+
+function consumeAllTopHoles(tracker) {
+  return consumeTopHoles(tracker, tracker && tracker.queue ? tracker.queue.length : 0);
+}
+
+function mergeTopHoleStates(target, source) {
+  const out = target || {};
+  Object.keys(source || {}).forEach(function (holeId) {
+    const next = source[holeId];
+    if (next === "pending" || (next === "consumed" && out[holeId] !== "pending")) {
+      out[holeId] = next;
+    }
+  });
+  return out;
+}
+
 /** 大风吹：最后一洞有胜者时吃掉全部余肉，不看成绩表。 */
 function meatEatCount(wanted, pool, isLast, windOn) {
   const p = Number(pool) || 0;
@@ -132,6 +240,7 @@ module.exports = {
   round1,
   formatPoints,
   formatMoney,
+  scoresToRelative,
   catalogIdOf,
   playerIdsOf,
   emptyLedger,
@@ -140,6 +249,14 @@ module.exports = {
   zeroSumOk,
   meatPieceValue,
   lastOnLabel,
+  firstOnLabel,
+  holePlayersReady,
+  pendingStartResults,
+  createTopHoleTracker,
+  enqueueTopHole,
+  consumeTopHoles,
+  consumeAllTopHoles,
+  mergeTopHoleStates,
   meatEatCount,
   emptyResults
 };

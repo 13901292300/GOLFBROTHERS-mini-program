@@ -1,0 +1,20 @@
+<view class="ds-card game-card">
+  <text class="game-card__name">让杆</text>
+  <view class="sec-hint">为受让人设置 PAR3 / PAR4 / PAR5 让杆及有效洞。正数时其余选手让受让人，负数时受让人让其余选手。</view>
+  <view wx:for="{{orderedPlayers}}" wx:key="id" class="pair-block">
+    <view class="recv-hcap-row">
+      <party-face party="{{item}}" layout="row"></party-face>
+      <view class="pair-hcap-btn {{item.hcapAddOff ? 'off' : ''}}" catchtap="openRecvHcapAdd" data-id="{{item.id}}">添加让杆</view>
+    </view>
+    <view
+      wx:for="{{item.hcapList}}"
+      wx:for-item="hcap"
+      wx:for-index="hidx"
+      wx:key="hidx"
+      class="pair-hcap"
+      catchtap="openRecvHcapEdit"
+      data-id="{{item.id}}"
+      data-index="{{hidx}}"
+    >{{hcap.hcapText}}</view>
+  </view>
+</view>

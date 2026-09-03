@@ -1,0 +1,24 @@
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleLasuoHcapFold">
+    <text class="game-card__name">让杆</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{lasuoHcapText}}</text>
+      <text class="rule-lib__chev">{{lasuoFoldHcap ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{lasuoFoldHcap}}" class="fold-body">
+    <view wx:if="{{!lasuoHcapRows.length}}" class="sec-hint">还没有让杆。点下方按钮添加。</view>
+    <view
+      wx:for="{{lasuoHcapRows}}"
+      wx:key="rowKey"
+      class="lasuo-hcap-item"
+      catchtap="openRecvHcapEdit"
+      data-id="{{item.id}}"
+      data-index="{{item.hidx}}"
+    >
+      <party-face party="{{item}}" layout="row"></party-face>
+      <text class="lasuo-hcap-item__text">{{item.hcapText}}</text>
+    </view>
+    <view class="pair-hcap-btn {{lasuoHcapCanAdd ? '' : 'off'}}" catchtap="openLasuoHcapAdd">添加让杆</view>
+  </view>
+</view>

@@ -56,5 +56,45 @@ assert(
   }).join(',') === fixtures.FRONT9.join(',')
 );
 
+var eastSouth = [];
+var i;
+for (i = 1; i <= 9; i++) eastSouth.push('东' + i);
+for (i = 1; i <= 9; i++) eastSouth.push('南' + i);
+assert(
+  '2 创建 A/C 不会被 normalize 成 A/B',
+  holeOrder.normalizeHoleOrder(['A1', 'C1', 'A2', 'C2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']).indexOf('B1') < 0
+);
+assert(
+  '自定义洞号不被默认词表吞掉',
+  holeOrder.normalizeHoleOrder(eastSouth).join(',') === eastSouth.join(',')
+);
+assert(
+  'resolve 优先已保存调整',
+  holeOrder.resolveHoleOrder({
+    created: eastSouth,
+    adjusted: eastSouth.slice(9).concat(eastSouth.slice(0, 9))
+  })[0] === '南1'
+);
+assert(
+  '无调整用创建快照',
+  holeOrder.resolveHoleOrder({ created: eastSouth, adjusted: [] })[0] === '东1'
+);
+assert(
+  '15 全空才兜底 A/B',
+  holeOrder.usedDefaultAbFallback({}) && holeOrder.resolveHoleOrder({})[0] === 'A1'
+);
+assert(
+  '过期 A/B 调整不能覆盖真实创建洞号',
+  holeOrder.resolveHoleOrder({ created: eastSouth, adjusted: full })[0] === '东1'
+);
+
+var recs = holeOrder.buildHoleRecords(eastSouth, { pars: { 东1: 3, 南1: 5 } });
+var moved = holeOrder.moveHoleOrderIndex(eastSouth, 0, 9);
+var ordered = holeOrder.orderRecordsByIds(recs, moved);
+assert(
+  '10 拖动后 par 跟随 holeId',
+  ordered[0].holeId === '东2' && ordered[8].holeId === '南1' && ordered[8].par === 5 && ordered[9].holeId === '东1' && ordered[9].par === 3
+);
+
 console.log('\nsideGameHoleOrder.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

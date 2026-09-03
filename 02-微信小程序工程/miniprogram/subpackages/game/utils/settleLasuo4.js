@@ -14,6 +14,25 @@ const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
 const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
 const COMBO_DEFAULTS = { "m2-m2": 25, "m2-m1": 10, "m1-m1": 4 };
 
+function unwrapRule(raw) {
+  var cur = raw && typeof raw === "object" ? raw : {};
+  var hops = 0;
+  while (
+    hops < 4 &&
+    cur &&
+    typeof cur === "object" &&
+    cur.reward == null &&
+    !(Array.isArray(cur.addRows) && cur.addRows.length) &&
+    !(Array.isArray(cur.mulRows) && cur.mulRows.length) &&
+    cur.ruleSnapshot &&
+    typeof cur.ruleSnapshot === "object"
+  ) {
+    cur = cur.ruleSnapshot;
+    hops += 1;
+  }
+  return cur && typeof cur === "object" ? cur : {};
+}
+
 function rowMap(rows) {
   const map = {};
   (rows || []).forEach(function (row) {
@@ -151,23 +170,36 @@ function teamTotal(rec, team, par, product) {
   return product ? x * y : x + y;
 }
 
-function rawCompare(rule, rec, aTeam, bTeam, par) {
-  let pts = 0;
+function indicatorParts(rule, rec, aTeam, bTeam, par) {
   const bw = weightOf(rule, "pkBetter", "pkBetterW");
-  if (bw) pts += bw * cmpVal(teamBest(rec, aTeam), teamBest(rec, bTeam));
   const ww = weightOf(rule, "pkWorse", "pkWorseW");
-  if (ww) pts += ww * cmpVal(teamWorst(rec, aTeam), teamWorst(rec, bTeam));
   const tw = weightOf(rule, "pkTotal", "pkTotalW");
+  const better = bw ? bw * cmpVal(teamBest(rec, aTeam), teamBest(rec, bTeam)) : 0;
+  const worse = ww ? ww * cmpVal(teamWorst(rec, aTeam), teamWorst(rec, bTeam)) : 0;
+  let total = 0;
   if (tw) {
     const product = (rule && rule.pkTotalMode) === "product";
-    pts += tw * cmpVal(teamTotal(rec, aTeam, par, product), teamTotal(rec, bTeam, par, product));
+    total = tw * cmpVal(teamTotal(rec, aTeam, par, product), teamTotal(rec, bTeam, par, product));
   }
-  return pts;
+  return { better: better, worse: worse, total: total, sum: better + worse + total };
+}
+
+function rawCompare(rule, rec, aTeam, bTeam, par) {
+  return indicatorParts(rule, rec, aTeam, bTeam, par).sum;
+}
+
+const SETTLE_LASUO4_VERSION = "v53-4.3.1";
+
+function bandValue(rows, rel, defaults) {
+  const band = stroke.scoreBand(rel);
+  const map = rowMap(rows);
+  if (map[band] != null) return map[band];
+  const fb = defaults && defaults[band];
+  return fb != null && isFinite(Number(fb)) ? Number(fb) : 0;
 }
 
 function addValueOf(rel, rule) {
-  const n = lookup(rowMap(rule && rule.addRows), stroke.scoreBand(rel), ADD_DEFAULTS);
-  return isFinite(n) ? n : 0;
+  return bandValue(rule && rule.addRows, rel, ADD_DEFAULTS);
 }
 
 function pickSlotPlayer(rec, team, worst) {
@@ -191,37 +223,59 @@ function totalSign(rawCmp) {
   return 0;
 }
 
-function addBonus(rule, rec, aTeam, bTeam, rawCmp, k) {
-  if (((rule && rule.reward) || "none") !== "add") return 0;
+function rewardModeOf(rule) {
+  const raw = rule && rule.reward;
+  const s = String(raw == null ? "" : raw).trim().toLowerCase();
+  if (s === "add" || s === "additive") return "add";
+  if (s === "mul" || s === "multiply" || s === "multi") return "mul";
+  if (s === "none" || s === "off") return "none";
+  return "none";
+}
+
+function totalCmp(rule, rec, aTeam, bTeam, par) {
+  if (!weightOf(rule, "pkTotal", "pkTotalW")) return 0;
+  const product = (rule && rule.pkTotalMode) === "product";
+  return cmpVal(teamTotal(rec, aTeam, par, product), teamTotal(rec, bTeam, par, product));
+}
+
+function addEligible(rule, totalSelected, teamTotalSign) {
+  if (!totalSelected) return true;
   const pre = (rule && rule.addPre) || "win";
-  let bonus = 0;
-  const sides = [
-    { team: aTeam, sign: 1 },
-    { team: bTeam, sign: -1 }
-  ];
-  sides.forEach(function (side) {
-    const tot = totalSign(rawCmp) * side.sign;
-    const bw = weightOf(rule, "pkBetter", "pkBetterW");
-    if (bw) {
-      const add = addValueOf(rec[pickSlotPlayer(rec, side.team, false)].rel, rule);
-      if (add > 0) bonus += add * bw * side.sign;
-    }
-    const ww = weightOf(rule, "pkWorse", "pkWorseW");
-    if (ww) {
-      const add = addValueOf(rec[pickSlotPlayer(rec, side.team, true)].rel, rule);
-      if (add > 0) bonus += add * ww * side.sign;
-    }
-    const tw = weightOf(rule, "pkTotal", "pkTotalW");
-    if (tw) {
-      if (pre === "win" && tot <= 0) return;
-      if (pre === "not-lose" && tot < 0) return;
-      side.team.forEach(function (id) {
-        const add = addValueOf(rec[id].rel, rule);
-        if (add > 0) bonus += add * tw * side.sign;
-      });
-    }
+  if (pre === "ignore") return true;
+  if (pre === "not-lose") return teamTotalSign >= 0;
+  return teamTotalSign > 0;
+}
+
+function teamAddReward(rule, rec, team) {
+  const bw = weightOf(rule, "pkBetter", "pkBetterW");
+  const ww = weightOf(rule, "pkWorse", "pkWorseW");
+  const tw = weightOf(rule, "pkTotal", "pkTotalW");
+  const bestId = pickSlotPlayer(rec, team, false);
+  const worstId = pickSlotPlayer(rec, team, true);
+  let sum = 0;
+  team.forEach(function (id) {
+    const v = addValueOf(rec[id].rel, rule);
+    if (!v) return;
+    let w = 0;
+    if (String(id) === String(bestId) && bw) w = bw;
+    else if (String(id) === String(worstId) && ww) w = ww;
+    else if (tw) w = tw;
+    if (w) sum += v * w;
   });
-  return core.round1(bonus * k);
+  return sum;
+}
+
+function addRewards(rule, rec, aTeam, bTeam, par) {
+  if (rewardModeOf(rule) !== "add") return { a: 0, b: 0 };
+  const totalW = weightOf(rule, "pkTotal", "pkTotalW");
+  const tot = totalCmp(rule, rec, aTeam, bTeam, par);
+  const signA = totalSign(tot);
+  const aOn = addEligible(rule, !!totalW, signA);
+  const bOn = addEligible(rule, !!totalW, -signA);
+  return {
+    a: aOn ? teamAddReward(rule, rec, aTeam) : 0,
+    b: bOn ? teamAddReward(rule, rec, bTeam) : 0
+  };
 }
 
 function comboKey(relA, relB) {
@@ -234,20 +288,28 @@ function comboKey(relA, relB) {
   return "";
 }
 
-function winMul(rule, rec, winTeam) {
-  if (((rule && rule.reward) || "none") !== "mul") return 1;
-  const person = rowMap(rule && rule.mulRows);
-  let best = 1;
-  winTeam.forEach(function (id) {
-    const m = lookup(person, stroke.scoreBand(rec[id].rel), MUL_DEFAULTS);
-    if (isFinite(m) && m > best) best = m;
-  });
+function personalMulOf(rel, rule) {
+  const band = stroke.scoreBand(rel);
+  const map = rowMap(rule && rule.mulRows);
+  if (map[band] != null) return map[band];
+  const fb = MUL_DEFAULTS[band];
+  return fb != null && isFinite(Number(fb)) ? Number(fb) : 1;
+}
+
+function resolveMultiplier(rule, rec, winTeam) {
+  if (rewardModeOf(rule) !== "mul") return { m: 1, source: "none" };
   const ck = comboKey(rec[winTeam[0]].rel, rec[winTeam[1]].rel);
-  if (ck) {
-    const combo = lookup(rowMap(rule && rule.comboMulRows), ck, COMBO_DEFAULTS);
-    if (isFinite(combo) && combo > 1) return combo;
+  const comboMap = rowMap(rule && rule.comboMulRows);
+  if (ck && comboMap[ck] != null) {
+    return { m: comboMap[ck], source: ck };
   }
-  return best > 0 ? best : 1;
+  let best = null;
+  winTeam.forEach(function (id) {
+    const m = personalMulOf(rec[id].rel, rule);
+    if (best == null || m > best) best = m;
+  });
+  if (best == null) return { m: 1, source: "default" };
+  return { m: best, source: "personal" };
 }
 
 function meatBand(diff) {
@@ -405,17 +467,24 @@ function pickBestRel(rec, team) {
 function settleLasuo4(game, ctx) {
   const holeOrder = (ctx && ctx.holeOrder) || [];
   const scores = (ctx && ctx.scores) || {};
-  const rule = (game && game.ruleSnapshot) || {};
+  const rule = unwrapRule((game && game.ruleSnapshot) || {});
   const k = pointValue(game);
+  const topHoleTracker = core.createTopHoleTracker();
   let order = initialOrder(game);
-  if (order.length < 4) return core.emptyResults(game, holeOrder);
+  if (order.length < 4) {
+    const empty = core.emptyResults(game, holeOrder);
+    empty.topHoleStates = topHoleTracker.states;
+    return empty;
+  }
   order = order.slice(0, 4);
   let meatPool = 0;
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const holeDebug = {};
   let rankedNext = false;
   let startMarked = false;
+  let prefixBlocked = false;
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
 
@@ -423,6 +492,10 @@ function settleLasuo4(game, ctx) {
     const ledger = core.holeLedger();
     const isLast = String(label) === lastLabel;
     if (!core.holeOn(game, label)) {
+      byHole[label] = ledger;
+      return;
+    }
+    if (prefixBlocked) {
       byHole[label] = ledger;
       return;
     }
@@ -441,6 +514,7 @@ function settleLasuo4(game, ctx) {
       rec[id] = { rel: rel, net: rel - n, pts: 0 };
     });
     if (!ready) {
+      prefixBlocked = true;
       rankedNext = false;
       byHole[label] = ledger;
       return;
@@ -449,31 +523,84 @@ function settleLasuo4(game, ctx) {
     const sides = teamsOf(order, (game && game.groupMode) || "fixed");
     const aTeam = sides.aTeam;
     const bTeam = sides.bTeam;
-    const rawCmp = rawCompare(rule, rec, aTeam, bTeam, par);
-    let aPts = core.round1(rawCmp * k);
-    const rawAbs = core.round1(Math.abs(aPts));
-    aPts = core.round1(aPts + addBonus(rule, rec, aTeam, bTeam, rawCmp, k));
-    const aWins = aPts > 0;
-    const winTeam = aWins ? aTeam : bTeam;
-    if (aPts !== 0) {
-      const mul = winMul(rule, rec, winTeam);
-      if (mul !== 1) aPts = core.round1(aPts * mul);
+    const parts = indicatorParts(rule, rec, aTeam, bTeam, par);
+    const rawCmp = parts.sum;
+    const mode = rewardModeOf(rule);
+    const adds = addRewards(rule, rec, aTeam, bTeam, par);
+    let rewardedPts = rawCmp;
+    let mulInfo = { m: 1, source: "none" };
+    let winTeam = aTeam;
+    let winningTeam = "none";
+    if (rawCmp > 0) {
+      winningTeam = "A";
+      winTeam = aTeam;
+    } else if (rawCmp < 0) {
+      winningTeam = "B";
+      winTeam = bTeam;
     }
+    if (mode === "add") {
+      rewardedPts = rawCmp + adds.a - adds.b;
+    } else if (mode === "mul") {
+      if (rawCmp > 0) {
+        mulInfo = resolveMultiplier(rule, rec, aTeam);
+        rewardedPts = rawCmp * mulInfo.m;
+      } else if (rawCmp < 0) {
+        mulInfo = resolveMultiplier(rule, rec, bTeam);
+        rewardedPts = rawCmp * mulInfo.m;
+      } else {
+        rewardedPts = 0;
+        mulInfo = { m: 1, source: "tie" };
+      }
+    }
+    const aPts = core.round1(rewardedPts * k);
+    const normalPts = core.round1(rawCmp * k);
+    const rawAbs = core.round1(Math.abs(normalPts));
     const rewardedAbs = core.round1(Math.abs(aPts));
+    const aWins = aPts > 0;
+    if (aPts > 0) winTeam = aTeam;
+    else if (aPts < 0) winTeam = bTeam;
     const flag = classifyPush(rule, rewardedAbs);
     const isPush = !!flag.push;
+    holeDebug[label] = {
+      selectedIndicators: {
+        better: weightOf(rule, "pkBetter", "pkBetterW") > 0,
+        worse: weightOf(rule, "pkWorse", "pkWorseW") > 0,
+        total: weightOf(rule, "pkTotal", "pkTotalW") > 0
+      },
+      indicatorWeights: {
+        better: weightOf(rule, "pkBetter", "pkBetterW"),
+        worse: weightOf(rule, "pkWorse", "pkWorseW"),
+        total: weightOf(rule, "pkTotal", "pkTotalW")
+      },
+      indicatorResults: parts,
+      baseTeamScore: rawCmp,
+      rewardMode: mode,
+      addRewardA: adds.a,
+      addRewardB: adds.b,
+      winningTeam: winningTeam,
+      multiplierSource: mulInfo.source,
+      multiplier: mulInfo.m,
+      rewardedTeamScore: rewardedPts,
+      K: k,
+      finalTeamScore: aPts,
+      settleVersion: SETTLE_LASUO4_VERSION
+    };
 
     if (aPts === 0) {
       order.forEach(function (id) {
         addPts(ledger, id, 0);
       });
-      if (isPush) meatPool += 1;
-    } else {
-      applySides(ledger, aTeam, bTeam, aPts);
-      if (aPts < 0) applyBao(ledger, aTeam, rec, oppBestNet(rec, bTeam), par, rule, aPts);
-      else applyBao(ledger, bTeam, rec, oppBestNet(rec, aTeam), par, rule, -aPts);
       if (isPush) {
         meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
+      }
+    } else {
+      applySides(ledger, aTeam, bTeam, aPts);
+      if (normalPts < 0) applyBao(ledger, aTeam, rec, oppBestNet(rec, bTeam), par, rule, normalPts);
+      else if (normalPts > 0) applyBao(ledger, bTeam, rec, oppBestNet(rec, aTeam), par, rule, -normalPts);
+      if (isPush) {
+        meatPool += 1;
+        core.enqueueTopHole(topHoleTracker, label);
       }
       if (meatPool > 0) {
         const eat = core.meatEatCount(
@@ -488,13 +615,18 @@ function settleLasuo4(game, ctx) {
           const piece = core.meatPieceValue(rule, holeForMeat, k);
           applySides(ledger, aTeam, bTeam, aWins ? core.round1(eat * piece) : core.round1(-eat * piece));
           meatPool -= eat;
+          holeDebug[label].meatScore = core.round1(eat * piece);
+          core.consumeTopHoles(topHoleTracker, eat);
         }
       }
     }
 
+    const personalScores = {};
     order.forEach(function (id) {
       rec[id].pts = Number(ledger[id]) || 0;
+      personalScores[id] = rec[id].pts;
     });
+    holeDebug[label].personalScores = personalScores;
     hist.push(rec);
     order = nextOrder(order, rec, hist, game, rule, isPush);
     rankedNext = true;
@@ -505,10 +637,14 @@ function settleLasuo4(game, ctx) {
     byHole: byHole,
     orderByHole: orderByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
-    catalogId: "lasuo-4"
+    catalogId: "lasuo-4",
+    settleVersion: SETTLE_LASUO4_VERSION,
+    topHoleStates: topHoleTracker.states,
+    holeDebug: holeDebug
   };
 }
 
 module.exports = {
-  settle: settleLasuo4
+  settle: settleLasuo4,
+  SETTLE_LASUO4_VERSION: SETTLE_LASUO4_VERSION
 };

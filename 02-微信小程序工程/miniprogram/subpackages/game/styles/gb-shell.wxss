@@ -1,4 +1,4 @@
-﻿/* 主体视觉规范 V3：Header + TAB + 表面 token */
+/* 主体视觉规范 V3：Header + TAB + 表面 token */
 
 .gb-page.bright-mode {
   --bg-primary: #fcfcfc;
@@ -210,5 +210,14 @@
 .gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
 .gb-header__eyebrow { display: block; font-size: 17rpx; font-weight: 900; letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.5); line-height: 1; margin-bottom: 6rpx; }
 .gb-header__title { display: block; color: #fff; font-size: 32rpx; font-weight: 900; font-style: italic; line-height: 1; }
+.gb-header__readonly { display: block; margin-top: 8rpx; font-size: 20rpx; font-weight: 700; font-style: normal; letter-spacing: 0; color: rgba(255, 255, 255, 0.78); }
+.gb-page--readonly .cta-gold,
+.gb-page--readonly .cta-ghost,
+.gb-page--readonly .mini-input,
+.gb-page--readonly .field,
+.gb-page--readonly .add-game-btn,
+.gb-page--readonly .game-card__del {
+  opacity: 0.55;
+}
 .gb-tabs { height: var(--tab-height); background: var(--tour-blue); display: flex; align-items: stretch; flex-shrink: 0; }
 .gb-body { flex: 1; height: 0; min-height: 0; }

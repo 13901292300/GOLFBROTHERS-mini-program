@@ -1,0 +1,7 @@
+<view wx:if="{{showInstanceHoleOrder}}" class="ds-card game-card" bindtap="openHoleOrder">
+  <view class="hole-preview">
+    <text class="game-card__name">调整洞序</text>
+    <text class="hole-count hole-order-card__text">{{holeOrderText}}</text>
+    <text class="setting-chev">›</text>
+  </view>
+</view>

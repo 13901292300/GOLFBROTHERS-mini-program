@@ -1,19 +1,15 @@
 /**
- * 两人比洞（V53 §4.1.2）
+ * 两人比洞（V53 §4.1.2，行 234–267）
  *
- * 比较调整后杆数（实际杆数 − 逐洞让杆）。胜洞差固定为 1（不是杆差）。
- * N>0：前者让后者，后者杆数 − N；N<0：后者让前者，前者杆数 − |N|。
- * 每洞积分 = 胜洞差 × 倍数 × 每洞分值。乘法奖励只看胜者相对标准杆。
- * 顶洞（默认：调整后打平）：本洞 0，该对累积 1 块肉。
- * 非顶洞且有肉：按胜者成绩查表吃 min(表, 存量)，余肉留下。
- * 肉不含奖励：每块 = 1×K；肉含奖励 / 「分值翻倍」：每块 = 本洞分值（不是本洞×2）。
- * 每对独立攒肉；对决始终零和。
+ * 胜负只比较 adjustedScore（实际杆数按让杆 N 调整，N 可为 0.5 / 负数）。
+ * 胜洞差固定为 1。
+ * 乘法奖励只看胜者真实成绩：performanceDiff = winnerActualScore − par。
+ * 不得用调整后的 3.5 / 2.5 去套成绩档。
  */
 const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
 
-const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
-const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
+const MATCH2_SETTLE_VERSION = "v53-4.1.2";
 
 function rowMap(rows) {
   const map = {};
@@ -91,17 +87,122 @@ function pairHcapN(pair, label, par) {
   return isFinite(s) ? s : 0;
 }
 
+function adjustedActual(actual, n, isLeft) {
+  const a = Number(actual);
+  const h = Number(n) || 0;
+  if (!h) return a;
+  if (h > 0) return isLeft ? a : a - h;
+  return isLeft ? a - Math.abs(h) : a;
+}
+
 function netRel(rel, n, isLeft) {
-  if (!n) return rel;
-  if (n > 0) return isLeft ? rel : rel - n;
-  return isLeft ? rel - Math.abs(n) : rel;
+  return adjustedActual(rel, n, isLeft);
 }
 
 function winnerMul(rule, winnerRel) {
-  if (((rule && rule.reward) || "none") !== "mul") return 1;
-  const m = lookup(rowMap(rule.mulRows), stroke.scoreBand(winnerRel), MUL_DEFAULTS);
-  return isFinite(m) && m > 0 ? m : 1;
+  return stroke.rewardMul(rule, winnerRel);
 }
+
+function match2MulState(rule) {
+  const mode = rule && rule.reward;
+  if (mode === "mul") return "mul";
+  if (mode === "none") return "none";
+  return "missing";
+}
+
+var SCORE_TYPE_BY_BAND = {
+  hio: "albatross",
+  m2: "eagle",
+  m1: "birdie",
+  par: "par",
+  p1: "bogey",
+  ge2: "doubleBogey"
+};
+
+function scoreTypeOf(rel) {
+  return SCORE_TYPE_BY_BAND[stroke.scoreBand(rel)] || "par";
+}
+
+function emptyHoleResult() {
+  return {
+    outcome: null,
+    scoreType: "par",
+    baseValue: 0,
+    multiplier: 1,
+    multiplierKey: "par",
+    winnerActualDiff: 0,
+    adjustedLeft: null,
+    adjustedRight: null,
+    finalValue: 0,
+    leftPts: 0,
+    rightPts: 0,
+    settleVersion: MATCH2_SETTLE_VERSION
+  };
+}
+
+function calculateMatchPlayHoleResult(input) {
+  input = input || {};
+  const rule = input.ruleConfig || {};
+  const k = pointValue({ multiplier: input.pointValue != null ? input.pointValue : 1 });
+  const n = Number(input.handicapN);
+  const hcap = isFinite(n) ? n : 0;
+  const parRaw = Number(input.par);
+  const par = parRaw === 3 || parRaw === 4 || parRaw === 5 ? parRaw : 4;
+  let actualA;
+  let actualB;
+  if (input.playerActual != null && input.playerActual !== "" && input.opponentActual != null && input.opponentActual !== "") {
+    actualA = Number(input.playerActual);
+    actualB = Number(input.opponentActual);
+  } else {
+    if (input.playerScore == null || input.playerScore === "" || input.opponentScore == null || input.opponentScore === "") {
+      return emptyHoleResult();
+    }
+    actualA = Number(input.playerScore) + par;
+    actualB = Number(input.opponentScore) + par;
+  }
+  if (!isFinite(actualA) || !isFinite(actualB)) return emptyHoleResult();
+  const relA = actualA - par;
+  const relB = actualB - par;
+  const adjA = adjustedActual(actualA, hcap, true);
+  const adjB = adjustedActual(actualB, hcap, false);
+  if (adjA === adjB) {
+    return {
+      outcome: "tie",
+      scoreType: scoreTypeOf(relA),
+      baseValue: 0,
+      multiplier: 1,
+      multiplierKey: stroke.scoreBand(relA),
+      winnerActualDiff: relA,
+      adjustedLeft: adjA,
+      adjustedRight: adjB,
+      finalValue: 0,
+      leftPts: 0,
+      rightPts: 0,
+      settleVersion: MATCH2_SETTLE_VERSION
+    };
+  }
+  const leftWins = adjA < adjB;
+  const winnerActualDiff = leftWins ? relA : relB;
+  const mulKey = stroke.scoreBand(winnerActualDiff);
+  const mul = winnerMul(rule, winnerActualDiff);
+  const holePts = core.round1(1 * mul * k);
+  return {
+    outcome: leftWins ? "win" : "lose",
+    scoreType: scoreTypeOf(winnerActualDiff),
+    baseValue: k,
+    multiplier: mul,
+    multiplierKey: mulKey,
+    winnerActualDiff: winnerActualDiff,
+    adjustedLeft: adjA,
+    adjustedRight: adjB,
+    finalValue: leftWins ? holePts : core.round1(-holePts),
+    leftPts: leftWins ? holePts : core.round1(-holePts),
+    rightPts: leftWins ? core.round1(-holePts) : holePts,
+    settleVersion: MATCH2_SETTLE_VERSION
+  };
+}
+
+const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
 
 function meatBand(diff) {
   const n = Number(diff);
@@ -123,21 +224,80 @@ function pushEnabled(rule) {
   return (rule && rule.pushRule) !== "none";
 }
 
+function resolveMatch2RuleSnapshot(game, librarySnap) {
+  const raw = (game && game.ruleSnapshot) || {};
+  let snap = raw;
+  let hops = 0;
+  while (
+    hops < 4 &&
+    snap &&
+    typeof snap === "object" &&
+    snap.reward == null &&
+    !(Array.isArray(snap.mulRows) && snap.mulRows.length) &&
+    snap.ruleSnapshot &&
+    typeof snap.ruleSnapshot === "object"
+  ) {
+    snap = snap.ruleSnapshot;
+    hops += 1;
+  }
+  const state = match2MulState(snap);
+  if (state !== "missing") return { ruleSnapshot: snap, mulState: state };
+  if (librarySnap && typeof librarySnap === "object") {
+    let lib = librarySnap;
+    let lh = 0;
+    while (
+      lh < 4 &&
+      lib &&
+      typeof lib === "object" &&
+      lib.reward == null &&
+      !(Array.isArray(lib.mulRows) && lib.mulRows.length) &&
+      lib.ruleSnapshot &&
+      typeof lib.ruleSnapshot === "object"
+    ) {
+      lib = lib.ruleSnapshot;
+      lh += 1;
+    }
+    const merged = Object.assign({}, snap, lib);
+    if (snap.requiredPartyCount != null) merged.requiredPartyCount = snap.requiredPartyCount;
+    if (Array.isArray(snap.scoreFields)) merged.scoreFields = snap.scoreFields;
+    const next = match2MulState(merged);
+    if (next !== "missing") return { ruleSnapshot: merged, mulState: next };
+  }
+  return { ruleSnapshot: snap, mulState: "missing" };
+}
+
 function settleMatch2(game, ctx) {
   const ids = core.playerIdsOf(game);
   const holeOrder = (ctx && ctx.holeOrder) || [];
   const scores = (ctx && ctx.scores) || {};
-  const rule = (game && game.ruleSnapshot) || {};
+  const resolved = resolveMatch2RuleSnapshot(game, ctx && ctx.libraryRuleSnapshot);
+  if (resolved.mulState === "missing") {
+    return {
+      byHole: {},
+      initial: core.emptyLedger(ids),
+      catalogId: "match-2",
+      settleVersion: MATCH2_SETTLE_VERSION,
+      mulMissing: true,
+      mulState: "missing",
+      resultSource: "mul_config_missing",
+      topHoleStates: {}
+    };
+  }
+  const rule = resolved.ruleSnapshot || {};
   const k = pointValue(game);
   const pairs = ((game && game.pairings) || []).filter(function (pair) {
     return pair && pair.leftId && pair.rightId && pair.on !== false;
   });
   const meatPool = {};
+  const topHoleTrackers = {};
   pairs.forEach(function (pair, i) {
-    meatPool[pair.id || i] = 0;
+    const key = pair.id || i;
+    meatPool[key] = 0;
+    topHoleTrackers[key] = core.createTopHoleTracker();
   });
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
+  let firstTrace = null;
 
   const byHole = {};
   holeOrder.forEach(function (label) {
@@ -152,19 +312,45 @@ function settleMatch2(game, ctx) {
         const leftRel = readRel(scores, label, left);
         const rightRel = readRel(scores, label, right);
         if (leftRel == null || rightRel == null) return;
-        const n = pairHcapN(pair, label, par);
-        const leftNet = netRel(leftRel, n, true);
-        const rightNet = netRel(rightRel, n, false);
-        if (leftNet === rightNet) {
-          if (pushEnabled(rule)) meatPool[key] += 1;
+        const hn = pairHcapN(pair, label, par);
+        const holeRes = calculateMatchPlayHoleResult({
+          playerScore: leftRel,
+          opponentScore: rightRel,
+          par: par,
+          ruleConfig: rule,
+          pointValue: k,
+          handicapN: hn
+        });
+        if (!firstTrace) {
+          firstTrace = {
+            settleVersion: MATCH2_SETTLE_VERSION,
+            resultSource: "settleMatch2",
+            reward: rule.reward || "",
+            mulRows: rule.mulRows || null,
+            pair: { leftId: left, rightId: right, handicap: hn },
+            par: par,
+            actualScores: { left: leftRel + par, right: rightRel + par },
+            adjustedScores: { left: holeRes.adjustedLeft, right: holeRes.adjustedRight },
+            winner: holeRes.outcome === "tie" ? "" : holeRes.outcome === "win" ? left : right,
+            winnerActualDiff: holeRes.winnerActualDiff,
+            multiplierKey: holeRes.multiplierKey,
+            multiplier: holeRes.multiplier,
+            K: k,
+            finalScores: { left: holeRes.leftPts, right: holeRes.rightPts }
+          };
+        }
+        if (holeRes.outcome === "tie") {
+          if (pushEnabled(rule)) {
+            meatPool[key] += 1;
+            core.enqueueTopHole(topHoleTrackers[key], label);
+          }
           addPts(ledger, left, 0);
           addPts(ledger, right, 0);
           return;
         }
-        const leftWins = leftNet < rightNet;
+        const leftWins = holeRes.outcome === "win";
         const winnerRel = leftWins ? leftRel : rightRel;
-        const mul = winnerMul(rule, winnerRel);
-        const holePts = core.round1(1 * mul * k);
+        const holePts = Math.abs(Number(holeRes.leftPts) || 0);
         const winner = leftWins ? left : right;
         const loser = leftWins ? right : left;
         addPts(ledger, winner, holePts);
@@ -178,6 +364,7 @@ function settleMatch2(game, ctx) {
             addPts(ledger, winner, meatPts);
             addPts(ledger, loser, -meatPts);
             meatPool[key] = pool - eat;
+            core.consumeTopHoles(topHoleTrackers[key], eat);
           }
         }
       });
@@ -185,15 +372,33 @@ function settleMatch2(game, ctx) {
     byHole[label] = ledger;
   });
 
+  if (typeof global !== "undefined" && global.__MATCH2_DEBUG__ && firstTrace) {
+    global.__MATCH2_LAST_TRACE__ = firstTrace;
+  }
+
+  const topHoleStates = {};
+  pairs.forEach(function (pair, i) {
+    const key = pair.id || i;
+    core.mergeTopHoleStates(topHoleStates, topHoleTrackers[key].states);
+  });
+
   return {
     byHole: byHole,
     initial: core.emptyLedger(ids),
-    catalogId: "match-2"
+    catalogId: "match-2",
+    settleVersion: MATCH2_SETTLE_VERSION,
+    mulState: resolved.mulState,
+    topHoleStates: topHoleStates
   };
 }
 
 module.exports = {
+  MATCH2_SETTLE_VERSION,
   settle: settleMatch2,
   pairHcapN,
-  netRel
+  netRel,
+  winnerMul,
+  match2MulState,
+  resolveMatch2RuleSnapshot,
+  calculateMatchPlayHoleResult
 };

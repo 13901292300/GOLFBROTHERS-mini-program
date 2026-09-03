@@ -1,0 +1,21 @@
+<view class="ds-card game-card">
+  <view class="fold-head" bindtap="toggleRankFold">
+    <text class="game-card__name">排序规则</text>
+    <view class="rule-lib__meta">
+      <text class="rule-lib__count">{{rankFoldText}}</text>
+      <text class="rule-lib__chev">{{rankFold ? "⌃" : "⌄"}}</text>
+    </view>
+  </view>
+  <view wx:if="{{rankFold}}" class="fold-body">
+    <view
+      wx:for="{{rankOptions}}"
+      wx:key="id"
+      class="rank-opt {{rankId === item.id ? 'on' : ''}}"
+      bindtap="setRank"
+      data-id="{{item.id}}"
+    >
+      <view class="radio-dot"></view>
+      <text>{{item.label}}</text>
+    </view>
+  </view>
+</view>

@@ -46,6 +46,23 @@ assert('未知 ruleId 返回空', catalog.findRule('not-a-rule') == null);
 assert('listCatalog(2) 不含 hidden skins', !JSON.stringify(catalog.listCatalog(2)).includes('skins'));
 assert('listCatalog(4) 仍不含 hidden skins', !JSON.stringify(catalog.listCatalog(4)).includes('"id":"skins"'));
 
+var openIds = [];
+catalog.listCatalog(8).forEach(function (g) {
+  (g.items || []).forEach(function (item) {
+    openIds.push(item.id);
+  });
+});
+assert('当前可用 16 种', openIds.length === 16, String(openIds.length));
+assert('三局已开放', openIds.indexOf('three-set') >= 0 && !catalog.isUnavailableRule('three-set'));
+assert('油菜已开放', openIds.indexOf('youcai') >= 0 && !catalog.isUnavailableRule('youcai'));
+assert('斗小地主已开放', openIds.indexOf('landlord-small') >= 0 && !catalog.isUnavailableRule('landlord-small'));
+['skins'].forEach(function (id) {
+  assert('未完成仍可 findRule ' + id, !!catalog.findRule(id));
+  assert('目录隐藏 ' + id, openIds.indexOf(id) < 0);
+  assert('isUnavailableRule ' + id, catalog.isUnavailableRule(id));
+});
+assert('比杆仍开放', !catalog.isUnavailableRule('stroke-2') && openIds.indexOf('stroke-2') >= 0);
+
 var src = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'subpackages', 'game', 'utils', 'catalog.js'),
   'utf8'
