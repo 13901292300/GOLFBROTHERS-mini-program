@@ -144,7 +144,7 @@ var pickJs = fs.readFileSync(path.join(gameRoot, 'pages/pick-players/index.js'),
 var listJs = fs.readFileSync(path.join(gameRoot, 'pages/list/index.js'), 'utf8');
 
 assert('WXML catalog 未改标题', /选择玩法/.test(catalogWxml) && /去配置/.test(catalogWxml));
-assert('catalog 页用设计目录（不受方数预锁）', /listCatalogForDesign\(\)/.test(catalogJs) && !/listCatalog\(maxPlayers\)/.test(catalogJs));
+assert('catalog 页按容量筛选候选', /listCatalogForGroupCapacity/.test(catalogJs) && /getParticipantCount/.test(catalogJs));
 assert('创建实例按 formation 校验', /getScoreFormationContext|resolveRuleCompatibility|partyFormation/.test(
   fs.readFileSync(path.join(__dirname, '../miniprogram/subpackages/game/pages/rules/index.js'), 'utf8')
 ));
@@ -217,7 +217,7 @@ var saved = bind.upsertMyRule({
   noSettings: true
 });
 assert('添加规则不依赖已选参与者', !!(saved && saved.id), JSON.stringify(saved));
-assert('规则库可见', bind.listMyRules(bind.getRuleDesignCap('hub')).some(function (r) {
+assert('规则库可见', bind.listAllMyRules().some(function (r) {
   return r.id === saved.id;
 }));
 

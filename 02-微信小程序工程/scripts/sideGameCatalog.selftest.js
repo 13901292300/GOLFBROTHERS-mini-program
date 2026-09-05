@@ -47,7 +47,7 @@ assert('listCatalog(2) 不含 hidden skins', !JSON.stringify(catalog.listCatalog
 assert('listCatalog(4) 仍不含 hidden skins', !JSON.stringify(catalog.listCatalog(4)).includes('"id":"skins"'));
 
 var openIds = [];
-catalog.listCatalog(8).forEach(function (g) {
+catalog.listCatalogForDesign().forEach(function (g) {
   (g.items || []).forEach(function (item) {
     openIds.push(item.id);
   });
@@ -62,6 +62,29 @@ assert('斗小地主已开放', openIds.indexOf('landlord-small') >= 0 && !catal
   assert('isUnavailableRule ' + id, catalog.isUnavailableRule(id));
 });
 assert('比杆仍开放', !catalog.isUnavailableRule('stroke-2') && openIds.indexOf('stroke-2') >= 0);
+
+function idsOf(groups) {
+  var out = [];
+  (groups || []).forEach(function (g) {
+    (g.items || []).forEach(function (item) {
+      out.push(item.id);
+    });
+  });
+  return out;
+}
+
+var two = idsOf(catalog.listCatalog(2));
+var three = idsOf(catalog.listCatalog(3));
+var four = idsOf(catalog.listCatalog(4));
+var five = idsOf(catalog.listCatalog(5));
+assert('2 人目录仅精确 2 人', two.indexOf('stroke-2') >= 0 && two.indexOf('landlord-mid') < 0 && two.indexOf('lasuo-4') < 0 && two.indexOf('horn') < 0);
+assert('3 人目录仅精确 3 人', three.indexOf('landlord-mid') >= 0 && three.indexOf('stroke-2') < 0 && three.indexOf('8421-4') < 0);
+assert('4 人目录不含多人', four.indexOf('8421-4') >= 0 && four.indexOf('lasuo-4') >= 0 && four.indexOf('horn') < 0 && four.indexOf('lasuo-n') < 0);
+assert('5 人目录仅多人', five.indexOf('horn') >= 0 && five.indexOf('lasuo-n') >= 0 && five.indexOf('lasuo-4') < 0 && five.indexOf('stroke-2') < 0);
+assert('人数 0 不展示目录', catalog.listCatalog(0).length === 0);
+assert('isRuleCompatibleWithPlayerCount 存在', typeof catalog.isRuleCompatibleWithPlayerCount === 'function');
+assert('喇叭花不兼容 4 人', catalog.isRuleCompatibleWithPlayerCount(catalog.findRule('horn'), 4) === false);
+assert('拉丝三点兼容 4 人', catalog.isRuleCompatibleWithPlayerCount(catalog.findRule('lasuo-4'), 4) === true);
 
 var src = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'subpackages', 'game', 'utils', 'catalog.js'),

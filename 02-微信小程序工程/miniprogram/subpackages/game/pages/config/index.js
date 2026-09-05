@@ -1059,10 +1059,16 @@ function isSetupRestReady(isThreePlayer, playerPickLocked, players, needPlayers,
     return partyFormation.isSelectionCompatible(formationParties, ids, ruleId);
   }
   if (showHorn) return n >= 5;
-  if (showLasuoN) return n >= 6;
+  if (showLasuoN) return n >= 5;
   if (isThreePlayer) return n === Number(needPlayers || 3);
-  if (usePagePick) return n >= 2;
-  return true;
+  if (usePagePick) {
+    const req = Number(needPlayers) || 0;
+    if (req >= 2 && req <= 4) return n === req;
+    return n >= 2;
+  }
+  const req = Number(needPlayers) || 0;
+  if (req >= 2 && req <= 4) return n === req;
+  return n >= 2;
 }
 
 function partySelectCap(data) {
@@ -3121,7 +3127,7 @@ Page({
     const minSelect = this.data.showHorn
       ? 5
       : this.data.showLasuoN
-      ? 6
+      ? 5
       : this.data.isThreePlayer
         ? this.data.needPlayers
         : 2;
@@ -4885,12 +4891,27 @@ Page({
       wx.showToast({ title: "喇叭花至少选 5 人", icon: "none" });
       return;
     }
-    if (this.data.showLasuoN && selected.length < 6) {
-      wx.showToast({ title: "多人拉丝至少选 6 人", icon: "none" });
+    if (this.data.showLasuoN && selected.length < 5) {
+      wx.showToast({ title: "多人拉丝至少选 5 人", icon: "none" });
       return;
     }
     if (this.data.isThreePlayer && selected.length !== this.data.needPlayers) {
       wx.showToast({ title: "请选择 " + this.data.needPlayers + " 名球员", icon: "none" });
+      return;
+    }
+    const exactNeed = Number(this.data.needPlayers) || 0;
+    if (
+      !this.data.showHorn &&
+      !this.data.showLasuoN &&
+      !this.data.teamedPartyMode &&
+      exactNeed >= 2 &&
+      exactNeed <= 4 &&
+      selected.length !== exactNeed
+    ) {
+      wx.showToast({
+        title: "该规则需要恰好 " + exactNeed + " 个参与方",
+        icon: "none"
+      });
       return;
     }
     if (selected.length < 2) {

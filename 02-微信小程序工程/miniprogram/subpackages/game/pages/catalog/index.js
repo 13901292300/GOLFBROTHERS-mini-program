@@ -19,6 +19,8 @@ Page({
     headerBarStyle: "",
     entry: "score",
     maxPlayers: 4,
+    participantCount: 0,
+    emptyHint: "",
     catalogGroups: []
   },
 
@@ -27,13 +29,18 @@ Page({
     const entry = (query && query.entry) || "score";
     if (!session.requireSetupDraft(entry)) return;
     const header = createHeaderStyle();
-    // 规则设计目录不受记分页方数锁死
     const maxPlayers = session.getRuleDesignCap(entry);
+    const participantCount = session.getParticipantCount(entry);
+    const manageAll = entry === "hub" || entry === "match";
     const present = {};
-    session.listMyRules(maxPlayers).forEach(function (rule) {
+    session.listAllMyRules().forEach(function (rule) {
       if (rule && rule.catalogId) present[rule.catalogId] = true;
     });
-    const sourceGroups = catalog.listCatalogForDesign();
+    const sourceGroups = manageAll
+      ? catalog.listCatalogForDesign()
+      : participantCount >= 2
+        ? catalog.listCatalogForGroupCapacity(participantCount)
+        : [];
     const catalogGroups = sourceGroups.map(function (group) {
       return Object.assign({}, group, {
         items: (group.items || []).filter(function (item) {
@@ -43,13 +50,23 @@ Page({
     }).filter(function (group) {
       return group.items.length > 0;
     });
-    const catalogIds = flattenCatalogIds(sourceGroups);
+    const catalogIds = flattenCatalogIds(catalog.listCatalogForDesign());
     const renderedCatalogIds = flattenCatalogIds(catalogGroups);
     this.setData({
       headerRootStyle: header.headerRootStyle,
       headerBarStyle: header.headerBarStyle,
       entry: entry,
       maxPlayers: maxPlayers,
+      participantCount: participantCount,
+      emptyHint: manageAll
+        ? catalogGroups.length
+          ? ""
+          : "没有可添加的玩法。"
+        : participantCount >= 2
+          ? catalogGroups.length
+            ? ""
+            : "当前 " + participantCount + " 个参与方没有可添加的玩法。"
+          : "请先选择足够的球员或组合，再添加规则。",
       catalogGroups: catalogGroups
     });
     this._catalogDiag = {
@@ -131,14 +148,17 @@ Page({
         this.data.maxPlayers
     );
     if (catalog.isNoSettings(item)) {
-      const existing = session.findMyRuleByName(item.name);
+      const existing = session.findMyRuleBySourceTemplateId
+        ? session.findMyRuleBySourceTemplateId(item.id)
+        : null;
       const saved = existing
         ? existing
         : session.upsertMyRule({
-            id: "my-" + Date.now(),
             name: item.name,
             players: Number(item.players || 2),
             catalogId: item.id,
+            ruleId: item.id,
+            sourceTemplateId: item.id,
             noSettings: true
           });
       wx.showToast({

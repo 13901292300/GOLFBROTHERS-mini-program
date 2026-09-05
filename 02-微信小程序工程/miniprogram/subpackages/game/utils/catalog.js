@@ -7,6 +7,8 @@ const CATALOG = [
         id: "stroke-2",
         name: "比杆",
         players: 2,
+        playerMode: "exact",
+        playerCount: 2,
         editFirst: true,
         matchupMode: "party-matchup",
         partySizeMode: "one-or-more",
@@ -16,6 +18,8 @@ const CATALOG = [
         id: "match-2",
         name: "比洞",
         players: 2,
+        playerMode: "exact",
+        playerCount: 2,
         editFirst: true,
         matchPlay: true,
         matchupMode: "party-matchup",
@@ -26,6 +30,8 @@ const CATALOG = [
         id: "8421-2",
         name: "单挂8421",
         players: 2,
+        playerMode: "exact",
+        playerCount: 2,
         editFirst: true,
         kind: "8421",
         matchupMode: "party-matchup",
@@ -36,6 +42,8 @@ const CATALOG = [
         id: "three-set",
         name: "三局",
         players: 2,
+        playerMode: "exact",
+        playerCount: 2,
         editFirst: false,
         noSettings: true,
         matchupMode: "party-matchup",
@@ -46,6 +54,8 @@ const CATALOG = [
         id: "youcai",
         name: "油菜",
         players: 2,
+        playerMode: "exact",
+        playerCount: 2,
         editFirst: false,
         noSettings: true,
         matchupMode: "party-matchup",
@@ -58,22 +68,24 @@ const CATALOG = [
     group: "3人",
     groupId: "3",
     items: [
-      { id: "landlord-big", name: "斗大地主", players: 3, editFirst: true, kind: "landlord-big" },
-      { id: "landlord-mid", name: "斗二地主", players: 3, editFirst: true, kind: "landlord-mid" },
-      { id: "landlord-small", name: "斗小地主", players: 3, editFirst: true, kind: "landlord-small" },
-      { id: "8421-3", name: "3人8421", players: 3, editFirst: true, kind: "8421" }
+      { id: "landlord-big", name: "斗大地主", players: 3, playerMode: "exact", playerCount: 3, editFirst: true, kind: "landlord-big" },
+      { id: "landlord-mid", name: "斗二地主", players: 3, playerMode: "exact", playerCount: 3, editFirst: true, kind: "landlord-mid" },
+      { id: "landlord-small", name: "斗小地主", players: 3, playerMode: "exact", playerCount: 3, editFirst: true, kind: "landlord-small" },
+      { id: "8421-3", name: "3人8421", players: 3, playerMode: "exact", playerCount: 3, editFirst: true, kind: "8421" }
     ]
   },
   {
     group: "4人",
     groupId: "4",
     items: [
-      { id: "lasuo-4", name: "四人拉丝", players: 4, editFirst: true, kind: "lasuo-4" },
-      { id: "8421-4", name: "4人8421", players: 4, editFirst: true, kind: "8421" },
+      { id: "lasuo-4", name: "四人拉丝", players: 4, playerMode: "exact", playerCount: 4, editFirst: true, kind: "lasuo-4" },
+      { id: "8421-4", name: "4人8421", players: 4, playerMode: "exact", playerCount: 4, editFirst: true, kind: "8421" },
       {
         id: "three-vs-one",
         name: "固定三打一",
         players: 4,
+        playerMode: "exact",
+        playerCount: 4,
         editFirst: true,
         kind: "three-vs-one",
         matchupMode: "exact-party-shape",
@@ -81,17 +93,41 @@ const CATALOG = [
         requiredPartyCount: 2,
         allowedPartyShapes: [[3, 1]]
       },
-      { id: "dizhubo-4", name: "4人地主婆", players: 4, editFirst: true, kind: "dizhubo-4" },
-      { id: "vegas", name: "拉斯维加斯", players: 4, editFirst: true, kind: "vegas" },
-      { id: "skins", name: "狼和羊", players: 4, editFirst: true, hidden: true, unavailable: true }
+      { id: "dizhubo-4", name: "4人地主婆", players: 4, playerMode: "exact", playerCount: 4, editFirst: true, kind: "dizhubo-4" },
+      { id: "vegas", name: "拉斯维加斯", players: 4, playerMode: "exact", playerCount: 4, editFirst: true, kind: "vegas" },
+      { id: "skins", name: "狼和羊", players: 4, playerMode: "exact", playerCount: 4, editFirst: true, hidden: true, unavailable: true }
     ]
   },
   {
     group: "多人",
     groupId: "multi",
     items: [
-      { id: "lasuo-n", name: "多人拉丝", players: 6, editFirst: false, noSettings: true, multi: true, kind: "lasuo-n", preset: true },
-      { id: "horn", name: "喇叭花", players: 5, editFirst: false, noSettings: true, multi: true, kind: "horn", preset: true }
+      {
+        id: "lasuo-n",
+        name: "多人拉丝",
+        players: 6,
+        playerMode: "range",
+        minPlayers: 5,
+        maxPlayers: null,
+        editFirst: false,
+        noSettings: true,
+        multi: true,
+        kind: "lasuo-n",
+        preset: true
+      },
+      {
+        id: "horn",
+        name: "喇叭花",
+        players: 5,
+        playerMode: "range",
+        minPlayers: 5,
+        maxPlayers: null,
+        editFirst: false,
+        noSettings: true,
+        multi: true,
+        kind: "horn",
+        preset: true
+      }
     ]
   }
 ];
@@ -173,11 +209,11 @@ function catalogDesignCap() {
 }
 
 function listCatalog(maxPlayers) {
-  const cap = Number(maxPlayers);
-  if (!(cap > 0)) return [];
+  const n = Number(maxPlayers);
+  if (!(n > 0)) return [];
   return CATALOG.map(function (group) {
     const items = group.items.filter(function (item) {
-      return !item.hidden && item.players <= cap;
+      return !item.hidden && isRuleCompatibleWithPlayerCount(item, n);
     });
     return { group: group.group, groupId: group.groupId, items: items };
   }).filter(function (group) {
@@ -216,6 +252,139 @@ function findRule(id) {
     if (hit) return hit;
   }
   return null;
+}
+
+const MULTI_MIN_PLAYERS = 5;
+
+function asPositiveInt(value) {
+  const n = Number(value);
+  return isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function catalogIdOf(rule) {
+  return String((rule && (rule.catalogId || rule.ruleId || rule.id)) || "");
+}
+
+function rulePlayerCapability(rule) {
+  const src = rule && typeof rule === "object" ? rule : {};
+  const catalogId = catalogIdOf(src);
+  const hit = catalogId ? findRule(catalogId) : null;
+  const explicitMode = String(src.playerMode || "");
+  const catalogMode = String((hit && hit.playerMode) || "");
+  const mode = explicitMode === "exact" || explicitMode === "range" ? explicitMode : catalogMode;
+
+  if (mode === "range") {
+    const minPlayers =
+      asPositiveInt(src.minPlayers) ||
+      asPositiveInt(hit && hit.minPlayers) ||
+      MULTI_MIN_PLAYERS;
+    const maxRaw = src.maxPlayers != null ? src.maxPlayers : hit && hit.maxPlayers;
+    const maxPlayers = maxRaw == null || maxRaw === "" ? null : asPositiveInt(maxRaw) || null;
+    return {
+      playerMode: "range",
+      playerCount: 0,
+      minPlayers: minPlayers,
+      maxPlayers: maxPlayers
+    };
+  }
+
+  if (mode === "exact") {
+    const exact =
+      asPositiveInt(src.playerCount) ||
+      asPositiveInt(hit && hit.playerCount) ||
+      asPositiveInt(src.players) ||
+      asPositiveInt(hit && hit.players);
+    return {
+      playerMode: "exact",
+      playerCount: exact,
+      minPlayers: exact,
+      maxPlayers: exact
+    };
+  }
+
+  if ((hit && hit.multi) || src.multi || catalogId === "lasuo-n" || catalogId === "horn") {
+    return {
+      playerMode: "range",
+      playerCount: 0,
+      minPlayers: MULTI_MIN_PLAYERS,
+      maxPlayers: null
+    };
+  }
+
+  const n = asPositiveInt(src.players) || asPositiveInt(hit && hit.players);
+  if (n >= MULTI_MIN_PLAYERS) {
+    return {
+      playerMode: "range",
+      playerCount: 0,
+      minPlayers: MULTI_MIN_PLAYERS,
+      maxPlayers: null
+    };
+  }
+  return {
+    playerMode: "exact",
+    playerCount: n,
+    minPlayers: n,
+    maxPlayers: n
+  };
+}
+
+function isMultiplayerRule(rule) {
+  const cap = rulePlayerCapability(rule);
+  return cap.playerMode === "range" || cap.minPlayers >= MULTI_MIN_PLAYERS;
+}
+
+function requiredEntityCount(rule) {
+  if (isMultiplayerRule(rule)) return 0;
+  const cap = rulePlayerCapability(rule);
+  return asPositiveInt(cap.playerCount) || asPositiveInt(cap.minPlayers);
+}
+
+/** 保存/开局：参与实体必须恰好等于规则要求（多人除外，多人 ≥ 5）。 */
+function isExactEntityCount(rule, selectedCount) {
+  const n = asPositiveInt(selectedCount);
+  if (!n) return false;
+  if (isMultiplayerRule(rule)) return n >= MULTI_MIN_PLAYERS;
+  const req = requiredEntityCount(rule);
+  return req >= 2 && n === req;
+}
+
+/**
+ * 记分页候选：容量覆盖。
+ * 2/3/4 人规则在 availableEntityCount 足够时都可见；永不混入多人规则；人数未知时不放行。
+ */
+function isRuleAvailableForGroupCapacity(rule, availableEntityCount) {
+  const n = asPositiveInt(availableEntityCount);
+  if (n < 2) return false;
+  if (isMultiplayerRule(rule)) return false;
+  const req = requiredEntityCount(rule);
+  if (req < 2 || req > 4) return false;
+  return req <= n;
+}
+
+function listCatalogForGroupCapacity(availableEntityCount) {
+  const n = asPositiveInt(availableEntityCount);
+  if (n < 2) return [];
+  return CATALOG.map(function (group) {
+    const items = group.items.filter(function (item) {
+      return !item.hidden && isRuleAvailableForGroupCapacity(item, n);
+    });
+    return { group: group.group, groupId: group.groupId, items: items };
+  }).filter(function (group) {
+    return group.items.length > 0;
+  });
+}
+
+function isRuleCompatibleWithPlayerCount(rule, participantCount) {
+  const n = asPositiveInt(participantCount);
+  if (!n) return false;
+  const cap = rulePlayerCapability(rule);
+  if (!(cap.playerMode === "range" || cap.playerCount > 0 || cap.minPlayers > 0)) return false;
+  if (cap.playerMode === "range") {
+    if (n < cap.minPlayers) return false;
+    if (cap.maxPlayers && n > cap.maxPlayers) return false;
+    return true;
+  }
+  return cap.playerCount === n;
 }
 
 function is8421(id) {
@@ -786,6 +955,14 @@ module.exports = {
   listCatalogForDesign,
   catalogDesignCap,
   findRule,
+  MULTI_MIN_PLAYERS,
+  rulePlayerCapability,
+  isMultiplayerRule,
+  requiredEntityCount,
+  isExactEntityCount,
+  isRuleAvailableForGroupCapacity,
+  listCatalogForGroupCapacity,
+  isRuleCompatibleWithPlayerCount,
   is8421,
   is8421Three,
   is8421Four,

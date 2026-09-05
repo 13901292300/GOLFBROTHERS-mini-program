@@ -2,29 +2,39 @@ const { createHeaderStyle } = require("../../../../utils/headerEngine.js");
 const session = require("../../utils/sideGameBind.js");
 const catalog = require("../../utils/catalog.js");
 const nav = require("../../utils/nav.js");
+const { createSkipTapGuard } = require("../../utils/ruleCardGestures.js");
 
-function preferGroupKey(playerCap) {
+const skipTap = createSkipTapGuard();
+
+function preferGroupKey(playerCap, manageAll) {
+  if (manageAll) return "";
   const n = Number(playerCap) || 0;
-  if (n <= 2) return "two";
+  if (n <= 0) return "";
+  if (n === 2) return "two";
   if (n === 3) return "three";
-  if (n === 4) return "four";
-  if (n >= 5) return "multi";
+  if (n >= 4) return "four";
   return "";
 }
 
-function groupMyRules(list, openMap, preferId, playerCap) {
+function groupKeyOf(rule) {
+  const cap = catalog.rulePlayerCapability(rule);
+  if (catalog.isMultiplayerRule(rule) || cap.playerMode === "range" || cap.minPlayers >= 5) return "multi";
+  if (cap.playerCount === 3) return "three";
+  if (cap.playerCount === 4) return "four";
+  return "two";
+}
+
+function groupMyRules(list, openMap, preferId, playerCap, manageAll) {
   const buckets = [
-    { key: "two", title: "2人规则库", items: [] },
-    { key: "three", title: "3人规则库", items: [] },
-    { key: "four", title: "4人规则库", items: [] },
-    { key: "multi", title: "多人规则库", items: [] }
+    { key: "two", title: "2人规则", items: [] },
+    { key: "three", title: "3人规则", items: [] },
+    { key: "four", title: "4人规则", items: [] },
+    { key: "multi", title: "多人规则", items: [] }
   ];
+  const bucketMap = { two: buckets[0], three: buckets[1], four: buckets[2], multi: buckets[3] };
   (list || []).forEach(function (rule) {
-    const n = Number(rule.players) || 0;
-    if (n <= 2) buckets[0].items.push(rule);
-    else if (n === 3) buckets[1].items.push(rule);
-    else if (n === 4) buckets[2].items.push(rule);
-    else buckets[3].items.push(rule);
+    const key = groupKeyOf(rule);
+    bucketMap[key].items.push(rule);
   });
   const groups = buckets.filter(function (bucket) {
     return bucket.items.length > 0;
@@ -38,7 +48,7 @@ function groupMyRules(list, openMap, preferId, playerCap) {
       if (hit) preferKey = group.key;
     });
   }
-  if (!preferKey) preferKey = preferGroupKey(playerCap);
+  if (!preferKey) preferKey = preferGroupKey(playerCap, manageAll);
   const hasPrefer = !!(preferKey && groups.some(function (group) {
     return group.key === preferKey;
   }));
@@ -66,14 +76,43 @@ function groupMyRules(list, openMap, preferId, playerCap) {
   return groups;
 }
 
+function mapRules(list) {
+  return (list || []).map(function (rule) {
+    const unavailable = catalog.isUnavailableRule(rule.catalogId || rule.ruleId);
+    return {
+      id: rule.id,
+      name: rule.name,
+      players: rule.players,
+      playerMode: rule.playerMode,
+      playerCount: rule.playerCount,
+      minPlayers: rule.minPlayers,
+      maxPlayers: rule.maxPlayers,
+      noSettings: !!rule.noSettings || catalog.isNoSettings(rule.catalogId),
+      unavailable: unavailable,
+      compatible: !!rule.compatible,
+      summary: unavailable ? "玩法尚未开放" : catalog.summarizeRule(session.unwrapGameplaySnapshot(rule))
+    };
+  });
+}
+
+function isManageEntry(entry) {
+  return entry === "hub" || entry === "match";
+}
+
+const DELETE_HINT =
+  "长按规则可删除。删除仅从‘我的规则库’移除，不影响之前已设置的游戏。如需添加其他规则，可点击底部‘添加规则’进行配置。";
+
 Page({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
     entry: "score",
     maxPlayers: 4,
+    participantCount: 0,
+    deleteHint: DELETE_HINT,
     myRules: [],
-    ruleGroups: []
+    ruleGroups: [],
+    emptyHint: ""
   },
 
   onLoad(query) {
@@ -81,13 +120,13 @@ Page({
     const entry = (query && query.entry) || "score";
     if (!session.requireSetupDraft(entry)) return;
     const header = createHeaderStyle();
-    // 规则库展示不受方数锁死；创建实例时再按 formation 校验
-    const maxPlayers = session.getRuleDesignCap(entry);
+    const participantCount = session.getParticipantCount(entry);
     this.setData({
       headerRootStyle: header.headerRootStyle,
       headerBarStyle: header.headerBarStyle,
       entry: entry,
-      maxPlayers: maxPlayers,
+      maxPlayers: session.getRuleDesignCap(entry),
+      participantCount: participantCount,
       matchId: (query && query.matchId) || "",
       groupId: (query && query.groupId) || "",
       scope: (query && query.scope) || "group"
@@ -103,29 +142,50 @@ Page({
           ? "match"
           : this.data.scope
     });
-    this.setData({ maxPlayers: session.getRuleDesignCap(this.data.entry) });
+    this.setData({
+      maxPlayers: session.getRuleDesignCap(this.data.entry),
+      participantCount: session.getParticipantCount(this.data.entry)
+    });
     this.reloadRules();
   },
+
+  setLibraryView() {},
 
   reloadRules(preferId) {
     const openMap = {};
     (this.data.ruleGroups || []).forEach(function (group) {
       openMap[group.key] = !!group.open;
     });
-    const myRules = session.listMyRules(this.data.maxPlayers).map(function (rule) {
-      const unavailable = catalog.isUnavailableRule(rule.catalogId || rule.ruleId);
-      return {
-        id: rule.id,
-        name: rule.name,
-        players: rule.players,
-        noSettings: !!rule.noSettings || catalog.isNoSettings(rule.catalogId),
-        unavailable: unavailable,
-        summary: unavailable ? "玩法尚未开放" : catalog.summarizeRule(session.unwrapGameplaySnapshot(rule))
-      };
-    });
+    const entry = this.data.entry;
+    const manageAll = isManageEntry(entry);
+    const participantCount = session.getParticipantCount(entry);
+    let emptyHint = "";
+    let source;
+    if (manageAll) {
+      source = session.listAllMyRules();
+      if (!source.length) emptyHint = "还没有保存的约定。点底部「添加规则」即可加入个人库。";
+    } else if (!(participantCount >= 2)) {
+      source = [];
+      emptyHint = "请先选择足够的球员或组合";
+    } else {
+      source = session.listCompatibleMyRules(participantCount);
+      if (!source.length) {
+        emptyHint = "规则库里还没有适合本场的约定。点底部「添加规则」去配置。";
+      }
+    }
+    const myRules = mapRules(
+      source.map(function (rule) {
+        const compatible = manageAll
+          ? true
+          : catalog.isRuleAvailableForGroupCapacity(rule, participantCount);
+        return Object.assign({}, rule, { compatible: compatible });
+      })
+    );
     this.setData({
+      participantCount: participantCount,
       myRules: myRules,
-      ruleGroups: groupMyRules(myRules, openMap, preferId, this.data.maxPlayers)
+      emptyHint: emptyHint,
+      ruleGroups: groupMyRules(myRules, openMap, preferId, participantCount, manageAll)
     });
   },
 
@@ -145,10 +205,7 @@ Page({
   },
 
   useMine(e) {
-    if (this._skipNextTap) {
-      this._skipNextTap = false;
-      return;
-    }
+    if (skipTap.consume()) return;
     const item = session.getMyRuleById(e.currentTarget.dataset.id);
     if (!item) {
       wx.showToast({ title: "未找到该规则", icon: "none" });
@@ -156,6 +213,16 @@ Page({
     }
     if (catalog.isUnavailableRule(item.catalogId || item.ruleId)) {
       wx.showToast({ title: "玩法尚未开放", icon: "none" });
+      return;
+    }
+    const participantCount = session.getParticipantCount(this.data.entry);
+    const manageAll = isManageEntry(this.data.entry);
+    if (!manageAll && !(participantCount >= 2)) {
+      wx.showToast({ title: "请先选择足够的球员或组合", icon: "none" });
+      return;
+    }
+    if (!manageAll && !catalog.isRuleAvailableForGroupCapacity(item, participantCount)) {
+      wx.showToast({ title: "当前参与方不足，无法使用该规则", icon: "none" });
       return;
     }
     const catalogId = item.catalogId || item.ruleId;
@@ -183,6 +250,7 @@ Page({
   },
 
   editMine(e) {
+    if (skipTap.consume()) return;
     const item = session.getMyRuleById(e.currentTarget.dataset.id);
     if (!item) {
       wx.showToast({ title: "未找到该规则", icon: "none" });
@@ -197,8 +265,12 @@ Page({
     });
   },
 
+  onControlLongPress() {
+    skipTap.arm();
+  },
+
   startDelete(e) {
-    this._skipNextTap = true;
+    skipTap.arm();
     const id = e.currentTarget.dataset.id;
     const item = session.getMyRuleById(id);
     const self = this;
@@ -211,8 +283,12 @@ Page({
       confirmText: "删除",
       confirmColor: "#C62828",
       success(res) {
+        skipTap.arm();
         if (!res.confirm) return;
-        session.removeMyRule(id);
+        const removed = session.removeMyRule(id);
+        if (removed && removed.dropped && removed.dropped.length) {
+          wx.showToast({ title: "已删除该规则，未保存的游戏已取消选择", icon: "none" });
+        }
         self.reloadRules();
       }
     });

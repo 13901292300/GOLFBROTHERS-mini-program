@@ -417,18 +417,13 @@ function recordToGame(row) {
   }
   var game = Object.assign({}, inst, {
     id: row.sideGameId,
-    name: row.title || inst.name || row.ruleId,
+    name: rec.resolveHistoricRuleTitle(row, inst),
     catalogId: row.ruleId || inst.catalogId,
     ruleLibId: inst.ruleLibId || "",
     ruleLibRevision: inst.ruleLibRevision,
-    ruleSnapshot: rec.mergeRuleSnapshot(
-      rec.buildRuleSnapshot(row.ruleId || inst.catalogId || inst.ruleId),
-      rec.pickFirstUsableGameplay([
-        inst.ruleSnapshot,
-        row.ruleSnapshot,
-        row.resultSnapshot && row.resultSnapshot.ruleSnapshot,
-        inst
-      ])
+    ruleSnapshot: rec.resolveHistoricRuleSnapshot(
+      Object.assign({}, inst, { catalogId: row.ruleId || inst.catalogId }),
+      row
     ),
     players: players || [],
     parties: inst.parties || row.participantParties || [],
@@ -1040,6 +1035,28 @@ function uniqueCandidateCount(entry) {
   return collectCandidateIds(entry).count;
 }
 
+/** 当前赛事/本组可供选择的游戏实体数。0 表示尚未确定，禁止回退成「显示全部规则」。 */
+function resolveAvailableGameEntityCount(entryOrCtx) {
+  if (
+    entryOrCtx &&
+    typeof entryOrCtx === "object" &&
+    entryOrCtx.entry == null &&
+    (entryOrCtx.parties || entryOrCtx.scoreParties || entryOrCtx.availablePartyCount != null)
+  ) {
+    return partyFormation.resolveAvailableGameEntityCount(entryOrCtx);
+  }
+  const key = rec.asString(
+    typeof entryOrCtx === "string" ? entryOrCtx : entryOrCtx && entryOrCtx.entry
+  ) || "score";
+  if (key === "hub" || key === "match") return uniqueCandidateCount(key);
+  const ctx = getScoreFormationContext(key);
+  return partyFormation.resolveAvailableGameEntityCount(ctx);
+}
+
+function getParticipantCount(entry) {
+  return resolveAvailableGameEntityCount(entry);
+}
+
 function listCandidatePlayerIds(entry) {
   return collectCandidateIds(entry).ids;
 }
@@ -1235,10 +1252,7 @@ function buildInstancePayload(entry, game, existingId) {
   var host = currentHost();
   var snapshot = rec.unwrapGameplaySnapshot(
     cloneRule(
-      game.ruleSnapshot ||
-        getMyRuleById(game.ruleLibId || game.libId) ||
-        findMyRuleByName(game.name) ||
-        {}
+      game.ruleSnapshot || rec.buildRuleSnapshot(game.catalogId) || {}
     )
   );
   var lib = getMyRuleById(game.ruleLibId || game.libId);
@@ -1685,9 +1699,76 @@ function hostKeyForLabel(label, entry, game) {
   return s;
 }
 
-function listMyRules(maxPlayers) {
-  var listed = ruleLibrary.list(maxPlayers);
+function listMyRules(participantCount) {
+  var listed =
+    participantCount && typeof participantCount === "object"
+      ? ruleLibrary.list(participantCount)
+      : participantCount == null || participantCount === ""
+        ? ruleLibrary.listAll()
+        : ruleLibrary.listCompatible(participantCount);
   return listed.ok && listed.data ? listed.data.items || [] : [];
+}
+
+function listAllMyRules() {
+  return listMyRules({ all: true });
+}
+
+function listCompatibleMyRules(participantCount) {
+  return listMyRules(participantCount);
+}
+
+function ruleForGameCompat(game) {
+  if (!game) return null;
+  return (
+    getMyRuleById(game.ruleLibId || game.libId) || {
+      id: game.ruleLibId || game.catalogId,
+      catalogId: game.catalogId || (game.ruleSnapshot && game.ruleSnapshot.catalogId),
+      ruleId: game.catalogId,
+      players: (game.ruleSnapshot && game.ruleSnapshot.players) || game.playerCount,
+      playerMode: game.ruleSnapshot && game.ruleSnapshot.playerMode,
+      minPlayers: game.ruleSnapshot && game.ruleSnapshot.minPlayers,
+      maxPlayers: game.ruleSnapshot && game.ruleSnapshot.maxPlayers,
+      playerCount: game.ruleSnapshot && game.ruleSnapshot.playerCount
+    }
+  );
+}
+
+function isGameCompatibleWithParticipantCount(game, participantCount, opts) {
+  var entry = rec.asString(opts && opts.entry);
+  var n = Number(participantCount) || 0;
+  var rule = ruleForGameCompat(game);
+  if (entry !== "hub" && entry !== "match") {
+    return catalog.isRuleAvailableForGroupCapacity(rule, n);
+  }
+  if (catalog.isMultiplayerRule(rule)) return n >= catalog.MULTI_MIN_PLAYERS;
+  var req = catalog.requiredEntityCount(rule);
+  return req >= 2 && req <= n;
+}
+
+function dropIncompatibleDraftGames(entry) {
+  var n = getParticipantCount(entry);
+  var dropped = [];
+  if (!(n > 0) || !inSetup(entry)) {
+    return { participantCount: n, dropped: dropped };
+  }
+  listGames(entry).forEach(function (game) {
+    if (isGameCompatibleWithParticipantCount(game, n, { entry: entry })) return;
+    dropped.push({
+      id: game.id,
+      name: game.name || "",
+      catalogId: game.catalogId || ""
+    });
+    removeGame(entry, game.id);
+  });
+  return { participantCount: n, dropped: dropped };
+}
+
+function listRosterIncompatibleGames(entry) {
+  var n = getParticipantCount(entry);
+  var games = listGames(entry).filter(function (game) {
+    return !isGameCompatibleWithParticipantCount(game, n, { entry: entry });
+  });
+  return { participantCount: n, games: games };
 }
 
 function cloneRule(rule) {
@@ -1709,6 +1790,12 @@ function findMyRuleByName(name) {
   return got.ok ? got.data : null;
 }
 
+function findMyRuleBySourceTemplateId(templateId) {
+  if (typeof ruleLibrary.findBySourceTemplateId !== "function") return null;
+  var got = ruleLibrary.findBySourceTemplateId(templateId);
+  return got.ok ? got.data : null;
+}
+
 function upsertMyRule(rule) {
   var blocked = assertWritable();
   if (blocked) return null;
@@ -1720,9 +1807,34 @@ function addMyRule(rule) {
   return upsertMyRule(rule);
 }
 
+function dropDraftGamesUsingRule(ruleId) {
+  var setup = draftMod.getSetupDraftRaw();
+  if (!setup) return [];
+  var entry = setup.entry || "score";
+  var key = rec.asString(ruleId);
+  var dropped = [];
+  listGames(entry).forEach(function (game) {
+    var libId = rec.asString(game.ruleLibId || game.libId);
+    if (libId !== key) return;
+    dropped.push({
+      id: game.id,
+      name: game.name || "",
+      catalogId: game.catalogId || ""
+    });
+    removeGame(entry, game.id);
+  });
+  return dropped;
+}
+
 function removeMyRule(id) {
-  if (assertWritable()) return;
-  ruleLibrary.remove(id);
+  if (assertWritable()) return { ok: false, dropped: [] };
+  var got = ruleLibrary.remove(id);
+  var dropped = got && got.ok ? dropDraftGamesUsingRule(id) : [];
+  return {
+    ok: !!(got && got.ok),
+    dropped: dropped,
+    sourceTemplateId: got && got.data ? got.data.sourceTemplateId : ""
+  };
 }
 
 function setDraft(next) {
@@ -1871,8 +1983,10 @@ function prepareMatch2Game(game) {
     play
   );
   if (settleMatch2MulState(game.ruleSnapshot) === "missing") {
-    var lib = libraryRuleForGame(game);
-    if (lib) game.ruleSnapshot = rec.mergeRuleSnapshot(game.ruleSnapshot, lib);
+    game.ruleSnapshot = rec.mergeRuleSnapshot(
+      rec.buildRuleSnapshot(game.catalogId || "match-2"),
+      game.ruleSnapshot
+    );
   }
   game._match2MulState = settleMatch2MulState(game.ruleSnapshot);
   return game;
@@ -1894,8 +2008,10 @@ function prepareStroke2Game(game) {
     play
   );
   if (settleStroke2RewardState(game.ruleSnapshot) === "missing") {
-    var lib = libraryRuleForGame(game);
-    if (lib) game.ruleSnapshot = rec.mergeRuleSnapshot(game.ruleSnapshot, lib);
+    game.ruleSnapshot = rec.mergeRuleSnapshot(
+      rec.buildRuleSnapshot(game.catalogId || "stroke-2"),
+      game.ruleSnapshot
+    );
   }
   var strokeState = settleStroke2RewardState(game.ruleSnapshot);
   if (strokeState === "missing") {
@@ -2013,7 +2129,7 @@ function computeResults(entry, game, notify) {
       holeOrder: holeLabelsOf(entry, game),
       pars: parsForGame(entry, game),
       windOn: windOnFor(entry, game),
-      libraryRuleSnapshot: libraryRuleForGame(game)
+      libraryRuleSnapshot: null
     });
   } catch (e) {
     return null;
@@ -2346,7 +2462,7 @@ function boardViewOf(entry, game, pairId) {
     holeOrder: holeLabelsOf(entry, game),
     pars: parsForGame(entry, game),
     windOn: windOnFor(entry, game),
-    libraryRuleSnapshot: libraryRuleForGame(view)
+    libraryRuleSnapshot: null
   });
   return view;
 }
@@ -2628,6 +2744,8 @@ module.exports = {
   listPlayers,
   getGroupCount,
   getRuleCap,
+  getParticipantCount,
+  resolveAvailableGameEntityCount,
   getRuleLibraryCap,
   getRuleDesignCap,
   getScoreFormationContext,
@@ -2638,6 +2756,7 @@ module.exports = {
   listScoreSlots,
   listGames,
   getGame,
+  recordToGame,
   addGame,
   updateGame,
   removeGame,
@@ -2679,8 +2798,14 @@ module.exports = {
   listScorePad,
   getScorecard,
   listMyRules,
+  listAllMyRules,
+  listCompatibleMyRules,
+  isGameCompatibleWithParticipantCount,
+  dropIncompatibleDraftGames,
+  listRosterIncompatibleGames,
   addMyRule,
   findMyRuleByName,
+  findMyRuleBySourceTemplateId,
   getMyRuleById,
   cloneRule,
   unwrapGameplaySnapshot: rec.unwrapGameplaySnapshot,

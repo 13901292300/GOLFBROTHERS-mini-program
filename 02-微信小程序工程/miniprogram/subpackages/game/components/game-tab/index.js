@@ -460,6 +460,20 @@ Component({
       try {
         const entry = this.resolveEntry();
         const listed = this._publishedGames(entry);
+        const participantCount = session.getParticipantCount(entry);
+        const incompatible = listed.filter(function (game) {
+          return !session.isGameCompatibleWithParticipantCount(game, participantCount, { entry: entry });
+        });
+        if (incompatible.length && participantCount > 0) {
+          const key = participantCount + ":" + incompatible.map(function (g) { return g.id; }).join(",");
+          if (this._compatWarnKey !== key) {
+            this._compatWarnKey = key;
+            wx.showToast({
+              title: "有 " + incompatible.length + " 场游戏不适用于当前 " + participantCount + " 人",
+              icon: "none"
+            });
+          }
+        }
         if (!listed.length) {
           this._holeY = 0;
           this.setData({

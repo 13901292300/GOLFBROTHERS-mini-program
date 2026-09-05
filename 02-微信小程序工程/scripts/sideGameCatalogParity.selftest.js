@@ -58,7 +58,7 @@ assert('沙盒 catalog 17', sbIds.length === 17);
 assert('catalog id 顺序一致', RULE_IDS.join(',') === sbIds.join(','));
 
 var openIds = [];
-officialCatalog.listCatalog(8).forEach(function (g) {
+officialCatalog.listCatalogForDesign().forEach(function (g) {
   (g.items || []).forEach(function (item) {
     openIds.push(item.id);
   });

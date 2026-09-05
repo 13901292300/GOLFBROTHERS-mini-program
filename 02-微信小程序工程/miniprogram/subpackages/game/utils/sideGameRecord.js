@@ -170,6 +170,32 @@ function collectMatch2GameplayCandidates(game, row) {
   ];
 }
 
+function resolveHistoricRuleTitle(row, inst) {
+  var title = asString(row && row.title) || asString(inst && inst.name);
+  if (title) return title;
+  var ruleId = asString((row && row.ruleId) || (inst && (inst.catalogId || inst.ruleId)));
+  var hit = ruleId ? catalog.findRule(ruleId) : null;
+  return asString(hit && hit.name) || ruleId;
+}
+
+function resolveHistoricRuleSnapshot(game, row) {
+  row = row || {};
+  game = game || {};
+  var inst = (row.config && row.config.instance) || (game.config && game.config.instance) || {};
+  var catalogId = asString(
+    row.ruleId ||
+      game.catalogId ||
+      inst.catalogId ||
+      inst.ruleId ||
+      (game.ruleSnapshot && game.ruleSnapshot.catalogId)
+  );
+  var play = pickFirstUsableGameplay(collectMatch2GameplayCandidates(game, row));
+  if (!play || !Object.keys(play).length) {
+    play = unwrapGameplaySnapshot(game.ruleSnapshot || inst.ruleSnapshot || row.ruleSnapshot || {});
+  }
+  return mergeRuleSnapshot(buildRuleSnapshot(catalogId), play);
+}
+
 function pickMulRow(snap, id) {
   var rows = (snap && snap.mulRows) || [];
   var i;
@@ -567,10 +593,8 @@ function validateCreateInput(input, host) {
   var minN = cap.requiredPartyCount;
   if (minN >= 5) {
     if (n < minN) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
-  } else if (minN === 3) {
-    if (n !== 3) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
-  } else if (minN === 4) {
-    if (n !== 4) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
+  } else if (minN >= 2 && minN <= 4) {
+    if (n !== minN) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
   } else if (n < 2) {
     return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
   }
@@ -912,6 +936,8 @@ module.exports = {
   pickFirstUsableGameplay: pickFirstUsableGameplay,
   collectMatch2GameplayCandidates: collectMatch2GameplayCandidates,
   collectGameplayCandidates: collectMatch2GameplayCandidates,
+  resolveHistoricRuleTitle: resolveHistoricRuleTitle,
+  resolveHistoricRuleSnapshot: resolveHistoricRuleSnapshot,
   mergeRuleSnapshot: mergeRuleSnapshot,
   describeMatch2MulSources: describeMatch2MulSources,
   describeStroke2RewardSources: describeStroke2RewardSources,

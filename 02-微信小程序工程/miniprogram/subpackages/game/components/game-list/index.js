@@ -139,6 +139,7 @@ Component({
 
     reload() {
       const entry = this.properties.entry;
+      const dropped = session.dropIncompatibleDraftGames(entry);
       const games = session.listGames(entry);
       session.syncPotGameIds(entry);
       const global = session.getGlobal(entry);
@@ -151,7 +152,11 @@ Component({
       const mapped = games.map(function (item) {
           const pairings = item.pairings || [];
           const n = gamePlayerCount(item);
+          const count = dropped && dropped.participantCount;
+          const rosterIncompatible =
+            count > 0 && !session.isGameCompatibleWithParticipantCount(item, count);
           return Object.assign({}, item, {
+            rosterIncompatible: rosterIncompatible,
             showKick: !catalog.isUnavailableRule(item.catalogId) && item.status !== "ended" && (n === 3 || n === 4) && pairings.length <= 1,
             unavailable: catalog.isUnavailableRule(item.catalogId),
             hasKick: ((item.kicks || []).some(function (kick) {
@@ -198,6 +203,16 @@ Component({
           });
       });
       const derived = setupListUi.fromDisplayedGames(mapped);
+      let capHint = "";
+      if (dropped && dropped.dropped && dropped.dropped.length) {
+        const names = dropped.dropped
+          .map(function (item) {
+            return item.name;
+          })
+          .filter(Boolean);
+        capHint = "已移除不适用于当前人数的规则" + (names.length ? "：" + names.join("、") : "");
+        wx.showToast({ title: capHint, icon: "none" });
+      }
       this.setData({
         games: mapped,
         hasDraftGames: derived.hasDraftGames,
@@ -210,7 +225,7 @@ Component({
         showGlobalSettings: showGlobalSettings,
         showMatchPrivacy: showMatchPrivacy,
         holeOrderText: holeOrderUtil.holeOrderTextOf(session.getHoleOrder(entry)),
-        capHint: ""
+        capHint: capHint
       });
     },
 

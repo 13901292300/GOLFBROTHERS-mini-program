@@ -107,6 +107,21 @@ function isTeamedFormation(formation) {
   return f === "2+2" || f === "3+1" || f === "2+1+1";
 }
 
+/**
+ * 可供选择的游戏实体数：1 名独立球员或 1 个组合各计 1。
+ * 禁止用标题、TAB、比赛名或未做组合转换的原始 roster 总人数。
+ */
+function resolveAvailableGameEntityCount(context) {
+  var ctx = context || {};
+  if (typeof ctx.availablePartyCount === "number" && ctx.availablePartyCount > 0) {
+    return ctx.availablePartyCount;
+  }
+  var parties = normalizeParties(ctx.parties || ctx.scoreParties || []);
+  if (parties.length) return parties.length;
+  var n = Number(ctx.entityCount);
+  return n > 0 ? n : 0;
+}
+
 function buildFormationContext(rawParties, opts) {
   var parties = normalizeParties(rawParties);
   var explicit =
@@ -424,6 +439,7 @@ module.exports = {
   buildPartyMatchups: buildPartyMatchups,
   listCompatiblePartySelections: listCompatiblePartySelections,
   defaultCompatibleSelection: defaultCompatibleSelection,
+  resolveAvailableGameEntityCount: resolveAvailableGameEntityCount,
   resolveAvailableGameCatalog: resolveAvailableGameCatalog,
   resolveRuleCompatibility: resolveRuleCompatibility,
   isSelectionCompatible: isSelectionCompatible,

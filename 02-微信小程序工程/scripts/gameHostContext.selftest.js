@@ -106,9 +106,13 @@ assert('catalog 17 ruleId', catalogIds.length === 17, String(catalogIds.length))
 catalogIds.forEach(function (id) {
   var cap = host.capOf(id);
   var rule = catalog.findRule(id);
+  var want =
+    rule && rule.playerMode === 'range'
+      ? Number(rule.minPlayers) || catalog.MULTI_MIN_PLAYERS
+      : rule && rule.players;
   assert(
-    id + ' requiredPartyCount=' + (rule && rule.players),
-    !!(cap && cap.requiredPartyCount === rule.players && cap.requiresIndividualScores === false)
+    id + ' requiredPartyCount=' + want,
+    !!(cap && cap.requiredPartyCount === want && cap.requiresIndividualScores === false)
   );
 });
 

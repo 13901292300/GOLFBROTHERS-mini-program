@@ -27,7 +27,7 @@ var RULE_CAPS = [
   { ruleId: 'dizhubo-4', requiredPartyCount: 4 },
   { ruleId: 'vegas', requiredPartyCount: 4 },
   { ruleId: 'skins', requiredPartyCount: 4 },
-  { ruleId: 'lasuo-n', requiredPartyCount: 6 },
+  { ruleId: 'lasuo-n', requiredPartyCount: 5 },
   { ruleId: 'horn', requiredPartyCount: 5 }
 ];
 

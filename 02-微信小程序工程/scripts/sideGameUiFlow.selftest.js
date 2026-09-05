@@ -18,6 +18,7 @@ var gameRoot = path.join(__dirname, '..', 'miniprogram', 'subpackages', 'game');
 var ruleLib = require('../miniprogram/subpackages/game/utils/sideGameRuleLibrary.js');
 var localLib = require('../miniprogram/subpackages/game/utils/localSideGameRuleLibrary.js');
 var rec = require('../miniprogram/subpackages/game/utils/sideGameRecord.js');
+var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 
 var passed = 0;
 var failed = 0;
@@ -122,7 +123,23 @@ assert('规则库可保存油菜空模板', !!(youcaiRule && youcaiRule.ok));
 var smallRule = lib.upsert({ name: '斗小地主', catalogId: 'landlord-small', ruleId: 'landlord-small', players: 3, ruleSnapshot: { catalogId: 'landlord-small', reward: 'none' } });
 assert('规则库可保存斗小地主', !!(smallRule && smallRule.ok));
 var listed = lib.list(4);
-assert('规则库 list 过滤 cap', listed.ok && listed.data.items.length === 4, String(listed.data.items.length));
+assert(
+  '规则库 list(4) 容量覆盖且无多人',
+  listed.ok &&
+    listed.data.items.every(function (item) {
+      return catalog.isRuleAvailableForGroupCapacity(item, 4);
+    }) &&
+    listed.data.items.some(function (item) {
+      return item.catalogId === '8421-4' || item.id === '8421-4';
+    }) &&
+    listed.data.items.some(function (item) {
+      return item.catalogId === 'stroke-2';
+    }) &&
+    listed.data.items.every(function (item) {
+      return item.catalogId !== 'horn' && item.catalogId !== 'lasuo-n';
+    }),
+  String((listed.data.items || []).map(function (item) { return item.catalogId || item.id; }))
+);
 var named = lib.findByName('我的比杆');
 assert('规则库 findByName', named.ok);
 lib.upsert({ id: 'rl_1', name: '我的比杆', catalogId: 'stroke-2', ruleId: 'stroke-2', players: 2, ruleSnapshot: { catalogId: 'stroke-2', k: 9 } });

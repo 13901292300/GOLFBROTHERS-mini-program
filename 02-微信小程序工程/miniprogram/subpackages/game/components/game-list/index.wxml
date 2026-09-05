@@ -45,6 +45,8 @@
     </view>
   </view>
 
+  <view wx:if="{{capHint}}" class="sec-hint page-top-hint">{{capHint}}</view>
+
   <view
     wx:if="{{!hasDraftGames && canEdit}}"
     class="add-game-btn"
@@ -64,6 +66,7 @@
         <text class="game-card__tag {{item.coeffText ? 'game-card__tag--seg' : ''}}">{{item.coeffText || item.multiplier || 1}}</text>
         <text wx:if="{{item.status === 'ended'}}" class="game-card__tag is-ended">已结束</text>
         <text wx:if="{{item.unavailable}}" class="game-card__tag">玩法尚未开放</text>
+        <text wx:if="{{item.rosterIncompatible}}" class="game-card__tag">不适用于当前人数</text>
       </view>
       <text wx:if="{{canEdit}}" class="game-card__del" catchtap="onDeleteGame" data-id="{{item.id}}">×</text>
     </view>

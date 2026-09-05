@@ -1441,6 +1441,7 @@ Page({
       players: positivePlayers(this.data.players, catalogItem && catalogItem.players, 2),
       catalogId: this.data.ruleId,
       ruleId: this.data.ruleId,
+      sourceTemplateId: (existing && existing.sourceTemplateId) || this.data.ruleId,
       reward: rewardMode,
       addRows: this.data.addRows,
       mulRows: this.data.mulRows,
@@ -1512,7 +1513,7 @@ Page({
       if (rule) done(rule);
       return;
     }
-    if (existingByName) {
+    if (existingByName && existingByName.id !== (this.data.libId || "")) {
       wx.showModal({
         title: "覆盖已有规则",
         content:

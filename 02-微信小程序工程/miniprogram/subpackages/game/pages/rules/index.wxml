@@ -13,9 +13,9 @@
 
   <scroll-view class="gb-body gb-body--with-cta" scroll-y>
     <view class="page-pad">
-      <view class="sec-hint page-top-hint">长按规则可删除。</view>
+      <view class="sec-hint page-top-hint library-delete-hint">{{deleteHint}}</view>
       <view wx:if="{{myRules.length === 0}}" class="empty">
-        还没有保存的约定。本场开赌前先添加规则，配好后可以起一个好记的名字，下次直接从这里选用。
+        {{emptyHint || "还没有保存的约定。点底部「添加规则」，配好后可以起一个好记的名字。"}}
       </view>
       <block wx:else>
         <view wx:for="{{ruleGroups}}" wx:key="renderKey" class="ds-card rule-lib">
@@ -43,13 +43,20 @@
                     wx:if="{{!rule.noSettings && !rule.unavailable}}"
                     class="rule-row__edit"
                     catchtap="editMine"
+                    catchlongpress="onControlLongPress"
                     data-id="{{rule.id}}"
                   >✎</text>
                 </view>
                 <text class="rule-row__desc">{{rule.summary}}</text>
               </view>
               <view class="rule-row__actions">
-                <text wx:if="{{!rule.unavailable}}" class="rule-row__add" catchtap="useMine" data-id="{{rule.id}}">+</text>
+                <text
+                  wx:if="{{!rule.unavailable && rule.compatible}}"
+                  class="rule-row__add"
+                  catchtap="useMine"
+                  catchlongpress="onControlLongPress"
+                  data-id="{{rule.id}}"
+                >+</text>
               </view>
             </view>
           </view>
