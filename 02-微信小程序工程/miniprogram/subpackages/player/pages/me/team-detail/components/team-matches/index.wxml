@@ -1,0 +1,49 @@
+<view class="matches">
+  <view wx:if="{{canCreateTeamMatch}}" class="match-create" bindtap="onCreateMatch">
+    <text class="match-create__plus">＋</text>
+    <text class="match-create__label">发起球队比赛</text>
+  </view>
+
+  <team-page-state
+    wx:if="{{pageState !== 'ready'}}"
+    pageState="{{pageState}}"
+    loadingText="比赛加载中…"
+    emptyTitle="暂无球队比赛"
+    emptyDesc="目前仅同步队内赛。还没有主办的队内赛。队际赛与系列赛尚未接入云端。"
+    errorTitle="加载失败"
+    errorDesc="无法获取球队比赛，请稍后重试。"
+    bind:retry="onRetry"
+  />
+
+  <view wx:if="{{pageState === 'ready'}}" class="match-list">
+    <view class="match-meta">
+      <text class="match-meta__label">主办 / 参与</text>
+      <text class="match-meta__count">{{matches.length}} 场</text>
+    </view>
+    <view
+      wx:for="{{matches}}"
+      wx:key="matchId"
+      class="ds-card match-row"
+      bindtap="onTapMatch"
+      data-id="{{item.matchId}}"
+      data-url="{{item.navUrl}}"
+      data-can-open="{{item.canOpen}}"
+      data-hint="{{item.navHint}}"
+    >
+      <image class="match-row__logo" src="{{item.logo}}" mode="aspectFill"></image>
+      <view class="match-row__main">
+        <text class="match-row__title">{{item.title}}</text>
+        <text class="match-row__meta">{{item.dateText}}{{item.venue ? ' · ' + item.venue : ''}}</text>
+        <view class="match-row__tags">
+          <text wx:if="{{item.relationLabel}}" class="team-tag team-tag--{{item.relationType}}">{{item.relationLabel}}</text>
+          <text wx:if="{{item.matchTypeLabel}}" class="team-tag">{{item.matchTypeLabel}}</text>
+          <text wx:if="{{item.statusLabel}}" class="team-tag">{{item.statusLabel}}</text>
+          <!-- mock 比赛没有对应的比赛详情数据，如实标出，不伪造可进入 -->
+          <text wx:if="{{!item.canOpen}}" class="team-tag match-row__unlinked">未关联详情</text>
+          <!-- 演示赛与球队的关联属于诊断数据，保留标识 -->
+        </view>
+      </view>
+      <text class="match-row__chevron">›</text>
+    </view>
+  </view>
+</view>

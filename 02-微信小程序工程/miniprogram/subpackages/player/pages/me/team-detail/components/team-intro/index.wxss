@@ -1,0 +1,153 @@
+.intro { padding-bottom: 24rpx; }
+
+.ds-card {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 16rpx;
+  box-shadow: var(--shadow-card, 0 8rpx 12rpx -2rpx rgba(0, 0, 0, 0.05));
+  margin-bottom: 20rpx;
+}
+
+.intro-hero {
+  padding: 40rpx 32rpx 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.intro-hero__logo {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-subtle, #f3f4f6);
+  margin-bottom: 24rpx;
+}
+
+.intro-hero__name {
+  font-size: 36rpx;
+  font-weight: 900;
+  color: var(--text-primary, #002d62);
+  line-height: 1.3;
+}
+
+.intro-hero__tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 16rpx;
+}
+
+.intro-share {
+  margin-top: 28rpx;
+  height: 72rpx;
+  padding: 0 40rpx;
+  line-height: 72rpx;
+  border-radius: 999rpx;
+  background: transparent;
+  color: var(--champion-gold, #ce9224);
+  border: 1px solid var(--champion-gold, #ce9224);
+  font-size: 26rpx;
+  font-weight: 800;
+}
+.intro-share::after { border: none; }
+.intro-share--hover { opacity: 0.78; }
+
+.intro-facts { padding: 8rpx 32rpx; }
+.intro-fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  min-height: 88rpx;
+}
+.intro-fact + .intro-fact { border-top: 1px solid var(--border, #e5e7eb); }
+.intro-fact__label {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text-muted, #6b7280);
+}
+.intro-fact__value {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary, #002d62);
+  text-align: right;
+}
+
+.intro-block { padding: 28rpx 32rpx 32rpx; }
+.intro-block__label {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--champion-gold, #ce9224);
+  margin-bottom: 16rpx;
+}
+.intro-block__body {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.7;
+  font-weight: 500;
+  color: var(--text-secondary, #374151);
+  white-space: pre-wrap;
+}
+.intro-block__body--slogan {
+  font-weight: 800;
+  color: var(--text-primary, #002d62);
+}
+
+.team-tag {
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1.3;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  border: 1px solid var(--border, #e5e7eb);
+}
+.team-tag--super_admin {
+  color: #fff;
+  background: var(--champion-gold, #ce9224);
+  border-color: var(--champion-gold, #ce9224);
+}
+.team-tag--admin {
+  color: #fff;
+  background: var(--tour-blue, #002d62);
+  border-color: var(--tour-blue, #002d62);
+}
+.team-tag--captain {
+  color: var(--champion-gold, #ce9224);
+  background: rgba(206, 146, 36, 0.12);
+  border-color: var(--champion-gold, #ce9224);
+}
+
+.intro-actions { padding: 8rpx 0; }
+.intro-action {
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.intro-action--danger { color: #ef4444; }
+.intro-action__badge {
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 999rpx;
+  background: #ef4444;
+  color: #fff;
+  font-size: 20rpx;
+  text-align: center;
+  line-height: 36rpx;
+}
+.intro-dissolved {
+  display: block;
+  padding: 24rpx 32rpx;
+  font-size: 24rpx;
+  color: var(--text-muted, #6b7280);
+}

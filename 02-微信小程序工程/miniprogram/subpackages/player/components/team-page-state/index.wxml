@@ -1,0 +1,15 @@
+<view wx:if="{{pageState === 'loading'}}" class="tps">
+  <text class="tps__text">{{loadingText}}</text>
+</view>
+<view wx:elif="{{pageState === 'empty'}}" class="tps">
+  <view class="tps__icon"><text>{{emptyIcon}}</text></view>
+  <text class="tps__title">{{emptyTitle}}</text>
+  <text wx:if="{{emptyDesc}}" class="tps__desc">{{emptyDesc}}</text>
+  <slot></slot>
+</view>
+<view wx:elif="{{pageState && pageState !== 'ready'}}" class="tps">
+  <view class="tps__icon"><text>!</text></view>
+  <text class="tps__title">{{errorTitle}}</text>
+  <text wx:if="{{errorDesc}}" class="tps__desc">{{errorDesc}}</text>
+  <view class="tps__btn" bindtap="onRetry">{{retryLabel}}</view>
+</view>

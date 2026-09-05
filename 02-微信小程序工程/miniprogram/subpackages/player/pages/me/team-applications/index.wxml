@@ -1,0 +1,39 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back"><text class="gb-header__chevron">‹</text></view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">入队申请</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <scroll-view class="team-scroll" scroll-y>
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="申请加载中…"
+        emptyTitle="暂无待处理申请"
+        emptyDesc="有人申请加入时会显示在这里。"
+        errorTitle="{{errorTitle}}"
+        errorDesc="{{errorDesc}}"
+        bind:retry="onRetry"
+      />
+      <view wx:if="{{pageState === 'ready'}}" class="notice-list">
+        <view
+          wx:for="{{list}}"
+          wx:key="applicationId"
+          class="ds-card notice-row"
+          data-id="{{item.applicationId}}"
+          bindtap="onTap"
+        >
+          <text class="notice-row__title">{{item.displayName || item.userId}}</text>
+          <text class="notice-row__sum">{{item.message || '申请加入球队'}}</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

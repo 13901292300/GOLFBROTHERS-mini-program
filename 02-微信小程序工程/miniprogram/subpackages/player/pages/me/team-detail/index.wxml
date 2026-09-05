@@ -1,0 +1,85 @@
+<view class="td-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">{{team.fullName || '球队详情'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="td-tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="key"
+      class="td-tab {{activeTab === item.key ? 'is-active' : ''}}"
+      data-tab="{{item.key}}"
+      bindtap="onTabChange"
+    >
+      <text class="td-tab__label">{{item.label}}</text>
+    </view>
+  </view>
+  <scroll-view wx:if="{{activeTab === 'intro' || activeTab === 'matches'}}" class="td-scroll" scroll-y>
+    <view class="td-content">
+      <team-intro
+        wx:if="{{activeTab === 'intro'}}"
+        pageState="{{introState}}"
+        team="{{team}}"
+        canShareTeam="{{canShareTeam}}"
+        pendingApplicationCount="{{pendingApplicationCount}}"
+        errorTitle="{{introErrorTitle}}"
+        errorDesc="{{introErrorDesc}}"
+        bind:retry="onRetryIntro"
+        bind:edit="onEditProfile"
+        bind:applications="onOpenApplications"
+        bind:notices="onOpenNotices"
+        bind:leave="onLeaveTeam"
+        bind:dissolve="onDissolveTeam"
+      />
+      <team-matches
+        wx:elif="{{activeTab === 'matches'}}"
+        pageState="{{matchesState}}"
+        matches="{{matches}}"
+        canCreateTeamMatch="{{canCreateTeamMatch}}"
+        bind:retry="onRetryMatches"
+        bind:creatematch="onCreateMatch"
+        bind:openmatch="onOpenMatch"
+      />
+    </view>
+  </scroll-view>
+
+  <view wx:elif="{{activeTab === 'members'}}" class="td-members-pane">
+    <team-members
+      pageState="{{membersState}}"
+      members="{{members}}"
+      keyword="{{memberKeyword}}"
+      showManageButton="{{showManageButton}}"
+      bind:search="onMemberSearch"
+      bind:retry="onRetryMembers"
+      bind:manage="onOpenManage"
+    />
+  </view>
+
+  <view wx:if="{{manageSheetVisible}}" class="td-mask" catchtouchmove="onSheetNoop" bindtap="onCloseManageSheet">
+    <view class="td-sheet" catchtap="onSheetNoop">
+      <view class="td-sheet__handle"></view>
+      <text class="td-sheet__title">成员管理</text>
+      <view
+        wx:for="{{manageMenuItems}}"
+        wx:key="key"
+        class="td-sheet__item"
+        data-key="{{item.key}}"
+        bindtap="onPickManageAction"
+      >
+        <text class="td-sheet__label">{{item.label}}</text>
+        <text wx:if="{{item.badge}}" class="td-sheet__badge">{{item.badge}}</text>
+      </view>
+      <view class="td-sheet__cancel" bindtap="onCloseManageSheet">取消</view>
+    </view>
+  </view>
+</view>

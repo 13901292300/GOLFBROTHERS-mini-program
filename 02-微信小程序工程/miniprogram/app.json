@@ -41,7 +41,17 @@
         "pages/me/contacts/index",
         "pages/me/statistics/index",
         "pages/me/edit/index",
-        "pages/me/history/index"
+        "pages/me/history/index",
+        "pages/me/teams/index",
+        "pages/me/teams/create/index",
+        "pages/me/team-detail/index",
+        "pages/me/team-invite/index",
+        "pages/me/team-manage/select/index",
+        "pages/me/team-manage/invite/index",
+        "pages/me/team-application/index",
+        "pages/me/team-edit/index",
+        "pages/me/team-notices/index",
+        "pages/me/team-applications/index"
       ]
     },
     {

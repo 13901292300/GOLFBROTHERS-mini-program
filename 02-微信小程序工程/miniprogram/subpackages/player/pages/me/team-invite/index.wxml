@@ -1,0 +1,70 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">加入球队</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="team-scroll" scroll-y>
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="球队资料加载中…"
+        errorTitle="{{errorTitle}}"
+        errorDesc="{{errorDesc}}"
+        bind:retry="onRetry"
+      />
+
+      <block wx:if="{{pageState === 'ready' && team}}">
+        <view class="ds-card intro-hero">
+          <image class="intro-hero__logo" src="{{team.logo}}" mode="aspectFill"></image>
+          <text class="intro-hero__name">{{team.fullName}}</text>
+          <text wx:if="{{team.memberCountText}}" class="intro-hero__meta">{{team.memberCountText}}</text>
+        </view>
+
+        <view class="ds-card intro-facts">
+          <view class="intro-fact">
+            <text class="intro-fact__label">成立时间</text>
+            <text class="intro-fact__value">{{team.foundedDateText || '待完善'}}</text>
+          </view>
+          <view class="intro-fact">
+            <text class="intro-fact__label">所在地区</text>
+            <text class="intro-fact__value">{{team.regionText || '待完善'}}</text>
+          </view>
+        </view>
+
+        <view class="ds-card intro-block">
+          <text class="intro-block__label">球队口号</text>
+          <text class="intro-block__body intro-block__body--slogan">{{team.slogan || '暂无口号'}}</text>
+        </view>
+
+        <view class="ds-card intro-block">
+          <text class="intro-block__label">球队介绍</text>
+          <text class="intro-block__body">{{team.description || '暂无介绍'}}</text>
+        </view>
+
+        <view wx:if="{{joinView.showCancel}}" class="ds-card invite-result">
+          <view class="invite-result__btn" bindtap="onCancelPending">{{joinView.cancelLabel || '取消申请'}}</view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{pageState === 'ready' && joinView}}" class="footer">
+    <text wx:if="{{joinView.hint}}" class="join-hint">{{joinView.hint}}</text>
+    <button
+      class="join-btn {{(joinView.ctaDisabled || submitting) ? 'is-disabled' : ''}}"
+      disabled="{{joinView.ctaDisabled || submitting}}"
+      bindtap="onTapJoinCta"
+    >{{submitting ? '提交中…' : joinView.ctaLabel}}</button>
+  </view>
+</view>

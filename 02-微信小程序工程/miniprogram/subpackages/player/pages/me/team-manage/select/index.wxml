@@ -1,0 +1,73 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">{{title}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="team-scroll" scroll-y>
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="成员加载中…"
+        emptyTitle="{{emptyText}}"
+        emptyDesc="请返回后选择其他操作。"
+        errorTitle="加载失败"
+        errorDesc="无法获取可操作成员，请稍后重试。"
+        bind:retry="onRetry"
+      />
+
+      <block wx:if="{{pageState === 'ready'}}">
+        <text class="pick-note">单选后点底部按钮确认</text>
+
+        <view class="pick-list">
+          <view
+            wx:for="{{members}}"
+            wx:key="userId"
+            class="ds-card pick-row {{selectedUserId === item.userId ? 'pick-row--active' : ''}}"
+            hover-class="pick-row--hover"
+            data-user-id="{{item.userId}}"
+            data-name="{{item.displayName}}"
+            bindtap="onTapMember"
+          >
+            <view class="pick-row__radio {{selectedUserId === item.userId ? 'pick-row__radio--on' : ''}}">
+              <text wx:if="{{selectedUserId === item.userId}}" class="pick-row__tick">✓</text>
+            </view>
+            <image class="pick-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+            <view class="pick-row__main">
+              <view class="pick-row__name-line">
+                <text class="pick-row__name">{{item.displayName}}</text>
+                <text
+                  wx:for="{{item.badges}}"
+                  wx:for-item="badge"
+                  wx:key="key"
+                  class="tm-tag tm-tag--{{badge.key}}"
+                >{{badge.label}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{pageState === 'ready'}}" class="pick-bar">
+    <text class="pick-bar__hint">{{selectedUserId ? ('已选择：' + selectedName) : '请先选择一名成员'}}</text>
+    <view class="pick-bar__actions">
+      <view class="pick-bar__btn pick-bar__btn--ghost" bindtap="onCancel">取消</view>
+      <view
+        class="pick-bar__btn pick-bar__btn--primary {{(!selectedUserId || submitting) ? 'pick-bar__btn--off' : ''}}"
+        bindtap="onConfirm"
+      >{{submitting ? '执行中…' : confirmLabel}}</view>
+    </view>
+  </view>
+</view>

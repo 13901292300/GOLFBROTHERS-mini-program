@@ -1,0 +1,39 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back"><text class="gb-header__chevron">‹</text></view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">球队通知</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <scroll-view class="team-scroll" scroll-y>
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="通知加载中…"
+        emptyTitle="暂无通知"
+        emptyDesc="入队申请结果和成员变动会显示在这里。"
+        errorTitle="{{errorTitle}}"
+        errorDesc="{{errorDesc}}"
+        bind:retry="onRetry"
+      />
+      <view wx:if="{{pageState === 'ready'}}" class="notice-list">
+        <view
+          wx:for="{{notices}}"
+          wx:key="noticeId"
+          class="ds-card notice-row"
+          data-index="{{index}}"
+          bindtap="onTapNotice"
+        >
+          <text class="notice-row__title">{{item.title}}</text>
+          <text wx:if="{{item.summary}}" class="notice-row__sum">{{item.summary}}</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

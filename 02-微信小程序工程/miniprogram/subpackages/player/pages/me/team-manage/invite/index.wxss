@@ -1,0 +1,144 @@
+.team-page {
+  --tour-blue: #002d62;
+  --champion-gold: #ce9224;
+}
+
+.team-page.dark-mode {
+  --bg-primary: #000000;
+  --bg-card: #111111;
+  --bg-subtle: #0a0a0a;
+  --border: #222222;
+  --text-primary: #f1f5f9;
+  --text-secondary: #e5e7f9;
+  --text-muted: #888888;
+  --shadow-card: none;
+}
+
+.team-page.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --shadow-card: 0 8rpx 12rpx -2rpx rgba(0, 0, 0, 0.05);
+}
+
+page { height: 100%; background: var(--bg-primary); }
+
+.team-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.gb-header {
+  background: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: #fff;
+  flex-shrink: 0;
+}
+.gb-header__inner { display: flex; align-items: center; }
+.gb-header__left { display: flex; align-items: center; gap: 20rpx; min-width: 0; }
+.gb-header__back { width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; }
+.gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
+.gb-header__eyebrow {
+  display: block;
+  font-size: 17rpx;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+.gb-header__title {
+  display: block;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+}
+
+.search-wrap {
+  flex-shrink: 0;
+  padding: 16rpx 28rpx;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.search__icon { font-size: 26rpx; color: var(--text-muted); }
+.search__input { flex: 1; min-width: 0; font-size: 28rpx; color: var(--text-primary); }
+.search__ph { color: var(--text-muted); }
+.search__clear {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-scroll { flex: 1; min-height: 0; height: 0; }
+.team-content { padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom)); }
+
+.pick-list { display: flex; flex-direction: column; gap: 16rpx; }
+
+/* DIAG-10 模拟操作提示，诊断结束后删除 */
+.pick-note { display: block; font-size: 22rpx; color: var(--text-muted, #6b7280); margin-bottom: 16rpx; }
+.ds-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16rpx;
+  box-shadow: var(--shadow-card);
+}
+.pick-row {
+  min-height: 120rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  box-sizing: border-box;
+}
+.pick-row--hover { background: var(--bg-subtle); }
+.pick-row__avatar {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 9999rpx;
+  background: var(--bg-subtle);
+  flex-shrink: 0;
+}
+.pick-row__main { flex: 1; min-width: 0; }
+.pick-row__name {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.pick-row__sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--text-muted);
+}
+.pick-row__action {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--champion-gold);
+}

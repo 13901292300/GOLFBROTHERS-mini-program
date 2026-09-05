@@ -1,0 +1,6 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "team-page-state": "/subpackages/player/components/team-page-state/index"
+  }
+}

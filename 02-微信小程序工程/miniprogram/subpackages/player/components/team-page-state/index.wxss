@@ -1,0 +1,56 @@
+.tps {
+  min-height: 480rpx;
+  padding: 80rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.tps__icon {
+  width: 144rpx;
+  height: 144rpx;
+  border-radius: 50%;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-card, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 36rpx;
+  font-size: 52rpx;
+  color: var(--champion-gold, #ce9224);
+}
+
+.tps__title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 900;
+  color: var(--text-primary, #002d62);
+  margin-bottom: 16rpx;
+}
+
+.tps__text,
+.tps__desc {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.6;
+  font-weight: 500;
+  color: var(--text-muted, #6b7280);
+}
+
+.tps__btn {
+  margin-top: 36rpx;
+  min-width: 240rpx;
+  height: 72rpx;
+  padding: 0 36rpx;
+  border-radius: 999rpx;
+  background: var(--tour-blue, #002d62);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

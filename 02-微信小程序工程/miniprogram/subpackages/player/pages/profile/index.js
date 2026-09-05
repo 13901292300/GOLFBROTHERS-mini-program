@@ -469,8 +469,18 @@ Page({
     });
   },
 
-  onTapTeamRow() {
-    wx.showToast({ title: '球队主页即将开放', icon: 'none' });
+  onTapTeamRow(e) {
+    const teamId = String(
+      (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.teamId) || ''
+    ).trim();
+    if (!teamId) {
+      wx.showToast({ title: '球队主页即将开放', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: '/subpackages/player/pages/me/team-detail/index?teamId=' + encodeURIComponent(teamId),
+      fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
+    });
   },
 
   _readViewerBundle(profileUserId, isCurrentUser) {

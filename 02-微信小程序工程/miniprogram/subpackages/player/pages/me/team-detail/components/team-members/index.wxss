@@ -1,0 +1,281 @@
+/* 组件根节点本身是父级 flex 列的子项，必须显式撑高，
+   否则 .tm-root 的 height:100% 落在 auto 高度上，成员列表 scroll-view 会塌成 0。 */
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.tm-root {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ct-search-wrap {
+  flex-shrink: 0;
+  background: var(--bg-primary, #fcfcfc);
+  padding: 16rpx 28rpx 12rpx;
+  border-bottom: 0;
+}
+
+.ct-search {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: var(--bg-subtle, #f3f4f6);
+  border: 1px solid var(--border, #e5e7eb);
+  box-sizing: border-box;
+}
+
+.ct-search__icon {
+  font-size: 26rpx;
+  color: var(--text-muted, #6b7280);
+  flex-shrink: 0;
+}
+
+.ct-search__input {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: var(--text-primary, #002d62);
+}
+
+.ct-search__ph { color: var(--text-muted, #6b7280); }
+
+.ct-search__clear {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--border, #e5e7eb);
+  color: var(--text-muted, #6b7280);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.ct-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+
+.ct-body {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding-right: 36rpx;
+}
+
+.ct-body--search { padding-right: 0; }
+
+.tm-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 8rpx 28rpx 16rpx;
+  background: var(--bg-primary, #fcfcfc);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.tm-toolbar__left {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+.tm-manage {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  height: 56rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  border: 1px solid var(--champion-gold, #ce9224);
+}
+
+.tm-manage__text {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--champion-gold, #ce9224);
+}
+
+.tm-manage__badge {
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  background: var(--champion-gold, #ce9224);
+  color: #fff;
+  font-size: 18rpx;
+  font-weight: 800;
+  line-height: 28rpx;
+  text-align: center;
+}
+
+.ct-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding: 20rpx 28rpx 8rpx;
+}
+
+.ct-meta__label {
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--champion-gold, #ce9224);
+}
+
+.ct-meta__count {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+}
+
+.ct-section { padding-bottom: 4rpx; }
+
+.ct-letter-head {
+  padding: 12rpx 28rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  color: var(--text-muted, #6b7280);
+  background: var(--bg-subtle, #f3f4f6);
+}
+
+.ct-row {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 22rpx 28rpx;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-primary, #fcfcfc);
+}
+
+.ct-row--hover { background: var(--bg-secondary, rgba(0, 0, 0, 0.03)); }
+
+.ct-avatar {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 9999rpx;
+  flex-shrink: 0;
+  background: var(--bg-subtle, #f3f4f6);
+}
+
+.ct-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.ct-line1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx 12rpx;
+  min-width: 0;
+}
+
+.ct-name {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--text-primary, #002d62);
+  line-height: 1.25;
+  max-width: 56%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-tag {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.tm-tag--super_admin {
+  color: #fff;
+  background: var(--champion-gold, #ce9224);
+  border-color: var(--champion-gold, #ce9224);
+}
+
+.tm-tag--admin {
+  color: #fff;
+  background: var(--tour-blue, #002d62);
+  border-color: var(--tour-blue, #002d62);
+}
+
+.tm-tag--captain {
+  color: var(--champion-gold, #ce9224);
+  background: rgba(206, 146, 36, 0.12);
+  border-color: var(--champion-gold, #ce9224);
+}
+
+.tm-chevron {
+  flex-shrink: 0;
+  font-size: 40rpx;
+  color: var(--text-muted, #6b7280);
+  line-height: 1;
+}
+
+.ct-empty {
+  padding: 120rpx 28rpx;
+  text-align: center;
+}
+
+.ct-empty__text {
+  font-size: 26rpx;
+  color: var(--text-muted, #6b7280);
+}
+
+.ct-pad { height: 48rpx; }
+
+.ct-index {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx 6rpx;
+  max-height: 86%;
+  overflow: hidden;
+}
+
+.ct-index__item {
+  width: 28rpx;
+  height: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16rpx;
+  font-weight: 800;
+  color: var(--text-muted, #6b7280);
+  line-height: 1;
+}
+
+.ct-index__item.is-active { color: var(--champion-gold, #ce9224); }

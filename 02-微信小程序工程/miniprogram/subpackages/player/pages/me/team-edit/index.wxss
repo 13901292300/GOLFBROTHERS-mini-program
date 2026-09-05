@@ -1,0 +1,83 @@
+.create-page {
+  --tour-blue: #002d62;
+  --champion-gold: #ce9224;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.create-page.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-muted: #6b7280;
+}
+
+.create-page.dark-mode {
+  --bg-primary: #000000;
+  --bg-card: #111111;
+  --border: #222222;
+  --text-primary: #f1f5f9;
+  --text-muted: #888888;
+}
+
+page { height: 100%; background: var(--bg-primary); }
+
+.gb-header {
+  background: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: #fff;
+  flex-shrink: 0;
+}
+.gb-header__inner { display: flex; align-items: center; }
+.gb-header__left { display: flex; align-items: center; gap: 20rpx; }
+.gb-header__back { width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; }
+.gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
+.gb-header__eyebrow {
+  display: block;
+  font-size: 17rpx;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6rpx;
+}
+.gb-header__title {
+  display: block;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+}
+
+.create-body { flex: 1; min-height: 0; }
+.form { padding: 32rpx; }
+.field { margin-bottom: 28rpx; }
+.field--row { display: flex; align-items: center; justify-content: space-between; }
+.field__label { display: block; font-size: 24rpx; font-weight: 800; color: var(--text-muted); margin-bottom: 12rpx; }
+.field__input, .field__area {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: var(--text-primary);
+}
+.field__area { min-height: 160rpx; }
+.footer { padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom)); }
+.submit-btn {
+  height: 88rpx;
+  border-radius: 999rpx;
+  background: #002d62;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.submit-btn.is-disabled { opacity: 0.5; }

@@ -1,0 +1,66 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">我的球队</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="team-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="球队加载中…"
+        emptyTitle="暂未加入球队"
+        emptyDesc="创建一支球队，或等待队长邀请。"
+        errorTitle="{{errorTitle || '加载失败'}}"
+        errorDesc="{{errorDesc || '无法获取我的球队，请稍后重试。不会改用本地数据。'}}"
+        bind:retry="onRetry"
+      />
+
+      <view wx:if="{{pageState === 'ready'}}" class="section">
+        <view class="section-label">
+          <text class="section-label__h2">已加入的球队</text>
+          <text class="section-note">{{teams.length}} 支</text>
+        </view>
+        <view class="team-list">
+          <view
+            wx:for="{{teams}}"
+            wx:key="id"
+            class="ds-card team-row"
+            hover-class="team-row--hover"
+            bindtap="onTapTeam"
+            data-id="{{item.id}}"
+          >
+            <image class="team-row__logo" src="{{item.logo}}" mode="aspectFill"></image>
+            <view class="team-row__main">
+              <text class="team-row__name">{{item.fullName}}</text>
+              <text wx:if="{{item.metaText}}" class="team-row__meta">{{item.metaText}}</text>
+              <view wx:if="{{item.badges.length}}" class="team-row__tags">
+                <text
+                  wx:for="{{item.badges}}"
+                  wx:for-item="badge"
+                  wx:key="key"
+                  class="team-tag team-tag--{{badge.key}}"
+                >{{badge.label}}</text>
+              </view>
+            </view>
+            <text class="team-row__chevron">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="footer">
+    <button class="create-team-btn" bindtap="onCreateTeam">＋ 创建球队</button>
+  </view>
+</view>

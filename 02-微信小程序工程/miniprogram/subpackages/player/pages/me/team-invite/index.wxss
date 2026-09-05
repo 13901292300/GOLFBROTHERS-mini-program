@@ -1,0 +1,237 @@
+.team-page {
+  --tour-blue: #002d62;
+  --champion-gold: #ce9224;
+  --error: #ef4444;
+}
+
+.team-page.dark-mode {
+  --bg-primary: #000000;
+  --bg-card: #111111;
+  --bg-subtle: #0a0a0a;
+  --border: #222222;
+  --text-primary: #f1f5f9;
+  --text-secondary: #e5e7f9;
+  --text-muted: #888888;
+  --shadow-card: none;
+}
+
+.team-page.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #e5e7eb;
+  --text-primary: #002d62;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --shadow-card: 0 8rpx 12rpx -2rpx rgba(0, 0, 0, 0.05);
+}
+
+page {
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.team-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.gb-header {
+  background: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: #fff;
+  flex-shrink: 0;
+}
+.gb-header__inner { display: flex; align-items: center; }
+.gb-header__left { display: flex; align-items: center; gap: 20rpx; min-width: 0; }
+.gb-header__back { width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; }
+.gb-header__chevron { color: #fff; font-size: 52rpx; line-height: 1; }
+.gb-header__eyebrow {
+  display: block;
+  font-size: 17rpx;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+.gb-header__title {
+  display: block;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+}
+
+/* DIAG-12 诊断身份切换条，诊断结束后删除 */
+.invite-diagbar {
+  flex-shrink: 0;
+  padding: 10rpx 32rpx;
+  background: #fff7e0;
+  border-bottom: 1px solid var(--champion-gold);
+}
+.invite-diagbar__text { display: block; font-size: 18rpx; color: #7a4b00; margin-bottom: 8rpx; }
+.invite-diagbar__btns { display: flex; gap: 12rpx; }
+.invite-diagbar__btn {
+  padding: 4rpx 16rpx;
+  border: 1px solid #ce9224;
+  border-radius: 999rpx;
+  font-size: 18rpx;
+  color: #7a4b00;
+}
+.invite-diagbar__btn.is-on { background: var(--champion-gold); color: #fff; }
+
+.team-scroll { flex: 1; min-height: 0; height: 0; }
+.team-content { padding: 24rpx 32rpx 24rpx; }
+
+/* 模拟申请提示：不得表述为后端已接通 */
+.invite-mocknote { padding: 20rpx 24rpx; }
+.invite-mocknote__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: #92400e;
+  margin-bottom: 8rpx;
+}
+.invite-mocknote__body { display: block; font-size: 22rpx; line-height: 1.6; color: var(--text-muted); }
+
+/* 消息中心未实现时的申请详情跳转 */
+.invite-result { padding: 20rpx 24rpx; }
+.invite-result__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+.invite-result__body { display: block; font-size: 22rpx; line-height: 1.6; color: var(--text-muted); }
+.invite-result__btn {
+  margin-top: 16rpx;
+  height: 72rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--tour-blue);
+  color: var(--tour-blue);
+  font-size: 26rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16rpx;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 20rpx;
+}
+
+.intro-hero {
+  padding: 40rpx 32rpx 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.intro-hero__logo {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  margin-bottom: 24rpx;
+}
+.intro-hero__name {
+  font-size: 36rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.intro-hero__meta {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.intro-facts { padding: 8rpx 32rpx; }
+.intro-fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  min-height: 88rpx;
+}
+.intro-fact + .intro-fact { border-top: 1px solid var(--border); }
+.intro-fact__label {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.intro-fact__value {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.intro-block { padding: 28rpx 32rpx 32rpx; }
+.intro-block__label {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--champion-gold);
+  margin-bottom: 16rpx;
+}
+.intro-block__body {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.7;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.intro-block__body--slogan {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 16rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+}
+
+.join-hint {
+  display: block;
+  margin-bottom: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.join-btn {
+  width: 100%;
+  height: 104rpx;
+  line-height: 104rpx;
+  border: 0;
+  border-radius: 12rpx;
+  background: var(--champion-gold);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 800;
+  padding: 0;
+}
+.join-btn::after { border: none; }
+.join-btn.is-disabled,
+.join-btn[disabled] {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}

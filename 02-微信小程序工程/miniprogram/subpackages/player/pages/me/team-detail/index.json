@@ -1,0 +1,9 @@
+{
+  "navigationStyle": "custom",
+  "enableShareAppMessage": true,
+  "usingComponents": {
+    "team-intro": "./components/team-intro/index",
+    "team-members": "./components/team-members/index",
+    "team-matches": "./components/team-matches/index"
+  }
+}

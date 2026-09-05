@@ -1,0 +1,127 @@
+<view class="tm-root">
+  <view class="ct-search-wrap">
+    <view class="ct-search">
+      <text class="ct-search__icon">🔍</text>
+      <input
+        class="ct-search__input"
+        type="text"
+        value="{{keyword}}"
+        placeholder="搜索姓名或昵称"
+        placeholder-class="ct-search__ph"
+        confirm-type="search"
+        bindinput="onSearchInput"
+      />
+      <view wx:if="{{keyword}}" bindtap="onClearSearch" class="ct-search__clear"><text>×</text></view>
+    </view>
+  </view>
+
+  <view wx:if="{{pageState === 'ready' || pageState === 'empty'}}" class="tm-toolbar">
+    <view class="tm-toolbar__left">
+      <text class="ct-meta__label">{{metaLabel}}</text>
+      <text class="ct-meta__count">{{listCount}}</text>
+    </view>
+    <view wx:if="{{showManageButton}}" class="tm-manage" bindtap="onTapManage">
+      <text class="tm-manage__text">管理</text>
+    </view>
+  </view>
+
+  <team-page-state
+    wx:if="{{pageState === 'loading' || pageState === 'error'}}"
+    pageState="{{pageState}}"
+    loadingText="成员加载中…"
+    errorTitle="加载失败"
+    errorDesc="无法获取球队成员，请稍后重试。"
+    bind:retry="onRetry"
+  />
+
+  <view wx:elif="{{pageState === 'ready' || pageState === 'empty'}}" class="ct-main">
+    <!-- 字母索引滚动 -->
+    <scroll-view
+      scroll-y
+      class="ct-body {{(!useLetterIndex || searchMode) ? 'ct-body--search' : ''}}"
+      scroll-into-view="{{scrollIntoView}}"
+      scroll-with-animation
+    >
+      <block wx:if="{{!searchMode && useLetterIndex}}">
+        <block wx:for="{{sections}}" wx:key="letter">
+          <view class="ct-section" id="{{item.anchorId}}">
+            <view class="ct-letter-head">{{item.letter}}</view>
+            <view
+              wx:for="{{item.items}}"
+              wx:for-item="member"
+              wx:key="id"
+              class="ct-row"
+              hover-class="ct-row--hover"
+              hover-stay-time="80"
+              data-user-id="{{member.userId}}"
+              data-nickname="{{member.nickname || member.displayName}}"
+              data-name="{{member.displayName}}"
+              data-avatar="{{member.avatar}}"
+              bindtap="onTapMember"
+            >
+              <image class="ct-avatar" src="{{member.avatar}}" mode="aspectFill" />
+              <view class="ct-info">
+                <view class="ct-line1">
+                  <text class="ct-name">{{member.displayName}}</text>
+                  <text
+                    wx:for="{{member.badges}}"
+                    wx:for-item="badge"
+                    wx:key="key"
+                    class="tm-tag tm-tag--{{badge.key}}"
+                  >{{badge.label}}</text>
+                </view>
+              </view>
+              <text class="tm-chevron">›</text>
+            </view>
+          </view>
+        </block>
+        <view wx:if="{{!listCount}}" class="ct-empty">
+          <text class="ct-empty__text">{{emptyText}}</text>
+        </view>
+      </block>
+
+      <block wx:else>
+        <view
+          wx:for="{{flatRows}}"
+          wx:key="id"
+          class="ct-row"
+          hover-class="ct-row--hover"
+          hover-stay-time="80"
+          data-user-id="{{item.userId}}"
+          data-nickname="{{item.nickname || item.displayName}}"
+          data-name="{{item.displayName}}"
+          data-avatar="{{item.avatar}}"
+          bindtap="onTapMember"
+        >
+          <image class="ct-avatar" src="{{item.avatar}}" mode="aspectFill" />
+          <view class="ct-info">
+            <view class="ct-line1">
+              <text class="ct-name">{{item.displayName}}</text>
+              <text
+                wx:for="{{item.badges}}"
+                wx:for-item="badge"
+                wx:key="key"
+                class="tm-tag tm-tag--{{badge.key}}"
+              >{{badge.label}}</text>
+            </view>
+          </view>
+          <text class="tm-chevron">›</text>
+        </view>
+        <view wx:if="{{!listCount}}" class="ct-empty">
+          <text class="ct-empty__text">{{emptyText}}</text>
+        </view>
+      </block>
+      <view class="ct-pad"></view>
+    </scroll-view>
+
+    <view wx:if="{{!searchMode && useLetterIndex}}" class="ct-index">
+      <view
+        wx:for="{{indexLetters}}"
+        wx:key="letter"
+        class="ct-index__item {{item.active ? 'is-active' : ''}}"
+        data-letter="{{item.letter}}"
+        bindtap="onTapIndex"
+      >{{item.letter}}</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,65 @@
+<view class="intro">
+  <team-page-state
+    wx:if="{{pageState !== 'ready'}}"
+    pageState="{{pageState}}"
+    loadingText="球队简介加载中…"
+    emptyTitle="暂无球队简介"
+    errorTitle="{{errorTitle}}"
+    errorDesc="{{errorDesc}}"
+    bind:retry="onRetry"
+  />
+
+  <block wx:if="{{pageState === 'ready' && team}}">
+    <view class="ds-card intro-hero">
+      <image class="intro-hero__logo" src="{{team.logo}}" mode="aspectFill"></image>
+      <text class="intro-hero__name">{{team.fullName}}</text>
+      <view wx:if="{{team.badges.length}}" class="intro-hero__tags">
+        <text
+          wx:for="{{team.badges}}"
+          wx:for-item="badge"
+          wx:key="key"
+          class="team-tag team-tag--{{badge.key}}"
+        >{{badge.label}}</text>
+      </view>
+      <button
+        wx:if="{{canShareTeam}}"
+        class="intro-share"
+        open-type="share"
+        hover-class="intro-share--hover"
+      >分享球队</button>
+    </view>
+
+    <view class="ds-card intro-facts">
+      <view class="intro-fact">
+        <text class="intro-fact__label">成立时间</text>
+        <text class="intro-fact__value">{{team.foundedDateText || '待完善'}}</text>
+      </view>
+      <view class="intro-fact">
+        <text class="intro-fact__label">所在地区</text>
+        <text class="intro-fact__value">{{team.regionText || '待完善'}}</text>
+      </view>
+    </view>
+
+    <view class="ds-card intro-block">
+      <text class="intro-block__label">球队口号</text>
+      <text class="intro-block__body intro-block__body--slogan">{{team.slogan || '暂无口号'}}</text>
+    </view>
+
+    <view class="ds-card intro-block">
+      <text class="intro-block__label">球队介绍</text>
+      <text class="intro-block__body">{{team.description || '暂无介绍'}}</text>
+    </view>
+
+    <view class="ds-card intro-actions">
+      <view wx:if="{{team.permissions.canEditTeamProfile && team.status !== 'dissolved'}}" class="intro-action" bindtap="onEdit">编辑资料</view>
+      <view wx:if="{{team.permissions.canReviewJoinRequests && team.status !== 'dissolved'}}" class="intro-action" bindtap="onApplications">
+        入队申请
+        <text wx:if="{{pendingApplicationCount}}" class="intro-action__badge">{{pendingApplicationCount}}</text>
+      </view>
+      <view class="intro-action" bindtap="onNotices">球队通知</view>
+      <view wx:if="{{team.isFormalMember && team.currentUserRole !== 'super_admin' && team.status !== 'dissolved'}}" class="intro-action intro-action--danger" bindtap="onLeave">退出球队</view>
+      <view wx:if="{{team.currentUserRole === 'super_admin' && team.status !== 'dissolved'}}" class="intro-action intro-action--danger" bindtap="onDissolve">解散球队</view>
+      <text wx:if="{{team.status === 'dissolved'}}" class="intro-dissolved">球队已解散，仅可查看历史资料与比赛。</text>
+    </view>
+  </block>
+</view>

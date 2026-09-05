@@ -142,6 +142,7 @@
               wx:key="teamId"
               class="pp-team-row"
               hover-class="pp-team-row--hover"
+              data-team-id="{{item.teamId}}"
               bindtap="onTapTeamRow"
             >
               <image class="pp-team-logo" src="{{item.logo}}" mode="aspectFill"></image>

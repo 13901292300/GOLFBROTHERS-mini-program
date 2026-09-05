@@ -1661,6 +1661,15 @@ Page({
     });
   },
 
+  navigateToMyTeams() {
+    wx.navigateTo({
+      url: '/subpackages/player/pages/me/teams/index',
+      fail: () => {
+        wx.showToast({ title: '页面尚未注册', icon: 'none' });
+      }
+    });
+  },
+
   navigateToMyMoments() {
     if (this._openingMyMoments) return;
     this._openingMyMoments = true;

@@ -1,0 +1,66 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">入队申请</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="team-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="申请加载中…"
+        errorTitle="{{errorTitle || '加载失败'}}"
+        errorDesc="{{errorDesc || '无法获取入队申请，请稍后重试。'}}"
+        bind:retry="onRetry"
+      />
+
+      <block wx:if="{{pageState === 'ready' && detail}}">
+        <view class="ds-card person-card" bindtap="onTapApplicant">
+          <image class="person-card__avatar" src="{{detail.applicant.avatar}}" mode="aspectFill"></image>
+          <view class="person-card__main">
+            <text class="person-card__name">{{detail.applicant.displayName}}</text>
+            <text wx:if="{{detail.applicant.nickname}}" class="person-card__sub">{{detail.applicant.nickname}}</text>
+            <text class="person-card__link">查看主页</text>
+          </view>
+          <text class="person-card__chevron">›</text>
+        </view>
+
+        <view class="ds-card facts">
+          <view class="fact">
+            <text class="fact__label">目标球队</text>
+            <text class="fact__value">{{detail.team.fullName}}</text>
+          </view>
+          <view class="fact">
+            <text class="fact__label">申请时间</text>
+            <text class="fact__value">{{detail.appliedAtText || '—'}}</text>
+          </view>
+        </view>
+
+        <view class="ds-card block">
+          <text class="block__label">申请说明</text>
+          <text class="block__body">{{detail.message || '未填写说明'}}</text>
+        </view>
+
+        <view wx:if="{{detail.actionView.statusLabel || detail.actionView.hint}}" class="status-box">
+          <text wx:if="{{detail.actionView.statusLabel}}" class="status-box__title">{{detail.actionView.statusLabel}}</text>
+          <text wx:if="{{detail.actionView.hint}}" class="status-box__hint">{{detail.actionView.hint}}</text>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{pageState === 'ready' && (detail.actionView.showApprove || detail.actionView.showReject)}}" class="footer">
+    <view wx:if="{{detail.actionView.showReject}}" class="footer-btn footer-btn--ghost" bindtap="onReject">{{detail.actionView.rejectLabel}}</view>
+    <view wx:if="{{detail.actionView.showApprove}}" class="footer-btn footer-btn--gold" bindtap="onApprove">{{detail.actionView.approveLabel}}</view>
+  </view>
+</view>

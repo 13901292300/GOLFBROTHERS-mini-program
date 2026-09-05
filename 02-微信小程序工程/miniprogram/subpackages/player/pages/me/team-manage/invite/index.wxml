@@ -1,0 +1,67 @@
+<view class="team-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">TEAM</text>
+          <text class="gb-header__title">添加球队成员</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="search-wrap">
+    <view class="search">
+      <text class="search__icon">🔍</text>
+      <input
+        class="search__input"
+        type="text"
+        value="{{keyword}}"
+        placeholder="搜索姓名或昵称"
+        placeholder-class="search__ph"
+        confirm-type="search"
+        bindinput="onSearchInput"
+      />
+      <view wx:if="{{keyword}}" bindtap="onClearSearch" class="search__clear"><text>×</text></view>
+    </view>
+  </view>
+
+  <scroll-view class="team-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="team-content">
+      <team-page-state
+        wx:if="{{pageState !== 'ready'}}"
+        pageState="{{pageState}}"
+        loadingText="正在搜索用户…"
+        emptyTitle="没有可添加的真实用户"
+        emptyDesc="当前无法搜索到可添加的用户。请通过有效邀请链接让对方自行申请，不会使用假名单。"
+        errorTitle="加载失败"
+        errorDesc="无法搜索用户，请稍后重试。"
+        bind:retry="onRetry"
+      />
+
+      <text wx:if="{{pageState === 'ready'}}" class="pick-note">仅显示尚未加入本队的候选人</text>
+
+      <view wx:if="{{pageState === 'ready'}}" class="pick-list">
+        <view
+          wx:for="{{users}}"
+          wx:key="userId"
+          class="ds-card pick-row"
+          hover-class="pick-row--hover"
+          data-user-id="{{item.userId}}"
+          data-name="{{item.displayName}}"
+          bindtap="onTapUser"
+        >
+          <image class="pick-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view class="pick-row__main">
+            <text class="pick-row__name">{{item.displayName}}</text>
+            <text wx:if="{{item.nickname}}" class="pick-row__sub">{{item.nickname}}</text>
+          </view>
+          <text class="pick-row__action">添加</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>
