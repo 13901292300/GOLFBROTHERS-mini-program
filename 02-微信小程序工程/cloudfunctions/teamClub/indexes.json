@@ -1,0 +1,21 @@
+{
+  "comment": "在微信云开发控制台按此添加索引。数据库无声明式唯一索引时，用确定性_id与事务保证唯一。",
+  "indexes": [
+    { "collection": "user_profiles", "keys": [{ "name": "openidHash", "unique": true }] },
+    { "collection": "user_profiles", "keys": [{ "name": "searchKey" }, { "name": "userId" }] },
+    { "collection": "team_clubs", "keys": [{ "name": "teamId", "unique": true }, { "name": "status" }] },
+    { "collection": "team_members", "keys": [{ "name": "teamId" }, { "name": "userId" }, { "name": "memberStatus" }] },
+    { "collection": "team_members", "keys": [{ "name": "userId" }, { "name": "memberStatus" }] },
+    { "collection": "team_applications", "keys": [{ "name": "teamId" }, { "name": "userId" }, { "name": "status" }] },
+    { "collection": "team_invites", "keys": [{ "name": "tokenHash" }] },
+    { "collection": "team_invites", "keys": [{ "name": "teamId" }, { "name": "status" }] },
+    { "collection": "team_notices", "keys": [{ "name": "recipientUserId" }, { "name": "createdAt" }] },
+    { "collection": "team_audits", "keys": [{ "name": "teamId" }, { "name": "createdAt" }] },
+    { "collection": "team_club_migrations", "keys": [{ "name": "actorUserId" }, { "name": "teamId" }] },
+    { "collection": "team_match_refs", "keys": [{ "name": "teamId" }, { "name": "updatedAt" }] },
+    { "collection": "team_match_refs", "keys": [{ "name": "matchId" }, { "name": "teamId" }] },
+    { "collection": "team_matches", "keys": [{ "name": "teamId" }, { "name": "updatedAt" }] },
+    { "collection": "team_matches", "keys": [{ "name": "matchId" }] },
+    { "collection": "team_match_scores", "keys": [{ "name": "matchId" }] }
+  ]
+}

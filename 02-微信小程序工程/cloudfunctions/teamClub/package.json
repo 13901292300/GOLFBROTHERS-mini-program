@@ -1,0 +1,14 @@
+{
+  "name": "teamClub",
+  "version": "1.0.0",
+  "description": "球队域唯一云函数入口。客户端禁止直写球队集合。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"run scripts/teamClub.cloud.selftest.js from miniprogram project root\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~2.4.0"
+  }
+}

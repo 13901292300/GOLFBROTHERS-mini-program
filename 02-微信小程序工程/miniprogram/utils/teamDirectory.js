@@ -315,7 +315,20 @@ function buildListMeta(team) {
 
 function allTeams() {
   _ensureCreatedTeams();
-  return createdTeams.concat(TEAMS);
+  const eventCreated = createdTeams.filter(function (t) {
+    return t && isEventOrganization(t);
+  });
+  const eventStatic = TEAMS.filter(function (t) {
+    return t && isEventOrganization(t);
+  });
+  let clubs = [];
+  try {
+    const repo = require('./teamClub/access.js');
+    clubs = repo.listAllDirectoryTeams() || [];
+  } catch (e) {
+    clubs = [];
+  }
+  return eventCreated.concat(eventStatic).concat(clubs);
 }
 
 function resolveLogo(team) {
@@ -389,9 +402,8 @@ function enrichOrganization(team) {
 
 function _resolveCurrentUserId() {
   try {
-    const gameStore = require('./gameStore.js');
-    const user = gameStore.getCurrentUser && gameStore.getCurrentUser();
-    return user && user.userId != null ? String(user.userId).trim() : '';
+    const identity = require('./teamClub/identity.js');
+    return identity.currentUserIdOrEmpty();
   } catch (e) {
     return '';
   }
@@ -579,6 +591,46 @@ function addCreatedTeam(payload) {
       : ORGANIZATION_TYPES.TEAM
   );
 
+  if (organizationType === ORGANIZATION_TYPES.TEAM) {
+    try {
+      const factory = require('./teamClub/repoFactory.js');
+      if (factory.getMode() !== 'local') {
+        return null;
+      }
+      const identity = require('./teamClub/identity.js');
+      const auth = identity.requireUser();
+      if (!auth.ok) return null;
+      const repo = require('./teamClub/repository.js');
+      const res = repo.createTeam({
+        name: name,
+        shortName: payload && payload.shortName,
+        city: (payload && (payload.region || payload.city)) || '',
+        logo: (payload && payload.logo) || '',
+        intro: (payload && (payload.desc || payload.description)) || '',
+        teamId: payload && payload.id
+      });
+      if (!res || !res.ok || !res.data) return null;
+      const teamId = String(res.data.teamId || res.data.id);
+      const extras = Array.isArray(payload && payload.members) ? payload.members : [];
+      extras.forEach(function (m) {
+        const uid = String((m && (m.userId || m.playerId)) || '').trim();
+        if (!uid || uid === auth.user.userId) return;
+        repo.addMember(teamId, uid, {
+          displayName: (m && (m.name || m.displayName)) || uid
+        });
+      });
+      const adminIds = normalizeAdminUserIds(payload && payload.adminUserIds);
+      adminIds.forEach(function (uid) {
+        if (!uid || uid === auth.user.userId) return;
+        repo.setAdmin(teamId, uid, true);
+      });
+      const mapped = repo.peekTeam(teamId);
+      return mapped ? enrichOrganization(mapped) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   const creatorId = String(
     (payload && (payload.createdBy || payload.creatorId || payload.ownerUserId)) ||
       _resolveCurrentUserId() ||
@@ -658,11 +710,20 @@ function addCreatedTeam(payload) {
 function getTeamMembers(teamId) {
   const id = String(teamId || '').trim();
   if (!id) return [];
+  try {
+    const repo = require('./teamClub/access.js');
+    if (repo.peekTeam(id)) {
+      return repo.peekMembers(id);
+    }
+  } catch (e) {
+    /* fall through */
+  }
   _ensureCreatedTeams();
 
   for (let i = 0; i < createdTeams.length; i++) {
     const ct = createdTeams[i];
     if (!ct || String(ct.id || '').trim() !== id) continue;
+    if (!isEventOrganization(ct)) break;
     if (Array.isArray(ct.members) && ct.members.length) {
       return ct.members.map(function (m, index) {
         return _normalizePersistedMember(m, id, index);
@@ -671,39 +732,18 @@ function getTeamMembers(teamId) {
     break;
   }
 
-  const raw = TEAM_MEMBERS_BY_TEAM_ID[id];
-  if (!Array.isArray(raw) || !raw.length) return [];
-  return raw.map((m, index) => {
-    const playerId = String(m.playerId || '').trim();
-    const name = String(m.name || '').trim();
-    const roleCode = normalizeTeamMemberRole(m.role, null, playerId);
-    const memberStatus =
-      m.memberStatus != null && String(m.memberStatus).trim()
-        ? String(m.memberStatus).trim()
-        : 'active';
-    return {
-      playerId: playerId,
-      userId: playerId,
-      name: name,
-      competitionName: name,
-      avatar: mockAvatars.pickMockAvatar(playerId || name || index),
-      phone: m.phone != null ? String(m.phone) : '',
-      gender: m.gender != null ? String(m.gender) : '',
-      pinyin: m.pinyin != null ? String(m.pinyin) : name,
-      teamId: id,
-      role: roleCode,
-      memberStatus: memberStatus,
-      joinedAt: m.joinedAt != null ? Number(m.joinedAt) || 0 : 0,
-      source: 'team_member',
-      pickChannel: 'team_members'
-    };
-  });
+  return [];
 }
 
 /** 测试/诊断：重新从 storage 灌入内存镜像（模拟冷启动） */
 function reloadCreatedTeamsFromStorage() {
   _createdTeamsReady = false;
   _hydrateCreatedTeams();
+  try {
+    require('./teamClub/access.js').reloadFromStorage();
+  } catch (e) {
+    /* ignore */
+  }
   return createdTeams.slice();
 }
 
@@ -747,113 +787,22 @@ function getTeamRoleLabel(roleCode) {
   return '成员';
 }
 
-function _isCurrentUserAlias(userId) {
+/**
+ * 按 userId 解析活跃俱乐部球队（统一仓储）。
+ */
+function listActiveClubTeamsForUser(userId) {
   const uid = String(userId || '').trim();
-  if (!uid) return false;
-  if (uid === 'me') return true;
+  if (!uid || uid.toLowerCase() === 'me') return [];
   try {
-    const cur = _resolveCurrentUserId();
-    return !!(cur && cur === uid);
+    const repo = require('./teamClub/access.js');
+    return repo.listTeamsForUser(uid);
   } catch (e) {
-    return false;
+    return [];
   }
 }
 
-/**
- * 按 userId 解析活跃俱乐部球队成员关系（只读）。
- * 命中规则（队长/管理员/普通成员）：
- * 1) getTeamMembers 花名册 active 命中 userId|playerId
- * 2) team.adminUserIds 命中（队长/管理员）
- * 不使用 isMine、不把固定字符串 me 当特殊身份、不从赛事/报名反推。
- * @param {string} userId
- * @param {{ includeIsMineCompat?: boolean }} [options]
- * @returns {Array<{teamId,name,shortName,logo,role,memberStatus,joinedAt,organizationType}>}
- */
-function listActiveClubTeamsForUser(userId, options) {
-  const uid = String(userId || '').trim();
-  if (!uid) return [];
-  const includeIsMineCompat = !!(options && options.includeIsMineCompat);
-  const out = [];
-  const seen = {};
-  const teams = allTeams();
-  const currentAlias = includeIsMineCompat ? _isCurrentUserAlias(uid) : false;
-
-  for (let i = 0; i < teams.length; i++) {
-    const team = teams[i];
-    if (!team || !isClubTeam(team)) continue;
-    const teamId = String(team.id || '').trim();
-    if (!teamId || seen[teamId]) continue;
-
-    let role = '';
-    let memberStatus = '';
-    let joinedAt = 0;
-    let matched = false;
-
-    const members = getTeamMembers(teamId);
-    for (let j = 0; j < members.length; j++) {
-      const m = members[j];
-      if (!m) continue;
-      const mid = String(m.userId || m.playerId || '').trim();
-      if (mid !== uid) continue;
-      const st = String(m.memberStatus || 'active').trim() || 'active';
-      if (st !== 'active') {
-        matched = true;
-        memberStatus = st;
-        break;
-      }
-      matched = true;
-      memberStatus = 'active';
-      role = normalizeTeamMemberRole(m.role, team, uid);
-      joinedAt = Number(m.joinedAt) || 0;
-      break;
-    }
-
-    // 队长/管理员：adminUserIds 命中即属队（不依赖花名册是否收录）
-    if (!matched) {
-      const admins = normalizeAdminUserIds(team.adminUserIds);
-      if (admins.indexOf(uid) >= 0) {
-        matched = true;
-        memberStatus = 'active';
-        role = normalizeTeamMemberRole(team.role, team, uid);
-        joinedAt = 0;
-      }
-    }
-
-    // 仅 getTeamsByUserId 兼容路径：当前用户 + isMine 演示补入
-    if (!matched && includeIsMineCompat && currentAlias && team.isMine) {
-      matched = true;
-      memberStatus = 'active';
-      role = normalizeTeamMemberRole(team.role, team, uid);
-      joinedAt = 0;
-    }
-
-    if (!matched || memberStatus !== 'active') continue;
-    seen[teamId] = true;
-    const enriched = enrichOrganization(team);
-    out.push({
-      teamId: teamId,
-      name: String((enriched && enriched.name) || team.name || '').trim(),
-      shortName: normalizeShortName((enriched && enriched.shortName) || team.shortName),
-      logo: resolveLogo(enriched || team),
-      role: role || 'member',
-      memberStatus: 'active',
-      joinedAt: joinedAt,
-      organizationType: ORGANIZATION_TYPES.TEAM
-    });
-  }
-  return out;
-}
-
-/**
- * 按 userId 查询所属球队（MVP / mock 成员关系）。
- * 来源：成员花名册 + adminUserIds +（当前用户）isMine 演示兼容。
- * 系列赛报名资格请使用 listActiveClubTeamsForUser（不含 isMine）。
- * 严禁从 teamGroups / matchTeamId / 报名 / 赛事代表队反推。
- * @param {string} userId
- * @returns {Array<{teamId,name,shortName,logo,role,memberStatus,joinedAt,organizationType}>}
- */
 function getTeamsByUserId(userId) {
-  return listActiveClubTeamsForUser(userId, { includeIsMineCompat: true });
+  return listActiveClubTeamsForUser(userId);
 }
 
 function isEventOrganization(orgOrType) {

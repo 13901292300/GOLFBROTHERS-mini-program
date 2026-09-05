@@ -43,6 +43,25 @@ App({
         env: envId,
         traceUser: true
       });
+      try {
+        const bootstrap = require('./utils/teamClub/bootstrap.js');
+        bootstrap.ensureCloudIdentity().then(function (ident) {
+          if (!ident || !ident.ok) return;
+          try {
+            require('./utils/teamClub/matchSync.js').flush();
+            require('./utils/teamClub/scoreSync.js').flush();
+          } catch (eSync) {
+            /* ignore */
+          }
+          try {
+            require('./utils/teamClub/matchRefSync.js').flush();
+          } catch (e2) {
+            /* ignore */
+          }
+        });
+      } catch (e) {
+        /* 云身份失败由球队页展示，不在启动时静默回落本地仓储 */
+      }
     }
   },
 
