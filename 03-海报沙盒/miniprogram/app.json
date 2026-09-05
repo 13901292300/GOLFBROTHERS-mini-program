@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/home/index"
+  ],
+  "subPackages": [
+    {
+      "root": "subpackages/poster",
+      "name": "posterModule",
+      "pages": [
+        "pages/create/index"
+      ]
+    }
+  ],
+  "window": {
+    "backgroundColor": "#11171B",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#002D62",
+    "navigationBarTitleText": "海报沙盒",
+    "navigationBarTextStyle": "white",
+    "pageOrientation": "auto"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
