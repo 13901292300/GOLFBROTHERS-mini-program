@@ -1,0 +1,23 @@
+page {
+  background: #11171b;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+
+  --champion-gold: #CE9224;
+  --tour-blue: #002D62;
+  --pga-blue: #002D62;
+  --data-blue: #00AEEF;
+}
+
+button {
+  background: initial;
+}
+
+button:focus {
+  outline: 0;
+}
+
+button::after {
+  border: none;
+}

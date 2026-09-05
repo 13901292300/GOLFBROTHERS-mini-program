@@ -1,0 +1,80 @@
+page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #11171b;
+}
+
+.gb-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--tour-blue);
+  border-bottom: 2px solid var(--champion-gold);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.gb-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gb-header__left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.gb-header__back {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gb-header__chevron {
+  color: #fff;
+  font-size: 52rpx;
+  line-height: 1;
+}
+
+.gb-header__eyebrow {
+  display: block;
+  font-size: 17rpx;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+
+.gb-header__title {
+  display: block;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+}
+
+.poster-page-container {
+  box-sizing: border-box;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.poster-page-container golf-poster {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

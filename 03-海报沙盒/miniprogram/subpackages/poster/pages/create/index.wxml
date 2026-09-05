@@ -1,0 +1,24 @@
+<!-- 自定义导航栏 -->
+<view class="gb-header" style="{{headerRootStyle}}">
+  <view class="gb-header__inner" style="{{headerBarStyle}}">
+    <view class="gb-header__left">
+      <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+        <text class="gb-header__chevron">‹</text>
+      </view>
+      <view>
+        <text class="gb-header__eyebrow">GOLF</text>
+        <text class="gb-header__title">高尔夫海报</text>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 海报组件：padding-top = headerEngine 算出的 headerTotalHeight，避免被固定顶栏遮挡 -->
+<view class="poster-page-container" style="{{posterContainerStyle}}">
+  <golf-poster
+    id="golfPoster"
+    round-id="{{roundId}}"
+    bind:export="onPosterExport"
+    bind:share="onPosterShare"
+  />
+</view>

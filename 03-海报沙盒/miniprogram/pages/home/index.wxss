@@ -1,0 +1,40 @@
+.sandbox-home {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 160rpx 48rpx 48rpx;
+  background: #11171b;
+  color: #fff;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 20rpx;
+  letter-spacing: 0.28em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 700;
+}
+
+.title {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 56rpx;
+  font-weight: 900;
+  font-style: italic;
+}
+
+.hint {
+  display: block;
+  margin-top: 24rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.open-btn {
+  margin-top: 64rpx;
+  background: #002d62;
+  color: #fff;
+  border: 2px solid #ce9224;
+  border-radius: 12rpx;
+  font-weight: 700;
+}

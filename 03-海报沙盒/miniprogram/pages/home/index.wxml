@@ -1,0 +1,6 @@
+<view class="sandbox-home">
+  <text class="eyebrow">GOLFBROTHERS</text>
+  <text class="title">海报沙盒</text>
+  <text class="hint">成绩为写死的 18 洞演示数据，不连接记分模块。</text>
+  <button class="open-btn" bindtap="openPoster">打开海报</button>
+</view>
