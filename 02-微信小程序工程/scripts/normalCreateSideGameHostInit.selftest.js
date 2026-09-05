@@ -119,6 +119,7 @@ function runCreateFinalize(game) {
   );
   game.front9Course = halfResolved.front9Course;
   game.back9Course = halfResolved.back9Course;
+  game.updatedAt = halfCourseEdit.nextSaveToken(game.updatedAt);
   gameStore.saveGame(game);
   var halfResult = halfCourseEdit.apply(
     {
@@ -129,7 +130,11 @@ function runCreateFinalize(game) {
       front9Course: game.front9Course,
       back9Course: game.back9Course,
       beforeCourse: beforeCourse,
-      rollbackGame: game
+      gameRollback: {
+        policy: 'delete',
+        gameId: game.gameId,
+        expectedUpdatedAt: game.updatedAt
+      }
     },
     game.front9Course,
     game.back9Course
@@ -148,6 +153,8 @@ function runEmptyConfirm(existing) {
   var form = gameEdit.hydrateCreateFormFromGame(existing);
   var merged = gameEdit.mergeFormWithExistingGame(existing, form);
   var updated = gameEdit.buildUpdatedGame(existing, merged, {});
+  var beforeGame = JSON.parse(JSON.stringify(existing));
+  updated.updatedAt = halfCourseEdit.nextSaveToken(existing.updatedAt);
   gameStore.saveGame(updated);
   var halfResult = halfCourseEdit.apply(
     {
@@ -164,7 +171,12 @@ function runEmptyConfirm(existing) {
         back9Course: existing.back9Course,
         courseHalfText: existing.courseHalfText
       },
-      rollbackGame: existing
+      gameRollback: {
+        policy: 'restore',
+        gameId: updated.gameId,
+        beforeGame: beforeGame,
+        expectedUpdatedAt: updated.updatedAt
+      }
     },
     updated.front9Course,
     updated.back9Course

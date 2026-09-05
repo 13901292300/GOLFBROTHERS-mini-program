@@ -330,7 +330,10 @@ var normalJs = fs.readFileSync(
 );
 assert('31 halfCourseEdit 调用 syncAfterCourseHalfChange', /syncAfterCourseHalfChange/.test(halfJs));
 assert('32 halfCourseEdit 失败回滚', /rollback\(/.test(halfJs) && /ok: false/.test(halfJs));
-assert('33 编辑页传 beforeCourse/rollbackGame', /beforeCourse/.test(normalJs) && /rollbackGame/.test(normalJs));
+assert(
+  '33 编辑页传 beforeCourse/gameRollback',
+  /beforeCourse/.test(normalJs) && /gameRollback/.test(normalJs) && /policy: 'restore'/.test(normalJs)
+);
 
 // --- UI freeze: no wxml/wxss touched in this feature path (guard scripts only) ---
 assert('34 UI 冻结：本模块无 WXML', true);

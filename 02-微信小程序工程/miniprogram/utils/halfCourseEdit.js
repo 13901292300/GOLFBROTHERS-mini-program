@@ -136,6 +136,178 @@ function snapshotCourseFields(ctx) {
   };
 }
 
+function cloneJson(v) {
+  if (v == null) return v;
+  try {
+    return JSON.parse(JSON.stringify(v));
+  } catch (e) {
+    return v;
+  }
+}
+
+function cloneLayout(layout) {
+  if (!layout) return null;
+  return {
+    holePars: (layout.holePars || []).slice(),
+    columnLabels: (layout.columnLabels || []).slice(),
+    columnPars: (layout.columnPars || []).slice(),
+    front9Key: layout.front9Key,
+    back9Key: layout.back9Key,
+    specialIdx: (layout.specialIdx || []).slice()
+  };
+}
+
+const CONFLICT_MESSAGE = '比赛数据已更新，请重新进入后再试';
+const SIDE_SETTINGS_KEY = matchHoleOrderRebuild.SETTINGS_KEY;
+const SIDE_GAMES_KEY = matchHoleOrderRebuild.GAMES_KEY;
+
+function restoreSideEffects(msSnap, layoutSnap) {
+  if (msSnap) matchState.setMatchState(cloneJson(msSnap));
+  else matchState.clearMatchState();
+  if (layoutSnap) holeLayout.applyLayout(cloneLayout(layoutSnap));
+}
+
+function snapshotWx(key) {
+  try {
+    const v = wx.getStorageSync(key);
+    return v === undefined ? undefined : cloneJson(v);
+  } catch (e) {
+    return undefined;
+  }
+}
+
+function restoreWx(key, snap) {
+  try {
+    if (snap === undefined) {
+      if (typeof wx.removeStorageSync === 'function') wx.removeStorageSync(key);
+      return;
+    }
+    wx.setStorageSync(key, snap);
+  } catch (e) {
+    throw e;
+  }
+}
+
+function nextSaveToken(prevUpdatedAt) {
+  const n = Date.now();
+  const p = Number(prevUpdatedAt);
+  const prev = isFinite(p) ? p : 0;
+  return n <= prev ? prev + 1 : n;
+}
+
+function gameTokenOf(game) {
+  if (!game) return '';
+  if (game.revision != null && String(game.revision) !== '') return 'r:' + String(game.revision);
+  return 't:' + String(game.updatedAt == null ? '' : game.updatedAt);
+}
+
+function sameSaveToken(game, expected) {
+  if (expected == null || expected === '') return false;
+  if (!game) return false;
+  return String(gameTokenOf(game)) === String(expected) || String(game.updatedAt) === String(expected);
+}
+
+function alreadyRestored(cur, beforeGame) {
+  if (!cur || !beforeGame) return false;
+  if (String(cur.gameId) !== String(beforeGame.gameId)) return false;
+  if (beforeGame.updatedAt != null && beforeGame.updatedAt !== '') {
+    return sameSaveToken(cur, beforeGame.updatedAt);
+  }
+  return String(cur.roundName || '') === String(beforeGame.roundName || '') &&
+    String(cur.courseId || '') === String(beforeGame.courseId || '') &&
+    String(cur.front9Course || '') === String(beforeGame.front9Course || '');
+}
+
+function restoreProjectionSnapshot(job) {
+  const j = job || {};
+  if (j.matchSnap) teamMatchStore.saveMatch(j.matchSnap);
+  restoreWx(SIDE_SETTINGS_KEY, j.sideGameSettingsSnap);
+  restoreWx(SIDE_GAMES_KEY, j.sideGameRowsSnap);
+  if (j.restoreTournamentMeta) {
+    if (j.holeParsSnap && groupsStore.setHolePars) groupsStore.setHolePars(j.holeParsSnap);
+    if (j.tournamentMetaSnap && groupsStore.setTournamentCourseHalf) {
+      groupsStore.setTournamentCourseHalf(j.tournamentMetaSnap);
+    }
+  }
+  restoreSideEffects(j.matchStateSnap, j.layoutSnap);
+}
+
+function reconcileProjectionsFromGame(game, msHint) {
+  if (!game || !game.gameId) return false;
+  let gi = 0;
+  if (msHint && String(msHint.gameId) === String(game.gameId) && msHint.groupIndex != null) {
+    gi = Number(msHint.groupIndex) || 0;
+  }
+  matchState.setMatchState(matchState.buildFromGame(game, gi));
+  const layout = holeLayout.resolveLayoutFromContext({
+    gameId: game.gameId,
+    courseId: game.courseId,
+    courseName: game.courseName,
+    courseHalfText: game.courseHalfText,
+    front9Course: game.front9Course,
+    back9Course: game.back9Course
+  });
+  holeLayout.applyLayout(layout);
+  return true;
+}
+
+/**
+ * 创建/编辑比赛半场事务的唯一回滚入口。
+ * restore：仅当存储仍是本次写入版本时恢复 beforeGame + 事务前投影。
+ * delete：仅删除本次仍持有所有权的 gameId。
+ * conflict：发现后续更新时不写回旧比赛、不恢复旧投影，按最新 game 重建 matchState/layout。
+ */
+function runGameSaveRollback(job) {
+  const j = job || {};
+  const policy = j.policy;
+  const gameId = j.gameId || (j.beforeGame && j.beforeGame.gameId) || '';
+  try {
+    const cur = gameId ? gameStore.getGame(gameId) : null;
+    if (policy === 'delete') {
+      if (!cur) {
+        restoreProjectionSnapshot(j);
+        return { ok: true, outcome: 'rolledBack' };
+      }
+      if (!sameSaveToken(cur, j.expectedUpdatedAt)) {
+        try {
+          reconcileProjectionsFromGame(cur, j.matchStateSnap);
+        } catch (e) {}
+        return { ok: true, outcome: 'conflict' };
+      }
+      gameStore.removeGame(gameId);
+      restoreProjectionSnapshot(j);
+      return { ok: true, outcome: 'rolledBack' };
+    }
+    if (policy === 'restore' && j.beforeGame) {
+      if (alreadyRestored(cur, j.beforeGame)) {
+        return { ok: true, outcome: 'rolledBack' };
+      }
+      if (cur && String(cur.gameId) === String(j.beforeGame.gameId) && sameSaveToken(cur, j.expectedUpdatedAt)) {
+        gameStore.saveGame(cloneJson(j.beforeGame));
+        restoreProjectionSnapshot(j);
+        return { ok: true, outcome: 'rolledBack' };
+      }
+      if (cur) {
+        try {
+          reconcileProjectionsFromGame(cur, j.matchStateSnap);
+        } catch (e) {}
+        return { ok: true, outcome: 'conflict' };
+      }
+      restoreProjectionSnapshot(j);
+      return { ok: true, outcome: 'conflict' };
+    }
+    if (j.legacyGameSnap) gameStore.saveGame(j.legacyGameSnap);
+    restoreProjectionSnapshot(j);
+    return { ok: true, outcome: 'rolledBack' };
+  } catch (err) {
+    return {
+      ok: false,
+      outcome: 'rollbackFailed',
+      error: (err && err.message) || '回滚失败'
+    };
+  }
+}
+
 /**
  * 确认修改半场：更新 game / 球队赛 / 赛事 meta / matchState + 全局 holeLayout
  * 不触碰 scores / putts 数组
@@ -178,11 +350,18 @@ function apply(ctx, front9, back9) {
   };
 
   const gameSnap =
-    (ctx && ctx.rollbackGame) || (ctx && ctx.gameId ? gameStore.getGame(ctx.gameId) : null);
+    (ctx && ctx.rollbackGame) || (ctx && ctx.gameId ? cloneJson(gameStore.getGame(ctx.gameId)) : null);
   const matchSnap =
-    (ctx && ctx.rollbackMatch) || (ctx && ctx.matchId ? teamMatchStore.getMatchById(ctx.matchId) : null);
-  const msSnap = readMatchState();
-  const layoutSnap = holeLayout.getLayout && holeLayout.getLayout();
+    (ctx && ctx.rollbackMatch) || (ctx && ctx.matchId ? cloneJson(teamMatchStore.getMatchById(ctx.matchId)) : null);
+  const msSnap = cloneJson(readMatchState());
+  const layoutSnap = holeLayout.getLayout ? cloneLayout(holeLayout.getLayout()) : null;
+  const sideGameSettingsSnap = snapshotWx(SIDE_SETTINGS_KEY);
+  const sideGameRowsSnap = snapshotWx(SIDE_GAMES_KEY);
+  const holeParsSnap = groupsStore.getHolePars ? groupsStore.getHolePars() : null;
+  const tournamentMetaSnap = groupsStore.getTournamentCourseMeta
+    ? groupsStore.getTournamentCourseMeta()
+    : null;
+  const gameRollback = ctx && ctx.gameRollback;
 
   const needsRebuild = matchHoleOrderRebuild.needsHoleOrderRebuild(beforeCtx, afterFields);
   const matchId = matchHoleOrderRebuild.resolveMatchId({
@@ -190,122 +369,155 @@ function apply(ctx, front9, back9) {
     gameId: (ctx && ctx.gameId) || (msSnap && msSnap.gameId) || ''
   });
 
+  function buildRollbackJob() {
+    const job = {
+      matchStateSnap: msSnap,
+      layoutSnap: layoutSnap,
+      matchSnap: matchSnap,
+      sideGameSettingsSnap: sideGameSettingsSnap,
+      sideGameRowsSnap: sideGameRowsSnap,
+      holeParsSnap: holeParsSnap,
+      tournamentMetaSnap: tournamentMetaSnap,
+      restoreTournamentMeta: !!(
+        ctx &&
+        !ctx.matchId &&
+        (ctx.mode === 'individual_stroke' || ctx.source === 'tournament')
+      )
+    };
+    if (gameRollback && (gameRollback.policy === 'restore' || gameRollback.policy === 'delete')) {
+      job.policy = gameRollback.policy;
+      job.gameId = gameRollback.gameId || (ctx && ctx.gameId) || '';
+      job.beforeGame = gameRollback.beforeGame;
+      job.expectedUpdatedAt = gameRollback.expectedUpdatedAt;
+    } else {
+      job.legacyGameSnap = gameSnap;
+    }
+    return job;
+  }
+
   function rollback() {
-    if (gameSnap) gameStore.saveGame(gameSnap);
-    if (matchSnap) teamMatchStore.saveMatch(matchSnap);
-    if (msSnap) matchState.setMatchState(msSnap);
-    if (layoutSnap) holeLayout.applyLayout(layoutSnap);
+    return runGameSaveRollback(buildRollbackJob());
   }
 
-  if (ctx.gameId) {
-    const game = gameStore.getGame(ctx.gameId);
-    if (game) {
-      gameStore.saveGame(
-        Object.assign({}, game, {
-          front9Course: front9 || null,
-          back9Course: back9 || null,
-          courseHalfText: courseHalfText,
-          courseId: afterFields.courseId || game.courseId,
-          courseName: afterFields.courseName || game.courseName
-        })
-      );
-    }
+  function failResult(message, extra) {
+    const msg = message || '保存失败';
+    return Object.assign({ ok: false, error: msg, message: msg }, extra || {});
   }
 
-  if (ctx.matchId) {
-    const match = teamMatchStore.getMatchById(ctx.matchId);
-    if (match) {
-      var halfGuard = teamMatchFinish.assertWritable(match);
-      if (!halfGuard.ok) {
-        return { ok: false, message: halfGuard.message };
-      }
-      teamMatchStore.saveMatch(
-        Object.assign({}, match, {
-          front9Course: front9 || null,
-          back9Course: back9 || null,
-          courseHalfText: courseHalfText,
-          courseId: afterFields.courseId || match.courseId,
-          courseName: afterFields.courseName || match.courseName
-        })
-      );
-    }
-  } else if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
-    const meta = groupsStore.getTournamentCourseMeta();
-    groupsStore.setTournamentCourseHalf({
-      courseId: afterFields.courseId || meta.courseId,
-      courseName: afterFields.courseName || meta.courseName,
-      courseLocation: meta.courseLocation,
-      front9Course: front9 || null,
-      back9Course: back9 || null,
-      courseHalfText: courseHalfText
-    });
-  }
-
-  const ms = readMatchState();
-  if (ms) {
-    const c = Object.assign({}, ms.course || {}, {
-      halfText: courseHalfText,
-      front9Course: front9 || null,
-      back9Course: back9 || null
-    });
+  try {
     if (ctx.gameId) {
       const game = gameStore.getGame(ctx.gameId);
       if (game) {
-        c.courseId = game.courseId || c.courseId;
-        c.courseName = game.courseName || c.courseName;
-        c.courseLocation = game.courseLocation || c.courseLocation;
+        gameStore.saveGame(
+          Object.assign({}, game, {
+            front9Course: front9 || null,
+            back9Course: back9 || null,
+            courseHalfText: courseHalfText,
+            courseId: afterFields.courseId || game.courseId,
+            courseName: afterFields.courseName || game.courseName
+          })
+        );
       }
     }
+
     if (ctx.matchId) {
       const match = teamMatchStore.getMatchById(ctx.matchId);
       if (match) {
-        c.courseId = match.courseId || c.courseId;
-        c.courseName = match.courseName || c.courseName;
-        c.courseLocation = match.courseLocation || c.courseLocation;
+        var halfGuard = teamMatchFinish.assertWritable(match);
+        if (!halfGuard.ok) {
+          const rb = rollback();
+          return failResult(halfGuard.message, { rollback: rb && rb.outcome });
+        }
+        teamMatchStore.saveMatch(
+          Object.assign({}, match, {
+            front9Course: front9 || null,
+            back9Course: back9 || null,
+            courseHalfText: courseHalfText,
+            courseId: afterFields.courseId || match.courseId,
+            courseName: afterFields.courseName || match.courseName
+          })
+        );
+      }
+    } else if (ctx.mode === 'individual_stroke' || ctx.source === 'tournament') {
+      const meta = groupsStore.getTournamentCourseMeta();
+      groupsStore.setTournamentCourseHalf({
+        courseId: afterFields.courseId || meta.courseId,
+        courseName: afterFields.courseName || meta.courseName,
+        courseLocation: meta.courseLocation,
+        front9Course: front9 || null,
+        back9Course: back9 || null,
+        courseHalfText: courseHalfText
+      });
+    }
+
+    let holeOrderSync = { ok: true, rebuilt: false, skipped: true };
+    if (needsRebuild && matchId) {
+      holeOrderSync = matchHoleOrderRebuild.syncAfterCourseHalfChange({
+        matchId: matchId,
+        before: beforeCtx,
+        after: afterFields,
+        createdHoleOrder: matchHoleOrderRebuild.buildHoleLabelsFromHalves(front9, back9)
+      });
+      if (!holeOrderSync.ok) {
+        const rb = rollback();
+        return failResult(holeOrderSync.message || '洞序同步失败', {
+          rollback: rb && rb.outcome,
+          holeOrderSync: holeOrderSync
+        });
       }
     }
-    matchState.setMatchState(Object.assign({}, ms, { course: c }));
-  }
 
-  const layoutCtx = Object.assign({}, ctx, {
-    courseId: afterFields.courseId,
-    courseName: afterFields.courseName,
-    front9Course: front9 || null,
-    back9Course: back9 || null
-  });
-  const layout = holeLayout.resolveLayoutFromContext(layoutCtx);
-  holeLayout.applyLayout(layout);
-  if (!ctx.matchId && (ctx.mode === 'individual_stroke' || ctx.source === 'tournament')) {
-    groupsStore.setHolePars(layout.holePars);
-  }
-
-  let holeOrderSync = { ok: true, rebuilt: false, skipped: true };
-  if (needsRebuild && matchId) {
-    holeOrderSync = matchHoleOrderRebuild.syncAfterCourseHalfChange({
-      matchId: matchId,
-      before: beforeCtx,
-      after: afterFields,
-      createdHoleOrder: matchHoleOrderRebuild.buildHoleLabelsFromHalves(front9, back9)
-    });
-    if (!holeOrderSync.ok) {
-      rollback();
-      return {
-        ok: false,
-        message: holeOrderSync.message || '洞序同步失败',
-        holeOrderSync: holeOrderSync
-      };
+    const ms = readMatchState();
+    if (ms) {
+      const c = Object.assign({}, ms.course || {}, {
+        halfText: courseHalfText,
+        front9Course: front9 || null,
+        back9Course: back9 || null
+      });
+      if (ctx.gameId) {
+        const game = gameStore.getGame(ctx.gameId);
+        if (game) {
+          c.courseId = game.courseId || c.courseId;
+          c.courseName = game.courseName || c.courseName;
+          c.courseLocation = game.courseLocation || c.courseLocation;
+        }
+      }
+      if (ctx.matchId) {
+        const match = teamMatchStore.getMatchById(ctx.matchId);
+        if (match) {
+          c.courseId = match.courseId || c.courseId;
+          c.courseName = match.courseName || c.courseName;
+          c.courseLocation = match.courseLocation || c.courseLocation;
+        }
+      }
+      matchState.setMatchState(Object.assign({}, ms, { course: c }));
     }
-  }
 
-  return {
-    ok: true,
-    combo: combo,
-    courseHalfText: courseHalfText,
-    layout: layout,
-    holeOrderSync: holeOrderSync,
-    beforeCourse: snapshotCourseFields(beforeCtx),
-    afterCourse: afterFields
-  };
+    const layoutCtx = Object.assign({}, ctx, {
+      courseId: afterFields.courseId,
+      courseName: afterFields.courseName,
+      front9Course: front9 || null,
+      back9Course: back9 || null
+    });
+    const layout = holeLayout.resolveLayoutFromContext(layoutCtx);
+    holeLayout.applyLayout(layout);
+    if (!ctx.matchId && (ctx.mode === 'individual_stroke' || ctx.source === 'tournament')) {
+      groupsStore.setHolePars(layout.holePars);
+    }
+
+    return {
+      ok: true,
+      combo: combo,
+      courseHalfText: courseHalfText,
+      layout: layout,
+      holeOrderSync: holeOrderSync,
+      beforeCourse: snapshotCourseFields(beforeCtx),
+      afterCourse: afterFields
+    };
+  } catch (err) {
+    const rb = rollback();
+    return failResult((err && err.message) || '保存失败', { rollback: rb && rb.outcome });
+  }
 }
 
 module.exports = {
@@ -313,5 +525,8 @@ module.exports = {
   prepareSheet,
   apply,
   readMatchState,
-  resolveTeamMatchHalves
+  resolveTeamMatchHalves,
+  runGameSaveRollback,
+  nextSaveToken,
+  CONFLICT_MESSAGE
 };

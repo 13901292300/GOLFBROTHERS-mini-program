@@ -201,6 +201,7 @@ Page({
   },
 
   onLoad(options) {
+    this._submitBlockedReason = '';
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     this._editReturnTo = (options && options.returnTo) || 'hub';
@@ -1298,6 +1299,7 @@ Page({
   },
 
   _finishSubmitFlow() {
+    if (this._guardSubmitBlocked()) return;
     const err = this._validateBeforeSubmit();
     if (err) {
       wx.showToast({ title: err, icon: 'none' });
@@ -1311,6 +1313,7 @@ Page({
   },
 
   onStart() {
+    if (this._guardSubmitBlocked()) return;
     const snapshot = this.data.isEditMode ? this._buildMergedFormSnapshot() : this._buildFormSnapshot();
 
     // 先走「门禁校验」：跳过半场与组合完整性，以便赛制变更时优先进入组合分配
@@ -1336,7 +1339,54 @@ Page({
     this._finishSubmitFlow();
   },
 
+  _guardSubmitBlocked() {
+    const reason = this._submitBlockedReason;
+    if (!reason) return false;
+    if (reason === 'conflict') {
+      wx.showToast({
+        title: halfCourseEdit.CONFLICT_MESSAGE || '比赛数据已更新，请重新进入后再试',
+        icon: 'none'
+      });
+      return true;
+    }
+    wx.showToast({
+      title: this.data.isEditMode
+        ? '保存未能完成，请重新进入页面后再试'
+        : '创建未能完成，请重新进入页面后再试',
+      icon: 'none'
+    });
+    return true;
+  },
+
+  _lockSubmitAfterHalfFail(reason) {
+    this._submitBlockedReason = reason || '';
+  },
+
+  _toastHalfCourseFail(halfResult, mode) {
+    const rb = halfResult && halfResult.rollback;
+    if (rb === 'conflict') {
+      this._lockSubmitAfterHalfFail('conflict');
+      wx.showToast({ title: halfCourseEdit.CONFLICT_MESSAGE || '比赛数据已更新，请重新进入后再试', icon: 'none' });
+      return;
+    }
+    if (rb === 'rollbackFailed') {
+      this._lockSubmitAfterHalfFail('rollbackFailed');
+      wx.showToast({
+        title: mode === 'create' ? '创建未能完成，请重新进入页面后再试' : '保存未能完成，请重新进入页面后再试',
+        icon: 'none'
+      });
+      return;
+    }
+    wx.showToast({
+      title:
+        (halfResult && (halfResult.error || halfResult.message)) ||
+        (mode === 'create' ? '创建失败' : '保存失败'),
+      icon: 'none'
+    });
+  },
+
   _doUpdate() {
+    if (this._guardSubmitBlocked()) return;
     const err = this._validateBeforeSubmit();
     if (err) {
       wx.showToast({ title: err, icon: 'none' });
@@ -1352,6 +1402,9 @@ Page({
     const updated = gameEdit.buildUpdatedGame(existing, form, {
       resolveRoundName: () => this._resolveRoundName()
     });
+    const beforeGame = JSON.parse(JSON.stringify(existing));
+    const saveToken = halfCourseEdit.nextSaveToken(existing.updatedAt);
+    updated.updatedAt = saveToken;
     gameStore.saveGame(updated);
 
     const savedGame = gameStore.getGameById(gameId);
@@ -1361,18 +1414,35 @@ Page({
       groups: savedGame ? gameStore.listGroups(savedGame) : []
     });
 
-    halfCourseEdit.apply(
+    const halfResult = halfCourseEdit.apply(
       {
         gameId: gameId,
         mode: 'game',
         courseId: updated.courseId,
         courseName: updated.courseName,
         front9Course: updated.front9Course,
-        back9Course: updated.back9Course
+        back9Course: updated.back9Course,
+        beforeCourse: {
+          courseId: existing.courseId,
+          courseName: existing.courseName,
+          front9Course: existing.front9Course,
+          back9Course: existing.back9Course,
+          courseHalfText: existing.courseHalfText
+        },
+        gameRollback: {
+          policy: 'restore',
+          gameId: gameId,
+          beforeGame: beforeGame,
+          expectedUpdatedAt: saveToken
+        }
       },
       updated.front9Course,
       updated.back9Course
     );
+    if (halfResult && halfResult.ok === false) {
+      this._toastHalfCourseFail(halfResult, 'save');
+      return;
+    }
 
     const ms = matchStateUtil.getMatchState();
     const gi = ms && ms.groupIndex != null ? Number(ms.groupIndex) || 0 : 0;
@@ -1395,6 +1465,7 @@ Page({
   },
 
   _doStart() {
+    if (this._guardSubmitBlocked()) return;
     const err = this._validateBeforeSubmit();
     if (err) {
       wx.showToast({ title: err, icon: 'none' });
@@ -1500,6 +1571,7 @@ Page({
     );
     game.front9Course = halfResolved.front9Course;
     game.back9Course = halfResolved.back9Course;
+    game.updatedAt = halfCourseEdit.nextSaveToken(0);
     gameStore.saveGame(game);
 
     const halfResult = halfCourseEdit.apply(
@@ -1511,14 +1583,18 @@ Page({
         front9Course: game.front9Course,
         back9Course: game.back9Course,
         beforeCourse: beforeCourse,
-        rollbackGame: game
+        gameRollback: {
+          policy: 'delete',
+          gameId: gameId,
+          expectedUpdatedAt: game.updatedAt
+        }
       },
       game.front9Course,
       game.back9Course
     );
     if (halfResult && halfResult.ok === false) {
       this._startNavLock = false;
-      wx.showToast({ title: halfResult.message || '创建失败', icon: 'none' });
+      this._toastHalfCourseFail(halfResult, 'create');
       return;
     }
 
