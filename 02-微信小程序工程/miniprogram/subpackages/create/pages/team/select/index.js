@@ -1,5 +1,6 @@
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const teamDirectory = require('../../../../../utils/teamDirectory.js');
+const teamClub = require('../../../../../utils/teamClub/service.js');
 const mockAvatars = require('../../../../../utils/mockAvatars.js');
 const {
   TEAM_SELECT_MODES,
@@ -705,7 +706,7 @@ Page({
       ? teamDirectory.normalizeShortName(this.data.createForm.shortName)
       : '';
 
-    const team = teamDirectory.addCreatedTeam({
+    const payload = {
       id: Date.now(),
       name: name,
       shortName: shortName,
@@ -715,43 +716,65 @@ Page({
       desc: this.data.createForm.desc,
       organizationType: organizationType,
       isMine: true
-    });
+    };
 
-    if (!team) return;
-
-    if (this.data.isParticipantMode) {
+    const finish = (team) => {
+      if (!team) return;
+      if (this.data.isParticipantMode) {
+        this.setData(
+          {
+            mode: 'list',
+            searchQuery: '',
+            createForm: { logo: '', name: '', shortName: '', slogan: '', desc: '' },
+            createNameCount: 0,
+            createShortNameCount: 0,
+            createSloganCount: 0,
+            createDescCount: 0
+          },
+          () => {
+            this.refreshTeams();
+            this._toggleParticipant(String(team.id));
+          }
+        );
+        return;
+      }
       this.setData(
         {
           mode: 'list',
           searchQuery: '',
+          selectedId: team.id,
+          selectedTeamId: team.id,
           createForm: { logo: '', name: '', shortName: '', slogan: '', desc: '' },
           createNameCount: 0,
           createShortNameCount: 0,
           createSloganCount: 0,
           createDescCount: 0
         },
-        () => {
-          this.refreshTeams();
-          this._toggleParticipant(String(team.id));
-        }
+        () => this.refreshTeams()
       );
+    };
+
+    if (organizationType === teamDirectory.ORGANIZATION_TYPES.TEAM) {
+      teamClub
+        .createTeam({
+          name: name,
+          shortName: shortName,
+          logo: payload.logo,
+          intro: payload.desc,
+          city: ''
+        })
+        .then((res) => {
+          if (!res || !res.ok || !res.team) {
+            wx.showToast({ title: (res && res.message) || '创建失败', icon: 'none' });
+            return;
+          }
+          finish(res.team);
+        });
       return;
     }
 
-    this.setData(
-      {
-        mode: 'list',
-        searchQuery: '',
-        selectedId: team.id,
-        selectedTeamId: team.id,
-        createForm: { logo: '', name: '', shortName: '', slogan: '', desc: '' },
-        createNameCount: 0,
-        createShortNameCount: 0,
-        createSloganCount: 0,
-        createDescCount: 0
-      },
-      () => this.refreshTeams()
-    );
+    const team = teamDirectory.addCreatedTeam(payload);
+    finish(team);
   },
 
   onConfirm() {

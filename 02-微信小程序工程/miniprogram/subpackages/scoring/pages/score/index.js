@@ -5147,6 +5147,14 @@ Page({
   // 只读取全局主题并渲染，本页不允许修改主题
   onShow() {
     this.applyTheme(getApp().getTheme());
+    try {
+      const scoreSync = require('../../../../utils/teamClub/scoreSync.js');
+      const ms = this._matchState || (this._readMatchState && this._readMatchState());
+      const matchId = (ms && ms.matchId) || this.data.gameId || '';
+      if (matchId) scoreSync.notifyConflictsOnPage(matchId);
+    } catch (eConflictUi) {
+      /* ignore */
+    }
     this._syncFontScale();
     const remarkRev = playerDisplayName.getRemarkRevision();
     const remarkChanged =

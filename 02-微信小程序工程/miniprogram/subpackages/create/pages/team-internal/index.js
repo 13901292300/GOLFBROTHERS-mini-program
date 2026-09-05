@@ -8,6 +8,8 @@ const {
   createDefaultEventInfoList
 } = require('../../../../utils/eventInfoDefaults.js');
 const matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
+const teamClubRepo = require('../../../../utils/teamClub/access.js');
+const teamClub = require('../../../../utils/teamClub/service.js');
 
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -175,6 +177,7 @@ Page({
     submitButtonText: '创建并开启报名',
     isEditMode: false,
     editMatchId: '',
+    pendingMatchId: '',
 
     teamId: '',
     teamName: EMPTY_TEAM_LABEL,
@@ -298,13 +301,98 @@ Page({
     this._activeTimeTarget = 'tee';
     this._freeModeTeamGroups = this._cloneTeamGroups(this.data.teamGroups);
     this.setData(this._buildEventInfoSortMeta(this.data.eventInfoList));
+    this._prefillTeamFromQuery(options);
+  },
+
+  /**
+   * 从「我的球队」发起比赛时预填主办球队。
+   * 只复用 _applySelectedTeam，不改变创建/提交业务。
+   */
+  _prefillTeamFromQuery(options) {
+    const raw = options && options.teamId != null ? String(options.teamId).trim() : '';
+    if (!raw) return;
+    let teamId = raw;
+    try {
+      teamId = decodeURIComponent(raw);
+    } catch (e) {
+      teamId = raw;
+    }
+    const club = teamClubRepo.peekTeam(teamId);
+    if (club && !club._stale && club.organizationType !== 'event_org') {
+      this._applySelectedTeam({
+        teamId: club.id,
+        teamName: club.name,
+        teamLogo: club.logo,
+        teamRole: club.role
+      });
+    }
+    teamClub.getTeamDetail(teamId).then((res) => {
+      if (!res || !res.ok || !res.team) {
+        if (res && (res.code === 'team_dissolved' || res.reason === 'team_dissolved')) {
+          wx.showToast({ title: '球队已解散，无法创建比赛', icon: 'none' });
+        }
+        return;
+      }
+      this._applySelectedTeam({
+        teamId: res.team.id,
+        teamName: res.team.fullName || res.team.name,
+        teamLogo: res.team.logo,
+        teamRole: res.team.currentUserRole
+      });
+    });
+  },
+
+  _publishTeamMatchIndex(match, status, done) {
+    const cb = typeof done === 'function' ? done : function () {};
+    if (!match || !match.teamId || !match.matchId) {
+      cb({ ok: false, code: 'invalid_args' });
+      return;
+    }
+    const matchSync = require('../../../../utils/teamClub/matchSync.js');
+    const factory = require('../../../../utils/teamClub/repoFactory.js');
+    const writeKind = this.data.isEditMode || match.cloudVersion != null ? 'full' : '';
+    teamClub.putMatch(match, {
+      operationId: this.data.isEditMode ? String(match.matchId) + ':v' + String(match.cloudVersion || 0) : match.matchId,
+      expectedVersion: this.data.isEditMode ? match.cloudVersion : undefined,
+      writeKind: writeKind
+    }).then((res) => {
+      if (res && res.ok) {
+        cb(res);
+        return;
+      }
+      if (factory.getMode() === 'cloud') {
+        matchSync.enqueue({
+          teamId: match.teamId,
+          matchId: match.matchId,
+          match: match,
+          operationId: match.matchId,
+          expectedVersion: match.cloudVersion,
+          writeKind: writeKind
+        });
+      }
+      cb(res || { ok: false });
+    }).catch(() => {
+      matchSync.enqueue({
+        teamId: match.teamId,
+        matchId: match.matchId,
+        match: match,
+        operationId: match.matchId
+      });
+      cb({ ok: false, code: 'network_error' });
+    });
   },
 
   _initEditMode(matchId) {
     const match = teamMatchStore.getMatchById(matchId);
     if (!match) {
-      wx.showToast({ title: '未找到比赛信息', icon: 'none' });
-      setTimeout(() => this.onBack(), 600);
+      teamClub.getMatch(matchId).then((res) => {
+        if (res && res.ok && res.match) {
+          this._initEditMode(matchId);
+          return;
+        }
+        wx.showToast({ title: (res && res.message) || '未找到比赛信息', icon: 'none' });
+        setTimeout(() => this.onBack(), 600);
+      });
       return;
     }
     const form = teamMatchStore.hydrateCreatePageFromMatch(match);
@@ -1681,23 +1769,40 @@ Page({
       return;
     }
 
-    const match = teamMatchStore.buildMatchFromCreatePage(this.data);
-    teamMatchStore.saveMatch(match);
-
-    wx.showModal({
-      title: '提示',
-      content: '创建比赛成功，请到赛事菜单查看',
-      showCancel: false,
-      confirmText: '确认',
-      success: (res) => {
-        if (!res.confirm) return;
-        wx.redirectTo({
-          url: '/pages/home/index?section=tournament',
-          fail: () => {
-            wx.reLaunch({ url: '/pages/home/index?section=tournament' });
-          }
+    let pendingId = String(this.data.pendingMatchId || this.data.matchId || '').trim();
+    if (!pendingId) pendingId = 'team-match-' + Date.now();
+    this.setData({ pendingMatchId: pendingId, matchId: pendingId });
+    const match = teamMatchStore.buildMatchFromCreatePage(
+      Object.assign({}, this.data, { pendingMatchId: pendingId, matchId: pendingId })
+    );
+    const factory = require('../../../../utils/teamClub/repoFactory.js');
+    this._publishTeamMatchIndex(match, 'scheduled', (pub) => {
+      if (!pub || !pub.ok) {
+        wx.showModal({
+          title: '创建未成功',
+          content: factory.getMode() === 'cloud'
+            ? '云端尚未确认本场比赛，表单已保留。请保持网络畅通后重试；在云端成功前不会视为正式创建。'
+            : '比赛保存失败，表单已保留。',
+          showCancel: false
         });
+        return;
       }
+      teamMatchStore.saveMatch(pub.match || match, { cacheOnly: true });
+      wx.showModal({
+        title: '提示',
+        content: '创建比赛成功，请到赛事菜单查看',
+        showCancel: false,
+        confirmText: '确认',
+        success: (res) => {
+          if (!res.confirm) return;
+          wx.redirectTo({
+            url: '/pages/home/index?section=tournament',
+            fail: () => {
+              wx.reLaunch({ url: '/pages/home/index?section=tournament' });
+            }
+          });
+        }
+      });
     });
   },
 
@@ -1776,31 +1881,39 @@ Page({
       updated.registerInfo = migratedRegisterInfo;
     }
 
-    teamMatchStore.saveMatch(updated);
-    const holeSync = require('../../../../utils/matchHoleOrderRebuild.js').syncAfterCourseHalfChange({
-      matchId: updated.matchId,
-      before: existing,
-      after: updated
-    });
-    if (!holeSync.ok) {
-      teamMatchStore.saveMatch(existing);
-      wx.showToast({ title: holeSync.message || '保存失败', icon: 'none' });
-      return;
-    }
-    // 改期等基础信息变更后，同步已有报名用户的 team_match 日程 date/content
-    this.syncTeamMatchSchedules(updated);
-    // 落盘成功后同步「原始赛制」，供下次校验失败回滚
-    this._originalGameMode = updated.gameMode || this.data.gameMode || this._originalGameMode;
-    wx.showToast({ title: '已保存修改', icon: 'success' });
-    setTimeout(() => {
-      if (getCurrentPages().length > 1) {
-        wx.navigateBack({ delta: 1 });
-      } else {
-        wx.redirectTo({
-          url: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
+    this._publishTeamMatchIndex(updated, updated.status || 'scheduled', (pub) => {
+      if (!pub || !pub.ok) {
+        wx.showModal({
+          title: '保存未同步到云端',
+          content: '本机修改未写入云端正文。请检查网络后重试，避免其他设备仍看到旧版本。',
+          showCancel: false
         });
+        return;
       }
-    }, 400);
+      teamMatchStore.saveMatch(pub.match || updated, { cacheOnly: true });
+      const holeSync = require('../../../../utils/matchHoleOrderRebuild.js').syncAfterCourseHalfChange({
+        matchId: updated.matchId,
+        before: existing,
+        after: updated
+      });
+      if (!holeSync.ok) {
+        teamMatchStore.saveMatch(existing);
+        wx.showToast({ title: holeSync.message || '保存失败', icon: 'none' });
+        return;
+      }
+      this.syncTeamMatchSchedules(updated);
+      this._originalGameMode = updated.gameMode || this.data.gameMode || this._originalGameMode;
+      wx.showToast({ title: '已保存修改', icon: 'success' });
+      setTimeout(() => {
+        if (getCurrentPages().length > 1) {
+          wx.navigateBack({ delta: 1 });
+        } else {
+          wx.redirectTo({
+            url: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
+          });
+        }
+      }, 400);
+    });
   },
 
   /**

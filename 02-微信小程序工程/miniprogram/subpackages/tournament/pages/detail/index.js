@@ -1832,8 +1832,49 @@ Page({
     return null;
   },
 
+  _pullCloudMatch(matchId, onDone) {
+    const cb = typeof onDone === 'function' ? onDone : function () {};
+    let factory;
+    try {
+      factory = require('../../../../utils/teamClub/repoFactory.js');
+    } catch (e) {
+      cb(null);
+      return;
+    }
+    if (factory.getMode() !== 'cloud') {
+      cb(null);
+      return;
+    }
+    const teamClub = require('../../../../utils/teamClub/service.js');
+    teamClub.getMatch(matchId).then((res) => {
+      if (res && res.ok && res.match) {
+        cb(res.match);
+        return;
+      }
+      cb(null, res);
+    }).catch(() => cb(null, { code: 'network_error' }));
+  },
+
   loadMatch(matchId) {
     const match = this._resolveMatchData(matchId);
+    if (!match) {
+      this._pullCloudMatch(matchId, (cloud, err) => {
+        if (this._resolveMatchData(matchId)) {
+          this.loadMatch(matchId);
+          return;
+        }
+        wx.showToast({
+          title: (err && err.message) || '无法打开比赛',
+          icon: 'none'
+        });
+      });
+      return;
+    }
+    if (!this._skipCloudPull) {
+      this._pullCloudMatch(matchId, (cloud) => {
+        if (cloud && this.data.matchId === matchId) this.refreshMatchData(matchId);
+      });
+    }
     this._syncTournamentHoleLayout(match);
     const lifecycle = this._getMatchLifecycle(match);
     const tabs = resolveTournamentTabs(lifecycle.status, match);
@@ -1904,6 +1945,16 @@ Page({
   },
 
   refreshMatchData(matchId) {
+    if (!this._skipCloudPull) {
+      this._pullCloudMatch(matchId, (cloud, err) => {
+        this._skipCloudPull = true;
+        if (cloud) this.refreshMatchData(matchId);
+        else if (!this._resolveMatchData(matchId)) {
+          wx.showToast({ title: (err && err.message) || '无法打开比赛', icon: 'none' });
+        }
+        this._skipCloudPull = false;
+      });
+    }
     const match = this._resolveMatchData(matchId);
     if (!match) return;
     this._syncTournamentHoleLayout(match);

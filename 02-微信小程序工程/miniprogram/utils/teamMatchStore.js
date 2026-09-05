@@ -5,9 +5,22 @@
 const STORAGE_KEY = 'gb_team_matches_v1';
 const clubDateFormat = require('./clubDateFormat.js');
 
+function cacheKey() {
+  try {
+    var factory = require('./teamClub/repoFactory.js');
+    if (factory.getMode() === 'cloud') {
+      var uid = require('./teamClub/identity.js').currentUserIdOrEmpty() || '_anon';
+      return STORAGE_KEY + '__' + uid;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return STORAGE_KEY;
+}
+
 function _readAll() {
   try {
-    const list = wx.getStorageSync(STORAGE_KEY);
+    const list = wx.getStorageSync(cacheKey());
     return Array.isArray(list) ? list : [];
   } catch (e) {
     return [];
@@ -16,7 +29,17 @@ function _readAll() {
 
 function _writeAll(list) {
   try {
-    wx.setStorageSync(STORAGE_KEY, list || []);
+    wx.setStorageSync(cacheKey(), list || []);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function clearUserMatchCache(userId) {
+  try {
+    const uid = String(userId || '').trim();
+    if (uid) wx.removeStorageSync(STORAGE_KEY + '__' + uid);
+    wx.removeStorageSync(STORAGE_KEY + '__' + '_anon');
   } catch (e) {
     /* ignore */
   }
@@ -559,7 +582,7 @@ function buildMatchFromCreatePage(pageData) {
   const gameStore = require('./gameStore.js');
   const creator = gameStore.getCurrentUser();
   const creatorId = data.createdBy || data.creatorId || (creator && creator.userId) || '';
-  const matchId = 'team-match-' + Date.now();
+  const matchId = String(data.matchId || data.pendingMatchId || '').trim() || ('team-match-' + Date.now());
   const matchType = data.matchType || 'team-internal';
   const organizer = resolveOrganizerSnapshot(data, matchType);
   return {
@@ -1572,7 +1595,7 @@ function hydrateCreatePageFromMatch(match) {
   };
 }
 
-function saveMatch(match) {
+function saveMatch(match, options) {
   if (!match || !match.matchId) return null;
   var seriesGuard = require('./seriesFinishLock.js').assertWritableForMatch(match);
   if (seriesGuard && !seriesGuard.ok) {
@@ -1581,9 +1604,22 @@ function saveMatch(match) {
     throw err;
   }
   match.scoreData = normalizeScoreData(match.scoreData);
+  const prev = _readAll().find((item) => item && item.matchId === match.matchId) || null;
   const list = _readAll();
   const next = [match].concat(list.filter((item) => item && item.matchId !== match.matchId));
   _writeAll(next);
+  if (options && options.cacheOnly) return match;
+  try {
+    const type = String(match.matchType || 'team-internal');
+    if (match.teamId && (!type || type === 'team-internal')) {
+      const factory = require('./teamClub/repoFactory.js');
+      if (factory.getMode() === 'cloud') {
+        require('./teamClub/scoreSync.js').enqueueFromMatchDiff(prev, match);
+      }
+    }
+  } catch (e) {
+    /* 索引补偿失败不得阻断本机缓存 */
+  }
   return match;
 }
 
@@ -1842,6 +1878,8 @@ module.exports = {
   updateMatchFromCreatePage,
   hydrateCreatePageFromMatch,
   saveMatch,
+  clearUserMatchCache,
+  STORAGE_KEY,
   saveMatchChecked,
   existsMatchId,
   listMatches,

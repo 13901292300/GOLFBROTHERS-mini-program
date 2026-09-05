@@ -197,6 +197,17 @@ function saveMatchIfWritable(match, options) {
   var guard = assertWritable(latest, opts);
   if (!guard.ok) return guard;
   try {
+    var factory = require('./teamClub/repoFactory.js');
+    if (factory.getMode() === 'cloud' && isMatchCompleted(match)) {
+      var scoreSync = require('./teamClub/scoreSync.js');
+      if (scoreSync.hasPending(match.matchId)) {
+        return { ok: false, reason: 'unsynced_scores', message: '还有未同步的成绩，暂时不能完赛' };
+      }
+    }
+  } catch (eSync) {
+    /* ignore */
+  }
+  try {
     saveMatch(match);
   } catch (e) {
     return { ok: false, reason: 'save_failed', message: '保存失败，请重试' };
