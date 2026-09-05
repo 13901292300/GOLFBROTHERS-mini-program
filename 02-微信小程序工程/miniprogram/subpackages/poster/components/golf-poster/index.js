@@ -16,7 +16,6 @@ const {
   ensureColorPresets,
   applyMarkerPreset,
   applyPalette,
-  applyLinkedColor,
   resolvePalette,
   paletteLinksActive,
   markersFollowTotal,
@@ -39,6 +38,13 @@ const {
   prepareSubjectShadow
 } = require("../../utils/poster-engine");
 const { getScoreData, applyScoreData } = require("../../utils/score-data");
+const { hasPosterMatchDate } = require("../../utils/calendar-date");
+const {
+  isCustomColorMode,
+  setCustomElementColor,
+  restorePosterColorState,
+  expandUiColorKey
+} = require("../../utils/poster-colors");
 const {
   savePosterDraft,
   loadPosterDraft,
@@ -50,14 +56,6 @@ const socialRelationStore = require("../../../../utils/socialRelationStore.js");
 const playerMomentPublishContext = require("../../../../utils/playerMomentPublishContext.js");
 
 const STEP_KEYS = ["template", "photo", "scorecard", "total", "identity", "stickers", "summary"];
-const COLOR_KEY_GROUPS = {
-  pgaUnder: ["eagleMarker", "underMarker"],
-  pgaOver: ["overMarker", "doubleBogeyMarker"]
-};
-const COLOR_KEY_SOURCES = {
-  pgaUnder: "underMarker",
-  pgaOver: "overMarker"
-};
 
 const COPY = {
   zh: {
@@ -145,6 +143,10 @@ const COPY = {
     board: "底板",
     rules: "分隔线",
     numbers: "逐洞成绩文字",
+    summaryLabel: "九洞分区标题",
+    summaryNumber: "九洞合计",
+    centerDivider: "左右九洞中缝",
+    extremeScore: "老鹰 / 双柏忌数字",
     markerColor: "成绩标记",
     pgaBirdieGroup: "老鹰 / 小鸟",
     pgaBogeyGroup: "柏忌 / 双柏忌",
@@ -188,6 +190,8 @@ const COPY = {
     nicknameReadonlyHint: "昵称来自记分卡，如需修改请返回记分页",
     course: "球场 / 赛事",
     date: "日期",
+    dateMissing: "日期待填",
+    dateRequired: "请先填写比赛日期",
     extra: "补充信息",
     textFont: "字体",
     textColor: "文字颜色",
@@ -306,6 +310,10 @@ const COPY = {
     board: "Board",
     rules: "Rules",
     numbers: "Hole score text",
+    summaryLabel: "Nine-hole labels",
+    summaryNumber: "Nine-hole totals",
+    centerDivider: "Front/back divider",
+    extremeScore: "Eagle / double numerals",
     markerColor: "Score marker",
     pgaBirdieGroup: "Eagle / birdie",
     pgaBogeyGroup: "Bogey / double",
@@ -349,6 +357,8 @@ const COPY = {
     nicknameReadonlyHint: "Name comes from the scorecard. Go back to edit it there.",
     course: "Course / event",
     date: "Date",
+    dateMissing: "DATE TBD",
+    dateRequired: "Add the match date first",
     extra: "Additional info",
     textFont: "Font",
     textColor: "Text color",
@@ -743,6 +753,7 @@ Component({
       merged.subjectPath = draft.subjectPath || saved.subjectPath || "";
       merged.subjectFileID = draft.subjectFileID || saved.subjectFileID || "";
       merged.templateId = templateId;
+      restorePosterColorState(merged);
       this.posterState = merged;
       this._applyScoreFromRound(this.properties.roundId);
 
@@ -879,6 +890,7 @@ Component({
         console.log("[golf-poster] getScoreData 返回 scoreData =", scoreData);
       }
       applyScoreData(this.posterState, scoreData);
+      this._syncDateMissingLabel();
       this.posterState.badge = "";
       const strokes = this.posterState.scoreSets && this.posterState.scoreSets.strokes;
       const identity = this.posterState.identity;
@@ -911,6 +923,14 @@ Component({
       this._rebuildColorControls(language);
       this._rebuildPaletteOptions(language);
       this._rebuildBackdropOptions(language);
+      this._syncDateMissingLabel(copy);
+    },
+
+    _syncDateMissingLabel(copyArg) {
+      const copy = copyArg || this.data.copy;
+      if (this.posterState && this.posterState.identity && this.posterState.identity.date) {
+        this.posterState.identity.date.missingLabel = (copy && copy.dateMissing) || "日期待填";
+      }
     },
 
     _gestureHint(copyArg, stepArg, largeEditArg) {
@@ -1899,8 +1919,10 @@ Component({
     selectScoringStyle(event) {
       const style = event.currentTarget.dataset.style === "dp" ? "dp" : "pga";
       this.posterState.scoringStyle = style;
-      applyMarkerPreset(this.posterState, style);
-      syncLinkedPaletteGroups(this.posterState);
+      if (!isCustomColorMode(this.posterState)) {
+        applyMarkerPreset(this.posterState, style);
+        syncLinkedPaletteGroups(this.posterState);
+      }
       this.setData({
         "form.scoringStyle": style,
         "form.cardOpacity": Number.isFinite(Number(this.posterState.style.cardOpacity))
@@ -2014,31 +2036,7 @@ Component({
     selectColor(event) {
       const styleKey = event.currentTarget.dataset.key;
       const value = event.currentTarget.dataset.value;
-      const template = TEMPLATES[this.posterState.templateId];
-      const linksOn = paletteLinksActive(this.posterState);
-      const markerLinked = linksOn
-        && template
-        && this.posterState.scoringStyle !== "dp"
-        && (markersFollowTotal(this.posterState) || template.scoreTextLinksToRelative)
-        && (styleKey === "pgaUnder" || styleKey === "pgaOver" || MARKER_STYLE_KEYS.indexOf(styleKey) >= 0);
-      const boardLinked = linksOn && template && template.boardLinksToTotal && styleKey === "card";
-      const scoreTextLinked = linksOn && template && (
-        template.scoreTextLinksToRelative || template.scoreTextLinksToTotal
-      ) && styleKey === "scoreText";
-      if (linksOn && (styleKey === "line" || styleKey === "total" || styleKey === "relativeTotalColor" || markerLinked || boardLinked || scoreTextLinked)) {
-        applyLinkedColor(this.posterState, styleKey, value);
-      } else {
-        const keys = COLOR_KEY_GROUPS[styleKey] || [styleKey];
-        const mode = this.posterState.scoringStyle === "dp" ? "dp" : "pga";
-        ensureColorPresets(this.posterState);
-        keys.forEach((key) => {
-          this.posterState.style[key] = value;
-          if (MARKER_STYLE_KEYS.indexOf(key) >= 0) {
-            this.posterState.colorPresets[mode][key] = value;
-          }
-        });
-      }
-      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
+      setCustomElementColor(this.posterState, styleKey, value);
       const patch = {};
       if (styleKey === "relativeTotalColor") patch["form.relativeTotalColor"] = value;
       this._rebuildColorControls();
@@ -2125,8 +2123,7 @@ Component({
 
     onTotalColorSelect(event) {
       const color = event.currentTarget.dataset.color;
-      applyLinkedColor(this.posterState, "total", color);
-      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
+      setCustomElementColor(this.posterState, "total", color);
       this._rebuildColorControls();
       this._rebuildPaletteOptions();
       this._render();
@@ -2159,8 +2156,7 @@ Component({
     onRelativeColorSelect(event) {
       const color = event.currentTarget.dataset.color;
       if (!this.posterState.relativeTotal) return;
-      applyLinkedColor(this.posterState, "relativeTotalColor", color);
-      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
+      setCustomElementColor(this.posterState, "relativeTotal", color);
       this.setData({ "form.relativeTotalColor": color });
       this._rebuildColorControls();
       this._rebuildPaletteOptions();
@@ -2234,8 +2230,7 @@ Component({
 
     selectTextColor(event) {
       const value = event.currentTarget.dataset.value;
-      applyLinkedColor(this.posterState, this.data.activeIdentity, value);
-      if (!paletteLinksActive(this.posterState)) this.posterState.paletteId = "custom";
+      setCustomElementColor(this.posterState, this.data.activeIdentity, value);
       this._rebuildColorControls();
       this._rebuildPaletteOptions();
       this._syncIdentityForm();
@@ -2399,6 +2394,20 @@ Component({
     async exportPoster() {
       if (this.data.saving) return;
       if (!this.posterCanvas) return;
+      const dateValue = this.posterState && this.posterState.identity && this.posterState.identity.date
+        ? this.posterState.identity.date.value
+        : "";
+      if (!hasPosterMatchDate(dateValue)) {
+        console.warn("[golf-poster] export blocked: match date missing", {
+          dateValue: dateValue,
+          roundId: this.properties.roundId
+        });
+        wx.showToast({
+          title: (this.data.copy && this.data.copy.dateRequired) || "请先填写比赛日期",
+          icon: "none"
+        });
+        return;
+      }
       this.setData({ saving: true });
       wx.showLoading({ title: this.data.copy.saving, mask: true });
       try {
@@ -3101,15 +3110,27 @@ Component({
     },
 
     _colorOptions(styleKey, language) {
-      let current;
-      if (styleKey === "total") {
-        current = String((this.posterState.total && this.posterState.total.color) || this.posterState.style.total || "#ce9224").toLowerCase();
-      } else if (styleKey === "relativeTotalColor") {
-        current = String((this.posterState.relativeTotal && this.posterState.relativeTotal.color) || this.posterState.style.relativeTotalColor || "#dc3f4d").toLowerCase();
-      } else {
-        const mapped = COLOR_KEY_SOURCES[styleKey] || styleKey;
-        const fallback = this.posterState.style.total || "#ce9224";
-        current = String(this.posterState.style[mapped] || fallback).toLowerCase();
+      const resolvedKey = expandUiColorKey(styleKey)[0];
+      const resolved = this.posterState.resolvedColors || {};
+      let current = String(resolved[resolvedKey] || "").toLowerCase();
+      if (!current) {
+        if (styleKey === "total") {
+          current = String((this.posterState.total && this.posterState.total.color) || this.posterState.style.total || "#ce9224").toLowerCase();
+        } else if (styleKey === "relativeTotalColor" || styleKey === "relativeTotal") {
+          current = String((this.posterState.relativeTotal && this.posterState.relativeTotal.color) || this.posterState.style.relativeTotalColor || "#dc3f4d").toLowerCase();
+        } else if (styleKey === "summaryLabel") {
+          current = String(this.posterState.style.summaryLabelColor || "#ffffff").toLowerCase();
+        } else if (styleKey === "summaryNumber") {
+          current = String(this.posterState.style.summaryNumberColor || this.posterState.style.scoreText || "#ffffff").toLowerCase();
+        } else if (styleKey === "divider") {
+          current = String(this.posterState.style.dividerColor || this.posterState.style.line || "#ce9224").toLowerCase();
+        } else if (styleKey === "extremeScore") {
+          current = String(this.posterState.style.extremeScoreColor || this.posterState.style.total || "#ce9224").toLowerCase();
+        } else if (styleKey === "nickname" || styleKey === "course" || styleKey === "date" || styleKey === "extra") {
+          current = String((this.posterState.identity[styleKey] && this.posterState.identity[styleKey].color) || "#ffffff").toLowerCase();
+        } else {
+          current = String(this.posterState.style[resolvedKey] || this.posterState.style.total || "#ce9224").toLowerCase();
+        }
       }
       const source = COLOR_OPTIONS.some((item) => item.value === current)
         ? COLOR_OPTIONS
@@ -3124,19 +3145,17 @@ Component({
     _rebuildColorControls(languageArg) {
       const language = languageArg || this.data.language;
       const copy = COPY[language];
-      const rowDefinitions = this.posterState.scoringStyle === "pga"
-        ? [
-          ["scoreText", copy.numbers],
-          ["pgaUnder", copy.pgaBirdieGroup],
-          ["pgaOver", copy.pgaBogeyGroup]
-        ]
-        : [
-          ["scoreText", copy.numbers],
-          ["eagleMarker", copy.eagle],
-          ["underMarker", copy.birdie],
-          ["overMarker", copy.bogey],
-          ["doubleBogeyMarker", copy.doubleBogey]
-        ];
+      const rowDefinitions = [
+        ["scoreText", copy.numbers],
+        ["eagleMarker", copy.eagle],
+        ["underMarker", copy.birdie],
+        ["overMarker", copy.bogey],
+        ["doubleBogeyMarker", copy.doubleBogey],
+        ["summaryLabel", copy.summaryLabel],
+        ["summaryNumber", copy.summaryNumber],
+        ["divider", copy.centerDivider],
+        ["extremeScore", copy.extremeScore]
+      ];
       const scoreColorRows = rowDefinitions.map((row) => ({
         key: row[0],
         label: row[1],

@@ -11,6 +11,8 @@ const {
   identityRotation,
   DP_MARKER_DEFAULTS
 } = require("./poster-data");
+const { DATE_MISSING_PLACEHOLDER, formatCalendarDateDotted } = require("./calendar-date");
+const { isCustomColorMode, resolveAndApplyPosterColors } = require("./poster-colors");
 
 function identityTextAlign(region, model) {
   const align = (region && region.align) || "center";
@@ -88,13 +90,36 @@ function scoreLabelOffset(label) {
   };
 }
 
+function resolvedColor(model, key, fallback) {
+  const colors = model && model.resolvedColors;
+  if (colors && colors[key]) return colors[key];
+  if (isCustomColorMode(model)) {
+    console.warn("[poster-engine] resolvedColors missing key", key, {
+      templateId: model && model.templateId,
+      colorMode: model && model.colorMode
+    });
+  }
+  return fallback;
+}
+
 function relativeTotalInk(model) {
-  if (model.relativeTotal && model.relativeTotal.color) return model.relativeTotal.color;
-  if (model.style && model.style.relativeTotalColor) return model.style.relativeTotalColor;
-  return "#dc3f4d";
+  return resolvedColor(
+    model,
+    "relativeTotal",
+    (model.relativeTotal && model.relativeTotal.color)
+      || (model.style && model.style.relativeTotalColor)
+      || "#dc3f4d"
+  );
 }
 
 function nineHoleLabelInk(model) {
+  if (isCustomColorMode(model)) {
+    return resolvedColor(
+      model,
+      "summaryLabel",
+      (model.style && model.style.summaryLabelColor) || relativeTotalInk(model)
+    );
+  }
   const template = TEMPLATES[model && model.templateId];
   if (template && template.summaryFollowsLine) {
     return (model.style && (model.style.line || model.style.dividerColor))
@@ -198,8 +223,9 @@ function isLightNeutralBoard(value) {
   return colorLuminance(value) >= 0.68 && spread <= 32;
 }
 
-function scorecardTextColor(style) {
-  return style.scoreText || "#ffffff";
+function scorecardTextColor(style, model) {
+  if (model) return resolvedColor(model, "scoreText", (style && style.scoreText) || "#ffffff");
+  return (style && style.scoreText) || "#ffffff";
 }
 
 function imageSource(asset) {
@@ -290,7 +316,7 @@ function drawPlaceholder(ctx, template, model) {
   ctx.fill();
   ctx.save();
   ctx.globalAlpha = 0.22;
-  ctx.fillStyle = model.style.line;
+  ctx.fillStyle = resolvedColor(model, "line", model.style.line);
   ctx.fillRect(0, 600, POSTER_WIDTH, 4);
   ctx.restore();
 }
@@ -632,7 +658,7 @@ function drawSubject(ctx, template, model) {
 function drawTotal(ctx, template, model, bounds) {
   if (!model.total || model.total.hidden || !model.total.value) return;
   const fontId = model.total.font || (model.fonts && model.fonts.total);
-  const color = model.total.color || model.style.total;
+  const color = resolvedColor(model, "total", model.total.color || model.style.total);
   ctx.save();
   ctx.globalAlpha = model.total.opacity / 100;
   ctx.textAlign = "center";
@@ -709,7 +735,7 @@ function drawRelativeTotal(ctx, model, bounds) {
   const bodyFont = fontCss(item.font || "bodoni", size, item.italic);
   ctx.save();
   ctx.globalAlpha = (item.opacity != null ? item.opacity : 88) / 100;
-  ctx.fillStyle = item.color || model.style.relativeTotalColor || "#dc3f4d";
+  ctx.fillStyle = resolvedColor(model, "relativeTotal", item.color || model.style.relativeTotalColor || "#dc3f4d");
   ctx.textAlign = "left";
   applyCanvasFont(ctx, bodyFont);
   const bodyWidth = textWidth(ctx, parts.body);
@@ -739,7 +765,7 @@ function scoreGeometry(template, model) {
 }
 
 function drawScoreMarker(ctx, x, y, radius, difference, scoringStyle, style, scale, model) {
-  const normalColor = scorecardTextColor(style);
+  const normalColor = scorecardTextColor(style, model);
   if (difference === 0) return normalColor;
 
   ctx.save();
@@ -747,25 +773,30 @@ function drawScoreMarker(ctx, x, y, radius, difference, scoringStyle, style, sca
   const template = model && TEMPLATES[model.templateId];
 
   if (scoringStyle === "dp") {
-    const systemDp = template && template.markerLinksToTotal;
+    const systemDp = !isCustomColorMode(model) && template && template.markerLinksToTotal;
     let markerColor;
-    if (difference <= -2) markerColor = (systemDp ? DP_MARKER_DEFAULTS.eagleMarker : style.eagleMarker) || "#f2b321";
-    else if (difference === -1) markerColor = (systemDp ? DP_MARKER_DEFAULTS.underMarker : style.underMarker) || "#dc3f4d";
-    else if (difference === 1) markerColor = (systemDp ? DP_MARKER_DEFAULTS.overMarker : style.overMarker) || "#101820";
-    else markerColor = (systemDp ? DP_MARKER_DEFAULTS.doubleBogeyMarker : style.doubleBogeyMarker) || "#1c75bc";
+    if (difference <= -2) markerColor = (systemDp ? DP_MARKER_DEFAULTS.eagleMarker : resolvedColor(model, "eagleMarker", style.eagleMarker)) || "#f2b321";
+    else if (difference === -1) markerColor = (systemDp ? DP_MARKER_DEFAULTS.underMarker : resolvedColor(model, "underMarker", style.underMarker)) || "#dc3f4d";
+    else if (difference === 1) markerColor = (systemDp ? DP_MARKER_DEFAULTS.overMarker : resolvedColor(model, "overMarker", style.overMarker)) || "#101820";
+    else markerColor = (systemDp ? DP_MARKER_DEFAULTS.doubleBogeyMarker : resolvedColor(model, "doubleBogeyMarker", style.doubleBogeyMarker)) || "#1c75bc";
     ctx.fillStyle = markerColor;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+    if (difference <= -2 || difference >= 2) {
+      if (isCustomColorMode(model)) {
+        return resolvedColor(model, "extremeScore", style.extremeScoreColor || normalColor);
+      }
+    }
     return normalColor;
   }
 
   let markerColor;
-  if (difference <= -2) markerColor = style.eagleMarker || "#dc3f4d";
-  else if (difference === -1) markerColor = style.underMarker || "#dc3f4d";
-  else if (difference === 1) markerColor = style.overMarker || "#6b7280";
-  else markerColor = style.doubleBogeyMarker || "#6b7280";
+  if (difference <= -2) markerColor = resolvedColor(model, "eagleMarker", style.eagleMarker) || "#dc3f4d";
+  else if (difference === -1) markerColor = resolvedColor(model, "underMarker", style.underMarker) || "#dc3f4d";
+  else if (difference === 1) markerColor = resolvedColor(model, "overMarker", style.overMarker) || "#6b7280";
+  else markerColor = resolvedColor(model, "doubleBogeyMarker", style.doubleBogeyMarker) || "#6b7280";
 
   if (difference <= -2) {
     if (template && template.doubleExtremeMarkers) {
@@ -810,8 +841,13 @@ function drawScoreMarker(ctx, x, y, radius, difference, scoringStyle, style, sca
 
   ctx.restore();
   if (difference <= -2 || difference >= 2) {
+    if (isCustomColorMode(model)) {
+      return resolvedColor(model, "extremeScore", style.extremeScoreColor || normalColor);
+    }
     if (!paletteLinksActive(model)) return normalColor;
-    if (extremeScoresFollowTotal(model)) return style.total || "#15533a";
+    if (extremeScoresFollowTotal(model)) {
+      return resolvedColor(model, "extremeScore", style.total || "#15533a");
+    }
     return normalColor;
   }
   return normalColor;
@@ -832,11 +868,16 @@ function drawNineHoleSummaries(ctx, options) {
   const numberItalic = Boolean(model.fonts && (model.fonts.scoreItalic || model.fonts.scoreItalic));
   const labelColor = nineHoleLabelInk(model);
   const template = TEMPLATES[model.templateId];
-  const numberColor = template && template.summaryFollowsTotal
-    ? labelColor
-    : template && template.summaryFollowsRelative
+  let numberColor;
+  if (isCustomColorMode(model)) {
+    numberColor = resolvedColor(model, "summaryNumber", scorecardTextColor(model.style, model));
+  } else {
+    numberColor = template && template.summaryFollowsTotal
       ? labelColor
-      : scorecardTextColor(model.style);
+      : template && template.summaryFollowsRelative
+        ? labelColor
+        : scorecardTextColor(model.style, model);
+  }
   const summaries = [
     { label: "FRONT", total: nineHoleStrokeTotal(model, 0), firstHalf: true },
     { label: "BACK", total: nineHoleStrokeTotal(model, 9), firstHalf: false }
@@ -917,11 +958,11 @@ function drawScorecard(ctx, template, model, bounds) {
   ctx.globalAlpha = Number.isFinite(cardOpacity)
     ? Math.max(0, Math.min(100, cardOpacity)) / 100
     : (template.scoreStyle === "grid" ? 0.16 : template.scoreStyle === "sidebar" ? 0.68 : 0.88);
-  ctx.fillStyle = model.style.card;
+  ctx.fillStyle = resolvedColor(model, "card", model.style.card);
   ctx.fillRect(board.x, board.y, board.w, board.h);
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = model.style.line;
-  ctx.fillStyle = model.style.line;
+  ctx.strokeStyle = resolvedColor(model, "line", model.style.line);
+  ctx.fillStyle = resolvedColor(model, "line", model.style.line);
 
   const vertical = geometry.base.direction === "vertical";
   const padX = (geometry.base.padX != null ? geometry.base.padX : (vertical ? 12 : 28)) * scale;
@@ -934,14 +975,18 @@ function drawScorecard(ctx, template, model, bounds) {
   if (vertical) {
     const dividerWidth = (geometry.base.dividerWidth || 4) * scale;
     const dividerInset = (geometry.base.dividerInset != null ? geometry.base.dividerInset : 0) * scale;
-    ctx.fillStyle = (model.style && model.style.dividerColor) || model.style.line;
+    ctx.fillStyle = resolvedColor(
+      model,
+      "divider",
+      (model.style && model.style.dividerColor) || model.style.line
+    );
     ctx.fillRect(
       board.x + board.w / 2 - dividerWidth / 2,
       board.y + dividerInset,
       dividerWidth,
       Math.max(0, board.h - dividerInset * 2)
     );
-    ctx.fillStyle = model.style.line;
+    ctx.fillStyle = resolvedColor(model, "line", model.style.line);
   } else {
     ctx.lineWidth = Math.max(2, 3 * scale);
     ctx.beginPath();
@@ -1009,7 +1054,7 @@ function drawScorecard(ctx, template, model, bounds) {
     const radius = Math.min(34 * scale, cellWidth * 0.41, cellHeight * 0.4);
     let label = "";
     let markerDifference = null;
-    let scoreColor = scorecardTextColor(model.style);
+    let scoreColor = scorecardTextColor(model.style, model);
     if (model.scoreMode === "relative") {
       const difference = parseRelativeScore(score);
       if (difference === null) return;
@@ -1059,8 +1104,10 @@ function drawScorecard(ctx, template, model, bounds) {
   ctx.restore();
 }
 
-function formattedDate(value) {
-  return value ? String(value).replace(/-/g, ".") : "";
+function formattedDate(value, item) {
+  const dotted = formatCalendarDateDotted(value);
+  if (dotted) return dotted;
+  return (item && item.missingLabel) || DATE_MISSING_PLACEHOLDER;
 }
 
 function identityMetaLineSpec(template) {
@@ -1076,7 +1123,7 @@ function identityMetaLineSpec(template) {
 function identityMetaText(model, key) {
   const item = model && model.identity && model.identity[key];
   if (!item || item.hidden) return "";
-  const raw = key === "date" ? formattedDate(item.value) : String(item.value || "").trim();
+  const raw = key === "date" ? formattedDate(item.value, item) : String(item.value || "").trim();
   return raw;
 }
 
@@ -1151,7 +1198,7 @@ function drawIdentityItem(ctx, region, item, text, bounds, key, model) {
   const align = identityTextAlign(region, model);
   const fontSize = Math.max(1, Number(item.size) || 18);
   ctx.save();
-  ctx.fillStyle = item.color;
+  ctx.fillStyle = resolvedColor(model, key, item && item.color);
   ctx.textBaseline = "middle";
   ctx.textAlign = sideways ? "center" : align;
   applyCanvasFont(ctx, fontCss(item.font, fontSize, Boolean(item.italic)));
@@ -1206,13 +1253,13 @@ function drawIdentity(ctx, template, model, bounds) {
   drawIdentityItem(ctx, layout.nickname, model.identity.nickname, model.identity.nickname.value, bounds, "nickname", model);
   if (drawIdentityMetaLine(ctx, template, model, bounds)) return;
   const courseParts = [model.identity.course.value].filter(Boolean);
-  if (layout.course && layout.course.combinesDate && model.identity.date.value) {
-    courseParts.push(formattedDate(model.identity.date.value));
+  if (layout.course && layout.course.combinesDate && model.identity.date && !model.identity.date.hidden) {
+    courseParts.push(formattedDate(model.identity.date.value, model.identity.date));
   }
   const courseJoiner = (layout.course && layout.course.dateJoiner) || " · ";
   drawIdentityItem(ctx, layout.course, model.identity.course, courseParts.join(courseJoiner), bounds, "course", model);
   if (layout.date) {
-    drawIdentityItem(ctx, layout.date, model.identity.date, formattedDate(model.identity.date.value), bounds, "date", model);
+    drawIdentityItem(ctx, layout.date, model.identity.date, formattedDate(model.identity.date.value, model.identity.date), bounds, "date", model);
   }
   drawIdentityItem(ctx, layout.extra, model.identity.extra, model.identity.extra.value, bounds, "extra", model);
 }
@@ -1251,6 +1298,7 @@ function drawGuide(ctx, bounds, target) {
 
 function renderPoster(ctx, model, options) {
   const settings = options || {};
+  resolveAndApplyPosterColors(model);
   const template = TEMPLATES[model.templateId];
   const bounds = {};
   ctx.clearRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
