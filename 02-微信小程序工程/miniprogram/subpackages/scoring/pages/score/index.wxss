@@ -3103,7 +3103,10 @@ page {
 .score-double .hole-cell-score { color: #ffffff; }
 
 /*
- * ===== 临时 Classic Style（仅 .score-page.is-score-classic / demo-weekend-amateur）=====
+ * ===== 原经典样式（.score-page.is-score-classic，含深色模式）=====
+ * 浅色正式复刻色板在 classic-app-replica.wxss（:not(.dark-mode)）。
+ * 深色仍走本段 is-score-classic.dark-mode，不走浅色复刻 token。
+ * 精英风格独立（is-score-elite-demo），不读下方 classic 色块。
  * classicClass 挂在 score-cell：整格传统记分卡色块；禁止 :has。
  * scoreClass / bestScoreClass / scoreStyle / 成绩逻辑不改。
  */
@@ -7577,3 +7580,5 @@ page {
 .score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-hole-par-overlay__par text {
   font-size: 28rpx;
 }
+
+@import '../../styles/classic-app-replica.wxss';

@@ -1,4 +1,4 @@
-<view class="score-page {{themeClass}} {{fontScaleClass}} {{scoreHoleStyleClassic ? 'is-score-classic' : ''}} {{isScoreClassicDemo ? 'is-score-classic-demo' : ''}} {{isScoreEliteDemo ? 'is-score-elite-demo' : ''}}">
+<view class="score-page {{themeClass}} {{fontScaleClass}} {{scoreHoleStyleClassic ? 'is-score-classic' : ''}} {{isScoreClassicDemo ? 'is-score-classic-demo' : ''}} {{isScoreEliteDemo ? 'is-score-elite-demo' : ''}} {{scoreHoleStyleClassic ? 'is-classic-app-replica' : ''}}">
   <!-- Header -->
   <view id="main-header" class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
@@ -273,7 +273,7 @@
               >
                 <block wx:if="{{cell.type === 'special'}}">
                   <view class="special-cell-inner">
-                    <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{cell.scoreMainWideClass}}">{{cell.val}}</text>
+                    <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.scoreMainWideClass}}">{{cell.val}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{cell.puttTotal}}</text>
                       <text class="special-cell-diff {{cell.diffClass}}">{{isScoreEliteDemo ? cell.eliteDiffStr : cell.diffStr}}</text>
@@ -285,7 +285,7 @@
                   <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                   <view class="hole-cell-inner">
                     <view class="{{cell.scoreClass}}">
-                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{cell.classicScoreSizeClass}} {{cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
+                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{cell.putts}}</text>
@@ -534,7 +534,7 @@
                 >
                   <block wx:if="{{cell.type === 'special'}}">
                     <view class="special-cell-inner">
-                      <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                      <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.scoreMainWideClass}}">{{cell.val}}</text>
                       <view class="special-cell-meta">
                         <text class="special-cell-putt">{{cell.puttTotal}}</text>
                         <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
@@ -546,7 +546,7 @@
                   <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                     <view class="hole-cell-inner">
                       <view class="{{cell.scoreClass}}">
-                        <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
+                        <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                       </view>
                       <view class="hole-cell-meta">
                         <text class="hole-cell-putt">{{cell.putts}}</text>
@@ -773,7 +773,7 @@
               >
                 <block wx:if="{{col.isSpecial}}">
                   <view class="special-cell-inner">
-                    <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{col.scoreMainWideClass}}">{{col.score}}</text>
+                    <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? col.replicaScoreSizeClass : col.scoreMainWideClass}}">{{col.score}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{col.putts}}</text>
                       <text class="special-cell-diff {{col.diffClass}}">{{isScoreEliteDemo ? col.eliteDiffStr : col.diffStr}}</text>
@@ -785,7 +785,7 @@
                   <view wx:if="{{col.hasWaist}}" class="corner-waist"></view>
                   <view class="hole-cell-inner">
                     <view class="{{col.scoreClass}}">
-                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}} {{col.scoreMainWideClass}}">{{col.mainStr}}</text>
+                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{scoreHoleStyleClassic ? col.replicaScoreSizeClass : col.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : col.scoreMainWideClass}}">{{col.mainStr}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{col.putts}}</text>
@@ -895,7 +895,7 @@
               >
                 <block wx:if="{{cell.type === 'special'}}">
                   <view class="special-cell-inner">
-                    <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                    <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.scoreMainWideClass}}">{{cell.val}}</text>
                     <view class="special-cell-meta">
                       <text class="special-cell-putt">{{cell.puttTotal}}</text>
                       <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
@@ -907,7 +907,7 @@
                   <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                   <view class="hole-cell-inner">
                     <view class="{{cell.scoreClass}}">
-                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
+                      <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{cell.putts}}</text>
@@ -1088,7 +1088,7 @@
             >
               <block wx:if="{{col.isSpecial}}">
                 <view class="special-cell-inner">
-                  <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{col.scoreMainWideClass}}">{{col.score}}</text>
+                  <text class="special-cell-val {{col.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? col.replicaScoreSizeClass : col.scoreMainWideClass}}">{{col.score}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{col.putts}}</text>
                     <text class="special-cell-diff {{col.diffClass}}">{{isScoreEliteDemo ? col.eliteDiffStr : col.diffStr}}</text>
@@ -1101,7 +1101,7 @@
                 <view wx:if="{{col.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{col.scoreClass}}">
-                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{col.classicScoreSizeClass}} {{col.scoreMainWideClass}}">{{col.mainStr}}</text>
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{scoreHoleStyleClassic ? col.replicaScoreSizeClass : col.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : col.scoreMainWideClass}}">{{col.mainStr}}</text>
                     </view>
                     <view class="hole-cell-meta">
                       <text class="hole-cell-putt">{{col.putts}}</text>
@@ -1195,7 +1195,7 @@
             >
               <block wx:if="{{cell.type === 'special'}}">
                 <view class="special-cell-inner">
-                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.scoreMainWideClass}}">{{cell.val}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{cell.puttTotal}}</text>
                     <text class="special-cell-diff {{cell.diffClass}}">{{isScoreEliteDemo ? cell.eliteDiffStr : cell.diffStr}}</text>
@@ -1208,7 +1208,7 @@
                 <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{cell.scoreClass}}">
-                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                   </view>
                   <view class="hole-cell-meta">
                     <text class="hole-cell-putt">{{cell.putts}}</text>
@@ -1290,7 +1290,7 @@
             >
               <block wx:if="{{cell.type === 'special'}}">
                 <view class="special-cell-inner">
-                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.scoreMainWideClass}}">{{cell.val}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{cell.puttTotal}}</text>
                     <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
@@ -1303,7 +1303,7 @@
                 <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{cell.scoreClass}}">
-                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                   </view>
                   <view class="hole-cell-meta">
                     <text class="hole-cell-putt">{{cell.putts}}</text>
@@ -1388,7 +1388,7 @@
             >
               <block wx:if="{{cell.type === 'special'}}">
                 <view class="special-cell-inner">
-                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}}">{{cell.val}}</text>
+                  <text class="special-cell-val {{cell.isTot ? 'special-cell-val--tot tot-value' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.scoreMainWideClass}}">{{cell.val}}</text>
                   <view class="special-cell-meta">
                     <text class="special-cell-putt">{{cell.puttTotal}}</text>
                     <text class="special-cell-diff {{cell.diffClass}}">{{cell.diffStr}}</text>
@@ -1401,7 +1401,7 @@
                 <view wx:if="{{cell.hasWaist}}" class="corner-waist"></view>
                 <view class="hole-cell-inner">
                   <view class="{{cell.scoreClass}}">
-                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}}">{{cell.mainStr || cell.displayHint}}</text>
+                    <text class="hole-cell-score {{scoreDisplayMode === 'diff' ? 'hole-cell-score--diff' : ''}} {{!cell.mainStr && cell.displayHint ? 'hole-cell-score--hint' : ''}} {{scoreHoleStyleClassic ? cell.replicaScoreSizeClass : cell.classicScoreSizeClass}} {{scoreHoleStyleClassic ? '' : cell.scoreMainWideClass}}">{{cell.mainStr || cell.displayHint}}</text>
                   </view>
                   <view class="hole-cell-meta">
                     <text class="hole-cell-putt">{{cell.putts}}</text>

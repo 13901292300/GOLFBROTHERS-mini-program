@@ -1,0 +1,256 @@
+/*
+ * 正式浅色经典风格（pageScoreStyle=classic）→ .score-page.is-classic-app-replica
+ * 全站记分页共用 token，不按 gameId / 演示赛标题启用。
+ * 深色模式：本文件色板选择器带 :not(.dark-mode)，暗色仍走原 is-score-classic.dark-mode。
+ * 精英风格：不读这些变量，保持 is-score-elite-demo / 公共基础格子。
+ *
+ * 尺寸基准：洞格宽度 --classic-app-replica-cell（与 fourball 洞列 144rpx 对齐）。
+ * 其余尺寸为相对该宽度的固定比例，禁止按某一机型写死 px。
+ *
+ * 比例（相对 cell）：
+ *   score size  68/144 ≈ 47%（个位）
+ *   2-digit     62/144 ≈ 43%
+ *   3-digit     54/144 ≈ 37.5%（独立 token，不复用两位数）
+ *   score top   18%
+ *   putt/diff   18/144 ≈ 12.5%
+ *   meta inset  8/144  ≈ 5.6%
+ *   marker      30/144 ≈ 20.8%
+ *
+ * 色板取样来源：微信图片_20260905155954_180_198.jpg（604×793 JPEG，压缩色）
+ *   成绩蓝 #009afe / 分边蓝 #009afe（独立 token）
+ *   成绩橙 #fe6400 / 分边红 #fe4236
+ *   白 #ffffff / 浅灰 #e6e6e6 / 中灰 #cecece / 深灰 #b5b5b5
+ *   小鸟底 #fff8f2 / 网格缝 #cccccc / 主数字黑 #070707
+ *   老鹰底 #ffe1cf
+ */
+.score-page.is-classic-app-replica {
+  --classic-app-replica-cell: 144rpx;
+  --classic-app-replica-aspect: 1 / 1;
+  --classic-app-replica-score-size: 68rpx;
+  --classic-app-replica-score-size-2digit: 62rpx;
+  --classic-app-replica-score-size-3digit: 54rpx;
+  --classic-app-replica-score-tracking-2digit: -0.04em;
+  --classic-app-replica-score-weight: 500;
+  --classic-app-replica-score-top: 18%;
+  --classic-app-replica-meta-size: 18rpx;
+  --classic-app-replica-meta-inset: 8rpx;
+  --classic-app-replica-meta-bottom: 6rpx;
+  --classic-app-replica-marker: 30rpx;
+  --classic-app-replica-grid: #cccccc;
+  --classic-app-replica-score-blue: #009afe;
+  --classic-app-replica-score-orange: #fe6400;
+  --classic-app-replica-score-black: #070707;
+  --classic-app-replica-side-blue: #009afe;
+  --classic-app-replica-side-red: #fe4236;
+  --classic-app-replica-cell-white: #ffffff;
+  --classic-app-replica-cell-light-gray: #e6e6e6;
+  --classic-app-replica-cell-mid-gray: #cecece;
+  --classic-app-replica-cell-dark-gray: #b5b5b5;
+  --classic-app-replica-cell-eagle: #ffe1cf;
+  --classic-app-replica-cell-birdie: #fff8f2;
+}
+
+.score-page.is-classic-app-replica.font-large {
+  --classic-app-replica-cell: 160rpx;
+  --classic-app-replica-score-size: 76rpx;
+  --classic-app-replica-score-size-2digit: 69rpx;
+  --classic-app-replica-score-size-3digit: 60rpx;
+  --classic-app-replica-meta-size: 20rpx;
+  --classic-app-replica-meta-inset: 9rpx;
+  --classic-app-replica-meta-bottom: 7rpx;
+  --classic-app-replica-marker: 33rpx;
+}
+
+.score-page.is-classic-app-replica .shell-row--player,
+.score-page.is-classic-app-replica .scoreboard-row--player,
+.score-page.is-classic-app-replica .player-column__row,
+.score-page.is-classic-app-replica .player-cell,
+.score-page.is-classic-app-replica .fourball-player-column__row,
+.score-page.is-classic-app-replica .fourball-tee-sticky-overlay__row,
+.score-page.is-classic-app-replica .tee-sticky-overlay__row,
+.score-page.is-classic-app-replica .match-play-tee-sticky-overlay__row,
+.score-page.is-classic-app-replica .match-play-side-row {
+  height: var(--classic-app-replica-cell);
+  min-height: var(--classic-app-replica-cell);
+}
+
+.score-page.is-classic-app-replica .match-play-status-row,
+.score-page.is-classic-app-replica .match-play-tee-sticky-overlay__status {
+  height: 100rpx;
+  min-height: 100rpx;
+}
+
+.score-page.is-classic-app-replica .scoreboard-row--player .score-cell:not(.sticky-col) {
+  width: var(--classic-app-replica-cell);
+  min-width: var(--classic-app-replica-cell);
+  height: var(--classic-app-replica-cell);
+  min-height: var(--classic-app-replica-cell);
+  padding: 0;
+  aspect-ratio: var(--classic-app-replica-aspect);
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.score-page.is-classic-app-replica .scoreboard-row--head .scoreboard-cell:not(.sticky-col),
+.score-page.is-classic-app-replica .scoreboard-row--par > .scoreboard-cell:not(.sticky-col) {
+  width: var(--classic-app-replica-cell);
+  min-width: var(--classic-app-replica-cell);
+}
+
+.score-page.is-classic-app-replica .scoreboard-row--player .score-cell:not(.sticky-col),
+.score-page.is-classic-app-replica .scoreboard-row--head .scoreboard-cell:not(.sticky-col),
+.score-page.is-classic-app-replica .scoreboard-row--par > .scoreboard-cell:not(.sticky-col),
+.score-page.is-classic-app-replica .scoreboard-row--player .fourball-track-lead--diff,
+.score-page.is-classic-app-replica .scoreboard-row--player .track-lead-diff {
+  border-right-color: var(--classic-app-replica-grid);
+  border-bottom-color: var(--classic-app-replica-grid);
+}
+
+.score-page.is-classic-app-replica .hole-cell-inner {
+  min-height: 100%;
+  height: 100%;
+  justify-content: flex-start;
+  padding-top: var(--classic-app-replica-score-top);
+  box-sizing: border-box;
+}
+
+.score-page.is-classic-app-replica .hole-cell-score,
+.score-page.is-classic-app-replica.font-large .hole-cell-score,
+.score-page.is-classic-app-replica .score-cell.classic-eagle .hole-cell-score,
+.score-page.is-classic-app-replica .score-cell.classic-birdie .hole-cell-score,
+.score-page.is-classic-app-replica .score-cell.classic-par .hole-cell-score,
+.score-page.is-classic-app-replica .score-cell.classic-bogey .hole-cell-score,
+.score-page.is-classic-app-replica .score-cell.classic-double .hole-cell-score,
+.score-page.is-classic-app-replica .score-cell.classic-triple .hole-cell-score {
+  font-size: var(--classic-app-replica-score-size);
+  font-weight: var(--classic-app-replica-score-weight) !important;
+  line-height: 1;
+}
+
+.score-page.is-classic-app-replica .hole-cell-score.is-replica-score-2digit,
+.score-page.is-classic-app-replica.font-large .hole-cell-score.is-replica-score-2digit {
+  font-size: var(--classic-app-replica-score-size-2digit) !important;
+  letter-spacing: var(--classic-app-replica-score-tracking-2digit);
+}
+
+.score-page.is-classic-app-replica .hole-cell-score.is-replica-score-3digit,
+.score-page.is-classic-app-replica.font-large .hole-cell-score.is-replica-score-3digit {
+  font-size: var(--classic-app-replica-score-size-3digit) !important;
+}
+
+.score-page.is-classic-app-replica .special-cell-val,
+.score-page.is-classic-app-replica.font-large .special-cell-val {
+  font-weight: var(--classic-app-replica-score-weight) !important;
+}
+
+.score-page.is-classic-app-replica .special-cell-val.is-replica-score-2digit,
+.score-page.is-classic-app-replica.font-large .special-cell-val.is-replica-score-2digit {
+  font-size: var(--classic-app-replica-score-size-2digit) !important;
+  letter-spacing: var(--classic-app-replica-score-tracking-2digit);
+}
+
+.score-page.is-classic-app-replica .special-cell-val.is-replica-score-3digit,
+.score-page.is-classic-app-replica.font-large .special-cell-val.is-replica-score-3digit {
+  font-size: var(--classic-app-replica-score-size-3digit) !important;
+}
+
+.score-page.is-classic-app-replica .special-cell-putt,
+.score-page.is-classic-app-replica .special-cell-diff {
+  font-size: var(--classic-app-replica-meta-size);
+  font-weight: 400;
+}
+
+.score-page.is-classic-app-replica .hole-cell-meta {
+  bottom: var(--classic-app-replica-meta-bottom);
+  left: var(--classic-app-replica-meta-inset);
+  right: var(--classic-app-replica-meta-inset);
+}
+
+.score-page.is-classic-app-replica .hole-cell-putt,
+.score-page.is-classic-app-replica .hole-cell-diff,
+.score-page.is-classic-app-replica.font-large .hole-cell-putt,
+.score-page.is-classic-app-replica.font-large .hole-cell-diff {
+  font-size: var(--classic-app-replica-meta-size);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-eagle {
+  background: var(--classic-app-replica-cell-eagle) !important;
+  background-color: var(--classic-app-replica-cell-eagle) !important;
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-birdie {
+  background: var(--classic-app-replica-cell-birdie) !important;
+  background-color: var(--classic-app-replica-cell-birdie) !important;
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-par {
+  background: var(--classic-app-replica-cell-white) !important;
+  background-color: var(--classic-app-replica-cell-white) !important;
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-bogey {
+  background: var(--classic-app-replica-cell-light-gray) !important;
+  background-color: var(--classic-app-replica-cell-light-gray) !important;
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-double {
+  background: var(--classic-app-replica-cell-mid-gray) !important;
+  background-color: var(--classic-app-replica-cell-mid-gray) !important;
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-triple {
+  background: var(--classic-app-replica-cell-dark-gray) !important;
+  background-color: var(--classic-app-replica-cell-dark-gray) !important;
+}
+
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-eagle .hole-cell-score,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-birdie .hole-cell-score {
+  color: var(--classic-app-replica-score-orange);
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-par .hole-cell-score {
+  color: var(--classic-app-replica-score-blue);
+}
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-bogey .hole-cell-score,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-double .hole-cell-score,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-triple .hole-cell-score {
+  color: var(--classic-app-replica-score-black);
+}
+
+.score-page.is-classic-app-replica:not(.dark-mode) .hole-cell-diff,
+.score-page.is-classic-app-replica:not(.dark-mode) .hole-cell-diff.diff-under,
+.score-page.is-classic-app-replica:not(.dark-mode) .hole-cell-diff.diff-even,
+.score-page.is-classic-app-replica:not(.dark-mode) .hole-cell-diff.diff-over {
+  color: var(--classic-app-replica-score-orange) !important;
+}
+
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-eagle .hole-cell-putt,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-birdie .hole-cell-putt,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-par .hole-cell-putt,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-bogey .hole-cell-putt,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-double .hole-cell-putt,
+.score-page.is-classic-app-replica:not(.dark-mode) .score-cell.classic-triple .hole-cell-putt {
+  color: var(--classic-app-replica-score-black);
+  opacity: 1;
+}
+
+.score-page.is-classic-app-replica .triangle-red,
+.score-page.is-classic-app-replica .triangle-blue,
+.score-page.is-classic-app-replica .triangle-gold {
+  top: 0;
+  right: 0;
+  left: auto;
+  bottom: auto;
+  margin: 0;
+  border-radius: 0;
+  border-width: 0 var(--classic-app-replica-marker) var(--classic-app-replica-marker) 0;
+}
+
+.score-page.is-classic-app-replica .triangle-blue {
+  border-color: transparent var(--classic-app-replica-side-blue) transparent transparent;
+}
+.score-page.is-classic-app-replica .triangle-red {
+  border-color: transparent var(--classic-app-replica-side-red) transparent transparent;
+}
+
+.score-page.is-classic-app-replica .corner-waist {
+  width: var(--classic-app-replica-marker);
+  height: var(--classic-app-replica-marker);
+}

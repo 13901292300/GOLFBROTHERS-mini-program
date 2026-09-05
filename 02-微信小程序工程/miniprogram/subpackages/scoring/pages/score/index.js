@@ -29,6 +29,7 @@ const mockAvatars = require('../../../../utils/mockAvatars.js');
 const scoreRankMark = require('../../utils/scoreRankMark.js');
 const groupManageIdentityDiff = require('../../utils/groupManageIdentityDiff.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
+const classicAppReplicaScoreDigits = require('../../utils/classicAppReplicaScoreDigits.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
 const reactionPanelConfig = require('../../../../utils/reactionPanelConfig.js');
 const scoreReactionAccess = require('../../../../utils/scoreReactionAccess.js');
@@ -1144,7 +1145,7 @@ function resolveEliteDemoHoleScoreClass(diff) {
 }
 
 /**
- * 临时 Classic Style（仅视觉验证）：按真实洞差映射 classic-* class。
+ * 正式浅色经典：按真实洞差映射 classic-* class（色板在 classic-app-replica.wxss）。
  * 不改 scoreClass / bestScoreClass / scoreStyle / getScoreStatus。
  * 空洞必须由调用方保证不传入（未录入返回 ''）。
  */
@@ -1238,7 +1239,9 @@ function buildBestBallColumns(displayMode, opts) {
       classicScoreSizeClass: isSpecial
         ? ''
         : resolveClassicHoleScoreSizeClass(score, displayMode),
-      scoreMainWideClass: resolveScoreMainWideClass(mainStr)
+      scoreMainWideClass: resolveScoreMainWideClass(mainStr),
+      replicaScoreSizeClass:
+        classicAppReplicaScoreDigits.resolveClassicScoreSizeClass(mainStr)
     };
   });
 }
@@ -1302,7 +1305,11 @@ function buildTeamBestColumns(scores, putts, displayMode, opts) {
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
         scoreClass: '',
         classicClass: '',
-        scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr)
+        scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr),
+        replicaScoreSizeClass:
+          classicAppReplicaScoreDigits.resolveClassicScoreSizeClass(
+            specialDisp.mainStr || specialDisp.displayScore
+          )
       };
     }
     const hi = holeCursor;
@@ -1317,10 +1324,11 @@ function buildTeamBestColumns(scores, putts, displayMode, opts) {
         scoreClass: '',
         classicClass: '',
         classicScoreSizeClass: '',
-        scoreMainWideClass: ''
+        scoreMainWideClass: '',
+        replicaScoreSizeClass: ''
       };
     }
-    const p = putts[hi] || 1;
+    const p = classicAppReplicaScoreDigits.resolveFilledHolePutt(putts[hi]);
     const diff = s - par;
     if (hi < 9) { outSum += s; outPutts += p; outDiff += diff; outFilled += 1; }
     else { inSum += s; inPutts += p; inDiff += diff; inFilled += 1; }
@@ -1341,7 +1349,9 @@ function buildTeamBestColumns(scores, putts, displayMode, opts) {
         : bestScoreClass(diff),
       classicClass: resolveClassicHoleClass(diff),
       classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
-      scoreMainWideClass: resolveScoreMainWideClass(mainStr)
+      scoreMainWideClass: resolveScoreMainWideClass(mainStr),
+      replicaScoreSizeClass:
+        classicAppReplicaScoreDigits.resolveClassicScoreSizeClass(mainStr)
     };
   });
   const relScore = outDiff + inDiff;
@@ -2157,7 +2167,11 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         isIn: isIn,
         isTot,
         diffClass: diffTotal < 0 ? 'diff-under' : diffTotal > 0 ? 'diff-over' : 'diff-even',
-        scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr)
+        scoreMainWideClass: resolveScoreMainWideClass(specialDisp.mainStr),
+        replicaScoreSizeClass:
+          classicAppReplicaScoreDigits.resolveClassicScoreSizeClass(
+            specialDisp.mainStr || specialDisp.displayScore
+          )
       };
     }
 
@@ -2186,6 +2200,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
         classicClass: '',
         classicScoreSizeClass: '',
         scoreMainWideClass: '',
+        replicaScoreSizeClass: '',
         triColor: tri.triColor,
         gameCornerRank: tri.gameCornerRank,
         triangleClass: tri.triangleClass,
@@ -2194,7 +2209,7 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       };
     }
 
-    const p = putts[hi] || 1;
+    const p = classicAppReplicaScoreDigits.resolveFilledHolePutt(putts[hi]);
     const diff = s - par;
     if (hi < 9) {
       outSum += s;
@@ -2230,6 +2245,8 @@ function enrichPlayer(player, pIdx, displayMode, options) {
       classicClass: resolveClassicHoleClass(diff),
       classicScoreSizeClass: resolveClassicHoleScoreSizeClass(s, displayMode),
       scoreMainWideClass: resolveScoreMainWideClass(mainStr),
+      replicaScoreSizeClass:
+        classicAppReplicaScoreDigits.resolveClassicScoreSizeClass(mainStr),
       triColor: tri.triColor,
       gameCornerRank: tri.gameCornerRank,
       triangleClass: tri.triangleClass,
@@ -3098,8 +3115,9 @@ Page({
   },
 
   /**
-   * 同步 pageScoreStyle → scoreHoleStyleClassic / isScoreClassicDemo / isScoreEliteDemo / 设置项可见性。
-   * 全站记分页（demo + 正式）均支持 classic / elite。
+   * 同步 pageScoreStyle → scoreHoleStyleClassic / isScoreClassicDemo / isScoreEliteDemo。
+   * classic：根 class 同时挂 is-classic-app-replica（正式浅色经典，全站记分页，不按 gameId）。
+   * elite：不挂 is-classic-app-replica。
    */
   _syncPageScoreStyle(gameId) {
     const pageScoreStyle = this._getPageScoreStyle();
@@ -8657,6 +8675,7 @@ Page({
             mainStr: c.mainStr != null ? c.mainStr : '',
             scoreClass: '',
             scoreMainWideClass: c.scoreMainWideClass || '',
+            replicaScoreSizeClass: c.replicaScoreSizeClass || '',
             holeIndex: c.holeIndex
           };
         }
@@ -8677,6 +8696,7 @@ Page({
           scoreClass: c.scoreClass || '',
           classicScoreSizeClass: c.classicScoreSizeClass || '',
           scoreMainWideClass: c.scoreMainWideClass || '',
+          replicaScoreSizeClass: c.replicaScoreSizeClass || '',
           holeIndex: c.holeIndex,
           triColor: c.triColor || '',
           gameCornerRank: c.gameCornerRank == null ? null : c.gameCornerRank,
