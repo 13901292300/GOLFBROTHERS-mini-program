@@ -5,6 +5,7 @@ const BRAND_HEIGHT = 70;
 const EVENT_BRAND_LOGO_PATH = "/subpackages/poster/images/mingxiaobei-logo.jpg";
 const EVENT_BRAND_TITLE = "2026青花郎·名校杯高校校友联谊赛";
 const MAX_STICKERS = 5;
+const posterColors = require("./poster-colors");
 
 const PGA_MARKER_DEFAULTS = {
   eagleMarker: "#dc3f4d",
@@ -51,6 +52,7 @@ function ensureColorPresets(model) {
 
 function applyMarkerPreset(model, styleId) {
   ensureColorPresets(model);
+  if (posterColors.isCustomColorMode(model)) return model;
   const mode = styleId === "dp" ? "dp" : "pga";
   if (mode === "dp" && markersFollowTotal(model)) {
     model.colorPresets.dp = Object.assign({}, DP_MARKER_DEFAULTS);
@@ -64,6 +66,7 @@ function applyMarkerPreset(model, styleId) {
 
 function applyTemplate2CardBoard(model) {
   if (!model || model.templateId !== "template2" || !model.style) return model;
+  if (posterColors.isCustomColorMode(model)) return model;
   if (model.scoringStyle === "dp") {
     model.style.card = "#ffffff";
     model.style.cardOpacity = 15;
@@ -183,6 +186,7 @@ function applyPaletteBackdrop(model) {
 function applyPaletteCardOpacity(model) {
   const template = TEMPLATES[model && model.templateId];
   if (!template || !template.paletteOverrides || !model || !model.style) return model;
+  if (posterColors.isCustomColorMode(model)) return model;
   const hasPaletteOpacity = Object.keys(template.paletteOverrides).some((id) => {
     const item = template.paletteOverrides[id];
     return item && item.cardOpacity != null && Number.isFinite(Number(item.cardOpacity));
@@ -1256,6 +1260,9 @@ function applyTemplateLook(model) {
   applyTemplate2CardBoard(model);
   applyTemplate3ColorLinks(model);
   applyTemplate4ColorLinks(model);
+  if (posterColors.isCustomColorMode(model)) {
+    posterColors.resolveAndApplyPosterColors(model);
+  }
   return model;
 }
 
@@ -1379,6 +1386,11 @@ function createPosterModel(templateId, sample, brand) {
     },
     layoutMirrored: false,
     paletteId,
+    colorMode: "template",
+    customColors: {},
+    colorSchemaVersion: posterColors.COLOR_SCHEMA_VERSION,
+    customColorStateReady: false,
+    resolvedColors: null,
     style: {
       total: palette.total,
       relativeTotalColor: "#dc3f4d",
@@ -1405,6 +1417,7 @@ function createPosterModel(templateId, sample, brand) {
   };
   remapPosterFonts(model);
   applyTemplateLook(model);
+  posterColors.resolveAndApplyPosterColors(model);
   return model;
 }
 
@@ -1496,7 +1509,9 @@ function ensureTotalDisplayModel(model) {
   }
   if (model.style) model.style.relativeTotalColor = model.relativeTotal.color;
   ensureColorPresets(model);
-  applyMarkerPreset(model, model.scoringStyle);
+  if (!posterColors.isCustomColorMode(model)) {
+    applyMarkerPreset(model, model.scoringStyle);
+  }
   return model;
 }
 
@@ -1636,17 +1651,9 @@ function applyLinkedColor(model, source, color) {
 
 function applyPalette(model, paletteId) {
   if (paletteId === "custom") {
-    if (model.style) {
-      model.style.summaryLabelColor = (model.relativeTotal && model.relativeTotal.color)
-        || model.style.relativeTotalColor
-        || model.style.summaryLabelColor;
-      model.style.extremeScoreColor = (model.total && model.total.color)
-        || model.style.total
-        || model.style.extremeScoreColor;
-    }
-    model.paletteId = "custom";
-    return model;
+    return posterColors.enterCustomColorMode(model);
   }
+  posterColors.enterTemplateColorMode(model);
   const template = TEMPLATES[model.templateId];
   const palette = resolvePalette(template, paletteId);
   if (!palette) return model;
@@ -1687,6 +1694,7 @@ function applyPalette(model, paletteId) {
   applyPaletteCardOpacity(model);
   applyPaletteTypography(model);
   applyPaletteBackdrop(model);
+  posterColors.resolveAndApplyPosterColors(model);
   return model;
 }
 
@@ -1752,6 +1760,14 @@ function switchTemplate(previous, templateId, brand) {
       dp: Object.assign({}, previous.colorPresets.dp)
     }
     : initColorPresets();
+  next.customColors = previous.customColors && typeof previous.customColors === "object"
+    ? Object.assign({}, previous.customColors)
+    : {};
+  next.colorMode = previous.colorMode === "custom" || previous.paletteId === "custom" ? "custom" : "template";
+  next.colorSchemaVersion = Number(previous.colorSchemaVersion) || 0;
+  next.customColorStateReady = false;
+  next.resolvedColors = null;
+  if (next.colorMode === "custom") next.paletteId = "custom";
   ensureTotalDisplayModel(next);
   next.identity.nickname.value = previous.identity.nickname.value;
   next.identity.course.value = previous.identity.course.value;
@@ -1773,6 +1789,10 @@ function switchTemplate(previous, templateId, brand) {
   next.stickers = previous.stickers;
   next.selectedStickerId = previous.selectedStickerId;
   applyTemplateLook(next);
+  if (next.colorMode === "custom") {
+    next.paletteId = "custom";
+    posterColors.resolveAndApplyPosterColors(next);
+  }
   return next;
 }
 

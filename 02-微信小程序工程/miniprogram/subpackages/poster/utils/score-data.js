@@ -7,6 +7,7 @@ const gameStore = require('../../../utils/gameStore.js');
 const matchState = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const { remapPosterFonts } = require("./poster-data");
+const { formatCalendarDateYMD, resolvePosterMatchDate } = require("./calendar-date");
 
 const HOLE_COUNT = 18;
 const DEFAULT_PAR = 72;
@@ -82,21 +83,6 @@ function sumFilledScores(scores) {
     total += n;
   }
   return total;
-}
-
-/**
- * 时间戳 / Date / 日期字符串 → YYYY-MM-DD（本地时区）。
- */
-function formatDateYMD(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const d = value instanceof Date ? value : new Date(value);
-  if (!d || Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const mm = m < 10 ? '0' + m : String(m);
-  const dd = day < 10 ? '0' + day : String(day);
-  return y + '-' + mm + '-' + dd;
 }
 
 /**
@@ -655,7 +641,7 @@ function buildScoreDataFromGame(game, gameId, groupIndex, playerId) {
   const relative = buildRelativeScores(scores, holePars);
   const playerName = resolvePlayerDisplayName(found, playerId);
   const nickname = resolveComboNickname(game, group, groupIndex, comboPlayerId, playerName);
-  const date = formatDateYMD(game.createdAt) || formatDateYMD(Date.now());
+  const date = resolvePosterMatchDate(game);
   const extra = game.roundName || game.gameMode || '';
 
   return {
@@ -749,7 +735,7 @@ function applyScoreData(model, scoreData) {
     console.warn('[score-data] applyScoreData nickname empty, fallback 球员', src.gameId, src.playerId);
   }
   const courseName = src.course || src.courseName || '';
-  const date = src.date || '';
+  const date = formatCalendarDateYMD(src.date);
   const extra = src.extra || '';
   const par = Number(src.roundPar || src.par) > 0 ? Number(src.roundPar || src.par) : DEFAULT_PAR;
   const total = src.total == null || src.total === ''
@@ -785,7 +771,7 @@ function applyScoreData(model, scoreData) {
     }
     model.identity.nickname.value = playerName;
     if (courseName) model.identity.course.value = courseName;
-    if (date) model.identity.date.value = date;
+    model.identity.date.value = date;
     if (extra) model.identity.extra.value = extra;
     model.photoPath = src.photoPath || '';
     model.previewSubject = src.source === 'sample' && !model.photoPath;
