@@ -5,6 +5,7 @@
 
 const mockAvatars = require('./mockAvatars.js');
 const playerManage = require('./playerManage.js');
+const comboDisplayName = require('./comboDisplayName.js');
 const teamMatchFinish = require('./teamMatchFinish.js');
 
 const TIME_MODE_UNIFORM = 'uniform';
@@ -373,7 +374,9 @@ function buildTeeSheetDraft(matchOrGame, playerLookup) {
       startHole: startHole,
       teeTimeLabel: teeTime || '待设置',
       startHoleLabel: startHole != null ? startHole + '号洞' : '待分配',
-      playersText: displayPlayers.map((p) => p.displayName).join(' / ') || '暂无球员',
+      playersText: comboDisplayName.joinMemberDisplayNames(
+        displayPlayers.map((p) => p.displayName)
+      ) || '暂无球员',
       displayPlayers: displayPlayers,
       // 保留原始 players / playersSlots 引用结构供 commit 时写回字段
       _rawPlayers: cloned.players,

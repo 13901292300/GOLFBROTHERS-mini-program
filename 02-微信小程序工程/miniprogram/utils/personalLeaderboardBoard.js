@@ -8,6 +8,7 @@
 
 var playerManage = require('./playerManage.js');
 var mockAvatars = require('./mockAvatars.js');
+var comboDisplayName = require('./comboDisplayName.js');
 var leaderboardSettingViewModel = require('./leaderboardSettingViewModel.js');
 var holeLayout = require('./holeLayout.js');
 var halfCourse = require('./halfCourse.js');
@@ -625,12 +626,7 @@ function buildEntityLeaderboardRows(match) {
       }
       if (!memberViews.length) continue;
 
-      var name = memberViews
-        .map(function (mv) {
-          return asString(mv && (mv.name || mv.displayName));
-        })
-        .filter(Boolean)
-        .join(' / ');
+      var name = comboDisplayName.joinMemberDisplayNames(memberViews);
       if (!name) continue;
 
       var entityRec = scoreByEntityId[entityId] || {};
