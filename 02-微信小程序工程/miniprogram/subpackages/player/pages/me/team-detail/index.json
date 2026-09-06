@@ -1,6 +1,5 @@
 {
   "navigationStyle": "custom",
-  "enableShareAppMessage": true,
   "usingComponents": {
     "team-intro": "./components/team-intro/index",
     "team-members": "./components/team-members/index",

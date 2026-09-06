@@ -1,6 +1,5 @@
 {
   "navigationStyle": "custom",
-  "enableShareAppMessage": true,
   "usingComponents": {
     "team-page-state": "/subpackages/player/components/team-page-state/index"
   }
