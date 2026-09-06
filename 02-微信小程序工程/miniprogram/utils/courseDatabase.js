@@ -51,12 +51,35 @@ const COURSE_DB = [
   { courseId: 'c-orient', courseName: '东方明珠高尔夫', location: '北京 · 通州', lat: 39.902, lng: 116.667, useCount: 3, lastUsed: '2026-03-05', pinyin: 'dongfangmingzhugaoerfu', abbr: 'dfmz', halfCourseCount: 3 },
   { courseId: 'c-nankou', courseName: '南口农场高尔夫练习场', location: '北京 · 昌平', lat: 40.244, lng: 116.143, useCount: 2, lastUsed: '2026-02-18', pinyin: 'nankounongchanggaoerfulianxichang', abbr: 'nk', halfCourseCount: 1 },
   { courseId: 'c-lake', courseName: '京北湖滨高尔夫', location: '北京 · 怀柔', lat: 40.378, lng: 116.631, useCount: 2, lastUsed: '2026-02-01', pinyin: 'jingbeihubingaoerfu', abbr: 'jbhb', halfCourseCount: 2 },
-  { courseId: 'c-county', courseName: '京都高尔夫俱乐部', location: '北京 · 平谷', lat: 40.142, lng: 117.121, useCount: 1, lastUsed: '2026-01-12', pinyin: 'jingdugaoerfujulebu', abbr: 'jd', halfCourseCount: 3 }
+  { courseId: 'c-county', courseName: '京都高尔夫俱乐部', location: '北京 · 平谷', lat: 40.142, lng: 117.121, useCount: 1, lastUsed: '2026-01-12', pinyin: 'jingdugaoerfujulebu', abbr: 'jd', halfCourseCount: 3 },
+  {
+    courseId: 'c-xinghewan',
+    courseName: '星河湾国际高尔夫俱乐部',
+    location: '湖南 · 长沙',
+    useCount: 0,
+    lastUsed: '',
+    pinyin: 'xinghewanguojigaoerfujulebu',
+    abbr: 'xhw',
+    searchKeys: '星河湾 星河湾国际 长沙 湖南 xinghewan',
+    halfCourseCount: 3,
+    halfCourses: [
+      { code: 'A', name: 'A', holes: 9, par: [4, 3, 4, 5, 4, 4, 5, 3, 4] },
+      { code: 'B', name: 'B', holes: 9, par: [4, 5, 4, 5, 3, 4, 4, 3, 4] },
+      { code: 'C', name: 'C', holes: 9, par: [4, 3, 4, 4, 5, 4, 3, 4, 5] }
+    ]
+  }
 ];
 
 const FALLBACK_ORIGIN = { lat: 39.9087, lng: 116.3975 };
+const UNKNOWN_DISTANCE_TEXT = '距离未知';
+const NEARBY_LIMIT = 10;
+
+function hasCoords(point) {
+  return Number.isFinite(Number(point && point.lat)) && Number.isFinite(Number(point && point.lng));
+}
 
 function distanceKm(a, b) {
+  if (!hasCoords(a) || !hasCoords(b)) return Infinity;
   const R = 6371;
   const toRad = (d) => (d * Math.PI) / 180;
   const dLat = toRad(b.lat - a.lat);
@@ -67,6 +90,60 @@ function distanceKm(a, b) {
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** 展示用距离：仅 Number.isFinite 可出数字文案；未知统一「距离未知」，不写 Infinity/NaN。 */
+function formatDistanceMeta(km) {
+  if (!Number.isFinite(Number(km))) {
+    return {
+      known: false,
+      distance: null,
+      distanceText: UNKNOWN_DISTANCE_TEXT,
+      metaText: UNKNOWN_DISTANCE_TEXT
+    };
+  }
+  const d = Number(km);
+  const eta = Math.max(1, Math.round((d / 40) * 60));
+  const distanceText = d.toFixed(1) + ' km';
+  return {
+    known: true,
+    distance: d,
+    distanceText: distanceText,
+    metaText: distanceText + ' · 约 ' + eta + ' 分钟'
+  };
+}
+
+function compareDistanceMeta(a, b) {
+  const aKnown = a && a.known ? 0 : 1;
+  const bKnown = b && b.known ? 0 : 1;
+  if (aKnown !== bKnown) return aKnown - bKnown;
+  if (aKnown === 0) return a.distance - b.distance;
+  return 0;
+}
+
+function buildCourseDistanceViews(origin, courses, limit) {
+  const cap = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : NEARBY_LIMIT;
+  const rows = (courses || []).map((c) => {
+    const fmt = formatDistanceMeta(distanceKm(origin, c));
+    return { c: c, fmt: fmt };
+  });
+  const distanceMap = {};
+  rows.forEach((row) => {
+    distanceMap[row.c.courseId] = row.fmt;
+  });
+  const nearbyCourses = rows
+    .slice()
+    .sort((a, b) => compareDistanceMeta(a.fmt, b.fmt))
+    .slice(0, cap)
+    .map((row) => ({
+      courseId: row.c.courseId,
+      courseName: row.c.courseName,
+      location: row.c.location,
+      distance: row.fmt.distance,
+      distanceText: row.fmt.distanceText,
+      metaText: row.fmt.metaText
+    }));
+  return { distanceMap: distanceMap, nearbyCourses: nearbyCourses };
 }
 
 /** 取球场前两个 COURSE 作为前9/后9（与球场选择页 buildHalves 规则一致） */
@@ -90,7 +167,9 @@ function findNearestCourse(origin) {
   let nearest = null;
   let minDist = Infinity;
   COURSE_DB.forEach((c) => {
-    const d = distanceKm(o, { lat: c.lat, lng: c.lng });
+    if (!hasCoords(c)) return;
+    const d = distanceKm(o, c);
+    if (!Number.isFinite(d)) return;
     if (d < minDist) {
       minDist = d;
       nearest = c;
@@ -126,7 +205,12 @@ function locateNearestCourseWithHalves() {
 module.exports = {
   COURSE_DB,
   FALLBACK_ORIGIN,
+  UNKNOWN_DISTANCE_TEXT,
+  NEARBY_LIMIT,
+  hasCoords,
   distanceKm,
+  formatDistanceMeta,
+  buildCourseDistanceViews,
   resolveFirstTwoCourses,
   findNearestCourse,
   getNearestCourseWithHalves,

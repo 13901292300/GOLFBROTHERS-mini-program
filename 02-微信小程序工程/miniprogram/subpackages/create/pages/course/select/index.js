@@ -9,7 +9,7 @@
  */
 
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
-const { COURSE_DB, FALLBACK_ORIGIN, distanceKm, resolveFirstTwoCourses } = require('../../../../../utils/courseDatabase.js');
+const { COURSE_DB, FALLBACK_ORIGIN, hasCoords, formatDistanceMeta, buildCourseDistanceViews, resolveFirstTwoCourses } = require('../../../../../utils/courseDatabase.js');
 const halfCourse = require('../../../../../utils/halfCourse.js');
 
 Page({
@@ -109,30 +109,13 @@ Page({
   },
 
   buildNearby(origin) {
-    // 计算全库距离（供搜索结果带距离），再取最近 10 条作为附近 TAB
-    const withDist = COURSE_DB.map((c) => {
-      const d = distanceKm(origin, { lat: c.lat, lng: c.lng });
-      const eta = Math.max(1, Math.round((d / 40) * 60)); // 约 40km/h 估算到场时间
-      return { c, distance: d, metaText: d.toFixed(1) + ' km · 约 ' + eta + ' 分钟' };
-    });
-    this._distanceMap = {};
-    withDist.forEach((w) => {
-      this._distanceMap[w.c.courseId] = { distance: w.distance, metaText: w.metaText };
-    });
-    const sorted = withDist.slice().sort((a, b) => a.distance - b.distance).slice(0, 10);
+    const views = buildCourseDistanceViews(origin, COURSE_DB);
+    this._distanceMap = views.distanceMap;
     this._nearbyIds = {};
-    sorted.forEach((w) => {
-      this._nearbyIds[w.c.courseId] = true;
+    views.nearbyCourses.forEach((item) => {
+      this._nearbyIds[item.courseId] = true;
     });
-    const list = sorted.map((w) => ({
-      courseId: w.c.courseId,
-      courseName: w.c.courseName,
-      location: w.c.location,
-      distance: w.distance,
-      metaText: w.metaText
-    }));
-    this.setData({ nearbyCourses: list, locating: false });
-    // 定位完成后若正处于搜索模式，刷新结果以补上距离信息
+    this.setData({ nearbyCourses: views.nearbyCourses, locating: false });
     if (this.data.searchMode) {
       this.setData({ searchResults: this.searchCourse((this.data.searchQuery || '').trim()) });
     }
@@ -180,18 +163,21 @@ Page({
     return ranked.slice(0, 20).map((r) => this._toResultItem(r.c));
   },
 
-  // 搜索结果卡片：名称 + 来源标签(常去/附近/搜索结果) + 距离(如有)
+  // 搜索结果卡片：名称 + 来源标签(常去/附近/搜索结果) + 距离文案（未知为「距离未知」）
   _toResultItem(c) {
     const freq = this._frequentIds && this._frequentIds[c.courseId];
     const inNearby = this._nearbyIds && this._nearbyIds[c.courseId];
-    const dist = this._distanceMap && this._distanceMap[c.courseId];
+    const dist = (this._distanceMap && this._distanceMap[c.courseId]) || (!hasCoords(c) ? formatDistanceMeta(Number.NaN) : null);
     const sourceLabel = freq ? '常去' : inNearby ? '附近' : '搜索结果';
+    const distanceText = dist ? dist.distanceText : '';
     const metaText = dist ? c.location + ' · ' + dist.metaText : c.location;
     return {
       courseId: c.courseId,
       courseName: c.courseName,
       location: c.location,
       sourceLabel: sourceLabel,
+      distance: dist ? dist.distance : null,
+      distanceText: distanceText,
       metaText: metaText
     };
   },

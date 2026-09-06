@@ -195,6 +195,20 @@ assert(
     importedDbPath === courseDbPath &&
     fs.existsSync(importedDbPath)
 );
+assert(
+  '选择页通过 buildCourseDistanceViews 生成距离文案',
+  /\bbuildCourseDistanceViews\b/.test(importedNames) &&
+    /\bhasCoords\b/.test(importedNames) &&
+    /\bformatDistanceMeta\b/.test(importedNames) &&
+    methodSource(newJs, 'buildNearby').indexOf('buildCourseDistanceViews(') >= 0 &&
+    methodSource(newJs, 'searchCourse').indexOf('COURSE_DB.forEach') >= 0 &&
+    newJs.indexOf('.toFixed(') < 0
+);
+assert(
+  '选择页搜索结果带 distanceText 且无 Infinity km',
+  newJs.indexOf('Infinity km') < 0 &&
+    methodSource(newJs, '_toResultItem').indexOf('distanceText') >= 0
+);
 
 var courseDb = require(courseDbPath);
 assert(
@@ -251,6 +265,18 @@ try {
 }
 assert('页面 JSON 可解析', pageJsonOk);
 assert('未保留 redirect 兼容壳', !fs.existsSync(oldPageDir));
+
+var views = courseDb.buildCourseDistanceViews(courseDb.FALLBACK_ORIGIN, courseDb.COURSE_DB);
+var xh = courseDb.COURSE_DB.find(function (c) { return c.courseId === 'c-xinghewan'; });
+var xhView = views.distanceMap['c-xinghewan'];
+assert(
+  '选择页距离视图对星河湾给出距离未知',
+  xh && xhView && xhView.distanceText === '距离未知' && (xh.location + ' · ' + xhView.metaText) === '湖南 · 长沙 · 距离未知'
+);
+assert(
+  '选择页距离视图不含 Infinity km / NaN km',
+  JSON.stringify(views).indexOf('Infinity km') < 0 && JSON.stringify(views).indexOf('NaN km') < 0
+);
 
 console.log('\npassed=' + passed + ' failed=' + failed);
 if (failures.length) {
