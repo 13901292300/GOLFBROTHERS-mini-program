@@ -2,7 +2,8 @@ const defaultConfig = require("../../../../config");
 const {
   POSTER_WIDTH,
   POSTER_HEIGHT,
-  EVENT_BRAND_LOGO_PATH,
+  DEFAULT_BRAND_TEXT,
+  ensureBrandHeader,
   MAX_STICKERS,
   PALETTES,
   COLOR_OPTIONS,
@@ -55,7 +56,11 @@ const gameStore = require("../../../../utils/gameStore.js");
 const socialRelationStore = require("../../../../utils/socialRelationStore.js");
 const playerMomentPublishContext = require("../../../../utils/playerMomentPublishContext.js");
 
-const STEP_KEYS = ["template", "photo", "scorecard", "total", "identity", "stickers", "summary"];
+const STEP_KEYS = ["template", "photo", "scorecard", "total", "identity", "brand", "stickers", "summary"];
+const STEP_COUNT = STEP_KEYS.length;
+const SUMMARY_STEP = STEP_KEYS.indexOf("summary");
+const STICKER_STEP = STEP_KEYS.indexOf("stickers");
+const BRAND_STEP = STEP_KEYS.indexOf("brand");
 
 const COPY = {
   zh: {
@@ -79,13 +84,14 @@ const COPY = {
     nudgeRight: "右",
     tapToExpand: "轻点海报放大编辑",
     tapToClose: "拖动元素调整，轻点海报返回步骤",
-    stepTitles: ["模板", "照片", "成绩卡", "总成绩", "文字信息", "贴纸", "完成海报"],
+    stepTitles: ["模板", "照片", "成绩卡", "总成绩", "文字信息", "品牌信息", "贴纸", "完成海报"],
     gestureHints: [
       "",
       "画布手势仅调整照片",
       "画布手势仅调整成绩卡",
       "画布手势仅调整总成绩",
       "画布手势仅调整当前文字",
+      "顶部品牌栏随本页设置更新",
       "画布手势仅调整选中贴纸",
       "完整海报预览"
     ],
@@ -187,7 +193,7 @@ const COPY = {
     totalEmpty: "成绩卡尚无逐洞成绩",
     totalReadonlyHint: "总杆来自成绩卡，不可在此修改",
     nickname: "昵称",
-    nicknameReadonlyHint: "昵称来自记分卡，如需修改请返回记分页",
+    nicknameReadonlyHint: "本页不可修改昵称，如需修改请到“我的”菜单修改。",
     course: "球场 / 赛事",
     date: "日期",
     dateMissing: "日期待填",
@@ -207,7 +213,18 @@ const COPY = {
     editScorecard: "修改成绩卡",
     editTotal: "修改总成绩",
     editIdentity: "修改文字",
+    editBrand: "修改品牌",
     editStickers: "修改贴纸",
+    brandLogo: "品牌 LOGO",
+    uploadBrandLogo: "上传品牌 LOGO",
+    resetBrandLogo: "恢复默认标志",
+    brandText: "品牌文字",
+    brandAlign: "位置",
+    brandAlignLeft: "左侧",
+    brandAlignCenter: "居中",
+    brandAlignRight: "右侧",
+    brandStyleHint: "全大写 · 斜体 · Playfair Display",
+    brandLineHint: "空余部分用横线补齐",
     exportPoster: "生成并保存海报",
     sharePoster: "分享海报",
     shareToCircle: "球友圈",
@@ -246,13 +263,14 @@ const COPY = {
     nudgeRight: "Right",
     tapToExpand: "Tap the poster to enlarge and edit",
     tapToClose: "Drag to adjust; tap the poster to return",
-    stepTitles: ["Template", "Photo", "Scorecard", "Total", "Text", "Stickers", "Complete"],
+    stepTitles: ["Template", "Photo", "Scorecard", "Total", "Text", "Brand", "Stickers", "Complete"],
     gestureHints: [
       "",
       "Canvas gestures adjust only the photo",
       "Canvas gestures adjust only the scorecard",
       "Canvas gestures adjust only the total",
       "Canvas gestures adjust the active text",
+      "The brand bar follows the settings on this page",
       "Canvas gestures adjust the selected sticker",
       "Full poster preview"
     ],
@@ -354,7 +372,7 @@ const COPY = {
     totalEmpty: "No hole scores on the scorecard yet",
     totalReadonlyHint: "Total comes from the scorecard and cannot be edited here",
     nickname: "Name",
-    nicknameReadonlyHint: "Name comes from the scorecard. Go back to edit it there.",
+    nicknameReadonlyHint: "Nickname cannot be changed on this page. Edit it in Me.",
     course: "Course / event",
     date: "Date",
     dateMissing: "DATE TBD",
@@ -374,7 +392,18 @@ const COPY = {
     editScorecard: "EDIT SCORECARD",
     editTotal: "EDIT TOTAL",
     editIdentity: "EDIT TEXT",
+    editBrand: "EDIT BRAND",
     editStickers: "EDIT STICKERS",
+    brandLogo: "Brand logo",
+    uploadBrandLogo: "UPLOAD LOGO",
+    resetBrandLogo: "USE DEFAULT MARK",
+    brandText: "Brand name",
+    brandAlign: "Position",
+    brandAlignLeft: "Left",
+    brandAlignCenter: "Center",
+    brandAlignRight: "Right",
+    brandStyleHint: "Uppercase · Italic · Playfair Display",
+    brandLineHint: "Empty space is filled with a rule",
     exportPoster: "GENERATE & SAVE",
     sharePoster: "Share poster",
     shareToCircle: "Circle",
@@ -468,7 +497,7 @@ Component({
     language: "zh",
     copy: COPY.zh,
     step: 0,
-    stepCounter: "01 / 07",
+    stepCounter: "01 / 08",
     stepTitle: COPY.zh.stepTitles[0],
     gestureHint: "",
     showWizardFooter: false,
@@ -543,6 +572,10 @@ Component({
       identityVisible: true,
       totalVisible: true,
       relativeVisible: true,
+      brandText: DEFAULT_BRAND_TEXT,
+      brandAlign: "left",
+      brandLogoPath: "",
+      brandUseCustomLogo: false,
       stickerScale: 100
     },
     saving: false,
@@ -553,7 +586,7 @@ Component({
   observers: {
     brand(value) {
       if (!this.posterState) return;
-      this.posterState.identity.brand = value || "GOLFBROTHERS";
+      this.posterState.identity.brand = value || DEFAULT_BRAND_TEXT;
       this._render();
     },
 
@@ -597,7 +630,8 @@ Component({
     async attached() {
       this.applyTheme();
       const language = this.properties.initialLanguage === "en" ? "en" : "zh";
-      this.posterState.identity.brand = this.properties.brand || "GOLFBROTHERS";
+      this.posterState.identity.brand = this.properties.brand || DEFAULT_BRAND_TEXT;
+      ensureBrandHeader(this.posterState);
       this._posterReady = true;
       this._applyScoreFromRound(this.properties.roundId);
       this._applyLanguage(language);
@@ -754,11 +788,14 @@ Component({
       merged.subjectFileID = draft.subjectFileID || saved.subjectFileID || "";
       merged.templateId = templateId;
       restorePosterColorState(merged);
+      ensureBrandHeader(merged);
       this.posterState = merged;
       this._applyScoreFromRound(this.properties.roundId);
 
       const step = Number(draft.step);
-      const safeStep = Number.isFinite(step) ? Math.max(0, Math.min(6, step)) : 0;
+      const hasBrandHeader = saved.brandHeader && typeof saved.brandHeader === "object";
+      const migrated = !hasBrandHeader && Number.isFinite(step) && step >= 5 ? step + 1 : step;
+      const safeStep = Number.isFinite(migrated) ? Math.max(0, Math.min(SUMMARY_STEP, migrated)) : 0;
       await new Promise((resolve) => {
         this.setData({
           step: safeStep,
@@ -848,6 +885,8 @@ Component({
       }
       this.posterState.stickers = restoredStickers;
       this._syncStickerControls();
+      ensureBrandHeader(this.posterState);
+      await this._ensureBrandLogo();
 
       if (this.posterState.backdropMode === "system") {
         try {
@@ -1046,7 +1085,7 @@ Component({
     },
 
     nextStep() {
-      if (this.data.step >= 6) return;
+      if (this.data.step >= SUMMARY_STEP) return;
       if (this.returnToSummary) {
         this._returnToSummary();
         return;
@@ -1087,10 +1126,10 @@ Component({
       const step = this.data.step;
       const summaryEdit = Boolean(this.returnToSummary);
       this.setData({
-        stepCounter: `${String(step + 1).padStart(2, "0")} / 07`,
+        stepCounter: `${String(step + 1).padStart(2, "0")} / ${String(STEP_COUNT).padStart(2, "0")}`,
         stepTitle: this.data.copy.stepTitles[step],
         gestureHint: this._gestureHint(this.data.copy, step, this.data.largeEdit),
-        showWizardFooter: step > 0 && step < 6,
+        showWizardFooter: step > 0 && step < SUMMARY_STEP,
         returnToSummaryMode: summaryEdit,
         primaryActionLabel: summaryEdit ? this.data.copy.confirmChange : this.data.copy.next,
         primaryActionIcon: summaryEdit ? "✓" : "›",
@@ -1101,7 +1140,7 @@ Component({
     _returnToSummary() {
       this.returnToSummary = false;
       this.setData({
-        step: 6,
+        step: SUMMARY_STEP,
         templatePreviewOpen: false
       }, () => {
         this.templateCanvas = null;
@@ -1137,7 +1176,7 @@ Component({
     },
 
     _onStepEntered(step) {
-      if (step === 5) this._enterStickerStep();
+      if (step === STICKER_STEP) this._enterStickerStep();
     },
 
     _ensureStickerSelection() {
@@ -1167,7 +1206,7 @@ Component({
     },
 
     openLargeEdit() {
-      const onStickers = Number(this.data.step) === 5;
+      const onStickers = Number(this.data.step) === STICKER_STEP;
       const stepTarget = onStickers
         ? this._ensureStickerSelection()
         : this._gestureTarget();
@@ -1189,7 +1228,7 @@ Component({
     },
 
     closeLargeEdit() {
-      const stickerTarget = Number(this.data.step) === 5
+      const stickerTarget = Number(this.data.step) === STICKER_STEP
         ? this._ensureStickerSelection()
         : "";
       this.setData({
@@ -2244,6 +2283,78 @@ Component({
       this._render();
     },
 
+    _syncBrandForm() {
+      ensureBrandHeader(this.posterState);
+      const header = this.posterState.brandHeader;
+      this.setData({
+        "form.brandText": header.text,
+        "form.brandAlign": header.align,
+        "form.brandLogoPath": header.useCustomLogo ? header.logoPath : "",
+        "form.brandUseCustomLogo": Boolean(header.useCustomLogo)
+      });
+    },
+
+    onBrandTextInput(event) {
+      ensureBrandHeader(this.posterState);
+      const value = String(event.detail.value || "").toUpperCase();
+      this.posterState.brandHeader.text = value;
+      this.posterState.identity.brand = value || DEFAULT_BRAND_TEXT;
+      this.setData({ "form.brandText": value });
+      this._render();
+    },
+
+    selectBrandAlign(event) {
+      ensureBrandHeader(this.posterState);
+      const align = event.currentTarget.dataset.align;
+      if (align !== "left" && align !== "center" && align !== "right") return;
+      this.posterState.brandHeader.align = align;
+      this.setData({ "form.brandAlign": align });
+      this._render();
+      this.saveDraft();
+    },
+
+    chooseBrandLogo() {
+      wx.chooseMedia({
+        count: 1,
+        mediaType: ["image"],
+        sourceType: ["album", "camera"],
+        sizeType: ["original", "compressed"],
+        success: async (result) => {
+          const file = result.tempFiles && result.tempFiles[0];
+          const filePath = file && file.tempFilePath;
+          if (!filePath) return;
+          ensureBrandHeader(this.posterState);
+          try {
+            const image = await this._loadCanvasImage(filePath);
+            this._brandLogoImage = image;
+            this._brandLogoPath = filePath;
+            this.posterState.brandHeader.logoPath = filePath;
+            this.posterState.brandHeader.useCustomLogo = true;
+            this.posterState.brandLogo = image;
+            this._syncBrandForm();
+            this._render();
+            this.saveDraft();
+          } catch (error) {
+            console.warn("[golf-poster] brand logo upload failed", error);
+          }
+        }
+      });
+    },
+
+    resetBrandLogo() {
+      ensureBrandHeader(this.posterState);
+      this.posterState.brandHeader.logoPath = "";
+      this.posterState.brandHeader.logoFileID = "";
+      this.posterState.brandHeader.useCustomLogo = false;
+      this.posterState.brandLogo = null;
+      this._brandLogoImage = null;
+      this._brandLogoPath = "";
+      this._brandLogoPromise = null;
+      this._syncBrandForm();
+      this._render();
+      this.saveDraft();
+    },
+
     chooseStickers() {
       const remaining = MAX_STICKERS - this.posterState.stickers.length;
       if (remaining <= 0) return;
@@ -2742,7 +2853,7 @@ Component({
 
     _gestureTarget() {
       const step = Number(this.data.step);
-      if (step === 5) return this._ensureStickerSelection();
+      if (step === STICKER_STEP) return this._ensureStickerSelection();
       if (this.data.largeEdit) return this.data.activeEditTarget || "";
       if (step === 1) return "photo";
       if (step === 2) return "scorecard";
@@ -2849,7 +2960,7 @@ Component({
         date: copy.date,
         extra: copy.extra
       };
-      if (target.indexOf("sticker:") === 0) return copy.stepTitles[5];
+      if (target.indexOf("sticker:") === 0) return copy.stepTitles[STICKER_STEP];
       return labels[target] || copy.noSelection;
     },
 
@@ -2890,6 +3001,12 @@ Component({
         this.templateCanvas.height = POSTER_HEIGHT;
         this.templateContext = this.templateCanvas.getContext("2d");
         const sample = createPosterModel(templateId, true, this.properties.brand);
+        if (this.posterState && this.posterState.brandHeader) {
+          sample.brandHeader = Object.assign({}, this.posterState.brandHeader);
+          sample.brandLogo = this.posterState.brandHeader.useCustomLogo
+            ? (this._brandLogoImage || this.posterState.brandLogo || null)
+            : null;
+        }
         if (templateId === "template2" && this.data.form.layoutMirrored && !sample.layoutMirrored) {
           mirrorPosterLayout(sample);
         }
@@ -2899,14 +3016,6 @@ Component({
             sample.backdrop = await this._loadCanvasImage(spec.path);
           } catch (error) {
             console.warn("[golf-poster] template backdrop missing", error);
-          }
-        }
-        sample.brandLogo = this._brandLogoImage || null;
-        if (!sample.brandLogo) {
-          try {
-            sample.brandLogo = await this._ensureBrandLogo();
-          } catch (error) {
-            console.warn("[golf-poster] template brand logo missing", error);
           }
         }
         renderPoster(this.templateContext, sample, { showGuide: false });
@@ -2975,12 +3084,25 @@ Component({
     },
 
     _ensureBrandLogo() {
-      if (this._brandLogoImage) return Promise.resolve(this._brandLogoImage);
-      if (this._brandLogoPromise) return this._brandLogoPromise;
-      this._brandLogoPromise = this._loadCanvasImage(EVENT_BRAND_LOGO_PATH)
-        .then((img) => this._punchBrandLogoWhite(img))
+      ensureBrandHeader(this.posterState);
+      const header = this.posterState.brandHeader;
+      if (!header.useCustomLogo || !header.logoPath) {
+        this._brandLogoImage = null;
+        this._brandLogoPath = "";
+        this._brandLogoPromise = null;
+        if (this.posterState) this.posterState.brandLogo = null;
+        return Promise.resolve(null);
+      }
+      if (this._brandLogoImage && this._brandLogoPath === header.logoPath) {
+        this.posterState.brandLogo = this._brandLogoImage;
+        return Promise.resolve(this._brandLogoImage);
+      }
+      if (this._brandLogoPromise && this._brandLogoPath === header.logoPath) return this._brandLogoPromise;
+      const logoPath = header.logoPath;
+      this._brandLogoPromise = this._loadCanvasImage(logoPath)
         .then((img) => {
           this._brandLogoImage = img;
+          this._brandLogoPath = logoPath;
           if (this.posterState) this.posterState.brandLogo = img;
           this._render();
           return img;
@@ -2988,6 +3110,12 @@ Component({
         .catch((error) => {
           console.warn("[golf-poster] brand logo missing", error);
           this._brandLogoPromise = null;
+          this._brandLogoImage = null;
+          this._brandLogoPath = "";
+          if (this.posterState) {
+            this.posterState.brandLogo = null;
+            this.posterState.brandHeader.useCustomLogo = false;
+          }
           return null;
         });
       return this._brandLogoPromise;
@@ -3012,8 +3140,8 @@ Component({
 
     _guideTarget() {
       const step = Number(this.data.step);
-      if (step >= 6 || step <= 0) return "";
-      if (step === 5) return this._ensureStickerSelection();
+      if (step >= SUMMARY_STEP || step <= 0 || step === BRAND_STEP) return "";
+      if (step === STICKER_STEP) return this._ensureStickerSelection();
       if (this.data.largeEdit) return this.data.activeEditTarget || "";
       return this._gestureTarget();
     },
@@ -3042,9 +3170,13 @@ Component({
 
     _renderNow(exporting) {
       if (!this.posterContext) return;
-      if (this.posterState) this.posterState.brandLogo = this._brandLogoImage || this.posterState.brandLogo || null;
+      if (this.posterState) {
+        ensureBrandHeader(this.posterState);
+        this.posterState.brandLogo = this._brandLogoImage || this.posterState.brandLogo || null;
+        if (!this.posterState.brandHeader.useCustomLogo) this.posterState.brandLogo = null;
+      }
       this.sceneBounds = renderPoster(this.posterContext, this.posterState, {
-        showGuide: !exporting && this.data.step > 0 && this.data.step < 6,
+        showGuide: !exporting && this.data.step > 0 && this.data.step < SUMMARY_STEP && this.data.step !== BRAND_STEP,
         guideTarget: this._guideTarget()
       });
     },
@@ -3215,6 +3347,7 @@ Component({
     _syncAllControls() {
       const model = this.posterState;
       model.badge = "";
+      ensureBrandHeader(model);
       ensureTotalDisplayModel(model);
       const calculation = calculateTotal(model);
       model.total.value = calculation.total === null ? "" : String(calculation.total);
@@ -3274,6 +3407,10 @@ Component({
           identityItalic: Boolean(model.identity[this.data.activeIdentity].italic),
           identityRotated: this._identityRotated(this.data.activeIdentity),
           identityVisible: !Boolean(model.identity[this.data.activeIdentity].hidden),
+          brandText: (model.brandHeader && model.brandHeader.text) || DEFAULT_BRAND_TEXT,
+          brandAlign: (model.brandHeader && model.brandHeader.align) || "left",
+          brandLogoPath: model.brandHeader && model.brandHeader.useCustomLogo ? model.brandHeader.logoPath : "",
+          brandUseCustomLogo: Boolean(model.brandHeader && model.brandHeader.useCustomLogo),
           stickerScale: this._selectedSticker() ? Math.round(this._selectedSticker().scale * 100) : 100
         },
         textFontIndex: fontIndex(model.identity[this.data.activeIdentity].font)

@@ -1,7 +1,7 @@
 <view class="poster-shell {{themeClass}}">
   <view hidden="{{step != 0}}" class="template-screen">
     <view class="template-heading">
-      <text class="step-kicker">01 / 07</text>
+      <text class="step-kicker">{{stepCounter}}</text>
       <view class="template-heading-row">
         <text class="page-title">{{copy.chooseTemplate}}</text>
         <button class="reset-button" bindtap="resetPoster" aria-label="{{copy.reset}}">
@@ -433,7 +433,7 @@
             <block wx:if="{{activeIdentity == 'nickname'}}">
               <text class="field-title">{{copy.nickname}}</text>
               <text class="identity-readonly">{{form.nickname}}</text>
-              <text class="score-readonly-hint">{{copy.nicknameReadonlyHint}}</text>
+              <text class="score-readonly-hint identity-nickname-hint">{{copy.nicknameReadonlyHint}}</text>
             </block>
             <block wx:elif="{{activeIdentity == 'course'}}">
               <text class="field-title">{{copy.course}}</text>
@@ -505,6 +505,41 @@
 
         <view class="control-card">
           <view class="card-block">
+            <text class="field-title">{{copy.brandLogo}}</text>
+            <view class="action-row">
+              <button class="upload-action" bindtap="chooseBrandLogo"><view class="upload-icon"></view>{{copy.uploadBrandLogo}}</button>
+              <button wx:if="{{form.brandUseCustomLogo}}" class="secondary-action" bindtap="resetBrandLogo">{{copy.resetBrandLogo}}</button>
+            </view>
+            <image wx:if="{{form.brandLogoPath}}" class="brand-logo-thumb" src="{{form.brandLogoPath}}" mode="aspectFit"></image>
+          </view>
+          <view class="card-block">
+            <text class="field-title">{{copy.brandText}}</text>
+            <input value="{{form.brandText}}" bindinput="onBrandTextInput" maxlength="32" />
+            <text class="score-readonly-hint">{{copy.brandStyleHint}}</text>
+          </view>
+          <view class="card-block">
+            <text class="field-title">{{copy.brandAlign}}</text>
+            <view class="segmented">
+              <button class="{{form.brandAlign == 'left' ? 'active' : ''}}" data-align="left" bindtap="selectBrandAlign">{{copy.brandAlignLeft}}</button>
+              <button class="{{form.brandAlign == 'center' ? 'active' : ''}}" data-align="center" bindtap="selectBrandAlign">{{copy.brandAlignCenter}}</button>
+              <button class="{{form.brandAlign == 'right' ? 'active' : ''}}" data-align="right" bindtap="selectBrandAlign">{{copy.brandAlignRight}}</button>
+            </view>
+            <text class="score-readonly-hint">{{copy.brandLineHint}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{step == 6}}" class="control-panel">
+        <view class="panel-heading">
+          <text class="panel-number">07</text>
+          <view>
+            <text class="panel-title">{{copy.stepTitles[6]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[6]}}</text>
+          </view>
+        </view>
+
+        <view class="control-card">
+          <view class="card-block">
             <view class="action-row">
               <button class="upload-action" disabled="{{stickers.length >= 5}}" bindtap="chooseStickers"><view class="upload-icon"></view>{{copy.uploadSticker}}</button>
               <text class="sticker-count">{{stickerCount}}</text>
@@ -528,12 +563,12 @@
         </view>
       </view>
 
-      <view wx:if="{{step == 6}}" class="control-panel summary-panel">
+      <view wx:if="{{step == 7}}" class="control-panel summary-panel">
         <view class="panel-heading">
-          <text class="panel-number">07</text>
+          <text class="panel-number">08</text>
           <view>
-            <text class="panel-title">{{copy.stepTitles[6]}}</text>
-            <text class="panel-copy">{{copy.gestureHints[6]}}</text>
+            <text class="panel-title">{{copy.stepTitles[7]}}</text>
+            <text class="panel-copy">{{copy.gestureHints[7]}}</text>
           </view>
         </view>
         <button class="free-edit-action" bindtap="openLargeEdit">
@@ -546,6 +581,7 @@
           <button data-step="scorecard" bindtap="jumpToStep">{{copy.editScorecard}}</button>
           <button data-step="total" bindtap="jumpToStep">{{copy.editTotal}}</button>
           <button data-step="identity" bindtap="jumpToStep">{{copy.editIdentity}}</button>
+          <button data-step="brand" bindtap="jumpToStep">{{copy.editBrand}}</button>
           <button data-step="stickers" bindtap="jumpToStep">{{copy.editStickers}}</button>
         </view>
         <button class="download-action" bindtap="exportPoster"><view class="download-icon"></view>{{copy.exportPoster}}</button>

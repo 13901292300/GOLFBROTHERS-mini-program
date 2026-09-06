@@ -2,7 +2,9 @@ const {
   POSTER_WIDTH,
   POSTER_HEIGHT,
   BRAND_HEIGHT,
-  EVENT_BRAND_TITLE,
+  DEFAULT_BRAND_TEXT,
+  ensureBrandHeader,
+  normalizeBrandAlign,
   TEMPLATES,
   FONT_OPTIONS,
   normalizeFontId,
@@ -392,58 +394,122 @@ function drawAtmosphere(ctx, template) {
   ctx.fillRect(0, 520, POSTER_WIDTH, POSTER_HEIGHT - 520);
 }
 
+const BRAND_GOLD = "#c9a13d";
+const BRAND_WHITE = "#ffffff";
+const BRAND_RULE = "rgba(226,232,236,0.72)";
+
+function brandDisplayText(model) {
+  ensureBrandHeader(model);
+  const raw = String((model.brandHeader && model.brandHeader.text) || "").trim();
+  const title = (raw || DEFAULT_BRAND_TEXT).toUpperCase();
+  return title;
+}
+
+function brandTextParts(title) {
+  const idx = title.indexOf(" ");
+  if (idx < 0) return [{ text: title, color: BRAND_WHITE }];
+  return [
+    { text: title.slice(0, idx), color: BRAND_WHITE },
+    { text: " " + title.slice(idx + 1), color: BRAND_GOLD }
+  ];
+}
+
+function measureBrandParts(ctx, parts) {
+  let width = 0;
+  for (let i = 0; i < parts.length; i += 1) {
+    width += ctx.measureText(parts[i].text).width;
+  }
+  return width;
+}
+
+function drawBrandParts(ctx, parts, x, y) {
+  let cursor = x;
+  for (let i = 0; i < parts.length; i += 1) {
+    ctx.fillStyle = parts[i].color;
+    ctx.fillText(parts[i].text, cursor, y);
+    cursor += ctx.measureText(parts[i].text).width;
+  }
+}
+
+function drawBrandRule(ctx, x1, x2, y) {
+  if (x2 - x1 < 28) return;
+  ctx.beginPath();
+  ctx.moveTo(x1, y);
+  ctx.lineTo(x2, y);
+  ctx.strokeStyle = BRAND_RULE;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function drawDefaultBrandMark(ctx, x, yCenter, height) {
+  const poleW = 5;
+  const poleH = height * 0.72;
+  const flagW = height * 0.72;
+  const poleY = yCenter - poleH / 2;
+  ctx.fillStyle = BRAND_WHITE;
+  ctx.fillRect(x, poleY, poleW, poleH);
+  ctx.fillStyle = BRAND_GOLD;
+  ctx.beginPath();
+  ctx.moveTo(x + poleW + 2, poleY + 2);
+  ctx.lineTo(x + poleW + 2 + flagW, poleY + poleH * 0.32);
+  ctx.lineTo(x + poleW + 2, poleY + poleH * 0.52);
+  ctx.closePath();
+  ctx.fill();
+  return poleW + 2 + flagW;
+}
+
 function drawBrand(ctx, model) {
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, POSTER_WIDTH, BRAND_HEIGHT);
 
-  const logo = model && model.brandLogo;
-  let textX = 120;
+  ensureBrandHeader(model);
+  const header = model.brandHeader;
+  const align = normalizeBrandAlign(header && header.align);
+  const title = brandDisplayText(model);
+  const parts = brandTextParts(title);
+  const logo = model && model.brandLogo && header.useCustomLogo ? model.brandLogo : null;
+  const padL = 24;
+  const padR = 48;
+  const innerL = padL;
+  const innerR = POSTER_WIDTH - padR;
+  const innerW = innerR - innerL;
+  const gapLogoText = 16;
+  const lineGap = 24;
+  const logoH = 42;
+  const midY = BRAND_HEIGHT / 2;
+  let logoW = 0;
   if (logo) {
     const srcW = Number(logo.width || logo.naturalWidth) || 1;
     const srcH = Number(logo.height || logo.naturalHeight) || 1;
-    const logoH = 58;
-    const logoW = Math.max(1, Math.round((logoH * srcW) / srcH));
-    const logoY = (BRAND_HEIGHT - logoH) / 2;
-    ctx.drawImage(logo, 24, logoY, logoW, logoH);
-    textX = 24 + logoW + 16;
+    logoW = Math.max(1, Math.round((logoH * srcW) / srcH));
   } else {
-    ctx.save();
-    ctx.translate(54, 18);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, -3, 5, 40);
-    ctx.fillStyle = "#c9a13d";
-    ctx.beginPath();
-    ctx.moveTo(7, -1);
-    ctx.lineTo(48, 11);
-    ctx.lineTo(7, 23);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    logoW = 5 + 2 + Math.round(logoH * 0.72);
   }
 
-  const title = EVENT_BRAND_TITLE;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  const maxTextW = POSTER_WIDTH - 48 - textX;
-  let size = 26;
+  const maxTextW = Math.max(80, innerW - logoW - gapLogoText);
+  let size = 30;
   applyCanvasFont(ctx, 'italic 700 ' + size + 'px "GOLF_Playfair", "PingFang SC"');
-  while (size > 16 && ctx.measureText(title).width > maxTextW) {
+  while (size > 16 && measureBrandParts(ctx, parts) > maxTextW) {
     size -= 1;
     applyCanvasFont(ctx, 'italic 700 ' + size + 'px "GOLF_Playfair", "PingFang SC"');
   }
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(title, textX, BRAND_HEIGHT / 2);
-  const brandEnd = textX + ctx.measureText(title).width;
-  const lineStart = brandEnd + 24;
-  const lineEnd = POSTER_WIDTH - 48;
-  if (lineEnd - lineStart >= 28) {
-    ctx.beginPath();
-    ctx.moveTo(lineStart, BRAND_HEIGHT / 2);
-    ctx.lineTo(lineEnd, BRAND_HEIGHT / 2);
-    ctx.strokeStyle = "rgba(226,232,236,0.72)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+  const textW = measureBrandParts(ctx, parts);
+  const contentW = logoW + gapLogoText + textW;
+  let contentX = innerL;
+  if (align === "right") contentX = innerR - contentW;
+  else if (align === "center") contentX = innerL + (innerW - contentW) / 2;
+
+  const logoY = midY - logoH / 2;
+  if (logo) {
+    ctx.drawImage(logo, contentX, logoY, logoW, logoH);
+  } else {
+    drawDefaultBrandMark(ctx, contentX, midY, logoH);
   }
+  drawBrandParts(ctx, parts, contentX + logoW + gapLogoText, midY);
+  drawBrandRule(ctx, innerL, contentX - lineGap, midY);
+  drawBrandRule(ctx, contentX + contentW + lineGap, innerR, midY);
 }
 
 function drawPreviewSubject(ctx, template, model) {

@@ -1,10 +1,42 @@
 const POSTER_WIDTH = 1000;
 const POSTER_HEIGHT = 1265;
 const BRAND_HEIGHT = 70;
-/** 临时赛事顶栏：名校杯 LOGO + 文案（中间圆点） */
+const DEFAULT_BRAND_TEXT = "GOLF BROTHERS";
+const DEFAULT_BRAND_ALIGN = "left";
+/** 自定义 LOGO 未上传时，顶栏绘制默认旗标，不再强制赛事图 */
 const EVENT_BRAND_LOGO_PATH = "/subpackages/poster/images/mingxiaobei-logo.jpg";
-const EVENT_BRAND_TITLE = "2026青花郎·名校杯高校校友联谊赛";
+const EVENT_BRAND_TITLE = DEFAULT_BRAND_TEXT;
 const MAX_STICKERS = 5;
+
+function createBrandHeader() {
+  return {
+    text: DEFAULT_BRAND_TEXT,
+    align: DEFAULT_BRAND_ALIGN,
+    logoPath: "",
+    logoFileID: "",
+    useCustomLogo: false
+  };
+}
+
+function normalizeBrandAlign(value) {
+  if (value === "center" || value === "right") return value;
+  return DEFAULT_BRAND_ALIGN;
+}
+
+function ensureBrandHeader(model) {
+  if (!model) return model;
+  const current = model.brandHeader && typeof model.brandHeader === "object" ? model.brandHeader : {};
+  const text = String(current.text == null ? DEFAULT_BRAND_TEXT : current.text);
+  model.brandHeader = {
+    text: text,
+    align: normalizeBrandAlign(current.align),
+    logoPath: String(current.logoPath || ""),
+    logoFileID: String(current.logoFileID || ""),
+    useCustomLogo: Boolean(current.useCustomLogo)
+  };
+  if (model.identity) model.identity.brand = text || DEFAULT_BRAND_TEXT;
+  return model;
+}
 const posterColors = require("./poster-colors");
 
 const PGA_MARKER_DEFAULTS = {
@@ -1382,8 +1414,10 @@ function createPosterModel(templateId, sample, brand) {
         rotation: defaultRegionRotation(template.layout.extra),
         hidden: false
       },
-      brand: brand || "GOLFBROTHERS"
+      brand: brand || DEFAULT_BRAND_TEXT
     },
+    brandHeader: createBrandHeader(),
+    brandLogo: null,
     layoutMirrored: false,
     paletteId,
     colorMode: "template",
@@ -1774,6 +1808,9 @@ function switchTemplate(previous, templateId, brand) {
   next.identity.date.value = previous.identity.date.value;
   next.identity.extra.value = previous.identity.extra.value;
   next.identity.brand = previous.identity.brand;
+  ensureBrandHeader(previous);
+  next.brandHeader = Object.assign(createBrandHeader(), previous.brandHeader || {});
+  next.brandLogo = previous.brandLogo || null;
   ["nickname", "course", "date", "extra"].forEach((key) => {
     next.identity[key].italic = resolveItalic(previous.identity[key] && previous.identity[key].italic, next.identity[key].italic);
     if (previous.identity[key] && Number.isFinite(Number(previous.identity[key].rotation))) {
@@ -1822,6 +1859,11 @@ module.exports = {
   BRAND_HEIGHT,
   EVENT_BRAND_LOGO_PATH,
   EVENT_BRAND_TITLE,
+  DEFAULT_BRAND_TEXT,
+  DEFAULT_BRAND_ALIGN,
+  createBrandHeader,
+  ensureBrandHeader,
+  normalizeBrandAlign,
   MAX_STICKERS,
   PALETTES,
   COLOR_OPTIONS,
