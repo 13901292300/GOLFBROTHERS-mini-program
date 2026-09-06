@@ -11,5 +11,6 @@
   <view class="tps__icon"><text>!</text></view>
   <text class="tps__title">{{errorTitle}}</text>
   <text wx:if="{{errorDesc}}" class="tps__desc">{{errorDesc}}</text>
-  <view class="tps__btn" bindtap="onRetry">{{retryLabel}}</view>
+  <view wx:if="{{showCompleteProfile}}" class="tps__btn" bindtap="onCompleteProfile">{{btnLabel || '完善资料'}}</view>
+  <view wx:elif="{{showRetry}}" class="tps__btn" bindtap="onRetry">{{btnLabel || retryLabel}}</view>
 </view>

@@ -13,8 +13,20 @@
     </view>
   </view>
 
-  <scroll-view scroll-y class="pe-body" enhanced show-scrollbar="{{false}}">
+  <scroll-view scroll-y class="pe-body {{teamClubOnboard ? 'pe-body--onboard' : ''}}" enhanced show-scrollbar="{{false}}">
     <view class="pe-main">
+      <view wx:if="{{teamClubOnboard}}" class="pe-onboard-hint">
+        <text class="pe-onboard-hint__title">完善球队资料</text>
+        <text class="pe-onboard-hint__desc">请使用微信授权填写昵称，并通过头像选择器设置头像。完成后即可创建或加入球队。</text>
+        <input
+          class="pe-wx-nick"
+          type="nickname"
+          maxlength="20"
+          placeholder="点击填写微信昵称"
+          bindchange="onWxNickname"
+          bindblur="onWxNickname"
+        />
+      </view>
       <!-- 1. 基础资料 -->
       <button class="pe-card pe-avatar-card pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" bindtap="onTapAvatar">
         <view class="pe-avatar-ring">
@@ -151,10 +163,12 @@
         <input
           wx:else
           class="pe-editor__input"
+          type="{{editorField === 'nickname' ? 'nickname' : 'text'}}"
           value="{{editorDraft}}"
           maxlength="{{editorMaxlength}}"
           placeholder="{{editorPlaceholder}}"
           bindinput="onEditorInput"
+          bindchange="onEditorWxChange"
           focus
         />
         <text class="pe-editor__count">{{editorCount}}/{{editorMaxlength}}</text>
@@ -187,5 +201,14 @@
         >{{item.label}}</view>
       </scroll-view>
     </view>
+  </view>
+
+  <view wx:if="{{teamClubOnboard}}" class="pe-onboard-bar">
+    <text wx:if="{{teamProfileError}}" class="pe-onboard-bar__err">{{teamProfileError}}</text>
+    <button
+      class="pe-onboard-bar__btn {{teamProfileBusy ? 'is-disabled' : ''}}"
+      disabled="{{teamProfileBusy}}"
+      bindtap="onFinishTeamProfile"
+    >{{teamProfileBusy ? '提交中…' : '完成并用于球队'}}</button>
   </view>
 </view>

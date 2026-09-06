@@ -38,7 +38,7 @@ function derivePermissions(role, isMember) {
     canRemoveMember: isSuper,
     canRemoveOrdinaryMember: canManage,
     canReviewJoinRequests: canReviewTeamApplication(r),
-    canShareTeam: true
+    canShareTeam: canManage
   };
 }
 

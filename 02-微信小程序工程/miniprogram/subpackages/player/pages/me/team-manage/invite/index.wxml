@@ -13,6 +13,16 @@
     </view>
   </view>
 
+  <view class="share-wrap">
+    <button
+      wx:if="{{shareReady}}"
+      class="wx-invite"
+      open-type="share"
+    >微信邀请好友</button>
+    <button wx:else class="wx-invite wx-invite--busy" disabled>邀请准备中…</button>
+    <text class="share-hint">也可搜索已注册用户并站内添加，搜索不到时不会生成虚拟用户。</text>
+  </view>
+
   <view class="search-wrap">
     <view class="search">
       <text class="search__icon">🔍</text>
@@ -36,7 +46,7 @@
         pageState="{{pageState}}"
         loadingText="正在搜索用户…"
         emptyTitle="没有可添加的真实用户"
-        emptyDesc="当前无法搜索到可添加的用户。请通过有效邀请链接让对方自行申请，不会使用假名单。"
+        emptyDesc="输入姓名搜索站内用户，或使用上方「微信邀请好友」。不会使用假名单。"
         errorTitle="加载失败"
         errorDesc="无法搜索用户，请稍后重试。"
         bind:retry="onRetry"

@@ -1,0 +1,4 @@
+.team-invite-bridge {
+  min-height: 100vh;
+  background: #f6f6f6;
+}

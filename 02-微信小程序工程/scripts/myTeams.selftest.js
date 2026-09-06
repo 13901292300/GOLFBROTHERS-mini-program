@@ -76,6 +76,7 @@ var manageSelectDir = path.join(mini, 'subpackages', 'player', 'pages', 'me', 't
 var manageInviteDir = path.join(mini, 'subpackages', 'player', 'pages', 'me', 'team-manage', 'invite');
 var applicationDir = path.join(mini, 'subpackages', 'player', 'pages', 'me', 'team-application');
 assert('邀请页四文件存在', pageFiles(inviteDir));
+assert('主包邀请入口四文件存在', pageFiles(path.join(mini, 'pages', 'team-invite')));
 assert('管理选人/邀请页存在', pageFiles(manageSelectDir) && pageFiles(manageInviteDir));
 assert('入队申请详情页存在', pageFiles(applicationDir));
 assert('球队详情内不再挂申请列表页', !pageFiles(path.join(mini, 'subpackages', 'player', 'pages', 'me', 'team-manage', 'applications')));
@@ -104,6 +105,11 @@ assert(
 
 var homeJs = read(path.join(mini, 'pages', 'home', 'index.js'));
 var homeWxml = read(path.join(mini, 'pages', 'home', 'index.wxml'));
+assert(
+  '主包注册邀请冷启动入口',
+  (app.pages || []).indexOf('pages/team-invite/index') >= 0
+);
+
 assert(
   '首页「我的球队」入口走新路由',
   homeJs.indexOf("url: '/subpackages/player/pages/me/teams/index'") >= 0 &&
@@ -261,7 +267,7 @@ assert(
   '成员无管理权限、管理员可发起比赛但不能改管理员/队长、超管可转让',
   memberPerm.canCreateTeamMatch === false &&
     memberPerm.canManageAdmins === false &&
-    memberPerm.canShareTeam === true &&
+    memberPerm.canShareTeam === false &&
     roles.canOpenMemberManageMenu(memberPerm) === false &&
     adminPerm.canCreateTeamMatch === true &&
     adminPerm.canInviteMember === true &&
@@ -321,8 +327,8 @@ var teamA = repo.createTeam({
   intro: '简介正文',
   acceptingMembers: true
 });
-var teamB = repo.createTeam({ name: '页面测试乙队', city: '上海', acceptingMembers: true });
-var teamC = repo.createTeam({ name: '空态队', city: '杭州', acceptingMembers: true });
+var teamB = repo.createTeam({ name: '页面测试乙队', shortName: '乙队', city: '上海', acceptingMembers: true });
+var teamC = repo.createTeam({ name: '空态队', shortName: '空态', city: '杭州', acceptingMembers: true });
 assert('本地仓储可创建球队', teamA.ok && teamB.ok && teamC.ok);
 var idA = teamA.data.teamId;
 var idB = teamB.data.teamId;
@@ -355,7 +361,7 @@ service.listMyTeams({ immediate: true }).then(function (res) {
   var tC = res.list.filter(function (t) { return t.id === idC; })[0];
   assert(
     '列表项含 LOGO/全称/地区/人数/徽章',
-    tA && tA.logo && tA.fullName && tA.regionText && tA.memberCount > 0 && tA.badges && tA.badges.length >= 1
+    tA && (tA.logo || tA.logoPlaceholder || tA.logoSrc) && tA.fullName && tA.regionText && tA.memberCount > 0 && tA.badges && tA.badges.length >= 1
   );
   assert(
     '超管列表项可发起比赛',
@@ -503,11 +509,15 @@ service.listMyTeams({ immediate: true }).then(function (res) {
   return service.getTeamInvitePage('no-such-team', { immediate: true });
 }).then(function (missing) {
   assert('球队不存在时返回 not_found', !missing.ok && (missing.reason === 'not_found' || missing.code === 'not_found'));
-  var share = service.buildTeamShareMessage({ id: idA, fullName: '页面测试甲队' });
+  var share = service.buildTeamShareMessage(
+    { id: idA, fullName: '页面测试甲队' },
+    { token: 'inv_testtokenabcdef' }
+  );
   assert(
-    '分享路径携带 teamId',
-    share.path.indexOf('/subpackages/player/pages/me/team-invite/index') >= 0 &&
-      share.path.indexOf('teamId=') >= 0
+    '分享路径携带邀请 token',
+    share.path.indexOf('/pages/team-invite/index') >= 0 &&
+      share.path.indexOf('token=') >= 0 &&
+      share.path.indexOf('teamId=') < 0
   );
 
   var manageDir = path.join(mini, 'subpackages', 'player', 'pages', 'me', 'team-manage');
@@ -561,8 +571,8 @@ service.listMyTeams({ immediate: true }).then(function (res) {
   assert('详情页无 DIAG 提前结束开关', detailJs.indexOf('DIAG_NO_AUTO_REFRESH') < 0 && detailJs.indexOf('DIAG_ISOLATE_MATCH') < 0);
 
   assert(
-    '分享卡片指向邀请页并携带 teamId',
-    share.path.indexOf('/team-invite/index') > 0 && share.path.indexOf('teamId=') > 0
+    '分享卡片指向邀请页并携带 token',
+    share.path.indexOf('/team-invite/index') > 0 && share.path.indexOf('token=') > 0
   );
   assert('无分享权限或资料未就绪时不分享', detailJs.indexOf('canShareTeam') > 0);
 
@@ -572,8 +582,9 @@ service.listMyTeams({ immediate: true }).then(function (res) {
   assert('邀请页拒绝分支有原因提示', inviteJsSrc.indexOf('already_pending') > 0);
 
   assert(
-    '普通成员可以分享球队',
-    roles.derivePermissions('member', { isMember: true }).canShareTeam === true
+    '仅管理员可分享邀请',
+    roles.derivePermissions('admin', { isMember: true }).canShareTeam === true &&
+      roles.derivePermissions('member', { isMember: true }).canShareTeam === false
   );
   assert(
     '普通成员不获得管理或创建比赛权限',

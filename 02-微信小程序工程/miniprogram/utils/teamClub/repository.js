@@ -10,11 +10,28 @@ var model = require('./model.js');
 var errors = require('./errors.js');
 var migrate = require('./migrate.js');
 var roles = require('./roles.js');
+var teamFields = require('./teamFields.js');
+var teamLogo = require('./teamLogo.js');
 
 var STORAGE_KEY = 'gb_team_club_v1';
 var DEFAULT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 var _cache = null;
+var _sharePlain = {};
+
+function hashToken(token) {
+  try {
+    return require('crypto')
+      .createHash('sha256')
+      .update('teamclub:invite:' + String(token || ''), 'utf8')
+      .digest('hex');
+  } catch (e) {
+    var h = 0;
+    var s = 'teamclub:invite:' + String(token || '');
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return 'h' + String(h >>> 0);
+  }
+}
 var _nowFn = function () {
   return Date.now();
 };
@@ -77,6 +94,7 @@ function persist() {
 
 function resetForTests() {
   _cache = model.createEmptyStore();
+  _sharePlain = {};
   persist();
 }
 
@@ -389,6 +407,12 @@ function createTeam(input, options) {
     slogan: String((input && input.slogan) || '').trim(),
     homeCourse: String((input && input.homeCourse) || '').trim()
   });
+  var shortChecked = teamFields.sanitizeShortName(team.shortName, { fallback: team.name });
+  if (!shortChecked.ok) return errors.fail(shortChecked.code, shortChecked.message);
+  team.shortName = shortChecked.shortName;
+  var logoChecked = teamLogo.persistLogo(team.logo);
+  if (!logoChecked.ok) return errors.fail(logoChecked.code, logoChecked.message);
+  team.logo = logoChecked.logo;
   team.updatedAt = nowMs();
   var member = model.createMemberRecord({
     teamId: team.teamId,
@@ -421,9 +445,17 @@ function updateTeam(teamId, patch, options) {
   if (conflict) return conflict;
   var p = patch || {};
   if (p.name != null) team.name = String(p.name).trim() || team.name;
-  if (p.shortName != null) team.shortName = String(p.shortName).trim();
+  if (p.shortName != null) {
+    var shortChecked = teamFields.sanitizeShortName(p.shortName, {});
+    if (!shortChecked.ok) return errors.fail(shortChecked.code, shortChecked.message);
+    team.shortName = shortChecked.shortName;
+  }
   if (p.city != null || p.region != null) team.city = String(p.city || p.region || '').trim();
-  if (p.logo != null) team.logo = String(p.logo).trim();
+  if (p.logo != null) {
+    var logoChecked = teamLogo.persistLogo(p.logo);
+    if (!logoChecked.ok) return errors.fail(logoChecked.code, logoChecked.message);
+    team.logo = logoChecked.logo;
+  }
   if (p.intro != null || p.desc != null) team.intro = String(p.intro || p.desc || '').trim();
   if (p.homeCourse != null) team.homeCourse = String(p.homeCourse).trim();
   audit(store, team.teamId, auth.user.userId, 'update_team', {});
@@ -801,9 +833,10 @@ function createInvite(teamId, options) {
   ]);
   if (denied) return denied;
   var ttl = Number((options && options.ttlMs) || DEFAULT_INVITE_TTL_MS);
+  var token = model.randomInviteToken();
   var invite = {
     inviteId: model.newId('inv'),
-    token: model.randomInviteToken(),
+    tokenHash: hashToken(token),
     teamId: String(teamId),
     createdBy: auth.user.userId,
     status: model.INVITE_STATUS.ACTIVE,
@@ -812,7 +845,39 @@ function createInvite(teamId, options) {
   };
   store.invites.push(invite);
   persist();
-  return errors.ok(invite);
+  return errors.ok({
+    inviteId: invite.inviteId,
+    token: token,
+    teamId: invite.teamId,
+    status: invite.status,
+    createdAt: invite.createdAt,
+    expiresAt: invite.expiresAt
+  });
+}
+
+function prepareShareInvite(teamId, options) {
+  var auth = actorFromOptions(options);
+  if (!auth.ok) return failAuth(auth);
+  var key = String(auth.user.userId) + ':' + String(teamId || '').trim();
+  var hit = _sharePlain[key];
+  if (hit && hit.token && Number(hit.expiresAt) > nowMs() + 60 * 1000) {
+    return errors.ok({
+      inviteId: hit.inviteId,
+      token: hit.token,
+      teamId: String(teamId),
+      status: model.INVITE_STATUS.ACTIVE,
+      expiresAt: hit.expiresAt
+    });
+  }
+  var created = createInvite(teamId, options);
+  if (created.ok && created.data) {
+    _sharePlain[key] = {
+      inviteId: created.data.inviteId,
+      token: created.data.token,
+      expiresAt: created.data.expiresAt
+    };
+  }
+  return created;
 }
 
 function revokeInvite(tokenOrId, options) {
@@ -835,12 +900,32 @@ function revokeInvite(tokenOrId, options) {
 
 function findInvite(store, tokenOrId) {
   var key = String(tokenOrId || '').trim();
+  var hashed = hashToken(key);
   for (var i = 0; i < store.invites.length; i++) {
     var inv = store.invites[i];
     if (!inv) continue;
-    if (inv.token === key || inv.inviteId === key) return inv;
+    if (inv.inviteId === key || inv.tokenHash === hashed || inv.token === key) return inv;
   }
   return null;
+}
+
+function invitePreviewLocal(store, invite, team, userId) {
+  var inviterMember = findMember(store, invite.teamId, invite.createdBy);
+  var view = mapTeamView(store, team, userId);
+  return errors.ok({
+    team: view,
+    invite: {
+      inviteId: invite.inviteId,
+      teamId: invite.teamId,
+      status: invite.status,
+      expiresAt: invite.expiresAt
+    },
+    inviter: {
+      displayName: (inviterMember && inviterMember.displayName) || '邀请人'
+    },
+    membershipGranted: false,
+    alreadyMember: !!view.isFormalMember
+  });
 }
 
 function resolveInvite(token, options) {
@@ -853,7 +938,34 @@ function resolveInvite(token, options) {
     return errors.fail('invite_revoked', '邀请已撤销');
   }
   if (invite.status === model.INVITE_STATUS.USED) {
-    return errors.fail('conflict', '邀请已使用');
+    return errors.fail('invite_used', '邀请已使用');
+  }
+  if (nowMs() > Number(invite.expiresAt)) {
+    invite.status = model.INVITE_STATUS.EXPIRED;
+    persist();
+    return errors.fail('invite_expired', '邀请已过期');
+  }
+  var team = findTeam(store, invite.teamId);
+  var dead = assertWritable(team);
+  if (dead) return dead;
+  return invitePreviewLocal(store, invite, team, auth.user.userId);
+}
+
+function getInviteByToken(token, options) {
+  return resolveInvite(token, options);
+}
+
+function acceptInvite(token, options) {
+  var auth = actorFromOptions(options);
+  if (!auth.ok) return failAuth(auth);
+  var store = loadStore();
+  var invite = findInvite(store, token);
+  if (!invite) return errors.fail('not_found', '邀请不存在');
+  if (invite.status === model.INVITE_STATUS.REVOKED) {
+    return errors.fail('invite_revoked', '邀请已撤销');
+  }
+  if (invite.status === model.INVITE_STATUS.USED) {
+    return errors.fail('invite_used', '邀请已使用');
   }
   if (nowMs() > Number(invite.expiresAt)) {
     invite.status = model.INVITE_STATUS.EXPIRED;
@@ -869,9 +981,19 @@ function resolveInvite(token, options) {
     avatar: auth.user.avatar
   });
   if (!added.ok && added.code !== 'already_member') return added;
-  invite.status = model.INVITE_STATUS.USED;
   persist();
-  return errors.ok(mapTeamView(store, team, auth.user.userId));
+  var already = !added.ok && added.code === 'already_member';
+  return errors.ok({
+    team: mapTeamView(store, team, auth.user.userId),
+    invite: {
+      inviteId: invite.inviteId,
+      teamId: invite.teamId,
+      status: invite.status,
+      expiresAt: invite.expiresAt
+    },
+    alreadyMember: already,
+    membershipGranted: !already
+  });
 }
 
 function clientMatchFromDoc(doc) {
@@ -1116,8 +1238,11 @@ module.exports = {
   cancelApplication: cancelApplication,
   reviewApplication: reviewApplication,
   createInvite: createInvite,
+  prepareShareInvite: prepareShareInvite,
   revokeInvite: revokeInvite,
   resolveInvite: resolveInvite,
+  getInviteByToken: getInviteByToken,
+  acceptInvite: acceptInvite,
   addMember: addMember,
   removeMember: removeMember,
   setAdmin: setAdmin,
@@ -1136,5 +1261,11 @@ module.exports = {
   upsertMatchRef: upsertMatchRef,
   listTeamsForUser: listTeamsForUser,
   mapTeamView: mapTeamView,
-  mapMemberView: mapMemberView
+  mapMemberView: mapMemberView,
+  prepareTeamAssetUpload: function () {
+    return Promise.resolve(errors.fail('service_unavailable', '本地仓储不支持云存储'));
+  },
+  purgeTeamAssetOrphans: function () {
+    return Promise.resolve(errors.ok({ deleted: 0, skipped: 0 }));
+  }
 };

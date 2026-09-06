@@ -5,6 +5,8 @@ const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const userProfileStore = require('../../../../../utils/userProfileStore.js');
 const genderNormalize = require('../../../../../utils/genderNormalize.js');
 const geoCatalog = require('../../../../../utils/geoCatalog.js');
+const profileOnboard = require('../../../../../utils/teamClub/profileOnboard.js');
+const profileFields = require('../../../../../utils/teamClub/profileFields.js');
 
 const IDENTITY_PLAYER = userProfileStore.IDENTITY_PLAYER || 'PLAYER';
 const IDENTITY_CADDIE = userProfileStore.IDENTITY_CADDIE || 'CADDIE';
@@ -108,12 +110,17 @@ Page({
     pickerMode: '',
     pickerTitle: '',
     pickerItems: [],
-    pickerAllowClear: false
+    pickerAllowClear: false,
+    teamClubOnboard: false,
+    teamProfileBusy: false,
+    teamProfileError: ''
   },
 
-  onLoad() {
+  onLoad(options) {
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
+    const from = String((options && options.from) || '').trim();
+    this.setData({ teamClubOnboard: from === 'teamClub' });
     this.refreshProfile();
   },
 
@@ -203,6 +210,17 @@ Page({
       this.refreshProfile();
       wx.showToast({ title: '头像已更新', icon: 'success' });
     };
+    if (this.data.teamClubOnboard) {
+      profileOnboard.uploadTempAvatar(path).then((up) => {
+        if (up && up.ok && up.avatar) {
+          saveAndApply(up.avatar);
+          return;
+        }
+        this.setData({ teamProfileError: (up && up.message) || '头像需上传后才能用于球队' });
+        wx.showToast({ title: (up && up.message) || '请使用可长期访问的头像', icon: 'none' });
+      });
+      return;
+    }
     if (typeof wx.saveFile !== 'function') {
       saveAndApply(path);
       return;
@@ -285,11 +303,12 @@ Page({
     }
 
     if (field === 'nickname') {
-      if (!value) {
-        wx.showToast({ title: '昵称不能为空', icon: 'none' });
+      const nick = profileFields.validateNickname(value);
+      if (!nick.ok) {
+        wx.showToast({ title: nick.message || '昵称不能为空', icon: 'none' });
         return;
       }
-      userProfileStore.updateProfile({ nickname: value });
+      userProfileStore.updateProfile({ nickname: nick.displayName });
     } else if (field === 'signature') {
       userProfileStore.updateProfile({ signature: value });
     } else if (field === 'displayName') {
@@ -475,6 +494,56 @@ Page({
 
   onTapAliasManage() {
     wx.showToast({ title: '马甲管理即将开放', icon: 'none' });
+  },
+
+  onEditorWxChange(e) {
+    if (this.data.editorField !== 'nickname') return;
+    this.onWxNickname(e);
+  },
+
+  onWxNickname(e) {
+    const value = String((e.detail && e.detail.value) || '').trim();
+    if (!value) return;
+    const nick = profileFields.validateNickname(value);
+    if (!nick.ok) {
+      wx.showToast({ title: nick.message, icon: 'none' });
+      return;
+    }
+    userProfileStore.updateProfile({ nickname: nick.displayName });
+    this.refreshProfile();
+  },
+
+  onFinishTeamProfile() {
+    if (this.data.teamProfileBusy || !profileOnboard.beginLock()) {
+      wx.showToast({ title: '正在提交，请稍候', icon: 'none' });
+      return;
+    }
+    this.setData({ teamProfileBusy: true, teamProfileError: '' });
+    profileOnboard
+      .submitFromLocal({ alreadyLocked: true, keepLockOnSuccess: true })
+      .then((res) => {
+        if (!res || !res.ok) {
+          profileOnboard.endLock();
+          this.setData({
+            teamProfileBusy: false,
+            teamProfileError: (res && res.message) || '建档失败，已保留填写内容'
+          });
+          wx.showToast({ title: (res && res.message) || '建档失败', icon: 'none' });
+          return;
+        }
+        wx.showToast({ title: '资料已完善', icon: 'success' });
+        setTimeout(() => {
+          profileOnboard.returnToMyTeams();
+        }, 400);
+      })
+      .catch(() => {
+        profileOnboard.endLock();
+        this.setData({
+          teamProfileBusy: false,
+          teamProfileError: '建档失败，已保留填写内容'
+        });
+        wx.showToast({ title: '建档失败，请稍后重试', icon: 'none' });
+      });
   },
 
   onBack() {

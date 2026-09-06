@@ -286,9 +286,13 @@ async function main() {
   assert(
     'production 云失败不回落本地正文',
     failList.ok === false &&
-      failList.code === 'service_unavailable' &&
+      (failList.code === 'service_unavailable' ||
+        failList.code === 'network_error' ||
+        failList.code === 'env_unknown') &&
       failPut.ok === false &&
-      failPut.code === 'service_unavailable'
+      (failPut.code === 'service_unavailable' ||
+        failPut.code === 'network_error' ||
+        failPut.code === 'env_unknown')
   );
 
   var myTeamsSrc = fs.readFileSync(path.join(root, 'scripts', 'myTeams.selftest.js'), 'utf8');

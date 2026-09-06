@@ -3,6 +3,8 @@
  */
 const { createHeaderStyle } = require('../../../../../../utils/headerEngine.js');
 const teamClub = require('../../../../../../utils/teamClub/service.js');
+const shareInvite = require('../../../../../../utils/teamClub/shareInvite.js');
+const routes = require('../../../../../../utils/teamClub/routes.js');
 
 Page({
   data: {
@@ -10,18 +12,20 @@ Page({
     headerRootStyle: '',
     headerBarStyle: '',
     teamId: '',
+    team: null,
     keyword: '',
-    pageState: 'loading',
-    users: []
+    pageState: 'empty',
+    users: [],
+    shareReady: false
   },
 
   onLoad(options) {
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
     const teamId = options && options.teamId != null ? String(options.teamId).trim() : '';
-    this.setData({ teamId: teamId });
+    this.setData({ teamId: teamId, pageState: 'empty', users: [] });
     this._timer = null;
-    this.search('');
+    this._prepareShare();
   },
 
   onShow() {
@@ -40,14 +44,58 @@ Page({
     this.setData({ themeClass: theme === 'dark' ? 'dark-mode' : 'bright-mode' });
   },
 
+  _prepareShare() {
+    const teamId = this.data.teamId;
+    const self = this;
+    this.setData({ shareReady: false });
+    try {
+      wx.hideShareMenu();
+    } catch (e0) {
+      /* ignore */
+    }
+    if (!teamId) return;
+    teamClub
+      .getTeamDetail(teamId)
+      .then(function (res) {
+        const team = res && res.ok ? res.team : null;
+        self.setData({ team: team });
+        const can = !!(team && team.permissions && team.permissions.canShareTeam);
+        if (!can) return;
+        return shareInvite.prepare(teamId).then(function (prep) {
+          const ready = !!(prep && prep.ok && prep.invite && prep.invite.token);
+          self.setData({ shareReady: ready });
+          if (ready) {
+            try {
+              wx.showShareMenu({ menus: ['shareAppMessage'] });
+            } catch (e1) {
+              /* ignore */
+            }
+          }
+        });
+      });
+  },
+
+  onShareAppMessage() {
+    const inv = shareInvite.current(this.data.teamId);
+    if (!this.data.shareReady || !inv || !inv.token) {
+      return { title: '邀请你加入球队', path: routes.TEAM_INVITE_PAGE };
+    }
+    return shareInvite.buildShareMessage(this.data.team, inv);
+  },
+
   onBack() {
     wx.navigateBack({ delta: 1 });
   },
 
   search(keyword) {
     const teamId = this.data.teamId;
+    const q = String(keyword || '').trim();
     if (!teamId) {
       this.setData({ pageState: 'error', users: [] });
+      return;
+    }
+    if (!q) {
+      this.setData({ pageState: 'empty', users: [] });
       return;
     }
     this.setData({ pageState: 'loading' });

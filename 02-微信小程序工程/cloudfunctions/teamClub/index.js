@@ -34,6 +34,12 @@ exports.main = async function (event, context) {
   }
 
   var store = cloudStore.createCloudStore(cloud.database());
+  store.deleteFiles = function (fileList) {
+    if (!fileList || !fileList.length) {
+      return Promise.resolve({ fileList: [] });
+    }
+    return cloud.deleteFile({ fileList: fileList });
+  };
   return engine.dispatch(store, { OPENID: wxContext.OPENID }, event || {});
 };
 

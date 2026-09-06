@@ -7,14 +7,21 @@
 var errors = require('./errors.js');
 var snapshot = require('./snapshot.js');
 var identity = require('./identity.js');
+var cloudEnv = require('./cloudEnv.js');
 
 function callCloud(action, payload) {
+  var route = cloudEnv.resolveTeamClubCloud();
+  cloudEnv.logRoute(action, route);
+  if (!route.ok) {
+    return Promise.resolve(errors.fail(route.code, route.message));
+  }
   if (typeof wx === 'undefined' || !wx.cloud || typeof wx.cloud.callFunction !== 'function') {
     return Promise.resolve(errors.fail('service_unavailable', '云服务不可用'));
   }
   return wx
     .cloud.callFunction({
-      name: 'teamClub',
+      name: cloudEnv.FUNCTION_NAME,
+      config: { env: route.envId },
       data: {
         action: action,
         payload: payload || {}
@@ -47,8 +54,8 @@ function invoke(name, payload) {
 }
 
 module.exports = {
-  listMyTeams: function () {
-    return invoke('listMyTeams', {});
+  listMyTeams: function (options) {
+    return invoke('listMyTeams', options || {});
   },
   getTeam: function (teamId) {
     return invoke('getTeam', { teamId: teamId });
@@ -79,6 +86,15 @@ module.exports = {
   },
   createInvite: function (teamId, options) {
     return invoke('createInvite', Object.assign({ teamId: teamId }, options || {}));
+  },
+  prepareShareInvite: function (teamId, options) {
+    return invoke('prepareShareInvite', Object.assign({ teamId: teamId }, options || {}));
+  },
+  getInviteByToken: function (token) {
+    return invoke('getInviteByToken', { token: token });
+  },
+  acceptInvite: function (token) {
+    return invoke('acceptInvite', { token: token });
   },
   revokeInvite: function (tokenOrId) {
     return invoke('revokeInvite', { token: tokenOrId, inviteId: tokenOrId });
@@ -116,8 +132,8 @@ module.exports = {
   dissolveTeam: function (teamId, options) {
     return invoke('dissolveTeam', Object.assign({ teamId: teamId }, options || {}));
   },
-  listTeamMatches: function (teamId) {
-    return invoke('listTeamMatches', { teamId: teamId });
+  listTeamMatches: function (teamId, options) {
+    return invoke('listTeamMatches', Object.assign({ teamId: teamId }, options || {}));
   },
   upsertMatchRef: function (payload) {
     return invoke('upsertMatchRef', payload || {});
@@ -155,8 +171,11 @@ module.exports = {
   searchUsers: function (query, options) {
     return invoke('searchUsers', Object.assign({ query: query }, options || {}));
   },
-  listNotices: function () {
-    return invoke('listNotices', {});
+  listNotices: function (options) {
+    return invoke('listNotices', options || {});
+  },
+  listInvites: function (teamId, options) {
+    return invoke('listInvites', Object.assign({ teamId: teamId }, options || {}));
   },
   getApplication: function (applicationId) {
     return invoke('getApplication', { applicationId: applicationId });
@@ -188,5 +207,11 @@ module.exports = {
   },
   reloadFromStorage: function () {
     return snapshot.listTeams();
+  },
+  prepareTeamAssetUpload: function (payload) {
+    return invoke('prepareTeamAssetUpload', payload || {});
+  },
+  purgeTeamAssetOrphans: function (payload) {
+    return invoke('purgeTeamAssetOrphans', payload || {});
   }
 };

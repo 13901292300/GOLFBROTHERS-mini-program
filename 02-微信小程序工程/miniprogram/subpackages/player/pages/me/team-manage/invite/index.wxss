@@ -63,6 +63,28 @@ page { height: 100%; background: var(--bg-primary); }
   line-height: 1;
 }
 
+.share-wrap {
+  flex-shrink: 0;
+  padding: 20rpx 28rpx 0;
+}
+.wx-invite {
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 999rpx;
+  background: var(--champion-gold);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.wx-invite::after { border: none; }
+.wx-invite--busy { opacity: 0.5; }
+.share-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: var(--text-muted);
+}
+
 .search-wrap {
   flex-shrink: 0;
   padding: 16rpx 28rpx;

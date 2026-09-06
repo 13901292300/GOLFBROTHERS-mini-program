@@ -22,13 +22,21 @@
         errorTitle="{{errorTitle}}"
         errorDesc="{{errorDesc}}"
         bind:retry="onRetry"
+        bind:completeprofile="onCompleteProfile"
       />
 
       <block wx:if="{{pageState === 'ready' && team}}">
         <view class="ds-card intro-hero">
-          <image class="intro-hero__logo" src="{{team.logo}}" mode="aspectFill"></image>
+          <image
+            class="intro-hero__logo"
+            src="{{team.logoBroken ? team.logoPlaceholder : team.logoSrc}}"
+            mode="aspectFill"
+            binderror="onLogoError"
+          ></image>
           <text class="intro-hero__name">{{team.fullName}}</text>
           <text wx:if="{{team.memberCountText}}" class="intro-hero__meta">{{team.memberCountText}}</text>
+          <text wx:if="{{inviterName}}" class="intro-hero__meta">邀请人：{{inviterName}}</text>
+          <text wx:if="{{expiresText}}" class="intro-hero__meta">有效期至 {{expiresText}}</text>
         </view>
 
         <view class="ds-card intro-facts">

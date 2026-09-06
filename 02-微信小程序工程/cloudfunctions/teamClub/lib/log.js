@@ -13,11 +13,21 @@ var SENSITIVE = {
   rawToken: true
 };
 
+function redactScalar(value) {
+  if (typeof value !== 'string') return value;
+  var s = value;
+  if (/^inv_[0-9a-f]{8,}$/i.test(s)) return '[redacted]';
+  s = s.replace(/inv_[0-9a-f]{12,}/gi, 'inv_****');
+  s = s.replace(/([?&]token=)[^&\s]+/gi, '$1[redacted]');
+  if (s.indexOf('oid_') === 0 && s.length > 12) return '[redacted]';
+  return s;
+}
+
 function sanitize(value, depth) {
   var d = depth || 0;
   if (d > 4) return '[truncated]';
   if (value == null) return value;
-  if (typeof value !== 'object') return value;
+  if (typeof value !== 'object') return redactScalar(value);
   if (Array.isArray(value)) {
     return value.slice(0, 20).map(function (item) {
       return sanitize(item, d + 1);

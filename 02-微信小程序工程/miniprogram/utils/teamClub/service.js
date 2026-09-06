@@ -10,8 +10,10 @@ var roles = require('./roles.js');
 var memberListView = require('./memberListView.js');
 var notices = require('./notices.js');
 var model = require('./model.js');
+var routes = require('./routes.js');
 var factory = require('./repoFactory.js');
 var identity = require('./identity.js');
+var teamLogo = require('./teamLogo.js');
 
 function repo() {
   return factory.get();
@@ -22,7 +24,7 @@ var TEAM_EDIT_PATH = '/subpackages/player/pages/me/team-edit/index';
 var TEAM_NOTICES_PATH = '/subpackages/player/pages/me/team-notices/index';
 var TEAM_APPLICATIONS_PATH = '/subpackages/player/pages/me/team-applications/index';
 var TEAM_DETAIL_PATH = '/subpackages/player/pages/me/team-detail/index';
-var TEAM_INVITE_PATH = '/subpackages/player/pages/me/team-invite/index';
+var TEAM_INVITE_PATH = routes.TEAM_INVITE_PAGE;
 var TEAM_MANAGE_SELECT_PATH = '/subpackages/player/pages/me/team-manage/select/index';
 var TEAM_MANAGE_INVITE_PATH = '/subpackages/player/pages/me/team-manage/invite/index';
 var TEAM_APPLICATION_PATH = notices.APPLICATION_DETAIL_PATH;
@@ -44,9 +46,13 @@ function decorateTeam(team) {
   var metaParts = [];
   if (regionText) metaParts.push(regionText);
   if (memberCountText) metaParts.push(memberCountText);
+  var logo = teamLogo.authorityLogo(team.logo);
   return Object.assign({}, team, {
     id: String(team.id || team.teamId || ''),
-    logo: resolveLogo(fullName, team.logo),
+    logo: logo,
+    logoSrc: team.logoSrc || (logo.indexOf('https://') === 0 ? logo : ''),
+    logoPlaceholder: teamLogo.PLACEHOLDER,
+    logoBroken: !!team.logoBroken,
     fullName: fullName,
     regionText: regionText,
     memberCount: memberCount,
@@ -54,6 +60,17 @@ function decorateTeam(team) {
     metaText: metaParts.join(' · '),
     foundedDateText: team.foundedDateText || ''
   });
+}
+
+function hydrateTeam(team) {
+  if (!team) return Promise.resolve(null);
+  return teamLogo.attachDisplay(decorateTeam(team));
+}
+
+function hydrateTeams(list) {
+  return Promise.all((list || []).map(function (row) {
+    return hydrateTeam(row);
+  }));
 }
 
 function decorateMember(m) {
@@ -100,7 +117,9 @@ function listMyTeams() {
   return wrap(function () {
     return asResult(repo().listMyTeams()).then(function (res) {
       if (!res.ok) return failEnvelope(res);
-      return { ok: true, list: (res.data || []).map(decorateTeam) };
+      return hydrateTeams(res.data || []).then(function (list) {
+        return { ok: true, list: list, cursor: res.cursor || '', hasMore: !!res.hasMore };
+      });
     });
   });
 }
@@ -109,7 +128,9 @@ function getTeamDetail(teamId) {
   return wrap(function () {
     return asResult(repo().getTeam(teamId)).then(function (res) {
       if (!res.ok) return failEnvelope(res, { team: null });
-      return { ok: true, team: decorateTeam(res.data) };
+      return hydrateTeam(res.data).then(function (team) {
+        return { ok: true, team: team };
+      });
     });
   });
 }
@@ -118,16 +139,16 @@ function listTeamMembers(teamId, options) {
   return wrap(function () {
     return asResult(repo().listMembers(teamId, options)).then(function (res) {
       if (!res.ok) return failEnvelope(res);
-      return { ok: true, list: (res.data || []).map(decorateMember) };
+      return { ok: true, list: (res.data || []).map(decorateMember), cursor: res.cursor || '', hasMore: !!res.hasMore };
     });
   });
 }
 
-function listTeamMatches(teamId) {
+function listTeamMatches(teamId, options) {
   return wrap(function () {
-    return asResult(repo().listTeamMatches(teamId)).then(function (res) {
+    return asResult(repo().listTeamMatches(teamId, options)).then(function (res) {
       if (!res.ok) return failEnvelope(res);
-      return { ok: true, list: res.data || [] };
+      return { ok: true, list: res.data || [], cursor: res.cursor || '', hasMore: !!res.hasMore };
     });
   });
 }
@@ -153,14 +174,16 @@ function applyMemberAction(teamId, action, targetUserId) {
     if (!runner) return failEnvelope({ code: 'unknown_action' });
     return asResult(runner(teamId, targetUserId)).then(function (res) {
       if (!res.ok) return failEnvelope(res);
-      return Promise.all([asResult(repo().listMembers(teamId)), asResult(repo().getTeam(teamId))]).then(function (pair) {
+        return Promise.all([asResult(repo().listMembers(teamId)), asResult(repo().getTeam(teamId))]).then(function (pair) {
         var members = pair[0];
         var team = pair[1];
-        return {
-          ok: true,
-          list: (members.ok ? members.data : []).map(decorateMember),
-          team: team.ok ? decorateTeam(team.data) : null
-        };
+        return hydrateTeam(team.ok ? team.data : null).then(function (deco) {
+          return {
+            ok: true,
+            list: (members.ok ? members.data : []).map(decorateMember),
+            team: deco
+          };
+        });
       });
     });
   });
@@ -170,22 +193,26 @@ function getPublicTeam(teamId) {
   return wrap(function () {
     return asResult(repo().getTeam(teamId)).then(function (res) {
       if (!res.ok) return failEnvelope(res, { team: null });
-      var team = decorateTeam(res.data);
-      return {
-        ok: true,
-        team: {
-          id: team.id,
-          logo: team.logo,
-          fullName: team.fullName,
-          slogan: team.slogan,
-          description: team.description,
-          foundedDateText: team.foundedDateText,
-          regionText: team.regionText,
-          memberCount: team.memberCount,
-          memberCountText: team.memberCountText,
-          acceptingMembers: team.acceptingMembers !== false
-        }
-      };
+      return hydrateTeam(res.data).then(function (team) {
+        return {
+          ok: true,
+          team: {
+            id: team.id,
+            logo: team.logo,
+            logoSrc: team.logoSrc,
+            logoPlaceholder: team.logoPlaceholder,
+            logoBroken: !!team.logoBroken,
+            fullName: team.fullName,
+            slogan: team.slogan,
+            description: team.description,
+            foundedDateText: team.foundedDateText,
+            regionText: team.regionText,
+            memberCount: team.memberCount,
+            memberCountText: team.memberCountText,
+            acceptingMembers: team.acceptingMembers !== false
+          }
+        };
+      });
     });
   });
 }
@@ -272,13 +299,14 @@ function getTeamInvitePage(teamId) {
   return wrap(function () {
     return asResult(repo().getTeam(teamId)).then(function (teamRes) {
       if (!teamRes.ok) return failEnvelope(teamRes, { joinView: null });
-      var team = decorateTeam(teamRes.data);
-      var auth = identity.requireUser();
-      var uid = auth.ok ? auth.user.userId : '';
-      var app = uid ? latestApplicationFromTeam(teamRes.data, uid) : null;
-      var joinView = buildJoinPageView(team, !!team.isFormalMember, app);
-      if (joinView) joinView.applicationId = app && (app.applicationId || app.id);
-      return { ok: true, team: team, joinView: joinView, isFormalMember: !!team.isFormalMember };
+      return hydrateTeam(teamRes.data).then(function (team) {
+        var auth = identity.requireUser();
+        var uid = auth.ok ? auth.user.userId : '';
+        var app = uid ? latestApplicationFromTeam(teamRes.data, uid) : null;
+        var joinView = buildJoinPageView(team, !!team.isFormalMember, app);
+        if (joinView) joinView.applicationId = app && (app.applicationId || app.id);
+        return { ok: true, team: team, joinView: joinView, isFormalMember: !!team.isFormalMember };
+      });
     });
   });
 }
@@ -290,32 +318,35 @@ function applyToJoinTeam(teamId, options) {
         return asResult(repo().getTeam(teamId)).then(function (teamRes) {
           var page = null;
           if (teamRes.ok) {
-            var team = decorateTeam(teamRes.data);
-            var auth = identity.requireUser();
-            var uid = auth.ok ? auth.user.userId : '';
-            var app = uid ? latestApplicationFromTeam(teamRes.data, uid) : null;
-            page = buildJoinPageView(team, !!team.isFormalMember, app);
+            return hydrateTeam(teamRes.data).then(function (team) {
+              var auth = identity.requireUser();
+              var uid = auth.ok ? auth.user.userId : '';
+              var app = uid ? latestApplicationFromTeam(teamRes.data, uid) : null;
+              var page = buildJoinPageView(team, !!team.isFormalMember, app);
+              return failEnvelope(res, { joinView: page, team: team });
+            });
           }
           return failEnvelope(res, { joinView: page });
         });
       }
       if (typeof repo().loadStore === 'function') fanoutApplicationNotices(res.data);
       return asResult(repo().getTeam(teamId)).then(function (after) {
-        var team2 = after.ok ? decorateTeam(after.data) : null;
-        var joinView = buildJoinPageView(team2, false, res.data);
-        if (joinView) joinView.applicationId = res.data.applicationId;
-        return {
-          ok: true,
-          joinView: joinView,
-          team: team2,
-          applicationId: res.data.applicationId,
-          notices: [],
-          messageJump: notices.buildApplicationJump(
-            res.data.applicationId,
-            '',
-            notices.TYPE.JOIN_APPLICATION_RECEIVED
-          )
-        };
+        return hydrateTeam(after.ok ? after.data : null).then(function (team2) {
+          var joinView = buildJoinPageView(team2, false, res.data);
+          if (joinView) joinView.applicationId = res.data.applicationId;
+          return {
+            ok: true,
+            joinView: joinView,
+            team: team2,
+            applicationId: res.data.applicationId,
+            notices: [],
+            messageJump: notices.buildApplicationJump(
+              res.data.applicationId,
+              '',
+              notices.TYPE.JOIN_APPLICATION_RECEIVED
+            )
+          };
+        });
       });
     });
   });
@@ -454,7 +485,15 @@ function packApplicationDetail(app, team, uid, options) {
         nickname: '',
         avatar: resolveLogo(app.userId, '')
       },
-      team: deco ? { id: deco.id, fullName: deco.fullName, logo: deco.logo } : null,
+      team: deco
+        ? {
+            id: deco.id,
+            fullName: deco.fullName,
+            logo: deco.logo,
+            logoSrc: deco.logoSrc,
+            logoPlaceholder: deco.logoPlaceholder
+          }
+        : null,
       actionView: actionView,
       jump: notices.buildApplicationJump(app.applicationId, options && options.noticeId, notices.TYPE.JOIN_APPLICATION_RECEIVED)
     }
@@ -500,17 +539,19 @@ function reviewJoinApplication(applicationId, decision) {
   });
 }
 
-function listTeamNotices() {
+function listTeamNotices(options) {
   return wrap(function () {
     var r = repo();
     if (typeof r.listNotices === 'function') {
-      return asResult(r.listNotices()).then(function (res) {
+      return asResult(r.listNotices(options)).then(function (res) {
         if (!res.ok) return failEnvelope(res);
         return {
           ok: true,
           category: notices.CATEGORY.TEAM_NOTICE,
           categoryLabel: '球队通知',
-          list: res.data || []
+          list: res.data || [],
+          cursor: res.cursor || '',
+          hasMore: !!res.hasMore
         };
       });
     }
@@ -537,7 +578,7 @@ function searchInviteCandidates(teamId, options) {
     if (typeof r.searchUsers === 'function') {
       return asResult(r.searchUsers(query, { teamId: teamId })).then(function (res) {
         if (!res.ok) return failEnvelope(res);
-        return { ok: true, list: res.data || [] };
+        return { ok: true, list: res.data || [], cursor: res.cursor || '', hasMore: !!res.hasMore };
       });
     }
     return { ok: true, list: [] };
@@ -551,12 +592,14 @@ function addTeamMember(teamId, userId, options) {
       return Promise.all([asResult(repo().listMembers(teamId)), asResult(repo().getTeam(teamId))]).then(function (pair) {
         var members = pair[0];
         var team = pair[1];
-        return {
-          ok: true,
-          reason: '',
-          list: (members.ok ? members.data : []).map(decorateMember),
-          team: team.ok ? decorateTeam(team.data) : null
-        };
+        return hydrateTeam(team.ok ? team.data : null).then(function (deco) {
+          return {
+            ok: true,
+            reason: '',
+            list: (members.ok ? members.data : []).map(decorateMember),
+            team: deco
+          };
+        });
       });
     });
   });
@@ -664,14 +707,17 @@ function buildApplicationDetailUrl(applicationId, noticeId) {
   return notices.buildApplicationDetailUrl(applicationId, noticeId);
 }
 
-function buildTeamShareMessage(team) {
+function buildTeamShareMessage(team, invite) {
   var row = team && typeof team === 'object' ? team : {};
-  var name = String(row.fullName || '').trim();
+  var name = String(row.fullName || row.name || '').trim();
+  var token = invite && invite.token ? String(invite.token).trim() : '';
   var share = {
     title: name ? '邀请你加入「' + name + '」' : '邀请你加入球队',
-    path: buildTeamInviteUrl(row.id)
+    path: token ? routes.buildInviteSharePath(token) : routes.TEAM_INVITE_PAGE
   };
-  var imageUrl = String(row.logo || '').trim();
+  share.ok = !!token;
+  var imageUrl = String(row.logoSrc || '').trim();
+  if (imageUrl.indexOf('https://') !== 0 || imageUrl === teamLogo.PLACEHOLDER) imageUrl = '';
   if (imageUrl) share.imageUrl = imageUrl;
   return share;
 }
@@ -739,11 +785,31 @@ module.exports = {
   addTeamMember: addTeamMember,
   getMemberManageMenu: getMemberManageMenu,
   listMembersForManageAction: listMembersForManageAction,
+  createMyProfile: function (input) {
+    return wrap(function () {
+      var r = repo();
+      if (typeof r.createMyProfile !== 'function') {
+        return failEnvelope({ code: 'unsupported', message: '当前仓储不支持建档' });
+      }
+      var body = input && typeof input === 'object' ? input : {};
+      return asResult(
+        r.createMyProfile({
+          displayName: body.displayName,
+          avatar: body.avatar
+        })
+      ).then(function (res) {
+        if (!res.ok) return failEnvelope(res);
+        return { ok: true, user: res.data };
+      });
+    });
+  },
   createTeam: function (input) {
     return wrap(function () {
       return asResult(repo().createTeam(input || {})).then(function (res) {
         if (!res.ok) return failEnvelope(res);
-        return { ok: true, team: decorateTeam(res.data) };
+        return hydrateTeam(res.data).then(function (team) {
+          return { ok: true, team: team };
+        });
       });
     });
   },
@@ -751,13 +817,25 @@ module.exports = {
     return wrap(function () {
       return asResult(repo().updateTeam(teamId, patch, options)).then(function (res) {
         if (!res.ok) return failEnvelope(res);
-        return { ok: true, team: decorateTeam(res.data) };
+        return hydrateTeam(res.data).then(function (team) {
+          return { ok: true, team: team };
+        });
       });
     });
   },
   createInvite: function (teamId, options) {
     return wrap(function () {
       return asResult(repo().createInvite(teamId, options)).then(function (res) {
+        if (!res.ok) return failEnvelope(res);
+        return { ok: true, invite: res.data };
+      });
+    });
+  },
+  prepareShareInvite: function (teamId, options) {
+    return wrap(function () {
+      var r = repo();
+      var fn = typeof r.prepareShareInvite === 'function' ? r.prepareShareInvite : r.createInvite;
+      return asResult(fn.call(r, teamId, options)).then(function (res) {
         if (!res.ok) return failEnvelope(res);
         return { ok: true, invite: res.data };
       });
@@ -776,7 +854,57 @@ module.exports = {
       return asResult(repo().resolveInvite(token, options)).then(function (res) {
         if (!res.ok) return failEnvelope(res);
         var team = res.data && res.data.team ? res.data.team : res.data;
-        return { ok: true, team: decorateTeam(team), invite: res.data && res.data.invite, membershipGranted: !!(res.data && res.data.membershipGranted) };
+        return hydrateTeam(team).then(function (deco) {
+          return {
+            ok: true,
+            team: deco,
+            invite: res.data && res.data.invite,
+            inviter: res.data && res.data.inviter,
+            alreadyMember: !!(res.data && res.data.alreadyMember),
+            membershipGranted: !!(res.data && res.data.membershipGranted)
+          };
+        });
+      });
+    });
+  },
+  getInviteByToken: function (token, options) {
+    return wrap(function () {
+      var r = repo();
+      var fn = typeof r.getInviteByToken === 'function' ? r.getInviteByToken : r.resolveInvite;
+      return asResult(fn.call(r, token, options)).then(function (res) {
+        if (!res.ok) return failEnvelope(res);
+        var team = res.data && res.data.team ? res.data.team : res.data;
+        return hydrateTeam(team).then(function (deco) {
+          return {
+            ok: true,
+            team: deco,
+            invite: res.data && res.data.invite,
+            inviter: res.data && res.data.inviter,
+            alreadyMember: !!(res.data && res.data.alreadyMember),
+            membershipGranted: !!(res.data && res.data.membershipGranted)
+          };
+        });
+      });
+    });
+  },
+  acceptInvite: function (token) {
+    return wrap(function () {
+      var r = repo();
+      if (typeof r.acceptInvite !== 'function') {
+        return failEnvelope({ code: 'unsupported', message: '当前仓储不支持接受邀请' });
+      }
+      return asResult(r.acceptInvite(token)).then(function (res) {
+        if (!res.ok) return failEnvelope(res);
+        var team = res.data && res.data.team ? res.data.team : res.data;
+        return hydrateTeam(team).then(function (deco) {
+          return {
+            ok: true,
+            team: deco,
+            invite: res.data && res.data.invite,
+            alreadyMember: !!(res.data && res.data.alreadyMember),
+            membershipGranted: !!(res.data && res.data.membershipGranted)
+          };
+        });
       });
     });
   },
@@ -948,7 +1076,7 @@ module.exports = {
     return wrap(function () {
       return asResult(repo().listApplications(teamId, options)).then(function (res) {
         if (!res.ok) return failEnvelope(res);
-        return { ok: true, list: res.data || [] };
+        return { ok: true, list: res.data || [], cursor: res.cursor || '', hasMore: !!res.hasMore };
       });
     });
   },

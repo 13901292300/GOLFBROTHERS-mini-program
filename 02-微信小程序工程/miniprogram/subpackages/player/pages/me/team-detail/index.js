@@ -4,6 +4,8 @@
  */
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const teamClub = require('../../../../../utils/teamClub/service.js');
+const shareInvite = require('../../../../../utils/teamClub/shareInvite.js');
+const routes = require('../../../../../utils/teamClub/routes.js');
 const bootstrap = require('../../../../../utils/teamClub/bootstrap.js');
 const pageErrors = require('../../../../../utils/teamClub/pageErrors.js');
 const matchRefSync = require('../../../../../utils/teamClub/matchRefSync.js');
@@ -31,6 +33,7 @@ Page({
     matches: [],
     canCreateTeamMatch: false,
     canShareTeam: false,
+    shareReady: false,
     showManageButton: false,
     manageMenuItems: [],
     manageSheetVisible: false,
@@ -99,7 +102,7 @@ Page({
   },
 
   /**
-   * 右上角菜单分享：只在有分享权限时开放。
+   * 右上角菜单分享：仅管理员且邀请 token 已预签发后开放。
    */
   _applyShareMenu(canShare) {
     const allow = !!canShare;
@@ -114,13 +117,29 @@ Page({
     }
   },
 
-  /** 原生分享回调：使用当前球队资料，落地页是球队邀请页并带上 teamId */
+  _prepareShare(teamId, silent) {
+    const self = this;
+    this.setData({ shareReady: false });
+    this._applyShareMenu(false);
+    return shareInvite.prepare(teamId).then(function (res) {
+      const ready = !!(res && res.ok && res.invite && res.invite.token);
+      self.setData({ shareReady: ready });
+      self._applyShareMenu(ready && self.data.canShareTeam);
+      if (!ready && !silent) {
+        wx.showToast({ title: (res && res.message) || '邀请准备中，请稍后重试', icon: 'none' });
+      }
+      return ready;
+    });
+  },
+
+  /** 原生分享：落地页只带服务端短期 token */
   onShareAppMessage() {
     const team = this.data.team;
-    if (!team || !this.data.canShareTeam) {
-      return { title: '高球伴侣', path: '/pages/home/index' };
+    const inv = shareInvite.current(this.data.teamId);
+    if (!team || !this.data.canShareTeam || !this.data.shareReady || !inv || !inv.token) {
+      return { title: '邀请你加入球队', path: routes.TEAM_INVITE_PAGE };
     }
-    return teamClub.buildTeamShareMessage(team);
+    return shareInvite.buildShareMessage(team, inv);
   },
 
   initHeaderNav() {
@@ -168,7 +187,7 @@ Page({
   loadIntro(silent) {
     const teamId = this.data.teamId;
     if (!teamId) {
-      this.setData({ introState: 'error', team: null, canCreateTeamMatch: false, canShareTeam: false });
+      this.setData({ introState: 'error', team: null, canCreateTeamMatch: false, canShareTeam: false, shareReady: false });
       return;
     }
     const token = this._openRequest('intro');
@@ -187,7 +206,8 @@ Page({
             introErrorDesc: err.errorDesc,
             team: null,
             canCreateTeamMatch: false,
-            canShareTeam: false
+            canShareTeam: false,
+            shareReady: false
           });
           if (err.code === 'team_dissolved' || err.pageState === 'team_dissolved') {
             this.setData({ manageSheetVisible: false, showManageButton: false });
@@ -204,7 +224,10 @@ Page({
           canShareTeam: !dissolved && !!permissions.canShareTeam,
           pendingApplicationCount: Number(res.team.pendingApplicationCount || 0)
         });
-        this._applyShareMenu(!dissolved && permissions.canShareTeam);
+        this._applyShareMenu(false);
+        if (!dissolved && permissions.canShareTeam) {
+          this._prepareShare(teamId, silent);
+        }
         if (dissolved) {
           this.setData({ manageSheetVisible: false });
         }
@@ -212,7 +235,7 @@ Page({
       .catch(() => {
         if (!this._isLatest('intro', token)) return;
         this._loaded.intro = false;
-        this.setData({ introState: 'error', team: null, canCreateTeamMatch: false, canShareTeam: false });
+        this.setData({ introState: 'error', team: null, canCreateTeamMatch: false, canShareTeam: false, shareReady: false });
       });
   },
 

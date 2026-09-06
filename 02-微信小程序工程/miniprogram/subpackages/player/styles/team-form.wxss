@@ -1,0 +1,168 @@
+/* 创建/编辑球队共用表单 token，避免两套输入框高度。 */
+.team-form {
+  --tf-input-height: 76rpx;
+  --tf-input-font: 28rpx;
+  --tf-input-line: 44rpx;
+  --tf-input-pad-y: 16rpx;
+  --tf-input-pad-x: 24rpx;
+  --tf-radius: 16rpx;
+  --tf-count-gap: 12rpx;
+  --tf-field-gap: 32rpx;
+  --tf-area-min: 200rpx;
+  --tf-border: #d1d5db;
+  --tf-ph: #9aa3af;
+}
+
+.team-form.dark-mode {
+  --tf-border: #3f3f46;
+  --tf-ph: #8b929c;
+}
+
+.form {
+  padding: 32rpx 32rpx 24rpx;
+}
+
+.form-logo {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 32rpx;
+  border: 2rpx solid var(--tf-border);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 32rpx;
+  overflow: hidden;
+  position: relative;
+}
+
+.form-logo__img {
+  width: 100%;
+  height: 100%;
+}
+
+.form-logo__ph {
+  font-size: 24rpx;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.form-logo__mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8rpx 0;
+  background: rgba(0, 45, 98, 0.72);
+  color: #fff;
+  font-size: 22rpx;
+  text-align: center;
+}
+
+.form-logo__hint {
+  display: block;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  margin: -16rpx 0 28rpx;
+  line-height: 1.4;
+}
+
+.field {
+  margin-bottom: var(--tf-field-gap);
+}
+
+.field--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--tf-input-height);
+}
+
+.field__label {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 12rpx;
+  line-height: 1.4;
+}
+
+.field--row .field__label {
+  margin-bottom: 0;
+}
+
+.field__input,
+.field__area {
+  width: 100%;
+  box-sizing: border-box;
+  border: 2rpx solid var(--tf-border);
+  background: var(--bg-card);
+  border-radius: var(--tf-radius);
+  padding: var(--tf-input-pad-y) var(--tf-input-pad-x);
+  font-size: var(--tf-input-font);
+  color: var(--text-primary);
+  min-height: var(--tf-input-height);
+}
+
+.field__input {
+  height: var(--tf-input-height);
+  line-height: var(--tf-input-height);
+  padding: 0 var(--tf-input-pad-x);
+  overflow: visible;
+}
+
+.field__ph {
+  color: var(--tf-ph);
+  font-size: var(--tf-input-font);
+  line-height: var(--tf-input-height);
+}
+
+.field__area {
+  min-height: var(--tf-area-min);
+  line-height: 1.5;
+  height: var(--tf-area-min);
+}
+
+.field__count {
+  display: block;
+  text-align: right;
+  font-size: 22rpx;
+  color: var(--text-muted);
+  margin-top: var(--tf-count-gap);
+  line-height: 1.3;
+  min-height: 28rpx;
+}
+
+.form-end-space {
+  height: 48rpx;
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 16rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--bg-primary);
+}
+
+.submit-btn {
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 999rpx;
+  background: #002d62;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.submit-btn::after {
+  border: none;
+}
+
+.submit-btn.is-disabled {
+  opacity: 0.5;
+}

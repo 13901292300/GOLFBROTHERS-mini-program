@@ -5,19 +5,15 @@ const { createHeaderStyle } = require('../../../../../../utils/headerEngine.js')
 const teamClub = require('../../../../../../utils/teamClub/service.js');
 const bootstrap = require('../../../../../../utils/teamClub/bootstrap.js');
 const pageErrors = require('../../../../../../utils/teamClub/pageErrors.js');
-const mockAvatars = require('../../../../../../utils/mockAvatars.js');
+const profileOnboard = require('../../../../../../utils/teamClub/profileOnboard.js');
+const teamFields = require('../../../../../../utils/teamClub/teamFields.js');
+const teamLogo = require('../../../../../../utils/teamClub/teamLogo.js');
+const teamAssetUpload = require('../../../../../../utils/teamClub/teamAssetUpload.js');
 
 const NAME_MAX = 30;
-const SHORT_MAX = 4;
 const SLOGAN_MAX = 40;
 const INTRO_MAX = 200;
 const CITY_MAX = 20;
-
-function isTempPath(url) {
-  const s = String(url || '').trim();
-  if (!s) return false;
-  return /^wxfile:\/\//i.test(s) || /^http:\/\/tmp\//i.test(s) || s.indexOf('tmp/') === 0;
-}
 
 Page({
   data: {
@@ -27,7 +23,15 @@ Page({
     pageState: 'ready',
     errorTitle: '',
     errorDesc: '',
+    actionKind: '',
+    actionLabel: '',
     submitting: false,
+    logoUploading: false,
+    logoPreview: '',
+    logoError: '',
+    logoSrc: '',
+    logoBroken: false,
+    logoPlaceholder: teamLogo.PLACEHOLDER,
     form: {
       name: '',
       shortName: '',
@@ -46,16 +50,40 @@ Page({
   onLoad() {
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
+    this._pendingLogos = [];
+    teamAssetUpload.flushOrphans();
     bootstrap.ensureCloudIdentity().then((ident) => {
       if (!ident || !ident.ok) {
         const err = pageErrors.fromResult(ident);
-        this.setData({ pageState: err.pageState, errorTitle: err.errorTitle, errorDesc: err.errorDesc });
+        this.setData({
+          pageState: err.pageState,
+          errorTitle: err.errorTitle,
+          errorDesc: err.errorDesc,
+          actionKind: err.actionKind || '',
+          actionLabel: err.actionLabel || ''
+        });
       }
     });
   },
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    if (this.data.pageState === 'profile_required' || this.data.pageState === 'need_login') {
+      bootstrap.ensureCloudIdentity().then((ident) => {
+        if (ident && ident.ok) {
+          this.setData({ pageState: 'ready', actionKind: '', actionLabel: '' });
+          return;
+        }
+        const err = pageErrors.fromResult(ident);
+        this.setData({
+          pageState: err.pageState,
+          errorTitle: err.errorTitle,
+          errorDesc: err.errorDesc,
+          actionKind: err.actionKind || '',
+          actionLabel: err.actionLabel || ''
+        });
+      });
+    }
   },
 
   initHeaderNav() {
@@ -76,8 +104,31 @@ Page({
   },
 
   onRetry() {
-    this.setData({ pageState: 'ready' });
-    this.onLoad();
+    if (this.data.pageState === 'profile_required') return;
+    this.setData({ pageState: 'ready', actionKind: '', actionLabel: '' });
+    bootstrap.ensureCloudIdentity().then((ident) => {
+      if (!ident || !ident.ok) {
+        const err = pageErrors.fromResult(ident);
+        this.setData({
+          pageState: err.pageState,
+          errorTitle: err.errorTitle,
+          errorDesc: err.errorDesc,
+          actionKind: err.actionKind || '',
+          actionLabel: err.actionLabel || ''
+        });
+      }
+    });
+  },
+
+  onCompleteProfile() {
+    if (profileOnboard.isBusy()) {
+      wx.showToast({ title: '正在处理，请稍候', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: profileOnboard.editProfileUrl(),
+      fail: () => wx.showToast({ title: '无法打开资料页', icon: 'none' })
+    });
   },
 
   _patchForm(patch) {
@@ -85,7 +136,7 @@ Page({
     this.setData({
       form: form,
       nameCount: String(form.name || '').length,
-      shortCount: String(form.shortName || '').length,
+      shortCount: teamFields.visibleLength(form.shortName),
       sloganCount: String(form.slogan || '').length,
       introCount: String(form.intro || '').length
     });
@@ -95,7 +146,9 @@ Page({
     this._patchForm({ name: String((e.detail && e.detail.value) || '').slice(0, NAME_MAX) });
   },
   onShort(e) {
-    this._patchForm({ shortName: String((e.detail && e.detail.value) || '').slice(0, SHORT_MAX) });
+    this._patchForm({
+      shortName: teamFields.sliceVisible((e.detail && e.detail.value) || '', teamFields.SHORT_MAX)
+    });
   },
   onCity(e) {
     this._patchForm({ city: String((e.detail && e.detail.value) || '').slice(0, CITY_MAX) });
@@ -110,61 +163,131 @@ Page({
     this._patchForm({ acceptingMembers: !!(e.detail && e.detail.value) });
   },
 
+  onLogoError() {
+    this.setData({ logoBroken: true });
+  },
+
+  onUnload() {
+    const pending = this._pendingLogos || [];
+    pending.forEach((id) => teamAssetUpload.enqueueOrphan(id));
+    teamAssetUpload.flushOrphans();
+  },
+
   onPickLogo() {
+    if (this.data.logoUploading || this.data.submitting || teamAssetUpload.isUploading()) {
+      wx.showToast({ title: '正在上传，请稍候', icon: 'none' });
+      return;
+    }
+    if (teamAssetUpload.hasPendingUpload()) {
+      this._retryLogo();
+      return;
+    }
+    this.setData({ logoUploading: true, logoError: '' });
     const self = this;
-    wx.chooseImage({
-      count: 1,
-      sizeType: ['compressed'],
-      sourceType: ['album', 'camera'],
-      success(res) {
-        const temp = res.tempFilePaths && res.tempFilePaths[0];
-        if (!temp) return;
-        if (!wx.cloud || typeof wx.cloud.uploadFile !== 'function') {
-          wx.showToast({ title: '无法上传图片，未保存临时路径', icon: 'none' });
+    if (!self._logoUploadId) self._logoUploadId = teamAssetUpload.newUploadId();
+    teamAssetUpload
+      .pickAndUpload({
+        kind: 'logo',
+        uploadId: self._logoUploadId,
+        onPreview: function (info) {
+          self.setData({
+            logoPreview: info && info.previewPath ? info.previewPath : self.data.logoPreview,
+            logoUploading: true,
+            logoBroken: false
+          });
+        }
+      })
+      .then((res) => self._finishLogoUpload(res));
+  },
+
+  _retryLogo() {
+    this.setData({ logoUploading: true, logoError: '' });
+    const self = this;
+    teamAssetUpload.retryPendingUpload().then((res) => self._finishLogoUpload(res));
+  },
+
+  _finishLogoUpload(res) {
+    const self = this;
+    if (!res || !res.ok) {
+      if (res && res.code === 'cancelled') {
+        self.setData({ logoUploading: false });
+        return;
+      }
+      const text = teamAssetUpload.displayUploadError(res);
+      self.setData({ logoUploading: false, logoError: text });
+      wx.showModal({
+        title: res && res.code === 'upload_uncertain' ? '上传待确认' : 'LOGO 尚未上传',
+        content: text,
+        showCancel: true,
+        confirmText: '重试',
+        success(r) {
+          if (!r.confirm) return;
+          if (teamAssetUpload.hasPendingUpload()) self._retryLogo();
+          else self.onPickLogo();
+        }
+      });
+      return;
+    }
+        const saved = teamLogo.persistLogo(res.fileID);
+        if (!saved.ok) {
+          self.setData({ logoUploading: false, logoError: saved.message || 'LOGO 无效' });
           return;
         }
-        wx.cloud.uploadFile({
-          cloudPath: 'team-logos/' + Date.now() + '.jpg',
-          filePath: temp,
-          success(up) {
-            const fileID = String((up && up.fileID) || '').trim();
-            if (!fileID || isTempPath(fileID)) {
-              wx.showToast({ title: 'LOGO 上传失败', icon: 'none' });
-              return;
-            }
-            self._patchForm({ logo: fileID });
-          },
-          fail() {
-            wx.showToast({ title: 'LOGO 上传失败', icon: 'none' });
-          }
+        const prev = String((self.data.form && self.data.form.logo) || '').trim();
+        if (prev && prev !== saved.logo && (self._pendingLogos || []).indexOf(prev) >= 0) {
+          teamAssetUpload.enqueueOrphan(prev, res.route);
+        }
+        self._pendingLogos = (self._pendingLogos || []).concat([saved.logo]);
+        self._logoUploadId = '';
+        self._patchForm({ logo: saved.logo });
+        teamLogo.displaySrc(saved.logo).then((d) => {
+          teamLogo.logDiag({
+            stage: 'create.upload',
+            upload: res.fileID,
+            saved: saved.logo,
+            boundField: 'logoSrc',
+            route: res.route
+          });
+          self.setData({
+            logoUploading: false,
+            logoPreview: '',
+            logoError: '',
+            logoSrc: d.logoSrc,
+            logoBroken: false,
+            logoPlaceholder: d.placeholder
+          });
         });
-      }
-    });
   },
 
   onSubmit() {
-    if (this.data.submitting) return;
+    if (this.data.submitting || this.data.logoUploading) return;
+    if (this.data.pageState === 'profile_required') return;
     const form = this.data.form;
     const name = String(form.name || '').trim();
     if (!name) {
       wx.showToast({ title: '请填写球队名称', icon: 'none' });
       return;
     }
-    if (isTempPath(form.logo)) {
+    const shortChecked = teamFields.sanitizeShortName(form.shortName, {});
+    if (!shortChecked.ok) {
+      wx.showToast({ title: shortChecked.message, icon: 'none' });
+      return;
+    }
+    const logoChecked = teamLogo.persistLogo(form.logo);
+    if (!logoChecked.ok) {
       wx.showToast({ title: 'LOGO 未上传成功', icon: 'none' });
       return;
     }
-    const logo = String(form.logo || '').trim() || mockAvatars.pickMockAvatar(name);
     this.setData({ submitting: true });
     const self = this;
     teamClub
       .createTeam({
         name: name,
-        shortName: String(form.shortName || '').trim(),
+        shortName: shortChecked.shortName,
         city: String(form.city || '').trim(),
         slogan: String(form.slogan || '').trim(),
         intro: String(form.intro || '').trim(),
-        logo: logo,
+        logo: logoChecked.logo,
         acceptingMembers: form.acceptingMembers !== false,
         idempotencyKey: 'create:' + name + ':' + Date.now()
       })
@@ -175,6 +298,14 @@ Page({
           wx.showToast({ title: err.errorTitle, icon: 'none' });
           return;
         }
+        teamLogo.logDiag({
+          stage: 'create.saved',
+          upload: logoChecked.logo,
+          saved: res.team.logo,
+          boundField: 'logoSrc'
+        });
+        teamAssetUpload.markCommitted(logoChecked.logo);
+        self._pendingLogos = [];
         wx.redirectTo({
           url: teamClub.buildTeamDetailUrl(res.team.id),
           fail: () => wx.navigateTo({ url: teamClub.buildTeamDetailUrl(res.team.id) })

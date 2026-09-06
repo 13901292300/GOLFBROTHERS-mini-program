@@ -1,21 +1,146 @@
 {
-  "comment": "在微信云开发控制台按此添加索引。数据库无声明式唯一索引时，用确定性_id与事务保证唯一。",
+  "comment": "按实际 where + orderBy 字段顺序声明。当前不要在控制台创建；云函数也暂不上传。唯一约束优先确定性 _id / lock 文档。",
+  "createNow": false,
   "indexes": [
-    { "collection": "user_profiles", "keys": [{ "name": "openidHash", "unique": true }] },
-    { "collection": "user_profiles", "keys": [{ "name": "searchKey" }, { "name": "userId" }] },
-    { "collection": "team_clubs", "keys": [{ "name": "teamId", "unique": true }, { "name": "status" }] },
-    { "collection": "team_members", "keys": [{ "name": "teamId" }, { "name": "userId" }, { "name": "memberStatus" }] },
-    { "collection": "team_members", "keys": [{ "name": "userId" }, { "name": "memberStatus" }] },
-    { "collection": "team_applications", "keys": [{ "name": "teamId" }, { "name": "userId" }, { "name": "status" }] },
-    { "collection": "team_invites", "keys": [{ "name": "tokenHash" }] },
-    { "collection": "team_invites", "keys": [{ "name": "teamId" }, { "name": "status" }] },
-    { "collection": "team_notices", "keys": [{ "name": "recipientUserId" }, { "name": "createdAt" }] },
-    { "collection": "team_audits", "keys": [{ "name": "teamId" }, { "name": "createdAt" }] },
-    { "collection": "team_club_migrations", "keys": [{ "name": "actorUserId" }, { "name": "teamId" }] },
-    { "collection": "team_match_refs", "keys": [{ "name": "teamId" }, { "name": "updatedAt" }] },
-    { "collection": "team_match_refs", "keys": [{ "name": "matchId" }, { "name": "teamId" }] },
-    { "collection": "team_matches", "keys": [{ "name": "teamId" }, { "name": "updatedAt" }] },
-    { "collection": "team_matches", "keys": [{ "name": "matchId" }] },
-    { "collection": "team_match_scores", "keys": [{ "name": "matchId" }] }
+    {
+      "collection": "team_members",
+      "name": "idx_members_team_status_joined",
+      "unique": false,
+      "fields": [
+        { "name": "teamId", "direction": "asc" },
+        { "name": "memberStatus", "direction": "asc" },
+        { "name": "joinedAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["listMembers"],
+      "createNow": false
+    },
+    {
+      "collection": "team_members",
+      "name": "idx_members_team_status_search",
+      "unique": false,
+      "fields": [
+        { "name": "teamId", "direction": "asc" },
+        { "name": "memberStatus", "direction": "asc" },
+        { "name": "searchKey", "direction": "asc" },
+        { "name": "_id", "direction": "asc" }
+      ],
+      "queryMethods": ["listMembers(keyword prefix)"],
+      "createNow": false
+    },
+    {
+      "collection": "team_members",
+      "name": "idx_members_user_status_joined",
+      "unique": false,
+      "fields": [
+        { "name": "userId", "direction": "asc" },
+        { "name": "memberStatus", "direction": "asc" },
+        { "name": "joinedAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["listMyTeams"],
+      "createNow": false
+    },
+    {
+      "collection": "team_applications",
+      "name": "idx_apps_team_status_created",
+      "unique": false,
+      "fields": [
+        { "name": "teamId", "direction": "asc" },
+        { "name": "status", "direction": "asc" },
+        { "name": "createdAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["listApplications"],
+      "createNow": false
+    },
+    {
+      "collection": "team_applications",
+      "name": "idx_apps_team_user_created",
+      "unique": false,
+      "fields": [
+        { "name": "teamId", "direction": "asc" },
+        { "name": "userId", "direction": "asc" },
+        { "name": "createdAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["getTeam viewerApplication"],
+      "createNow": false
+    },
+    {
+      "collection": "team_invites",
+      "name": "uniq_invites_tokenHash",
+      "unique": true,
+      "fields": [{ "name": "tokenHash", "direction": "asc" }],
+      "queryMethods": ["findInviteByTokenOrId"],
+      "createNow": false
+    },
+    {
+      "collection": "team_invites",
+      "name": "idx_invites_team_status_created",
+      "unique": false,
+      "fields": [
+        { "name": "teamId", "direction": "asc" },
+        { "name": "status", "direction": "asc" },
+        { "name": "createdAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["listInvites"],
+      "createNow": false
+    },
+    {
+      "collection": "team_notices",
+      "name": "idx_notices_recipient_created",
+      "unique": false,
+      "fields": [
+        { "name": "recipientUserId", "direction": "asc" },
+        { "name": "createdAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["listNotices"],
+      "createNow": false
+    },
+    {
+      "collection": "team_matches",
+      "name": "idx_matches_team_updated",
+      "unique": false,
+      "fields": [
+        { "name": "teamId", "direction": "asc" },
+        { "name": "updatedAt", "direction": "desc" },
+        { "name": "_id", "direction": "desc" }
+      ],
+      "queryMethods": ["listTeamMatches"],
+      "createNow": false
+    },
+    {
+      "collection": "team_match_scores",
+      "name": "idx_scores_match_id",
+      "unique": false,
+      "fields": [
+        { "name": "matchId", "direction": "asc" },
+        { "name": "_id", "direction": "asc" }
+      ],
+      "queryMethods": ["loadScoreRows / getMatch hydrate"],
+      "createNow": false
+    },
+    {
+      "collection": "user_profiles",
+      "name": "uniq_profiles_openidHash",
+      "unique": true,
+      "fields": [{ "name": "openidHash", "direction": "asc" }],
+      "queryMethods": ["openidHash uniqueness (identity uses _id=userId)"],
+      "createNow": false
+    },
+    {
+      "collection": "user_profiles",
+      "name": "idx_profiles_searchKey",
+      "unique": false,
+      "fields": [
+        { "name": "searchKey", "direction": "asc" },
+        { "name": "_id", "direction": "asc" }
+      ],
+      "queryMethods": ["searchUsers prefix"],
+      "createNow": false
+    }
   ]
 }

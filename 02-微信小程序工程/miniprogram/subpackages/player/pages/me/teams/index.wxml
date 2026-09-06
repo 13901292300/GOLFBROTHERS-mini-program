@@ -23,7 +23,10 @@
         emptyDesc="创建一支球队，或等待队长邀请。"
         errorTitle="{{errorTitle || '加载失败'}}"
         errorDesc="{{errorDesc || '无法获取我的球队，请稍后重试。不会改用本地数据。'}}"
+        actionKind="{{actionKind}}"
+        actionLabel="{{actionLabel}}"
         bind:retry="onRetry"
+        bind:completeprofile="onCompleteProfile"
       />
 
       <view wx:if="{{pageState === 'ready'}}" class="section">
@@ -40,7 +43,13 @@
             bindtap="onTapTeam"
             data-id="{{item.id}}"
           >
-            <image class="team-row__logo" src="{{item.logo}}" mode="aspectFill"></image>
+            <image
+              class="team-row__logo"
+              src="{{item.logoBroken ? item.logoPlaceholder : item.logoSrc}}"
+              mode="aspectFill"
+              data-id="{{item.id}}"
+              binderror="onLogoError"
+            ></image>
             <view class="team-row__main">
               <text class="team-row__name">{{item.fullName}}</text>
               <text wx:if="{{item.metaText}}" class="team-row__meta">{{item.metaText}}</text>
@@ -60,7 +69,7 @@
     </view>
   </scroll-view>
 
-  <view class="footer">
+  <view wx:if="{{showCreate}}" class="footer">
     <button class="create-team-btn" bindtap="onCreateTeam">＋ 创建球队</button>
   </view>
 </view>

@@ -7,11 +7,20 @@ var C = require('./constants.js');
 var permissions = require('./permissions.js');
 var matchDoc = require('./matchDoc.js');
 var scoreShards = require('./scoreShards.js');
+var queryUtil = require('./queryUtil.js');
+var profileFields = require('./profileFields.js');
+var teamAssets = require('./teamAssets.js');
+var teamFields = require('./teamFields.js');
 
 function roleLabel(role) {
   if (role === C.ROLES.SUPER_ADMIN) return '超级管理员';
   if (role === C.ROLES.ADMIN) return '管理员';
   return '成员';
+}
+
+function sanitizeStoredLogo(raw) {
+  var envId = String(process.env.TCB_ENV || process.env.WX_CLOUD_ENV || '').trim();
+  return teamFields.persistStoredLogo(raw, envId);
 }
 
 function publicUser(profile) {
@@ -50,16 +59,18 @@ function mapMemberView(m) {
 }
 
 function mapTeamView(team, members, viewerId) {
+  var list = Array.isArray(members) ? members : members ? [members] : [];
   var mine = null;
-  var captain = '';
-  (members || []).forEach(function (m) {
-    if (m.memberStatus !== C.MEMBER_STATUS.ACTIVE) return;
+  var captain = String(team.captainUserId || '');
+  list.forEach(function (m) {
+    if (!m || m.memberStatus !== C.MEMBER_STATUS.ACTIVE) return;
     if (m.userId === String(viewerId || '')) mine = m;
-    if (m.isCaptain) captain = m.userId;
+    if (!captain && m.isCaptain) captain = m.userId;
   });
-  var activeCount = (members || []).filter(function (m) {
-    return m.memberStatus === C.MEMBER_STATUS.ACTIVE;
-  }).length;
+  var activeCount =
+    team.memberCount != null ? Number(team.memberCount) || 0 : list.filter(function (m) {
+      return m && m.memberStatus === C.MEMBER_STATUS.ACTIVE;
+    }).length;
   var currentUserRole = mine ? mine.role : '';
   var perms = mine
     ? permissions.derivePermissions(currentUserRole, true)
@@ -67,7 +78,7 @@ function mapTeamView(team, members, viewerId) {
   if (team.status === C.TEAM_STATUS.DISSOLVED) {
     perms = permissions.emptyPermissions();
   }
-  var hist = findMemberRecord(members, viewerId);
+  var hist = findMemberRecord(list, viewerId);
   return {
     id: team.teamId,
     teamId: team.teamId,
@@ -154,21 +165,20 @@ function ignoreClientClaims(payload) {
     dateText: p.dateText,
     snapshot: p.snapshot,
     relationType: p.relationType,
-    confirmName: p.confirmName || p.teamName
+    confirmName: p.confirmName || p.teamName,
+    cursor: p.cursor,
+    limit: p.limit
   };
 }
 
 function resolveActor(tx, wxCtx) {
   var openid = wxCtx && wxCtx.OPENID ? String(wxCtx.OPENID).trim() : '';
   if (!openid) return Promise.resolve(errors.fail('need_login', '未登录'));
-  var openidHash = cryptoUtil.hashOpenid(openid);
-  return tx.query(C.COLLECTIONS.PROFILES, function (row) {
-    return row && row.openidHash === openidHash;
-  }).then(function (rows) {
-    if (!rows.length) {
+  var userId = cryptoUtil.userIdFromOpenid(openid);
+  return tx.get(C.COLLECTIONS.PROFILES, userId).then(function (profile) {
+    if (!profile) {
       return errors.fail('profile_required', '请先完善用户档案');
     }
-    var profile = rows[0];
     return {
       ok: true,
       user: {
@@ -187,16 +197,51 @@ function requireActor(tx, wxCtx) {
   });
 }
 
-function getTeamMembers(tx, teamId) {
-  return tx.query(C.COLLECTIONS.MEMBERS, function (row) {
-    return row && row.teamId === String(teamId);
+function getMember(tx, teamId, userId) {
+  if (!teamId || !userId) return Promise.resolve(null);
+  return tx.get(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, userId));
+}
+
+function isActiveMemberRow(m) {
+  return !!(m && m.memberStatus === C.MEMBER_STATUS.ACTIVE);
+}
+
+function pagedOk(page, mapper) {
+  var rows = (page && page.list) || [];
+  var list = mapper ? rows.map(mapper) : rows;
+  var r = errors.ok(list);
+  r.cursor = (page && page.cursor) || '';
+  r.hasMore = !!(page && page.hasMore);
+  return r;
+}
+
+function addAdminUser(team, uid) {
+  var id = String(uid || '');
+  if (!id) return;
+  team.adminUserIds = Array.isArray(team.adminUserIds) ? team.adminUserIds.slice() : [];
+  if (team.adminUserIds.indexOf(id) < 0) team.adminUserIds.push(id);
+}
+
+function removeAdminUser(team, uid) {
+  var id = String(uid || '');
+  team.adminUserIds = (Array.isArray(team.adminUserIds) ? team.adminUserIds : []).filter(function (x) {
+    return x !== id;
   });
+}
+
+function bumpCount(team, field, delta) {
+  team[field] = Math.max(0, Number(team[field] || 0) + delta);
+}
+
+function searchKeyOf(name) {
+  return String(name || '').trim().toLowerCase();
 }
 
 function findMemberRecord(members, userId) {
   var uid = String(userId || '');
-  for (var i = 0; i < members.length; i++) {
-    if (members[i].userId === uid) return members[i];
+  var list = Array.isArray(members) ? members : [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && list[i].userId === uid) return list[i];
   }
   return null;
 }
@@ -273,12 +318,15 @@ function addMemberRow(tx, team, input, now) {
       return errors.fail('already_member', '已是成员');
     }
     if (existing) {
+      var wasActive = existing.memberStatus === C.MEMBER_STATUS.ACTIVE;
       existing.memberStatus = C.MEMBER_STATUS.ACTIVE;
       existing.role = C.ROLES.MEMBER;
       existing.displayName = String((input && input.displayName) || existing.displayName || uid);
+      existing.searchKey = searchKeyOf(existing.displayName);
       existing.joinedAt = now;
       existing.leftAt = 0;
       existing.updatedAt = now;
+      if (!wasActive) bumpCount(team, 'memberCount', 1);
       return tx.put(C.COLLECTIONS.MEMBERS, docId, existing).then(function () {
         return errors.ok(existing);
       });
@@ -288,6 +336,7 @@ function addMemberRow(tx, team, input, now) {
       teamId: team.teamId,
       userId: uid,
       displayName: String((input && input.displayName) || uid),
+      searchKey: searchKeyOf((input && input.displayName) || uid),
       avatar: String((input && input.avatar) || ''),
       role: C.ROLES.MEMBER,
       isCaptain: false,
@@ -298,19 +347,21 @@ function addMemberRow(tx, team, input, now) {
       updatedAt: now
     };
     return tx.put(C.COLLECTIONS.MEMBERS, docId, row).then(function () {
+      bumpCount(team, 'memberCount', 1);
       return errors.ok(row);
     });
   });
 }
 
-function fanoutApplicationNotices(tx, team, app, members, now) {
-  var jobs = [];
-  members.forEach(function (m) {
-    if (m.memberStatus !== C.MEMBER_STATUS.ACTIVE) return;
-    if (!permissions.canReviewTeamApplication(m.role)) return;
-    var nid = ['tn', 'join_application_received', app.applicationId, m.userId].join('-');
-    jobs.push(
-      tx.put(C.COLLECTIONS.NOTICES, nid, {
+function fanoutApplicationNotices(tx, team, app, now) {
+  var ids = Array.isArray(team.adminUserIds) && team.adminUserIds.length
+    ? team.adminUserIds
+    : [team.ownerUserId];
+  var jobs = ids.map(function (uid) {
+    return getMember(tx, team.teamId, uid).then(function (m) {
+      if (!isActiveMemberRow(m) || !permissions.canReviewTeamApplication(m.role)) return null;
+      var nid = ['tn', 'join_application_received', app.applicationId, m.userId].join('-');
+      return tx.put(C.COLLECTIONS.NOTICES, nid, {
         noticeId: nid,
         id: nid,
         category: 'team_notice',
@@ -331,8 +382,8 @@ function fanoutApplicationNotices(tx, team, app, members, now) {
             '/subpackages/player/pages/me/team-application/index?applicationId=' +
             encodeURIComponent(app.applicationId)
         }
-      })
-    );
+      });
+    });
   });
   return Promise.all(jobs);
 }
@@ -341,6 +392,17 @@ function createEngine(store, wxCtx) {
   function run(fn) {
     return store.runTransaction(function (tx) {
       return fn(tx);
+    });
+  }
+
+  function queryPage(name, spec) {
+    return store.query(name, spec);
+  }
+
+  function getDoc(name, id) {
+    if (typeof store.get === 'function') return store.get(name, id);
+    return run(function (tx) {
+      return tx.get(name, id);
     });
   }
 
@@ -363,20 +425,28 @@ function createEngine(store, wxCtx) {
       if (!openid) return errors.fail('need_login', '未登录');
       var openidHash = cryptoUtil.hashOpenid(openid);
       var userId = cryptoUtil.userIdFromOpenid(openid);
-      return tx.query(C.COLLECTIONS.PROFILES, function (row) {
-        return row && row.openidHash === openidHash;
-      }).then(function (rows) {
-        if (rows.length) {
-          return errors.ok(publicUser(rows[0]));
+      return tx.get(C.COLLECTIONS.PROFILES, userId).then(function (existing) {
+        if (existing) {
+          return errors.ok(publicUser(existing));
         }
-        var displayName = String((payload && payload.displayName) || '').trim() || userId;
-        var avatar = String((payload && payload.avatar) || '').trim();
+        var checked = profileFields.validateProfileInput(
+          {
+            displayName: payload && payload.displayName,
+            avatar: payload && payload.avatar
+          },
+          { requireAvatar: false }
+        );
+        if (!checked.ok) {
+          return errors.fail(checked.code || 'invalid_args', checked.message || '资料不完整');
+        }
+        var displayName = checked.displayName;
+        var avatar = checked.avatar;
         var profile = {
           userId: userId,
           openidHash: openidHash,
           displayName: displayName,
           avatar: avatar,
-          searchKey: displayName.toLowerCase(),
+          searchKey: searchKeyOf(displayName),
           createdAt: tx.nowMs()
         };
         return tx.put(C.COLLECTIONS.PROFILES, userId, profile).then(function () {
@@ -386,24 +456,36 @@ function createEngine(store, wxCtx) {
     });
   }
 
-  function listMyTeams() {
+  function listMyTeams(payload) {
+    var cursor = payload && payload.cursor;
+    var limit = payload && payload.limit;
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
-        return tx.query(C.COLLECTIONS.MEMBERS, function (row) {
-          return row && row.userId === auth.user.userId;
-        }).then(function (memberships) {
-          var jobs = memberships.map(function (m) {
-            return tx.get(C.COLLECTIONS.CLUBS, m.teamId).then(function (team) {
-              if (!team) return null;
-              return getTeamMembers(tx, team.teamId).then(function (members) {
-                return mapTeamView(team, members, auth.user.userId);
-              });
-            });
+        return { ok: true, __page: true, userId: auth.user.userId };
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      return queryPage(C.COLLECTIONS.MEMBERS, {
+        where: { userId: g.userId, memberStatus: C.MEMBER_STATUS.ACTIVE },
+        orderBy: [
+          { field: 'joinedAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ],
+        limit: limit,
+        cursor: cursor
+      }).then(function (page) {
+        var jobs = page.list.map(function (m) {
+          return getDoc(C.COLLECTIONS.CLUBS, m.teamId).then(function (team) {
+            if (!team) return null;
+            return mapTeamView(team, m, g.userId);
           });
-          return Promise.all(jobs).then(function (list) {
-            return errors.ok(list.filter(Boolean));
-          });
+        });
+        return Promise.all(jobs).then(function (list) {
+          var r = errors.ok(list.filter(Boolean));
+          r.cursor = page.cursor || '';
+          r.hasMore = !!page.hasMore;
+          return r;
         });
       });
     });
@@ -417,28 +499,23 @@ function createEngine(store, wxCtx) {
         if (!teamId) return errors.fail('invalid_args', '缺少 teamId');
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           if (!team) return errors.fail('not_found', '球队不存在');
-          return getTeamMembers(tx, teamId).then(function (members) {
-            return tx.query(C.COLLECTIONS.APPLICATIONS, function (a) {
-              return a && a.teamId === teamId && a.userId === auth.user.userId;
-            }).then(function (apps) {
-              var view = mapTeamView(team, members, auth.user.userId);
-              var latest = null;
-              apps.forEach(function (row) {
-                if (!latest || Number(row.createdAt) > Number(latest.createdAt)) latest = row;
-              });
-              view.viewerApplication = latest;
-              var canReview = !!(view.permissions && view.permissions.canReviewJoinRequests);
-              if (!canReview) {
-                view.pendingApplicationCount = 0;
-                return errors.ok(view);
-              }
-              return tx.query(C.COLLECTIONS.APPLICATIONS, function (a) {
-                return a && a.teamId === teamId && a.status === C.APP_STATUS.PENDING;
-              }).then(function (pending) {
-                view.pendingApplicationCount = (pending || []).length;
+          return getMember(tx, teamId, auth.user.userId).then(function (mine) {
+            var view = mapTeamView(team, mine, auth.user.userId);
+            var canReview = !!(view.permissions && view.permissions.canReviewJoinRequests);
+            if (!canReview) view.pendingApplicationCount = 0;
+            return tx
+              .query(C.COLLECTIONS.APPLICATIONS, {
+                where: { teamId: teamId, userId: auth.user.userId },
+                orderBy: [
+                  { field: 'createdAt', direction: 'desc' },
+                  { field: '_id', direction: 'desc' }
+                ],
+                limit: 1
+              })
+              .then(function (page) {
+                view.viewerApplication = (page.list && page.list[0]) || null;
                 return errors.ok(view);
               });
-            });
           });
         });
       });
@@ -457,6 +534,10 @@ function createEngine(store, wxCtx) {
           if (hit && hit.result) return hit.result;
           var presetId = String(p.teamId || '').trim();
           if (isDemoTeamId(presetId)) return errors.fail('invalid_args', '拒绝导入演示球队');
+          var logoChecked = sanitizeStoredLogo(p.logo);
+          if (!logoChecked.ok) return errors.fail(logoChecked.code, logoChecked.message);
+          var shortChecked = teamFields.sanitizeShortName(p.shortName, { fallback: name });
+          if (!shortChecked.ok) return errors.fail(shortChecked.code, shortChecked.message);
           var check = presetId ? tx.get(C.COLLECTIONS.CLUBS, presetId) : Promise.resolve(null);
           return check.then(function (exists) {
             if (exists) return errors.fail('conflict', 'teamId 已存在');
@@ -466,9 +547,9 @@ function createEngine(store, wxCtx) {
               teamId: teamId,
               schemaVersion: C.SCHEMA_VERSION,
               name: name,
-              shortName: String(p.shortName || name).trim(),
+              shortName: shortChecked.shortName,
               city: String(p.city || '').trim(),
-              logo: String(p.logo || '').trim(),
+              logo: logoChecked.logo,
               intro: String(p.intro || '').trim(),
               homeCourse: String(p.homeCourse || '').trim(),
               slogan: String(p.slogan || '').trim(),
@@ -478,13 +559,18 @@ function createEngine(store, wxCtx) {
               updatedAt: now,
               version: 1,
               dissolvedAt: 0,
-              acceptingMembers: payload && payload.acceptingMembers === false ? false : true
+              acceptingMembers: payload && payload.acceptingMembers === false ? false : true,
+              memberCount: 1,
+              captainUserId: auth.user.userId,
+              adminUserIds: [auth.user.userId],
+              pendingApplicationCount: 0
             };
             var member = {
               memberId: cryptoUtil.newId('tm'),
               teamId: teamId,
               userId: auth.user.userId,
               displayName: auth.user.displayName,
+              searchKey: searchKeyOf(auth.user.displayName),
               avatar: auth.user.avatar,
               role: C.ROLES.SUPER_ADMIN,
               isCaptain: true,
@@ -523,18 +609,25 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var mine = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(mine, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+          return getMember(tx, teamId, auth.user.userId).then(function (mine) {
+            var denied = requireRole(isActiveMemberRow(mine) ? mine : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
             if (denied) return denied;
             var conflict = bumpTeam(team, p.expectedVersion != null ? p.expectedVersion : payload && payload.expectedVersion, tx.nowMs());
             if (conflict) return conflict;
             if (p.name != null) team.name = String(p.name).trim() || team.name;
-            if (p.shortName != null) team.shortName = String(p.shortName).trim();
+            if (p.shortName != null) {
+              var shortChecked = teamFields.sanitizeShortName(p.shortName, {});
+              if (!shortChecked.ok) return errors.fail(shortChecked.code, shortChecked.message);
+              team.shortName = shortChecked.shortName;
+            }
             if (payload && (payload.city != null || payload.region != null || p.city != null)) {
               team.city = String(p.city || '').trim();
             }
-            if (p.logo != null) team.logo = String(p.logo).trim();
+            if (p.logo != null) {
+              var logoChecked = sanitizeStoredLogo(p.logo);
+              if (!logoChecked.ok) return errors.fail(logoChecked.code, logoChecked.message);
+              team.logo = logoChecked.logo;
+            }
             if (payload && (payload.intro != null || payload.desc != null || p.intro != null)) {
               team.intro = String(p.intro || '').trim();
             }
@@ -543,7 +636,7 @@ function createEngine(store, wxCtx) {
             return tx.put(C.COLLECTIONS.CLUBS, teamId, team).then(function () {
               return writeAudit(tx, teamId, auth.user.userId, 'update_team', {});
             }).then(function () {
-              return errors.ok(mapTeamView(team, members, auth.user.userId));
+              return errors.ok(mapTeamView(team, mine, auth.user.userId));
             });
           });
         });
@@ -553,47 +646,68 @@ function createEngine(store, wxCtx) {
 
   function listMembers(payload) {
     var teamId = String((payload && payload.teamId) || '').trim();
-    var keyword = String((payload && (payload.keyword || payload.query)) || '').trim().toLowerCase();
+    var keyword = searchKeyOf((payload && (payload.keyword || payload.query)) || '');
+    var cursor = payload && payload.cursor;
+    var limit = payload && payload.limit;
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           if (!team) return errors.fail('not_found', '球队不存在');
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var list = members
-              .filter(function (m) {
-                return m.memberStatus === C.MEMBER_STATUS.ACTIVE;
-              })
-              .map(mapMemberView)
-              .filter(function (m) {
-                if (!keyword) return true;
-                return String(m.displayName || '').toLowerCase().indexOf(keyword) >= 0;
-              });
-            return errors.ok(list);
-          });
+          return { ok: true, __page: true };
         });
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      var spec = {
+        where: { teamId: teamId, memberStatus: C.MEMBER_STATUS.ACTIVE },
+        limit: limit,
+        cursor: cursor
+      };
+      if (keyword) {
+        spec.range = queryUtil.prefixRange(keyword);
+        spec.orderBy = [
+          { field: 'searchKey', direction: 'asc' },
+          { field: '_id', direction: 'asc' }
+        ];
+      } else {
+        spec.orderBy = [
+          { field: 'joinedAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ];
+      }
+      return queryPage(C.COLLECTIONS.MEMBERS, spec).then(function (page) {
+        return pagedOk(page, mapMemberView);
       });
     });
   }
 
   function listApplications(payload) {
     var teamId = String((payload && payload.teamId) || '').trim();
-    var status = payload && payload.status;
+    var status = (payload && payload.status) || C.APP_STATUS.PENDING;
+    var cursor = payload && payload.cursor;
+    var limit = payload && payload.limit;
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
-        return getTeamMembers(tx, teamId).then(function (members) {
-          var mine = findActiveMember(members, auth.user.userId);
-          var denied = requireRole(mine, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+        return getMember(tx, teamId, auth.user.userId).then(function (mine) {
+          var denied = requireRole(isActiveMemberRow(mine) ? mine : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
           if (denied) return denied;
-          return tx.query(C.COLLECTIONS.APPLICATIONS, function (a) {
-            if (!a || a.teamId !== teamId) return false;
-            if (status && a.status !== status) return false;
-            return true;
-          }).then(function (list) {
-            return errors.ok(list);
-          });
+          return { ok: true, __page: true };
         });
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      return queryPage(C.COLLECTIONS.APPLICATIONS, {
+        where: { teamId: teamId, status: status },
+        orderBy: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ],
+        limit: limit,
+        cursor: cursor
+      }).then(function (page) {
+        return pagedOk(page);
       });
     });
   }
@@ -612,12 +726,12 @@ function createEngine(store, wxCtx) {
           }
           var lockId = C.pendingLockId(teamId, auth.user.userId);
           return Promise.all([
-            getTeamMembers(tx, teamId),
+            getMember(tx, teamId, auth.user.userId),
             tx.get(C.COLLECTIONS.PENDING_LOCKS, lockId)
           ]).then(function (pair) {
-            var members = pair[0];
+            var mine = pair[0];
             var lock = pair[1];
-            if (findActiveMember(members, auth.user.userId)) {
+            if (isActiveMemberRow(mine)) {
               return errors.fail('already_member', '已是球队成员');
             }
             if (lock) return errors.fail('already_pending', '已有待审核申请');
@@ -645,7 +759,11 @@ function createEngine(store, wxCtx) {
                 });
               })
               .then(function () {
-                return fanoutApplicationNotices(tx, team, app, members, now);
+                bumpCount(team, 'pendingApplicationCount', 1);
+                return tx.put(C.COLLECTIONS.CLUBS, teamId, team);
+              })
+              .then(function () {
+                return fanoutApplicationNotices(tx, team, app, now);
               })
               .then(function () {
                 return writeAudit(tx, teamId, auth.user.userId, 'create_application', {
@@ -677,6 +795,9 @@ function createEngine(store, wxCtx) {
             return tx.put(C.COLLECTIONS.APPLICATIONS, applicationId, app).then(function () {
               return tx.remove(C.COLLECTIONS.PENDING_LOCKS, C.pendingLockId(app.teamId, app.userId));
             }).then(function () {
+              bumpCount(team, 'pendingApplicationCount', -1);
+              return tx.put(C.COLLECTIONS.CLUBS, app.teamId, team);
+            }).then(function () {
               return errors.ok(app);
             });
           });
@@ -697,9 +818,8 @@ function createEngine(store, wxCtx) {
           return tx.get(C.COLLECTIONS.CLUBS, app.teamId).then(function (team) {
             var dead = assertWritable(team);
             if (dead) return dead;
-            return getTeamMembers(tx, app.teamId).then(function (members) {
-              var mine = findActiveMember(members, auth.user.userId);
-              if (!mine || !permissions.canReviewTeamApplication(mine.role)) {
+            return getMember(tx, app.teamId, auth.user.userId).then(function (mine) {
+              if (!isActiveMemberRow(mine) || !permissions.canReviewTeamApplication(mine.role)) {
                 return errors.fail('forbidden', '无权审核');
               }
               if (app.status !== C.APP_STATUS.PENDING) {
@@ -718,34 +838,39 @@ function createEngine(store, wxCtx) {
               app.status = action === 'approve' ? C.APP_STATUS.APPROVED : C.APP_STATUS.REJECTED;
               var next = tx.put(C.COLLECTIONS.APPLICATIONS, applicationId, app).then(function () {
                 return tx.remove(C.COLLECTIONS.PENDING_LOCKS, C.pendingLockId(app.teamId, app.userId));
+              }).then(function () {
+                bumpCount(team, 'pendingApplicationCount', -1);
+                return tx.put(C.COLLECTIONS.CLUBS, app.teamId, team);
               });
               if (action === 'approve') {
                 next = next.then(function () {
                   return addMemberRow(tx, team, { userId: app.userId, displayName: app.displayName }, now);
                 }).then(function (added) {
                   if (!added.ok && added.code !== 'already_member') return added;
-                  return writeAudit(tx, app.teamId, auth.user.userId, 'approve_application', {
-                    applicationId: app.applicationId
-                  }).then(function () {
-                    return putNotice(tx, {
-                      noticeId: ['tn', 'join_application_result', app.applicationId, app.userId].join('-'),
-                      type: 'join_application_result',
-                      teamId: app.teamId,
-                      applicationId: app.applicationId,
-                      recipientUserId: app.userId,
-                      title: '入队申请已通过',
-                      summary: (team && team.name ? team.name : '球队') + ' 已同意你的申请',
-                      jump: {
-                        category: 'team_notice',
+                  return tx.put(C.COLLECTIONS.CLUBS, app.teamId, team).then(function () {
+                    return writeAudit(tx, app.teamId, auth.user.userId, 'approve_application', {
+                      applicationId: app.applicationId
+                    }).then(function () {
+                      return putNotice(tx, {
+                        noticeId: ['tn', 'join_application_result', app.applicationId, app.userId].join('-'),
                         type: 'join_application_result',
+                        teamId: app.teamId,
                         applicationId: app.applicationId,
-                        url:
-                          '/subpackages/player/pages/me/team-application/index?applicationId=' +
-                          encodeURIComponent(app.applicationId)
-                      }
+                        recipientUserId: app.userId,
+                        title: '入队申请已通过',
+                        summary: (team && team.name ? team.name : '球队') + ' 已同意你的申请',
+                        jump: {
+                          category: 'team_notice',
+                          type: 'join_application_result',
+                          applicationId: app.applicationId,
+                          url:
+                            '/subpackages/player/pages/me/team-application/index?applicationId=' +
+                            encodeURIComponent(app.applicationId)
+                        }
+                      });
+                    }).then(function () {
+                      return errors.ok(app);
                     });
-                  }).then(function () {
-                    return errors.ok(app);
                   });
                 });
               } else {
@@ -793,9 +918,8 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var mine = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(mine, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+          return getMember(tx, teamId, auth.user.userId).then(function (mine) {
+            var denied = requireRole(isActiveMemberRow(mine) ? mine : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
             if (denied) return denied;
             if (payload && C.normalizeRole(payload.role) === C.ROLES.SUPER_ADMIN) {
               /* ignore untrusted role */
@@ -807,7 +931,9 @@ function createEngine(store, wxCtx) {
               tx.nowMs()
             ).then(function (added) {
               if (!added.ok) return added;
-              return writeAudit(tx, teamId, auth.user.userId, 'add_member', { userId: targetUserId }).then(function () {
+              return tx.put(C.COLLECTIONS.CLUBS, teamId, team).then(function () {
+                return writeAudit(tx, teamId, auth.user.userId, 'add_member', { userId: targetUserId });
+              }).then(function () {
                 return putNotice(tx, {
                   noticeId: ['tn', 'member_added', teamId, targetUserId].join('-'),
                   type: 'member_added',
@@ -836,12 +962,15 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var actor = findActiveMember(members, auth.user.userId);
-            var target = findActiveMember(members, targetUserId);
+          return Promise.all([
+            getMember(tx, teamId, auth.user.userId),
+            getMember(tx, teamId, targetUserId)
+          ]).then(function (pair) {
+            var actor = pair[0];
+            var target = pair[1] && pair[1].memberStatus === C.MEMBER_STATUS.ACTIVE ? pair[1] : null;
             if (!target) return errors.fail('not_found', '成员不存在');
             if (target.role === C.ROLES.SUPER_ADMIN) return errors.fail('forbidden', '不能移出超级管理员');
-            if (!actor) return errors.fail('forbidden', '不是球队成员');
+            if (!isActiveMemberRow(actor)) return errors.fail('forbidden', '不是球队成员');
             if (actor.role !== C.ROLES.SUPER_ADMIN) {
               if (actor.role !== C.ROLES.ADMIN || target.role !== C.ROLES.MEMBER) {
                 return errors.fail('forbidden', '无权移出该成员');
@@ -853,6 +982,9 @@ function createEngine(store, wxCtx) {
             target.updatedAt = tx.nowMs();
             var conflict = bumpTeam(team, null, tx.nowMs());
             if (conflict) return conflict;
+            bumpCount(team, 'memberCount', -1);
+            removeAdminUser(team, targetUserId);
+            if (team.captainUserId === targetUserId) team.captainUserId = '';
             return tx
               .put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, targetUserId), target)
               .then(function () {
@@ -891,17 +1023,22 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var actor = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(actor, [C.ROLES.SUPER_ADMIN]);
+          return Promise.all([
+            getMember(tx, teamId, auth.user.userId),
+            getMember(tx, teamId, targetUserId)
+          ]).then(function (pair) {
+            var actor = pair[0];
+            var target = pair[1] && pair[1].memberStatus === C.MEMBER_STATUS.ACTIVE ? pair[1] : null;
+            var denied = requireRole(isActiveMemberRow(actor) ? actor : null, [C.ROLES.SUPER_ADMIN]);
             if (denied) return denied;
-            var target = findActiveMember(members, targetUserId);
             if (!target) return errors.fail('not_found', '成员不存在');
             if (target.role === C.ROLES.SUPER_ADMIN) return errors.fail('forbidden', '不能更改超级管理员角色');
             target.role = makeAdmin ? C.ROLES.ADMIN : C.ROLES.MEMBER;
             target.grants = makeAdmin ? [C.GRANT_REVIEW] : [];
             target.updatedAt = tx.nowMs();
             bumpTeam(team, null, tx.nowMs());
+            if (makeAdmin) addAdminUser(team, targetUserId);
+            else removeAdminUser(team, targetUserId);
             return tx
               .put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, targetUserId), target)
               .then(function () {
@@ -930,20 +1067,27 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var actor = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(actor, [C.ROLES.SUPER_ADMIN]);
+          return Promise.all([
+            getMember(tx, teamId, auth.user.userId),
+            getMember(tx, teamId, targetUserId),
+            team.captainUserId ? getMember(tx, teamId, team.captainUserId) : Promise.resolve(null)
+          ]).then(function (pair) {
+            var actor = pair[0];
+            var target = pair[1] && pair[1].memberStatus === C.MEMBER_STATUS.ACTIVE ? pair[1] : null;
+            var prevCap = pair[2];
+            var denied = requireRole(isActiveMemberRow(actor) ? actor : null, [C.ROLES.SUPER_ADMIN]);
             if (denied) return denied;
-            var target = findActiveMember(members, targetUserId);
             if (!target) return errors.fail('not_found', '成员不存在');
             var jobs = [];
-            members.forEach(function (m) {
-              if (m.memberStatus !== C.MEMBER_STATUS.ACTIVE) return;
-              var nextCap = m.userId === targetUserId;
-              if (!!m.isCaptain === nextCap) return;
-              m.isCaptain = nextCap;
-              jobs.push(tx.put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, m.userId), m));
-            });
+            if (prevCap && prevCap.userId !== targetUserId && prevCap.isCaptain) {
+              prevCap.isCaptain = false;
+              jobs.push(tx.put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, prevCap.userId), prevCap));
+            }
+            if (!target.isCaptain) {
+              target.isCaptain = true;
+              jobs.push(tx.put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, targetUserId), target));
+            }
+            team.captainUserId = targetUserId;
             bumpTeam(team, null, tx.nowMs());
             return Promise.all(jobs)
               .then(function () {
@@ -970,15 +1114,17 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var actor = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(actor, [C.ROLES.SUPER_ADMIN]);
+          return Promise.all([
+            getMember(tx, teamId, auth.user.userId),
+            getMember(tx, teamId, targetUserId)
+          ]).then(function (pair) {
+            var actor = pair[0];
+            var target = pair[1];
+            var denied = requireRole(isActiveMemberRow(actor) ? actor : null, [C.ROLES.SUPER_ADMIN]);
             if (denied) return denied;
-            var target = findActiveMember(members, targetUserId) || members.filter(function (m) {
-              return m.userId === targetUserId;
-            })[0];
             if (!target) return errors.fail('not_found', '成员不存在');
             target.isCaptain = false;
+            if (team.captainUserId === targetUserId) team.captainUserId = '';
             bumpTeam(team, null, tx.nowMs());
             return tx
               .put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, targetUserId), target)
@@ -1003,11 +1149,14 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var from = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(from, [C.ROLES.SUPER_ADMIN]);
+          return Promise.all([
+            getMember(tx, teamId, auth.user.userId),
+            getMember(tx, teamId, toUserId)
+          ]).then(function (pair) {
+            var from = pair[0];
+            var to = pair[1] && pair[1].memberStatus === C.MEMBER_STATUS.ACTIVE ? pair[1] : null;
+            var denied = requireRole(isActiveMemberRow(from) ? from : null, [C.ROLES.SUPER_ADMIN]);
             if (denied) return denied;
-            var to = findActiveMember(members, toUserId);
             if (!to) return errors.fail('not_found', '目标不是活跃成员');
             if (to.userId === from.userId) return errors.fail('invalid_args', '不能转让给自己');
             var conflict = bumpTeam(team, payload && payload.expectedVersion, tx.nowMs());
@@ -1016,6 +1165,8 @@ function createEngine(store, wxCtx) {
             from.grants = [C.GRANT_REVIEW];
             to.role = C.ROLES.SUPER_ADMIN;
             team.ownerUserId = to.userId;
+            addAdminUser(team, from.userId);
+            addAdminUser(team, to.userId);
             return tx
               .put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, from.userId), from)
               .then(function () {
@@ -1028,7 +1179,7 @@ function createEngine(store, wxCtx) {
                 return writeAudit(tx, teamId, auth.user.userId, 'transfer_ownership', { toUserId: toUserId });
               })
               .then(function () {
-                return errors.ok(mapTeamView(team, members, auth.user.userId));
+                return errors.ok(mapTeamView(team, from, auth.user.userId));
               });
           });
         });
@@ -1044,9 +1195,8 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var me = findActiveMember(members, auth.user.userId);
-            if (!me) return errors.fail('not_found', '不是成员');
+          return getMember(tx, teamId, auth.user.userId).then(function (me) {
+            if (!isActiveMemberRow(me)) return errors.fail('not_found', '不是成员');
             if (me.role === C.ROLES.SUPER_ADMIN) {
               return errors.fail('forbidden', '超级管理员需先转让或解散');
             }
@@ -1055,6 +1205,9 @@ function createEngine(store, wxCtx) {
             me.role = me.role === C.ROLES.ADMIN ? C.ROLES.MEMBER : me.role;
             me.leftAt = tx.nowMs();
             bumpTeam(team, null, tx.nowMs());
+            bumpCount(team, 'memberCount', -1);
+            removeAdminUser(team, me.userId);
+            if (team.captainUserId === me.userId) team.captainUserId = '';
             return tx
               .put(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, me.userId), me)
               .then(function () {
@@ -1080,9 +1233,8 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           var dead = assertWritable(team);
           if (dead) return dead;
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var me = findActiveMember(members, auth.user.userId);
-            var denied = requireRole(me, [C.ROLES.SUPER_ADMIN]);
+          return getMember(tx, teamId, auth.user.userId).then(function (me) {
+            var denied = requireRole(isActiveMemberRow(me) ? me : null, [C.ROLES.SUPER_ADMIN]);
             if (denied) return denied;
             var confirmName = String((payload && (payload.confirmName || payload.teamName)) || '').trim();
             if (!confirmName || confirmName !== String(team.name || '').trim()) {
@@ -1117,9 +1269,8 @@ function createEngine(store, wxCtx) {
           return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
             var dead = assertWritable(team);
             if (dead) return dead;
-            return getTeamMembers(tx, teamId).then(function (members) {
-              var me = findActiveMember(members, auth.user.userId);
-              var denied = requireRole(me, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+            return getMember(tx, teamId, auth.user.userId).then(function (me) {
+              var denied = requireRole(isActiveMemberRow(me) ? me : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
               if (denied) return denied;
               var token = cryptoUtil.randomInviteToken();
               var now = tx.nowMs();
@@ -1132,6 +1283,7 @@ function createEngine(store, wxCtx) {
                 inviterUserId: auth.user.userId,
                 status: C.INVITE_STATUS.ACTIVE,
                 createdAt: now,
+                updatedAt: now,
                 expiresAt: now + ttl
               };
               return tx.put(C.COLLECTIONS.INVITES, inviteId, row).then(function () {
@@ -1162,10 +1314,12 @@ function createEngine(store, wxCtx) {
     return tx.get(C.COLLECTIONS.INVITES, key).then(function (byId) {
       if (byId) return byId;
       var tokenHash = cryptoUtil.hashToken(key);
-      return tx.query(C.COLLECTIONS.INVITES, function (row) {
-        return row && row.tokenHash === tokenHash;
-      }).then(function (rows) {
-        return rows[0] || null;
+      return tx.query(C.COLLECTIONS.INVITES, {
+        where: { tokenHash: tokenHash },
+        limit: 1,
+        lookup: true
+      }).then(function (page) {
+        return (page.list && page.list[0]) || null;
       });
     });
   }
@@ -1180,11 +1334,11 @@ function createEngine(store, wxCtx) {
           return tx.get(C.COLLECTIONS.CLUBS, invite.teamId).then(function (team) {
             var dead = assertWritable(team);
             if (dead) return dead;
-            return getTeamMembers(tx, invite.teamId).then(function (members) {
-              var me = findActiveMember(members, auth.user.userId);
-              var denied = requireRole(me, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+            return getMember(tx, invite.teamId, auth.user.userId).then(function (me) {
+              var denied = requireRole(isActiveMemberRow(me) ? me : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
               if (denied) return denied;
               invite.status = C.INVITE_STATUS.REVOKED;
+              invite.updatedAt = tx.nowMs();
               return tx.put(C.COLLECTIONS.INVITES, invite.inviteId, invite).then(function () {
                 return writeAudit(tx, invite.teamId, auth.user.userId, 'revoke_invite', {
                   inviteId: invite.inviteId
@@ -1204,16 +1358,53 @@ function createEngine(store, wxCtx) {
     });
   }
 
+  function inviteStatusFail(invite) {
+    if (!invite) return errors.fail('not_found', '邀请不存在');
+    if (invite.status === C.INVITE_STATUS.REVOKED) {
+      return errors.fail('invite_revoked', '邀请已撤销');
+    }
+    if (invite.status === C.INVITE_STATUS.USED) {
+      return errors.fail('invite_used', '邀请已使用');
+    }
+    if (invite.status === C.INVITE_STATUS.EXPIRED) {
+      return errors.fail('invite_expired', '邀请已过期');
+    }
+    return null;
+  }
+
+  function invitePreview(tx, invite, team, auth) {
+    return Promise.all([
+      getMember(tx, invite.teamId, auth.user.userId),
+      tx.get(C.COLLECTIONS.PROFILES, invite.createdBy || invite.inviterUserId)
+    ]).then(function (pair) {
+      var mine = pair[0];
+      var inviter = pair[1];
+      var view = mapTeamView(team, mine, auth.user.userId);
+      return errors.ok({
+        team: view,
+        invite: {
+          inviteId: invite.inviteId,
+          teamId: invite.teamId,
+          status: invite.status,
+          expiresAt: invite.expiresAt
+        },
+        inviter: {
+          displayName: String((inviter && (inviter.displayName || inviter.nickname)) || '邀请人')
+        },
+        membershipGranted: false,
+        alreadyMember: !!(view && view.isFormalMember)
+      });
+    });
+  }
+
   function resolveInvite(payload) {
     var token = String((payload && payload.token) || '').trim();
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
         return findInviteByTokenOrId(tx, token).then(function (invite) {
-          if (!invite) return errors.fail('not_found', '邀请不存在');
-          if (invite.status === C.INVITE_STATUS.REVOKED) {
-            return errors.fail('invite_revoked', '邀请已撤销');
-          }
+          var bad = inviteStatusFail(invite);
+          if (bad) return bad;
           if (tx.nowMs() > Number(invite.expiresAt)) {
             invite.status = C.INVITE_STATUS.EXPIRED;
             return tx.put(C.COLLECTIONS.INVITES, invite.inviteId, invite).then(function () {
@@ -1223,19 +1414,123 @@ function createEngine(store, wxCtx) {
           return tx.get(C.COLLECTIONS.CLUBS, invite.teamId).then(function (team) {
             var dead = assertWritable(team);
             if (dead) return dead;
-            return getTeamMembers(tx, invite.teamId).then(function (members) {
-              var view = mapTeamView(team, members, auth.user.userId);
-              return errors.ok({
-                team: view,
-                invite: {
-                  inviteId: invite.inviteId,
-                  teamId: invite.teamId,
-                  status: invite.status,
-                  expiresAt: invite.expiresAt
-                },
-                membershipGranted: false,
-                canApply: !view.isFormalMember
+            return invitePreview(tx, invite, team, auth);
+          });
+        });
+      });
+    });
+  }
+
+  function getInviteByToken(payload) {
+    return resolveInvite(payload);
+  }
+
+  function prepareShareInvite(payload) {
+    var teamId = String((payload && payload.teamId) || '').trim();
+    var ttl = Number((payload && payload.ttlMs) || C.DEFAULT_INVITE_TTL_MS);
+    return run(function (tx) {
+      return requireActor(tx, wxCtx).then(function (auth) {
+        if (!auth.ok) return auth;
+        var idem = String(auth.user.userId + ':prepareShareInvite:' + teamId);
+        return readIdempotency(tx, idem).then(function (hit) {
+          var prev = hit && hit.result && hit.result.ok ? hit.result.data : null;
+          if (prev && prev.token && Number(prev.expiresAt) > tx.nowMs() + 60 * 1000) {
+            return hit.result;
+          }
+          return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
+            var dead = assertWritable(team);
+            if (dead) return dead;
+            return getMember(tx, teamId, auth.user.userId).then(function (me) {
+              var denied = requireRole(isActiveMemberRow(me) ? me : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+              if (denied) return denied;
+              var token = cryptoUtil.randomInviteToken();
+              var now = tx.nowMs();
+              var inviteId = cryptoUtil.newId('inv');
+              var row = {
+                inviteId: inviteId,
+                tokenHash: cryptoUtil.hashToken(token),
+                teamId: teamId,
+                createdBy: auth.user.userId,
+                inviterUserId: auth.user.userId,
+                status: C.INVITE_STATUS.ACTIVE,
+                createdAt: now,
+                updatedAt: now,
+                expiresAt: now + ttl
+              };
+              return tx.put(C.COLLECTIONS.INVITES, inviteId, row).then(function () {
+                return writeAudit(tx, teamId, auth.user.userId, 'prepare_share_invite', { inviteId: inviteId });
+              }).then(function () {
+                var result = errors.ok({
+                  inviteId: inviteId,
+                  token: token,
+                  teamId: teamId,
+                  status: row.status,
+                  createdAt: now,
+                  expiresAt: row.expiresAt
+                });
+                return writeIdempotency(tx, idem, result).then(function () {
+                  return result;
+                });
               });
+            });
+          });
+        });
+      });
+    });
+  }
+
+  function acceptInvite(payload) {
+    var token = String((payload && payload.token) || '').trim();
+    return run(function (tx) {
+      return requireActor(tx, wxCtx).then(function (auth) {
+        if (!auth.ok) return auth;
+        return findInviteByTokenOrId(tx, token).then(function (invite) {
+          var bad = inviteStatusFail(invite);
+          if (bad) return bad;
+          if (tx.nowMs() > Number(invite.expiresAt)) {
+            invite.status = C.INVITE_STATUS.EXPIRED;
+            return tx.put(C.COLLECTIONS.INVITES, invite.inviteId, invite).then(function () {
+              return errors.fail('invite_expired', '邀请已过期');
+            });
+          }
+          return tx.get(C.COLLECTIONS.CLUBS, invite.teamId).then(function (team) {
+            var dead = assertWritable(team);
+            if (dead) return dead;
+            var now = tx.nowMs();
+            return addMemberRow(
+              tx,
+              team,
+              {
+                userId: auth.user.userId,
+                displayName: auth.user.displayName || auth.user.userId,
+                avatar: auth.user.avatar || ''
+              },
+              now
+            ).then(function (added) {
+              if (!added.ok && added.code !== 'already_member') return added;
+              var already = !added.ok && added.code === 'already_member';
+              var next = already ? Promise.resolve() : tx.put(C.COLLECTIONS.CLUBS, team.teamId, team);
+              return next
+                .then(function () {
+                  return writeAudit(tx, invite.teamId, auth.user.userId, already ? 'accept_invite_idempotent' : 'accept_invite', {
+                    inviteId: invite.inviteId
+                  });
+                })
+                .then(function () {
+                  return getMember(tx, invite.teamId, auth.user.userId).then(function (mine) {
+                    return errors.ok({
+                      team: mapTeamView(team, mine, auth.user.userId),
+                      invite: {
+                        inviteId: invite.inviteId,
+                        teamId: invite.teamId,
+                        status: invite.status,
+                        expiresAt: invite.expiresAt
+                      },
+                      alreadyMember: already,
+                      membershipGranted: !already
+                    });
+                  });
+                });
             });
           });
         });
@@ -1259,8 +1554,9 @@ function createEngine(store, wxCtx) {
   }
 
   function loadScoreRows(tx, matchId) {
-    return tx.query(C.COLLECTIONS.MATCH_SCORES, function (row) {
-      return row && row.matchId === String(matchId);
+    return tx.queryAll(C.COLLECTIONS.MATCH_SCORES, {
+      where: { matchId: String(matchId) },
+      orderBy: [{ field: '_id', direction: 'asc' }]
     });
   }
 
@@ -1329,10 +1625,10 @@ function createEngine(store, wxCtx) {
       return tx.get(C.COLLECTIONS.MATCHES, matchId).then(function (doc) {
         if (!doc) return errors.fail('not_found', '比赛不存在');
         return Promise.all([
-          getTeamMembers(tx, doc.teamId),
+          getMember(tx, doc.teamId, auth.user.userId),
           tx.get(C.COLLECTIONS.CLUBS, doc.teamId)
         ]).then(function (pair) {
-          var rec = findMemberRecord(pair[0] || [], auth.user.userId);
+          var rec = pair[0];
           var team = pair[1];
           var denied = scoreShards.assertScoreWrite(
             auth.user.userId,
@@ -1408,33 +1704,73 @@ function createEngine(store, wxCtx) {
     });
   }
 
+  function listInvites(payload) {
+    var teamId = String((payload && payload.teamId) || '').trim();
+    var status = (payload && payload.status) || C.INVITE_STATUS.ACTIVE;
+    var cursor = payload && payload.cursor;
+    var limit = payload && payload.limit;
+    return run(function (tx) {
+      return requireActor(tx, wxCtx).then(function (auth) {
+        if (!auth.ok) return auth;
+        return getMember(tx, teamId, auth.user.userId).then(function (me) {
+          var denied = requireRole(isActiveMemberRow(me) ? me : null, [C.ROLES.SUPER_ADMIN, C.ROLES.ADMIN]);
+          if (denied) return denied;
+          return { ok: true, __page: true };
+        });
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      return queryPage(C.COLLECTIONS.INVITES, {
+        where: { teamId: teamId, status: status },
+        orderBy: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ],
+        limit: limit,
+        cursor: cursor
+      }).then(function (page) {
+        return pagedOk(page);
+      });
+    });
+  }
+
   function listTeamMatches(payload) {
     var teamId = String((payload && payload.teamId) || '').trim();
+    var cursor = payload && payload.cursor;
+    var limit = payload && payload.limit;
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
         if (!teamId) return errors.fail('invalid_args', '缺少 teamId');
         return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
           if (!team) return errors.fail('not_found', '球队不存在');
-          return getTeamMembers(tx, teamId).then(function (members) {
-            var rec = findMemberRecord(members, auth.user.userId);
+          return getMember(tx, teamId, auth.user.userId).then(function (rec) {
             if (!rec) return errors.fail('forbidden', '无权查看球队比赛');
-            return tx.query(C.COLLECTIONS.MATCHES, function (row) {
-              return row && row.teamId === teamId;
-            }).then(function (rows) {
-              var list = [];
-              (rows || []).forEach(function (doc) {
-                if (!matchDoc.isTeamInternalMatch(doc)) return;
-                if (!matchDoc.canReadMatch(auth.user.userId, rec, doc, team)) return;
-                list.push(matchDoc.projectCard(doc));
-              });
-              list.sort(function (a, b) {
-                return Number(b.updatedAt || 0) - Number(a.updatedAt || 0);
-              });
-              return errors.ok(list);
-            });
+            return { ok: true, __page: true, rec: rec, team: team, userId: auth.user.userId };
           });
         });
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      return queryPage(C.COLLECTIONS.MATCHES, {
+        where: { teamId: teamId },
+        orderBy: [
+          { field: 'updatedAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ],
+        limit: limit,
+        cursor: cursor
+      }).then(function (page) {
+        var list = [];
+        (page.list || []).forEach(function (doc) {
+          if (!matchDoc.isTeamInternalMatch(doc)) return;
+          if (!matchDoc.canReadMatch(g.userId, g.rec, doc, g.team)) return;
+          list.push(matchDoc.projectCard(doc));
+        });
+        var r = errors.ok(list);
+        r.cursor = page.cursor || '';
+        r.hasMore = !!page.hasMore;
+        return r;
       });
     });
   }
@@ -1448,10 +1784,10 @@ function createEngine(store, wxCtx) {
         return tx.get(C.COLLECTIONS.MATCHES, matchId).then(function (doc) {
           if (!doc) return errors.fail('not_found', '比赛不存在');
           return Promise.all([
-            getTeamMembers(tx, doc.teamId),
+            getMember(tx, doc.teamId, auth.user.userId),
             tx.get(C.COLLECTIONS.CLUBS, doc.teamId)
           ]).then(function (pair) {
-            var rec = findMemberRecord(pair[0] || [], auth.user.userId);
+            var rec = pair[0];
             if (!matchDoc.canReadMatch(auth.user.userId, rec, doc, pair[1])) {
               return errors.fail('forbidden', '无权查看该比赛');
             }
@@ -1484,17 +1820,16 @@ function createEngine(store, wxCtx) {
           return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
             if (!team) return errors.fail('not_found', '球队不存在');
             return Promise.all([
-              getTeamMembers(tx, teamId),
+              getMember(tx, teamId, auth.user.userId),
               tx.get(C.COLLECTIONS.MATCHES, matchId)
             ]).then(function (pair) {
-              var members = pair[0] || [];
+              var rec = pair[0];
               var existing = pair[1];
-              var rec = findMemberRecord(members, auth.user.userId);
               var now = tx.nowMs();
               if (!existing) {
                 var dead = assertWritable(team);
                 if (dead) return dead;
-                var mine = findActiveMember(members, auth.user.userId);
+                var mine = isActiveMemberRow(rec) ? rec : null;
                 if (!mine || !permissions.derivePermissions(mine.role, true).canCreateTeamMatch) {
                   return errors.fail('forbidden', '无权创建球队比赛');
                 }
@@ -1623,10 +1958,10 @@ function createEngine(store, wxCtx) {
           return tx.get(C.COLLECTIONS.MATCHES, matchId).then(function (doc) {
             if (!doc) return errors.fail('not_found', '比赛不存在');
             return Promise.all([
-              getTeamMembers(tx, doc.teamId),
+              getMember(tx, doc.teamId, auth.user.userId),
               tx.get(C.COLLECTIONS.CLUBS, doc.teamId)
             ]).then(function (pair) {
-              var rec = findMemberRecord(pair[0] || [], auth.user.userId);
+              var rec = pair[0];
               var denied = scoreShards.assertScoreWrite(auth.user.userId, rec, doc, pair[1], {}, 'complete', matchDoc);
               if (denied) return errors.fail(denied.code, denied.message);
               return migrateScoresIfNeeded(tx, doc, auth.user.userId).then(function (fresh) {
@@ -1662,8 +1997,7 @@ function createEngine(store, wxCtx) {
         if (!matchId) return errors.fail('invalid_args', '缺少 matchId');
         return tx.get(C.COLLECTIONS.MATCHES, matchId).then(function (doc) {
           if (!doc) return errors.fail('not_found', '比赛正文不存在，不能单独写索引');
-          return getTeamMembers(tx, doc.teamId).then(function (members) {
-            var rec = findMemberRecord(members, auth.user.userId);
+          return getMember(tx, doc.teamId, auth.user.userId).then(function (rec) {
             return tx.get(C.COLLECTIONS.CLUBS, doc.teamId).then(function (team) {
               var access = matchDoc.writeAccess(auth.user.userId, rec, doc, team);
               if (access === 'none') return errors.fail('forbidden', '无权刷新比赛索引');
@@ -1714,9 +2048,8 @@ function createEngine(store, wxCtx) {
             }
             return tx.get(C.COLLECTIONS.CLUBS, teamId).then(function (team) {
               if (!team) return errors.fail('ownership_unproven', '球队不存在，无法迁移比赛');
-              return getTeamMembers(tx, teamId).then(function (members) {
-                var mine = findActiveMember(members, auth.user.userId);
-                if (!mine || (mine.role !== C.ROLES.SUPER_ADMIN && claimed !== auth.user.userId)) {
+              return getMember(tx, teamId, auth.user.userId).then(function (mine) {
+                if (!isActiveMemberRow(mine) || (mine.role !== C.ROLES.SUPER_ADMIN && claimed !== auth.user.userId)) {
                   return errors.fail('ownership_unproven', '无法证明可迁移该比赛');
                 }
                 var now = tx.nowMs();
@@ -1759,56 +2092,84 @@ function createEngine(store, wxCtx) {
   function searchUsers(payload) {
     var query = String((payload && (payload.query || payload.keyword)) || '').trim();
     var teamId = String((payload && payload.teamId) || '').trim();
+    var cursor = payload && payload.cursor;
+    var limit = Math.min(Number(payload && payload.limit) || 8, 20);
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
         if (!query) return errors.ok([]);
-        return Promise.all([
-          tx.query(C.COLLECTIONS.PROFILES, function (row) {
-            if (!row) return false;
-            if (row.userId === query) return true;
-            if (query.length < 2) return false;
-            return String(row.searchKey || row.displayName || '').toLowerCase().indexOf(query.toLowerCase()) >= 0;
-          }),
-          teamId ? getTeamMembers(tx, teamId) : Promise.resolve([]),
-          teamId
-            ? tx.query(C.COLLECTIONS.APPLICATIONS, function (a) {
-                return a && a.teamId === teamId && a.status === C.APP_STATUS.PENDING;
-              })
-            : Promise.resolve([])
-        ]).then(function (triple) {
-          var profiles = triple[0] || [];
-          var members = triple[1] || [];
-          var apps = triple[2] || [];
-          var memberIds = {};
-          members.forEach(function (m) {
-            if (m.memberStatus === C.MEMBER_STATUS.ACTIVE) memberIds[m.userId] = true;
+        return { ok: true, __page: true, userId: auth.user.userId };
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      var exact = getDoc(C.COLLECTIONS.PROFILES, query).then(function (hit) {
+        return hit ? { list: [hit], cursor: '', hasMore: false } : { list: [], cursor: '', hasMore: false };
+      });
+      var prefix = searchKeyOf(query);
+      var prefixPage = prefix
+        ? queryPage(C.COLLECTIONS.PROFILES, {
+            range: queryUtil.prefixRange(prefix),
+            orderBy: [
+              { field: 'searchKey', direction: 'asc' },
+              { field: '_id', direction: 'asc' }
+            ],
+            limit: limit,
+            cursor: cursor,
+            fields: ['userId', 'displayName', 'avatar', 'searchKey']
+          })
+        : Promise.resolve({ list: [], cursor: '', hasMore: false });
+      return Promise.all([exact, prefixPage]).then(function (pair) {
+        var merged = [];
+        var seen = {};
+        function push(p) {
+          if (!p || !p.userId || seen[p.userId]) return;
+          seen[p.userId] = true;
+          merged.push(p);
+        }
+        pair[0].list.forEach(push);
+        pair[1].list.forEach(push);
+        var jobs = merged.map(function (p) {
+          if (p.userId === g.userId) return Promise.resolve(null);
+          if (!teamId) return Promise.resolve(publicUser(p));
+          return Promise.all([
+            getDoc(C.COLLECTIONS.MEMBERS, C.memberDocId(teamId, p.userId)),
+            getDoc(C.COLLECTIONS.PENDING_LOCKS, C.pendingLockId(teamId, p.userId))
+          ]).then(function (flags) {
+            if (isActiveMemberRow(flags[0]) || flags[1]) return null;
+            return publicUser(p);
           });
-          var pendingIds = {};
-          apps.forEach(function (a) {
-            pendingIds[a.userId] = true;
-          });
-          var list = [];
-          profiles.forEach(function (p) {
-            if (p.userId === auth.user.userId) return;
-            if (memberIds[p.userId] || pendingIds[p.userId]) return;
-            list.push(publicUser(p));
-          });
-          return errors.ok(list.slice(0, 8));
+        });
+        return Promise.all(jobs).then(function (rows) {
+          var list = rows.filter(Boolean).slice(0, limit);
+          var r = errors.ok(list);
+          r.cursor = pair[1].cursor || '';
+          r.hasMore = !!pair[1].hasMore;
+          return r;
         });
       });
     });
   }
 
-  function listNotices() {
+  function listNotices(payload) {
+    var cursor = payload && payload.cursor;
+    var limit = payload && payload.limit;
     return run(function (tx) {
       return requireActor(tx, wxCtx).then(function (auth) {
         if (!auth.ok) return auth;
-        return tx.query(C.COLLECTIONS.NOTICES, function (row) {
-          return row && row.recipientUserId === auth.user.userId;
-        }).then(function (list) {
-          return errors.ok(list);
-        });
+        return { ok: true, __page: true, userId: auth.user.userId };
+      });
+    }).then(function (g) {
+      if (!g || !g.ok || !g.__page) return g;
+      return queryPage(C.COLLECTIONS.NOTICES, {
+        where: { recipientUserId: g.userId },
+        orderBy: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ],
+        limit: limit,
+        cursor: cursor
+      }).then(function (page) {
+        return pagedOk(page);
       });
     });
   }
@@ -1822,8 +2183,8 @@ function createEngine(store, wxCtx) {
           if (!app) return errors.fail('not_found', '申请不存在');
           return tx.get(C.COLLECTIONS.CLUBS, app.teamId).then(function (team) {
             if (!team) return errors.fail('not_found', '球队不存在');
-            return getTeamMembers(tx, app.teamId).then(function (members) {
-              var view = mapTeamView(team, members, auth.user.userId);
+            return getMember(tx, app.teamId, auth.user.userId).then(function (mine) {
+              var view = mapTeamView(team, mine, auth.user.userId);
               var canReview = !!(view.permissions && view.permissions.canReviewJoinRequests);
               if (app.userId !== auth.user.userId && !canReview) {
                 return errors.fail('forbidden', '无权查看该申请');
@@ -1947,8 +2308,12 @@ function createEngine(store, wxCtx) {
     cancelApplication: cancelApplication,
     reviewApplication: reviewApplication,
     createInvite: createInvite,
+    prepareShareInvite: prepareShareInvite,
+    listInvites: listInvites,
     revokeInvite: revokeInvite,
     resolveInvite: resolveInvite,
+    getInviteByToken: getInviteByToken,
+    acceptInvite: acceptInvite,
     addMember: addMember,
     removeMember: removeMember,
     setAdmin: function (payload) {
@@ -1976,6 +2341,27 @@ function createEngine(store, wxCtx) {
     listNotices: listNotices,
     getApplication: getApplication,
     confirmMigration: confirmMigration,
+    prepareTeamAssetUpload: function (payload) {
+      var openid = wxCtx && wxCtx.OPENID ? String(wxCtx.OPENID).trim() : '';
+      if (!openid) return errors.fail('need_login', '未登录');
+      var made = teamAssets.prepare(openid, payload || {});
+      if (!made.ok) return errors.fail(made.code, made.message);
+      return errors.ok({ cloudPath: made.cloudPath, uploadId: made.uploadId });
+    },
+    purgeTeamAssetOrphans: function (payload) {
+      var openid = wxCtx && wxCtx.OPENID ? String(wxCtx.OPENID).trim() : '';
+      if (!openid) return errors.fail('need_login', '未登录');
+      var filtered = teamAssets.filterOwnTmp((payload && payload.fileIDs) || [], openid);
+      if (!filtered.safe.length) {
+        return errors.ok({ deleted: 0, skipped: filtered.skipped });
+      }
+      if (!store || typeof store.deleteFiles !== 'function') {
+        return errors.ok({ deleted: 0, skipped: filtered.skipped, pending: filtered.safe.length });
+      }
+      return Promise.resolve(store.deleteFiles(filtered.safe)).then(function () {
+        return errors.ok({ deleted: filtered.safe.length, skipped: filtered.skipped });
+      });
+    },
     setNowMs: function (n) {
       if (store.setNowMs) store.setNowMs(n);
     }
@@ -2030,6 +2416,8 @@ function stripClientIdentity(event) {
     payload.operationId = e.payload.operationId || payload.operationId;
     payload.writeKind = e.payload.writeKind || payload.writeKind;
     payload.matchSnapshot = e.payload.matchSnapshot || payload.matchSnapshot;
+    payload.cursor = e.payload.cursor != null ? e.payload.cursor : payload.cursor;
+    payload.limit = e.payload.limit != null ? e.payload.limit : payload.limit;
     payload.hole = e.payload.hole != null ? e.payload.hole : payload.hole;
     payload.entityId = e.payload.entityId || e.payload.playerId || payload.entityId;
     payload.entityKind = e.payload.entityKind || payload.entityKind;

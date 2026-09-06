@@ -5,11 +5,9 @@ const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const teamClub = require('../../../../../utils/teamClub/service.js');
 const bootstrap = require('../../../../../utils/teamClub/bootstrap.js');
 const pageErrors = require('../../../../../utils/teamClub/pageErrors.js');
-
-function isTempPath(url) {
-  const s = String(url || '').trim();
-  return /^wxfile:\/\//i.test(s) || /^http:\/\/tmp\//i.test(s);
-}
+const teamFields = require('../../../../../utils/teamClub/teamFields.js');
+const teamLogo = require('../../../../../utils/teamClub/teamLogo.js');
+const teamAssetUpload = require('../../../../../utils/teamClub/teamAssetUpload.js');
 
 Page({
   data: {
@@ -22,6 +20,16 @@ Page({
     teamId: '',
     version: 1,
     submitting: false,
+    logoUploading: false,
+    logoPreview: '',
+    logoError: '',
+    logoSrc: '',
+    logoBroken: false,
+    logoPlaceholder: teamLogo.PLACEHOLDER,
+    nameCount: 0,
+    shortCount: 0,
+    sloganCount: 0,
+    introCount: 0,
     form: { name: '', shortName: '', city: '', slogan: '', intro: '', logo: '', acceptingMembers: true }
   },
 
@@ -30,11 +38,20 @@ Page({
     this.applyTheme(getApp().getTheme());
     const teamId = options && options.teamId ? String(options.teamId).trim() : '';
     this.setData({ teamId: teamId });
+    this._savedLogo = '';
+    this._pendingLogos = [];
     bootstrap.ensureCloudIdentity().then(() => this.load());
   },
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+  },
+
+  onUnload() {
+    (this._pendingLogos || []).forEach((id) => {
+      if (id !== this._savedLogo) teamAssetUpload.enqueueOrphan(id);
+    });
+    teamAssetUpload.flushOrphans();
   },
 
   initHeaderNav() {
@@ -48,6 +65,15 @@ Page({
 
   onBack() {
     wx.navigateBack({ delta: 1 });
+  },
+
+  _syncCounts(form) {
+    return {
+      nameCount: String(form.name || '').length,
+      shortCount: teamFields.visibleLength(form.shortName),
+      sloganCount: String(form.slogan || '').length,
+      introCount: String(form.intro || '').length
+    };
   },
 
   load() {
@@ -72,19 +98,31 @@ Page({
         });
         return;
       }
-      this.setData({
-        pageState: 'ready',
-        version: team.version,
-        form: {
-          name: team.fullName || team.name || '',
-          shortName: team.shortName || '',
-          city: team.city || team.regionText || '',
-          slogan: team.slogan || '',
-          intro: team.description || '',
-          logo: team.logo || '',
-          acceptingMembers: team.acceptingMembers !== false
-        }
-      });
+      const form = {
+        name: team.fullName || team.name || '',
+        shortName: team.shortName || '',
+        city: team.city || team.regionText || '',
+        slogan: team.slogan || '',
+        intro: team.description || '',
+        logo: team.logo || '',
+        acceptingMembers: team.acceptingMembers !== false
+      };
+      this._savedLogo = form.logo;
+      this.setData(
+        Object.assign(
+          {
+            pageState: 'ready',
+            version: team.version,
+            form: form,
+            logoPreview: '',
+            logoError: '',
+            logoSrc: team.logoSrc || '',
+            logoBroken: !!team.logoBroken,
+            logoPlaceholder: team.logoPlaceholder || teamLogo.PLACEHOLDER
+          },
+          this._syncCounts(form)
+        )
+      );
     });
   },
 
@@ -93,24 +131,117 @@ Page({
   },
 
   _patch(patch) {
-    this.setData({ form: Object.assign({}, this.data.form, patch) });
+    const form = Object.assign({}, this.data.form, patch);
+    this.setData(Object.assign({ form: form }, this._syncCounts(form)));
   },
   onName(e) { this._patch({ name: e.detail.value }); },
-  onShort(e) { this._patch({ shortName: e.detail.value }); },
+  onShort(e) {
+    this._patch({
+      shortName: teamFields.sliceVisible((e.detail && e.detail.value) || '', teamFields.SHORT_MAX)
+    });
+  },
   onCity(e) { this._patch({ city: e.detail.value }); },
   onSlogan(e) { this._patch({ slogan: e.detail.value }); },
   onIntro(e) { this._patch({ intro: e.detail.value }); },
   onAccept(e) { this._patch({ acceptingMembers: !!e.detail.value }); },
 
+  onLogoError() {
+    this.setData({ logoBroken: true });
+  },
+
+  onPickLogo() {
+    if (this.data.logoUploading || this.data.submitting || teamAssetUpload.isUploading()) {
+      wx.showToast({ title: '正在上传，请稍候', icon: 'none' });
+      return;
+    }
+    if (teamAssetUpload.hasPendingUpload()) {
+      this._retryLogo();
+      return;
+    }
+    this.setData({ logoUploading: true, logoError: '' });
+    const self = this;
+    if (!self._logoUploadId) self._logoUploadId = teamAssetUpload.newUploadId();
+    teamAssetUpload
+      .pickAndUpload({
+        kind: 'logo',
+        uploadId: self._logoUploadId,
+        onPreview: function (info) {
+          self.setData({
+            logoPreview: info && info.previewPath ? info.previewPath : self.data.logoPreview,
+            logoUploading: true
+          });
+        }
+      })
+      .then((res) => self._finishLogoUpload(res));
+  },
+
+  _retryLogo() {
+    this.setData({ logoUploading: true, logoError: '' });
+    const self = this;
+    teamAssetUpload.retryPendingUpload().then((res) => self._finishLogoUpload(res));
+  },
+
+  _finishLogoUpload(res) {
+    const self = this;
+    if (!res || !res.ok) {
+      if (res && res.code === 'cancelled') {
+        self.setData({ logoUploading: false });
+        return;
+      }
+      const text = teamAssetUpload.displayUploadError(res);
+      self.setData({ logoUploading: false, logoError: text });
+      wx.showModal({
+        title: res && res.code === 'upload_uncertain' ? '上传待确认' : 'LOGO 尚未上传',
+        content: text,
+        showCancel: true,
+        confirmText: '重试',
+        success(r) {
+          if (!r.confirm) return;
+          if (teamAssetUpload.hasPendingUpload()) self._retryLogo();
+          else self.onPickLogo();
+        }
+      });
+      return;
+    }
+        const saved = teamLogo.persistLogo(res.fileID);
+        if (!saved.ok) {
+          self.setData({ logoUploading: false, logoError: saved.message || 'LOGO 无效' });
+          return;
+        }
+        const prev = String((self.data.form && self.data.form.logo) || '').trim();
+        if (prev && prev !== saved.logo && (self._pendingLogos || []).indexOf(prev) >= 0) {
+          teamAssetUpload.enqueueOrphan(prev, res.route);
+        }
+        self._pendingLogos = (self._pendingLogos || []).concat([saved.logo]);
+        self._logoUploadId = '';
+        self._patch({ logo: saved.logo });
+        teamLogo.displaySrc(saved.logo).then((d) => {
+          self.setData({
+            logoUploading: false,
+            logoPreview: '',
+            logoError: '',
+            logoSrc: d.logoSrc,
+            logoBroken: false,
+            logoPlaceholder: d.placeholder
+          });
+        });
+  },
+
   onSubmit() {
-    if (this.data.submitting) return;
+    if (this.data.submitting || this.data.logoUploading) return;
     const form = this.data.form;
     const name = String(form.name || '').trim();
     if (!name) {
       wx.showToast({ title: '请填写球队名称', icon: 'none' });
       return;
     }
-    if (isTempPath(form.logo)) {
+    const shortChecked = teamFields.sanitizeShortName(form.shortName, {});
+    if (!shortChecked.ok) {
+      wx.showToast({ title: shortChecked.message, icon: 'none' });
+      return;
+    }
+    const logoChecked = teamLogo.persistLogo(form.logo);
+    if (!logoChecked.ok) {
       wx.showToast({ title: 'LOGO 未上传成功', icon: 'none' });
       return;
     }
@@ -119,11 +250,11 @@ Page({
     teamClub
       .updateTeam(this.data.teamId, {
         name: name,
-        shortName: form.shortName,
+        shortName: shortChecked.shortName,
         city: form.city,
         slogan: form.slogan,
         intro: form.intro,
-        logo: form.logo,
+        logo: logoChecked.logo,
         acceptingMembers: form.acceptingMembers
       }, { expectedVersion: this.data.version })
       .then((res) => {
@@ -144,6 +275,9 @@ Page({
           wx.showToast({ title: err.errorTitle, icon: 'none' });
           return;
         }
+        teamAssetUpload.markCommitted(logoChecked.logo);
+        self._pendingLogos = [];
+        self._savedLogo = logoChecked.logo;
         wx.showToast({ title: '已保存', icon: 'none' });
         wx.navigateBack({ delta: 1 });
       })

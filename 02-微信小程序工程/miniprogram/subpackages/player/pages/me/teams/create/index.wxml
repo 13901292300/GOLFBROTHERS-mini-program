@@ -1,4 +1,4 @@
-<view class="create-page {{themeClass}}">
+<view class="create-page team-form {{themeClass}}">
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
       <view class="gb-header__left">
@@ -18,48 +18,61 @@
     pageState="{{pageState}}"
     errorTitle="{{errorTitle}}"
     errorDesc="{{errorDesc}}"
+    actionKind="{{actionKind}}"
+    actionLabel="{{actionLabel}}"
     bind:retry="onRetry"
+    bind:completeprofile="onCompleteProfile"
   />
 
-  <scroll-view wx:else class="create-body" scroll-y>
+  <scroll-view wx:else class="create-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
     <view class="form">
       <view class="form-logo" bindtap="onPickLogo">
-        <image wx:if="{{form.logo}}" class="form-logo__img" src="{{form.logo}}" mode="aspectFill"></image>
+        <image
+          wx:if="{{logoPreview || form.logo}}"
+          class="form-logo__img"
+          src="{{logoPreview || (logoBroken ? logoPlaceholder : logoSrc)}}"
+          mode="aspectFill"
+          binderror="onLogoError"
+        ></image>
         <text wx:else class="form-logo__ph">上传 LOGO</text>
+        <view wx:if="{{logoUploading}}" class="form-logo__mask">上传中</view>
       </view>
+      <text wx:if="{{logoError}}" class="form-logo__hint">{{logoError}}</text>
+      <text wx:else class="form-logo__hint">支持 jpg / png / webp，最大 5MB</text>
       <view class="field">
         <text class="field__label">球队名称 *</text>
-        <input class="field__input" value="{{form.name}}" maxlength="30" bindinput="onName" placeholder="请输入球队全称" />
+        <input class="field__input" placeholder-class="field__ph" value="{{form.name}}" maxlength="30" bindinput="onName" placeholder="请输入球队全称" />
         <text class="field__count">{{nameCount}}/30</text>
       </view>
       <view class="field">
         <text class="field__label">简称</text>
-        <input class="field__input" value="{{form.shortName}}" maxlength="4" bindinput="onShort" placeholder="最多4字" />
+        <input class="field__input" placeholder-class="field__ph" value="{{form.shortName}}" maxlength="{{-1}}" bindinput="onShort" placeholder="最多4字" />
         <text class="field__count">{{shortCount}}/4</text>
       </view>
       <view class="field">
         <text class="field__label">地区</text>
-        <input class="field__input" value="{{form.city}}" maxlength="20" bindinput="onCity" placeholder="城市或地区" />
+        <input class="field__input" placeholder-class="field__ph" value="{{form.city}}" maxlength="20" bindinput="onCity" placeholder="城市或地区" />
       </view>
       <view class="field">
         <text class="field__label">口号</text>
-        <input class="field__input" value="{{form.slogan}}" maxlength="40" bindinput="onSlogan" placeholder="可选" />
+        <input class="field__input" placeholder-class="field__ph" value="{{form.slogan}}" maxlength="40" bindinput="onSlogan" placeholder="可选" />
         <text class="field__count">{{sloganCount}}/40</text>
       </view>
       <view class="field">
         <text class="field__label">简介</text>
-        <textarea class="field__area" value="{{form.intro}}" maxlength="200" bindinput="onIntro" placeholder="介绍球队" />
+        <textarea class="field__area" placeholder-class="field__ph" value="{{form.intro}}" maxlength="200" bindinput="onIntro" placeholder="介绍球队" auto-height="{{false}}" />
         <text class="field__count">{{introCount}}/200</text>
       </view>
       <view class="field field--row">
         <text class="field__label">接受新成员申请</text>
         <switch checked="{{form.acceptingMembers}}" bindchange="onAccept" color="#002d62" />
       </view>
+      <view class="form-end-space"></view>
     </view>
   </scroll-view>
 
   <view wx:if="{{pageState === 'ready'}}" class="footer">
-    <button class="submit-btn {{submitting ? 'is-disabled' : ''}}" disabled="{{submitting}}" bindtap="onSubmit">
+    <button class="submit-btn {{submitting || logoUploading ? 'is-disabled' : ''}}" disabled="{{submitting || logoUploading}}" bindtap="onSubmit">
       {{submitting ? '创建中…' : '创建球队'}}
     </button>
   </view>

@@ -11,7 +11,12 @@
 
   <block wx:if="{{pageState === 'ready' && team}}">
     <view class="ds-card intro-hero">
-      <image class="intro-hero__logo" src="{{team.logo}}" mode="aspectFill"></image>
+      <image
+        class="intro-hero__logo"
+        src="{{team.logoBroken ? team.logoPlaceholder : team.logoSrc}}"
+        mode="aspectFill"
+        binderror="onLogoError"
+      ></image>
       <text class="intro-hero__name">{{team.fullName}}</text>
       <view wx:if="{{team.badges.length}}" class="intro-hero__tags">
         <text
@@ -22,11 +27,16 @@
         >{{badge.label}}</text>
       </view>
       <button
-        wx:if="{{canShareTeam}}"
+        wx:if="{{canShareTeam && shareReady}}"
         class="intro-share"
         open-type="share"
         hover-class="intro-share--hover"
-      >分享球队</button>
+      >微信邀请好友</button>
+      <button
+        wx:elif="{{canShareTeam}}"
+        class="intro-share intro-share--busy"
+        disabled
+      >邀请准备中…</button>
     </view>
 
     <view class="ds-card intro-facts">

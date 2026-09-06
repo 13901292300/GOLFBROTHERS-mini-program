@@ -147,7 +147,7 @@ function derivePermissions(role, options) {
     canRemoveMember: isSuper,
     canRemoveOrdinaryMember: canManage,
     canReviewJoinRequests: canReviewTeamApplication(r, grants),
-    canShareTeam: true
+    canShareTeam: canManage
   };
 }
 

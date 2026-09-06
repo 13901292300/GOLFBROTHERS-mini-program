@@ -43,6 +43,7 @@ var EXTRA_METHODS = [
   'resolveIdentity',
   'createMyProfile',
   'searchUsers',
+  'listInvites',
   'listNotices',
   'getApplication',
   'confirmMigration',
@@ -54,7 +55,10 @@ var EXTRA_METHODS = [
   'submitHoleScore',
   'updatePutt',
   'correctScore',
-  'completeMatch'
+  'completeMatch',
+  'prepareShareInvite',
+  'getInviteByToken',
+  'acceptInvite'
 ];
 
 module.exports = {

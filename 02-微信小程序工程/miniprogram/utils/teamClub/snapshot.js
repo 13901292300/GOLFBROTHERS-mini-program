@@ -54,7 +54,14 @@ function putTeam(team) {
   if (!team || !(team.teamId || team.id)) return;
   var id = String(team.teamId || team.id);
   var b = bucket();
-  b.teams[id] = team;
+  var prev = b.teams[id];
+  var next = Object.assign({}, team);
+  var nextLogo = String(next.logo || '').trim();
+  var prevLogo = prev ? String(prev.logo || '').trim() : '';
+  if (prevLogo.indexOf('cloud://') === 0 && nextLogo.indexOf('cloud://') !== 0) {
+    next.logo = prevLogo;
+  }
+  b.teams[id] = next;
   b.asOf[id] = Date.now();
   b.stale[id] = false;
 }

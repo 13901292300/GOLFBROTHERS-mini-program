@@ -3,6 +3,7 @@
     "pages/home/index",
     "pages/index/index",
     "pages/match/join/index",
+    "pages/team-invite/index",
     "pages/game/hub/index",
     "pages/feedback/index",
     "pages/profile/footprints/index",
@@ -133,6 +134,12 @@
     }
   },
   "requiredPrivateInfos": ["getLocation"],
+  "preloadRule": {
+    "pages/team-invite/index": {
+      "network": "all",
+      "packages": ["player"]
+    }
+  },
   "sitemapLocation": "sitemap.json",
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"

@@ -55,6 +55,7 @@ var EXTRA_METHODS = [
   'resolveIdentity',
   'createMyProfile',
   'searchUsers',
+  'listInvites',
   'listNotices',
   'getApplication',
   'confirmMigration',
@@ -66,7 +67,12 @@ var EXTRA_METHODS = [
   'submitHoleScore',
   'updatePutt',
   'correctScore',
-  'completeMatch'
+  'completeMatch',
+  'prepareTeamAssetUpload',
+  'purgeTeamAssetOrphans',
+  'prepareShareInvite',
+  'getInviteByToken',
+  'acceptInvite'
 ];
 
 function memberDocId(teamId, userId) {

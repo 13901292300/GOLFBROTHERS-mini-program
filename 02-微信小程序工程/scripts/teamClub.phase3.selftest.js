@@ -159,7 +159,7 @@ async function main() {
   assert('生产默认 cloud', factory.getMode() === 'cloud');
   var cloudRepo = factory.get();
   var failList = await cloudRepo.listMyTeams();
-  assert('云失败不回落本地', failList.ok === false && failList.code === 'service_unavailable');
+  assert('云失败不回落本地', failList.ok === false && (failList.code === 'service_unavailable' || failList.code === 'network_error' || failList.code === 'env_unknown'));
 
   var identity = require(path.join(mini, 'utils', 'teamClub', 'identity.js'));
   var snapshot = require(path.join(mini, 'utils', 'teamClub', 'snapshot.js'));

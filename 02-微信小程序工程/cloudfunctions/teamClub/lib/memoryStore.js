@@ -1,5 +1,8 @@
 'use strict';
 
+var queryUtil = require('./queryUtil.js');
+var ser = require('./storeSerialize.js');
+
 function clone(obj) {
   return obj == null ? obj : JSON.parse(JSON.stringify(obj));
 }
@@ -27,10 +30,33 @@ function createMemoryStore(seed) {
     return Date.now();
   };
   var chain = Promise.resolve();
+  var sdkWrites = [];
 
   function col(name) {
     if (!data[name]) data[name] = {};
     return data[name];
+  }
+
+  function runQuery(name, spec) {
+    var page = queryUtil.applyMemoryQuery(col(name), spec);
+    return Promise.resolve({
+      list: page.list.map(clone),
+      cursor: page.cursor,
+      hasMore: page.hasMore
+    });
+  }
+
+  function sdkWrite(op, name, id, payload) {
+    ser.assertSdkWriteData(payload);
+    sdkWrites.push({
+      op: op,
+      collection: name,
+      id: String(id),
+      data: clone(payload)
+    });
+    var stored = ser.attachDocId(id, payload);
+    col(name)[String(id)] = clone(stored);
+    return clone(stored);
   }
 
   function api() {
@@ -43,23 +69,37 @@ function createMemoryStore(seed) {
         return Promise.resolve(row ? clone(row) : null);
       },
       put: function (name, id, doc) {
-        var row = clone(doc) || {};
-        row._id = String(id);
-        col(name)[String(id)] = row;
-        return Promise.resolve(clone(row));
+        try {
+          var payload = ser.toSdkWriteData(doc);
+          return Promise.resolve(sdkWrite('set', name, id, payload));
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      },
+      update: function (name, id, doc) {
+        try {
+          var payload = ser.toSdkWriteData(doc);
+          var existing = col(name)[String(id)];
+          if (!existing) {
+            return Promise.reject(new Error('document.update:fail not found'));
+          }
+          var merged = Object.assign({}, existing, payload);
+          delete merged._id;
+          delete merged._openid;
+          return Promise.resolve(sdkWrite('update', name, id, merged));
+        } catch (err) {
+          return Promise.reject(err);
+        }
       },
       remove: function (name, id) {
         delete col(name)[String(id)];
         return Promise.resolve(true);
       },
-      query: function (name, pred) {
-        var map = col(name);
-        var out = [];
-        Object.keys(map).forEach(function (k) {
-          var row = map[k];
-          if (!pred || pred(row)) out.push(clone(row));
-        });
-        return Promise.resolve(out);
+      query: function (name, spec) {
+        return runQuery(name, spec);
+      },
+      queryAll: function (name, spec) {
+        return queryUtil.queryAllFrom(runQuery, name, spec);
       }
     };
   }
@@ -84,6 +124,39 @@ function createMemoryStore(seed) {
     },
     dump: function () {
       return clone(data);
+    },
+    deletedFiles: [],
+    deleteFiles: function (fileList) {
+      var list = Array.isArray(fileList) ? fileList : [];
+      this.deletedFiles = (this.deletedFiles || []).concat(list);
+      return Promise.resolve({
+        fileList: list.map(function (id) {
+          return { fileID: id, status: 0 };
+        })
+      });
+    },
+    getLastSdkWrites: function () {
+      return clone(sdkWrites);
+    },
+    clearLastSdkWrites: function () {
+      sdkWrites = [];
+    },
+    sdkSetRaw: function (name, id, data) {
+      try {
+        sdkWrite('set', name, id, data);
+        return Promise.resolve(true);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    },
+    get: function (name, id) {
+      return api().get(name, id);
+    },
+    query: function (name, spec) {
+      return runQuery(name, spec);
+    },
+    queryAll: function (name, spec) {
+      return queryUtil.queryAllFrom(runQuery, name, spec);
     },
     runTransaction: function (fn) {
       var run = function () {

@@ -54,6 +54,7 @@
 }
 .intro-share::after { border: none; }
 .intro-share--hover { opacity: 0.78; }
+.intro-share--busy { opacity: 0.5; }
 
 .intro-facts { padding: 8rpx 32rpx; }
 .intro-fact {

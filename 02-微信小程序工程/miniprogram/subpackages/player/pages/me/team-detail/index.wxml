@@ -31,6 +31,7 @@
         pageState="{{introState}}"
         team="{{team}}"
         canShareTeam="{{canShareTeam}}"
+        shareReady="{{shareReady}}"
         pendingApplicationCount="{{pendingApplicationCount}}"
         errorTitle="{{introErrorTitle}}"
         errorDesc="{{introErrorDesc}}"

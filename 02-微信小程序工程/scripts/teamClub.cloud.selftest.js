@@ -307,6 +307,12 @@ async function main() {
   var redacted = log.sanitize({ token: 'inv_secret', OPENID: 'oXXX', phone: '13800000000', action: 'createInvite' });
   assert('日志无敏感信息', redacted.token === '[redacted]' && redacted.OPENID === '[redacted]' && redacted.phone === '[redacted]' && redacted.action === 'createInvite');
 
+  var dirtyWrites = (store.getLastSdkWrites() || []).filter(function (w) {
+    var d = w.data || {};
+    return Object.prototype.hasOwnProperty.call(d, '_id') || Object.prototype.hasOwnProperty.call(d, '_openid');
+  });
+  assert('全部 SDK 写入不含 _id/_openid', (store.getLastSdkWrites() || []).length > 0 && dirtyWrites.length === 0);
+
   C.CONTRACT_METHODS.forEach(function (name) {
     assert('契约方法存在: ' + name, typeof engine.createEngine(store, { OPENID: OID.owner })[name] === 'function');
   });
@@ -316,7 +322,13 @@ async function main() {
   assert('默认/显式 cloud 模式', factory.getMode() === 'cloud');
   var cloudRepo = factory.get();
   var noFallback = await cloudRepo.listMyTeams();
-  assert('云失败不回落本地', noFallback.ok === false && (noFallback.code === 'service_unavailable' || noFallback.code === 'network_error'));
+  assert(
+    '云失败不回落本地',
+    noFallback.ok === false &&
+      (noFallback.code === 'service_unavailable' ||
+        noFallback.code === 'network_error' ||
+        noFallback.code === 'env_unknown')
+  );
   var localSrc = fs.readFileSync(path.join(root, 'miniprogram', 'utils', 'teamClub', 'cloudRepository.js'), 'utf8');
   assert('cloudRepository 不 require 本地 repository', localSrc.indexOf("require('./repository.js')") < 0);
 
