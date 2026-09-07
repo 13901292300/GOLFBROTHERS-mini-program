@@ -1,5 +1,5 @@
 /**
- * team/select 迁入 create 分包：页面完整性、路由与 eventChannel 契约。
+ * team/select 迁入 create 分包：页面完整性、路由、eventChannel 与球队云仓储契约。
  *
  * 运行（在 02-微信小程序工程 目录）：
  *   node scripts/teamSelectSubpackage.selftest.js
@@ -7,7 +7,6 @@
 
 var fs = require('fs');
 var path = require('path');
-var crypto = require('crypto');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
@@ -32,14 +31,6 @@ function assert(label, condition) {
 
 function read(file) {
   return fs.readFileSync(file, 'utf8');
-}
-
-function hashBuffer(buffer) {
-  return crypto.createHash('sha256').update(buffer).digest('hex').toUpperCase();
-}
-
-function hashFile(file) {
-  return hashBuffer(fs.readFileSync(file));
 }
 
 var extensions = ['js', 'wxml', 'wxss', 'json'];
@@ -102,31 +93,80 @@ var newJs = read(newJsPath);
 });
 
 var requiredFiles = [];
+var requireSpecs = [];
 newJs.replace(/require\(['"]([^'"]+)['"]\)/g, function (match, request) {
+  requireSpecs.push(request.replace(/\\/g, '/'));
   requiredFiles.push(path.resolve(newPageDir, request));
   return match;
 });
 assert(
-  '四个主包 utils require 均可解析',
-  requiredFiles.length === 4 && requiredFiles.every(fs.existsSync)
+  '选球队页 require 均可解析',
+  requiredFiles.length > 0 && requiredFiles.every(fs.existsSync)
+);
+assert(
+  '使用正式 teamClub/service 云仓储路径',
+  requireSpecs.some(function (r) {
+    return /utils\/teamClub\/service(?:\.js)?$/.test(r);
+  })
 );
 
+delete global.__TEAM_CLUB_REPO_MODE;
+var factory = require(path.join(mini, 'utils', 'teamClub', 'repoFactory.js'));
+var flags = require(path.join(mini, 'utils', 'teamClub', 'devFlags.js'));
+assert(
+  '生产默认云仓储且不回落 mock/local',
+  factory.getMode() === 'cloud' &&
+    flags.USE_LOCAL_REPOSITORY === false &&
+    requireSpecs.indexOf('../../../../../utils/teamClub/repository.js') < 0 &&
+    requireSpecs.indexOf('../../../../../utils/teamClub/mock.js') < 0 &&
+    newJs.indexOf("require('./mock") < 0
+);
+
+var wxml = read(path.join(newPageDir, 'index.wxml'));
 JSON.parse(read(path.join(newPageDir, 'index.json')));
 assert('页面 JSON 可解析', true);
-
-var normalizedJs = newJs
-  .replace(/\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/utils\//g, '../../../utils/')
-  .replace(/\r\n/g, '\n');
 assert(
-  '业务页面除 require 外内容保持原样',
-  hashBuffer(Buffer.from(normalizedJs, 'utf8')) ===
-      'C27F1D819501C666780196A72AEEBBE836B6EFF00D984F7DC54BF62F558B9B49' &&
-    hashFile(path.join(newPageDir, 'index.wxml')) ===
-      '1E01F82357F0E18B96D1993C5EB59120C9E0A6DAD4B2B6779CFC4DC52F1DEC8F' &&
-    hashFile(path.join(newPageDir, 'index.wxss')) ===
-      '1574170DA9D3FDAFA183F864A9F6A3E978A8F5A62F75F2D38EBEB357CFEAB8A4' &&
-    hashFile(path.join(newPageDir, 'index.json')) ===
-      '38F20314C5CD1B7AD1A9D900520CE04EA1EE0469D66D5E84884BA11FAA3E0992'
+  '页面四件套与空态结构完整',
+  ['js', 'wxml', 'wxss', 'json'].every(function (ext) {
+    return fs.existsSync(path.join(newPageDir, 'index.' + ext));
+  }) &&
+    wxml.indexOf('showEmptyState') >= 0 &&
+    wxml.indexOf('team-empty') >= 0
+);
+
+var utilsRoot = path.join(mini, 'utils') + path.sep;
+var createRoot = path.join(mini, 'subpackages', 'create') + path.sep;
+var heavyRoots = [
+  path.join(mini, 'subpackages', 'poster') + path.sep,
+  path.join(mini, 'subpackages', 'game') + path.sep,
+  path.join(mini, 'subpackages', 'tournament') + path.sep,
+  path.join(mini, 'subpackages', 'tournament-manage') + path.sep,
+  path.join(mini, 'subpackages', 'scoring') + path.sep,
+  path.join(mini, 'subpackages', 'player', 'pages') + path.sep
+];
+var heavyHits = requiredFiles.filter(function (abs) {
+  return heavyRoots.some(function (rootDir) {
+    return abs.indexOf(rootDir) === 0;
+  });
+});
+assert(
+  '不依赖海报/游戏/赛事等大型无关分包',
+  heavyHits.length === 0 &&
+    requiredFiles.every(function (abs) {
+      return abs.indexOf(utilsRoot) === 0 || abs.indexOf(createRoot) === 0;
+    })
+);
+assert(
+  '公开契约：列表刷新与确认入口仍存在',
+  newJs.indexOf('refreshTeams') >= 0 && newJs.indexOf('onConfirm') >= 0
+);
+assert(
+  '空态/加载态/错误态可处理',
+  newJs.indexOf('showEmptyState') >= 0 &&
+    newJs.indexOf('emptyVisible') >= 0 &&
+    /createTeam\s*\(/.test(newJs) &&
+    /\.then\s*\(/.test(newJs) &&
+    newJs.indexOf("title: (res && res.message) || '创建失败'") >= 0
 );
 assert('未保留 redirect 兼容壳', !fs.existsSync(oldPageDir));
 

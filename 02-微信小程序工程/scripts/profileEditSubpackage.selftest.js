@@ -73,11 +73,60 @@ assert('跳转失败最多回首页一次', calls.length === 2 && calls[1].url =
 var jsPath = path.join(newDir, 'index.js');
 var js = read(jsPath);
 var wxml = read(path.join(newDir, 'index.wxml'));
-var requires = [];
+var requireSpecs = [];
 js.replace(/require\(['"]([^'"]+)['"]\)/g, function (match, request) {
-  requires.push(path.resolve(newDir, request)); return match;
+  requireSpecs.push(request);
+  return match;
 });
-assert('四个主包 utils require 可解析', requires.length === 4 && requires.every(fs.existsSync));
+var resolvedRequires = requireSpecs.map(function (request) {
+  return path.resolve(newDir, request);
+});
+var utilsRoot = path.join(mini, 'utils') + path.sep;
+var playerRoot = path.join(mini, 'subpackages', 'player') + path.sep;
+var forbiddenRoots = [
+  path.join(mini, 'subpackages', 'poster') + path.sep,
+  path.join(mini, 'subpackages', 'game') + path.sep,
+  path.join(mini, 'subpackages', 'tournament') + path.sep,
+  path.join(mini, 'subpackages', 'tournament-manage') + path.sep,
+  path.join(mini, 'subpackages', 'tournament-tools') + path.sep,
+  path.join(mini, 'subpackages', 'scoring') + path.sep,
+  path.join(mini, 'subpackages', 'create') + path.sep
+];
+function under(file, rootDir) {
+  return file.indexOf(rootDir) === 0;
+}
+var missing = resolvedRequires.filter(function (abs) {
+  return !fs.existsSync(abs);
+});
+var outside = resolvedRequires.filter(function (abs) {
+  return !under(abs, utilsRoot) && !under(abs, playerRoot);
+});
+var heavy = resolvedRequires.filter(function (abs) {
+  return forbiddenRoots.some(function (rootDir) {
+    return under(abs, rootDir);
+  });
+});
+var rels = requireSpecs.map(function (request) {
+  return request.replace(/\\/g, '/');
+});
+assert('资料编辑页全部 require 可解析', missing.length === 0 && resolvedRequires.length > 0, missing.join(','));
+assert(
+  '主包依赖仅轻量 utils 或本分包',
+  outside.length === 0 && heavy.length === 0,
+  outside.concat(heavy).join(',')
+);
+assert(
+  '建档闭环允许 profileOnboard/profileFields',
+  rels.some(function (r) { return /teamClub\/profileOnboard(?:\.js)?$/.test(r); }) &&
+    rels.some(function (r) { return /teamClub\/profileFields(?:\.js)?$/.test(r); })
+);
+assert(
+  '资料页不反向引用大型页面模块',
+  !rels.some(function (r) {
+    return /\/pages\//.test(r) || /subpackages\/(poster|game|tournament|scoring)\//.test(r);
+  })
+);
+assert('资料编辑不形成跨分包循环 require', heavy.length === 0 && outside.length === 0);
 assert('资料读取、编辑、校验与保存入口保持',
   js.indexOf('userProfileStore.loadProfile') >= 0 && js.indexOf('userProfileStore.updateProfile') >= 0 &&
   js.indexOf('昵称不能为空') >= 0 && js.indexOf('genderNormalize') >= 0 &&

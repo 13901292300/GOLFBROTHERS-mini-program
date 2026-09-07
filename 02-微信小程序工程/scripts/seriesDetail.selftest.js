@@ -451,7 +451,53 @@ function freeze(obj) {
     'app.json 已注册 series-detail',
     !!(tour && (tour.pages || []).indexOf('pages/series-detail/index') >= 0)
   );
-  assert('app.json 无 preloadRule', appJson.preloadRule == null);
+  var preload = appJson.preloadRule;
+  var packagesByName = {};
+  var packagesByRoot = {};
+  (appJson.subPackages || []).forEach(function (pkg) {
+    if (!pkg) return;
+    if (pkg.name) packagesByName[String(pkg.name)] = pkg;
+    if (pkg.root) packagesByRoot[String(pkg.root).replace(/\\/g, '/')] = pkg;
+  });
+  function mainPageExists(pagePath) {
+    return (appJson.pages || []).indexOf(pagePath) >= 0;
+  }
+  function subPackageExists(name) {
+    var key = String(name || '');
+    if (packagesByName[key]) return true;
+    if (packagesByRoot['subpackages/' + key]) return true;
+    return false;
+  }
+  if (preload && typeof preload === 'object') {
+    var preloadPages = Object.keys(preload);
+    var danglingPages = [];
+    var danglingPackages = [];
+    preloadPages.forEach(function (pagePath) {
+      if (!mainPageExists(pagePath)) danglingPages.push(pagePath);
+      var rule = preload[pagePath] || {};
+      (rule.packages || []).forEach(function (pkgName) {
+        if (!subPackageExists(pkgName)) danglingPackages.push(pagePath + '→' + pkgName);
+      });
+    });
+    assert('preloadRule 允许存在且键为真实主包页', danglingPages.length === 0, danglingPages.join(','));
+    assert('preloadRule 分包名均已注册', danglingPackages.length === 0, danglingPackages.join(','));
+    var inviteRule = preload['pages/team-invite/index'];
+    assert(
+      '邀请冷启动只预载 player 分包',
+      !!(
+        inviteRule &&
+        Array.isArray(inviteRule.packages) &&
+        inviteRule.packages.length === 1 &&
+        inviteRule.packages[0] === 'player'
+      )
+    );
+    assert('player 分包真实存在', subPackageExists('player'));
+  } else {
+    assert('preloadRule 允许存在且键为真实主包页', false, 'missing preloadRule');
+    assert('preloadRule 分包名均已注册', false, 'missing preloadRule');
+    assert('邀请冷启动只预载 player 分包', false, 'missing preloadRule');
+    assert('player 分包真实存在', subPackageExists('player'));
+  }
 })();
 
 // ---- 4C-2 视觉返修：Hero / 参赛主体归属 / 吸顶 TAB ----

@@ -1057,13 +1057,63 @@ function wrapJournalFailOnce(baseJournal, predicate) {
   assert('未写 journal', h.journal.getJournal(series.seriesId).journal == null);
 })();
 
-// ---------- 旧 API 零变化烟测 ----------
-(function testLegacyApisUntouched() {
-  var src = fs.readFileSync(path.join(utilsDir, 'teamMatchStore.js'), 'utf8');
+// ---------- 队内赛 matchId：稳定 pending / 重试复用 / 无预设才新生 ----------
+(function testMatchIdReuseContract() {
+  function isLegalMatchId(id) {
+    return typeof id === 'string' && /^team-match-\S+$/.test(id);
+  }
+  var pending = 'team-match-stable-retry';
+  var first = teamMatchStore.buildMatchFromCreatePage({
+    pendingMatchId: pending,
+    matchType: 'team-internal',
+    teamName: '甲队'
+  });
+  var retry = teamMatchStore.buildMatchFromCreatePage({
+    pendingMatchId: pending,
+    matchId: pending,
+    matchType: 'team-internal',
+    teamName: '甲队'
+  });
+  var fromMatchId = teamMatchStore.buildMatchFromCreatePage({
+    matchId: pending,
+    matchType: 'team-internal',
+    teamName: '甲队'
+  });
   assert(
-    'buildMatchFromCreatePage 仍用 Date.now 造 id',
-    src.indexOf("const matchId = 'team-match-' + Date.now()") >= 0
+    '创建使用稳定 pendingMatchId/matchId',
+    !!(first && first.matchId === pending && retry.matchId === pending && fromMatchId.matchId === pending)
   );
+  assert(
+    '同一次提交与超时重试复用同一 matchId',
+    first.matchId === retry.matchId && retry.matchId === pending
+  );
+  assert('重试不生成第二场 id', first.matchId === retry.matchId && first.matchId === fromMatchId.matchId);
+
+  var generated = teamMatchStore.buildMatchFromCreatePage({
+    matchType: 'team-internal',
+    teamName: '乙队'
+  });
+  var generatedId = generated && generated.matchId;
+  assert(
+    '无预设 ID 才生成新 ID 且格式合法',
+    isLegalMatchId(generatedId) && generatedId !== pending
+  );
+  var reusedGenerated = teamMatchStore.buildMatchFromCreatePage({
+    pendingMatchId: generatedId,
+    matchType: 'team-internal',
+    teamName: '乙队'
+  });
+  assert('生成后回填 pending 仍复用', !!(reusedGenerated && reusedGenerated.matchId === generatedId));
+  var other = teamMatchStore.buildMatchFromCreatePage({
+    pendingMatchId: 'team-match-other-station',
+    matchType: 'team-internal',
+    teamName: '丙队'
+  });
+  assert(
+    '不同预设 ID 互不碰撞',
+    !!(other && other.matchId === 'team-match-other-station' && other.matchId !== pending && other.matchId !== generatedId)
+  );
+
   assert('saveMatch 函数仍存在', typeof teamMatchStore.saveMatch === 'function');
   assert('saveMatchChecked 为新增导出', typeof teamMatchStore.saveMatchChecked === 'function');
   assert('existsMatchId 为新增导出', typeof teamMatchStore.existsMatchId === 'function');
