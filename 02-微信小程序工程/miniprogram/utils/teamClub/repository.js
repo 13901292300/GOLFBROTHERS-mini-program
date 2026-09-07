@@ -706,7 +706,13 @@ function setAdmin(teamId, userId, makeAdmin, options) {
   if (target.role === model.ROLES.SUPER_ADMIN) {
     return errors.fail('forbidden', '不能更改超级管理员角色');
   }
-  target.role = makeAdmin ? model.ROLES.ADMIN : model.ROLES.MEMBER;
+  var desiredRole = makeAdmin ? model.ROLES.ADMIN : model.ROLES.MEMBER;
+  if (target.role === desiredRole) {
+    var noop = errors.ok(mapMemberView(target));
+    noop.alreadyApplied = true;
+    return noop;
+  }
+  target.role = desiredRole;
   target.grants = makeAdmin ? [roles.PERMISSION_KEYS.TEAM_APPLICATION_REVIEW] : [];
   target.updatedAt = nowMs();
   bumpTeam(team);

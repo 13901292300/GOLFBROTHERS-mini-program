@@ -1033,7 +1033,13 @@ function createEngine(store, wxCtx) {
             if (denied) return denied;
             if (!target) return errors.fail('not_found', '成员不存在');
             if (target.role === C.ROLES.SUPER_ADMIN) return errors.fail('forbidden', '不能更改超级管理员角色');
-            target.role = makeAdmin ? C.ROLES.ADMIN : C.ROLES.MEMBER;
+            var desiredRole = makeAdmin ? C.ROLES.ADMIN : C.ROLES.MEMBER;
+            if (target.role === desiredRole) {
+              var noop = errors.ok(mapMemberView(target));
+              noop.alreadyApplied = true;
+              return noop;
+            }
+            target.role = desiredRole;
             target.grants = makeAdmin ? [C.GRANT_REVIEW] : [];
             target.updatedAt = tx.nowMs();
             bumpTeam(team, null, tx.nowMs());
