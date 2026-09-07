@@ -145,6 +145,31 @@ assert(
     /--classic-app-replica-score-size-3digit:\s*54rpx;/.test(replicaWxss)
 );
 assert(
+  'font-large keeps replica cell 144rpx',
+  /--classic-app-replica-cell:\s*144rpx;/.test(replicaWxss) &&
+    !/\.is-classic-app-replica\.font-large[\s\S]*?--classic-app-replica-cell:/.test(
+      replicaWxss
+    )
+);
+assert(
+  'font-large does not retune replica marker or meta inset',
+  !/\.is-classic-app-replica\.font-large[\s\S]*?--classic-app-replica-marker:/.test(
+    replicaWxss
+  ) &&
+    !/\.is-classic-app-replica\.font-large[\s\S]*?--classic-app-replica-meta-inset:/.test(
+      replicaWxss
+    ) &&
+    !/\.is-classic-app-replica\.font-large[\s\S]*?--classic-app-replica-meta-bottom:/.test(
+      replicaWxss
+    )
+);
+assert(
+  'font-large still enlarges replica score type',
+  /is-classic-app-replica\.font-large[\s\S]*?--classic-app-replica-score-size:\s*76rpx;/.test(
+    replicaWxss
+  )
+);
+assert(
   'score weight is 500',
   /--classic-app-replica-score-weight:\s*500;/.test(replicaWxss)
 );

@@ -5,6 +5,7 @@
  * 精英风格：不读这些变量，保持 is-score-elite-demo / 公共基础格子。
  *
  * 尺寸基准：洞格宽度 --classic-app-replica-cell（与 fourball 洞列 144rpx 对齐）。
+ * 大字体只放大成绩/推杆字号，不改 cell / marker 几何。
  * 其余尺寸为相对该宽度的固定比例，禁止按某一机型写死 px。
  *
  * 比例（相对 cell）：
@@ -51,14 +52,10 @@
 }
 
 .score-page.is-classic-app-replica.font-large {
-  --classic-app-replica-cell: 160rpx;
   --classic-app-replica-score-size: 76rpx;
   --classic-app-replica-score-size-2digit: 69rpx;
   --classic-app-replica-score-size-3digit: 60rpx;
   --classic-app-replica-meta-size: 20rpx;
-  --classic-app-replica-meta-inset: 9rpx;
-  --classic-app-replica-meta-bottom: 7rpx;
-  --classic-app-replica-marker: 33rpx;
 }
 
 .score-page.is-classic-app-replica .shell-row--player,
