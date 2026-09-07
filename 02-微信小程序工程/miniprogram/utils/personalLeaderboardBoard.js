@@ -8,7 +8,7 @@
 
 var playerManage = require('./playerManage.js');
 var mockAvatars = require('./mockAvatars.js');
-var comboDisplayName = require('./comboDisplayName.js');
+var comboEntityProjection = require('./comboEntityProjection.js');
 var leaderboardSettingViewModel = require('./leaderboardSettingViewModel.js');
 var holeLayout = require('./holeLayout.js');
 var halfCourse = require('./halfCourse.js');
@@ -29,6 +29,10 @@ function asString(v) {
 
 function isFilledScore(score) {
   return score !== null && score !== undefined && score !== '' && !Number.isNaN(Number(score));
+}
+
+function hasFiniteMetric(v) {
+  return v != null && v !== '' && Number.isFinite(Number(v));
 }
 
 /** 成绩归属为当前座位球员；旧 scorePlayerId 不得覆盖当前身份 */
@@ -594,9 +598,13 @@ function buildEntityLeaderboardRows(match) {
         else mid = resolveAnyPlayerId(mm);
         if (mid) memberIds.push(mid);
       }
-      if (!memberIds.length) continue;
+      var entityRec = scoreByEntityId[entityId] || {};
+      if (!comboEntityProjection.shouldKeepEntityComboRow(entityId, memberIds, entityRec)) {
+        continue;
+      }
 
       var memberViews = [];
+      var publicMembers = [];
       for (var mi = 0; mi < memberIds.length; mi++) {
         var uid = memberIds[mi];
         var slotPlayer = slotPlayerMap[uid] || null;
@@ -604,6 +612,7 @@ function buildEntityLeaderboardRows(match) {
         var mergedMember = Object.assign({}, lookup, slotPlayer || {});
         var genderDisplay = playerManage.getGenderDisplay(mergedMember);
         var displayName = resolvePlayerDisplayName(mergedMember);
+        var publicName = comboEntityProjection.memberPublicName(mergedMember);
         var lookupAvatar =
           (lookup && (lookup.avatar || lookup.avatarUrl)) ||
           (slotPlayer && (slotPlayer.avatar || slotPlayer.avatarUrl)) ||
@@ -623,13 +632,10 @@ function buildEntityLeaderboardRows(match) {
           isFemale: genderDisplay.gender === 'female',
           badgeTeamId: resolveBadgeTeamId(match, uid, playerTeamLookup, teamLogoMap, mergedMember)
         });
+        publicMembers.push({ displayName: publicName });
       }
-      if (!memberViews.length) continue;
 
-      var name = comboDisplayName.joinMemberDisplayNames(memberViews);
-      if (!name) continue;
-
-      var entityRec = scoreByEntityId[entityId] || {};
+      var name = comboEntityProjection.formatEntityComboDisplayName(entity, publicMembers);
       var scores = Array.isArray(entityRec.scores) ? entityRec.scores.slice() : [];
       var grossTotal = 0;
       var parThru = 0;
@@ -643,6 +649,19 @@ function buildEntityLeaderboardRows(match) {
       }
       var toPar = grossTotal - parThru;
       var hasScore = thru > 0;
+      if (!hasScore && comboEntityProjection.entityScoreRecordHasValue(entityRec)) {
+        hasScore = true;
+        if (hasFiniteMetric(entityRec.grossTotal)) {
+          grossTotal = Number(entityRec.grossTotal);
+        } else if (hasFiniteMetric(entityRec.gross)) {
+          grossTotal = Number(entityRec.gross);
+        }
+        if (hasFiniteMetric(entityRec.toPar)) {
+          toPar = Number(entityRec.toPar);
+        } else if (hasFiniteMetric(entityRec.diff)) {
+          toPar = Number(entityRec.diff);
+        }
+      }
       var teamGroupId =
         entity.teamGroupId != null && String(entity.teamGroupId).trim() !== ''
           ? String(entity.teamGroupId).trim()
@@ -704,7 +723,7 @@ function buildEntityLeaderboardRows(match) {
         hasScore: hasScore,
         scoreStr: hasScore ? formatLeaderboardDiff(toPar) : '-',
         scoreClass: hasScore ? resolveLeaderboardTotalClass(toPar) : 'score-even',
-        avatar: memberViews[0].avatar || '',
+        avatar: memberViews[0] && memberViews[0].avatar ? memberViews[0].avatar : '',
         teamName: teamName,
         teamTag: playerManage.formatTeamTagName(teamName),
         scoreSource: 'teamMatch.scoreData.teamScoresByEntity',

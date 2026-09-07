@@ -17,7 +17,7 @@ const groupsStore = require('../../../utils/groupsStore.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const halfCourse = require('../../../utils/halfCourse.js');
 const playerManage = require('../../../utils/playerManage.js');
-const comboDisplayName = require('../../../utils/comboDisplayName.js');
+const comboEntityProjection = require('../../../utils/comboEntityProjection.js');
 const tPosition = require('../../../utils/tPosition.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const matchStatus = require('../../../utils/matchStatus.js');
@@ -599,20 +599,15 @@ function resolveEntityMemberId(raw) {
   return id != null ? String(id).trim() : '';
 }
 
-/** 与领先榜 Entity 行一致：成员昵称用 / 连接 */
-function resolveEntityStatisticsDisplayName(memberIds, lookup) {
-  const names = (Array.isArray(memberIds) ? memberIds : [])
-    .map((uid) => {
-      const meta = (lookup && lookup[uid]) || {};
-      return (
-        playerManage.resolveMatchNickname(meta) ||
-        meta.nickname ||
-        ''
-      );
-    })
-    .map((n) => String(n || '').trim())
-    .filter(Boolean);
-  return comboDisplayName.joinMemberDisplayNames(names);
+/** 与领先榜 Entity 行一致：自定义组合名 > 成员 / 拼接 > 组合 */
+function resolveEntityStatisticsDisplayName(entity, memberIds, lookup) {
+  const names = (Array.isArray(memberIds) ? memberIds : []).map((uid) => {
+    const meta = (lookup && lookup[uid]) || {};
+    return {
+      displayName: comboEntityProjection.memberPublicName(meta)
+    };
+  });
+  return comboEntityProjection.formatEntityComboDisplayName(entity, names);
 }
 
 function findTeamScoreByEntityId(groupScoreData, entityId) {
@@ -663,11 +658,10 @@ function buildEntityStatisticsRows(match) {
       const memberIds = (Array.isArray(entity.members) ? entity.members : [])
         .map(resolveEntityMemberId)
         .filter(Boolean);
-      // 空占用行不进统计（与领先榜一致）
-      if (!memberIds.length) return;
+      const rec = findTeamScoreByEntityId(groupScoreData, entityId);
+      if (!comboEntityProjection.shouldKeepEntityComboRow(entityId, memberIds, rec)) return;
       seen[entityId] = true;
 
-      const rec = findTeamScoreByEntityId(groupScoreData, entityId);
       const scores = rec && Array.isArray(rec.scores) ? rec.scores : [];
       const putts = rec && Array.isArray(rec.putts) ? rec.putts : [];
       const fairways = rec && Array.isArray(rec.fairways) ? rec.fairways : [];
@@ -675,7 +669,7 @@ function buildEntityStatisticsRows(match) {
       const sands = rec && Array.isArray(rec.sands) ? rec.sands : [];
       const holeStats = computePlayerHoleStats(scores, putts, pars, fairways, penalties, sands);
 
-      const name = resolveEntityStatisticsDisplayName(memberIds, lookup) || '组合';
+      const name = resolveEntityStatisticsDisplayName(entity, memberIds, lookup);
       const members = memberIds.map((uid) => {
         const meta = lookup[uid] || {};
         return {

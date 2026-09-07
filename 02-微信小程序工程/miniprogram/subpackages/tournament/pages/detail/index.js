@@ -1,5 +1,6 @@
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const comboDisplayName = require('../../../../utils/comboDisplayName.js');
+const comboEntityProjection = require('../../../../utils/comboEntityProjection.js');
 /**
  * 赛事详情页（球队赛 / 队内赛正在进行中）
  * 1:1 复刻 01-HTML原型/记分页面/队内赛正在进行中.html
@@ -6022,8 +6023,6 @@ Page({
             return '';
           })
           .filter(Boolean);
-        // 空占用行不进领先榜（避免「第N组组合」占位名）
-        if (!memberIds.length) return;
 
         const memberViews = memberIds
           .map((uid) => {
@@ -6057,8 +6056,19 @@ Page({
             };
           })
           .filter(Boolean);
-        if (!memberViews.length) return;
-
+        const rec = scoreByEntityId[entityId] || {};
+        if (!comboEntityProjection.shouldKeepEntityComboRow(entityId, memberIds, rec)) {
+          return;
+        }
+        const publicMembers = memberIds.map((uid) => {
+          const slotPlayer = slotPlayerMap[uid] || null;
+          const lookup = nameLookup[uid] || {};
+          return {
+            displayName: comboEntityProjection.memberPublicName(
+              Object.assign({}, lookup, slotPlayer || {})
+            )
+          };
+        });
         const entityType = entity.entityType ? String(entity.entityType) : '';
         const compositionMode =
           entity.compositionMode === '2+2' ? '2+2' : entity.compositionMode === '4+0' ? '4+0' : '';
@@ -6066,12 +6076,8 @@ Page({
           entityType === 'pair' || compositionMode === '2+2'
             ? 'pair'
             : 'team';
-        // 名称必须来自成员昵称，禁止「第N组组合 / 第一组合」占位
-        const name = comboDisplayName.joinMemberDisplayNames(memberViews);
-        if (!name) return;
-        const avatar = memberViews[0].avatar || '';
-
-        const rec = scoreByEntityId[entityId] || {};
+        const name = comboEntityProjection.formatEntityComboDisplayName(entity, publicMembers);
+        const avatar = (memberViews[0] && memberViews[0].avatar) || '';
         const scores = Array.isArray(rec.scores) ? rec.scores.slice() : [];
         let grossTotal = 0;
         let parThru = 0;
@@ -6083,8 +6089,21 @@ Page({
           parThru += Number(pars[h] || 0);
           thru += 1;
         }
-        const toPar = grossTotal - parThru;
-        const hasScore = thru > 0;
+        let toPar = grossTotal - parThru;
+        let hasScore = thru > 0;
+        if (!hasScore && comboEntityProjection.entityScoreRecordHasValue(rec)) {
+          hasScore = true;
+          if (rec.grossTotal != null && rec.grossTotal !== '' && Number.isFinite(Number(rec.grossTotal))) {
+            grossTotal = Number(rec.grossTotal);
+          } else if (rec.gross != null && rec.gross !== '' && Number.isFinite(Number(rec.gross))) {
+            grossTotal = Number(rec.gross);
+          }
+          if (rec.toPar != null && rec.toPar !== '' && Number.isFinite(Number(rec.toPar))) {
+            toPar = Number(rec.toPar);
+          } else if (rec.diff != null && rec.diff !== '' && Number.isFinite(Number(rec.diff))) {
+            toPar = Number(rec.diff);
+          }
+        }
         const teamGroupId =
           entity.teamGroupId != null && String(entity.teamGroupId).trim() !== ''
             ? String(entity.teamGroupId).trim()

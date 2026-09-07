@@ -8,7 +8,7 @@
 
 var standingsViewOptions = require('./seriesStandingsViewOptions.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
-var comboDisplayName = require('../../../../utils/comboDisplayName.js');
+var comboEntityProjection = require('../../../../utils/comboEntityProjection.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -37,8 +37,12 @@ function emptyStatusLabel(match, hasUnit) {
   return 'AWAITING SCORE';
 }
 
-function memberNameJoin(members) {
-  return comboDisplayName.joinMemberDisplayNames(members);
+function memberPublicFields(pl, id) {
+  var publicName = comboEntityProjection.memberPublicName(pl);
+  var disp = resolvePlayerDisplay(pl, id);
+  disp.name = publicName;
+  disp.displayName = publicName;
+  return disp;
 }
 
 function readEntityScore(rec) {
@@ -189,12 +193,16 @@ function buildEntityOrPairRows(match, wantPair) {
         if (typeof mm === 'string' || typeof mm === 'number') mid = asString(mm);
         else mid = asString(mm.userId || mm.playerId || mm.id);
         if (!mid) continue;
-        members.push(resolvePlayerDisplay(lookup[mid], mid));
+        members.push(memberPublicFields(lookup[mid], mid));
       }
-      if (!members.length) continue;
-      var name = memberNameJoin(members);
-      if (!name) continue;
-      var scored = readEntityScore(byEntity[entityId] || {});
+      var scoreRec = byEntity[entityId] || {};
+      if (!comboEntityProjection.shouldKeepEntityComboRow(entityId, members.map(function (mem) {
+        return mem && mem.userId;
+      }), scoreRec)) {
+        continue;
+      }
+      var name = comboEntityProjection.formatEntityComboDisplayName(entity, members);
+      var scored = readEntityScore(scoreRec);
       var statusLabel = '';
       if (!scored.hasScore) statusLabel = emptyStatusLabel(match, true);
       rows.push({

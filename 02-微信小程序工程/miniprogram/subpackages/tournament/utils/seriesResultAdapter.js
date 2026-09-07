@@ -9,7 +9,7 @@ var seriesModel = require('../../../utils/seriesModel.js');
 var holeLayout = require('../../../utils/holeLayout.js');
 var halfCourse = require('../../../utils/halfCourse.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
-var comboDisplayName = require('../../../utils/comboDisplayName.js');
+var comboEntityProjection = require('../../../utils/comboEntityProjection.js');
 
 function asString(v) {
   return v == null ? '' : String(v);
@@ -175,14 +175,43 @@ function buildPeoriaNetMap(match) {
   return map;
 }
 
-function resolveUnitName(memberIds, playerLookup) {
+function summaryFromEntityScoreRecord(scoreRec, pars) {
+  var summary = summarizeScores(scoreRec && scoreRec.scores, pars);
+  if (summary.ok) return summary;
+  if (!comboEntityProjection.entityScoreRecordHasValue(scoreRec)) return summary;
+  var rec = scoreRec || {};
+  var gross = null;
+  if (rec.grossTotal != null && rec.grossTotal !== '' && Number.isFinite(Number(rec.grossTotal))) {
+    gross = Number(rec.grossTotal);
+  } else if (rec.gross != null && rec.gross !== '' && Number.isFinite(Number(rec.gross))) {
+    gross = Number(rec.gross);
+  }
+  var toPar = null;
+  if (rec.toPar != null && rec.toPar !== '' && Number.isFinite(Number(rec.toPar))) {
+    toPar = Number(rec.toPar);
+  } else if (rec.diff != null && rec.diff !== '' && Number.isFinite(Number(rec.diff))) {
+    toPar = Number(rec.diff);
+  }
+  if (gross == null && toPar == null) {
+    return summary;
+  }
+  return {
+    ok: true,
+    gross: gross != null ? gross : 0,
+    toPar: toPar != null ? toPar : 0,
+    thru: 0
+  };
+}
+
+function resolveUnitName(entity, memberIds, playerLookup) {
   var names = [];
   for (var i = 0; i < memberIds.length; i++) {
     var id = memberIds[i];
-    var nick = resolvePlayerNickname(playerLookup[id]) || id;
-    if (nick) names.push(nick);
+    names.push({
+      displayName: comboEntityProjection.memberPublicName(playerLookup[id])
+    });
   }
-  return comboDisplayName.joinMemberDisplayNames(names);
+  return comboEntityProjection.formatEntityComboDisplayName(entity, names);
 }
 
 function stableEntryId(matchId, sourceEntityKey) {
@@ -332,10 +361,12 @@ function extractEntityEntries(ctx, match, participantMap, playerLookup, teamMap,
         var mid = resolvePlayerId(rawMembers[m]);
         if (mid) memberIds.push(mid);
       }
-      if (!memberIds.length) continue;
-
       var scoreRec = scoreByEntityId[entityId] || {};
-      var summary = summarizeScores(scoreRec.scores, pars);
+      if (!comboEntityProjection.shouldKeepEntityComboRow(entityId, memberIds, scoreRec)) {
+        continue;
+      }
+
+      var summary = summaryFromEntityScoreRecord(scoreRec, pars);
       if (!summary.ok) continue;
 
       var teamKey =
@@ -356,7 +387,7 @@ function extractEntityEntries(ctx, match, participantMap, playerLookup, teamMap,
       var entityType = asString(entity.entityType).trim();
       var resultUnitType =
         kind === 'g4' || entityType === 'pair' ? 'pair' : 'entity';
-      if (resultUnitType === 'pair' && memberIds.length < 2) continue;
+      if (resultUnitType === 'pair' && memberIds.length > 0 && memberIds.length < 2) continue;
 
       var entry = buildEntryBase(ctx, {
         seriesParticipantId: seriesParticipantId,
@@ -364,7 +395,7 @@ function extractEntityEntries(ctx, match, participantMap, playerLookup, teamMap,
         sourceEntityKey: entityId,
         memberUserIds: memberIds,
         unitId: entityId,
-        unitName: resolveUnitName(memberIds, playerLookup) || entityId,
+        unitName: resolveUnitName(entity, memberIds, playerLookup),
         gross: summary.gross,
         toPar: summary.toPar,
         net: null,

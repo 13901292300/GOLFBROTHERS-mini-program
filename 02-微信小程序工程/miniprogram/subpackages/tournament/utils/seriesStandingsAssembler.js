@@ -11,6 +11,7 @@ var seriesScoring = require('./seriesScoring.js');
 var seriesResultAdapter = require('./seriesResultAdapter.js');
 var seriesStationMatch = require('../../../utils/seriesStationMatch.js');
 var playerManage = require('../../../utils/playerManage.js');
+var comboEntityProjection = require('../../../utils/comboEntityProjection.js');
 
 function asString(v) {
   return v == null ? '' : String(v);
@@ -111,7 +112,9 @@ function projectDisplayEntry(entry, counting) {
     roundIndex: e.roundIndex != null ? e.roundIndex : null,
     resultUnitType: asString(e.resultUnitType).trim() || 'player',
     unitId: asString(e.unitId || e.sourceEntityKey).trim(),
-    unitName: asString(e.unitName).trim() || '计分单元',
+    unitName:
+      comboEntityProjection.fallbackComboUnitName(e.resultUnitType, e.unitName) ||
+      (asString(e.resultUnitType).trim() === 'player' ? '计分单元' : '组合'),
     rankingValue: e.rankingValue != null ? e.rankingValue : null,
     grossTotalValue: e.grossTotalValue != null ? e.grossTotalValue : e.gross,
     toParValue: e.toParValue != null ? e.toParValue : e.toPar,
@@ -497,7 +500,10 @@ function mergeLineupWithScores(lineupSeats, scoredDisplayEntries) {
           counting: scored.counting || 'pending',
           // 名单行仍用席位球员名；记分卡按 entity/pair 语义打开
           resultUnitType: scoredType,
-          unitName: asString(seat.unitName).trim() || asString(scored.unitName).trim() || seat.unitId,
+          unitName:
+            asString(seat.unitName).trim() ||
+            comboEntityProjection.fallbackComboUnitName(scoredType, scored.unitName) ||
+            (isEntityScore ? '组合' : asString(seat.unitId).trim()),
           playerId: asString(seat.playerId || seat.unitId).trim(),
           entityId: isEntityScore ? asString(scored.unitId).trim() : '',
           isEntity: isEntityScore,

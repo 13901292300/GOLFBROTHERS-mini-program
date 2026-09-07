@@ -243,16 +243,19 @@ function makeManagedMatch(opts) {
     round: { roundId: 'r2', index: 2, matchId: 'm-g2', gameMode: '四人四球比杆赛' },
     match: match
   });
-  assert('四人四球 entity 抽取', res.ok && res.entries.length === 1);
+  assert('四人四球 entity 抽取', res.ok && res.entries.length === 2);
   assert('resultUnitType=entity', res.entries[0].resultUnitType === 'entity');
-  assert('空 members 不进榜', res.entries[0].sourceEntityKey === 'ent-red');
+  var g2Keys = res.entries.map(function (e) { return e.sourceEntityKey; }).sort().join(',');
+  assert('四人四球含有分成绩空members', g2Keys === 'ent-empty,ent-red');
+  var g2Empty = res.entries.filter(function (e) { return e.sourceEntityKey === 'ent-empty'; })[0];
+  assert('空 members 有分名称为组合', g2Empty && g2Empty.unitName === '组合' && String(g2Empty.memberUserIds) === '');
 
   var best = seriesResultAdapter.extractEntriesFromStation({
     series: series,
     round: { roundId: 'r2', index: 2, matchId: 'm-g2', gameMode: '最佳球位比杆赛' },
     match: Object.assign({}, match, { gameMode: '最佳球位比杆赛' })
   });
-  assert('最佳球位同 entity 路径', best.ok && best.entries.length === 1);
+  assert('最佳球位同 entity 路径', best.ok && best.entries.length === 2);
 })();
 
 // ---- 四人两球 pair ----

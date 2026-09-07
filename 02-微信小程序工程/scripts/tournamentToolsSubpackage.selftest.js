@@ -118,7 +118,6 @@ var hashes = {
   'pages/peoria/index.wxml': 'B0D898BB51530A19B5118D633AF8E946FBABCBF5C72255815615F40258C0FA8E',
   'pages/peoria/index.wxss': '614D2990167FD757CAB402CC4C01AA96ECD05FD57D1D9193F23D1EF645540428',
   'pages/peoria/index.json': '38F20314C5CD1B7AD1A9D900520CE04EA1EE0469D66D5E84884BA11FAA3E0992',
-  'utils/statisticsAdapter.js': 'A6064B9095D6E4255A483CAD4FAE224C533195DE17178E012BBAA3DB50FC11C1',
   'utils/peoriaStore.js': 'EE031FF3B79D457C35BDE6A2E08FF83600C6AFEAFD7BF16E9FF6EF10B73A9514',
   'utils/peoriaCalculator.js': '44054278DB1656831448382EA8FE1E68F090CBE48DCB53972CA5AA43DB1CFFFC'
 };
@@ -177,6 +176,12 @@ assert('stats require 可解析', statsReqs.length > 0 && statsReqs.every(fs.exi
 assert('scorecard require 可解析', scorecardReqs.length > 0 && scorecardReqs.every(fs.existsSync));
 assert('peoria require 可解析', peoriaReqs.length > 0 && peoriaReqs.every(fs.existsSync));
 assert('statisticsAdapter require 可解析', adapterReqs.length > 0 && adapterReqs.every(fs.existsSync));
+assert(
+  'statisticsAdapter 导出组合统计并走统一投影',
+  /function buildEntityStatisticsRows/.test(read(path.join(toolsRoot, 'utils', 'statisticsAdapter.js'))) &&
+    read(path.join(toolsRoot, 'utils', 'statisticsAdapter.js')).indexOf("require('../../../utils/comboEntityProjection.js')") >= 0 &&
+    read(path.join(toolsRoot, 'utils', 'statisticsAdapter.js')).indexOf('formatEntityComboDisplayName') >= 0
+);
 assert('peoriaStore require 可解析', storeReqs.length > 0 && storeReqs.every(fs.existsSync));
 assert(
   '页面仍走相对 utils 适配器（未改 require）',
