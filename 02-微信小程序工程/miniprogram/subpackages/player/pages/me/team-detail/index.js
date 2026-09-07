@@ -323,7 +323,10 @@ Page({
 
   onTabChange(e) {
     const tab = String(((e && e.currentTarget && e.currentTarget.dataset) || {}).tab || '').trim();
-    if (!tab || tab === this.data.activeTab) return;
+    const allowed = TABS.some(function (item) {
+      return item.key === tab;
+    });
+    if (!allowed || tab === this.data.activeTab) return;
     // 先切 Tab 再取数：切换不依赖请求结果，失败态也不会挡住切换
     this.setData({ activeTab: tab });
     if (tab === 'members' && !this._attempted.members) this.loadMembers();

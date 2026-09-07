@@ -600,6 +600,68 @@ service.listMyTeams({ immediate: true }).then(function (res) {
   assert('生产不启用本地仓储开关', devFlags.USE_LOCAL_REPOSITORY === false);
 
   identity.setTestSession({ userId: 'user_owner', displayName: '唐伟' });
+
+  var navCalls = [];
+  global.getApp = function () {
+    return { getTheme: function () { return 'bright'; } };
+  };
+  global.Component = function () {};
+  wx.hideShareMenu = function () {};
+  wx.showShareMenu = function () {};
+  wx.navigateTo = function (opt) {
+    navCalls.push(opt && opt.url);
+  };
+  wx.redirectTo = function (opt) {
+    navCalls.push(opt && opt.url);
+  };
+  wx.reLaunch = function (opt) {
+    navCalls.push(opt && opt.url);
+  };
+  wx.getWindowInfo = function () {
+    return { statusBarHeight: 44, windowWidth: 375, screenWidth: 375 };
+  };
+  wx.getMenuButtonBoundingClientRect = function () {
+    return { top: 48, height: 32, bottom: 80, left: 279, right: 367, width: 88 };
+  };
+  var capturedDetail = null;
+  global.Page = function (def) {
+    capturedDetail = def;
+  };
+  var detailPagePath = path.join(detailDir, 'index.js');
+  delete require.cache[detailPagePath];
+  require(detailPagePath);
+  assert('详情页 Page() 可捕获', !!capturedDetail && typeof capturedDetail.onTabChange === 'function');
+  assert('详情页无 onSwitchTab 残留', typeof capturedDetail.onSwitchTab !== 'function');
+  var detailPage = Object.assign({}, capturedDetail);
+  detailPage.data = JSON.parse(JSON.stringify(capturedDetail.data));
+  detailPage.setData = function (patch) {
+    Object.assign(this.data, patch || {});
+  };
+  function tapTab(key) {
+    detailPage.onTabChange({
+      currentTarget: { dataset: { tab: key } },
+      target: { dataset: {} }
+    });
+  }
+  detailPage.onLoad({ teamId: idA });
+  assert('onLoad 记录当前球队且默认简介 Tab', detailPage.data.teamId === idA && detailPage.data.activeTab === 'intro');
+  tapTab('members');
+  assert('点击成员 Tab 生效', detailPage.data.activeTab === 'members');
+  tapTab('matches');
+  assert('点击比赛 Tab 生效', detailPage.data.activeTab === 'matches');
+  tapTab('intro');
+  assert('点击简介 Tab 生效', detailPage.data.activeTab === 'intro');
+  tapTab('members');
+  tapTab('members');
+  assert('重复点击当前 Tab 保持成员', detailPage.data.activeTab === 'members');
+  tapTab('unknown-tab');
+  tapTab('');
+  assert('未知或空 Tab 安全回退', detailPage.data.activeTab === 'members');
+  assert(
+    '切 Tab 不改球队且不导航',
+    detailPage.data.teamId === idA && navCalls.length === 0
+  );
+
   var removed = service.applyMemberAction(idA, 'remove', 'user_member');
   return Promise.resolve(removed);
 }).then(function (removed) {
