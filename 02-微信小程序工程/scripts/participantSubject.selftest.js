@@ -70,17 +70,102 @@ var named = subject.buildParticipantSubject(
 assert('保留合法组合名', named.displayName === '双人组');
 
 assert('内部标签过滤', subject.isInternalPartyLabel('Team 2') && subject.isInternalPartyLabel('party-1'));
-
-var userCombo1 = subject.buildParticipantSubject(
-  { partyId: 'u1', playerIds: ['A', 'B'], displayName: '组合1' },
-  {
-    presentPlayer: people({
-      A: { playerId: 'A', displayName: '', avatar: '' },
-      B: { playerId: 'B', displayName: '', avatar: '' }
-    })
-  }
+assert(
+  '组合N / Team N 均为内部标签',
+  subject.isInternalPartyLabel('组合1') &&
+    subject.isInternalPartyLabel('组合 1') &&
+    subject.isInternalPartyLabel('Team 1')
 );
-assert('用户名组合1在无成员简称时可显示', userCombo1.displayName === '组合1');
+
+var namedZh = people({
+  A: { playerId: 'A', displayName: '张三', avatar: '' },
+  B: { playerId: 'B', displayName: '李四', avatar: '' }
+});
+var emptyNames = people({
+  A: { playerId: 'A', displayName: '', avatar: '' },
+  B: { playerId: 'B', displayName: '', avatar: '' }
+});
+var triangle = people({
+  A: { playerId: 'A', displayName: '张三', avatar: '' },
+  B: { playerId: 'B', displayName: '李四', avatar: '' },
+  C: { playerId: 'C', displayName: '王五', avatar: '' }
+});
+var internalMembers = people({
+  A: { playerId: 'A', displayName: '组合1', avatar: '' },
+  B: { playerId: 'B', displayName: '球员', avatar: '' }
+});
+var mixedMembers = people({
+  A: { playerId: 'A', displayName: '张三', avatar: '' },
+  B: { playerId: 'B', displayName: '组合1', avatar: '' }
+});
+
+var combo1Join = subject.buildParticipantSubject(
+  { partyId: 'u-join-1', playerIds: ['A', 'B'], displayName: '组合1' },
+  { presentPlayer: namedZh }
+);
+assert('组合1 + 成员名为张三/李四', combo1Join.displayName === '张三/李四');
+assert('组合1 + 成员时身份键不变', combo1Join.subjectId === 'u-join-1' && combo1Join.partyId === 'u-join-1');
+
+var combo1Spaced = subject.buildParticipantSubject(
+  { partyId: 'u-join-space', playerIds: ['A', 'B'], displayName: '组合 1' },
+  { presentPlayer: namedZh }
+);
+assert('组合 1 + 成员名为张三/李四', combo1Spaced.displayName === '张三/李四');
+assert(
+  '组合 1 + 成员时身份键不变',
+  combo1Spaced.subjectId === 'u-join-space' && combo1Spaced.partyId === 'u-join-space'
+);
+
+var combo1Empty = subject.buildParticipantSubject(
+  { partyId: 'u1', playerIds: ['A', 'B'], displayName: '组合1' },
+  { presentPlayer: emptyNames }
+);
+assert('组合1 + 空成员名为统一占位组合', combo1Empty.displayName === '组合');
+assert('组合1 + 空成员时身份键不变', combo1Empty.subjectId === 'u1' && combo1Empty.partyId === 'u1');
+
+assert('Team 1 + 成员名为斜杠拼接', s22a.displayName === '爱丽丝/鲍勃');
+
+var customEmpty = subject.buildParticipantSubject(
+  { partyId: 'u-custom-empty', playerIds: ['A', 'B'], displayName: '双人组' },
+  { presentPlayer: emptyNames }
+);
+assert('双人组 + 空成员名仍保留', customEmpty.displayName === '双人组');
+assert(
+  '双人组空成员身份键不变',
+  customEmpty.subjectId === 'u-custom-empty' && customEmpty.partyId === 'u-custom-empty'
+);
+
+var iron = subject.buildParticipantSubject(
+  { partyId: 'u-iron', playerIds: ['A', 'B', 'C'], displayName: '铁三角' },
+  { presentPlayer: triangle }
+);
+assert('铁三角 + 有成员名仍保留', iron.displayName === '铁三角');
+assert('铁三角身份键不变', iron.subjectId === 'u-iron' && iron.partyId === 'u-iron');
+
+var internalJoin = subject.buildParticipantSubject(
+  { partyId: 'u-internal-mem', playerIds: ['A', 'B'], displayName: '组合1' },
+  { presentPlayer: internalMembers }
+);
+assert(
+  '成员自身内部标签不混入拼接',
+  internalJoin.displayName === '组合' &&
+    internalJoin.displayName.indexOf('组合1') < 0 &&
+    internalJoin.displayName.indexOf('球员') < 0
+);
+assert(
+  '内部成员名时身份键不变',
+  internalJoin.subjectId === 'u-internal-mem' && internalJoin.partyId === 'u-internal-mem'
+);
+
+var mixedJoin = subject.buildParticipantSubject(
+  { partyId: 'u-mixed-mem', playerIds: ['A', 'B'], displayName: '组合2' },
+  { presentPlayer: mixedMembers }
+);
+assert('仅真实成员名进入拼接', mixedJoin.displayName === '张三');
+assert(
+  '混合成员身份键不变',
+  mixedJoin.subjectId === 'u-mixed-mem' && mixedJoin.partyId === 'u-mixed-mem'
+);
 
 console.log('\nparticipantSubject.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);
