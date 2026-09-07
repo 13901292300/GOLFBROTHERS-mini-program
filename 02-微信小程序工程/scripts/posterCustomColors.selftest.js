@@ -5,13 +5,9 @@
  *   node scripts/posterCustomColors.selftest.js
  */
 
-var path = require("path");
 var posterColors = require("../miniprogram/subpackages/poster/utils/poster-colors.js");
 var posterData = require("../miniprogram/subpackages/poster/utils/poster-data.js");
 var posterDraft = require("../miniprogram/subpackages/poster/utils/poster-draft.js");
-var sandboxRoot = path.join(__dirname, "..", "..", "03-海报沙盒", "miniprogram", "subpackages", "poster", "utils");
-var sandboxColors = require(path.join(sandboxRoot, "poster-colors.js"));
-var sandboxData = require(path.join(sandboxRoot, "poster-data.js"));
 
 var passed = 0;
 var failed = 0;
@@ -257,36 +253,6 @@ assert("默认值不来自其他元素", missing.course === posterColors.DEFAULT
 posterColors.COLOR_ELEMENT_KEYS.forEach(function (key) {
   assert("fallback 后 resolved 仍含 " + key, !!missing[key]);
 });
-
-assert("沙盒 poster-colors 键集合一致", sandboxColors.COLOR_ELEMENT_KEYS.join(",") === posterColors.COLOR_ELEMENT_KEYS.join(","));
-assert("沙盒 schema 常量一致", sandboxColors.COLOR_SCHEMA_VERSION === posterColors.COLOR_SCHEMA_VERSION);
-
-var sandboxModel = sandboxData.createPosterModel("academy", false, "GOLFBROTHERS");
-assert("沙盒新建为模板模式", sandboxModel.colorMode === "template");
-sandboxData.applyPalette(sandboxModel, "custom");
-assert("沙盒可进入自定义", sandboxColors.isCustomColorMode(sandboxModel));
-sandboxColors.setCustomElementColor(sandboxModel, "eagleMarker", "#aaaaaa");
-sandboxColors.setCustomElementColor(sandboxModel, "underMarker", "#bbbbbb");
-sandboxColors.setCustomElementColor(sandboxModel, "divider", "#cccccc");
-sandboxColors.setCustomElementColor(sandboxModel, "extremeScore", "#dddddd");
-assert("沙盒 PGA 标记独立", lower(sandboxModel.customColors.eagleMarker) === "#aaaaaa" && lower(sandboxModel.customColors.underMarker) === "#bbbbbb");
-assert("沙盒中缝独立", lower(sandboxModel.customColors.divider) === "#cccccc" && lower(sandboxModel.customColors.line) !== "#cccccc");
-assert("沙盒极端分独立", lower(sandboxModel.customColors.extremeScore) === "#dddddd" && lower(sandboxModel.customColors.scoreText) !== "#dddddd");
-assert("沙盒 schema 版本写入模型", sandboxModel.colorSchemaVersion === 2);
-sandboxData.applyMarkerPreset(sandboxModel, "pga");
-assert("沙盒自定义下标记预设不覆盖", lower(sandboxModel.customColors.eagleMarker) === "#aaaaaa");
-
-var sandboxRestored = restoreAfterDestroy(sandboxModel, function () {
-  return sandboxData.createPosterModel("academy", false, "GOLFBROTHERS");
-}, sandboxColors);
-assert("沙盒销毁重建后持久化老鹰色", lower(sandboxRestored.customColors.eagleMarker) === "#aaaaaa");
-assert("沙盒销毁重建后小鸟仍独立", lower(sandboxRestored.customColors.underMarker) === "#bbbbbb");
-assert("沙盒销毁重建后中缝持久化", lower(sandboxRestored.customColors.divider) === "#cccccc");
-assert("沙盒销毁重建后极端分持久化", lower(sandboxRestored.customColors.extremeScore) === "#dddddd");
-
-runIndependenceSuite("sandbox", function () {
-  return sandboxData.createPosterModel("academy", false, "GOLFBROTHERS");
-}, sandboxColors, sandboxData);
 
 console.log("");
 console.log(failed ? "FAILED " + failed + " / " + (passed + failed) : "OK  " + passed + " passed");

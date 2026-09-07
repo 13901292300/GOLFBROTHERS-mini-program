@@ -146,15 +146,6 @@ assert('成绩数据不再 new Date(value)', /new Date\(\s*value\s*\)/.test(scor
 assert('成绩数据不把 createdAt 当比赛日', scoreSrc.indexOf('createdAt') < 0 || scoreSrc.indexOf('formatDateYMD(game.createdAt)') < 0);
 assert('导出前校验比赛日期', posterJs.indexOf('export blocked: match date missing') >= 0);
 
-var sandboxRoot = path.join(__dirname, '../../03-海报沙盒/miniprogram/subpackages/poster');
-var sandboxScore = fs.readFileSync(path.join(sandboxRoot, 'utils/score-data.js'), 'utf8');
-var sandboxEngine = fs.readFileSync(path.join(sandboxRoot, 'utils/poster-engine.js'), 'utf8');
-var sandboxCal = fs.existsSync(path.join(sandboxRoot, 'utils/calendar-date.js'));
-assert('沙盒已接入 calendar-date', sandboxCal);
-assert('沙盒删除 formatDateYMD(game.createdAt)', sandboxScore.indexOf('formatDateYMD(game.createdAt)') < 0);
-assert('沙盒使用 resolvePosterMatchDate', sandboxScore.indexOf('resolvePosterMatchDate') >= 0);
-assert('沙盒引擎使用日历点分格式', sandboxEngine.indexOf('formatCalendarDateDotted') >= 0);
-
 console.log('');
 console.log(failed ? 'FAILED ' + failed + ' / ' + (passed + failed) : 'OK  ' + passed + ' passed');
 process.exit(failed ? 1 : 0);

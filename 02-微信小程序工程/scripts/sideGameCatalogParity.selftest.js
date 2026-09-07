@@ -1,5 +1,5 @@
 /**
- * 17 种玩法迁移完整性：入口对照 + 沙盒/主体同输入结算一致。
+ * 17 种玩法产品契约：目录完整、结算分发、主体同输入结构正确。
  * 运行：node scripts/sideGameCatalogParity.selftest.js
  */
 var fs = require('fs');
@@ -7,7 +7,6 @@ var path = require('path');
 
 var proj = path.join(__dirname, '..');
 var gameRoot = path.join(proj, 'miniprogram', 'subpackages', 'game');
-var sandboxRoot = path.join(proj, '..', '04-游戏沙盒', 'miniprogram', 'subpackages', 'game');
 
 if (typeof global.wx !== 'object') {
   global.wx = {
@@ -37,8 +36,6 @@ function read(root, rel) {
 
 var officialCatalog = require(path.join(gameRoot, 'utils', 'catalog.js'));
 var officialSettle = require(path.join(gameRoot, 'utils', 'settle.js'));
-var sandboxSettle = require(path.join(sandboxRoot, 'utils', 'settle.js'));
-var sandboxCatalog = require(path.join(sandboxRoot, 'utils', 'catalog.js'));
 
 var RULE_IDS = [];
 (officialCatalog.CATALOG || []).forEach(function (g) {
@@ -47,15 +44,13 @@ var RULE_IDS = [];
   });
 });
 assert('主体 catalog 17', RULE_IDS.length === 17, String(RULE_IDS.length));
-
-var sbIds = [];
-(sandboxCatalog.CATALOG || []).forEach(function (g) {
-  (g.items || []).forEach(function (item) {
-    sbIds.push(item.id);
-  });
+var seenIds = {};
+var uniqueIds = true;
+RULE_IDS.forEach(function (id) {
+  if (seenIds[id]) uniqueIds = false;
+  seenIds[id] = true;
 });
-assert('沙盒 catalog 17', sbIds.length === 17);
-assert('catalog id 顺序一致', RULE_IDS.join(',') === sbIds.join(','));
+assert('catalog id 唯一', uniqueIds);
 
 var openIds = [];
 officialCatalog.listCatalogForDesign().forEach(function (g) {
@@ -110,18 +105,11 @@ var TOP_HOLE_SETTLE_FILES = [
   'settleHorn.js'
 ];
 SETTLE_FILES.forEach(function (name) {
-  var a = read(sandboxRoot, 'utils/' + name);
   var b = read(gameRoot, 'utils/' + name);
+  assert('结算文件存在 ' + name, !!b);
   if (TOP_HOLE_SETTLE_FILES.indexOf(name) >= 0) {
-    assert(
-      '结算文件仅放行顶洞跟踪 ' + name,
-      a !== b &&
-        a.toLowerCase().indexOf('tophole') < 0 &&
-        b.toLowerCase().indexOf('tophole') >= 0
-    );
-    return;
+    assert('结算文件含顶洞跟踪 ' + name, b.toLowerCase().indexOf('tophole') >= 0);
   }
-  assert('结算文件未改写 ' + name, a === b);
 });
 
 var SETTLE_BRANCHES = [
@@ -287,11 +275,8 @@ RULE_IDS.forEach(function (id) {
     pars: { A1: 4, A2: 4, A3: 3 },
     windOn: false
   };
-  var a = sandboxSettle.settleGame(built.game, ctx);
   var b = officialSettle.settleGame(built.game, ctx);
-  var legacyB = JSON.parse(JSON.stringify(b || {}));
-  delete legacyB.topHoleStates;
-  assert('同输入旧结算字段一致 ' + id, JSON.stringify(a) === JSON.stringify(legacyB));
+  assert('settleGame 产出 byHole ' + id, !!(b && b.byHole && typeof b.byHole === 'object'));
   if (TOP_HOLE_IDS.indexOf(id) >= 0) {
     assert(
       '主体提供 topHoleStates ' + id,

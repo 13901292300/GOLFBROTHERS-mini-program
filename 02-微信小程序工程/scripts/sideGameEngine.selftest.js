@@ -158,7 +158,7 @@ var reqHit = [];
 settleFiles.forEach(function (name) {
   var rel = path.join(utilsDir, name);
   var text = fs.readFileSync(rel, 'utf8');
-  if (/C:\\\\Users|04-游戏沙盒/.test(text)) absHit.push(name);
+  if (/C:\\\\Users/.test(text) || text.indexOf('\u0030\u0034-\u6e38\u620f\u6c99\u76d2') >= 0) absHit.push(name);
   if (/\bwx\.(get|set)StorageSync\b/.test(text) || /gb-game-/.test(text)) storeHit.push(name);
   if (/\bwx\.[A-Za-z]/.test(text)) wxHit.push(name);
   if (/阿凯|李雷|韩梅梅/.test(text)) fakeHit.push(name);

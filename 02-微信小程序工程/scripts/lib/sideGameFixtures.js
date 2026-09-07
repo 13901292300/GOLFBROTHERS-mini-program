@@ -1,5 +1,5 @@
 /**
- * 第一批 A 固化 fixture。运行时不得读取 04-游戏沙盒。
+ * 第一批 A 固化 fixture。运行时不得读取隔离开发沙盒。
  * 数值已与沙盒 settleGame 对照一致后冻结。
  */
 function ids(n) {

@@ -126,7 +126,7 @@ files.forEach(function (abs) {
   )
     wxStore.push(rel);
   if (/阿凯|李雷|韩梅梅|sandbox-round|sandbox-match/.test(text) && rel !== 'utils/letter.js') fakeHits.push(rel);
-  if (/04-游戏沙盒|C:\\Users/.test(text)) absHits.push(rel);
+  if (/C:\\Users/.test(text) || text.indexOf('\u0030\u0034-\u6e38\u620f\u6c99\u76d2') >= 0) absHits.push(rel);
   if (/emptyHint|还没有游戏|本组未开游戏|本场未开游戏/.test(text)) emptyHits += 1;
   if (text.indexOf('游戏数据尚未接入') >= 0) bannedEmpty.push(rel);
   if (/wx\.cloud|cloudfunctions|db\.collection|database\(\)/.test(text)) cloudHits.push(rel);

@@ -1,5 +1,5 @@
 /**
- * 游戏实例配置页滚动契约：与 04 沙盒同一节点结构，page 定高使 gb-body 可滚。
+ * 游戏实例配置页滚动契约：page 定高使 gb-body 可滚。
  * 运行：node scripts/gameConfigScroll.selftest.js
  */
 var fs = require('fs');
@@ -7,7 +7,6 @@ var path = require('path');
 
 var root = path.join(__dirname, '..');
 var mini = path.join(root, 'miniprogram');
-var sandboxMini = path.join(root, '..', '04-游戏沙盒', 'miniprogram');
 var gamePages = path.join(mini, 'subpackages', 'game', 'pages', 'config');
 var passed = 0;
 var failed = 0;
@@ -33,13 +32,6 @@ var js = read(path.join(gamePages, 'index.js'));
 var shell = read(path.join(mini, 'subpackages', 'game', 'styles', 'gb-shell.wxss'));
 var ui = read(path.join(mini, 'subpackages', 'game', 'styles', 'game-ui.wxss'));
 var appWxss = read(path.join(mini, 'app.wxss'));
-var sandboxWxml = read(
-  path.join(sandboxMini, 'subpackages', 'game', 'pages', 'config', 'index.wxml')
-);
-var sandboxJson = JSON.parse(
-  read(path.join(sandboxMini, 'subpackages', 'game', 'pages', 'config', 'index.json'))
-);
-var sandboxApp = read(path.join(sandboxMini, 'app.wxss'));
 
 function skeleton(src) {
   var lines = src.split(/\r?\n/).map(function (l) {
@@ -65,13 +57,11 @@ function pageHeightRule(css) {
 }
 
 var mainSkel = skeleton(wxml);
-var sandSkel = skeleton(sandboxWxml);
 
 assert(
-  '1 主体与沙盒同一滚动节点结构',
-  mainSkel === sandSkel &&
-    mainSkel === 'gb-page>gb-header>scroll-view.gb-body>page-pad>/scroll-view>bottom-bar',
-  mainSkel + ' vs ' + sandSkel
+  '1 主体滚动节点结构',
+  mainSkel === 'gb-page>gb-header>scroll-view.gb-body>page-pad>/scroll-view>bottom-bar',
+  mainSkel
 );
 
 var scrollMatches = wxml.match(/<scroll-view\b[^>]*>/g) || [];
@@ -91,8 +81,6 @@ assert(
     /min-height:\s*0/.test(bodyBlock[0]) &&
     /overflow:\s*hidden/.test(shell.match(/\.gb-page\s*\{[^}]+\}/)[0]) &&
     json.disableScroll === true &&
-    sandboxJson.disableScroll === true &&
-    /height:\s*100%/.test(sandboxApp) &&
     !/page\s*\{[^}]*height:\s*100%/.test(appWxss),
   'page height on config wxss; gb-body flex chain; host app has no page height'
 );
@@ -185,9 +173,8 @@ assert(
 );
 
 assert(
-  'WXML 骨架与沙盒 config 对齐（header 后即 gb-body）',
-  /gb-header[\s\S]*<scroll-view class="gb-body" scroll-y>/.test(wxml) &&
-    /gb-header[\s\S]*<scroll-view class="gb-body" scroll-y>/.test(sandboxWxml)
+  'WXML 骨架 header 后即 gb-body',
+  /gb-header[\s\S]*<scroll-view class="gb-body" scroll-y>/.test(wxml)
 );
 
 console.log('SUMMARY passed=' + passed + ' failed=' + failed);

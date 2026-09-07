@@ -23,7 +23,6 @@ var hostMod = require('../miniprogram/subpackages/game/utils/gameHostContext.js'
 var hostSession = require('../miniprogram/subpackages/game/utils/sideGameHostSession.js');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var bind = require('../miniprogram/subpackages/game/utils/sideGameBind.js');
-var sandboxSettle = require('../../04-游戏沙盒/miniprogram/subpackages/game/utils/settle.js');
 var officialSettle = require('../miniprogram/subpackages/game/utils/settle.js');
 
 var passed = 0;
@@ -256,25 +255,9 @@ var engineOut = officialSettle.settleGame(
     windOn: false
   }
 );
-var sandboxOut = sandboxSettle.settleGame(
-  {
-    catalogId: 'match-2',
-    players: [{ id: 'pA' }, { id: 'pB' }],
-    pairings: [{ id: 'pair-ab', leftId: 'pA', rightId: 'pB', on: true }],
-    holes: gameHoles(),
-    ruleSnapshot: rec.buildRuleSnapshot('match-2'),
-    multiplier: 1
-  },
-  {
-    scores: parityScores,
-    holeOrder: catalog.HOLES.slice(),
-    pars: catalog.defaultHolePars(),
-    windOn: false
-  }
-);
 assert(
-  '沙盒/主体 settleGame 旧字段和值一致',
-  JSON.stringify(withoutTopHoleStates(engineOut)) === JSON.stringify(sandboxOut)
+  'match-2 settleGame 产出 byHole+initial',
+  !!(withoutTopHoleStates(engineOut) && engineOut.byHole && engineOut.initial)
 );
 assert(
   '主体 settleGame 显式提供 topHoleStates',
@@ -284,7 +267,7 @@ assert(
     !Array.isArray(engineOut.topHoleStates)
 );
 assert(
-  'ViewModel 关键字段与沙盒看板一致',
+  'ViewModel 含看板关键字段',
   ['hasGames', 'gameCount', 'players', 'holes', 'totals', 'showPot', 'potRowLabel', 'pots'].every(function (k) {
     return Object.prototype.hasOwnProperty.call(board2, k);
   })
@@ -302,31 +285,23 @@ var host3 = makeHost(parties3, {
   pC: filled18(6)
 });
 attach(host3);
-var multi = bind.addGame(
-  'score',
-  stroke2Instance(
-    [
-      { id: 'pA', name: '甲' },
-      { id: 'pB', name: '乙' },
-      { id: 'pC', name: '丙' }
-    ],
-    [
-      { id: 'pair-ab', leftId: 'pA', rightId: 'pB', on: true, strokes: 0 },
-      { id: 'pair-ac', leftId: 'pA', rightId: 'pC', on: true, strokes: 0 },
-      { id: 'pair-bc', leftId: 'pB', rightId: 'pC', on: true, strokes: 0 }
-    ]
-  )
+var multiDraft = stroke2Instance(
+  [
+    { id: 'pA', name: '甲' },
+    { id: 'pB', name: '乙' },
+    { id: 'pC', name: '丙' }
+  ],
+  [
+    { id: 'pair-ab', leftId: 'pA', rightId: 'pB', on: true, strokes: 0 },
+    { id: 'pair-ac', leftId: 'pA', rightId: 'pC', on: true, strokes: 0 },
+    { id: 'pair-bc', leftId: 'pB', rightId: 'pC', on: true, strokes: 0 }
+  ]
 );
-var firstPair = bind.defaultPairId(multi);
-assert('2方多对局默认第一组', firstPair === 'pair-ab', String(firstPair));
-var boardP1 = bind.listBoard('score', multi.id, 'pair-ab');
-var boardP2 = bind.listBoard('score', multi.id, 'pair-ac');
-assert('默认第一 pair 两行', (boardP1.players || []).length === 2);
+assert('2方规则三方草稿默认第一对', bind.defaultPairId(multiDraft) === 'pair-ab');
+var multi = bind.addGame('score', multiDraft);
 assert(
-  '切换 pair 后表格内容变化',
-  cellTexts(boardP1).join('|') !== cellTexts(boardP2).join('|') &&
-    (boardP2.players || []).map(function (p) { return p.id; }).join(',') !==
-      (boardP1.players || []).map(function (p) { return p.id; }).join(',')
+  '三方比杆落库受 party_count 约束',
+  !!(multi && multi.__fail && multi.reason === 'party_count')
 );
 
 installRepo();

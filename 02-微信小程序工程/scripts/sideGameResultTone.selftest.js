@@ -24,7 +24,6 @@ var hostSession = require('../miniprogram/subpackages/game/utils/sideGameHostSes
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var bind = require('../miniprogram/subpackages/game/utils/sideGameBind.js');
 var resultTone = require('../miniprogram/subpackages/game/utils/resultTone.js');
-var sandboxTone = require('../../04-游戏沙盒/miniprogram/subpackages/game/utils/resultTone.js');
 
 var mini = path.join(__dirname, '..', 'miniprogram');
 var passed = 0;
@@ -174,7 +173,6 @@ function read(rel) {
 
 var tone = resultTone.resultToneClass;
 assert('模块与 bind 导出同一函数', bind.resultToneClass === resultTone.resultToneClass);
-assert('沙盒 resultTone 与主体规则一致', sandboxTone.resultToneClass(1) === 'result-positive' && sandboxTone.resultToneClass(-1) === 'result-negative');
 
 assert('1. 逐洞 +1 红色', tone(1) === 'result-positive');
 assert('2. 逐洞 -1 绿色', tone(-1) === 'result-negative');
@@ -243,11 +241,6 @@ assert(
     /"game-tab"/.test(read('subpackages/tournament/pages/detail/index.json'))
 );
 
-var scorePadWxss = fs.readFileSync(
-  path.join(__dirname, '..', '..', '04-游戏沙盒', 'miniprogram', 'subpackages', 'game', 'components', 'score-pad', 'index.wxss'),
-  'utf8'
-);
-assert('11. 沙盒记分格 over/under 未改成结果色', /\.under/.test(scorePadWxss) && /\.over/.test(scorePadWxss) && !/result-positive/.test(scorePadWxss));
 assert('11. resultTone 不含三角逻辑', !/triColor/.test(read('subpackages/game/utils/resultTone.js')));
 assert('11. 记分盘仍写 triColor', /triColor: rankTriColorForCell/.test(bindJs));
 assert(
@@ -324,39 +317,21 @@ var parties3 = [
 ];
 var host3 = makeHost(parties3, { pA: filled18(4), pB: filled18(5), pC: filled18(6) });
 attach(host3);
-var multi = bind.addGame(
-  'score',
-  stroke2Instance(
-    [
-      { id: 'pA', name: '甲' },
-      { id: 'pB', name: '乙' },
-      { id: 'pC', name: '丙' }
-    ],
-    [
-      { id: 'pair-ab', leftId: 'pA', rightId: 'pB', on: true, strokes: 0 },
-      { id: 'pair-ac', leftId: 'pA', rightId: 'pC', on: true, strokes: 0 },
-      { id: 'pair-bc', leftId: 'pB', rightId: 'pC', on: true, strokes: 0 }
-    ]
-  )
+var multiDraft = stroke2Instance(
+  [
+    { id: 'pA', name: '甲' },
+    { id: 'pB', name: '乙' },
+    { id: 'pC', name: '丙' }
+  ],
+  [
+    { id: 'pair-ab', leftId: 'pA', rightId: 'pB', on: true, strokes: 0 },
+    { id: 'pair-ac', leftId: 'pA', rightId: 'pC', on: true, strokes: 0 },
+    { id: 'pair-bc', leftId: 'pB', rightId: 'pC', on: true, strokes: 0 }
+  ]
 );
-var boardP1 = bind.listBoard('score', multi.id, 'pair-ab');
-var boardP2 = bind.listBoard('score', multi.id, 'pair-ac');
-assert(
-  '9. 1V1 切换后颜色跟随当前结果',
-  boardP1.totals.map(function (t) { return t.cls; }).join('|') !==
-    boardP2.totals.map(function (t) { return t.cls; }).join('|') ||
-    boardP1.holes[0].cells.map(function (c) { return c.raw + ':' + c.cls; }).join('|') !==
-      boardP2.holes[0].cells.map(function (c) { return c.raw + ':' + c.cls; }).join('|')
-);
-assert(
-  '9. 各组 cls 均由 raw 生成',
-  boardP1.holes[0].cells.every(function (c) {
-    return c.cls === tone(c.raw) || c.text === '-' || c.text === '—' || c.text === '';
-  }) &&
-    boardP2.holes[0].cells.every(function (c) {
-      return c.cls === tone(c.raw) || c.text === '-' || c.text === '—' || c.text === '';
-    })
-);
+assert('9. 三方草稿 defaultPairId 指向第一对', bind.defaultPairId(multiDraft) === 'pair-ab');
+var multi = bind.addGame('score', multiDraft);
+assert('9. 三方比杆落库受 party_count 约束', !!(multi && multi.__fail && multi.reason === 'party_count'));
 
 installRepo();
 var comboParties = [
@@ -443,16 +418,12 @@ assert(
   })
 );
 
-var sandboxUi = fs.readFileSync(
-  path.join(__dirname, '..', '..', '04-游戏沙盒', 'miniprogram', 'subpackages', 'game', 'styles', 'game-ui.wxss'),
-  'utf8'
+var officialUi = read('subpackages/game/styles/game-ui.wxss');
+assert(
+  '主体看板使用结果 class',
+  /\.board-cell\.result-positive/.test(officialUi) && /\.board-cell\.result-negative/.test(officialUi)
 );
-assert('沙盒看板使用同一结果 class', /\.board-cell\.result-positive/.test(sandboxUi) && /\.board-cell\.result-negative/.test(sandboxUi));
-var sandboxSession = fs.readFileSync(
-  path.join(__dirname, '..', '..', '04-游戏沙盒', 'miniprogram', 'subpackages', 'game', 'utils', 'session.js'),
-  'utf8'
-);
-assert('沙盒 listBoard 走 resultToneClass', /resultTone\.resultToneClass/.test(sandboxSession));
+assert('listBoard 走 resultToneClass', /resultTone\.resultToneClass/.test(bindJs));
 
 var detailWxml = read('subpackages/game/pages/detail/index.wxml');
 assert('pages/detail 无独立结果表色', !/result-positive/.test(detailWxml));

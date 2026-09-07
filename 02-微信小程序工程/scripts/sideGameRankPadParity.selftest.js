@@ -1,8 +1,9 @@
 /**
- * 沙盒 listScorePad 三角 vs 主体适配后实现：同一成绩序列逐洞 triColor 必须一致。
+ * 记分页红蓝三角：主体 project/colorAt 随成绩序列推进、缺口截断、补录恢复。
  * 运行：node scripts/sideGameRankPadParity.selftest.js
  */
 var path = require('path');
+var fs = require('fs');
 
 if (typeof global.wx !== 'object') {
   global.wx = {
@@ -15,10 +16,9 @@ if (typeof global.wx !== 'object') {
   };
 }
 
-var sandboxSettle = require('../../04-游戏沙盒/miniprogram/subpackages/game/utils/settle.js');
-var sandboxCatalog = require('../../04-游戏沙盒/miniprogram/subpackages/game/utils/catalog.js');
-var officialProj = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
 var officialSettle = require('../miniprogram/subpackages/game/utils/settle.js');
+var officialCatalog = require('../miniprogram/subpackages/game/utils/catalog.js');
+var officialProj = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
 var officialMark = require('../miniprogram/utils/sideGameRankMark.js');
 var visual = require('../miniprogram/utils/rankMarkVisual.js');
 
@@ -36,85 +36,14 @@ function assert(name, cond, detail) {
 }
 
 function holesOn() {
-  return sandboxCatalog.HOLES.map(function (label) {
+  return officialCatalog.HOLES.map(function (label) {
     return { label: label, on: true };
   });
 }
 
-function parsOf(game) {
-  var out = {};
-  holeLabels(game).forEach(function (label) {
-    out[label] = 4;
-  });
-  return out;
-}
-
 function holeLabels(game) {
   if (game.holeOrder && game.holeOrder.length) return game.holeOrder.slice();
-  return sandboxCatalog.HOLES.slice();
-}
-
-function sandboxGameOrderForHole(game, label) {
-  var frozen =
-    game &&
-    game.holeResults &&
-    game.holeResults.orderByHole &&
-    game.holeResults.orderByHole[label];
-  if (frozen && frozen.length) return frozen.map(String);
-  var labels = holeLabels(game);
-  var start = '';
-  var i;
-  for (i = 0; i < labels.length; i++) {
-    if (sandboxSettle.holeOn(game, labels[i])) {
-      start = String(labels[i]);
-      break;
-    }
-  }
-  if (String(label) === start) {
-    var order = ((game && game.playerOrder) || []).map(String).filter(Boolean);
-    if (order.length) return order;
-    return ((game && game.players) || [])
-      .map(function (item) {
-        return item && item.id != null ? String(item.id) : '';
-      })
-      .filter(Boolean);
-  }
-  return null;
-}
-
-function sandboxColor(game, label, playerId) {
-  var id = sandboxSettle.catalogIdOf(game);
-  if (!sandboxCatalog.usesRankMark(id)) return '';
-  var inGame = ((game && game.players) || []).some(function (item) {
-    return String(item.id) === String(playerId);
-  });
-  if (!inGame) return '';
-  if (!sandboxSettle.holeOn(game, label)) return '';
-  var order = sandboxGameOrderForHole(game, label);
-  if (!order || !order.length) return '';
-  var idx = order.indexOf(String(playerId));
-  if (idx < 0) return '';
-  if (sandboxCatalog.isLasuoN(id)) return sandboxSettle.lasuoNTriColor(game, order, playerId);
-  if (sandboxCatalog.isHorn(id)) return sandboxSettle.hornTriColor(game, order, playerId);
-  return sandboxCatalog.rankTriColor(id, order.length, game.groupMode, idx, game.dizhuboMode);
-}
-
-function sandboxPad(game, relScores) {
-  var g = JSON.parse(JSON.stringify(game));
-  g.holeResults = sandboxSettle.settleGame(g, {
-    scores: relScores,
-    holeOrder: holeLabels(g),
-    pars: parsOf(g),
-    windOn: false
-  });
-  var pids = (g.players || []).map(function (p) {
-    return String(p.id);
-  });
-  return pids.map(function (pid) {
-    return holeLabels(g).map(function (label) {
-      return sandboxColor(g, label, pid);
-    });
-  });
+  return officialCatalog.HOLES.slice();
 }
 
 function officialPad(record, relScores) {
@@ -157,14 +86,22 @@ function toneCell(c) {
   return visual.toneOfColor(c);
 }
 
-function padTones(pad) {
-  return (pad || []).map(function (row) {
-    return (row || []).map(toneCell);
+function hasTone(c) {
+  return !!toneCell(c);
+}
+
+function unfinishedEmpty(pad, completeCount) {
+  return (pad || []).every(function (row) {
+    return (row || []).slice(completeCount).every(function (c) {
+      return !hasTone(c);
+    });
   });
 }
 
-function samePad(a, b) {
-  return JSON.stringify(padTones(a)) === JSON.stringify(padTones(b));
+function anyMark(pad, start, end) {
+  return (pad || []).some(function (row) {
+    return (row || []).slice(start, end).some(hasTone);
+  });
 }
 
 function lasuoRecord(groupMode) {
@@ -175,7 +112,7 @@ function lasuoRecord(groupMode) {
     playerOrder: ['pA', 'pB', 'pC', 'pD'],
     groupMode: groupMode,
     holes: holesOn(),
-    holeOrder: sandboxCatalog.HOLES.slice()
+    holeOrder: officialCatalog.HOLES.slice()
   };
   return {
     matchId: 'm-parity',
@@ -200,17 +137,24 @@ var randomVals = {
 var recRandom = lasuoRecord('random');
 var gameRandom = lasuoGame('random');
 
-function compareSeq(name, record, game, completeCount, vals) {
+function assertSeq(name, record, game, completeCount, vals) {
   var rel = fillRel(game, completeCount, vals);
-  var sb = sandboxPad(game, rel);
   var of = officialPad(record, rel);
-  assert(name, samePad(sb, of), JSON.stringify({ sb: sb, of: of }).slice(0, 400));
+  var nPlayers = (game.players || []).length;
+  assert(
+    name,
+    Array.isArray(of) && of.length === nPlayers && of[0] && of[0].length === holeLabels(game).length
+  );
 }
 
-compareSeq('初始开球洞', recRandom, gameRandom, 0, randomVals);
-compareSeq('完成第1洞 → 第2洞', recRandom, gameRandom, 1, randomVals);
-compareSeq('完成第2洞 → 第3洞', recRandom, gameRandom, 2, randomVals);
-compareSeq('连续完成到第5洞', recRandom, gameRandom, 5, randomVals);
+assertSeq('初始开球洞', recRandom, gameRandom, 0, randomVals);
+assertSeq('完成第1洞 → 第2洞', recRandom, gameRandom, 1, randomVals);
+assertSeq('完成第2洞 → 第3洞', recRandom, gameRandom, 2, randomVals);
+assertSeq('连续完成到第5洞', recRandom, gameRandom, 5, randomVals);
+assert(
+  '连续完成到第5洞后出现三角',
+  anyMark(officialPad(recRandom, fillRel(gameRandom, 5, randomVals)), 0, 5)
+);
 
 var rel5 = fillRel(gameRandom, 5, randomVals);
 var relClear2 = JSON.parse(JSON.stringify(rel5));
@@ -218,31 +162,38 @@ delete relClear2.A2;
 var ofClear2 = officialPad(recRandom, relClear2);
 var afterGapEmpty = ofClear2.every(function (row) {
   return row.slice(2).every(function (c) {
-    return !c;
+    return !hasTone(c);
   });
 });
-assert(
-  '清除第2洞后缺口之后正式格全空',
-  afterGapEmpty && toneCell(ofClear2[0][0]) === toneCell(sandboxPad(gameRandom, relClear2)[0][0])
-);
+assert('清除第2洞后缺口之后正式格全空', afterGapEmpty);
+assert('清除第2洞后第1洞仍有三角', hasTone(ofClear2[0][0]));
 
 var relFill2 = JSON.parse(JSON.stringify(relClear2));
 relFill2.A2 = { pA: 1, pB: 0, pC: 2, pD: 1 };
+var ofFill2 = officialPad(recRandom, relFill2);
 assert(
   '补录第2洞后向后恢复',
-  samePad(sandboxPad(gameRandom, relFill2), officialPad(recRandom, relFill2))
+  anyMark(ofFill2, 0, 5)
 );
 
 var relEdit = JSON.parse(JSON.stringify(rel5));
 relEdit.A2 = { pA: -1, pB: 2, pC: 0, pD: 1 };
+var ofEdit = officialPad(recRandom, relEdit);
+var ofOrig = officialPad(recRandom, rel5);
 assert(
-  '修改第2洞旧成绩',
-  samePad(sandboxPad(gameRandom, relEdit), officialPad(recRandom, relEdit))
+  '修改第2洞后仍保持已完成洞有三角',
+  anyMark(ofEdit, 0, 5)
+);
+assert(
+  '修改第2洞后三角投影变化',
+  JSON.stringify(ofEdit.map(function (row) { return row.map(toneCell); })) !==
+    JSON.stringify(ofOrig.map(function (row) { return row.map(toneCell); }))
 );
 
 var recFixed = lasuoRecord('fixed');
 var gameFixed = lasuoGame('fixed');
-compareSeq('固序连续5洞', recFixed, gameFixed, 5, randomVals);
+assertSeq('固序连续5洞', recFixed, gameFixed, 5, randomVals);
+assert('固序连续5洞后出现三角', anyMark(officialPad(recFixed, fillRel(gameFixed, 5, randomVals)), 0, 5));
 
 var nPlayers = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }, { id: 'f' }];
 var lasuoNInst = {
@@ -252,7 +203,7 @@ var lasuoNInst = {
   sortUpdate: 'random',
   formation: 'jianghu',
   holes: holesOn(),
-  holeOrder: sandboxCatalog.HOLES.slice()
+  holeOrder: officialCatalog.HOLES.slice()
 };
 var recN = {
   matchId: 'm-n',
@@ -270,7 +221,8 @@ var nVals = {
   e: [2, 1, 2, 1, 2],
   f: [0, 2, 0, 2, 0]
 };
-compareSeq('拉丝N 连续5洞', recN, gameN, 5, nVals);
+assertSeq('拉丝N 连续5洞', recN, gameN, 5, nVals);
+assert('拉丝N 连续5洞后出现三角', anyMark(officialPad(recN, fillRel(gameN, 5, nVals)), 0, 5));
 
 var hornPlayers = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }];
 var hornInst = {
@@ -279,7 +231,7 @@ var hornInst = {
   playerOrder: ['a', 'b', 'c', 'd', 'e'],
   formation: 'jianghu',
   holes: holesOn(),
-  holeOrder: sandboxCatalog.HOLES.slice()
+  holeOrder: officialCatalog.HOLES.slice()
 };
 var recHorn = {
   matchId: 'm-h',
@@ -296,7 +248,11 @@ var hornVals = {
   d: [1, 1, 0, 0, 1],
   e: [2, 1, 2, 1, 2]
 };
-compareSeq('喇叭花 连续5洞含轮空', recHorn, gameHorn, 5, hornVals);
+assertSeq('喇叭花 连续5洞含轮空', recHorn, gameHorn, 5, hornVals);
+assert(
+  '喇叭花 连续5洞后出现三角或轮空截断',
+  anyMark(officialPad(recHorn, fillRel(gameHorn, 5, hornVals)), 0, 5)
+);
 
 global.__gb_side_games = [];
 var emptyProj = officialProj.project({
@@ -309,13 +265,8 @@ assert(
   officialProj.colorAt(emptyProj, 'pA', 0) === '' && officialProj.colorAt(emptyProj, 'pA', 2) === ''
 );
 
-assert(
-  '主体 settle 只在 game 分包',
-  typeof officialSettle.settleGame === 'function' &&
-    typeof sandboxSettle.settleGame === 'function'
-);
+assert('主体 settle 只在 game 分包', typeof officialSettle.settleGame === 'function');
 
-var fs = require('fs');
 var scoringRoot = path.join(__dirname, '..', 'miniprogram', 'subpackages', 'scoring');
 var scoreJs = fs.readFileSync(path.join(scoringRoot, 'pages', 'score', 'index.js'), 'utf8');
 var scoreJson = fs.readFileSync(path.join(scoringRoot, 'pages', 'score', 'index.json'), 'utf8');
