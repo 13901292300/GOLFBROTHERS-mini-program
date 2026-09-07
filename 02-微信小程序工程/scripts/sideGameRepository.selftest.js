@@ -36,6 +36,40 @@ function assert(name, cond, detail) {
   }
 }
 
+function createdOk(out) {
+  return !!(out && out.ok && out.data && out.data.sideGameId);
+}
+
+function failDetail(out) {
+  if (!out) return 'null';
+  return String(out.reason || '') + (out.data && out.data.sideGameId ? ' id=' + out.data.sideGameId : '');
+}
+
+function makeIsolatedRepo(prefix) {
+  var n = 0;
+  return localMod.createLocalSideGameRepository({
+    storage: memStorage(),
+    idGen: function () {
+      n += 1;
+      return prefix + n;
+    },
+    clock: function () {
+      return 4000;
+    }
+  });
+}
+
+function identityFingerprint(row) {
+  if (!row) return '';
+  return JSON.stringify({
+    parties: row.participantParties,
+    revision: row.revision,
+    hostRevisionAtSettle: row.hostRevisionAtSettle,
+    resultSnapshot: row.resultSnapshot,
+    config: row.config
+  });
+}
+
 function memStorage(failWrite, failRead) {
   var bag = {};
   return {
@@ -159,6 +193,7 @@ var repo = localMod.createLocalSideGameRepository({
 });
 facade.setImplementation(repo);
 
+try {
 assert('门面 listVisible 存在', typeof facade.listVisible === 'function');
 assert('门面 create 存在', typeof facade.create === 'function');
 assert('资格 implementation=local-preview', entitlement.IMPLEMENTATION === 'local-preview');
@@ -351,6 +386,7 @@ assert('记分页 allowBigPot=false 不可开大锅饭', !potDenied.ok && potDen
   assert(ruleId + ' 方数不足拒绝', !wrong.ok && wrong.reason === 'party_count');
 });
 
+// 交叉占用仅证明「方数≠成员人数」；不可用于 remap 成功路径。
 var comboCreate = repo.create(
   createInput(makeHost(), {
     idempotencyKey: 'combo',
@@ -376,23 +412,178 @@ var stale = rec.isResultStale(refreshed.data, makeHost({ revision: 'r2' }));
 assert('Host revision 变化标记过期', stale === true);
 assert('未点刷新不改结果', facade.getById(live.data.sideGameId).data.hostRevisionAtSettle === 'r1');
 
-var mapped = repo.create(
-  createInput(makeHost(), {
-    idempotencyKey: 'map',
-    participantParties: [
-      { partyId: 'A', partyType: 'player', displayName: '甲', memberPlayerIds: ['A'] },
-      { partyId: 'combo-1', partyType: 'combination', displayName: '组合', memberPlayerIds: ['A', 'B'] }
-    ]
+var playerMapHost = makeHost({ matchId: 'm-map-p' });
+var playerMapRepo = makeIsolatedRepo('sgp_');
+var playerMap = playerMapRepo.create(
+  createInput(playerMapHost, {
+    matchId: 'm-map-p',
+    idempotencyKey: 'map_player',
+    title: '个人更正',
+    participantParties: partiesOf('A', 'B'),
+    config: rec.emptyConfig({
+      instance: {
+        catalogId: 'stroke-2',
+        players: [
+          { id: 'A', name: '甲' },
+          { id: 'B', name: '乙' }
+        ],
+        pairings: [{ id: 'p1', leftId: 'A', rightId: 'B', on: true }]
+      }
+    })
   })
 );
-repo.refreshResult(mapped.data.sideGameId, makeHost());
-var remap = repo.remapPlayerId('m1', 'A', 'C');
-assert('remap 更新相关记录', remap.ok && (remap.data.updatedSideGameIds || []).indexOf(mapped.data.sideGameId) >= 0);
-var afterMap = repo.getById(mapped.data.sideGameId).data;
-assert('player partyId A→C', afterMap.participantParties[0].partyId === 'C');
-assert('combination partyId 保持', afterMap.participantParties[1].partyId === 'combo-1');
-assert('memberPlayerIds A→C', afterMap.participantParties[1].memberPlayerIds.indexOf('C') >= 0 && afterMap.participantParties[1].memberPlayerIds.indexOf('A') < 0);
-assert('remap 后结果过期', afterMap.hostRevisionAtSettle === '');
+assert('个人方 remap 夹具创建', createdOk(playerMap), failDetail(playerMap));
+if (createdOk(playerMap)) {
+  playerMapRepo.refreshResult(playerMap.data.sideGameId, playerMapHost);
+  var beforePlayer = playerMapRepo.getById(playerMap.data.sideGameId);
+  var remapPlayer = playerMapRepo.remapPlayerId('m-map-p', 'A', 'C');
+  var afterPlayerGot = playerMapRepo.getById(playerMap.data.sideGameId);
+  var afterPlayer = afterPlayerGot && afterPlayerGot.ok ? afterPlayerGot.data : null;
+  var playerParties = (afterPlayer && afterPlayer.participantParties) || [];
+  var playerInst = afterPlayer && afterPlayer.config && afterPlayer.config.instance;
+  var playerSnap = JSON.stringify((afterPlayer && afterPlayer.resultSnapshot) || {});
+  assert(
+    '个人方 remap 更新记录',
+    !!(remapPlayer && remapPlayer.ok && (remapPlayer.data.updatedSideGameIds || []).indexOf(playerMap.data.sideGameId) >= 0),
+    failDetail(remapPlayer)
+  );
+  assert('个人方 partyId A→C', !!(playerParties[0] && playerParties[0].partyId === 'C' && (playerParties[0].memberPlayerIds || []).indexOf('C') >= 0));
+  assert('个人方对手 B 不变', !!(playerParties[1] && playerParties[1].partyId === 'B' && (playerParties[1].memberPlayerIds || []).join(',') === 'B'));
+  assert(
+    '个人方 config/结果身份键更新',
+    !!(playerInst && playerInst.players && playerInst.players[0] && playerInst.players[0].id === 'C' && playerInst.pairings && playerInst.pairings[0] && playerInst.pairings[0].leftId === 'C' && playerInst.pairings[0].rightId === 'B' && playerSnap.indexOf('"A"') < 0 && playerSnap.indexOf('"C"') >= 0)
+  );
+  assert(
+    '个人方 remap 后结果过期',
+    !!(afterPlayer && afterPlayer.hostRevisionAtSettle === '' && rec.isResultStale(afterPlayer, playerMapHost) === true && beforePlayer && beforePlayer.ok && beforePlayer.data.hostRevisionAtSettle === 'r1')
+  );
+}
+
+var comboMapHost = makeHost({ matchId: 'm-map-c' });
+var comboMapRepo = makeIsolatedRepo('sgc_');
+var comboMap = comboMapRepo.create(
+  createInput(comboMapHost, {
+    matchId: 'm-map-c',
+    idempotencyKey: 'map_combo',
+    title: '组合成员更正',
+    participantParties: [
+      { partyId: 'combo-1', partyType: 'combination', displayName: '组合', memberPlayerIds: ['A', 'B'] },
+      { partyId: 'D', partyType: 'player', displayName: '丁', memberPlayerIds: ['D'] }
+    ],
+    config: rec.emptyConfig({
+      instance: {
+        catalogId: 'stroke-2',
+        parties: [
+          {
+            id: 'combo-1',
+            partyType: 'combination',
+            members: [
+              { playerId: 'A', displayName: '甲' },
+              { playerId: 'B', displayName: '乙' }
+            ]
+          },
+          { id: 'D', partyType: 'player', name: '丁' }
+        ]
+      }
+    })
+  })
+);
+assert('组合成员 remap 夹具创建', createdOk(comboMap), failDetail(comboMap));
+if (createdOk(comboMap)) {
+  comboMapRepo.refreshResult(comboMap.data.sideGameId, comboMapHost);
+  var remapCombo = comboMapRepo.remapPlayerId('m-map-c', 'A', 'C');
+  var afterComboGot = comboMapRepo.getById(comboMap.data.sideGameId);
+  var afterCombo = afterComboGot && afterComboGot.ok ? afterComboGot.data : null;
+  var comboParties = (afterCombo && afterCombo.participantParties) || [];
+  var comboSnap = JSON.stringify((afterCombo && afterCombo.resultSnapshot) || {});
+  var comboInst = afterCombo && afterCombo.config && afterCombo.config.instance;
+  var comboMembers =
+    comboInst && comboInst.parties && comboInst.parties[0] && comboInst.parties[0].members
+      ? comboInst.parties[0].members.map(function (m) {
+          return m.playerId;
+        })
+      : [];
+  assert(
+    '组合成员 remap 更新记录',
+    !!(remapCombo && remapCombo.ok && (remapCombo.data.updatedSideGameIds || []).indexOf(comboMap.data.sideGameId) >= 0),
+    failDetail(remapCombo)
+  );
+  assert('组合 partyId 保持 combo-1', !!(comboParties[0] && comboParties[0].partyId === 'combo-1'));
+  assert(
+    '组合成员 [A,B]→[C,B] 顺序稳定',
+    !!(comboParties[0] && (comboParties[0].memberPlayerIds || []).join(',') === 'C,B')
+  );
+  assert('组合对手 D 不变', !!(comboParties[1] && comboParties[1].partyId === 'D' && (comboParties[1].memberPlayerIds || []).join(',') === 'D'));
+  assert(
+    '组合结果/config 身份同步并过期',
+    !!(afterCombo && afterCombo.hostRevisionAtSettle === '' && rec.isResultStale(afterCombo, comboMapHost) === true && comboSnap.indexOf('"A"') < 0 && comboMembers.join(',') === 'C,B')
+  );
+}
+
+var conflictHost = makeHost({ matchId: 'm-map-x' });
+var conflictRepo = makeIsolatedRepo('sgx_');
+var conflictRow = conflictRepo.create(
+  createInput(conflictHost, {
+    matchId: 'm-map-x',
+    idempotencyKey: 'map_conflict',
+    title: '冲突',
+    participantParties: partiesOf('A', 'B')
+  })
+);
+assert('冲突 remap 夹具创建', createdOk(conflictRow), failDetail(conflictRow));
+if (createdOk(conflictRow)) {
+  conflictRepo.refreshResult(conflictRow.data.sideGameId, conflictHost);
+  var beforeConflictGot = conflictRepo.getById(conflictRow.data.sideGameId);
+  var beforeConflict = beforeConflictGot && beforeConflictGot.ok ? beforeConflictGot.data : null;
+  var beforeFp = identityFingerprint(beforeConflict);
+  var conflictRemap = conflictRepo.remapPlayerId('m-map-x', 'A', 'B');
+  var afterConflictGot = conflictRepo.getById(conflictRow.data.sideGameId);
+  var afterConflict = afterConflictGot && afterConflictGot.ok ? afterConflictGot.data : null;
+  assert(
+    '目标已被另一方占用则 identity_conflict',
+    !!(conflictRemap && conflictRemap.ok === false && conflictRemap.reason === 'identity_conflict'),
+    failDetail(conflictRemap)
+  );
+  assert(
+    '冲突不部分写入',
+    !!(afterConflict && beforeConflict && beforeFp === identityFingerprint(afterConflict) && afterConflict.revision === beforeConflict.revision && afterConflict.hostRevisionAtSettle === 'r1')
+  );
+}
+
+var isoHostChange = makeHost({ matchId: 'm-iso-1' });
+var isoHostKeep = makeHost({ matchId: 'm-iso-2' });
+var isoRepo = makeIsolatedRepo('sgi_');
+var isoChange = isoRepo.create(
+  createInput(isoHostChange, {
+    matchId: 'm-iso-1',
+    idempotencyKey: 'iso_change',
+    participantParties: partiesOf('A', 'B')
+  })
+);
+var isoKeep = isoRepo.create(
+  createInput(isoHostKeep, {
+    matchId: 'm-iso-2',
+    idempotencyKey: 'iso_keep',
+    participantParties: partiesOf('A', 'B')
+  })
+);
+assert('多比赛夹具创建', createdOk(isoChange) && createdOk(isoKeep), failDetail(isoChange) + ' / ' + failDetail(isoKeep));
+if (createdOk(isoChange) && createdOk(isoKeep)) {
+  var isoRemap = isoRepo.remapPlayerId('m-iso-1', 'A', 'C');
+  var afterIsoChangeGot = isoRepo.getById(isoChange.data.sideGameId);
+  var afterIsoKeepGot = isoRepo.getById(isoKeep.data.sideGameId);
+  var afterIsoChange = afterIsoChangeGot && afterIsoChangeGot.ok ? afterIsoChangeGot.data : null;
+  var afterIsoKeep = afterIsoKeepGot && afterIsoKeepGot.ok ? afterIsoKeepGot.data : null;
+  assert(
+    'remap 只改指定 matchId',
+    !!(isoRemap && isoRemap.ok && afterIsoChange && afterIsoChange.participantParties[0] && afterIsoChange.participantParties[0].partyId === 'C'),
+    failDetail(isoRemap)
+  );
+  assert(
+    '另一场同名 ID 记录不变',
+    !!(afterIsoKeep && afterIsoKeep.participantParties[0] && afterIsoKeep.participantParties[0].partyId === 'A' && afterIsoKeep.participantParties[1] && afterIsoKeep.participantParties[1].partyId === 'B' && isoRemap && (isoRemap.data.updatedSideGameIds || []).indexOf(isoKeep.data.sideGameId) < 0)
+  );
+}
 
 var idSwap = {
   implementation: 'mock-id',
@@ -426,7 +617,7 @@ var blocked = repo.create(createInput(makeHost(), { idempotencyKey: 'ent' }));
 assert('替换 Entitlement 后拒绝创建', !blocked.ok && blocked.reason === 'no_entitlement');
 entitlement.setImplementation(savedEnt);
 assert('预览资格仍放行', entitlement.canCreate({}).ok && entitlement.canCreate({}).implementation === 'local-preview');
-assert('预览不伪造参赛身份', entitlement.canUpdate({ userId: 'me', record: mapped.data }).relaxed === true);
+assert('预览不伪造参赛身份', entitlement.canUpdate({ userId: 'me', record: live.data }).relaxed === true);
 
 var cloudish = {
   listVisible: function () {
@@ -676,10 +867,14 @@ var failCommit = failSettingsRepo.commitSetupDraft({
 assert('设置失败则整批失败', !failCommit.ok && failCommit.reason === 'settings_write_failed');
 assert('设置失败不留下新游戏', !failSettingsRepo.getById('sg_should_not').ok);
 assert('设置失败原游戏仍在', failSettingsRepo.getById(pre.data.sideGameId).ok);
-
-identity.setImplementation(savedIdentity);
-entitlement.setImplementation(savedEnt);
-facade.setImplementation(savedRepo);
+} catch (err) {
+  failed += 1;
+  console.log('FAIL  unexpected throw :: ' + (err && err.stack ? err.stack : err));
+} finally {
+  identity.setImplementation(savedIdentity);
+  entitlement.setImplementation(savedEnt);
+  facade.setImplementation(savedRepo);
+}
 
 console.log('\nsideGameRepository.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);
