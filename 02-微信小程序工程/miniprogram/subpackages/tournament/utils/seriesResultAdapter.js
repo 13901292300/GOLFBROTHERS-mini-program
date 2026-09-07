@@ -9,6 +9,7 @@ var seriesModel = require('../../../utils/seriesModel.js');
 var holeLayout = require('../../../utils/holeLayout.js');
 var halfCourse = require('../../../utils/halfCourse.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
+var comboDisplayName = require('../../../utils/comboDisplayName.js');
 
 function asString(v) {
   return v == null ? '' : String(v);
@@ -181,7 +182,7 @@ function resolveUnitName(memberIds, playerLookup) {
     var nick = resolvePlayerNickname(playerLookup[id]) || id;
     if (nick) names.push(nick);
   }
-  return names.join(' / ');
+  return comboDisplayName.joinMemberDisplayNames(names);
 }
 
 function stableEntryId(matchId, sourceEntityKey) {

@@ -10,6 +10,7 @@ const {
 } = require('../teamMatchCapabilities.js');
 const playerManage = require('../playerManage.js');
 const mockAvatars = require('../mockAvatars.js');
+const comboDisplayName = require('../comboDisplayName.js');
 const playerDirectory = require('../playerDirectory.js');
 const tPosition = require('../tPosition.js');
 const teamMatchStore = require('../teamMatchStore.js');
@@ -896,7 +897,7 @@ function buildMatchPlayTeamPreview(group, matchLike) {
         teamId === '__unknown__'
           ? sideUnit
           : maps.teamNameById[teamId] || teamId || sideUnit,
-      namesText: names.join(' / ')
+      namesText: comboDisplayName.joinMemberDisplayNames(names)
     });
   });
   return lines.length ? lines : null;
@@ -962,7 +963,7 @@ function buildCompositionPreview(matchLike, group) {
     if (!names.length) return;
     compositions.push({
       label: label,
-      text: names.join(' / ')
+      text: comboDisplayName.joinMemberDisplayNames(names)
     });
   };
 
@@ -1065,7 +1066,7 @@ function buildG4CompositionPreviewFromSeats(group, match, registerInfo) {
     }
     return {
       label: resolveComboLabel(members),
-      text: members.map((m) => m.name).filter(Boolean).join(' / ')
+      text: comboDisplayName.joinMemberDisplayNames(members)
     };
   };
 

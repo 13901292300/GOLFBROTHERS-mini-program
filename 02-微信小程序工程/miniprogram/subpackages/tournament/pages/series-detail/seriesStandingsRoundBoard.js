@@ -8,6 +8,7 @@
 
 var standingsViewOptions = require('./seriesStandingsViewOptions.js');
 var standingsViewModel = require('./seriesStandingsViewModel.js');
+var comboDisplayName = require('../../../../utils/comboDisplayName.js');
 
 function asString(v) {
   return v == null ? '' : String(v).trim();
@@ -37,13 +38,7 @@ function emptyStatusLabel(match, hasUnit) {
 }
 
 function memberNameJoin(members) {
-  var list = Array.isArray(members) ? members : [];
-  var names = [];
-  for (var i = 0; i < list.length; i++) {
-    var n = asString(list[i] && (list[i].name || list[i].displayName || list[i].unitName));
-    if (n) names.push(n);
-  }
-  return names.join(' / ');
+  return comboDisplayName.joinMemberDisplayNames(members);
 }
 
 function readEntityScore(rec) {

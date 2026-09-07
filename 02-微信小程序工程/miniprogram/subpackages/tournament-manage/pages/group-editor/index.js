@@ -12,6 +12,7 @@ const matchManageAccess = require('../../../../utils/matchManageAccess.js');
 const playerManage = require('../../../../utils/playerManage.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
+const comboDisplayName = require('../../../../utils/comboDisplayName.js');
 const playerDirectory = require('../../../../utils/playerDirectory.js');
 const tPosition = require('../../../../utils/tPosition.js');
 const {
@@ -503,7 +504,7 @@ Page({
         };
       });
       let label = '组合' + (idx + 1);
-      let namesText = members.map((m) => m.name).filter(Boolean).join(' / ') || '暂无球员';
+      let namesText = comboDisplayName.joinMemberDisplayNames(members) || '暂无球员';
       if (isG4) {
         let teamLabel = '';
         for (let i = 0; i < ids.length; i++) {

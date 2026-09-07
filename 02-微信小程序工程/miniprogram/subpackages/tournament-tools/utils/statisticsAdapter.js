@@ -17,6 +17,7 @@ const groupsStore = require('../../../utils/groupsStore.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const halfCourse = require('../../../utils/halfCourse.js');
 const playerManage = require('../../../utils/playerManage.js');
+const comboDisplayName = require('../../../utils/comboDisplayName.js');
 const tPosition = require('../../../utils/tPosition.js');
 const mockAvatars = require('../../../utils/mockAvatars.js');
 const matchStatus = require('../../../utils/matchStatus.js');
@@ -598,7 +599,7 @@ function resolveEntityMemberId(raw) {
   return id != null ? String(id).trim() : '';
 }
 
-/** 与领先榜 Entity 行一致：成员昵称用 ' / ' 连接 */
+/** 与领先榜 Entity 行一致：成员昵称用 / 连接 */
 function resolveEntityStatisticsDisplayName(memberIds, lookup) {
   const names = (Array.isArray(memberIds) ? memberIds : [])
     .map((uid) => {
@@ -611,7 +612,7 @@ function resolveEntityStatisticsDisplayName(memberIds, lookup) {
     })
     .map((n) => String(n || '').trim())
     .filter(Boolean);
-  return names.join(' / ');
+  return comboDisplayName.joinMemberDisplayNames(names);
 }
 
 function findTeamScoreByEntityId(groupScoreData, entityId) {
