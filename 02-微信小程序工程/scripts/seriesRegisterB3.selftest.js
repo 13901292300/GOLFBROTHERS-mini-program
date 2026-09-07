@@ -6,6 +6,8 @@
  *   node scripts/seriesRegisterB3.selftest.js
  */
 
+global.__TEAM_CLUB_REPO_MODE = 'local';
+
 var path = require('path');
 var fs = require('fs');
 
@@ -107,9 +109,17 @@ function baseOrgSeries(overrides) {
 }
 
 (function testAuthMembershipAdapter() {
-  var adminTeams = teamDirectory.listActiveClubTeamsForUser('me');
+  var identity = require(path.join(utilsDir, 'teamClub', 'identity.js'));
+  var repo = require(path.join(utilsDir, 'teamClub', 'repository.js'));
+  identity.setTestSession({ userId: 'user_owner', displayName: 'Owner' });
+  repo.resetForTests();
+  repo.createTeam({ name: '湘鹰', teamId: '1' });
+  repo.createTeam({ name: '星途', teamId: '2' });
+  repo.addMember('1', 'tm-1001', { displayName: '周启明' });
+
+  var adminTeams = teamDirectory.listActiveClubTeamsForUser('user_owner');
   assert(
-    'adminUserIds 命中队长/管理员球队（1/2），不含 isMine-only 江湖(3)',
+    '创建者命中自己创建的俱乐部球队 1/2',
     teamIdsOf(adminTeams) === '1,2'
   );
 
@@ -121,20 +131,15 @@ function baseOrgSeries(overrides) {
       memberTeams[0].role === 'member'
   );
 
-  var adminOnTeam2 = teamDirectory.listActiveClubTeamsForUser('me');
-  var role2 = (adminOnTeam2.filter(function (t) {
-    return t.teamId === '2';
-  })[0] || {}).role;
-  assert('adminUserIds 角色可解析为 admin/owner', role2 === 'admin' || role2 === 'owner');
-
   var none = teamDirectory.listActiveClubTeamsForUser('nobody-xyz');
   assert('无关用户无球队', none.length === 0);
 
+  var meDenied = teamDirectory.listActiveClubTeamsForUser('me');
+  assert('正式查询拒绝 me 作为身份', meDenied.length === 0);
   var withCompat = teamDirectory.getTeamsByUserId('me');
-  assert(
-    'getTeamsByUserId 仍保留 isMine 兼容（含球队3），Series 不用此路径',
-    teamIdsOf(withCompat).indexOf('3') >= 0
-  );
+  assert('getTeamsByUserId 不再把 me/isMine 补成球队', withCompat.length === 0);
+  identity.setTestSession(null);
+  repo.resetForTests();
 })();
 
 (function testOrgEligibilityRealAdapter() {
@@ -443,6 +448,22 @@ function baseOrgSeries(overrides) {
   );
 })();
 
+function restoreTeamClubTestIsolation() {
+  try {
+    var identity = require(path.join(utilsDir, 'teamClub', 'identity.js'));
+    identity.setTestSession(null);
+  } catch (e) { /* ignore */ }
+  try {
+    var repo = require(path.join(utilsDir, 'teamClub', 'repository.js'));
+    repo.resetForTests();
+  } catch (e2) { /* ignore */ }
+  delete global.__TEAM_CLUB_REPO_MODE;
+  Object.keys(require.cache).forEach(function (k) {
+    var n = String(k).replace(/\\/g, '/');
+    if (n.indexOf('/teamClub/') >= 0 || /\/teamDirectory\.js$/.test(n)) delete require.cache[k];
+  });
+}
+
 console.log('');
 console.log('---- seriesRegisterB3.selftest ----');
 console.log('passed=' + passed + ' failed=' + failed);
@@ -451,6 +472,8 @@ if (failed) {
   failures.forEach(function (f) {
     console.log(' - ' + f);
   });
+  restoreTeamClubTestIsolation();
   process.exit(1);
 }
+restoreTeamClubTestIsolation();
 process.exit(0);

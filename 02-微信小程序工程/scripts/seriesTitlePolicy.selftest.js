@@ -3,6 +3,8 @@
  * 运行：node scripts/seriesTitlePolicy.selftest.js
  */
 
+global.__TEAM_CLUB_REPO_MODE = 'local';
+
 var path = require('path');
 
 var utilsDir = path.join(__dirname, '..', 'miniprogram', 'utils');
@@ -101,12 +103,30 @@ assert(
     policy.sanitizeTitleText('  A\nB\rC\u2028D\u2029  ')
 );
 
+function restoreTeamClubTestIsolation() {
+  try {
+    var identity = require(path.join(utilsDir, 'teamClub', 'identity.js'));
+    identity.setTestSession(null);
+  } catch (e) { /* ignore */ }
+  try {
+    var repo = require(path.join(utilsDir, 'teamClub', 'repository.js'));
+    repo.resetForTests();
+  } catch (e2) { /* ignore */ }
+  delete global.__TEAM_CLUB_REPO_MODE;
+  Object.keys(require.cache).forEach(function (k) {
+    var n = String(k).replace(/\\/g, '/');
+    if (n.indexOf('/teamClub/') >= 0 || /\/teamDirectory\.js$/.test(n)) delete require.cache[k];
+  });
+}
+
 console.log('');
 console.log('seriesTitlePolicy.selftest: ' + passed + ' passed, ' + failed + ' failed');
 if (failed) {
   failures.forEach(function (f) {
     console.log(' - ' + f);
   });
+  restoreTeamClubTestIsolation();
   process.exit(1);
 }
+restoreTeamClubTestIsolation();
 process.exit(0);

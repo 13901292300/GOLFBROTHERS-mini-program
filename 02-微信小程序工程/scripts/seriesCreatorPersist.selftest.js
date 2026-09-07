@@ -3,6 +3,8 @@
  * 运行：node scripts/seriesCreatorPersist.selftest.js
  */
 
+global.__TEAM_CLUB_REPO_MODE = 'local';
+
 var path = require('path');
 var fs = require('fs');
 var seriesTestPaths = require('./lib/seriesTestPaths.js');
@@ -34,6 +36,10 @@ function clearModule(id) {
 function loadFresh() {
   [
     path.join(mini, 'utils/teamDirectory.js'),
+    path.join(mini, 'utils/teamClub/identity.js'),
+    path.join(mini, 'utils/teamClub/repository.js'),
+    path.join(mini, 'utils/teamClub/migrate.js'),
+    path.join(mini, 'utils/teamClub/service.js'),
     path.join(mini, 'utils/seriesModel.js'),
     path.join(mini, 'utils/seriesStore.js'),
     path.join(mini, 'utils/seriesStationMatch.js'),
@@ -190,6 +196,8 @@ function buildPublishableSeries(seriesModel, overrides) {
   };
   var mods = loadFresh();
   var td = mods.teamDirectory;
+  var identity = require(path.join(mini, 'utils/teamClub/identity.js'));
+  identity.setTestSession({ userId: 'creator-user-a', displayName: '创建者甲' });
 
   var mine = td.addCreatedTeam({
     id: 'club-mine',
@@ -224,6 +232,7 @@ function buildPublishableSeries(seriesModel, overrides) {
   });
   assert('自定义球队创建成功', !!(mine && mine.id === 'club-mine'));
 
+  identity.setTestSession({ userId: 'other-owner', displayName: '他主' });
   var other = td.addCreatedTeam({
     id: 'club-other',
     name: '他队',
@@ -242,6 +251,7 @@ function buildPublishableSeries(seriesModel, overrides) {
   });
   assert('第二支自定义球队创建成功', !!(other && other.id === 'club-other'));
 
+  identity.setTestSession({ userId: 'creator-user-a', displayName: '创建者甲' });
   var org = td.addCreatedTeam({
     id: 'org-persist-1',
     name: '持久化机构',
@@ -437,6 +447,8 @@ function buildPublishableSeries(seriesModel, overrides) {
   memory = Object.create(null);
   var mods = loadFresh();
   var td = mods.teamDirectory;
+  var identity = require(path.join(mini, 'utils/teamClub/identity.js'));
+  identity.setTestSession({ userId: 'creator-user-a', displayName: '甲' });
   td.addCreatedTeam({
     id: 'club-mine',
     name: '我的持久球队',
@@ -458,6 +470,7 @@ function buildPublishableSeries(seriesModel, overrides) {
       }
     ]
   });
+  identity.setTestSession({ userId: 'other-owner', displayName: '他' });
   td.addCreatedTeam({
     id: 'club-other',
     name: '他队',
@@ -609,6 +622,23 @@ function buildPublishableSeries(seriesModel, overrides) {
   );
 })();
 
+function restoreTeamClubTestIsolation() {
+  try {
+    var identity = require(path.join(mini, 'utils/teamClub/identity.js'));
+    identity.setTestSession(null);
+  } catch (e) { /* ignore */ }
+  try {
+    var repo = require(path.join(mini, 'utils/teamClub/repository.js'));
+    repo.resetForTests();
+  } catch (e2) { /* ignore */ }
+  memory = Object.create(null);
+  delete global.__TEAM_CLUB_REPO_MODE;
+  Object.keys(require.cache).forEach(function (k) {
+    var n = String(k).replace(/\\/g, '/');
+    if (n.indexOf('/teamClub/') >= 0 || /\/teamDirectory\.js$/.test(n)) delete require.cache[k];
+  });
+}
+
 console.log('');
 console.log('---- seriesCreatorPersist.selftest ----');
 console.log('passed=' + passed + ' failed=' + failed);
@@ -617,6 +647,8 @@ if (failed) {
   failures.forEach(function (f) {
     console.log(' - ' + f);
   });
+  restoreTeamClubTestIsolation();
   process.exit(1);
 }
+restoreTeamClubTestIsolation();
 process.exit(0);
