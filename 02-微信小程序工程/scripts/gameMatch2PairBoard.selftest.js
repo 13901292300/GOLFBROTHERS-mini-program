@@ -1,5 +1,5 @@
 /**
- * 4 方比洞：主菜单整体汇总 vs 二级 1V1。对齐沙盒 empty activePairId。
+ * match-2 比洞棋盘：恰好 2 方、1 条对决。4 个个人方非法。
  * 运行：node scripts/gameMatch2PairBoard.selftest.js
  */
 var fs = require('fs');
@@ -79,26 +79,25 @@ function pairId(a, b) {
   return String(a) + '|' + String(b);
 }
 
-function allPairs(ids) {
-  var out = [];
-  var i;
-  var j;
-  for (i = 0; i < ids.length; i++) {
-    for (j = i + 1; j < ids.length; j++) {
-      out.push({
-        id: pairId(ids[i], ids[j]),
-        leftId: ids[i],
-        rightId: ids[j],
-        on: true,
-        strokes: 0
-      });
-    }
-  }
-  return out;
+function onPairings(game) {
+  return ((game && game.pairings) || []).filter(function (p) {
+    return p && p.on !== false && p.leftId && p.rightId;
+  });
 }
 
-function match2Instance(players, pairings) {
-  return {
+function createdOk(game) {
+  return !!(game && game.id && !game.__fail);
+}
+
+function failReason(game) {
+  if (!game) return 'null';
+  if (game.__fail) return String(game.reason || 'failed');
+  return 'unexpected_ok';
+}
+
+function match2Instance(players, pairings, extra) {
+  extra = extra || {};
+  var inst = {
     catalogId: 'match-2',
     name: '比洞',
     players: players,
@@ -108,6 +107,27 @@ function match2Instance(players, pairings) {
     multiplier: 1,
     ruleSnapshot: rec.mergeRuleSnapshot(rec.buildRuleSnapshot('match-2'), { reward: 'none', pushRule: 'none' })
   };
+  if (extra.parties) inst.parties = extra.parties;
+  return inst;
+}
+
+function hostPlayersFromParties(parties) {
+  var out = [];
+  var seen = {};
+  (parties || []).forEach(function (p) {
+    var ids = p.memberPlayerIds && p.memberPlayerIds.length ? p.memberPlayerIds : [p.partyId];
+    ids.forEach(function (id) {
+      if (seen[id]) return;
+      seen[id] = true;
+      out.push({
+        playerId: id,
+        displayName: p.partyType === 'combination' ? String(id) : p.displayName || String(id),
+        groupId: p.groupId || 'g1',
+        avatar: p.avatar || ''
+      });
+    });
+  });
+  return out;
 }
 
 function makeHost(parties, scores, opts) {
@@ -116,14 +136,6 @@ function makeHost(parties, scores, opts) {
   var pars = {};
   holeOrder.forEach(function (h) {
     pars[h] = 4;
-  });
-  var players = parties.map(function (p) {
-    return {
-      playerId: p.partyId,
-      displayName: p.displayName,
-      groupId: p.groupId || 'g1',
-      avatar: p.avatar || ''
-    };
   });
   var ctx = hostMod.emptyContext({
     matchId: opts.matchId || 'm-m2',
@@ -136,7 +148,7 @@ function makeHost(parties, scores, opts) {
     holeOrder: holeOrder,
     pars: pars,
     allowBigPot: true,
-    players: players,
+    players: hostPlayersFromParties(parties),
     scoreParties: parties,
     officialScoresByPartyId: scores
   });
@@ -226,6 +238,7 @@ function attachTab(inst) {
 
 function findGameOpt(options, gameId) {
   var hit = null;
+  if (!gameId) return hit;
   (options || []).forEach(function (item) {
     if (item.id === gameId) hit = item;
     (item.children || []).forEach(function (child) {
@@ -235,16 +248,17 @@ function findGameOpt(options, gameId) {
   return hit;
 }
 
-function scoreSnap(nameMap, scoreMap) {
+function scoreSnap(nameMap, scoreMap, matchId) {
   var scoresByPlayer = {};
   var slots = [];
   Object.keys(scoreMap).forEach(function (id) {
     scoresByPlayer[id] = { scores: filled18(scoreMap[id]) };
     slots.push({ playerId: id, name: nameMap[id] || id });
   });
+  var mid = matchId || 'm-m2';
   return scoringSnap.fromGame(
     {
-      gameId: 'm-m2',
+      gameId: mid,
       groups: [
         {
           groupId: 'g1',
@@ -253,272 +267,198 @@ function scoreSnap(nameMap, scoreMap) {
         }
       ]
     },
-    { scope: 'group', groupId: 'g1', matchId: 'm-m2', allowBigPot: true }
+    { scope: 'group', groupId: 'g1', matchId: mid, allowBigPot: true }
   );
 }
 
-var nameMap = { pA: '甲', pB: '乙', pC: '丙', pD: '丁' };
-
-var parties = [
-  { partyId: 'pA', partyType: 'player', displayName: '甲', memberPlayerIds: ['pA'], groupId: 'g1' },
-  { partyId: 'pB', partyType: 'player', displayName: '乙', memberPlayerIds: ['pB'], groupId: 'g1' },
-  { partyId: 'pC', partyType: 'player', displayName: '丙', memberPlayerIds: ['pC'], groupId: 'g1' },
-  { partyId: 'pD', partyType: 'player', displayName: '丁', memberPlayerIds: ['pD'], groupId: 'g1' }
-];
-var scores = {
-  pA: holesOf(3),
-  pB: holesOf(5),
-  pC: holesOf(4),
-  pD: holesOf(6)
-};
-var ids = ['pA', 'pB', 'pC', 'pD'];
-var pairs = allPairs(ids);
-
-installRepo();
-var host = makeHost(parties, scores);
-attach(host);
-bind.discardSetupDraft();
-var game = bind.addGame(
-  'score',
-  match2Instance(
-    [
-      { id: 'pA' },
-      { id: 'pB' },
-      { id: 'pC' },
-      { id: 'pD' }
-    ],
-    pairs
-  )
-);
-
-assert('1 4方比洞生成6个pair', !!(game && game.id) && pairs.length === 6 && (game.pairings || []).filter(function (p) {
-  return p.on !== false;
-}).length === 6);
-
-var tab = makeTab({
-  entry: 'score',
-  hostSnapshot: scoreSnap(nameMap, { pA: 3, pB: 5, pC: 4, pD: 6 })
-});
-attachTab(tab);
-attach(host);
-
-var opt = findGameOpt(tab.data.gameOptions, game.id);
-var overall = bind.listBoard('score', game.id);
-var boardAB = bind.listBoard('score', game.id, pairId('pA', 'pB'));
-var boardCD = bind.listBoard('score', game.id, pairId('pC', 'pD'));
-
-assert(
-  '2 初次进入 activePairId 为空，显示整体汇总',
-  tab.data.activePairId === '' &&
-    (tab.data.board.players || []).length === 4 &&
-    (overall.players || []).length === 4
-);
-
-assert(
-  '3 主比洞点击显示全部6个pair',
-  tab.data.activeGameId === game.id &&
-    tab.data.activeGameName === '比洞' &&
-    opt &&
-    opt.hasPairs &&
-    (opt.pairs || []).length === 6
-);
-
-assert('4 二级菜单有6项', (opt.pairs || []).length === 6);
-
-tab.onSelectPair({ currentTarget: { dataset: { gid: game.id, pid: pairId('pA', 'pB') } } });
-assert(
-  '5 点击 pair AB 只显示 AB',
-  tab.data.activePairId === pairId('pA', 'pB') &&
-    (tab.data.board.players || []).map(function (p) { return p.id; }).join(',') === 'pA,pB' &&
-    (boardAB.players || []).length === 2
-);
-
-tab.onSelectPair({ currentTarget: { dataset: { gid: game.id, pid: pairId('pC', 'pD') } } });
-assert(
-  '6 点击 pair CD 切换为 CD',
-  tab.data.activePairId === pairId('pC', 'pD') &&
-    (tab.data.board.players || []).map(function (p) { return p.id; }).join(',') === 'pC,pD' &&
-    (boardCD.players || []).map(function (p) { return p.id; }).join(',') === 'pC,pD'
-);
-
-var totalsCD = (tab.data.board.totals || []).slice();
-tab.onSelectGame({ currentTarget: { dataset: { id: game.id } } });
-assert(
-  '7 再点击主比洞回全部汇总',
-  tab.data.activePairId === '' &&
-    (tab.data.board.players || []).length === 4 &&
-    (tab.data.board.totals || []).length === 4 &&
-    JSON.stringify(tab.data.board.totals) !== JSON.stringify(totalsCD)
-);
-
-assert(
-  '8 不默认锁定第一 pair',
-  tab.data.activePairId === '' &&
-    !(opt.pairs || [])[0].on &&
-    !/activePairId = String\(pairs\[0\]\.id\)/.test(
-      fs.readFileSync(path.join(gameRoot, 'components/game-tab/index.js'), 'utf8')
-    )
-);
-
-var overallIds = (overall.players || []).map(function (p) { return p.id; }).sort().join(',');
-assert(
-  '9 整体汇总不把6场合成四方一场',
-  overallIds === 'pA,pB,pC,pD' &&
-    (overall.players || []).length === 4 &&
-    (boardAB.players || []).length === 2 &&
-    game.catalogId === 'match-2' &&
-    (game.pairings || []).length === 6
-);
+function pairingEnds(game) {
+  return onPairings(game).map(function (p) {
+    return [p.leftId, p.rightId].sort().join('|');
+  });
+}
 
 function hasTone(board) {
   var ok = false;
-  (board.holes || []).forEach(function (h) {
+  ((board && board.holes) || []).forEach(function (h) {
     (h.cells || []).forEach(function (c) {
       if (c.cls) ok = true;
     });
   });
-  (board.totals || []).forEach(function (c) {
+  ((board && board.totals) || []).forEach(function (c) {
     if (c.cls) ok = true;
   });
   return ok;
 }
-assert('10 正负结果颜色保持', hasTone(overall) && hasTone(boardAB) && hasTone(boardCD));
 
-assert(
-  '11 头像昵称正确',
-  (overall.players || []).map(function (p) { return p.name; }).join(',') === '甲,乙,丙,丁' &&
-    (opt.pairs || []).some(function (p) { return p.name.indexOf('甲') >= 0 && p.name.indexOf('乙') >= 0; })
-);
-
-function runEntry(entry) {
-  var t = makeTab({
-    entry: entry,
-    hostSnapshot: scoreSnap(nameMap, { pA: 3, pB: 5, pC: 4, pD: 6 }),
-    scope: entry === 'match' ? 'match' : 'group'
+function playerIds(board) {
+  return ((board && board.players) || []).map(function (p) {
+    return p.id;
   });
-  attachTab(t);
-  attach(host);
-  return t;
 }
 
-var hubTab = runEntry('hub');
-var matchTab = runEntry('match');
-assert(
-  '12 记分页/Hub/赛事详情行为一致',
-  tab.data.activePairId === '' &&
-    hubTab.data.activePairId === '' &&
-    matchTab.data.activePairId === '' &&
-    (tab.data.board.players || []).length === 4 &&
-    (hubTab.data.board.players || []).length === 4 &&
-    (matchTab.data.board.players || []).length === 4
-);
+function playerNames(board) {
+  return ((board && board.players) || []).map(function (p) {
+    return p.name;
+  });
+}
 
-var flow = makeTab({
-  entry: 'match',
-  layoutMode: 'flow',
-  hostSnapshot: scoreSnap(nameMap, { pA: 3, pB: 5, pC: 4, pD: 6 })
-});
-attachTab(flow);
-attach(host);
-assert('13a 球队详情整体汇总行数', (flow.data.board.totals || []).length === 4);
-flow.onSelectPair({
-  currentTarget: { dataset: { gid: game.id, pid: pairId('pA', 'pB') } }
-});
-assert(
-  '13 球队详情底部汇总随整体/单pair切换',
-  (flow.data.board.totals || []).length === 2 && flow.data.activePairId === pairId('pA', 'pB')
-);
-flow.onSelectGame({ currentTarget: { dataset: { id: game.id } } });
-assert('13b 切回整体汇总', (flow.data.board.totals || []).length === 4 && flow.data.activePairId === '');
-
-installRepo();
-attach(makeHost(parties.slice(0, 2), { pA: holesOf(3), pB: holesOf(5) }));
-bind.discardSetupDraft();
-var two = bind.addGame(
-  'score',
-  match2Instance(
-    [{ id: 'pA' }, { id: 'pB' }],
-    [{ id: pairId('pA', 'pB'), leftId: 'pA', rightId: 'pB', on: true, strokes: 0 }]
-  )
-);
-var twoTab = makeTab({
-  entry: 'score',
-  hostSnapshot: scoreSnap({ pA: '甲', pB: '乙' }, { pA: 3, pB: 5 })
-});
-attachTab(twoTab);
-var twoOpt = findGameOpt(twoTab.data.gameOptions, two.id);
-assert(
-  '14 2方只有1个pair时仍按沙盒行为正常',
-  twoTab.data.activePairId === '' &&
-    (!twoOpt || !twoOpt.hasPairs) &&
-    (twoTab.data.board.players || []).length === 2
-);
-
-var comboParties = [
-  {
-    partyId: 'c1',
-    partyType: 'combination',
-    displayName: '组合甲',
-    memberPlayerIds: ['m1', 'm2'],
-    groupId: 'g1'
-  },
-  {
-    partyId: 'c2',
-    partyType: 'combination',
-    displayName: '组合乙',
-    memberPlayerIds: ['m3', 'm4'],
-    groupId: 'g1'
-  },
-  {
-    partyId: 'c3',
-    partyType: 'combination',
-    displayName: '组合丙',
-    memberPlayerIds: ['m5', 'm6'],
-    groupId: 'g1'
-  },
-  {
-    partyId: 'c4',
-    partyType: 'combination',
-    displayName: '组合丁',
-    memberPlayerIds: ['m7', 'm8'],
-    groupId: 'g1'
-  }
-];
-installRepo();
-attach(
-  makeHost(comboParties, {
-    c1: holesOf(3),
-    c2: holesOf(5),
-    c3: holesOf(4),
-    c4: holesOf(6)
-  })
-);
-bind.discardSetupDraft();
-var comboIds = ['c1', 'c2', 'c3', 'c4'];
-var comboGame = bind.addGame(
-  'score',
-  match2Instance(
-    comboIds.map(function (id) {
-      return { id: id };
-    }),
-    allPairs(comboIds)
-  )
-);
-var comboBoard = bind.listBoard('score', comboGame.id);
-assert(
-  '组合方整体汇总 4 行且名称来自 party',
-  (comboBoard.players || []).length === 4 &&
-    (comboBoard.players || []).every(function (p) {
-      return p.partyType === 'combination' && (p.memberNames || []).length === 2;
+try {
+  var fourParties = [
+    { partyId: 'pA', partyType: 'player', displayName: '甲', memberPlayerIds: ['pA'], groupId: 'g1' },
+    { partyId: 'pB', partyType: 'player', displayName: '乙', memberPlayerIds: ['pB'], groupId: 'g1' },
+    { partyId: 'pC', partyType: 'player', displayName: '丙', memberPlayerIds: ['pC'], groupId: 'g1' },
+    { partyId: 'pD', partyType: 'player', displayName: '丁', memberPlayerIds: ['pD'], groupId: 'g1' }
+  ];
+  installRepo();
+  attach(
+    makeHost(fourParties, {
+      pA: holesOf(3),
+      pB: holesOf(5),
+      pC: holesOf(4),
+      pD: holesOf(6)
     })
-);
+  );
+  bind.discardSetupDraft();
+  var four = bind.addGame(
+    'score',
+    match2Instance(
+      [{ id: 'pA' }, { id: 'pB' }, { id: 'pC' }, { id: 'pD' }],
+      [{ id: pairId('pA', 'pB'), leftId: 'pA', rightId: 'pB', on: true, strokes: 0 }]
+    )
+  );
+  assert(
+    '4个个人方创建 match-2 返回 party_count',
+    !!(four && four.__fail === true && four.reason === 'party_count'),
+    failReason(four)
+  );
+  if (createdOk(four)) {
+    assert('4个个人方不得当作合法局继续读棋盘', false, four.id);
+  }
 
-var tabJs = fs.readFileSync(path.join(gameRoot, 'components/game-tab/index.js'), 'utf8');
-assert(
-  '点击主菜单清空 pair 与沙盒一致',
-  /activeGameId: id, activePairId: ""/.test(tabJs) &&
-    /setBoardView\([^,]+, id, ""\)/.test(tabJs)
-);
+  var twoParties = fourParties.slice(0, 2);
+  installRepo();
+  var twoHost = makeHost(twoParties, { pA: holesOf(3), pB: holesOf(5) });
+  attach(twoHost);
+  bind.discardSetupDraft();
+  var two = bind.addGame(
+    'score',
+    match2Instance(
+      [{ id: 'pA' }, { id: 'pB' }],
+      [{ id: pairId('pA', 'pB'), leftId: 'pA', rightId: 'pB', on: true, strokes: 0 }]
+    )
+  );
+  assert('2个个人方创建成功', createdOk(two), failReason(two));
+  if (createdOk(two)) {
+    var twoPairs = onPairings(two);
+    var twoBoard = bind.listBoard('score', two.id);
+    var twoTab = makeTab({
+      entry: 'score',
+      hostSnapshot: scoreSnap({ pA: '甲', pB: '乙' }, { pA: 3, pB: 5 })
+    });
+    attachTab(twoTab);
+    attach(twoHost);
+    var twoOpt = findGameOpt(twoTab.data.gameOptions, two.id);
+    assert('2个个人方棋盘2行', playerIds(twoBoard).length === 2 && playerIds(twoTab.data.board).length === 2);
+    assert(
+      '2个个人方仅1条对决',
+      twoPairs.length === 1 && pairingEnds(two).join(',') === 'pA|pB'
+    );
+    assert(
+      '2个个人方无6项笛卡尔积菜单',
+      twoTab.data.activePairId === '' &&
+        (!twoOpt || twoOpt.hasPairs !== true) &&
+        ((twoOpt && twoOpt.pairs) || []).length < 2
+    );
+    assert('2个个人方显示名来自球员', playerNames(twoBoard).join(',') === '甲,乙');
+    assert('2个个人方结果色保持', hasTone(twoBoard));
+  }
+
+  var comboParties = [
+    {
+      partyId: 'c1',
+      partyType: 'combination',
+      displayName: '组合甲',
+      memberPlayerIds: ['m1', 'm2'],
+      groupId: 'g1'
+    },
+    {
+      partyId: 'c2',
+      partyType: 'combination',
+      displayName: '组合乙',
+      memberPlayerIds: ['m3', 'm4'],
+      groupId: 'g1'
+    }
+  ];
+  installRepo();
+  var comboHost = makeHost(comboParties, { c1: holesOf(3), c2: holesOf(5) }, { matchId: 'm-m2c' });
+  attach(comboHost);
+  bind.discardSetupDraft();
+  var comboGame = bind.addGame(
+    'score',
+    match2Instance(
+      [{ id: 'c1' }, { id: 'c2' }],
+      [{ id: pairId('c1', 'c2'), leftId: 'c1', rightId: 'c2', on: true, strokes: 0 }],
+      { parties: comboParties }
+    )
+  );
+  assert('2个combination创建成功', createdOk(comboGame), failReason(comboGame));
+  if (createdOk(comboGame)) {
+    var comboPairs = onPairings(comboGame);
+    var comboBoard = bind.listBoard('score', comboGame.id);
+    var comboTab = makeTab({
+      entry: 'score',
+      hostSnapshot: scoreSnap(
+        { m1: '甲1', m2: '甲2', m3: '乙1', m4: '乙2' },
+        { m1: 3, m2: 3, m3: 5, m4: 5 },
+        'm-m2c'
+      )
+    });
+    attachTab(comboTab);
+    attach(comboHost);
+    var comboOpt = findGameOpt(comboTab.data.gameOptions, comboGame.id);
+    var comboPlayers = comboBoard.players || [];
+    assert('2个combination棋盘2行', comboPlayers.length === 2 && playerIds(comboTab.data.board).length === 2);
+    assert(
+      '2个combination仅1条party对决',
+      comboPairs.length === 1 && pairingEnds(comboGame).join(',') === 'c1|c2'
+    );
+    assert(
+      '对决两端是partyId不是球员笛卡尔积',
+      comboPairs[0].leftId !== 'm1' &&
+        comboPairs[0].rightId !== 'm2' &&
+        ['c1', 'c2'].indexOf(comboPairs[0].leftId) >= 0 &&
+        ['c1', 'c2'].indexOf(comboPairs[0].rightId) >= 0
+    );
+    assert(
+      '组合显示名来自party或成员',
+      comboPlayers.every(function (p) {
+        var name = String(p.name || '');
+        var fromParty = name.indexOf('组合') >= 0;
+        var fromMembers = (p.memberNames || []).length === 2;
+        return p.partyType === 'combination' && (fromParty || fromMembers);
+      })
+    );
+    assert(
+      'combination无6项球员菜单',
+      comboTab.data.activePairId === '' &&
+        (!comboOpt || comboOpt.hasPairs !== true) &&
+        ((comboOpt && comboOpt.pairs) || []).length < 2
+    );
+  }
+
+  var tabJs = fs.readFileSync(path.join(gameRoot, 'components/game-tab/index.js'), 'utf8');
+  assert(
+    '主菜单点击清空 activePairId',
+    /activeGameId: id, activePairId: ""/.test(tabJs) && /setBoardView\([^,]+, id, ""\)/.test(tabJs)
+  );
+  assert(
+    '不默认锁定第一 pair',
+    !/activePairId = String\(pairs\[0\]\.id\)/.test(tabJs)
+  );
+} catch (err) {
+  failed += 1;
+  console.log('FAIL  unexpected throw :: ' + (err && err.stack ? err.stack : err));
+}
 
 console.log('SUMMARY passed=' + passed + ' failed=' + failed);
 process.exit(failed ? 1 : 0);
