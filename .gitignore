@@ -6,6 +6,8 @@
 
 # 02-微信小程序工程：本机配置、上传源、本地字体、临时脚本
 02-微信小程序工程/project.private.config.json
+03-海报沙盒/project.private.config.json
+04-游戏沙盒/project.private.config.json
 02-微信小程序工程/cos-upload/
 02-微信小程序工程/miniprogram/subpackages/poster/fonts/
 02-微信小程序工程/scripts/_count_selftests.js
