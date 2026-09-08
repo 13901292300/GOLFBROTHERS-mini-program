@@ -67,6 +67,7 @@ Page({
     this._seq = { intro: 0, members: 0, matches: 0 };
     this._attempted = { intro: false, members: false, matches: false };
     this._loaded = { intro: false, members: false, matches: false };
+    this._identityReady = null;
 
     this.setData({ teamId: teamId });
 
@@ -76,10 +77,26 @@ Page({
 
     // 右上角菜单分享先关掉，等简介加载出 canShareTeam 后再按权限打开
     this._applyShareMenu(false);
-    bootstrap.ensureCloudIdentity().then(() => {
+    this._ensureIdentityReady().then(() => {
       this.loadIntro();
       matchRefSync.flush();
     });
+  },
+
+  _ensureIdentityReady() {
+    if (!this._identityReady) {
+      const self = this;
+      this._identityReady = Promise.resolve(bootstrap.ensureCloudIdentity())
+        .then(function (res) {
+          if (!res || res.ok === false) self._identityReady = null;
+          return res || { ok: false, code: 'cloud_identity_missing' };
+        })
+        .catch(function () {
+          self._identityReady = null;
+          return { ok: false, code: 'cloud_identity_missing' };
+        });
+    }
+    return this._identityReady;
   },
 
   onShow() {
@@ -245,6 +262,13 @@ Page({
       this.setData({ membersState: 'error', members: [] });
       return;
     }
+    this._ensureIdentityReady().then(
+      () => this._loadMembersAfterIdentity(teamId),
+      () => this._loadMembersAfterIdentity(teamId)
+    );
+  },
+
+  _loadMembersAfterIdentity(teamId) {
     const token = this._openRequest('members');
     if (!token) return;
     if (!this._loaded.members) this.setData({ membersState: 'loading' });
