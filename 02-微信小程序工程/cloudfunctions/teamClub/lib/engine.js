@@ -456,6 +456,75 @@ function createEngine(store, wxCtx) {
     });
   }
 
+  function fanoutProfileToMemberships(user) {
+    function loop(cursor) {
+      return queryPage(C.COLLECTIONS.MEMBERS, {
+        where: { userId: user.userId },
+        orderBy: [
+          { field: 'joinedAt', direction: 'desc' },
+          { field: '_id', direction: 'desc' }
+        ],
+        limit: 50,
+        cursor: cursor
+      }).then(function (page) {
+        var rows = (page && page.list) || [];
+        var jobs = rows.map(function (m) {
+          if (!m || !m.teamId || !m.userId) return Promise.resolve(null);
+          var next = Object.assign({}, m, {
+            displayName: user.displayName,
+            avatar: user.avatar || '',
+            searchKey: searchKeyOf(user.displayName)
+          });
+          return run(function (tx) {
+            return tx.put(C.COLLECTIONS.MEMBERS, C.memberDocId(m.teamId, m.userId), next);
+          });
+        });
+        return Promise.all(jobs).then(function () {
+          if (page && page.hasMore && page.cursor) return loop(page.cursor);
+        });
+      });
+    }
+    return loop('');
+  }
+
+  function updateMyProfile(payload) {
+    return run(function (tx) {
+      return requireActor(tx, wxCtx).then(function (auth) {
+        if (!auth.ok) return auth;
+        return tx.get(C.COLLECTIONS.PROFILES, auth.user.userId).then(function (existing) {
+          if (!existing) return errors.fail('profile_required', '请先完善用户档案');
+          var nextAvatar =
+            payload && payload.avatar != null && String(payload.avatar).trim() !== ''
+              ? payload.avatar
+              : existing.avatar;
+          var checked = profileFields.validateProfileInput(
+            {
+              displayName:
+                payload && payload.displayName != null ? payload.displayName : existing.displayName,
+              avatar: nextAvatar
+            },
+            { requireAvatar: false }
+          );
+          if (!checked.ok) {
+            return errors.fail(checked.code || 'invalid_args', checked.message || '资料不完整');
+          }
+          existing.displayName = checked.displayName;
+          existing.avatar = checked.avatar || existing.avatar || '';
+          existing.searchKey = searchKeyOf(existing.displayName);
+          existing.updatedAt = tx.nowMs();
+          return tx.put(C.COLLECTIONS.PROFILES, auth.user.userId, existing).then(function () {
+            return errors.ok(publicUser(existing));
+          });
+        });
+      });
+    }).then(function (res) {
+      if (!res || !res.ok || !res.data) return res;
+      return fanoutProfileToMemberships(res.data).then(function () {
+        return res;
+      });
+    });
+  }
+
   function listMyTeams(payload) {
     var cursor = payload && payload.cursor;
     var limit = payload && payload.limit;
@@ -677,7 +746,25 @@ function createEngine(store, wxCtx) {
         ];
       }
       return queryPage(C.COLLECTIONS.MEMBERS, spec).then(function (page) {
-        return pagedOk(page, mapMemberView);
+        var rows = (page && page.list) || [];
+        var jobs = rows.map(function (m) {
+          if (!m || !m.userId) return Promise.resolve(mapMemberView(m));
+          return getDoc(C.COLLECTIONS.PROFILES, m.userId).then(function (p) {
+            if (!p) return mapMemberView(m);
+            var next = Object.assign({}, m);
+            var dn = p.displayName != null ? String(p.displayName).trim() : '';
+            if (dn) next.displayName = dn;
+            var av = p.avatar != null ? String(p.avatar).trim() : '';
+            if (profileFields.isDurableAvatar(av)) next.avatar = av;
+            return mapMemberView(next);
+          });
+        });
+        return Promise.all(jobs).then(function (list) {
+          var r = errors.ok(list);
+          r.cursor = (page && page.cursor) || '';
+          r.hasMore = !!(page && page.hasMore);
+          return r;
+        });
       });
     });
   }
@@ -2304,6 +2391,7 @@ function createEngine(store, wxCtx) {
   var api = {
     resolveIdentity: resolveIdentity,
     createMyProfile: createMyProfile,
+    updateMyProfile: updateMyProfile,
     listMyTeams: listMyTeams,
     getTeam: getTeam,
     createTeam: createTeam,
@@ -2405,6 +2493,7 @@ function stripClientIdentity(event) {
     payload.teamSnapshot = e.payload.teamSnapshot || e.payload.team || payload.teamSnapshot;
     payload.name = e.payload.name || payload.name;
     payload.displayName = e.payload.displayName || payload.displayName;
+    payload.avatar = e.payload.avatar != null ? e.payload.avatar : payload.avatar;
     payload.inviteId = e.payload.inviteId || payload.inviteId;
     payload.makeAdmin = e.payload.makeAdmin;
     payload.slogan = e.payload.slogan != null ? e.payload.slogan : payload.slogan;

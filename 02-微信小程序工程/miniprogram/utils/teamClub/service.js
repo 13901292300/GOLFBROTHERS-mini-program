@@ -33,8 +33,9 @@ var MATCH_DETAIL_PATH = '/subpackages/tournament/pages/detail/index';
 
 function resolveLogo(seed, explicit) {
   var url = String(explicit || '').trim();
-  if (url) return mockAvatars.resolveAvatar(url, seed);
-  return mockAvatars.pickMockAvatar(seed);
+  if (!url) return mockAvatars.pickMockAvatar(seed);
+  if (mockAvatars.isDurableAvatarSrc(url) && url.indexOf('cloud://') === 0) return url;
+  return mockAvatars.resolveAvatar(url, seed);
 }
 
 function decorateTeam(team) {
@@ -75,9 +76,15 @@ function hydrateTeams(list) {
 
 function decorateMember(m) {
   if (!m) return null;
-  var pinyin = String(m.sortPinyin || m.displayName || '').toLowerCase();
-  return Object.assign({}, m, {
-    avatar: resolveLogo(m.userId || m.displayName, m.avatar),
+  var live = m;
+  try {
+    live = require('./liveMemberProfile.js').overlaySelfMember(m) || m;
+  } catch (e) {
+    live = m;
+  }
+  var pinyin = String(live.sortPinyin || live.displayName || '').toLowerCase();
+  return Object.assign({}, live, {
+    avatar: resolveLogo(live.userId || live.displayName, live.avatar),
     sortPinyin: pinyin,
     letter: memberListView.letterFromPinyin(pinyin)
   });
@@ -799,6 +806,29 @@ module.exports = {
         })
       ).then(function (res) {
         if (!res.ok) return failEnvelope(res);
+        return { ok: true, user: res.data };
+      });
+    });
+  },
+  updateMyProfile: function (input) {
+    return wrap(function () {
+      var r = repo();
+      if (typeof r.updateMyProfile !== 'function') {
+        return failEnvelope({ code: 'unsupported', message: '当前仓储不支持更新资料' });
+      }
+      var body = input && typeof input === 'object' ? input : {};
+      return asResult(
+        r.updateMyProfile({
+          displayName: body.displayName,
+          avatar: body.avatar
+        })
+      ).then(function (res) {
+        if (!res.ok) return failEnvelope(res);
+        try {
+          identity.writeSession(res.data);
+        } catch (e) {
+          /* ignore */
+        }
         return { ok: true, user: res.data };
       });
     });

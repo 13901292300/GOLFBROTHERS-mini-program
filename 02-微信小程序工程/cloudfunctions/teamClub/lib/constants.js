@@ -54,6 +54,7 @@ var CONTRACT_METHODS = [
 var EXTRA_METHODS = [
   'resolveIdentity',
   'createMyProfile',
+  'updateMyProfile',
   'searchUsers',
   'listInvites',
   'listNotices',

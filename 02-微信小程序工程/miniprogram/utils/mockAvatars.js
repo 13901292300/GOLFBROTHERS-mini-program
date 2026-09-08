@@ -52,15 +52,65 @@ function isLocalAvatarPath(s) {
   return /^\/(assets|images)\//.test(s) || /^(assets|images)\//.test(s);
 }
 
+function isTempWeChatFile(s) {
+  const v = String(s || '').trim();
+  if (!v) return false;
+  if (/^wxfile:\/\/tmp/i.test(v)) return true;
+  if (/^https?:\/\/tmp\b/i.test(v)) return true;
+  if (/\/tmp(?:[_/]|$)/i.test(v) && /^(wxfile:|https?:)/i.test(v)) return true;
+  return false;
+}
+
+function _userDataRoot() {
+  try {
+    const root = typeof wx !== 'undefined' && wx.env && wx.env.USER_DATA_PATH;
+    return root ? String(root).replace(/\/$/, '') : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/** 用户目录持久文件：usr / USER_DATA_PATH。不含「非 tmp 即持久」。 */
+function isDurableLocalUserFile(s) {
+  const v = String(s || '').trim();
+  if (!v || isTempWeChatFile(v)) return false;
+  if (/^[A-Za-z]:[\\/]/.test(v) || /^file:\/\//i.test(v)) return false;
+  const root = _userDataRoot();
+  if (root && (v === root || v.indexOf(root + '/') === 0 || v.indexOf(root + '\\') === 0)) {
+    return true;
+  }
+  if (/^wxfile:\/\/usr/i.test(v)) return true;
+  if (/^https?:\/\/usr(?:\/|$)/i.test(v)) return true;
+  if (/^https?:\/\/127\.0\.0\.1(?::\d+)?\/usr\b/i.test(v)) return true;
+  if (/^https?:\/\/localhost(?::\d+)?\/usr\b/i.test(v)) return true;
+  return false;
+}
+
+function isHttpsNetworkAvatar(s) {
+  const v = String(s || '').trim();
+  return /^https:\/\//i.test(v) && !isTempWeChatFile(v);
+}
+
+function isCloudFileId(s) {
+  return /^cloud:\/\//i.test(String(s || '').trim());
+}
+
+/** 资料/记分可长期使用的头像：https、cloud://、包内资源、用户目录文件 */
+function isDurableAvatarSrc(s) {
+  const v = String(s || '').trim();
+  if (!v) return false;
+  if (isTempWeChatFile(v)) return false;
+  if (isCloudFileId(v)) return true;
+  if (isHttpsNetworkAvatar(v)) return true;
+  if (isLocalAvatarPath(v)) return true;
+  if (isDurableLocalUserFile(v)) return true;
+  return false;
+}
+
 function isInvalidAvatarSrc(s) {
-  return (
-    !s ||
-    s.startsWith('http://') ||
-    s.startsWith('file:') ||
-    /^[A-Za-z]:[\\/]/.test(s) ||
-    /wxfile:\/\//.test(s) ||
-    /tmp\//.test(s)
-  );
+  if (!s) return true;
+  if (isDurableAvatarSrc(s)) return false;
+  return true;
 }
 
 function normalizeLocalPath(s) {
@@ -78,11 +128,11 @@ function normalizeLocalPath(s) {
 /** 将头像字段规范为小程序可访问路径 */
 function resolveAvatar(src, seed) {
   const s = String(src || '').trim();
+  if (isDurableLocalUserFile(s) || isHttpsNetworkAvatar(s)) {
+    return s;
+  }
   if (isLocalAvatarPath(s)) {
     return normalizeLocalPath(s);
-  }
-  if (s.indexOf('https://') === 0) {
-    return s;
   }
   if (isInvalidAvatarSrc(s)) {
     return seed != null && String(seed).trim() ? pickMockAvatar(seed) : DEFAULT_AVATAR;
@@ -106,5 +156,8 @@ module.exports = {
   avatarByIndex,
   pickMockAvatar,
   resolveAvatar,
-  enrichPlayerAvatar
+  enrichPlayerAvatar,
+  isTempWeChatFile,
+  isDurableLocalUserFile,
+  isDurableAvatarSrc
 };

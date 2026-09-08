@@ -152,13 +152,13 @@ assert(
   'WXML chooseAvatar 绑定 onChooseAvatar',
   /open-type=["']chooseAvatar["']/.test(wxml) &&
     /bindchooseavatar=["']onChooseAvatar["']/.test(wxml) &&
-    /bindtap=["']onTapAvatar["']/.test(wxml)
+    !/bindtap=["']onTapAvatar["']/.test(wxml)
 );
 assert(
-  '_pickLocalAvatar 存在且被头像入口调用',
+  '头像入口只走 chooseAvatar，不叠相册弹窗',
   methodSource(js, '_pickLocalAvatar').indexOf('wx.chooseMedia') >= 0 &&
     methodSource(js, 'updateAvatar').indexOf('this._pickLocalAvatar()') >= 0 &&
-    methodSource(js, 'onTapAvatar').indexOf('this._pickLocalAvatar()') >= 0 &&
+    !/\bonTapAvatar\s*\(/.test(js) &&
     methodSource(js, 'onChooseAvatar').indexOf('_commitAvatar') >= 0
 );
 
@@ -208,10 +208,24 @@ var store = {
   IDENTITY_CADDIE: 'CADDIE',
   DEFAULT_AVATAR: '/default/avatar.png',
   loadProfile: function () { return profileState; },
+  resolveDisplayAvatar: function (p) {
+    return (p && p.avatar) || '/default/avatar.png';
+  },
   updateProfile: function (patch) {
     updates.push(patch);
     Object.keys(patch).forEach(function (key) {
       profileState[key] = patch[key];
+    });
+  },
+  persistAvatarFile: function (tempPath, cb) {
+    wxApi.saveFile({
+      tempFilePath: tempPath,
+      success: function (res) {
+        cb({ ok: true, path: String((res && res.savedFilePath) || '') });
+      },
+      fail: function () {
+        cb({ ok: false, path: '' });
+      }
     });
   }
 };

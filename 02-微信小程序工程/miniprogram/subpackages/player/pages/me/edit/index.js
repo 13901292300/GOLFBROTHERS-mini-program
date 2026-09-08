@@ -53,7 +53,7 @@ function buildUserProfileView() {
   const regionDisplayName = geoCatalog.formatRegionDisplayName(p);
 
   return {
-    avatar: p.avatar || userProfileStore.DEFAULT_AVATAR,
+    avatar: userProfileStore.resolveDisplayAvatar(p),
     nickname: nickname,
     gender: genderNormalize.genderLabelZh(p.gender),
     signature: signature,
@@ -145,25 +145,14 @@ Page({
     this.setData({ userProfile: buildUserProfileView() });
   },
 
-  /** 预留：未来接微信头像更新 */
+  /** 相册选图备用入口（勿与 chooseAvatar 同时绑 tap，否则会叠两个底部弹窗） */
   updateAvatar() {
     this._pickLocalAvatar();
-  },
-
-  onTapAvatar() {
-    setTimeout(() => {
-      if (this._avatarChosen) {
-        this._avatarChosen = false;
-        return;
-      }
-      this._pickLocalAvatar();
-    }, 400);
   },
 
   onChooseAvatar(e) {
     const url = e && e.detail && e.detail.avatarUrl;
     if (!url) return;
-    this._avatarChosen = true;
     this._commitAvatar(url);
   },
 
@@ -208,6 +197,7 @@ Page({
     const saveAndApply = (finalPath) => {
       userProfileStore.updateProfile({ avatar: finalPath });
       this.refreshProfile();
+      profileOnboard.syncLiveProfileToTeams();
       wx.showToast({ title: '头像已更新', icon: 'success' });
     };
     if (this.data.teamClubOnboard) {
@@ -221,14 +211,12 @@ Page({
       });
       return;
     }
-    if (typeof wx.saveFile !== 'function') {
-      saveAndApply(path);
-      return;
-    }
-    wx.saveFile({
-      tempFilePath: path,
-      success: (res) => saveAndApply(res.savedFilePath || path),
-      fail: () => saveAndApply(path)
+    userProfileStore.persistAvatarFile(path, (res) => {
+      if (res && res.ok && res.path) {
+        saveAndApply(res.path);
+        return;
+      }
+      wx.showToast({ title: '头像保存失败', icon: 'none' });
     });
   },
 
@@ -309,6 +297,7 @@ Page({
         return;
       }
       userProfileStore.updateProfile({ nickname: nick.displayName });
+      profileOnboard.syncLiveProfileToTeams();
     } else if (field === 'signature') {
       userProfileStore.updateProfile({ signature: value });
     } else if (field === 'displayName') {
@@ -511,6 +500,7 @@ Page({
     }
     userProfileStore.updateProfile({ nickname: nick.displayName });
     this.refreshProfile();
+    profileOnboard.syncLiveProfileToTeams();
   },
 
   onFinishTeamProfile() {

@@ -84,7 +84,29 @@ function peekTeam(teamId) {
 }
 
 function peekMembers(teamId) {
-  return (bucket().members[String(teamId)] || []).slice();
+  var list = (bucket().members[String(teamId)] || []).slice();
+  try {
+    return require('./liveMemberProfile.js').overlaySelfMembers(list);
+  } catch (e) {
+    return list;
+  }
+}
+
+function patchCurrentUserAppearance(user) {
+  var uid = String((user && user.userId) || userKey()).trim();
+  if (!uid) return;
+  var name = String((user && user.displayName) || '').trim();
+  var avatar = String((user && user.avatar) || '').trim();
+  var b = bucket();
+  Object.keys(b.members).forEach(function (tid) {
+    b.members[tid] = (b.members[tid] || []).map(function (m) {
+      if (!m || String(m.userId || '').trim() !== uid) return m;
+      return Object.assign({}, m, {
+        displayName: name || m.displayName,
+        avatar: avatar || m.avatar
+      });
+    });
+  });
 }
 
 function listTeams() {
@@ -118,6 +140,7 @@ module.exports = {
   putMembers: putMembers,
   peekTeam: peekTeam,
   peekMembers: peekMembers,
+  patchCurrentUserAppearance: patchCurrentUserAppearance,
   listTeams: listTeams,
   applyResult: applyResult,
   STALE_MS: STALE_MS

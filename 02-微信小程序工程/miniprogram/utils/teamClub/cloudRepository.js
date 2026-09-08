@@ -37,6 +37,14 @@ function callCloud(action, payload) {
       if (result.ok && action === 'createMyProfile' && result.data) {
         identity.writeSession(result.data);
       }
+      if (result.ok && action === 'updateMyProfile' && result.data) {
+        identity.writeSession(result.data);
+        try {
+          snapshot.patchCurrentUserAppearance(result.data);
+        } catch (e2) {
+          /* ignore */
+        }
+      }
       return result;
     })
     .catch(function () {
@@ -167,6 +175,9 @@ module.exports = {
   },
   createMyProfile: function (input) {
     return invoke('createMyProfile', input || {});
+  },
+  updateMyProfile: function (input) {
+    return invoke('updateMyProfile', input || {});
   },
   searchUsers: function (query, options) {
     return invoke('searchUsers', Object.assign({ query: query }, options || {}));

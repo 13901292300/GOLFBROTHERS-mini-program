@@ -42,6 +42,7 @@ var METHODS = [
 var EXTRA_METHODS = [
   'resolveIdentity',
   'createMyProfile',
+  'updateMyProfile',
   'searchUsers',
   'listInvites',
   'listNotices',

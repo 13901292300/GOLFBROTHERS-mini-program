@@ -92,6 +92,119 @@ function submitCloudProfile(input) {
   });
 }
 
+function applyLiveToLocalCaches(user) {
+  if (!user) return;
+  try {
+    identity.writeSession(user);
+  } catch (e) {
+    /* ignore */
+  }
+  try {
+    require('./snapshot.js').patchCurrentUserAppearance(user);
+  } catch (e2) {
+    /* ignore */
+  }
+}
+
+function warnSyncFailure(reason) {
+  try {
+    console.warn('[profileOnboard] syncLiveProfileToTeams failed', String(reason || 'update_profile_failed'));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function currentLocalAvatar() {
+  try {
+    return String((userProfileStore.loadProfile() || {}).avatar || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+
+/** 仅当本地头像仍是本次同步开始时的那张时，才回写 durable URL，避免慢上传覆盖后来的新头像 */
+function writebackDurableAvatarIfUnchanged(startedAvatar, durableAvatar) {
+  var durable = String(durableAvatar || '').trim();
+  if (!fields.isDurableAvatar(durable)) return;
+  if (currentLocalAvatar() !== String(startedAvatar || '').trim()) return;
+  if (currentLocalAvatar() === durable) return;
+  try {
+    userProfileStore.updateProfile({ avatar: durable });
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function resolveDurableAvatar(localAvatar) {
+  var raw = String(localAvatar || '').trim();
+  if (!raw) {
+    return Promise.resolve({ ok: true, avatar: '', empty: true });
+  }
+  if (fields.isDurableAvatar(raw)) {
+    return Promise.resolve({ ok: true, avatar: raw });
+  }
+  return uploadTempAvatar(raw).then(function (up) {
+    var uploaded = up && up.avatar ? String(up.avatar).trim() : '';
+    if (up && up.ok && fields.isDurableAvatar(uploaded)) {
+      return { ok: true, avatar: uploaded };
+    }
+    return { ok: false, code: 'avatar_upload_failed' };
+  });
+}
+
+function mapUpdateProfileFailure(res) {
+  var code = res && res.code ? String(res.code) : '';
+  if (code === 'unknown_action') return 'unknown_action';
+  if (code === 'profile_required' || code === 'need_login') return 'cloud_identity_missing';
+  return 'update_profile_failed';
+}
+
+/**
+ * 把「我的」最新昵称/头像写回云档案，并刷新已加入球队花名册中的本人行。
+ * 不参与本地资料即时保存；失败不回滚 gb_user_profile_v1。
+ */
+function syncLiveProfileToTeams() {
+  var startedAvatar = currentLocalAvatar();
+  var draft = readLocalDraft();
+  var nick = fields.validateNickname(draft.displayName);
+  if (!nick.ok) {
+    return Promise.resolve({ ok: true, skipped: 'invalid_nickname' });
+  }
+  var repo = factory.get();
+  if (!repo || typeof repo.updateMyProfile !== 'function') {
+    warnSyncFailure('update_profile_failed');
+    return Promise.resolve({ ok: false, code: 'update_profile_failed' });
+  }
+
+  return resolveDurableAvatar(startedAvatar)
+    .then(function (up) {
+      var payload = { displayName: nick.displayName };
+      var durableAvatar = '';
+      if (up && up.ok && fields.isDurableAvatar(up.avatar)) {
+        durableAvatar = up.avatar;
+        payload.avatar = durableAvatar;
+      } else if (startedAvatar) {
+        warnSyncFailure('avatar_upload_failed');
+      }
+      return Promise.resolve(repo.updateMyProfile(payload)).then(function (res) {
+        if (res && res.ok && res.data) {
+          applyLiveToLocalCaches(res.data);
+          if (durableAvatar) {
+            writebackDurableAvatarIfUnchanged(startedAvatar, durableAvatar);
+          }
+          return { ok: true, user: res.data };
+        }
+        var reason = mapUpdateProfileFailure(res);
+        warnSyncFailure(reason);
+        return { ok: false, code: reason };
+      });
+    })
+    .catch(function () {
+      warnSyncFailure('update_profile_failed');
+      return { ok: false, code: 'update_profile_failed' };
+    });
+}
+
 function submitFromLocal(options) {
   var opts = options || {};
   if (_busy && !opts.alreadyLocked) {
@@ -155,6 +268,7 @@ module.exports = {
   uploadTempAvatar: uploadTempAvatar,
   submitCloudProfile: submitCloudProfile,
   submitFromLocal: submitFromLocal,
+  syncLiveProfileToTeams: syncLiveProfileToTeams,
   returnToMyTeams: returnToMyTeams,
   beginLock: beginLock,
   endLock: endLock,

@@ -11,6 +11,7 @@
 
 const gameStore = require('./gameStore.js');
 const geoCatalog = require('./geoCatalog.js');
+const mockAvatars = require('./mockAvatars.js');
 
 const STORAGE_KEY = 'gb_user_profile_v1';
 
@@ -256,6 +257,97 @@ function persistRegisterCompetitionDraft(draft) {
   return setDisplayName(value);
 }
 
+/** 「我的」展示用：仅持久头像；临时路径不显示为已保存成功 */
+function resolveDisplayAvatar(profile) {
+  const raw = String((profile && profile.avatar) || '').trim();
+  if (mockAvatars.isDurableAvatarSrc(raw)) return raw;
+  return DEFAULT_AVATAR;
+}
+
+function _avatarExtFromPath(path) {
+  const m = String(path || '').match(/(\.[a-zA-Z0-9]{1,8})(?:\?|$)/);
+  return m ? m[1] : '.jpg';
+}
+
+function _wxSaveFileFallback(tempPath, done) {
+  if (typeof wx.saveFile !== 'function') {
+    done({ ok: false, path: '', reason: 'save_unavailable' });
+    return;
+  }
+  wx.saveFile({
+    tempFilePath: tempPath,
+    success: (res) => {
+      const saved = String((res && res.savedFilePath) || '').trim();
+      if (mockAvatars.isDurableAvatarSrc(saved)) {
+        done({ ok: true, path: saved });
+        return;
+      }
+      done({ ok: false, path: '', reason: 'not_durable' });
+    },
+    fail: () => done({ ok: false, path: '', reason: 'save_failed' })
+  });
+}
+
+/**
+ * 把选图临时文件落到用户目录。失败不回写临时路径。
+ * callback({ ok, path, reason })
+ */
+function persistAvatarFile(tempPath, callback) {
+  const path = String(tempPath || '').trim();
+  const done = typeof callback === 'function' ? callback : function () {};
+  if (!path) {
+    done({ ok: false, path: '', reason: 'empty' });
+    return;
+  }
+  if (mockAvatars.isDurableAvatarSrc(path) && /^https:\/\//i.test(path)) {
+    done({ ok: true, path: path });
+    return;
+  }
+  if (mockAvatars.isDurableLocalUserFile(path)) {
+    done({ ok: true, path: path });
+    return;
+  }
+  let dest = '';
+  try {
+    const root = wx.env && wx.env.USER_DATA_PATH;
+    if (root) {
+      dest = String(root).replace(/\/$/, '') + '/gb_avatar_' + Date.now() + _avatarExtFromPath(path);
+    }
+  } catch (e) {
+    dest = '';
+  }
+  const finishIfDurable = (saved) => {
+    const next = String(saved || '').trim();
+    if (mockAvatars.isDurableAvatarSrc(next)) {
+      done({ ok: true, path: next });
+      return;
+    }
+    done({ ok: false, path: '', reason: 'not_durable' });
+  };
+  const fs = typeof wx.getFileSystemManager === 'function' ? wx.getFileSystemManager() : null;
+  if (fs && dest && typeof fs.saveFile === 'function') {
+    fs.saveFile({
+      tempFilePath: path,
+      filePath: dest,
+      success: (res) => finishIfDurable((res && res.savedFilePath) || dest),
+      fail: () => {
+        if (typeof fs.copyFile === 'function') {
+          fs.copyFile({
+            srcPath: path,
+            destPath: dest,
+            success: () => finishIfDurable(dest),
+            fail: () => _wxSaveFileFallback(path, done)
+          });
+        } else {
+          _wxSaveFileFallback(path, done);
+        }
+      }
+    });
+    return;
+  }
+  _wxSaveFileFallback(path, done);
+}
+
 module.exports = {
   STORAGE_KEY,
   DEFAULT_AVATAR,
@@ -270,5 +362,7 @@ module.exports = {
   setCompetitionName,
   getRegisterCompetitionNameDefault,
   resolveRegisterCompetitionName,
-  persistRegisterCompetitionDraft
+  persistRegisterCompetitionDraft,
+  persistAvatarFile,
+  resolveDisplayAvatar
 };

@@ -1200,6 +1200,44 @@ function upsertMatchRef(payload) {
   return errors.ok(row);
 }
 
+function updateMyProfile(input) {
+  var auth = actorFromOptions();
+  if (!auth.ok) return failAuth(auth);
+  var profileFields = require('./profileFields.js');
+  var existingName = String((auth.user && auth.user.displayName) || '').trim();
+  var existingAvatar = String((auth.user && auth.user.avatar) || '').trim();
+  var nextAvatar =
+    input && input.avatar != null && String(input.avatar).trim() !== ''
+      ? input.avatar
+      : existingAvatar;
+  var checked = profileFields.validateProfileInput(
+    {
+      displayName: input && input.displayName != null ? input.displayName : existingName,
+      avatar: nextAvatar
+    },
+    { requireAvatar: false }
+  );
+  if (!checked.ok) return errors.fail(checked.code, checked.message);
+  var uid = String(auth.user.userId || '').trim();
+  identity.writeSession({
+    userId: uid,
+    displayName: checked.displayName,
+    avatar: checked.avatar || existingAvatar
+  });
+  var store = loadStore();
+  store.members.forEach(function (m) {
+    if (!m || String(m.userId || '').trim() !== uid) return;
+    m.displayName = checked.displayName;
+    m.avatar = checked.avatar || existingAvatar;
+  });
+  persist();
+  return errors.ok({
+    userId: uid,
+    displayName: checked.displayName,
+    avatar: checked.avatar || existingAvatar
+  });
+}
+
 function listTeamsForUser(userId) {
   var uid = String(userId || '').trim();
   if (!uid || uid.toLowerCase() === 'me') return [];
@@ -1265,6 +1303,7 @@ module.exports = {
   putMatch: putMatch,
   confirmMatchMigration: confirmMatchMigration,
   upsertMatchRef: upsertMatchRef,
+  updateMyProfile: updateMyProfile,
   listTeamsForUser: listTeamsForUser,
   mapTeamView: mapTeamView,
   mapMemberView: mapMemberView,

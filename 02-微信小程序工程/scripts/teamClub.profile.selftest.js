@@ -25,6 +25,7 @@ function read(p) {
 }
 
 var fields = require(path.join(mini, 'utils', 'teamClub', 'profileFields.js'));
+var userProfileStore = require(path.join(mini, 'utils', 'userProfileStore.js'));
 var pageErrors = require(path.join(mini, 'utils', 'teamClub', 'pageErrors.js'));
 var profileOnboard = require(path.join(mini, 'utils', 'teamClub', 'profileOnboard.js'));
 var engine = require(path.join(cloudLib, 'engine.js'));
@@ -92,6 +93,30 @@ async function main() {
   assert('非法字符拒绝', fields.validateNickname('A<b>').ok === false);
   assert('https 头像可入库', fields.isDurableAvatar('https://cdn.example.com/a.jpg') === true);
   assert('cloud fileID 可入库', fields.isDurableAvatar('cloud://env.bucket/a.jpg') === true);
+  var cloudSrc = 'cloud://env.bucket/a.jpg';
+  assert(
+    'cloud:// 可在我的页展示',
+    userProfileStore.resolveDisplayAvatar({ avatar: cloudSrc }) === cloudSrc
+  );
+  assert(
+    'https 展示保持原样',
+    userProfileStore.resolveDisplayAvatar({ avatar: 'https://cdn.example.com/a.jpg' }) ===
+      'https://cdn.example.com/a.jpg'
+  );
+  assert(
+    'usr 持久文件展示保持原样',
+    userProfileStore.resolveDisplayAvatar({ avatar: 'wxfile://usr/gb_avatar.jpg' }) ===
+      'wxfile://usr/gb_avatar.jpg'
+  );
+  assert(
+    '空头像仍回退默认图',
+    userProfileStore.resolveDisplayAvatar({ avatar: '' }) === userProfileStore.DEFAULT_AVATAR
+  );
+  assert(
+    'tmp 路径仍不可展示',
+    userProfileStore.resolveDisplayAvatar({ avatar: 'wxfile://tmp/a.jpg' }) ===
+      userProfileStore.DEFAULT_AVATAR
+  );
   assert('临时路径不可入库', fields.isTempPath('wxfile://tmp_a.jpg') === true && !fields.validateAvatar('wxfile://tmp_a.jpg', true).ok);
   assert('http tmp 不可入库', !fields.validateAvatar('http://tmp/wx123.jpg', true).ok);
 
@@ -139,7 +164,11 @@ async function main() {
   assert('建档成功后自动刷新列表', teamsAfter);
 
   var onboard = read(path.join(mini, 'utils', 'teamClub', 'profileOnboard.js'));
-  assert('建档请求不带客户端 userId', onboard.indexOf('createMyProfile({') >= 0 && onboard.indexOf('userId:') < 0);
+  var createCall = onboard.match(/createMyProfile\(\{[\s\S]*?\}\)/);
+  assert(
+    '建档请求不带客户端 userId',
+    !!(createCall && createCall[0].indexOf('createMyProfile({') >= 0 && createCall[0].indexOf('userId:') < 0)
+  );
   assert('提交锁覆盖确认弹窗', teamsJs.indexOf('beginLock()') >= 0 && teamsJs.indexOf('showModal') >= 0);
   assert('提交锁覆盖资料页返回', editJs.indexOf('keepLockOnSuccess: true') >= 0 && teamsJs.indexOf('keepLockOnSuccess: true') >= 0);
   assert('提交锁覆盖自动刷新', teamsJs.indexOf('loadTeams()') >= 0 && teamsJs.indexOf('endLock()') >= 0);
@@ -267,6 +296,83 @@ async function main() {
   );
   var afterUpdate = await sdkStore.get(C.COLLECTIONS.CLUBS, teamId);
   assert('update 后读取仍有 _id 和 teamId', afterUpdate && afterUpdate._id === teamId && afterUpdate.teamId === teamId);
+
+  var renamed = await call(sdkStore, 'oid_sdk_a', 'updateMyProfile', {
+    displayName: '新队长名',
+    avatar: 'https://cdn.example.com/new-a.jpg'
+  });
+  assert('更新资料成功', renamed.ok && renamed.data && renamed.data.displayName === '新队长名');
+  var membersAfter = await call(sdkStore, 'oid_sdk_a', 'listMembers', { teamId: teamId });
+  var selfRow = ((membersAfter && membersAfter.data) || []).find(function (m) {
+    return m && m.userId === pA.data.userId;
+  });
+  assert(
+    '已建球队超管花名册跟随新头像昵称',
+    !!(selfRow && selfRow.displayName === '新队长名' && String(selfRow.avatar).indexOf('new-a') >= 0)
+  );
+  await sdkStore.runTransaction(function (tx) {
+    return tx.get(C.COLLECTIONS.PROFILES, pA.data.userId).then(function (p) {
+      p.avatar = '';
+      p.displayName = '';
+      return tx.put(C.COLLECTIONS.PROFILES, pA.data.userId, p);
+    });
+  });
+  var membersKeepSnap = await call(sdkStore, 'oid_sdk_a', 'listMembers', { teamId: teamId });
+  var keepRow = ((membersKeepSnap && membersKeepSnap.data) || []).find(function (m) {
+    return m && m.userId === pA.data.userId;
+  });
+  assert(
+    '空 profile 字段不覆盖成员快照',
+    !!(
+      keepRow &&
+      keepRow.displayName === '新队长名' &&
+      String(keepRow.avatar).indexOf('new-a') >= 0
+    )
+  );
+  await sdkStore.runTransaction(function (tx) {
+    return tx.get(C.COLLECTIONS.PROFILES, pA.data.userId).then(function (p) {
+      p.avatar = 'https://cdn.example.com/new-a.jpg';
+      p.displayName = '新队长名';
+      return tx.put(C.COLLECTIONS.PROFILES, pA.data.userId, p);
+    });
+  });
+  var createStillIdempotent = await call(sdkStore, 'oid_sdk_a', 'createMyProfile', {
+    displayName: '不该变',
+    avatar: 'https://cdn.example.com/z.jpg'
+  });
+  assert(
+    'createMyProfile 仍不覆盖已更新资料',
+    createStillIdempotent.ok && createStillIdempotent.data.displayName === '新队长名'
+  );
+  assert('资料页改昵称头像会同步球队', editJs.indexOf('syncLiveProfileToTeams') >= 0);
+  var onboardSrc = read(path.join(mini, 'utils', 'teamClub', 'profileOnboard.js'));
+  assert(
+    '同步失败打 warn 且区分原因',
+    onboardSrc.indexOf("console.warn('[profileOnboard] syncLiveProfileToTeams failed'") >= 0 &&
+      onboardSrc.indexOf('avatar_upload_failed') >= 0 &&
+      onboardSrc.indexOf('update_profile_failed') >= 0 &&
+      onboardSrc.indexOf('unknown_action') >= 0 &&
+      onboardSrc.indexOf('cloud_identity_missing') >= 0
+  );
+  assert(
+    'durable 校验后才 updateMyProfile，且回写有启动时 avatar 比对',
+    onboardSrc.indexOf('resolveDurableAvatar') >= 0 &&
+      onboardSrc.indexOf('writebackDurableAvatarIfUnchanged') >= 0 &&
+      onboardSrc.indexOf('fields.isDurableAvatar(durable)') >= 0 &&
+      onboardSrc.indexOf('currentLocalAvatar() !== String(startedAvatar') >= 0 &&
+      onboardSrc.indexOf('empty: true') >= 0 &&
+      onboardSrc.indexOf('payload.avatar = durableAvatar') >= 0
+  );
+  var detailJs = read(
+    path.join(mini, 'subpackages', 'player', 'pages', 'me', 'team-detail', 'index.js')
+  );
+  assert(
+    '成员列表先 ensureCloudIdentity 再拉成员',
+    detailJs.indexOf('_ensureIdentityReady') >= 0 &&
+      /loadMembers\(\)\s*\{[\s\S]*_ensureIdentityReady\(\)\.then/.test(detailJs) &&
+      detailJs.indexOf('_loadMembersAfterIdentity') >= 0 &&
+      detailJs.indexOf('self._identityReady = null') >= 0
+  );
 
   var stripped = ser.toSdkWriteData({
     _id: 'doc1',

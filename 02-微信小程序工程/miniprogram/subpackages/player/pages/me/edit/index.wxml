@@ -28,7 +28,7 @@
         />
       </view>
       <!-- 1. 基础资料 -->
-      <button class="pe-card pe-avatar-card pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" bindtap="onTapAvatar">
+      <button class="pe-card pe-avatar-card pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
         <view class="pe-avatar-ring">
           <image class="pe-avatar-img" src="{{userProfile.avatar}}" mode="aspectFill" />
         </view>
