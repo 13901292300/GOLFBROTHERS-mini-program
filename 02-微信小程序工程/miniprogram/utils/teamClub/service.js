@@ -772,6 +772,18 @@ function fetchTeamMatches(teamId) {
   });
 }
 
+function listTeamsForCreateDefault() {
+  return wrap(function () {
+    return require('./createTeamSelect.js').listTeamsForCreateDefault({
+      listMyTeams: listMyTeams
+    });
+  });
+}
+
+function searchTeamsForCreate(keyword) {
+  return require('./createTeamSelect.js').searchTeamsForCreate(keyword);
+}
+
 module.exports = {
   CREATE_TEAM_PATH: CREATE_TEAM_PATH,
   TEAM_DETAIL_PATH: TEAM_DETAIL_PATH,
@@ -787,6 +799,8 @@ module.exports = {
     return identity.currentUserIdOrEmpty();
   },
   listMyTeams: listMyTeams,
+  listTeamsForCreateDefault: listTeamsForCreateDefault,
+  searchTeamsForCreate: searchTeamsForCreate,
   getTeamDetail: getTeamDetail,
   listTeamMembers: listTeamMembers,
   listTeamMatches: listTeamMatches,

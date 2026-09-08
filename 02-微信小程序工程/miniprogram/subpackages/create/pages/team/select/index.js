@@ -1,6 +1,7 @@
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const teamDirectory = require('../../../../../utils/teamDirectory.js');
 const teamClub = require('../../../../../utils/teamClub/service.js');
+const bootstrap = require('../../../../../utils/teamClub/bootstrap.js');
 const mockAvatars = require('../../../../../utils/mockAvatars.js');
 const {
   TEAM_SELECT_MODES,
@@ -8,6 +9,9 @@ const {
   isMultiParticipantSelectMode,
   isEventOrgSelectMode
 } = require('../../../../../utils/teamSelectModes.js');
+const { resolveTeamSelectEmptyUi } = require('../../../../../utils/teamSelectSearchUi.js');
+const teamAssetUpload = require('../../../../../utils/teamClub/teamAssetUpload.js');
+const teamLogo = require('../../../../../utils/teamClub/teamLogo.js');
 
 const NAME_MAX = 30;
 const SLOGAN_MAX = 50;
@@ -59,9 +63,14 @@ Page({
     selectedIds: [],
     selectedParticipants: [],
     teams: [],
+    teamsLoading: false,
     selectedTeam: null,
     emptyVisible: false,
     showEmptyState: false,
+    showSearchCreateEmpty: false,
+    showSearchUnavailable: false,
+    searchImplemented: false,
+    searchOk: true,
     emptyTerm: '',
     footerSelectedCount: 0,
     confirmEnabled: false,
@@ -85,7 +94,9 @@ Page({
     createShortNameCount: 0,
     createSloganCount: 0,
     createDescCount: 0,
-    showCreateShortName: true
+    showCreateShortName: true,
+    logoUploading: false,
+    logoPreview: ''
   },
 
   onLoad(options) {
@@ -105,6 +116,13 @@ Page({
     this._selectMode = selectMode;
     this._pendingInitParticipants = null;
     this._pendingInitOrganization = null;
+    this._defaultTeams = [];
+    this._searchResults = [];
+    this._searchImplemented = false;
+    this._searchOk = true;
+    this._clubDefaultReady = false;
+    this._loadingDefault = false;
+    this._searchSeq = 0;
 
     // 比洞赛：限制最多 2 支（由创建页传入 maxCount）
     const maxCount = options && options.maxCount != null ? Number(options.maxCount) : 0;
@@ -142,7 +160,7 @@ Page({
         if (this._pendingInitParticipants) {
           const pendingIds = this._pendingInitParticipants.selectedIds || [];
           this._pendingInitParticipants = null;
-          this.setData({ selectedIds: pendingIds }, () => this.refreshTeams());
+          this.setData({ selectedIds: pendingIds }, () => this._afterInitLoad());
           return;
         }
         if (this._pendingInitOrganization) {
@@ -153,11 +171,11 @@ Page({
               selectedId: pending.selectedId || '',
               selectedTeamId: pending.selectedId || null
             },
-            () => this.refreshTeams()
+            () => this._afterInitLoad()
           );
           return;
         }
-        this.refreshTeams();
+        this._afterInitLoad();
       }
     );
   },
@@ -299,6 +317,9 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    if (this._clubDefaultReady && !isEventOrgSelectMode(this.data.selectMode)) {
+      this.refreshTeams();
+    }
   },
 
   initHeaderNav() {
@@ -329,12 +350,78 @@ Page({
     }
   },
 
+  _afterInitLoad() {
+    if (isEventOrgSelectMode(this.data.selectMode)) {
+      this.refreshTeams();
+      return;
+    }
+    this._loadDefaultClubTeams();
+  },
+
+  _loadDefaultClubTeams() {
+    if (this._loadingDefault) return;
+    this._loadingDefault = true;
+    this.setData({ teamsLoading: true });
+    const finish = (list) => {
+      this._loadingDefault = false;
+      this._clubDefaultReady = true;
+      this._defaultTeams = Array.isArray(list) ? list : [];
+      this.refreshTeams();
+    };
+    bootstrap
+      .ensureCloudIdentity()
+      .then(() => teamClub.listTeamsForCreateDefault())
+      .then((res) => finish(res && res.ok ? res.list || [] : []))
+      .catch(() => finish([]));
+  },
+
+  _resetClubSearchState() {
+    this._searchSeq += 1;
+    this._searchResults = [];
+    this._searchImplemented = false;
+    this._searchOk = true;
+  },
+
+  _searchGlobalTeams(keyword) {
+    const seq = (this._searchSeq += 1);
+    teamClub.searchTeamsForCreate(keyword).then((res) => {
+      if (seq !== this._searchSeq) return;
+      this._searchOk = !!(res && res.ok);
+      this._searchImplemented = !!(res && res.implemented);
+      this._searchResults = res && Array.isArray(res.list) ? res.list : [];
+      this.refreshTeams();
+    }).catch(() => {
+      if (seq !== this._searchSeq) return;
+      this._searchOk = false;
+      this._searchImplemented = false;
+      this._searchResults = [];
+      this.refreshTeams();
+    });
+  },
+
+  _visibleClubList() {
+    const keyword = this.data.searchQuery.trim();
+    if (keyword) return this._searchResults || [];
+    return this._defaultTeams || [];
+  },
+
+  _findCandidate(id) {
+    const sid = String(id || '').trim();
+    if (!sid) return null;
+    const pools = [this.data.teams || [], this._defaultTeams || [], this._searchResults || []];
+    for (let p = 0; p < pools.length; p++) {
+      const hit = pools[p].filter((row) => row && String(row.id || row.teamId) === sid)[0];
+      if (hit) return hit;
+    }
+    return teamDirectory.getTeamById(sid);
+  },
+
   _loadList(searchKeyword) {
     const selectMode = this.data.selectMode;
     if (isEventOrgSelectMode(selectMode)) {
       return teamDirectory.listSelectableEventOrganizations(searchKeyword);
     }
-    return teamDirectory.listClubTeamsForSelect(searchKeyword);
+    return this._visibleClubList();
   },
 
   refreshTeams() {
@@ -362,7 +449,7 @@ Page({
       selectedParticipants = selectedIds
         .map((id) => {
           const snap = this._participantSnapshots[id];
-          const team = teamDirectory.getTeamById(id);
+          const team = teamDirectory.getTeamById(id) || this._findCandidate(id);
           if (!team && !snap) return null;
           const shortName = String(
             (snap && (snap.name || snap.sourceTeamShortName)) ||
@@ -384,7 +471,7 @@ Page({
         })
         .filter(Boolean);
     } else if (this.data.selectedId) {
-      const t = teamDirectory.getTeamById(this.data.selectedId);
+      const t = teamDirectory.getTeamById(this.data.selectedId) || this._findCandidate(this.data.selectedId);
       const orgSnap = this._organizationSnapshot;
       if (t) {
         // 已选回显：目录为准；同 ID 时优先展示创建页传入的本场快照名/LOGO
@@ -409,7 +496,21 @@ Page({
       }
     }
 
-    const showEmptyState = !!searchKeyword && teams.length === 0;
+    const stillLoadingDefault =
+      !isEventOrgSelectMode(this.data.selectMode) &&
+      !!this._loadingDefault &&
+      !searchKeyword;
+    const emptyUi = resolveTeamSelectEmptyUi({
+      searchKeyword: searchKeyword,
+      teamCount: teams.length,
+      stillLoadingDefault: stillLoadingDefault,
+      isEventOrg: isEventOrgSelectMode(this.data.selectMode),
+      searchImplemented: !!this._searchImplemented,
+      searchOk: this._searchOk === true
+    });
+    const showSearchCreateEmpty = !!emptyUi.showSearchCreateEmpty;
+    const showSearchUnavailable = !!emptyUi.showSearchUnavailable;
+    const showEmptyState = showSearchCreateEmpty;
     const footerSelectedCount = participantMode
       ? selectedParticipants.length
       : selectedTeam
@@ -421,12 +522,17 @@ Page({
 
     this.setData({
       teams: teams,
+      teamsLoading: stillLoadingDefault,
       selectedTeamId: participantMode ? null : this.data.selectedId || null,
       selectedTeam: selectedTeam,
       selectedParticipants: selectedParticipants,
       selectedIds: selectedIds,
       emptyVisible: showEmptyState,
       showEmptyState: showEmptyState,
+      showSearchCreateEmpty: showSearchCreateEmpty,
+      showSearchUnavailable: showSearchUnavailable,
+      searchImplemented: !!this._searchImplemented,
+      searchOk: this._searchOk === true,
       emptyTerm: searchKeyword,
       searchKeyword: searchKeyword,
       footerSelectedCount: footerSelectedCount,
@@ -439,14 +545,38 @@ Page({
   },
 
   onSearchInput(e) {
-    this.setData({ searchQuery: e.detail.value || '' }, () => this.refreshTeams());
+    const next = e.detail.value || '';
+    this.setData({ searchQuery: next }, () => {
+      if (isEventOrgSelectMode(this.data.selectMode)) {
+        this.refreshTeams();
+        return;
+      }
+      const keyword = String(next).trim();
+      if (!keyword) {
+        this._resetClubSearchState();
+        this.refreshTeams();
+        return;
+      }
+      this._searchGlobalTeams(keyword);
+    });
   },
 
   handleSearch() {
-    this.refreshTeams();
+    if (isEventOrgSelectMode(this.data.selectMode)) {
+      this.refreshTeams();
+      return;
+    }
+    const keyword = this.data.searchQuery.trim();
+    if (!keyword) {
+      this._resetClubSearchState();
+      this.refreshTeams();
+      return;
+    }
+    this._searchGlobalTeams(keyword);
   },
 
   clearSearch() {
+    this._resetClubSearchState();
     this.setData({ searchQuery: '' }, () => this.refreshTeams());
   },
 
@@ -469,7 +599,7 @@ Page({
     if (idx >= 0) {
       // 已选：打开简称编辑（不要求重新选择；无目录球队也可用快照）
       const snap = this._participantSnapshots[id] || {};
-      const team = teamDirectory.getTeamById(id);
+      const team = teamDirectory.getTeamById(id) || this._findCandidate(id);
       const initial =
         snap.name ||
         snap.sourceTeamShortName ||
@@ -495,7 +625,7 @@ Page({
       return;
     }
 
-    const team = teamDirectory.getTeamById(id);
+    const team = this._findCandidate(id);
     if (!team) return;
     const initial =
       (team.shortName && String(team.shortName).trim()) ||
@@ -545,7 +675,7 @@ Page({
       return;
     }
 
-    const team = teamDirectory.getTeamById(id);
+    const team = teamDirectory.getTeamById(id) || this._findCandidate(id);
     if (!team && !this.data.shortNameEditingExisting) {
       this.cancelShortNameSheet();
       return;
@@ -626,7 +756,9 @@ Page({
       createNameCount: charLen(keyword),
       createShortNameCount: 0,
       createSloganCount: 0,
-      createDescCount: 0
+      createDescCount: 0,
+      logoUploading: false,
+      logoPreview: ''
     });
   },
 
@@ -637,23 +769,55 @@ Page({
       createNameCount: 0,
       createShortNameCount: 0,
       createSloganCount: 0,
-      createDescCount: 0
+      createDescCount: 0,
+      logoUploading: false,
+      logoPreview: ''
     });
     this.refreshTeams();
   },
 
   chooseTeamLogo() {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const file = res.tempFiles && res.tempFiles[0];
-        if (!file || !file.tempFilePath) return;
-        this.setData({ 'createForm.logo': file.tempFilePath });
-      },
-      fail: () => {}
-    });
+    if (this.data.logoUploading || teamAssetUpload.isUploading()) {
+      wx.showToast({ title: '正在上传，请稍候', icon: 'none' });
+      return;
+    }
+    const self = this;
+    this.setData({ logoUploading: true });
+    teamAssetUpload
+      .pickAndUpload({
+        kind: 'logo',
+        onPreview: function (info) {
+          self.setData({
+            logoPreview: (info && info.previewPath) || self.data.logoPreview || '',
+            logoUploading: true
+          });
+        }
+      })
+      .then((res) => {
+        if (!res || !res.ok) {
+          if (res && res.code === 'cancelled') {
+            self.setData({ logoUploading: false, logoPreview: '' });
+            return;
+          }
+          self.setData({ logoUploading: false, logoPreview: '' });
+          wx.showToast({
+            title: teamAssetUpload.displayUploadError(res) || 'LOGO 上传失败',
+            icon: 'none'
+          });
+          return;
+        }
+        const saved = teamLogo.persistLogo(res.fileID);
+        if (!saved.ok) {
+          self.setData({ logoUploading: false, logoPreview: '' });
+          wx.showToast({ title: saved.message || 'LOGO 上传失败', icon: 'none' });
+          return;
+        }
+        self.setData({
+          logoUploading: false,
+          logoPreview: '',
+          'createForm.logo': saved.logo
+        });
+      });
   },
 
   handleCreateTeamNameInput(e) {
@@ -689,6 +853,10 @@ Page({
   },
 
   submitCreateTeam() {
+    if (this.data.logoUploading) {
+      wx.showToast({ title: '正在上传，请稍候', icon: 'none' });
+      return;
+    }
     const name = (this.data.createForm.name || '').trim();
     if (!name) {
       wx.showToast({
@@ -706,11 +874,17 @@ Page({
       ? teamDirectory.normalizeShortName(this.data.createForm.shortName)
       : '';
 
+    const logoChecked = teamLogo.persistLogo(this.data.createForm.logo);
+    if (!logoChecked.ok) {
+      wx.showToast({ title: 'LOGO 未上传成功', icon: 'none' });
+      return;
+    }
+
     const payload = {
       id: Date.now(),
       name: name,
       shortName: shortName,
-      logo: this.data.createForm.logo || mockAvatars.pickMockAvatar(name),
+      logo: logoChecked.logo || mockAvatars.pickMockAvatar(name),
       role: '超级管理员',
       slogan: this.data.createForm.slogan,
       desc: this.data.createForm.desc,
@@ -720,6 +894,27 @@ Page({
 
     const finish = (team) => {
       if (!team) return;
+      this._resetClubSearchState();
+      const tid = String(team.id || team.teamId || '').trim();
+      if (tid && !isEventOrgSelectMode(this.data.selectMode)) {
+        const exists = (this._defaultTeams || []).some(function (row) {
+          return String((row && (row.teamId || row.id)) || '') === tid;
+        });
+        if (!exists) {
+          this._defaultTeams = [
+            {
+              teamId: tid,
+              id: tid,
+              name: team.name || team.fullName || '',
+              shortName: team.shortName || '',
+              logo: team.logo || '',
+              source: 'my_team',
+              isMyTeam: true,
+              organizationType: 'team'
+            }
+          ].concat(this._defaultTeams || []);
+        }
+      }
       if (this.data.isParticipantMode) {
         this.setData(
           {
@@ -793,7 +988,7 @@ Page({
       const participants = ids
         .map((id, index) => {
           const snap = this._participantSnapshots[id] || {};
-          const team = teamDirectory.getTeamById(id);
+          const team = teamDirectory.getTeamById(id) || this._findCandidate(id);
           const shortName = String(
             snap.name || snap.sourceTeamShortName || ''
           ).trim();
@@ -834,7 +1029,7 @@ Page({
       });
       return;
     }
-    const team = teamDirectory.getTeamById(this.data.selectedId);
+    const team = teamDirectory.getTeamById(this.data.selectedId) || this._findCandidate(this.data.selectedId);
     if (!team) return;
 
     if (this.data.isEventOrgMode) {

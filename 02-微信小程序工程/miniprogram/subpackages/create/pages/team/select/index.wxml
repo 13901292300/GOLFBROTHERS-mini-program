@@ -66,7 +66,18 @@
           </view>
         </view>
 
-        <view wx:if="{{!showEmptyState}}" class="section">
+        <view wx:if="{{teamsLoading}}" class="section">
+          <view class="section-label">
+            <text class="section-label__h2">{{listSectionTitle}}</text>
+            <text class="section-note">加载中…</text>
+          </view>
+        </view>
+
+        <view wx:elif="{{showSearchUnavailable}}" class="team-empty team-empty--center">
+          <text class="team-empty__title">暂无搜索结果</text>
+        </view>
+
+        <view wx:elif="{{!showSearchCreateEmpty}}" class="section">
           <view class="section-label">
             <text class="section-label__h2">{{listSectionTitle}}</text>
             <text class="section-note">{{listSectionNote}}</text>
@@ -91,7 +102,7 @@
           </view>
         </view>
 
-        <view wx:if="{{showEmptyState}}" class="team-empty team-empty--center">
+        <view wx:if="{{showSearchCreateEmpty}}" class="team-empty team-empty--center">
           <view class="team-empty__icon"><text>🛡</text></view>
           <text class="team-empty__title">{{emptyTitle}}</text>
           <text class="team-empty__desc">“{{emptyTerm}}”目前不存在。</text>
