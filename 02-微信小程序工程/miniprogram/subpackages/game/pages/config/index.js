@@ -5,9 +5,11 @@ const nav = require("../../utils/nav.js");
 const numField = require("../../utils/numField.js");
 const holeOrderUtil = require("../../utils/holeOrder.js");
 const configGuard = require("../../utils/sideGameConfigGuard.js");
+const pageBoot = require("../../utils/pageBoot.js");
 const scoreMapUtil = require("../../utils/sideGameScoreMap.js");
 const partyFormation = require("../../utils/partyFormation.js");
 const threeSetPairReset = require("../../utils/threeSetPairReset.js");
+const playerScoreCfg = require("../../utils/sideGame8421PlayerConfig.js");
 const normalizeHoleOrder = holeOrderUtil.normalizeHoleOrder;
 const rotateHoleOrderToStart = holeOrderUtil.rotateHoleOrderToStart;
 const holeOrderTextOf = holeOrderUtil.holeOrderTextOf;
@@ -1047,6 +1049,17 @@ function isSetupRestReady(isThreePlayer, playerPickLocked, players, needPlayers,
     return item.selected;
   }).length;
   if (teamedPartyMode) {
+    if (catalog.isAllPairsOneVsOneCatalog(ruleId)) {
+      if (n < 2) return false;
+      const ids = (players || [])
+        .filter(function (item) {
+          return item.selected;
+        })
+        .map(function (item) {
+          return item.id;
+        });
+      return partyFormation.isSelectionCompatible(formationParties, ids, ruleId);
+    }
     const need = Number(partyPickExact) || 0;
     if (!(need > 0) || n !== need) return false;
     const ids = (players || [])
@@ -1060,6 +1073,7 @@ function isSetupRestReady(isThreePlayer, playerPickLocked, players, needPlayers,
   }
   if (showHorn) return n >= 5;
   if (showLasuoN) return n >= 5;
+  if (catalog.isAllPairsOneVsOneCatalog(ruleId)) return n >= 2;
   if (isThreePlayer) return n === Number(needPlayers || 3);
   if (usePagePick) {
     const req = Number(needPlayers) || 0;
@@ -1415,12 +1429,7 @@ function mergeScoreFields(selected, players) {
     return Object.assign({}, item, {
       scoreCode: src.scoreCode != null && src.scoreCode !== "" ? src.scoreCode : item.scoreCode,
       scoreRows: src.scoreRows || item.scoreRows,
-      deductMode: src.deductMode != null ? src.deductMode : item.deductMode,
-      deductWay: src.deductWay != null ? src.deductWay : item.deductWay,
-      deductPlusN: src.deductPlusN != null ? src.deductPlusN : item.deductPlusN,
-      deductDoubleN: src.deductDoubleN != null ? src.deductDoubleN : item.deductDoubleN,
-      deductCap: src.deductCap != null ? src.deductCap : item.deductCap,
-      deductCapN: src.deductCapN != null ? src.deductCapN : item.deductCapN
+      scoreOverrides: src.scoreOverrides || item.scoreOverrides
     });
   });
 }
@@ -1439,32 +1448,13 @@ function deductThumb(d) {
   return way + " · " + cap;
 }
 
-function defaultDeduct(snapshot) {
-  const s = snapshot || {};
-  return {
-    deductMode: s.deductMode === "none" ? "none" : "on",
-    deductWay: s.deductWay === "doublepar-n" ? "doublepar-n" : "plus-n",
-    deductPlusN: s.deductPlusN != null && s.deductPlusN !== "" ? String(s.deductPlusN) : "4",
-    deductDoubleN: s.deductDoubleN != null && s.deductDoubleN !== "" ? String(s.deductDoubleN) : "0",
-    deductCap: s.deductCap === "cap" ? "cap" : "none",
-    deductCapN: s.deductCapN != null && s.deductCapN !== "" ? String(s.deductCapN) : "3"
-  };
-}
-
-function pickDeduct(src, fallback) {
-  const base = fallback || defaultDeduct(null);
-  if (!src || (src.deductMode == null && src.deductWay == null && src.deductCap == null)) {
-    return Object.assign({}, base);
-  }
-  return {
-    deductMode: src.deductMode === "none" ? "none" : "on",
-    deductWay: src.deductWay === "doublepar-n" ? "doublepar-n" : "plus-n",
-    deductPlusN: src.deductPlusN != null && src.deductPlusN !== "" ? String(src.deductPlusN) : base.deductPlusN,
-    deductDoubleN:
-      src.deductDoubleN != null && src.deductDoubleN !== "" ? String(src.deductDoubleN) : base.deductDoubleN,
-    deductCap: src.deductCap === "cap" ? "cap" : "none",
-    deductCapN: src.deductCapN != null && src.deductCapN !== "" ? String(src.deductCapN) : base.deductCapN
-  };
+function pickPlayerScoreMeta(src) {
+  if (!src) return {};
+  const out = {};
+  if (src.scoreCode != null && src.scoreCode !== "") out.scoreCode = src.scoreCode;
+  if (src.scoreRows) out.scoreRows = src.scoreRows;
+  if (src.scoreOverrides) out.scoreOverrides = src.scoreOverrides;
+  return out;
 }
 
 const PAGE_FOLD_FIELDS = [
@@ -1802,7 +1792,7 @@ function exclusiveFoldPatch(data, field) {
   return patch;
 }
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -1943,6 +1933,7 @@ Page({
     hcapGroupRecv: false,
     hcapPlayerId: "",
     showTwoParty: false,
+    allPairsOneVsOne: false,
     matchPlay: false,
     showPairHandicap: false,
     showMatchHandicap: false,
@@ -1992,7 +1983,8 @@ Page({
     canEdit: true,
     canView: true,
     pageMode: "edit",
-    readonlyHint: ""
+    readonlyHint: "",
+    themeClass: ""
   },
 
   onNumFocus: numField.onNumFocus,
@@ -2001,6 +1993,7 @@ Page({
 
   onLoad(query) {
     if (!session.ensureHost(query)) return;
+    pageBoot.applyTheme(this);
     const header = createHeaderStyle();
     const entry = (query && query.entry) || "score";
     if (!session.requireSetupDraft(entry)) return;
@@ -2022,15 +2015,18 @@ Page({
         session.getMyRuleById(libId) ||
         session.findMyRuleByName(decodeURIComponent((query && query.ruleName) || (existing && existing.name) || "")) ||
         null;
-    const snapshot = session.cloneRule(session.unwrapGameplaySnapshot ? session.unwrapGameplaySnapshot(rawSnap) : rawSnap);
+    let snapshot = session.cloneRule(session.unwrapGameplaySnapshot ? session.unwrapGameplaySnapshot(rawSnap) : rawSnap);
     const catalogId = (snapshot && snapshot.catalogId) || (existing && existing.catalogId) || (query && query.ruleId) || "";
+    if (catalogId && session.ensureStrokePlayReward) {
+      snapshot = session.cloneRule(session.ensureStrokePlayReward(catalogId, snapshot || {}));
+    }
     if (catalog.isUnavailableRule(catalogId)) {
       wx.showToast({ title: "玩法尚未开放", icon: "none" });
       nav.navigateBackSafe(1);
       return;
     }
     const catalogItem = catalog.findRule(catalogId);
-    const rulePlayers = Number((snapshot && snapshot.players) || (catalogItem && catalogItem.players) || needPlayers);
+    const rulePlayers = catalog.resolveInstancePlayerNeed(catalogId, snapshot, needPlayers);
     const showTwoParty = rulePlayers === 2;
     const matchPlay =
       !!(snapshot && snapshot.matchPlay) || !!(catalogItem && catalogItem.matchPlay);
@@ -2094,7 +2090,6 @@ Page({
     const showScoreMap = catalog.is8421(catalogId);
     const showInstanceDeduct = catalog.is8421(catalogId);
     const pickNeed = rulePlayers > 0 ? rulePlayers : needPlayers;
-    const deductFallback = defaultDeduct(snapshot);
     const people = session.listPlayers(entry);
     const formCtx = entry === "score" ? session.getScoreFormationContext(entry) : null;
     const teamedPartyMode = !!(formCtx && formCtx.teamed);
@@ -2130,7 +2125,7 @@ Page({
         hcapPar3: "0",
         hcapPar4: "0",
         hcapPar5: "0"
-      }, deductFallback);
+      }, pickPlayerScoreMeta(item));
     };
     let playersBase;
     if (usePagePick) {
@@ -2154,7 +2149,7 @@ Page({
       });
     } else if (showTwoParty) {
       playersBase = session.listScoreSlots(entry).map(function (item) {
-        return Object.assign({}, faceOf(item), { scoreCode: defaultScoreCode, selected: true }, deductFallback);
+        return Object.assign({}, faceOf(item), { scoreCode: defaultScoreCode, selected: true }, pickPlayerScoreMeta(item));
       });
     } else {
       playersBase = pool.map(function (item, idx) {
@@ -2176,7 +2171,7 @@ Page({
             : playerPickLocked
               ? true
               : !!hit;
-          return Object.assign({}, item, pickDeduct(hit || item, deductFallback), {
+          return Object.assign({}, item, pickPlayerScoreMeta(hit || item), {
             selected: forceSelected,
             required: teamedPartyMode ? !!playerPickLocked : !!item.required,
             subjectType: item.subjectType,
@@ -2195,7 +2190,7 @@ Page({
     if (existing && usePagePick) {
       players = playersBase.map(function (item) {
         const hit = picked[item.id] || item;
-        return Object.assign({}, item, pickDeduct(hit, deductFallback), {
+        return Object.assign({}, item, pickPlayerScoreMeta(hit), {
           selected: true,
           scoreCode: (hit.scoreCode != null && hit.scoreCode !== "") ? hit.scoreCode : (item.scoreCode || defaultScoreCode),
           scoreRows: hit.scoreRows || item.scoreRows || null,
@@ -2278,8 +2273,11 @@ Page({
           }
           return decoratePairHcap(
             Object.assign({}, item, {
-              // 三局：回显保存的勾选；其他玩法保持原强制开启行为
-              on: showThreeSet ? hit.on !== false : true,
+              // 三局 / 1V1 all-pairs：回显勾选；其余两人玩法保持原强制开启
+              on:
+                showThreeSet || catalog.isAllPairsOneVsOneCatalog(catalogId)
+                  ? hit.on !== false
+                  : true,
               strokes:
                 hit.strokes != null && hit.strokes !== ""
                   ? String(hit.strokes)
@@ -2597,6 +2595,7 @@ Page({
       holeOrderText: holeOrderTextOf(globalHoleOrder),
       showInstanceHoleOrder: showInstanceHoleOrder,
       showTwoParty: showTwoParty,
+      allPairsOneVsOne: catalog.isAllPairsOneVsOneCatalog(catalogId),
       showThreeSet: showThreeSet,
       showHoleRange: showHoleRange,
       segmentValues: segmentValues,
@@ -2622,7 +2621,7 @@ Page({
       pairs: pairs,
       pairCount: pairCount,
       rosterCompact: rosterCompact,
-      pairFold: !!teamedPartyMode
+      pairFold: !!teamedPartyMode || catalog.isAllPairsOneVsOneCatalog(catalogId)
     });
     this._bootConfigGuard();
   },
@@ -2648,6 +2647,7 @@ Page({
   },
 
   onShow() {
+    pageBoot.applyTheme(this);
     const players = (this.data.players || []).map(faceOf);
     const pairs = (this.data.pairs || []).map(pairFaces);
     const patch = Object.assign(
@@ -3213,12 +3213,7 @@ Page({
       return Object.assign({}, item, {
         scoreCode: hit.scoreCode != null && hit.scoreCode !== "" ? hit.scoreCode : item.scoreCode,
         scoreRows: hit.scoreRows || item.scoreRows,
-        deductMode: hit.deductMode,
-        deductWay: hit.deductWay,
-        deductPlusN: hit.deductPlusN,
-        deductDoubleN: hit.deductDoubleN,
-        deductCap: hit.deductCap,
-        deductCapN: hit.deductCapN
+        scoreOverrides: hit.scoreOverrides || item.scoreOverrides
       });
     });
     this.setData(
@@ -3254,7 +3249,6 @@ Page({
       rosterById[item.id] = item;
     });
     const defaultScoreCode = this.data.defaultScoreCode || "8421";
-    const deductFallback = defaultDeduct(this.data.ruleSnapshot);
     const players = ids
       .map(function (id) {
         const prev = prevById[id];
@@ -3264,9 +3258,10 @@ Page({
         return faceOf(
           Object.assign(
           {},
-          deductFallback,
           prev || {},
           cfg,
+          pickPlayerScoreMeta(prev),
+          pickPlayerScoreMeta(cfg),
           {
             id: person.id,
             selected: true,
@@ -3371,7 +3366,8 @@ Page({
     if (this.data.teamedPartyMode) {
       const exact = Number(this.data.partyPickExact) || 0;
       const nextSelected = !players[idx].selected;
-      if (nextSelected && selectedCount >= exact) {
+      const teamedAllPairs = catalog.isAllPairsOneVsOneCatalog(this.data.ruleId);
+      if (!teamedAllPairs && nextSelected && exact && selectedCount >= exact) {
         wx.showToast({ title: "最多选择 " + exact + " 方", icon: "none" });
         return;
       }
@@ -3599,7 +3595,10 @@ Page({
   },
 
   togglePair(e) {
-    if (this.data.teamedPartyMode || this.data.matchupLocked) {
+    if (this.data.matchupLocked) {
+      return;
+    }
+    if (this.data.teamedPartyMode && !catalog.isAllPairsOneVsOneCatalog(this.data.ruleId)) {
       return;
     }
     const id = e.currentTarget.dataset.id;
@@ -4400,7 +4399,8 @@ Page({
     const player = this.data.players[idx] || {};
     const code = player.scoreCode || this.data.defaultScoreCode || "8421";
     const isPreset = (this.data.scorePresets || []).indexOf(code) >= 0;
-    const deduct = pickDeduct(player, defaultDeduct(this.data.ruleSnapshot));
+    const deduct = playerScoreCfg.resolve8421PlayerScoreConfig(this.data.ruleSnapshot, player);
+    this._scoreSheetStart = Object.assign({}, deduct);
     this.setData({
       showScoreSheet: true,
       scorePlayerIndex: idx,
@@ -4489,14 +4489,11 @@ Page({
     player.scoreCode = value;
     if (scoreMapUtil.isValidScoreCode(value)) player.scoreRows = null;
     if (this.data.showInstanceDeduct) {
-      Object.assign(player, {
-        deductMode: this.data.deductMode === "none" ? "none" : "on",
-        deductWay: this.data.deductWay === "doublepar-n" ? "doublepar-n" : "plus-n",
-        deductPlusN: this.data.deductPlusN || "4",
-        deductDoubleN: this.data.deductDoubleN || "0",
-        deductCap: this.data.deductCap === "cap" ? "cap" : "none",
-        deductCapN: this.data.deductCapN || "3"
-      });
+      playerScoreCfg.applyScoreOverridesFromForm(
+        player,
+        playerScoreCfg.deductFormFromUi(this.data),
+        this._scoreSheetStart || playerScoreCfg.deductFormFromUi(this.data)
+      );
     }
     this.setData(
       Object.assign(
@@ -4869,9 +4866,14 @@ Page({
       selected = decoratePlayersHcap(selected, this.data.holes);
     }
     if (this.data.teamedPartyMode) {
+      const allPairsRule = catalog.isAllPairsOneVsOneCatalog(this.data.ruleId);
       const exact = Number(this.data.partyPickExact) || 0;
-      if (selected.length !== exact) {
+      if (!allPairsRule && selected.length !== exact) {
         wx.showToast({ title: "请选择 " + exact + " 方参与", icon: "none" });
+        return;
+      }
+      if (allPairsRule && selected.length < 2) {
+        wx.showToast({ title: "请选择至少 2 方参与", icon: "none" });
         return;
       }
       if (
@@ -4900,10 +4902,13 @@ Page({
       return;
     }
     const exactNeed = Number(this.data.needPlayers) || 0;
+    const allPairs = catalog.isAllPairsOneVsOneCatalog(this.data.ruleId);
     if (
+      !allPairs &&
       !this.data.showHorn &&
       !this.data.showLasuoN &&
       !this.data.teamedPartyMode &&
+      !this.data.showTwoParty &&
       exactNeed >= 2 &&
       exactNeed <= 4 &&
       selected.length !== exactNeed
@@ -5042,6 +5047,10 @@ Page({
         });
       }
     }
+    if (allPairs && !pairings.length) {
+      wx.showToast({ title: "请至少保留 1 场对决", icon: "none" });
+      return;
+    }
     let groupMode = this.data.groupMode;
     if (hideSplitHighGroup(this.data.ruleId) && groupMode === "split-high") {
       groupMode = "random";
@@ -5051,9 +5060,16 @@ Page({
       catalogId: this.data.ruleId,
       ruleLibId: this.data.ruleLibId,
       ruleSnapshot: session.cloneRule(
-        Object.assign({}, this.data.ruleSnapshot || {}, {
-          scoreCode: this.data.defaultScoreCode || "8421"
-        })
+        session.ensureStrokePlayReward
+          ? session.ensureStrokePlayReward(
+              this.data.ruleId,
+              Object.assign({}, this.data.ruleSnapshot || {}, {
+                scoreCode: this.data.defaultScoreCode || "8421"
+              })
+            )
+          : Object.assign({}, this.data.ruleSnapshot || {}, {
+              scoreCode: this.data.defaultScoreCode || "8421"
+            })
       ),
       groupMode: groupMode,
       groupModeLabel: labelOf(groupModesOf(this.data.ruleId, this.data.showLandlordGroup), groupMode),
@@ -5271,4 +5287,4 @@ Page({
       )
     );
   }
-});
+}));

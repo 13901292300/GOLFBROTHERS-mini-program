@@ -121,6 +121,27 @@ function hasExplicitGameplayReward(snap) {
   return mode === 'mul' || mode === 'none' || mode === 'add';
 }
 
+/** stroke-2 / match-2：无 reward 视为合法「无额外奖励」none，避免建档成功后结算才报未写入 */
+function ensureStrokePlayReward(catalogId, snap) {
+  var id = asString(catalogId || (snap && (snap.catalogId || snap.ruleId)));
+  var play = unwrapGameplaySnapshot(snap || {});
+  if (id !== 'stroke-2' && id !== 'match-2') return play;
+  if (id === 'match-2') {
+    if (hasExplicitMatch2Reward(play)) {
+      play.reward = normalizeRewardMode(play.reward);
+      return play;
+    }
+    play.reward = 'none';
+    return play;
+  }
+  if (hasExplicitGameplayReward(play)) {
+    play.reward = normalizeRewardMode(play.reward);
+    return play;
+  }
+  play.reward = 'none';
+  return play;
+}
+
 function mergeRuleSnapshot(capability, gameplay) {
   var cap = capability && typeof capability === 'object' ? jsonClone(capability) : {};
   var capPlay = unwrapGameplaySnapshot(cap);
@@ -591,7 +612,9 @@ function validateCreateInput(input, host) {
   if (!cap) return { ok: false, reason: 'unknown_rule' };
   var n = rec.participantParties.length;
   var minN = cap.requiredPartyCount;
-  if (minN >= 5) {
+  if (catalog.isAllPairsOneVsOneCatalog(rec.ruleId)) {
+    if (n < 2) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
+  } else if (minN >= 5) {
     if (n < minN) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
   } else if (minN >= 2 && minN <= 4) {
     if (n !== minN) return { ok: false, reason: 'party_count', fieldPath: 'participantParties.length' };
@@ -933,6 +956,7 @@ module.exports = {
   stripLibraryMeta: stripLibraryMeta,
   hasExplicitMatch2Reward: hasExplicitMatch2Reward,
   hasExplicitGameplayReward: hasExplicitGameplayReward,
+  ensureStrokePlayReward: ensureStrokePlayReward,
   pickFirstUsableGameplay: pickFirstUsableGameplay,
   collectMatch2GameplayCandidates: collectMatch2GameplayCandidates,
   collectGameplayCandidates: collectMatch2GameplayCandidates,

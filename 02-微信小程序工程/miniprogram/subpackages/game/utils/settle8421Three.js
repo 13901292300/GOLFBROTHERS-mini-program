@@ -108,24 +108,14 @@ function applyTeam(ledger, solo, mates, dualWins, unit) {
   addPts(ledger, mates[1], -unit);
 }
 
-function applyBaoNeg(ledger, solo, mates, rec, rule) {
-  const mode = (rule && rule.baoNeg) || "none";
-  if (mode === "none") return;
-  const n0 = rec[mates[0]].score < 0;
-  const n1 = rec[mates[1]].score < 0;
-  if (n0 === n1) return;
-  const cover = n0 ? mates[0] : mates[1];
-  const other = n0 ? mates[1] : mates[0];
-  if (mode === "ahead" && !(rec[other].score >= rec[solo].score)) return;
-  const p = Math.abs(rec[cover].score);
-  addPts(ledger, cover, -p);
-  addPts(ledger, other, p);
+function applyBaoNeg(ledger, solo, mates, rec, rule, mappedSpread) {
+  s8421.applyBaoNegPair(ledger, mates[0], mates[1], rec, rule, rec[solo].score, mappedSpread);
 }
 
 function settle8421Three(game, ctx) {
   const holeOrder = (ctx && ctx.holeOrder) || [];
   const scores = (ctx && ctx.scores) || {};
-  const rule = (game && game.ruleSnapshot) || {};
+  const rule = s8421.unwrapRule((game && game.ruleSnapshot) || {});
   const k = s8421.pointValue(game);
   let order = initialOrder(game);
   const topHoleTracker = core.createTopHoleTracker();
@@ -202,7 +192,7 @@ function settle8421Three(game, ctx) {
       }
     } else {
       applyTeam(ledger, solo, mates, dualWins, unit);
-      if (!dualWins) applyBaoNeg(ledger, solo, mates, rec, rule);
+      const meatLedger = core.holeLedger();
       if (isPush) {
         if (!skipMeat) {
           if (allDouble) comboMul = comboMul * 2;
@@ -215,7 +205,7 @@ function settle8421Three(game, ctx) {
           const eat = core.meatEatCount(0, meatPool, isLast, windOn);
           if (eat > 0) {
             const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
-            applyTeam(ledger, solo, mates, dualWins, meatPts);
+            applyTeam(meatLedger, solo, mates, dualWins, meatPts);
             meatPool -= eat;
             core.consumeTopHoles(topHoleTracker, eat);
           }
@@ -229,11 +219,13 @@ function settle8421Three(game, ctx) {
         const eat = core.meatEatCount(s8421.meatWanted(rule, rec[best].rel, meatPool), meatPool, isLast, windOn);
         if (eat > 0) {
           const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
-          applyTeam(ledger, solo, mates, dualWins, meatPts);
+          applyTeam(meatLedger, solo, mates, dualWins, meatPts);
           meatPool -= eat;
           core.consumeTopHoles(topHoleTracker, eat);
         }
       }
+      s8421.mergeLedger(ledger, meatLedger);
+      if (!dualWins) applyBaoNeg(ledger, solo, mates, rec, rule, d);
     }
 
     rec[solo].pts = Number(ledger[solo]) || 0;

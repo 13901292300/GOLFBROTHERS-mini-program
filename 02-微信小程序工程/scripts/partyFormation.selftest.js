@@ -74,6 +74,23 @@ var f11 = partyFormation.buildFormationContext(partiesOf([1, 1]));
 assert('1+1 可比洞', partyFormation.resolveRuleCompatibility(f11, 'match-2').compatible);
 assert('1+1 一个party对决', partyFormation.buildPartyMatchups(f11.parties).length === 1);
 
+var f1111 = partyFormation.buildFormationContext(partiesOf([1, 1, 1, 1]));
+var r1111 = partyFormation.resolveRuleCompatibility(f1111, 'match-2');
+assert('1+1+1+1 比洞可见', r1111.visible && r1111.compatible);
+assert('1+1+1+1 默认四方都入选', r1111.defaultPartyIds.length === 4);
+assert('1+1+1+1 候选对决 6', (r1111.matchups || []).length === 6);
+assert('1+1+1+1 不锁死只能两人', r1111.locked === false);
+assert(
+  '1+1+1+1 可选三方',
+  partyFormation.isSelectionCompatible(f1111.parties, ['party-0', 'party-1', 'party-2'], 'match-2')
+);
+assert(
+  '1+1+1+1 一方不兼容',
+  !partyFormation.isSelectionCompatible(f1111.parties, ['party-0'], 'match-2')
+);
+var r84214 = partyFormation.resolveRuleCompatibility(f1111, '8421-4');
+assert('1+1+1+1 的 8421-4 仍按 4 方固定', r84214.compatible && r84214.locked === true);
+
 // --- 3+1 ---
 var f31 = partyFormation.buildFormationContext(partiesOf([3, 1]));
 assert('3+1 两方', f31.formation === '3+1' && f31.availablePartyCount === 2);
@@ -95,19 +112,19 @@ assert(
     partyFormation.resolveRuleCompatibility(f211, 'landlord-big').defaultPartyIds.length === 3
 );
 var r2112 = partyFormation.resolveRuleCompatibility(f211, 'match-2');
-assert('两方玩法从三方中选', r2112.visible && !r2112.locked && r2112.compatiblePartySelections.length >= 2);
-var sel21 = r2112.compatiblePartySelections.filter(function (s) {
-  return s.shape === '2+1';
-})[0];
-assert('含双人方+单人方', !!sel21);
-assert('选两方后1个对决', sel21 && sel21.matchups.length === 1);
-assert('不拆分双人方', sel21.parties.some(function (p) {
-  return p.playerIds.length === 2;
-}));
+assert('两方1V1 三方可见且不锁死恰好2方', r2112.visible && !r2112.locked && r2112.compatible);
+assert('1V1 默认三方都入选', r2112.defaultPartyIds.length === 3);
+assert('1V1 三方生成 3 对决', (r2112.matchups || []).length === 3);
+assert(
+  '不拆分双人方',
+  (r2112.compatiblePartySelections[0].parties || []).some(function (p) {
+    return p.playerIds.length === 2;
+  })
+);
 assert(
   '对决保存partyId',
-  sel21.matchups[0].leftPartyId.indexOf('party-') === 0 &&
-    sel21.matchups[0].rightPartyId.indexOf('party-') === 0
+  r2112.matchups[0].leftPartyId.indexOf('party-') === 0 &&
+    r2112.matchups[0].rightPartyId.indexOf('party-') === 0
 );
 
 assert(

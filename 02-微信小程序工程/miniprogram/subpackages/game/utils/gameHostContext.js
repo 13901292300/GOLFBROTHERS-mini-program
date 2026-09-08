@@ -8,6 +8,7 @@ var matchStatus = require('../../../utils/matchStatus.js');
 var playerManage = require('../../../utils/playerManage.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
 var mockAvatars = require('../../../utils/mockAvatars.js');
+var catalog = require('./catalog.js');
 
 var SCORE_FIELDS = ['holes.score'];
 
@@ -785,11 +786,14 @@ function validatePartySelection(host, selectedPartyIds, ruleId) {
     return { ok: false, reason: 'unknown_rule', message: '未知玩法' };
   }
   var ids = Array.isArray(selectedPartyIds) ? selectedPartyIds.map(asString).filter(Boolean) : [];
-  if (ids.length !== cap.requiredPartyCount) {
+  var pairwise = catalog.isAllPairsOneVsOneCatalog(ruleId);
+  if (pairwise ? ids.length < 2 : ids.length !== cap.requiredPartyCount) {
     return {
       ok: false,
       reason: 'party_count',
-      message: '该玩法需要' + cap.requiredPartyCount + '方参与，当前仅选择' + ids.length + '方。'
+      message: pairwise
+        ? '该玩法至少需要2方参与，当前仅选择' + ids.length + '方。'
+        : '该玩法需要' + cap.requiredPartyCount + '方参与，当前仅选择' + ids.length + '方。'
     };
   }
   if (!host || !host.holeContextReady) {

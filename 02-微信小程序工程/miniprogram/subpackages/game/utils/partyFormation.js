@@ -277,6 +277,20 @@ function listCompatiblePartySelections(parties, catalogId) {
   var cap = ruleCapability(catalogId);
   var required = cap.requiredPartyCount;
   var list = normalizeParties(parties);
+  if (catalog.isAllPairsOneVsOneCatalog(catalogId)) {
+    if (list.length < 2) return [];
+    return [
+      {
+        partyIds: list.map(function (p) {
+          return p.partyId;
+        }),
+        parties: list,
+        sizes: list.map(partySize),
+        shape: shapeKey(list.map(partySize)),
+        matchups: buildPartyMatchups(list)
+      }
+    ];
+  }
   if (!(required > 0) || list.length < required) return [];
   return combinations(list, required)
     .filter(function (combo) {
@@ -387,6 +401,12 @@ function resolveRuleCompatibility(formationCtxOrParties, catalogId) {
   var locked =
     selections.length === 1 &&
     selections[0].partyIds.length === ctx.availablePartyCount;
+  if (
+    catalog.isAllPairsOneVsOneCatalog(catalogId) &&
+    ctx.availablePartyCount > cap.requiredPartyCount
+  ) {
+    locked = false;
+  }
   return Object.assign(base, {
     compatible: true,
     visible: true,
@@ -407,7 +427,9 @@ function isSelectionCompatible(parties, selectedIds, catalogId) {
     return want[p.partyId];
   });
   var cap = ruleCapability(catalogId);
-  if (picked.length !== cap.requiredPartyCount) return false;
+  if (catalog.isAllPairsOneVsOneCatalog(catalogId)) {
+    if (picked.length < 2) return false;
+  } else if (picked.length !== cap.requiredPartyCount) return false;
   if (!partiesMeetMinSize(picked, cap.minPlayersPerParty)) return false;
   if (cap.matchupMode === "party-matchup" || cap.matchupMode === "fixed-party-count") {
     return true;

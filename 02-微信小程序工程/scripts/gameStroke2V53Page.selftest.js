@@ -468,10 +468,12 @@ global.__lastToast = '';
 var boardMiss = bind.listBoard('score', miss.created.id);
 var missRow = repo.getById(miss.created.id).data;
 assert(
-  '写入失败提示 奖励配置未写入 且不存错误快照',
-  global.__lastToast === '奖励配置未写入' &&
-    !(boardCell(boardMiss, 0, 0) && boardCell(boardMiss, 0, 0).raw === -1) &&
-    !(missRow.resultSnapshot && missRow.resultSnapshot.rewardMissing)
+  '无 reward 字段 + 规则库 id：按无额外奖励结算，不提示未写入',
+  global.__lastToast !== '奖励配置未写入' &&
+    boardCell(boardMiss, 0, 0) &&
+    boardCell(boardMiss, 0, 0).raw === -1 &&
+    missRow.ruleSnapshot &&
+    missRow.ruleSnapshot.reward === 'none'
 );
 
 var restored = settle.resolveStroke2RuleSnapshot(

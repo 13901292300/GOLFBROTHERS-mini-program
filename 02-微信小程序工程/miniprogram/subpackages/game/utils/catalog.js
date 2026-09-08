@@ -339,6 +339,91 @@ function requiredEntityCount(rule) {
   return asPositiveInt(cap.playerCount) || asPositiveInt(cap.minPlayers);
 }
 
+/**
+ * 配置页人数/是否两人玩法：以 catalog 精确人数为准。
+ * 禁止用 ruleSnapshot.players 覆盖（8421 家族快照常误带 4，会把单挂 8421-2 当成 4 方）。
+ */
+function resolveInstancePlayerNeed(catalogId, snapshot, fallback) {
+  const item = findRule(catalogId) || { catalogId: catalogId };
+  const exact = requiredEntityCount(item);
+  if (exact >= 2) return exact;
+  const fromSnap = asPositiveInt(snapshot && snapshot.players);
+  if (fromSnap >= 2) return fromSnap;
+  const fromItem = asPositiveInt(item && item.players);
+  if (fromItem >= 2) return fromItem;
+  return asPositiveInt(fallback) || 0;
+}
+
+const ALL_PAIRS_ONE_VS_ONE = {
+  "stroke-2": true,
+  "match-2": true,
+  "8421-2": true
+};
+
+/** 每个 pairing 恰好 1V1；实例可选 n>=2 人，生成 C(n,2) 场 */
+function isAllPairsOneVsOneCatalog(catalogId) {
+  return !!ALL_PAIRS_ONE_VS_ONE[String(catalogId || "")];
+}
+
+function listAllPairsOneVsOne(ids) {
+  const uniq = [];
+  const seen = {};
+  (ids || []).forEach(function (id) {
+    const s = String(id == null ? "" : id);
+    if (!s || seen[s]) return;
+    seen[s] = true;
+    uniq.push(s);
+  });
+  const pairs = [];
+  for (let i = 0; i < uniq.length; i++) {
+    for (let j = i + 1; j < uniq.length; j++) {
+      pairs.push({
+        id: uniq[i] + "|" + uniq[j],
+        leftId: uniq[i],
+        rightId: uniq[j]
+      });
+    }
+  }
+  return pairs;
+}
+
+function pairingRowKey(row) {
+  if (!row) return "";
+  if (row.id) return String(row.id);
+  const a = row.leftId != null ? row.leftId : row.leftPartyId;
+  const b = row.rightId != null ? row.rightId : row.rightPartyId;
+  if (a == null || b == null || a === "" || b === "") return "";
+  return String(a) + "|" + String(b);
+}
+
+/** 候选 C(n,2)；已有行保留 on；新出现的 pairing 默认勾选 */
+function syncAllPairsOnState(playerIds, prevRows) {
+  const prev = {};
+  (prevRows || []).forEach(function (row) {
+    const key = pairingRowKey(row);
+    if (!key) return;
+    prev[key] = row;
+    const a = row.leftId != null ? row.leftId : row.leftPartyId;
+    const b = row.rightId != null ? row.rightId : row.rightPartyId;
+    if (a != null && b != null) prev[String(a) + "|" + String(b)] = row;
+  });
+  return listAllPairsOneVsOne(playerIds).map(function (c) {
+    const hit = prev[c.id] || prev[c.leftId + "|" + c.rightId];
+    return {
+      id: c.id,
+      leftId: c.leftId,
+      rightId: c.rightId,
+      on: hit ? hit.on !== false : true
+    };
+  });
+}
+
+function selectedAllPairs(rows) {
+  return (rows || []).filter(function (row) {
+    return row && row.on !== false && row.on !== 0;
+  });
+}
+
 /** 保存/开局：参与实体必须恰好等于规则要求（多人除外，多人 ≥ 5）。 */
 function isExactEntityCount(rule, selectedCount) {
   const n = asPositiveInt(selectedCount);
@@ -959,6 +1044,11 @@ module.exports = {
   rulePlayerCapability,
   isMultiplayerRule,
   requiredEntityCount,
+  resolveInstancePlayerNeed,
+  isAllPairsOneVsOneCatalog,
+  listAllPairsOneVsOne,
+  syncAllPairsOnState,
+  selectedAllPairs,
   isExactEntityCount,
   isRuleAvailableForGroupCapacity,
   listCatalogForGroupCapacity,

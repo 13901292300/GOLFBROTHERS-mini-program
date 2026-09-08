@@ -5,13 +5,16 @@
  * 比较两队映射得分之和，高者胜。
  * D = |A和 − B和|。胜队每人 +D·K，负队每人 −D·K。无让杆。
  * 顶洞不换组合。乱拉按排序规则重排；高手不见面只在高手区/低手区内重排后再交叉组队。
- * 包负分仅一队内恰好一人映射分为负时。分值翻倍：每块肉 = 本洞分值 D·K。
+ * 包负分仅一队内恰好一人映射分为负时；转移额 = |映射负分| ×（本洞人均结果 / D）。分值翻倍：每块肉 = 本洞分值 D·K。
  */
 const core = require("./settleCore.js");
 const s8421 = require("./settle8421.js");
 
-function addPts(ledger, id, n) {
-  ledger[id] = core.round1((Number(ledger[id]) || 0) + n);
+function applySides(ledger, win, lose, unit) {
+  s8421.addPts(ledger, win[0], unit);
+  s8421.addPts(ledger, win[1], unit);
+  s8421.addPts(ledger, lose[0], -unit);
+  s8421.addPts(ledger, lose[1], -unit);
 }
 
 function initialOrder(game) {
@@ -101,9 +104,12 @@ function nextOrder(order, rec, hist, game, isPush) {
   return stableSort(order, cmp);
 }
 
-function mapScore(game, rule, id, rel, par) {
+function mapScore(game, rule, id, rel, par, hole) {
   const player = s8421.playerOf(game, id);
-  return s8421.personalScore(rel, s8421.scoreMapFor(player, rule, game), s8421.deductCfg(player, rule), par);
+  const deduct = s8421.deductCfg(player, rule);
+  const map = s8421.scoreMapFor(player, rule, game);
+  const dbg = s8421.personalScoreDebug(rel, map, deduct, par);
+  return dbg.mappedScore;
 }
 
 function pickBestOnTeam(ids, rec) {
@@ -113,13 +119,6 @@ function pickBestOnTeam(ids, rec) {
     else if (rec[id].score === rec[best].score && rec[id].rel < rec[best].rel) best = id;
   });
   return best;
-}
-
-function applySides(ledger, win, lose, unit) {
-  addPts(ledger, win[0], unit);
-  addPts(ledger, win[1], unit);
-  addPts(ledger, lose[0], -unit);
-  addPts(ledger, lose[1], -unit);
 }
 
 function oppBest(ids, rec) {
@@ -143,24 +142,14 @@ function teamsOf(order, mode) {
   };
 }
 
-function applyBaoNegTeam(ledger, team, opp, rec, rule) {
-  const mode = (rule && rule.baoNeg) || "none";
-  if (mode === "none") return;
-  const n0 = rec[team[0]].score < 0;
-  const n1 = rec[team[1]].score < 0;
-  if (n0 === n1) return;
-  const cover = n0 ? team[0] : team[1];
-  const other = n0 ? team[1] : team[0];
-  if (mode === "ahead" && !(rec[other].score >= oppBest(opp, rec))) return;
-  const p = Math.abs(rec[cover].score);
-  addPts(ledger, cover, -p);
-  addPts(ledger, other, p);
+function applyBaoNegTeam(ledger, team, opp, rec, rule, mappedSpread) {
+  s8421.applyBaoNegPair(ledger, team[0], team[1], rec, rule, oppBest(opp, rec), mappedSpread);
 }
 
 function settle8421Four(game, ctx) {
   const holeOrder = (ctx && ctx.holeOrder) || [];
   const scores = (ctx && ctx.scores) || {};
-  const rule = (game && game.ruleSnapshot) || {};
+  const rule = s8421.unwrapRule((game && game.ruleSnapshot) || {});
   const k = s8421.pointValue(game);
   let order = initialOrder(game);
   const topHoleTracker = core.createTopHoleTracker();
@@ -205,7 +194,7 @@ function settle8421Four(game, ctx) {
         ready = false;
         return;
       }
-      rec[id] = { rel: rel, score: mapScore(game, rule, id, rel, par), pts: 0 };
+      rec[id] = { rel: rel, score: mapScore(game, rule, id, rel, par, label), pts: 0 };
     });
     if (!ready) {
       rankedNext = false;
@@ -229,7 +218,7 @@ function settle8421Four(game, ctx) {
 
     if (d === 0) {
       order.forEach(function (id) {
-        addPts(ledger, id, 0);
+        s8421.addPts(ledger, id, 0);
       });
       if (isPush && !skipMeat) {
         if (allDouble) comboMul = comboMul * 2;
@@ -240,8 +229,7 @@ function settle8421Four(game, ctx) {
       const win = aWins ? aTeam : bTeam;
       const lose = aWins ? bTeam : aTeam;
       applySides(ledger, win, lose, unit);
-      applyBaoNegTeam(ledger, aTeam, bTeam, rec, rule);
-      applyBaoNegTeam(ledger, bTeam, aTeam, rec, rule);
+      const meatLedger = core.holeLedger();
       if (isPush) {
         if (!skipMeat) {
           if (allDouble) comboMul = comboMul * 2;
@@ -255,7 +243,7 @@ function settle8421Four(game, ctx) {
           const eat = core.meatEatCount(0, meatPool, isLast, windOn);
           if (eat > 0) {
             const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
-            applySides(ledger, win, lose, meatPts);
+            applySides(meatLedger, win, lose, meatPts);
             meatPool -= eat;
             core.consumeTopHoles(topHoleTracker, eat);
           }
@@ -268,11 +256,14 @@ function settle8421Four(game, ctx) {
         const eat = core.meatEatCount(s8421.meatWanted(rule, rec[best].rel, meatPool), meatPool, isLast, windOn);
         if (eat > 0) {
           const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
-          applySides(ledger, win, lose, meatPts);
+          applySides(meatLedger, win, lose, meatPts);
           meatPool -= eat;
           core.consumeTopHoles(topHoleTracker, eat);
         }
       }
+      s8421.mergeLedger(ledger, meatLedger);
+      applyBaoNegTeam(ledger, aTeam, bTeam, rec, rule, d);
+      applyBaoNegTeam(ledger, bTeam, aTeam, rec, rule, d);
     }
 
     order.forEach(function (id) {

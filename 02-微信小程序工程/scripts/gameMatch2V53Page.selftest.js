@@ -257,10 +257,14 @@ global.__lastToast = '';
 var boardMiss = bind.listBoard('score', miss.created.id);
 var missRow = repo.getById(miss.created.id).data;
 assert(
-  '能力桩写入失败提示不是历史缺失',
-  global.__lastToast === '倍率配置未写入' &&
-    !(boardMiss.holes && boardMiss.holes[0] && boardMiss.holes[0].cells && boardMiss.holes[0].cells[0] && boardMiss.holes[0].cells[0].raw === 5) &&
-    !(missRow.resultSnapshot && missRow.resultSnapshot.byHole && missRow.resultSnapshot.byHole.A1 && missRow.resultSnapshot.byHole.A1.pA === 1)
+  '能力桩缺 reward 按无倍率结算，不提示未写入',
+  global.__lastToast !== '倍率配置未写入' &&
+    missRow.ruleSnapshot &&
+    missRow.ruleSnapshot.reward === 'none' &&
+    boardMiss.holes &&
+    boardMiss.holes[0] &&
+    boardMiss.holes[0].cells &&
+    boardMiss.holes[0].cells[0]
 );
 
 var restoredSnap = settle.resolveMatch2RuleSnapshot(

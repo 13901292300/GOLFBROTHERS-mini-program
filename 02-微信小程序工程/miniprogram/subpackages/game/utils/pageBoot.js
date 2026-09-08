@@ -27,6 +27,66 @@ function hasRepository() {
   return repository.hasImplementation();
 }
 
+function themeClass() {
+  try {
+    var app = getApp();
+    var theme = app && typeof app.getTheme === 'function' ? app.getTheme() : 'bright';
+    return theme === 'dark' ? 'dark-mode' : 'bright-mode';
+  } catch (e) {
+    return 'bright-mode';
+  }
+}
+
+function windowBg(cls) {
+  return cls === 'dark-mode' ? '#000000' : '#FCFCFC';
+}
+
+/** 先改窗口色，再 setData。不读页面实例，供 onLoad 首行与组件 created 调用。 */
+function paintNativeTheme(cls) {
+  cls = cls || themeClass();
+  var bg = windowBg(cls);
+  try {
+    if (typeof wx !== 'undefined' && typeof wx.setBackgroundColor === 'function') {
+      wx.setBackgroundColor({
+        backgroundColor: bg,
+        backgroundColorTop: bg,
+        backgroundColorBottom: bg
+      });
+    }
+    if (typeof wx !== 'undefined' && typeof wx.setBackgroundTextStyle === 'function') {
+      wx.setBackgroundTextStyle({
+        textStyle: cls === 'dark-mode' ? 'light' : 'dark'
+      });
+    }
+  } catch (e2) {
+    /* ignore */
+  }
+  return cls;
+}
+
+function applyTheme(page) {
+  var cls = paintNativeTheme();
+  if (!page || typeof page.setData !== 'function') return cls;
+  if (page.data && page.data.themeClass === cls) return cls;
+  page.setData({ themeClass: cls });
+  return cls;
+}
+
+/** 保证 onLoad/onShow 在业务逻辑前先对齐已保存主题（官方时序：onLoad 早于首帧渲染） */
+function bindPageTheme(options) {
+  var origLoad = options.onLoad;
+  var origShow = options.onShow;
+  options.onLoad = function (query) {
+    applyTheme(this);
+    if (typeof origLoad === 'function') return origLoad.call(this, query);
+  };
+  options.onShow = function (opts) {
+    applyTheme(this);
+    if (typeof origShow === 'function') return origShow.call(this, opts);
+  };
+  return options;
+}
+
 function headerPatch() {
   var header = headerEngine.createHeaderStyle();
   return {
@@ -77,6 +137,8 @@ function bootPage(page, query, extraData) {
   Object.keys(extraData).forEach(function (key) {
     patch[key] = extraData[key];
   });
+  var cls = paintNativeTheme();
+  patch.themeClass = cls;
   page.setData(patch);
   page._hostQuery = ctx;
   return ctx;
@@ -90,5 +152,9 @@ module.exports = {
   headerPatch: headerPatch,
   encodeQuery: encodeQuery,
   pageUrl: pageUrl,
-  bootPage: bootPage
+  bootPage: bootPage,
+  themeClass: themeClass,
+  paintNativeTheme: paintNativeTheme,
+  applyTheme: applyTheme,
+  bindPageTheme: bindPageTheme
 };

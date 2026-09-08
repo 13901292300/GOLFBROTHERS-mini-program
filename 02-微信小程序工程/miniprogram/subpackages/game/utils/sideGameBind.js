@@ -634,7 +634,13 @@ function persistToSetup(entry, game, existingId) {
   var next = hydrateUiGame(
     rec.jsonClone(
       Object.assign({}, game, {
-        id: rec.asString(existingId) || rec.asString(game && game.id) || "sg_draft_" + Date.now()
+        id: rec.asString(existingId) || rec.asString(game && game.id) || "sg_draft_" + Date.now(),
+        ruleSnapshot: rec.ensureStrokePlayReward(
+          game && game.catalogId,
+          rec.unwrapGameplaySnapshot(
+            (game && game.ruleSnapshot) || rec.buildRuleSnapshot(game && game.catalogId) || {}
+          )
+        )
       })
     )
   );
@@ -1250,9 +1256,10 @@ function getGame(entry, gameId) {
 
 function buildInstancePayload(entry, game, existingId) {
   var host = currentHost();
-  var snapshot = rec.unwrapGameplaySnapshot(
-    cloneRule(
-      game.ruleSnapshot || rec.buildRuleSnapshot(game.catalogId) || {}
+  var snapshot = rec.ensureStrokePlayReward(
+    game.catalogId,
+    rec.unwrapGameplaySnapshot(
+      cloneRule(game.ruleSnapshot || rec.buildRuleSnapshot(game.catalogId) || {})
     )
   );
   var lib = getMyRuleById(game.ruleLibId || game.libId);
@@ -1269,7 +1276,7 @@ function buildInstancePayload(entry, game, existingId) {
   var vis = getGlobal(entry).privacy;
   var scope = entryScopeOf(entry);
   var groupId = scope === "group" ? rec.asString(host.groupId) || rec.asString(activeHostQuery.groupId) : "";
-  return {
+  var payload = {
     matchId: matchIdOf(),
     groupId: groupId,
     scope: scope,
@@ -1291,6 +1298,7 @@ function buildInstancePayload(entry, game, existingId) {
     hostContext: host,
     idempotencyKey: existingId ? "" : rec.asString(game.id)
   };
+  return payload;
 }
 
 function stampCreatedHoleOrder(game, host) {
@@ -1875,7 +1883,7 @@ function configUrl(entry, maxPlayers, rule, gameId) {
     ruleId: rule.catalogId || rule.ruleId || "",
     libId: rule.id || "",
     ruleName: rule.name || "",
-    players: rule.players || 4
+    players: catalog.resolveInstancePlayerNeed(rule.catalogId || rule.ruleId, rule, rule.players || 4)
   });
   if (gameId) bag.gameId = gameId;
   return "/subpackages/game/pages/config/index?" + encodeBag(bag);
@@ -1887,6 +1895,148 @@ function signedText(n) {
 
 function cellCls(n) {
   return resultTone.resultToneClass(n);
+}
+
+var HOLE5_AUDIT_LABEL = "5";
+var HOLE5_AUDIT_ROUND = "刘山洪";
+
+function hole5AuditHostMeta() {
+  var hostGameId = matchIdOf();
+  var roundName = "";
+  try {
+    var gameStore = require("../../../utils/gameStore.js");
+    var g = gameStore.getGameById(hostGameId);
+    if (g) roundName = rec.asString(g.roundName);
+  } catch (eMeta) {}
+  return { hostGameId: hostGameId, roundName: roundName };
+}
+
+function hole5AuditShouldLog() {
+  var meta = hole5AuditHostMeta();
+  if (meta.roundName && meta.roundName !== HOLE5_AUDIT_ROUND) return false;
+  return true;
+}
+
+function hole5AuditAbsAndPar(entry, game) {
+  var host = currentHost();
+  var labels = getHoleOrder(entry);
+  var engine = hostMod.scoresToEngineFormat(host.officialScoresByPartyId, labels);
+  if (!engine || !Object.keys(engine).length) {
+    engine = hostMod.scoresToEngineFormat(
+      host.officialScoresByPartyId,
+      holeOrderUtil.uniqueLabels(host.holeOrder)
+    );
+  }
+  var hostKey = hostKeyForLabel(HOLE5_AUDIT_LABEL, entry, game);
+  var pars = parsForGame(entry, game);
+  var par = Number(pars[HOLE5_AUDIT_LABEL]);
+  if (!(par === 3 || par === 4 || par === 5)) par = 4;
+  return {
+    absoluteScores: engine[HOLE5_AUDIT_LABEL] || engine[hostKey] || {},
+    par: par,
+    hostKey: hostKey
+  };
+}
+
+function hole5AuditPriorRelative(scores, holeOrder) {
+  var order = holeOrder || [];
+  var idx = order.indexOf(HOLE5_AUDIT_LABEL);
+  if (idx < 0) return {};
+  var out = {};
+  var i;
+  for (i = 0; i < idx; i++) {
+    var lab = order[i];
+    out[lab] = (scores && scores[lab]) || {};
+  }
+  return out;
+}
+
+function hole5AuditCompactKicks(game) {
+  return ((game && game.kicks) || []).map(function (kick) {
+    return {
+      fromHole: kick && kick.fromHole != null ? String(kick.fromHole) : "",
+      fromIndex: kick && kick.fromIndex,
+      toIndex: kick && kick.toIndex,
+      multiplier: kick && kick.multiplier
+    };
+  });
+}
+
+function hole5AuditKickFactor(game, entry, label) {
+  var order = holeLabelsOf(entry, game);
+  var ki = order.indexOf(String(label));
+  var factors = listKickFactors(game, entry);
+  return Number(ki >= 0 ? factors[ki] : 1) || 1;
+}
+
+function hole5AuditPickStates(states, holeOrder) {
+  var src = states || {};
+  var order = holeOrder || [];
+  var idx = order.indexOf(HOLE5_AUDIT_LABEL);
+  var out = {};
+  var i;
+  if (idx < 0) {
+    if (src[HOLE5_AUDIT_LABEL] != null) out[HOLE5_AUDIT_LABEL] = src[HOLE5_AUDIT_LABEL];
+    return out;
+  }
+  for (i = 0; i <= idx; i++) {
+    var lab = order[i];
+    if (src[lab] != null) out[lab] = src[lab];
+  }
+  return out;
+}
+
+function logHole5SettleAudit(entry, game, result, scores, pars) {
+  try {
+    if (!hole5AuditShouldLog()) return;
+    var meta = hole5AuditHostMeta();
+    var absPar = hole5AuditAbsAndPar(entry, game);
+    var holeOrder = holeLabelsOf(entry, game);
+    var catalogId = settle.catalogIdOf(game);
+    var playerIds = settle.playerIdsOf(game);
+    var factors = listKickFactors(game, entry);
+    var ki = holeOrder.indexOf(HOLE5_AUDIT_LABEL);
+    var prior = hole5AuditPriorRelative(scores, holeOrder);
+    var rawByHole5 =
+      result && result.byHole && result.byHole[HOLE5_AUDIT_LABEL]
+        ? result.byHole[HOLE5_AUDIT_LABEL]
+        : null;
+    var payload = {
+      stage: "settle",
+      hostGameId: meta.hostGameId,
+      roundName: meta.roundName || undefined,
+      sideGameId: game && game.id,
+      catalogId: catalogId,
+      playerIds: playerIds,
+      hole: HOLE5_AUDIT_LABEL,
+      absoluteScores: absPar.absoluteScores,
+      par: absPar.par,
+      relativeScores: (scores && scores[HOLE5_AUDIT_LABEL]) || {},
+      holeEnabled: holeOn(game, HOLE5_AUDIT_LABEL),
+      kicks: hole5AuditCompactKicks(game),
+      kickFactor: Number(ki >= 0 ? factors[ki] : 1) || 1,
+      rawHole5: rawByHole5,
+      settleVersion: result && result.settleVersion,
+      ended: isEndedGame(game),
+      mulState: game && game._match2MulState,
+      rewardState: game && game._stroke2RewardState,
+      resultSource: result && result.resultSource
+    };
+    if (prior && Object.keys(prior).length) payload.relativeScoresPrior = prior;
+    if (result && result.topHoleStates) {
+      payload.topHoleStatesThru5 = hole5AuditPickStates(result.topHoleStates, holeOrder);
+    }
+    if (result && result.orderByHole) {
+      payload.orderByHole5 = result.orderByHole[HOLE5_AUDIT_LABEL] || null;
+      payload.orderByHolePrior = hole5AuditPriorRelative(result.orderByHole, holeOrder);
+    }
+    if (result && result.meatPool != null) payload.meatPool = result.meatPool;
+    if (game && game.multiplier != null && game.multiplier !== "") {
+      payload.unitMultiplier = game.multiplier;
+    }
+    if (pars && pars[HOLE5_AUDIT_LABEL] != null) payload.parFromSettleCtx = pars[HOLE5_AUDIT_LABEL];
+    console.log("[game-hole5-audit]", payload);
+  } catch (eLog) {}
 }
 
 function remapEngineByHoleIndex(engine, fromOrder, toOrder) {
@@ -1980,12 +2130,12 @@ function prepareMatch2Game(game) {
   var play = rec.pickFirstUsableGameplay(rec.collectMatch2GameplayCandidates(game, row));
   game.ruleSnapshot = rec.mergeRuleSnapshot(
     rec.buildRuleSnapshot(game.catalogId || "match-2"),
-    play
+    rec.ensureStrokePlayReward("match-2", play)
   );
   if (settleMatch2MulState(game.ruleSnapshot) === "missing") {
     game.ruleSnapshot = rec.mergeRuleSnapshot(
       rec.buildRuleSnapshot(game.catalogId || "match-2"),
-      game.ruleSnapshot
+      rec.ensureStrokePlayReward("match-2", game.ruleSnapshot)
     );
   }
   game._match2MulState = settleMatch2MulState(game.ruleSnapshot);
@@ -2005,18 +2155,18 @@ function prepareStroke2Game(game) {
   var play = rec.pickFirstUsableGameplay(rec.collectMatch2GameplayCandidates(game, row));
   game.ruleSnapshot = rec.mergeRuleSnapshot(
     rec.buildRuleSnapshot(game.catalogId || "stroke-2"),
-    play
+    rec.ensureStrokePlayReward("stroke-2", play)
   );
   if (settleStroke2RewardState(game.ruleSnapshot) === "missing") {
     game.ruleSnapshot = rec.mergeRuleSnapshot(
       rec.buildRuleSnapshot(game.catalogId || "stroke-2"),
-      game.ruleSnapshot
+      rec.ensureStrokePlayReward("stroke-2", game.ruleSnapshot)
     );
   }
   var strokeState = settleStroke2RewardState(game.ruleSnapshot);
   if (strokeState === "missing") {
     var intended = intendedStrokeReward(game);
-    if (intended === "add" || intended === "mul" || game.ruleLibId) {
+    if (intended === "add" || intended === "mul") {
       game._stroke2RewardState = "missing";
       return game;
     }
@@ -2052,8 +2202,10 @@ function is8421Catalog(game) {
 
 function prepare8421Game(game) {
   if (!game || !is8421Catalog(game)) return game;
-  var row = persistRowFor(game);
-  var play = rec.pickFirstUsableGameplay(rec.collectMatch2GameplayCandidates(game, row));
+  var lib = getMyRuleById(game.ruleLibId || game.libId);
+  var fromLib = lib ? rec.unwrapGameplaySnapshot(lib) : {};
+  var fromInst = rec.unwrapGameplaySnapshot(game.ruleSnapshot || {});
+  var play = Object.assign({}, fromLib, fromInst);
   game.ruleSnapshot = rec.mergeRuleSnapshot(
     rec.buildRuleSnapshot(game.catalogId || "8421-2"),
     play
@@ -2102,6 +2254,13 @@ function computeResults(entry, game, notify) {
       blank.mulMissing = true;
       blank.mulState = "missing";
       blank.resultSource = writeFail ? "mul_write_error" : "mul_history_unrecoverable";
+      logHole5SettleAudit(
+        entry,
+        game,
+        blank,
+        getScorecard(entry, game),
+        parsForGame(entry, game)
+      );
       return blank;
     }
     if (game && game._stroke2RewardState === "missing") {
@@ -2122,16 +2281,38 @@ function computeResults(entry, game, notify) {
       strokeBlank.rewardMissing = true;
       strokeBlank.rewardState = "missing";
       strokeBlank.resultSource = strokeWriteFail ? "reward_write_error" : "reward_history_unrecoverable";
+      logHole5SettleAudit(
+        entry,
+        game,
+        strokeBlank,
+        getScorecard(entry, game),
+        parsForGame(entry, game)
+      );
       return strokeBlank;
     }
-    return settle.settleGame(game, {
-      scores: getScorecard(entry, game),
+    var settleScores = getScorecard(entry, game);
+    var settlePars = parsForGame(entry, game);
+    var settleOut = settle.settleGame(game, {
+      scores: settleScores,
       holeOrder: holeLabelsOf(entry, game),
-      pars: parsForGame(entry, game),
+      pars: settlePars,
       windOn: windOnFor(entry, game),
       libraryRuleSnapshot: null
     });
+    logHole5SettleAudit(entry, game, settleOut, settleScores, settlePars);
+    return settleOut;
   } catch (e) {
+    try {
+      if (hole5AuditShouldLog()) {
+        console.log("[game-hole5-audit]", {
+          stage: "settle-error",
+          hostGameId: matchIdOf(),
+          sideGameId: game && game.id,
+          hole: HOLE5_AUDIT_LABEL,
+          message: String((e && e.message) || e || "")
+        });
+      }
+    } catch (eAudit) {}
     return null;
   }
 }
@@ -2457,13 +2638,16 @@ function boardViewOf(entry, game, pairId) {
   prepareMatch2Game(view);
   prepareStroke2Game(view);
   prepare8421Game(view);
+  var pairScores = getScorecard(entry, view);
+  var pairPars = parsForGame(entry, game);
   view.holeResults = settle.settleGame(view, {
-    scores: getScorecard(entry, view),
+    scores: pairScores,
     holeOrder: holeLabelsOf(entry, game),
-    pars: parsForGame(entry, game),
+    pars: pairPars,
     windOn: windOnFor(entry, game),
     libraryRuleSnapshot: null
   });
+  logHole5SettleAudit(entry, view, view.holeResults, pairScores, pairPars);
   return view;
 }
 
@@ -2596,6 +2780,7 @@ const labels = getHoleOrder(entry);
       return { raw: 0, inGame: false, played: false };
     });
     const topHoleState = selectedTopHoleStates[label] || "";
+    const hole5Contrib = [];
     focusGames.forEach(function (game) {
       const ids = [];
       const ledger = {};
@@ -2616,8 +2801,10 @@ const labels = getHoleOrder(entry);
         if (joined) acc[pi].inGame = true;
       });
       if (!anyPlayed) return;
+      const potBefore = potRemain;
+      const inPotGame = !!(showPot && potGameSet[String(game.id)]);
       let shown = ledger;
-      if (showPot && potGameSet[String(game.id)]) {
+      if (inPotGame) {
         const applied = settle.applyHolePot(potMode, potN, potRemain, ledger, ids);
         shown = applied.display;
         if (!isBigPot) potRemain = applied.remaining;
@@ -2632,6 +2819,31 @@ const labels = getHoleOrder(entry);
         acc[pi].played = true;
         acc[pi].raw = settle.round1(acc[pi].raw + (Number(shown[id]) || 0));
       });
+      if (String(label) === HOLE5_AUDIT_LABEL) {
+        const frozenHole =
+          game.holeResults &&
+          game.holeResults.byHole &&
+          game.holeResults.byHole[label];
+        const engineByParty = {};
+        ids.forEach(function (id) {
+          engineByParty[id] =
+            frozenHole && Object.prototype.hasOwnProperty.call(frozenHole, id)
+              ? frozenHole[id]
+              : null;
+        });
+        hole5Contrib.push({
+          sideGameId: game && game.id,
+          catalogId: settle.catalogIdOf(game),
+          holeEnabled: holeOn(game, label),
+          kickFactor: hole5AuditKickFactor(game, entry, label),
+          inPot: inPotGame,
+          potBefore: potBefore,
+          potAfter: potRemain,
+          engineByParty: engineByParty,
+          afterKickByParty: ledger,
+          afterPotByParty: shown
+        });
+      }
     });
     const cells = acc.map(function (item) {
       const cell = resultFormat.formatBoardCell({
@@ -2642,6 +2854,42 @@ const labels = getHoleOrder(entry);
       });
       return cell;
     });
+    if (String(label) === HOLE5_AUDIT_LABEL) {
+      try {
+        if (hole5AuditShouldLog()) {
+          var meta = hole5AuditHostMeta();
+          var isAllView =
+            !gid || gid === "__all__" || gid === "__all_nopot__" || gid === "__pot__";
+          var parties = players.map(function (player, pi) {
+            var cell = cells[pi] || {};
+            return {
+              partyId: player && player.id,
+              finalRaw: cell.raw,
+              finalText: cell.text,
+              played: cell.played,
+              status: cell.status
+            };
+          });
+          console.log("[game-hole5-audit]", {
+            stage: "display",
+            hostGameId: meta.hostGameId,
+            roundName: meta.roundName || undefined,
+            viewGameId: gid || "__all__",
+            isAllView: isAllView,
+            isConcreteGameView: isConcreteGameView,
+            hole: HOLE5_AUDIT_LABEL,
+            sideGameId: isConcreteGameView && selectedGame ? selectedGame.id : undefined,
+            catalogId:
+              isConcreteGameView && selectedGame
+                ? settle.catalogIdOf(selectedGame)
+                : undefined,
+            contributions: hole5Contrib,
+            sumByParty: parties,
+            potRemainAfterHole5: potRemain
+          });
+        }
+      } catch (eHole5Display) {}
+    }
     return { label: label, cells: cells, topHoleState: topHoleState };
   });
   const totals = players.map(function (player, pi) {
@@ -2811,6 +3059,7 @@ module.exports = {
   unwrapGameplaySnapshot: rec.unwrapGameplaySnapshot,
   normalizeRewardMode: rec.normalizeRewardMode,
   draftFromLibraryRow: rec.draftFromLibraryRow,
+  ensureStrokePlayReward: rec.ensureStrokePlayReward,
   describeMatch2MulSources: rec.describeMatch2MulSources,
   pickFirstUsableGameplay: rec.pickFirstUsableGameplay,
   upsertMyRule,

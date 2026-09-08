@@ -248,6 +248,9 @@ function normalizePlayer(p) {
     memberPlayerIds: Array.isArray(memberIds)
       ? memberIds.map(asString).filter(Boolean)
       : null,
+    scoreCode: raw.scoreCode != null && raw.scoreCode !== '' ? asString(raw.scoreCode) : null,
+    scoreRows: raw.scoreRows || null,
+    scoreOverrides: raw.scoreOverrides && typeof raw.scoreOverrides === 'object' ? raw.scoreOverrides : null,
     hcp: raw.hcp != null && raw.hcp !== '' ? normScalar(raw.hcp) : null
   };
   return normalize(out);

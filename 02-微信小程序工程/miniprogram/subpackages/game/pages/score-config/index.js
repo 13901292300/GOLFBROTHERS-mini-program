@@ -4,8 +4,10 @@ const letter = require("../../utils/letter.js");
 const nav = require("../../utils/nav.js");
 const session = require("../../utils/sideGameBind.js");
 const configGuard = require("../../utils/sideGameConfigGuard.js");
+const pageBoot = require("../../utils/pageBoot.js");
 const scoreMapUtil = require("../../utils/sideGameScoreMap.js");
 const numField = require("../../utils/numField.js");
+const playerScoreCfg = require("../../utils/sideGame8421PlayerConfig.js");
 
 function scoreToneOf(code, defaultCode) {
   const def = String(defaultCode || "8421");
@@ -48,33 +50,6 @@ function rebuildView(players, defaultCode) {
   };
 }
 
-function defaultDeduct(snapshot) {
-  const s = snapshot || {};
-  return {
-    deductMode: s.deductMode === "none" ? "none" : "on",
-    deductWay: s.deductWay === "doublepar-n" ? "doublepar-n" : "plus-n",
-    deductPlusN: s.deductPlusN != null && s.deductPlusN !== "" ? String(s.deductPlusN) : "4",
-    deductDoubleN: s.deductDoubleN != null && s.deductDoubleN !== "" ? String(s.deductDoubleN) : "0",
-    deductCap: s.deductCap === "cap" ? "cap" : "none",
-    deductCapN: s.deductCapN != null && s.deductCapN !== "" ? String(s.deductCapN) : "3"
-  };
-}
-
-function pickDeduct(src, fallback) {
-  if (!src || (src.deductMode == null && src.deductWay == null && src.deductCap == null)) {
-    return Object.assign({}, fallback);
-  }
-  return {
-    deductMode: src.deductMode === "none" ? "none" : "on",
-    deductWay: src.deductWay === "doublepar-n" ? "doublepar-n" : "plus-n",
-    deductPlusN: src.deductPlusN != null && src.deductPlusN !== "" ? String(src.deductPlusN) : fallback.deductPlusN,
-    deductDoubleN:
-      src.deductDoubleN != null && src.deductDoubleN !== "" ? String(src.deductDoubleN) : fallback.deductDoubleN,
-    deductCap: src.deductCap === "cap" ? "cap" : "none",
-    deductCapN: src.deductCapN != null && src.deductCapN !== "" ? String(src.deductCapN) : fallback.deductCapN
-  };
-}
-
 function deductThumb(d) {
   if (!d || d.deductMode === "none") return "";
   const way =
@@ -89,7 +64,7 @@ function isNonNegInt(value) {
   return /^(0|[1-9]\d*)$/.test(String(value == null ? "" : value).trim());
 }
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -118,14 +93,16 @@ Page({
     canEdit: true,
     canView: true,
     pageMode: "edit",
-    readonlyHint: ""
+    readonlyHint: "",
+    themeClass: ""
   },
 
   onLoad(query) {
     if (!session.ensureHost(query)) return;
+    pageBoot.applyTheme(this);
     const header = createHeaderStyle();
     this._channel = this.getOpenerEventChannel && this.getOpenerEventChannel();
-    this._deductFallback = defaultDeduct(null);
+    this._ruleSnapshot = null;
     this.setData({
       headerRootStyle: header.headerRootStyle,
       headerBarStyle: header.headerBarStyle
@@ -138,13 +115,16 @@ Page({
     }
   },
 
+  onShow() {
+    pageBoot.applyTheme(this);
+  },
+
   bootstrap(payload) {
     const defaultScoreCode = payload.defaultScoreCode || "8421";
-    this._deductFallback = defaultDeduct(payload.ruleSnapshot);
+    this._ruleSnapshot = payload.ruleSnapshot || null;
     const players = (payload.players || []).map(function (item) {
-      const deduct = pickDeduct(item, defaultDeduct(payload.ruleSnapshot));
       const hyd = scoreMapUtil.hydratePlayerScore(item);
-      return Object.assign({}, item, deduct, {
+      return Object.assign({}, item, {
         scoreCode: hyd.scoreCode || defaultScoreCode,
         scoreRows: item.scoreRows || null,
         selected: true
@@ -177,7 +157,8 @@ Page({
     const player = idx >= 0 ? this.data.players[idx] : {};
     const code = player.scoreCode || this.data.defaultScoreCode || "8421";
     const isPreset = (this.data.scorePresets || []).indexOf(code) >= 0;
-    const deduct = pickDeduct(player, this._deductFallback);
+    const deduct = playerScoreCfg.resolve8421PlayerScoreConfig(this._ruleSnapshot, player);
+    this._scoreSheetStart = Object.assign({}, deduct);
     this.setData({
       showScoreSheet: true,
       scorePlayerIndex: idx,
@@ -324,14 +305,11 @@ Page({
     player.scoreCode = value;
     if (scoreMapUtil.isValidScoreCode(value)) player.scoreRows = null;
     if (this.data.showInstanceDeduct) {
-      Object.assign(player, {
-        deductMode: this.data.deductMode === "none" ? "none" : "on",
-        deductWay: this.data.deductWay === "doublepar-n" ? "doublepar-n" : "plus-n",
-        deductPlusN: this.data.deductPlusN || "4",
-        deductDoubleN: this.data.deductDoubleN || "0",
-        deductCap: this.data.deductCap === "cap" ? "cap" : "none",
-        deductCapN: this.data.deductCapN || "3"
-      });
+      playerScoreCfg.applyScoreOverridesFromForm(
+        player,
+        playerScoreCfg.deductFormFromUi(this.data),
+        this._scoreSheetStart || playerScoreCfg.deductFormFromUi(this.data)
+      );
     }
     this.setData(
       Object.assign(rebuildView(players, this.data.defaultScoreCode), {
@@ -364,4 +342,4 @@ Page({
     }
     nav.navigateBackSafe(1);
   }
-});
+}));

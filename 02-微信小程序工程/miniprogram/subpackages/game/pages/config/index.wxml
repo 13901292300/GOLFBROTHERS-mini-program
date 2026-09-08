@@ -1,4 +1,4 @@
-<view class="gb-page bright-mode {{pageMode === 'readonly' ? 'gb-page--readonly' : ''}}">
+<view class="gb-page {{themeClass}} {{pageMode === 'readonly' ? 'gb-page--readonly' : ''}}">
   <view class="gb-header" style="{{headerRootStyle}}">
     <view class="gb-header__inner" style="{{headerBarStyle}}">
       <view class="gb-header__left">
@@ -65,7 +65,7 @@
               <view class="sec-hint">人选超过 8 人，已按两两对决自动生成全部组合，不再逐场展示。</view>
             </block>
             <block wx:else>
-              <view wx:if="{{!teamedPartyMode}}" class="sec-hint">{{showThreeSet ? handicapHint : (showPairHandicap || showPairHoleHandicap ? handicapHint : '默认全选。可单独取消某场。')}}</view>
+              <view wx:if="{{!teamedPartyMode || allPairsOneVsOne}}" class="sec-hint">{{showThreeSet ? handicapHint : (showPairHandicap || showPairHoleHandicap ? handicapHint : '默认全选。可单独取消某场。')}}</view>
               <view
                 wx:for="{{pairs}}"
                 wx:key="id"
@@ -76,7 +76,7 @@
                   bindtap="togglePair"
                   data-id="{{item.id}}"
                 >
-                  <view wx:if="{{!teamedPartyMode}}" class="check-box {{item.on ? 'on' : ''}}"></view>
+                  <view wx:if="{{!teamedPartyMode || allPairsOneVsOne}}" class="check-box {{item.on ? 'on' : ''}}"></view>
                   <view class="pair-side">
                     <party-face party="{{item.leftFace}}" layout="slot"></party-face>
                   </view>
