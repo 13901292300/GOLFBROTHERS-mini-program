@@ -1153,6 +1153,7 @@ function listTeamMatches(teamId) {
           logo: (card && card.clubLogo) || '',
           relationType: entry.relationType,
           relationLabel: entry.relationType === 'organizer' ? '主办' : '参赛',
+          status: String(match.status || (card && card.status) || ''),
           statusLabel: String((card && card.statusLabel) || ''),
           matchType: String(match.matchType || ''),
           matchTypeLabel: String((card && card.matchTypeLabel) || ''),

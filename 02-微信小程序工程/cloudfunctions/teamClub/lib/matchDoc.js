@@ -159,6 +159,7 @@ function projectCard(matchDoc) {
     logo: String(body.teamLogo || body.matchLogo || ''),
     relationType: 'organizer',
     relationLabel: '主办',
+    status: status,
     statusLabel: statusLabel(status),
     matchType: String(body.matchType || 'team-internal'),
     matchTypeLabel: '队内赛',

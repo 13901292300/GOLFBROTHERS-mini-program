@@ -132,7 +132,10 @@ async function main() {
     match: { matchId: 'gm_p3', teamId: teamId, status: 'cancelled' }
   });
   var afterCancel = await call(store, 'oid_p3_member', 'listTeamMatches', { teamId: teamId });
-  assert('正文完成/取消可更新', afterCancel.data[0].statusLabel === '已取消');
+  assert(
+    '正文完成/取消可更新',
+    afterCancel.data[0].statusLabel === '已取消' && afterCancel.data[0].status === 'cancelled'
+  );
 
   var xfer = await call(store, 'oid_p3_owner', 'transferOwnership', {
     teamId: teamId,
@@ -214,6 +217,12 @@ async function main() {
   );
   var engineSrc = fs.readFileSync(path.join(cloudLib, 'engine.js'), 'utf8');
   assert('listTeamMatches 不是固定空数组实现', engineSrc.indexOf('COLLECTIONS.MATCHES') >= 0 || engineSrc.indexOf("MATCHES") >= 0);
+  var svcSrc = read('utils/teamClub/service.js');
+  assert(
+    '球队详情比赛列表在 service 层隐藏已取消',
+    svcSrc.indexOf('isCancelledTeamMatchCard') >= 0 &&
+      svcSrc.indexOf("st === 'cancelled'") >= 0
+  );
   assert('生产页面无占位/mock/DIAG/me 残留', leftovers.length === 0);
   if (leftovers.length) console.log(leftovers);
 

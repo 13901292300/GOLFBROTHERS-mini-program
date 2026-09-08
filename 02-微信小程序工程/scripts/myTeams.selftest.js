@@ -355,6 +355,34 @@ var putA = repo.putMatch({
 });
 assert('页面测试写入比赛正文', putA.ok && putA.data.matchId === 'gm_page_1');
 
+var putCancelled = repo.putMatch({
+  teamId: idA,
+  matchId: 'gm_page_cancelled',
+  match: {
+    matchId: 'gm_page_cancelled',
+    teamId: idA,
+    matchType: 'team-internal',
+    roundName: '已取消队内赛',
+    teeTime: '2026-09-01',
+    courseName: '测试球场',
+    status: 'cancelled'
+  }
+});
+assert('页面测试写入已取消比赛', putCancelled.ok && putCancelled.data.matchId === 'gm_page_cancelled');
+
+var putOnlyCancelled = repo.putMatch({
+  teamId: idC,
+  matchId: 'gm_empty_cancelled',
+  match: {
+    matchId: 'gm_empty_cancelled',
+    teamId: idC,
+    matchType: 'team-internal',
+    roundName: '空态队已取消赛',
+    status: 'cancelled'
+  }
+});
+assert('空态队写入仅取消比赛', putOnlyCancelled.ok);
+
 service.listMyTeams({ immediate: true }).then(function (res) {
   assert('listMyTeams 仓储成功', res.ok && res.list.length >= 3);
   var tA = res.list.filter(function (t) { return t.id === idA; })[0];
@@ -431,6 +459,13 @@ service.listMyTeams({ immediate: true }).then(function (res) {
   return service.listTeamMatches(idA, { immediate: true });
 }).then(function (matches) {
   assert('球队比赛列表仅队内赛且可打开', matches.ok && matches.list.length >= 1 && matches.list[0].canOpen === true && matches.list[0].matchId === 'gm_page_1' && String(matches.list[0].matchType || 'team-internal') === 'team-internal');
+  assert(
+    '球队比赛列表不展示已取消比赛',
+    matches.ok &&
+      matches.list.every(function (row) {
+        return row.matchId !== 'gm_page_cancelled';
+      })
+  );
   return service.listTeamMatches(idC, { immediate: true });
 }).then(function (emptyMatches) {
   assert('空态队比赛为空', emptyMatches.ok && emptyMatches.list.length === 0);

@@ -151,11 +151,20 @@ function listTeamMembers(teamId, options) {
   });
 }
 
+function isCancelledTeamMatchCard(row) {
+  var st = String((row && row.status) || '').trim().toLowerCase();
+  if (st === 'cancelled' || st === 'canceled') return true;
+  return String((row && row.statusLabel) || '').trim() === '已取消';
+}
+
 function listTeamMatches(teamId, options) {
   return wrap(function () {
     return asResult(repo().listTeamMatches(teamId, options)).then(function (res) {
       if (!res.ok) return failEnvelope(res);
-      return { ok: true, list: res.data || [], cursor: res.cursor || '', hasMore: !!res.hasMore };
+      var list = (res.data || []).filter(function (row) {
+        return !isCancelledTeamMatchCard(row);
+      });
+      return { ok: true, list: list, cursor: res.cursor || '', hasMore: !!res.hasMore };
     });
   });
 }

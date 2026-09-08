@@ -247,6 +247,14 @@ async function main() {
     match: { matchId: 'gm_cloud_1', teamId: teamId, status: 'cancelled' }
   });
   assert('取消比赛同步正文状态', cancelRef.ok && cancelRef.data.status === 'cancelled');
+  var listedCancel = await call(store, OID.member, 'listTeamMatches', { teamId: teamId });
+  assert(
+    '云仓储列表仍含已取消记录（展示层再过滤）',
+    listedCancel.ok &&
+      (listedCancel.data || []).some(function (row) {
+        return row.matchId === 'gm_cloud_1' && row.status === 'cancelled' && row.statusLabel === '已取消';
+      })
+  );
   var outsiderForge = await call(store, OID.outsider, 'putMatch', {
     teamId: teamId,
     matchId: 'gm_hack',
