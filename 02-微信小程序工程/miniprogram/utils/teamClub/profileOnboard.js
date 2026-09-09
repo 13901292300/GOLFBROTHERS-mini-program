@@ -69,6 +69,8 @@ function uploadTempAvatar(filePath) {
       errMsg: res && res.errMsg,
       envName: res && res.envName
     };
+  }).catch(function () {
+    return { ok: false, code: 'invalid_avatar', message: '头像上传失败，请重试' };
   });
 }
 

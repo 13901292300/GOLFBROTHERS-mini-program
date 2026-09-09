@@ -26,6 +26,7 @@ function read(p) {
 
 var fields = require(path.join(mini, 'utils', 'teamClub', 'profileFields.js'));
 var userProfileStore = require(path.join(mini, 'utils', 'userProfileStore.js'));
+var mockAvatars = require(path.join(mini, 'utils', 'mockAvatars.js'));
 var pageErrors = require(path.join(mini, 'utils', 'teamClub', 'pageErrors.js'));
 var profileOnboard = require(path.join(mini, 'utils', 'teamClub', 'profileOnboard.js'));
 var engine = require(path.join(cloudLib, 'engine.js'));
@@ -102,6 +103,10 @@ async function main() {
     'https 展示保持原样',
     userProfileStore.resolveDisplayAvatar({ avatar: 'https://cdn.example.com/a.jpg' }) ===
       'https://cdn.example.com/a.jpg'
+  );
+  assert(
+    '比赛 resolveAvatar 接受 cloud://',
+    mockAvatars.resolveAvatar('cloud://env.bucket/a.jpg', 'u1') === 'cloud://env.bucket/a.jpg'
   );
   assert(
     'usr 持久文件展示保持原样',

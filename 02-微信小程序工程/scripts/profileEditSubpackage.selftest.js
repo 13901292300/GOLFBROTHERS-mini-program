@@ -230,7 +230,10 @@ var store = {
   }
 };
 var wxApi = {
-  showToast: function () {},
+  _toasts: [],
+  showToast: function (opts) { wxApi._toasts.push((opts && opts.title) || ''); },
+  showLoading: function () {},
+  hideLoading: function () {},
   navigateBack: function (opts) { if (opts && opts.fail) opts.fail(); },
   redirectTo: function () {},
   chooseMedia: function (opts) { opts.fail({ errMsg: 'chooseMedia:fail cancel' }); },
@@ -279,6 +282,28 @@ assert(
   updates.length === 1 &&
     updates[0].avatar === '/saved/avatar.png' &&
     profileState.avatar === '/saved/avatar.png'
+);
+
+assert(
+  '_commitAvatar 失败会 toast 且不把临时路径当成功',
+  js.indexOf('头像上传失败，请重试') >= 0 &&
+    js.indexOf('_avatarUploading') >= 0 &&
+    methodSource(js, '_commitAvatar').indexOf('.catch') >= 0
+);
+
+wxApi.saveFile = function (opts) {
+  opts.fail({ errMsg: 'saveFile:fail' });
+};
+wxApi._toasts = [];
+updates.length = 0;
+profileState.avatar = keptAvatar;
+page.refreshProfile();
+page._commitAvatar('/tmp/fail-avatar.jpg');
+assert(
+  'persist 失败恢复旧头像并提示',
+  updates.length === 0 &&
+    profileState.avatar === keptAvatar &&
+    wxApi._toasts.indexOf('头像上传失败，请重试') >= 0
 );
 
 var jsonOk = false;

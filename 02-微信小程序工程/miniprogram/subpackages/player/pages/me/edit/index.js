@@ -162,6 +162,7 @@ Page({
       wx.chooseMedia({
         count: 1,
         mediaType: ['image'],
+        sizeType: ['original'],
         sourceType: ['album', 'camera'],
         success: (res) => {
           const file = res.tempFiles && res.tempFiles[0];
@@ -182,7 +183,7 @@ Page({
     }
     wx.chooseImage({
       count: 1,
-      sizeType: ['compressed'],
+      sizeType: ['original'],
       sourceType: ['album', 'camera'],
       success: (res) => {
         const path = res.tempFilePaths && res.tempFilePaths[0];
@@ -194,21 +195,86 @@ Page({
   _commitAvatar(tempPath) {
     const path = String(tempPath || '').trim();
     if (!path) return;
+    if (this._avatarUploading) return;
+    this._avatarUploading = true;
+    const prevAvatar = String((userProfileStore.loadProfile() || {}).avatar || '');
+    try {
+      wx.showLoading({ title: '上传中', mask: true });
+    } catch (eLoad) {
+      /* ignore */
+    }
+    const hide = () => {
+      this._avatarUploading = false;
+      try {
+        wx.hideLoading();
+      } catch (eHide) {
+        /* ignore */
+      }
+    };
+    const restorePrev = () => {
+      try {
+        const cur = String((userProfileStore.loadProfile() || {}).avatar || '');
+        if (cur !== prevAvatar) {
+          userProfileStore.updateProfile({ avatar: prevAvatar });
+          this.refreshProfile();
+        }
+      } catch (eRest) {
+        /* ignore */
+      }
+    };
+    const failUpload = () => {
+      restorePrev();
+      hide();
+      wx.showToast({ title: '头像上传失败，请重试', icon: 'none' });
+    };
     const saveAndApply = (finalPath) => {
-      userProfileStore.updateProfile({ avatar: finalPath });
+      const next = String(finalPath || '').trim();
+      const cloudOk = profileFields.isDurableAvatar(next);
+      const localOk =
+        !this.data.teamClubOnboard &&
+        next &&
+        next.indexOf('wxfile://tmp') < 0 &&
+        next.indexOf('http://tmp') < 0;
+      if (this.data.teamClubOnboard ? !cloudOk : !localOk && !cloudOk) {
+        failUpload();
+        return;
+      }
+      userProfileStore.updateProfile({ avatar: next });
       this.refreshProfile();
-      profileOnboard.syncLiveProfileToTeams();
-      wx.showToast({ title: '头像已更新', icon: 'success' });
+      const finishOk = () => {
+        hide();
+        wx.showToast({ title: '头像已更新', icon: 'success' });
+      };
+      const syncRes = profileOnboard.syncLiveProfileToTeams();
+      if (!this.data.teamClubOnboard) {
+        finishOk();
+        return;
+      }
+      Promise.resolve(syncRes)
+        .then((res) => {
+          if (res && res.ok) {
+            finishOk();
+            return;
+          }
+          failUpload();
+        })
+        .catch(function () {
+          failUpload();
+        });
     };
     if (this.data.teamClubOnboard) {
-      profileOnboard.uploadTempAvatar(path).then((up) => {
-        if (up && up.ok && up.avatar) {
-          saveAndApply(up.avatar);
-          return;
-        }
-        this.setData({ teamProfileError: (up && up.message) || '头像需上传后才能用于球队' });
-        wx.showToast({ title: (up && up.message) || '请使用可长期访问的头像', icon: 'none' });
-      });
+      profileOnboard
+        .uploadTempAvatar(path)
+        .then((up) => {
+          if (up && up.ok && up.avatar && profileFields.isDurableAvatar(up.avatar)) {
+            saveAndApply(up.avatar);
+            return;
+          }
+          failUpload();
+        })
+        .catch(function () {
+          failUpload();
+        });
       return;
     }
     userProfileStore.persistAvatarFile(path, (res) => {
@@ -216,7 +282,7 @@ Page({
         saveAndApply(res.path);
         return;
       }
-      wx.showToast({ title: '头像保存失败', icon: 'none' });
+      failUpload();
     });
   },
 

@@ -128,7 +128,7 @@ function normalizeLocalPath(s) {
 /** 将头像字段规范为小程序可访问路径 */
 function resolveAvatar(src, seed) {
   const s = String(src || '').trim();
-  if (isDurableLocalUserFile(s) || isHttpsNetworkAvatar(s)) {
+  if (isCloudFileId(s) || isDurableLocalUserFile(s) || isHttpsNetworkAvatar(s)) {
     return s;
   }
   if (isLocalAvatarPath(s)) {
@@ -137,7 +137,7 @@ function resolveAvatar(src, seed) {
   if (isInvalidAvatarSrc(s)) {
     return seed != null && String(seed).trim() ? pickMockAvatar(seed) : DEFAULT_AVATAR;
   }
-  return DEFAULT_AVATAR;
+  return s;
 }
 
 /** 为球员对象补全可展示头像（各页面统一入口） */

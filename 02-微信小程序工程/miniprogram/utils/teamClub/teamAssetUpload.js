@@ -219,21 +219,38 @@ function inspectLocalFile(filePath, meta) {
   });
 }
 
-function maybeCompress(filePath, ins) {
+var AVATAR_MAX_EDGE = 1024;
+var AVATAR_JPEG_QUALITY = 85;
+var AVATAR_SKIP_COMPRESS_UNDER = 1024 * 1024;
+
+function maybeCompress(filePath, ins, kind) {
   var h = hooks();
   var compress = h.compressImage || (typeof wx !== 'undefined' && wx.compressImage);
   var ext = ins && ins.ext;
-  if (typeof compress !== 'function' || (ext !== 'jpg' && ext !== 'png')) {
+  var isAvatar = kind === 'avatar';
+  var skipPngAvatar =
+    isAvatar && (ext === 'png' || ext === 'webp') && Number(ins && ins.fileSize) <= 2 * 1024 * 1024;
+  if (
+    typeof compress !== 'function' ||
+    (ext !== 'jpg' && ext !== 'png') ||
+    skipPngAvatar ||
+    (isAvatar && Number(ins && ins.fileSize) <= AVATAR_SKIP_COMPRESS_UNDER)
+  ) {
     return Promise.resolve({
       filePath: filePath,
       fileSize: ins && ins.fileSize,
       ext: ext,
-      compressed: false
+      compressed: false,
+      compressQuality: 0
     });
   }
-  var quality = Number(ins && ins.fileSize) > 1024 * 1024 ? 70 : 80;
+  var quality = isAvatar
+    ? AVATAR_JPEG_QUALITY
+    : Number(ins && ins.fileSize) > 1024 * 1024
+      ? 70
+      : 80;
   return new Promise(function (resolve) {
-    compress({
+    var opts = {
       src: filePath,
       quality: quality,
       success: function (res) {
@@ -244,7 +261,8 @@ function maybeCompress(filePath, ins) {
               filePath: filePath,
               fileSize: ins.fileSize,
               ext: ext,
-              compressed: false
+              compressed: false,
+              compressQuality: quality
             });
             return;
           }
@@ -252,7 +270,8 @@ function maybeCompress(filePath, ins) {
             filePath: again.filePath,
             fileSize: again.fileSize,
             ext: again.ext,
-            compressed: true
+            compressed: true,
+            compressQuality: quality
           });
         });
       },
@@ -265,14 +284,21 @@ function maybeCompress(filePath, ins) {
           filePath: filePath,
           fileSize: ins && ins.fileSize,
           ext: ext,
-          compressed: false
+          compressed: false,
+          compressQuality: quality
         });
       }
-    });
+    };
+    if (isAvatar) {
+      opts.compressedWidth = AVATAR_MAX_EDGE;
+      opts.compressedHeight = AVATAR_MAX_EDGE;
+    }
+    compress(opts);
   });
 }
 
-function maybeSquare(filePath) {
+function maybeSquare(filePath, kind) {
+  if (kind === 'avatar') return Promise.resolve(filePath);
   var h = hooks();
   var crop = h.cropImage || (typeof wx !== 'undefined' && wx.cropImage);
   if (typeof crop !== 'function') return Promise.resolve(filePath);
@@ -301,7 +327,7 @@ function chooseLocalImage() {
       wx.chooseMedia({
         count: 1,
         mediaType: ['image'],
-        sizeType: ['compressed'],
+        sizeType: ['original'],
         sourceType: ['album', 'camera'],
         success: function (res) {
           var f = res.tempFiles && res.tempFiles[0];
@@ -325,7 +351,7 @@ function chooseLocalImage() {
     }
     wx.chooseImage({
       count: 1,
-      sizeType: ['compressed'],
+      sizeType: ['original'],
       sourceType: ['album', 'camera'],
       success: function (res) {
         var p = res.tempFilePaths && res.tempFilePaths[0];
@@ -594,8 +620,8 @@ function uploadLocalFile(input) {
         ins.previewPath = previewPath;
         return ins;
       }
-      return maybeSquare(ins.filePath).then(function (squared) {
-        return maybeCompress(squared, ins).then(function (compressed) {
+      return maybeSquare(ins.filePath, kind).then(function (squared) {
+        return maybeCompress(squared, ins, kind).then(function (compressed) {
           ins.filePath = compressed.filePath;
           ins.fileSize = compressed.fileSize;
           ins.compressed = !!compressed.compressed;

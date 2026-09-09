@@ -840,6 +840,19 @@ async function main() {
       compressed.code !== 'file_too_large'
   );
 
+  compressCalls = 0;
+  var avatarSmall = await teamAssetUpload.uploadLocalFile({
+    kind: 'avatar',
+    filePath: 'wxfile://tmp_album.jpg',
+    size: 400000,
+    fileType: 'jpg',
+    uploadId: 'avatar-skip-compress'
+  });
+  assert(
+    '头像小于 1MB 不再二次 compressImage',
+    avatarSmall.ok && compressCalls === 0 && avatarSmall.compressed === false
+  );
+
   teamAssetUpload.resetTestHooks();
   teamAssetUpload.setTestHooks({
     chooseImage: function () {
