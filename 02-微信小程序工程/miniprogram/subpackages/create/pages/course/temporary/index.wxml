@@ -1,0 +1,79 @@
+<view class="temp-page {{themeClass}}">
+  <view class="gb-header" style="{{headerRootStyle}}">
+    <view class="gb-header__inner" style="{{headerBarStyle}}">
+      <view class="gb-header__left">
+        <view bindtap="onBack" class="gb-header__back" aria-label="返回">
+          <text class="gb-header__chevron">‹</text>
+        </view>
+        <view>
+          <text class="gb-header__eyebrow">COURSE</text>
+          <text class="gb-header__title">临时球场</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="content" scroll-y>
+    <view class="section">
+      <view class="section-label"><text class="section-label__h2">球场名称（选填）</text></view>
+      <view class="ds-card ds-field">
+        <view class="field-main">
+          <input
+            class="name-input"
+            type="text"
+            value="{{courseName}}"
+            placeholder="不填则显示为「临时球场」"
+            placeholder-class="name-ph"
+            bindinput="onNameInput"
+          />
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-label">
+        <text class="section-label__h2">前九</text>
+        <text class="section-count">点选循环 3 / 4 / 5</text>
+      </view>
+      <view class="par-grid">
+        <view
+          wx:for="{{frontHoles}}"
+          wx:key="hole"
+          class="par-cell {{item.par ? 'filled' : ''}}"
+          bindtap="onCyclePar"
+          data-index="{{item.hole - 1}}"
+        >
+          <text class="par-cell__hole">{{item.hole}}</text>
+          <text class="par-cell__par">{{item.parText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-label">
+        <text class="section-label__h2">后九</text>
+      </view>
+      <view class="par-grid">
+        <view
+          wx:for="{{backHoles}}"
+          wx:key="hole"
+          class="par-cell {{item.par ? 'filled' : ''}}"
+          bindtap="onCyclePar"
+          data-index="{{item.hole - 1}}"
+        >
+          <text class="par-cell__hole">{{item.hole}}</text>
+          <text class="par-cell__par">{{item.parText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="total-row">
+      <text class="total-label">总 PAR</text>
+      <text class="total-value">{{totalParText}}</text>
+    </view>
+  </scroll-view>
+
+  <view class="footer">
+    <button class="confirm-btn {{canConfirm ? '' : 'disabled'}}" bindtap="onConfirm">确认临时球场</button>
+  </view>
+</view>

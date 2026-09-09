@@ -127,12 +127,7 @@ function _countFilled(scores) {
 function _resolveHolePars(ctx) {
   try {
     if (typeof holeLayout.resolveLayoutFromContext === 'function') {
-      const layout = holeLayout.resolveLayoutFromContext({
-        courseId: (ctx && ctx.courseId) || '',
-        courseName: (ctx && ctx.courseName) || '',
-        front9Course: (ctx && ctx.front9Course) || null,
-        back9Course: (ctx && ctx.back9Course) || null
-      });
+      const layout = holeLayout.resolveLayoutFromContext(holeLayout.contextFromRecord(ctx));
       if (layout && Array.isArray(layout.holePars)) return layout.holePars.slice();
     }
   } catch (e) { /* ignore */ }

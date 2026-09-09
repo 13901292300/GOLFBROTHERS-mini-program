@@ -14,6 +14,7 @@ const groupsStore = require('../../../../utils/groupsStore.js');
 const matchStatus = require('../../../../utils/matchStatus.js');
 const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
 const eventSponsorConfig = require('../../../../utils/eventSponsorConfig.js');
 const tempAdminPermission = require('../../../../utils/tempAdminPermission.js');
 const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
@@ -646,13 +647,7 @@ Page({
     const gameId = this._gameId || this.data.gameId;
     const game = gameId ? gameStore.getGameById(gameId) : null;
     if (!game) return;
-    const layout = holeLayout.resolveLayoutFromContext({
-      courseId: game.courseId,
-      courseName: game.courseName,
-      front9Course: game.front9Course,
-      back9Course: game.back9Course,
-      courseHalfText: game.courseHalfText
-    });
+    const layout = holeLayout.resolveLayoutFromContext(holeLayout.contextFromRecord(game));
     holeLayout.applyLayout(layout);
   },
 
@@ -688,7 +683,7 @@ Page({
       gameId: gameId,
       hubReady: true,
       groups: groups,
-      courseName: game.courseName || '',
+      courseName: halfCourse.formatCourseDisplayName(game),
       roundName: game.roundName || game.courseName || '高尔夫球局',
       headerTitle: this._resolveHeaderTitle(game, groups),
       gameFormat: game.gameMode || '个人比杆赛',

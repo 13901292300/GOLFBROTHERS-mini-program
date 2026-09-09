@@ -4,6 +4,8 @@ const gameStore = require('../../../../utils/gameStore.js');
 const matchStateUtil = require('../../../../utils/matchState.js');
 const gameEdit = require('../../utils/gameEdit.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
+const temporaryCourse = require('../../../../utils/temporaryCourse.js');
 
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
@@ -149,6 +151,12 @@ Page({
     front9Course: null,
     back9Course: null,
     courseHalfText: '',
+    courseLayoutRevision: null,
+    courseSource: '',
+    temporaryCourseId: '',
+    holePars: null,
+    courseDisplayName: '',
+    hasSelectedCourse: false,
     teeTimeText: '',
     gameMode: '个人比杆赛',
     gameModes: GAME_MODES,
@@ -265,6 +273,12 @@ Page({
         front9Course: form.front9Course,
         back9Course: form.back9Course,
         courseHalfText: form.courseHalfText,
+        courseLayoutRevision: form.courseLayoutRevision,
+        courseSource: form.courseSource || '',
+        temporaryCourseId: form.temporaryCourseId || '',
+        holePars: form.holePars || null,
+        courseDisplayName: halfCourse.formatCourseDisplayName(form),
+        hasSelectedCourse: halfCourse.hasSelectedCourse(form),
         teeTimeText: form.teeTimeText,
         gameMode: form.gameMode,
         visibility: form.visibility,
@@ -280,6 +294,14 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    this._syncCourseSelectionView();
+  },
+
+  _syncCourseSelectionView() {
+    this.setData({
+      hasSelectedCourse: halfCourse.hasSelectedCourse(this.data),
+      courseDisplayName: halfCourse.formatCourseDisplayName(this.data)
+    });
   },
 
   applyTheme(theme) {
@@ -317,14 +339,7 @@ Page({
       events: {
         courseSelected: (payload) => {
           if (!payload) return;
-          this.setData({
-            courseId: payload.courseId || '',
-            courseName: payload.courseName || '',
-            courseLocation: payload.courseLocation || '',
-            front9Course: payload.front9Course || null,
-            back9Course: payload.back9Course || null,
-            courseHalfText: payload.halfText ? '（' + payload.halfText + '）' : ''
-          });
+          this.setData(halfCourse.buildCourseSelectionFields(payload));
         }
       },
       fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
@@ -1255,6 +1270,10 @@ Page({
       front9Course: this.data.front9Course || null,
       back9Course: this.data.back9Course || null,
       courseHalfText: this.data.courseHalfText || '',
+      courseLayoutRevision: this.data.courseLayoutRevision,
+      courseSource: this.data.courseSource || '',
+      temporaryCourseId: this.data.temporaryCourseId || '',
+      holePars: this.data.holePars || null,
       teeTimeText: this.data.teeTimeText || '',
       roundName: this.data.roundName,
       gameMode: this.data.gameMode || '',
@@ -1414,6 +1433,7 @@ Page({
       groups: savedGame ? gameStore.listGroups(savedGame) : []
     });
 
+    if (!temporaryCourse.isTemporarySource(updated)) {
     const halfResult = halfCourseEdit.apply(
       {
         gameId: gameId,
@@ -1442,6 +1462,7 @@ Page({
     if (halfResult && halfResult.ok === false) {
       this._toastHalfCourseFail(halfResult, 'save');
       return;
+    }
     }
 
     const ms = matchStateUtil.getMatchState();
@@ -1552,6 +1573,17 @@ Page({
       creatorInGame: creatorInGame,
       createdAt: Date.now()
     };
+    const isTemporary = temporaryCourse.isTemporarySource(this.data);
+    if (isTemporary) {
+      game.courseSource = 'temporary';
+      game.temporaryCourseId = this.data.temporaryCourseId || temporaryCourse.nextTemporaryCourseId();
+      game.courseId = '';
+      game.courseName = (this.data.courseName || '').trim();
+      game.front9Course = 'A';
+      game.back9Course = 'B';
+      game.holePars = temporaryCourse.cloneHolePars(this.data.holePars);
+      game.courseLayoutRevision = null;
+    }
     // 与空修改确认同源：校验已用 resolveHalfCourses，但创建落盘不得省略半场。
     // 双半场球场若只回填 courseId（front9/back9 为空），记分页仍能画红蓝三角，
     // 游戏 Host 的 holeContextReady 为 false，结果不展示。
@@ -1562,18 +1594,21 @@ Page({
       back9Course: game.back9Course,
       courseHalfText: game.courseHalfText
     };
-    const halfResolved = gameEdit.resolveHalfCourses(
-      game.courseId,
-      game.courseName,
-      game.front9Course,
-      game.back9Course,
-      game.courseHalfText
-    );
-    game.front9Course = halfResolved.front9Course;
-    game.back9Course = halfResolved.back9Course;
+    if (!isTemporary) {
+      const halfResolved = gameEdit.resolveHalfCourses(
+        game.courseId,
+        game.courseName,
+        game.front9Course,
+        game.back9Course,
+        game.courseHalfText
+      );
+      game.front9Course = halfResolved.front9Course;
+      game.back9Course = halfResolved.back9Course;
+    }
     game.updatedAt = halfCourseEdit.nextSaveToken(0);
     gameStore.saveGame(game);
 
+    if (!isTemporary) {
     const halfResult = halfCourseEdit.apply(
       {
         gameId: gameId,
@@ -1596,6 +1631,7 @@ Page({
       this._startNavLock = false;
       this._toastHalfCourseFail(halfResult, 'create');
       return;
+    }
     }
 
     const persisted = gameStore.getGame(gameId) || game;

@@ -9,6 +9,7 @@ const groupsStore = require('./groupsStore.js');
 const matchPlayResult = require('./matchPlayResult.js');
 const holeLayout = require('./holeLayout.js');
 const halfCourse = require('./halfCourse.js');
+const temporaryCourse = require('./temporaryCourse.js');
 const teamMatchStore = require('./teamMatchStore.js');
 const gameStore = require('./gameStore.js');
 const gameLeaderboard = require('./gameLeaderboard.js');
@@ -94,16 +95,7 @@ function _sumPars(pars, from, to) {
 
 function resolveHolePars(matchOrGame) {
   const src = matchOrGame || {};
-  const parsed =
-    !src.front9Course && !src.back9Course
-      ? halfCourse.parseCourseHalfText(src.courseHalfText || src.courseHalf || src.halfText)
-      : {};
-  const layout = holeLayout.resolveLayoutFromContext({
-    courseId: src.courseId || '',
-    courseName: src.courseName || '',
-    front9Course: src.front9Course || parsed.front9Course || null,
-    back9Course: src.back9Course || parsed.back9Course || null
-  });
+  const layout = holeLayout.resolveLayoutFromContext(holeLayout.contextFromRecord(src));
   return (layout.holePars || holeLayout.getLayout().holePars).slice();
 }
 
@@ -112,7 +104,9 @@ function resolveCourseName(matchOrGame, related) {
     _trim(matchOrGame && matchOrGame.courseName) ||
     _trim(related && related.courseName) ||
     _trim(matchOrGame && matchOrGame.venue) ||
-    '球场'
+    (temporaryCourse.isTemporarySource(matchOrGame) || temporaryCourse.isTemporarySource(related)
+      ? temporaryCourse.DISPLAY_FALLBACK
+      : '球场')
   );
 }
 

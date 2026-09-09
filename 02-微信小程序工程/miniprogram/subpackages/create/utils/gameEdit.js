@@ -4,6 +4,7 @@
 
 const gameStore = require('../../../utils/gameStore.js');
 const halfCourse = require('../../../utils/halfCourse.js');
+const temporaryCourse = require('../../../utils/temporaryCourse.js');
 const { resolveFirstTwoCourses } = require('../../../utils/courseDatabase.js');
 
 const COMPOSITION_MODES = { '最好成绩赛': true, '最佳球位赛': true };
@@ -89,13 +90,15 @@ function hydrateCreateFormFromGame(game) {
   if (!groups.length) {
     groups.push({ id: 'grp-1', players: slotsToCreatePlayers('grp-1', []) });
   }
-  const halfResolved = resolveHalfCourses(
-    game.courseId,
-    game.courseName,
-    game.front9Course,
-    game.back9Course,
-    game.courseHalfText
-  );
+  const halfResolved = temporaryCourse.isTemporarySource(game)
+    ? { front9Course: game.front9Course || 'A', back9Course: game.back9Course || 'B' }
+    : resolveHalfCourses(
+        game.courseId,
+        game.courseName,
+        game.front9Course,
+        game.back9Course,
+        game.courseHalfText
+      );
   return {
     roundName: game.roundName || '',
     courseId: game.courseId || '',
@@ -104,6 +107,10 @@ function hydrateCreateFormFromGame(game) {
     front9Course: halfResolved.front9Course,
     back9Course: halfResolved.back9Course,
     courseHalfText: game.courseHalfText || '',
+    courseLayoutRevision: game.courseLayoutRevision,
+    courseSource: game.courseSource || '',
+    temporaryCourseId: game.temporaryCourseId || '',
+    holePars: Array.isArray(game.holePars) ? game.holePars.slice() : null,
     teeTimeText: game.teeTime || '',
     gameMode: game.gameMode || '个人比杆赛',
     visibility: game.visibility === 'private' ? 'private' : 'public',
@@ -154,15 +161,21 @@ function resolveHalfCourses(courseId, courseName, front9, back9, courseHalfText)
 function mergeFormWithExistingGame(existing, form) {
   if (!existing) return form || {};
   const f = form || {};
-  const courseId = f.courseId || existing.courseId || '';
+  var isTemporary;
+  if (temporaryCourse.isTemporarySource(f)) isTemporary = true;
+  else if (f.courseId) isTemporary = false;
+  else isTemporary = temporaryCourse.isTemporarySource(existing);
+  const courseId = isTemporary ? '' : f.courseId || existing.courseId || '';
   const courseName = (f.courseName || existing.courseName || '').trim();
-  const halfResolved = resolveHalfCourses(
-    courseId,
-    courseName,
-    f.front9Course || existing.front9Course,
-    f.back9Course || existing.back9Course,
-    f.courseHalfText || existing.courseHalfText
-  );
+  const halfResolved = isTemporary
+    ? { front9Course: 'A', back9Course: 'B' }
+    : resolveHalfCourses(
+        courseId,
+        courseName,
+        f.front9Course || existing.front9Course,
+        f.back9Course || existing.back9Course,
+        f.courseHalfText || existing.courseHalfText
+      );
   return {
     courseId: courseId,
     courseName: courseName,
@@ -170,6 +183,14 @@ function mergeFormWithExistingGame(existing, form) {
     front9Course: halfResolved.front9Course,
     back9Course: halfResolved.back9Course,
     courseHalfText: f.courseHalfText || existing.courseHalfText || '',
+    courseLayoutRevision: f.courseLayoutRevision != null ? f.courseLayoutRevision : existing.courseLayoutRevision,
+    courseSource: isTemporary ? 'temporary' : '',
+    temporaryCourseId: isTemporary
+      ? f.temporaryCourseId || existing.temporaryCourseId || ''
+      : '',
+    holePars: isTemporary
+      ? temporaryCourse.cloneHolePars(f.holePars || existing.holePars)
+      : null,
     teeTimeText: (f.teeTimeText || '').trim() || existing.teeTime || '',
     roundName: f.roundName != null && f.roundName !== '' ? f.roundName : (existing.roundName || ''),
     gameMode: f.gameMode || existing.gameMode || '',
@@ -208,10 +229,16 @@ function compositionRecordValid(rec, count) {
  */
 function validateSubmitForm(form, helpers) {
   const h = helpers || {};
-  const courseId = form.courseId;
-  const courseName = (form.courseName || '').trim();
-  if (!courseId || !courseName) {
-    return '尚未选择球场，请选择后才可确认';
+  if (temporaryCourse.isTemporarySource(form)) {
+    if (!temporaryCourse.isValidHolePars(form && form.holePars)) {
+      return '请完成18洞标准杆（每洞3/4/5）';
+    }
+  } else {
+    const courseId = form.courseId;
+    const courseName = (form.courseName || '').trim();
+    if (!courseId || !courseName) {
+      return '尚未选择球场，请选择后才可确认';
+    }
   }
 
   const teeTimeText = (form.teeTimeText || '').trim();
@@ -219,17 +246,21 @@ function validateSubmitForm(form, helpers) {
     return '请设置开球时间';
   }
 
-  const course = halfCourse.resolveHalfCourseRecord(courseId, courseName);
-  if (!h.skipHalfCourse && course && halfCourse.buildHalves(course).length >= 2) {
-    const halfResolved = resolveHalfCourses(
-      courseId,
-      courseName,
-      form.front9Course,
-      form.back9Course,
-      form.courseHalfText
-    );
-    if (!halfResolved.front9Course && !halfResolved.back9Course) {
-      return '请选择球场前9/后9半场';
+  if (!temporaryCourse.isTemporarySource(form) && !h.skipHalfCourse) {
+    const courseId = form.courseId;
+    const courseName = (form.courseName || '').trim();
+    const course = halfCourse.resolveHalfCourseRecord(courseId, courseName);
+    if (course && halfCourse.buildHalves(course).length >= 2) {
+      const halfResolved = resolveHalfCourses(
+        courseId,
+        courseName,
+        form.front9Course,
+        form.back9Course,
+        form.courseHalfText
+      );
+      if (!halfResolved.front9Course && !halfResolved.back9Course) {
+        return '请选择球场前9/后9半场';
+      }
     }
   }
 
@@ -378,6 +409,14 @@ function buildUpdatedGame(existing, form, helpers) {
     front9Course: form.front9Course || null,
     back9Course: form.back9Course || null,
     courseHalfText: form.courseHalfText || '',
+    courseLayoutRevision: form.courseLayoutRevision != null ? form.courseLayoutRevision : existing.courseLayoutRevision,
+    courseSource: temporaryCourse.isTemporarySource(form) ? 'temporary' : '',
+    temporaryCourseId: temporaryCourse.isTemporarySource(form)
+      ? form.temporaryCourseId || existing.temporaryCourseId || ''
+      : '',
+    holePars: temporaryCourse.isTemporarySource(form)
+      ? temporaryCourse.cloneHolePars(form.holePars || existing.holePars)
+      : null,
     teeTime: form.teeTimeText || '',
     roundName: finalRoundName,
     gameMode: form.gameMode || '',

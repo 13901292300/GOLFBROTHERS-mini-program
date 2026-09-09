@@ -147,7 +147,11 @@ function buildFromGame(game, groupIndex) {
       teeTime: (game && game.teeTime) || '',
       roundName: (game && game.roundName) || (game && game.courseName) || '',
       front9Course: (game && game.front9Course) || null,
-      back9Course: (game && game.back9Course) || null
+      back9Course: (game && game.back9Course) || null,
+      courseLayoutRevision: game && game.courseLayoutRevision,
+      courseSource: (game && game.courseSource) || '',
+      temporaryCourseId: (game && game.temporaryCourseId) || '',
+      holePars: game && Array.isArray(game.holePars) ? game.holePars.slice() : null
     },
     scores: emptyScores(),
     groupCount: groups.length || 1

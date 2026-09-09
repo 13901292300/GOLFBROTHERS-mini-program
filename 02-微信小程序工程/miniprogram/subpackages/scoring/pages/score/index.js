@@ -9608,24 +9608,13 @@ Page({
     if (this.data.gameId) {
       const game = gameStore.getGame(this.data.gameId);
       if (game) {
-        ctx.courseId = game.courseId;
-        ctx.courseName = game.courseName;
-        ctx.front9Course = game.front9Course;
-        ctx.back9Course = game.back9Course;
-        ctx.courseHalfText = game.courseHalfText;
+        Object.assign(ctx, holeLayout.contextFromRecord(game));
       }
     } else if (this.data.mode === 'individual_stroke') {
       const c = (ms && ms.course) || {};
-      ctx.courseId = c.courseId;
-      ctx.courseName = c.courseName;
-      ctx.front9Course = c.front9Course;
-      ctx.back9Course = c.back9Course;
+      Object.assign(ctx, holeLayout.contextFromRecord(c));
     } else if (ms && ms.course) {
-      const c = ms.course;
-      ctx.courseId = c.courseId;
-      ctx.courseName = c.courseName;
-      ctx.front9Course = c.front9Course;
-      ctx.back9Course = c.back9Course;
+      Object.assign(ctx, holeLayout.contextFromRecord(ms.course));
     }
 
     const layout = holeLayout.resolveLayoutFromContext(ctx);

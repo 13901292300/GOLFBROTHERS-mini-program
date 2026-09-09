@@ -55,16 +55,7 @@ function resolveScoresByPlayerRecord(scoresByPlayer, slotPlayer, currentPlayerId
 
 function resolveMatchHolePars(match) {
   var src = match || {};
-  var parsed =
-    !src.front9Course && !src.back9Course
-      ? halfCourse.parseCourseHalfText(src.courseHalfText || src.courseHalf || src.halfText)
-      : {};
-  var layout = holeLayout.resolveLayoutFromContext({
-    courseId: src.courseId || '',
-    courseName: src.courseName || '',
-    front9Course: src.front9Course || parsed.front9Course || null,
-    back9Course: src.back9Course || parsed.back9Course || null
-  });
+  var layout = holeLayout.resolveLayoutFromContext(holeLayout.contextFromRecord(src));
   return (layout.holePars || holeLayout.getLayout().holePars || []).slice();
 }
 

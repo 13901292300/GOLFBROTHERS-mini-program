@@ -22,7 +22,8 @@
         "pages/team-inter/index",
         "pages/series/index",
         "pages/team/select/index",
-        "pages/course/select/index"
+        "pages/course/select/index",
+        "pages/course/temporary/index"
       ]
     },
     {

@@ -202,6 +202,14 @@ Page({
   },
 
   // 统一回填普通创建页并关闭（front9/back9 可为 null）
+  _emitCourseSelected(payload) {
+    const channel = this.getOpenerEventChannel && this.getOpenerEventChannel();
+    if (channel && channel.emit) {
+      channel.emit('courseSelected', payload);
+    }
+    wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/subpackages/create/pages/normal/index' }) });
+  },
+
   _returnCourse(course, front9, back9, halfText) {
     const payload = {
       courseId: course.courseId,
@@ -211,12 +219,21 @@ Page({
       back9Course: back9 || null,
       halfText: halfText || ''
     };
-    const channel = this.getOpenerEventChannel && this.getOpenerEventChannel();
-    if (channel && channel.emit) {
-      channel.emit('courseSelected', payload);
-    }
     this.setData({ selectedId: course.courseId });
-    wx.navigateBack({ delta: 1, fail: () => wx.redirectTo({ url: '/subpackages/create/pages/normal/index' }) });
+    this._emitCourseSelected(payload);
+  },
+
+  onCreateTemporaryCourse() {
+    wx.navigateTo({
+      url: '/subpackages/create/pages/course/temporary/index',
+      events: {
+        courseSelected: (payload) => {
+          if (!payload || payload.courseSource !== 'temporary') return;
+          this._emitCourseSelected(payload);
+        }
+      },
+      fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })
+    });
   },
 
   /* ===== 半场选择二级弹窗 ===== */

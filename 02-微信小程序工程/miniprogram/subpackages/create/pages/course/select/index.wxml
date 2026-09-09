@@ -61,7 +61,10 @@
         </view>
       </view>
 
-      <view wx:if="{{searchResults.length === 0}}" class="course-empty">未找到匹配的球场，换个关键词试试</view>
+      <view wx:if="{{searchResults.length === 0}}" class="course-empty">
+        <text class="course-empty__text">未找到匹配的球场，换个关键词试试</text>
+        <view class="temp-course-btn" bindtap="onCreateTemporaryCourse">创建临时球场</view>
+      </view>
     </view>
   </scroll-view>
 

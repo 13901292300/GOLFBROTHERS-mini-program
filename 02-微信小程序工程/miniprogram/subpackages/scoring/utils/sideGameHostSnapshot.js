@@ -57,6 +57,9 @@ function courseContextOf(src) {
   };
   if (rec.courseLayoutRevision != null) out.courseLayoutRevision = rec.courseLayoutRevision;
   if (rec.courseParRevision != null) out.courseParRevision = rec.courseParRevision;
+  if (rec.courseSource) out.courseSource = rec.courseSource;
+  if (rec.temporaryCourseId) out.temporaryCourseId = rec.temporaryCourseId;
+  if (Array.isArray(rec.holePars)) out.holePars = rec.holePars.slice();
   return out;
 }
 

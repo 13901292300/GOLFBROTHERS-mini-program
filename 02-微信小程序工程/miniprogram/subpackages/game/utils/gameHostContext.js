@@ -111,6 +111,9 @@ function courseContextFields(src) {
   };
   if (rec.courseLayoutRevision != null) out.courseLayoutRevision = rec.courseLayoutRevision;
   if (rec.courseParRevision != null) out.courseParRevision = rec.courseParRevision;
+  if (rec.courseSource) out.courseSource = rec.courseSource;
+  if (rec.temporaryCourseId) out.temporaryCourseId = rec.temporaryCourseId;
+  if (Array.isArray(rec.holePars)) out.holePars = rec.holePars.slice();
   return out;
 }
 
@@ -122,6 +125,23 @@ function resolveOfficialHoleContext(src) {
     var parsed = halfCourse.parseCourseHalfText(rec.courseHalfText || rec.halfText || '');
     front = asString(parsed && parsed.front9Course);
     back = asString(parsed && parsed.back9Course);
+  }
+  if (rec.courseSource === 'temporary') {
+    var snap = holeLayout.buildLayoutFromHolePars(rec.holePars, front || 'A', back || 'B');
+    if (!snap) {
+      return { holeContextReady: false, holeOrder: [], pars: {} };
+    }
+    front = asString(snap.front9Key) || 'A';
+    back = asString(snap.back9Key) || 'B';
+    var holeOrderT = [];
+    var parsT = {};
+    var ti;
+    for (ti = 0; ti < 9; ti++) holeOrderT.push(front + (ti + 1));
+    for (ti = 0; ti < 9; ti++) holeOrderT.push(back + (ti + 1));
+    for (ti = 0; ti < holeOrderT.length; ti++) {
+      parsT[holeOrderT[ti]] = snap.holePars[ti];
+    }
+    return { holeContextReady: true, holeOrder: holeOrderT, pars: parsT };
   }
   if (!front || !back) {
     return { holeContextReady: false, holeOrder: [], pars: {} };

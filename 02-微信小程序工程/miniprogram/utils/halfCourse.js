@@ -11,6 +11,7 @@ const {
   QHW_CANONICAL_ID,
   QHW_DISPLAY_NAME
 } = require('./courseDatabase.js');
+const temporaryCourse = require('./temporaryCourse.js');
 
 const DEFAULT_PAR9 = [4, 4, 4, 3, 4, 5, 4, 3, 4];
 
@@ -222,6 +223,9 @@ function resolveDisplayHalves(input) {
  */
 function formatCourseDisplayName(input) {
   var o = input && typeof input === 'object' ? input : {};
+  if (temporaryCourse.isTemporarySource(o)) {
+    return temporaryCourse.displayCourseName(o.courseName);
+  }
   var rawName = _trim(o.courseName || o.course || '');
   var halves = resolveDisplayHalves(o);
   var fromName = stripHalfComboSuffix(rawName);
@@ -262,28 +266,50 @@ function formatCourseLineForUi(input) {
   return display ? display + ' · ' + note : note;
 }
 
+function hasSelectedCourse(record) {
+  if (temporaryCourse.isValidTemporaryCourse(record)) return true;
+  var o = record && typeof record === 'object' ? record : {};
+  return !!(_trim(o.courseId) && _trim(o.courseName));
+}
+
 function buildCourseSelectionFields(payload) {
   var p = payload && typeof payload === 'object' ? payload : {};
+  var isTemporary = p.courseSource === 'temporary';
   var courseHalfText = halfTextFromPayload(p);
   var courseName = _trim(p.courseName);
   var front9 = p.front9Course != null ? p.front9Course : p.front9;
   var back9 = p.back9Course != null ? p.back9Course : p.back9;
+  if (isTemporary) {
+    front9 = front9 || 'A';
+    back9 = back9 || 'B';
+    courseHalfText = formatCourseHalfText(formatHalfCombo(front9, back9));
+  }
   var fields = {
-    courseId: p.courseId || '',
+    courseId: isTemporary ? '' : p.courseId || '',
     courseName: courseName,
-    courseLocation: p.courseLocation || '',
+    courseLocation: isTemporary ? '' : p.courseLocation || '',
     front9Course: front9 || null,
     back9Course: back9 || null,
     courseHalfText: courseHalfText,
+    courseSource: isTemporary ? 'temporary' : '',
+    temporaryCourseId: isTemporary ? String(p.temporaryCourseId || '').trim() : '',
+    holePars: isTemporary && Array.isArray(p.holePars) ? p.holePars.slice() : null,
     courseDisplayName: formatCourseDisplayName({
-      courseId: p.courseId || '',
+      courseId: isTemporary ? '' : p.courseId || '',
       courseName: courseName,
       front9Course: front9,
       back9Course: back9,
-      courseHalfText: courseHalfText
+      courseHalfText: courseHalfText,
+      courseSource: isTemporary ? 'temporary' : ''
     })
   };
-  if (p.courseLayoutRevision != null) fields.courseLayoutRevision = p.courseLayoutRevision;
+  if (!isTemporary && p.courseLayoutRevision != null) {
+    fields.courseLayoutRevision = p.courseLayoutRevision;
+  }
+  if (isTemporary) {
+    fields.courseLayoutRevision = null;
+  }
+  fields.hasSelectedCourse = hasSelectedCourse(fields);
   return fields;
 }
 
@@ -313,6 +339,7 @@ module.exports = {
   formatCourseHalfText,
   formatCourseDisplayName,
   formatCourseLineForUi,
+  hasSelectedCourse,
   buildCourseSelectionFields,
   parseCourseHalfText,
   parseHalfPair,
