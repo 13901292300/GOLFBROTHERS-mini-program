@@ -7,6 +7,8 @@
  * handicap / floatCoef：竞技展示字段（非编辑页写入）
  * nationality* / region*：公开地理字段（均可空；不复用球队 region）
  * updatedAt：成功保存时更新
+ * avatar：canonical 持久头像（cloud:// 或稳定 https），用于身份 / 云同步 / 球局快照
+ * avatarLocalPath：本机 USER_DATA_PATH 展示缓存（wxfile://usr），仅 UI，不得入库快照
  */
 
 const gameStore = require('./gameStore.js');
@@ -81,6 +83,7 @@ function _baseFromCurrentUser() {
     phoneBound: false,
     phoneMasked: '未绑定',
     avatar: DEFAULT_AVATAR,
+    avatarLocalPath: '',
     handicap: DEFAULT_HANDICAP,
     floatCoef: DEFAULT_FLOAT_COEF,
     nationalityCode: '',
@@ -155,6 +158,7 @@ function normalizeProfile(raw) {
         ? String(src.phoneMasked).trim()
         : base.phoneMasked,
     avatar: avatarRaw || DEFAULT_AVATAR,
+    avatarLocalPath: _normalizeAvatarLocalPath(src.avatarLocalPath),
     handicap: _toNumberOr(src.handicap != null ? src.handicap : base.handicap, DEFAULT_HANDICAP),
     floatCoef: _toNumberOr(
       src.floatCoef != null ? src.floatCoef : base.floatCoef,
@@ -257,11 +261,143 @@ function persistRegisterCompetitionDraft(draft) {
   return setDisplayName(value);
 }
 
+function _normalizeAvatarLocalPath(value) {
+  const v = String(value == null ? '' : value).trim();
+  if (!v) return '';
+  if (/^cloud:\/\//i.test(v)) return '';
+  if (mockAvatars.isTempWeChatFile(v)) return '';
+  if (!mockAvatars.isDurableLocalUserFile(v)) return '';
+  return v;
+}
+
+function _isManagedGbAvatarFile(filePath) {
+  const v = _normalizeAvatarLocalPath(filePath);
+  if (!v) return false;
+  const base = v.split(/[\\/]/).pop() || '';
+  const name = String(base).split('?')[0];
+  return /^gb_avatar_/i.test(name);
+}
+
+function _localAvatarFileExists(filePath) {
+  const v = _normalizeAvatarLocalPath(filePath);
+  if (!v) return false;
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') return false;
+    const fs = wx.getFileSystemManager();
+    if (!fs || typeof fs.accessSync !== 'function') return false;
+    fs.accessSync(v);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function _tryUnlinkLocalAvatarFile(filePath) {
+  const v = String(filePath || '').trim();
+  if (!v || !_isManagedGbAvatarFile(v)) return;
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') return;
+    const fs = wx.getFileSystemManager();
+    if (!fs) return;
+    if (typeof fs.unlinkSync === 'function') {
+      fs.unlinkSync(v);
+      return;
+    }
+    if (typeof fs.unlink === 'function') {
+      fs.unlink({
+        filePath: v,
+        fail: function () {}
+      });
+    }
+  } catch (e) {
+    try {
+      console.warn('[userProfileStore] unlink local avatar failed');
+    } catch (e2) {
+      /* ignore */
+    }
+  }
+}
+
 /** 「我的」展示用：仅持久头像；临时路径不显示为已保存成功 */
 function resolveDisplayAvatar(profile) {
   const raw = String((profile && profile.avatar) || '').trim();
   if (mockAvatars.isDurableAvatarSrc(raw)) return raw;
   return DEFAULT_AVATAR;
+}
+
+/**
+ * 当前登录用户本人 UI src：有效本机缓存优先，否则 canonical avatar。
+ * 不写回 profile，不下载 cloud 文件。
+ */
+function resolveCurrentUserAvatarDisplay(profile) {
+  const p = profile && typeof profile === 'object' ? profile : {};
+  const local = _normalizeAvatarLocalPath(p.avatarLocalPath);
+  if (local && _localAvatarFileExists(local)) return local;
+  return resolveDisplayAvatar(p);
+}
+
+/**
+ * 删除未被 profile 引用、且不是 keepPath 的 gb_avatar_*。
+ * 用于事务失败时清 orphan new，或成功后清 prev。删除失败只 warn。
+ */
+function discardUnusedAvatarLocalFile(candidatePath, keepPath) {
+  const candidate = _normalizeAvatarLocalPath(candidatePath);
+  const keep = _normalizeAvatarLocalPath(keepPath);
+  if (!candidate || !_isManagedGbAvatarFile(candidate)) return;
+  if (keep && candidate === keep) return;
+  try {
+    const referenced = _normalizeAvatarLocalPath((loadProfile() || {}).avatarLocalPath);
+    if (referenced && referenced === candidate) return;
+  } catch (e) {
+    /* ignore */
+  }
+  _tryUnlinkLocalAvatarFile(candidate);
+}
+
+/**
+ * 一次写入 canonical avatar + 本机缓存。默认在保存成功后再删上一份 gb_avatar_*。
+ * 保存抛错时不删 prev，并尝试清未入档的 new local。
+ */
+function commitAvatarCanonicalAndLocal(input, opts) {
+  const canonical = String((input && input.avatar) || '').trim();
+  const nextPath = _normalizeAvatarLocalPath(input && input.avatarLocalPath);
+  const current = loadProfile();
+  const oldPath = _normalizeAvatarLocalPath(current.avatarLocalPath);
+  let saved;
+  try {
+    saved = updateProfile({
+      avatar: canonical,
+      avatarLocalPath: nextPath
+    });
+  } catch (e) {
+    discardUnusedAvatarLocalFile(nextPath, oldPath);
+    throw e;
+  }
+  const raw = _readRaw() || {};
+  const persistedAvatar = String(raw.avatar || '').trim();
+  const persistedLocal = _normalizeAvatarLocalPath(raw.avatarLocalPath);
+  if (persistedAvatar !== canonical || persistedLocal !== nextPath) {
+    discardUnusedAvatarLocalFile(nextPath, oldPath);
+    throw new Error('avatar_commit_not_persisted');
+  }
+  const unlinkPrevious = !opts || opts.unlinkPreviousLocal !== false;
+  if (unlinkPrevious) {
+    discardUnusedAvatarLocalFile(oldPath, saved && saved.avatarLocalPath);
+  }
+  return saved;
+}
+
+/**
+ * 仅写本机缓存（兼容旧调用）。新选图路径请用 commitAvatarCanonicalAndLocal。
+ */
+function commitAvatarLocalPath(newLocalPath) {
+  const nextPath = _normalizeAvatarLocalPath(newLocalPath);
+  if (!nextPath) return loadProfile();
+  const current = loadProfile();
+  const oldPath = _normalizeAvatarLocalPath(current.avatarLocalPath);
+  const saved = updateProfile({ avatarLocalPath: nextPath });
+  discardUnusedAvatarLocalFile(oldPath, saved && saved.avatarLocalPath);
+  return saved;
 }
 
 function _avatarExtFromPath(path) {
@@ -364,5 +500,9 @@ module.exports = {
   resolveRegisterCompetitionName,
   persistRegisterCompetitionDraft,
   persistAvatarFile,
-  resolveDisplayAvatar
+  resolveDisplayAvatar,
+  resolveCurrentUserAvatarDisplay,
+  commitAvatarLocalPath,
+  commitAvatarCanonicalAndLocal,
+  discardUnusedAvatarLocalFile
 };

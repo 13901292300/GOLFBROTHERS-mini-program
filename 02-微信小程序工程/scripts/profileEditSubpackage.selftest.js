@@ -169,6 +169,7 @@ function loadEditPage(wxApi, store) {
     require: function (request) {
       var abs = path.resolve(newDir, request);
       if (path.basename(abs) === 'userProfileStore.js') return store;
+      if (path.basename(abs) === 'profileOnboard.js') return mockOnboard;
       if (path.basename(abs) === 'headerEngine.js') {
         return {
           createHeaderStyle: function () {
@@ -181,6 +182,7 @@ function loadEditPage(wxApi, store) {
     },
     Page: function (value) { pageDef = value; },
     getApp: function () { return { getTheme: function () { return 'bright'; } }; },
+    Promise: Promise,
     wx: wxApi,
     console: console,
     setTimeout: function (fn) { fn(); },
@@ -203,6 +205,19 @@ function loadEditPage(wxApi, store) {
 var keptAvatar = '/kept/avatar.png';
 var profileState = { avatar: keptAvatar, nickname: '测' };
 var updates = [];
+var discarded = [];
+var uploadOk = false;
+var lastUploadPath = '';
+var mockOnboard = {
+  uploadTempAvatar: function (filePath) {
+    lastUploadPath = String(filePath || '');
+    if (!uploadOk) return Promise.resolve({ ok: false, code: 'invalid_avatar' });
+    return Promise.resolve({ ok: true, avatar: 'cloud://env.bucket/new.jpg' });
+  },
+  syncLiveProfileToTeams: function () {
+    return Promise.resolve({ ok: true });
+  }
+};
 var store = {
   IDENTITY_PLAYER: 'PLAYER',
   IDENTITY_CADDIE: 'CADDIE',
@@ -211,11 +226,27 @@ var store = {
   resolveDisplayAvatar: function (p) {
     return (p && p.avatar) || '/default/avatar.png';
   },
+  resolveCurrentUserAvatarDisplay: function (p) {
+    return (p && p.avatarLocalPath) || (p && p.avatar) || '/default/avatar.png';
+  },
   updateProfile: function (patch) {
     updates.push(patch);
     Object.keys(patch).forEach(function (key) {
       profileState[key] = patch[key];
     });
+    return profileState;
+  },
+  commitAvatarLocalPath: function (localPath) {
+    return store.updateProfile({ avatarLocalPath: localPath });
+  },
+  commitAvatarCanonicalAndLocal: function (input) {
+    return store.updateProfile({
+      avatar: input.avatar,
+      avatarLocalPath: input.avatarLocalPath
+    });
+  },
+  discardUnusedAvatarLocalFile: function (candidate, keep) {
+    discarded.push({ candidate: candidate, keep: keep });
   },
   persistAvatarFile: function (tempPath, cb) {
     wxApi.saveFile({
@@ -264,56 +295,94 @@ assert(
 wxApi.chooseMedia = function (opts) {
   opts.success({ tempFiles: [{ tempFilePath: '/tmp/new-avatar.jpg' }] });
 };
-page._pickLocalAvatar();
-assert(
-  '本地选图成功才写入头像',
-  updates.length === 1 &&
-    updates[0].avatar === '/saved/new-avatar.jpg' &&
-    profileState.avatar === '/saved/new-avatar.jpg' &&
-    page.data.userProfile.avatar === '/saved/new-avatar.jpg'
-);
 
-updates.length = 0;
-profileState.avatar = keptAvatar;
-page.refreshProfile();
-page.onChooseAvatar({ detail: { avatarUrl: '/wx/avatar.png' } });
-assert(
-  'onChooseAvatar 成功写入微信头像',
-  updates.length === 1 &&
-    updates[0].avatar === '/saved/avatar.png' &&
-    profileState.avatar === '/saved/avatar.png'
-);
-
-assert(
-  '_commitAvatar 失败会 toast 且不把临时路径当成功',
-  js.indexOf('头像上传失败，请重试') >= 0 &&
-    js.indexOf('_avatarUploading') >= 0 &&
-    methodSource(js, '_commitAvatar').indexOf('.catch') >= 0
-);
-
-wxApi.saveFile = function (opts) {
-  opts.fail({ errMsg: 'saveFile:fail' });
-};
-wxApi._toasts = [];
-updates.length = 0;
-profileState.avatar = keptAvatar;
-page.refreshProfile();
-page._commitAvatar('/tmp/fail-avatar.jpg');
-assert(
-  'persist 失败恢复旧头像并提示',
-  updates.length === 0 &&
-    profileState.avatar === keptAvatar &&
-    wxApi._toasts.indexOf('头像上传失败，请重试') >= 0
-);
-
-var jsonOk = false;
-try {
-  JSON.parse(read(path.join(newDir, 'index.json')));
-  JSON.parse(read(path.join(oldDir, 'index.json')));
-  jsonOk = true;
-} catch (e) {
-  jsonOk = false;
+function afterMicrotask(fn) {
+  return Promise.resolve().then(fn);
 }
-assert('新旧 JSON 均可解析', jsonOk);
-console.log('\npassed=' + passed + ' failed=' + failed);
-if (failed) process.exit(1);
+
+afterMicrotask(function () {
+  return afterMicrotask(function () {});
+})
+  .then(function () {
+    page._pickLocalAvatar();
+    return afterMicrotask(function () {});
+  })
+  .then(function () {
+    assert(
+      '云失败时不写入 profile，并 toast 失败',
+      updates.length === 0 &&
+        profileState.avatar === keptAvatar &&
+        !profileState.avatarLocalPath &&
+        wxApi._toasts.indexOf('头像上传失败，请重试') >= 0
+    );
+    uploadOk = true;
+    wxApi._toasts = [];
+    updates.length = 0;
+    discarded.length = 0;
+    profileState.avatar = keptAvatar;
+    profileState.avatarLocalPath = '';
+    page.refreshProfile();
+    page._pickLocalAvatar();
+    return afterMicrotask(function () {});
+  })
+  .then(function () {
+    assert(
+      '云成功后一次提交 canonical + local',
+      updates.length === 1 &&
+        updates[0].avatar === 'cloud://env.bucket/new.jpg' &&
+        updates[0].avatarLocalPath === '/saved/new-avatar.jpg' &&
+        profileState.avatar === 'cloud://env.bucket/new.jpg' &&
+        wxApi._toasts.indexOf('头像已更新') >= 0 &&
+        lastUploadPath === '/saved/new-avatar.jpg'
+    );
+    uploadOk = true;
+    updates.length = 0;
+    profileState.avatar = keptAvatar;
+    profileState.avatarLocalPath = '';
+    page.refreshProfile();
+    page.onChooseAvatar({ detail: { avatarUrl: '/wx/avatar.png' } });
+    return afterMicrotask(function () {});
+  })
+  .then(function () {
+    assert(
+      'onChooseAvatar 云成功才写入 canonical 与 local',
+      updates.length === 1 &&
+        updates[0].avatar === 'cloud://env.bucket/new.jpg' &&
+        updates[0].avatarLocalPath === '/saved/avatar.png'
+    );
+    assert(
+      '_commitAvatar 失败会 toast 且不把临时路径当成功',
+      js.indexOf('头像上传失败，请重试') >= 0 &&
+        js.indexOf('_avatarUploading') >= 0 &&
+        methodSource(js, '_commitAvatar').indexOf('.catch') >= 0
+    );
+    wxApi.saveFile = function (opts) {
+      opts.fail({ errMsg: 'saveFile:fail' });
+    };
+    wxApi._toasts = [];
+    updates.length = 0;
+    profileState.avatar = keptAvatar;
+    page.refreshProfile();
+    page._commitAvatar('/tmp/fail-avatar.jpg');
+    assert(
+      'persist 失败恢复旧头像并提示',
+      updates.length === 0 &&
+        profileState.avatar === keptAvatar &&
+        wxApi._toasts.indexOf('头像上传失败，请重试') >= 0
+    );
+    var jsonOk = false;
+    try {
+      JSON.parse(read(path.join(newDir, 'index.json')));
+      JSON.parse(read(path.join(oldDir, 'index.json')));
+      jsonOk = true;
+    } catch (e) {
+      jsonOk = false;
+    }
+    assert('新旧 JSON 均可解析', jsonOk);
+    console.log('\npassed=' + passed + ' failed=' + failed);
+    if (failed) process.exit(1);
+  })
+  .catch(function (err) {
+    console.error(err);
+    process.exit(1);
+  });

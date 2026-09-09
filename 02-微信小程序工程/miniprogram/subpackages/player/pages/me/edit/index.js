@@ -53,7 +53,7 @@ function buildUserProfileView() {
   const regionDisplayName = geoCatalog.formatRegionDisplayName(p);
 
   return {
-    avatar: userProfileStore.resolveDisplayAvatar(p),
+    avatar: userProfileStore.resolveCurrentUserAvatarDisplay(p),
     nickname: nickname,
     gender: genderNormalize.genderLabelZh(p.gender),
     signature: signature,
@@ -197,7 +197,9 @@ Page({
     if (!path) return;
     if (this._avatarUploading) return;
     this._avatarUploading = true;
-    const prevAvatar = String((userProfileStore.loadProfile() || {}).avatar || '');
+    const prev = userProfileStore.loadProfile() || {};
+    const prevAvatar = String(prev.avatar || '');
+    const prevLocal = String(prev.avatarLocalPath || '');
     try {
       wx.showLoading({ title: '上传中', mask: true });
     } catch (eLoad) {
@@ -213,76 +215,142 @@ Page({
     };
     const restorePrev = () => {
       try {
-        const cur = String((userProfileStore.loadProfile() || {}).avatar || '');
-        if (cur !== prevAvatar) {
-          userProfileStore.updateProfile({ avatar: prevAvatar });
+        const cur = userProfileStore.loadProfile() || {};
+        const patch = {};
+        if (String(cur.avatar || '') !== prevAvatar) patch.avatar = prevAvatar;
+        if (String(cur.avatarLocalPath || '') !== prevLocal) patch.avatarLocalPath = prevLocal;
+        if (Object.keys(patch).length) {
+          userProfileStore.updateProfile(patch);
           this.refreshProfile();
         }
       } catch (eRest) {
         /* ignore */
       }
     };
-    const failUpload = () => {
+    const discardOrphanNew = (newLocalPath) => {
+      try {
+        if (typeof userProfileStore.discardUnusedAvatarLocalFile === 'function') {
+          userProfileStore.discardUnusedAvatarLocalFile(newLocalPath, prevLocal);
+        }
+      } catch (eDisc) {
+        /* ignore */
+      }
+    };
+    const failUpload = (newLocalPath) => {
       restorePrev();
+      discardOrphanNew(newLocalPath);
       hide();
       wx.showToast({ title: '头像上传失败，请重试', icon: 'none' });
     };
-    const saveAndApply = (finalPath) => {
-      const next = String(finalPath || '').trim();
-      const cloudOk = profileFields.isDurableAvatar(next);
-      const localOk =
-        !this.data.teamClubOnboard &&
-        next &&
-        next.indexOf('wxfile://tmp') < 0 &&
-        next.indexOf('http://tmp') < 0;
-      if (this.data.teamClubOnboard ? !cloudOk : !localOk && !cloudOk) {
-        failUpload();
-        return;
-      }
-      userProfileStore.updateProfile({ avatar: next });
-      this.refreshProfile();
-      const finishOk = () => {
-        hide();
-        wx.showToast({ title: '头像已更新', icon: 'success' });
-      };
-      const syncRes = profileOnboard.syncLiveProfileToTeams();
-      if (!this.data.teamClubOnboard) {
-        finishOk();
-        return;
-      }
-      Promise.resolve(syncRes)
-        .then((res) => {
-          if (res && res.ok) {
-            finishOk();
-            return;
-          }
-          failUpload();
-        })
-        .catch(function () {
-          failUpload();
-        });
+    const finishOk = () => {
+      hide();
+      wx.showToast({ title: '头像已更新', icon: 'success' });
     };
-    if (this.data.teamClubOnboard) {
-      profileOnboard
-        .uploadTempAvatar(path)
-        .then((up) => {
-          if (up && up.ok && up.avatar && profileFields.isDurableAvatar(up.avatar)) {
-            saveAndApply(up.avatar);
-            return;
-          }
-          failUpload();
-        })
-        .catch(function () {
-          failUpload();
+    const commitBoth = (cloudAvatar, localPath, unlinkPreviousLocal) => {
+      const next = String(cloudAvatar || '').trim();
+      if (!profileFields.isDurableAvatar(next)) return false;
+      const payload = {
+        avatar: next,
+        avatarLocalPath: String(localPath || '')
+      };
+      if (typeof userProfileStore.commitAvatarCanonicalAndLocal === 'function') {
+        userProfileStore.commitAvatarCanonicalAndLocal(payload, {
+          unlinkPreviousLocal: unlinkPreviousLocal !== false
         });
+      } else {
+        userProfileStore.updateProfile(payload);
+      }
+      this.refreshProfile();
+      return true;
+    };
+    const persistThenUploadCanonical = (done) => {
+      userProfileStore.persistAvatarFile(path, (res) => {
+        const saved = res && res.ok ? String(res.path || '').trim() : '';
+        const localPath = saved && !profileFields.isDurableAvatar(saved) ? saved : '';
+        done({
+          localPath: localPath,
+          persistOk: !!saved
+        });
+      });
+    };
+
+    if (this.data.teamClubOnboard) {
+      persistThenUploadCanonical((localRes) => {
+        const newLocal = (localRes && localRes.localPath) || '';
+        const uploadSrc = newLocal || path;
+        profileOnboard
+          .uploadTempAvatar(uploadSrc)
+          .then((up) => {
+            if (!(up && up.ok && up.avatar && profileFields.isDurableAvatar(up.avatar))) {
+              failUpload(newLocal);
+              return;
+            }
+            try {
+              if (!commitBoth(up.avatar, newLocal, false)) {
+                failUpload(newLocal);
+                return;
+              }
+            } catch (eCommit) {
+              failUpload(newLocal);
+              return;
+            }
+            Promise.resolve(profileOnboard.syncLiveProfileToTeams())
+              .then((res) => {
+                if (res && res.ok) {
+                  try {
+                    if (typeof userProfileStore.discardUnusedAvatarLocalFile === 'function') {
+                      userProfileStore.discardUnusedAvatarLocalFile(prevLocal, newLocal);
+                    }
+                  } catch (eOld) {
+                    /* ignore */
+                  }
+                  finishOk();
+                  return;
+                }
+                failUpload(newLocal);
+              })
+              .catch(function () {
+                failUpload(newLocal);
+              });
+          })
+          .catch(function () {
+            failUpload(newLocal);
+          });
+      });
       return;
     }
-    userProfileStore.persistAvatarFile(path, (res) => {
-      if (res && res.ok && res.path) {
-        saveAndApply(res.path);
+
+    persistThenUploadCanonical((localRes) => {
+      const newLocal = (localRes && localRes.localPath) || '';
+      if (!(localRes && localRes.persistOk && newLocal)) {
+        failUpload(newLocal);
         return;
       }
-      failUpload();
+      Promise.resolve(profileOnboard.uploadTempAvatar(newLocal))
+        .then((up) => {
+          if (!(up && up.ok && up.avatar && profileFields.isDurableAvatar(up.avatar))) {
+            failUpload(newLocal);
+            return;
+          }
+          try {
+            if (!commitBoth(up.avatar, newLocal, true)) {
+              failUpload(newLocal);
+              return;
+            }
+          } catch (eCommit) {
+            failUpload(newLocal);
+            return;
+          }
+          finishOk();
+          try {
+            profileOnboard.syncLiveProfileToTeams();
+          } catch (eSync) {
+            /* ignore */
+          }
+        })
+        .catch(function () {
+          failUpload(newLocal);
+        });
     });
   },
 
