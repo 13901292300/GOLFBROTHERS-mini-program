@@ -32,7 +32,9 @@ App({
   },
 
   onLaunch: function () {
+    var self = this;
     this.globalData.theme = this.getTheme();
+    this._bindScoreSyncNetworkListener();
 
     if (!wx.cloud) {
       console.error("请使用 2.2.3 或以上的基础库以使用云能力");
@@ -49,7 +51,7 @@ App({
           if (!ident || !ident.ok) return;
           try {
             require('./utils/teamClub/matchSync.js').flush();
-            require('./utils/teamClub/scoreSync.js').flush();
+            self._tryFlushScoreSync();
           } catch (eSync) {
             /* ignore */
           }
@@ -61,6 +63,43 @@ App({
         });
       } catch (e) {
         /* 云身份失败由球队页展示，不在启动时静默回落本地仓储 */
+      }
+    }
+  },
+
+
+  onShow: function () {
+    this._tryFlushScoreSync();
+  },
+
+  _bindScoreSyncNetworkListener: function () {
+    if (this._scoreSyncNetworkBound) return;
+    if (typeof wx === 'undefined' || typeof wx.onNetworkStatusChange !== 'function') return;
+    var self = this;
+    wx.onNetworkStatusChange(function (res) {
+      if (res && res.isConnected === true) {
+        self._tryFlushScoreSync();
+      }
+    });
+    this._scoreSyncNetworkBound = true;
+  },
+
+  _tryFlushScoreSync: function () {
+    try {
+      var p = require('./utils/teamClub/scoreSync.js').flush();
+      if (p && typeof p.then === 'function') {
+        p.then(
+          function () {},
+          function (err) {
+            console.warn('score sync retry failed', err);
+          }
+        );
+      }
+    } catch (e) {
+      try {
+        console.warn('score sync retry failed', e);
+      } catch (e2) {
+        /* ignore */
       }
     }
   },

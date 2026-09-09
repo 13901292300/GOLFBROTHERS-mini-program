@@ -5155,6 +5155,7 @@ Page({
     } catch (eConflictUi) {
       /* ignore */
     }
+    this._tryFlushPendingScoreSync();
     this._syncFontScale();
     const remarkRev = playerDisplayName.getRemarkRevision();
     const remarkChanged =
@@ -5196,6 +5197,32 @@ Page({
           remarkNameMap: ctx.map
         })
       });
+    }
+  },
+
+  _tryFlushPendingScoreSync() {
+    try {
+      if (this._isGameStoreContext()) return;
+      const ms = this._matchState || (this._readMatchState && this._readMatchState());
+      const matchId = String((ms && ms.matchId) || '').trim();
+      if (!matchId) return;
+      const scoreSync = require('../../../../utils/teamClub/scoreSync.js');
+      if (!scoreSync.hasPending(matchId)) return;
+      const p = scoreSync.flush();
+      if (p && typeof p.then === 'function') {
+        p.then(
+          function () {},
+          function (err) {
+            console.warn('score sync retry failed', err);
+          }
+        );
+      }
+    } catch (e) {
+      try {
+        console.warn('score sync retry failed', e);
+      } catch (e2) {
+        /* ignore */
+      }
     }
   },
 

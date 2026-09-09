@@ -62,40 +62,45 @@ function writeList(key, list) {
   }
 }
 
-function readOutbox() {
-  var uid = trustedUid();
+function resolveOwnerUid(uid) {
+  var next = uid != null ? String(uid).trim() : '';
+  return next || trustedUid();
+}
+
+function readOutbox(uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return [];
   return readList(outboxKey(uid)).filter(function (row) {
     return row && (!row.ownerUserId || row.ownerUserId === uid);
   });
 }
 
-function writeOutbox(list) {
-  var uid = trustedUid();
+function writeOutbox(list, uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return;
   writeList(outboxKey(uid), list || []);
 }
 
-function readConflicts() {
-  var uid = trustedUid();
+function readConflicts(uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return [];
   return readList(conflictKey(uid));
 }
 
-function writeConflicts(list) {
-  var uid = trustedUid();
+function writeConflicts(list, uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return;
   writeList(conflictKey(uid), list || []);
 }
 
-function readHeld() {
-  var uid = trustedUid();
+function readHeld(uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return [];
   return readList(heldKey(uid));
 }
 
-function writeHeld(list) {
-  var uid = trustedUid();
+function writeHeld(list, uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return;
   writeList(heldKey(uid), list || []);
 }
@@ -140,7 +145,7 @@ function scoreOpId(row) {
 function enqueue(payload) {
   var uid = trustedUid();
   if (!uid || !payload) return 0;
-  var list = readOutbox();
+  var list = readOutbox(uid);
   var operationId = String((payload && payload.operationId) || scoreOpId(payload));
   list = list.filter(function (row) {
     return !(row && String(row.operationId) === operationId);
@@ -153,7 +158,7 @@ function enqueue(payload) {
       retries: Number((payload && payload.retries) || 0)
     })
   );
-  writeOutbox(list);
+  writeOutbox(list, uid);
   return 1;
 }
 
@@ -163,8 +168,9 @@ function matchClosed(match) {
   return st === 'finished' || st === 'cancelled' || st === 'canceled' || st === 'completed' || st === 'ended';
 }
 
-function holdRow(row, reason, extra) {
-  var held = readHeld();
+function holdRow(row, reason, extra, uid) {
+  uid = resolveOwnerUid(uid);
+  var held = readHeld(uid);
   held.push(
     Object.assign({}, extra || {}, {
       reason: reason,
@@ -186,12 +192,13 @@ function holdRow(row, reason, extra) {
       autoReplay: false
     })
   );
-  writeHeld(held);
+  writeHeld(held, uid);
 }
 
-function recordConflict(row, res) {
+function recordConflict(row, res, uid) {
+  uid = resolveOwnerUid(uid);
   var cloud = (res && (res.current || (res.data && res.data.current))) || null;
-  var list = readConflicts();
+  var list = readConflicts(uid);
   list.push({
     matchId: row.matchId,
     hole: row.hole,
@@ -205,26 +212,26 @@ function recordConflict(row, res) {
     at: Date.now(),
     autoReplay: false
   });
-  writeConflicts(list);
+  writeConflicts(list, uid);
 }
 
-function takeConflicts(matchId) {
-  var uid = trustedUid();
+function takeConflicts(matchId, uid) {
+  uid = resolveOwnerUid(uid);
   if (!uid) return [];
   var id = String(matchId || '');
-  var all = readConflicts();
+  var all = readConflicts(uid);
   var taken = [];
   var rest = [];
   all.forEach(function (row) {
     if (row && (!id || String(row.matchId) === id)) taken.push(row);
     else rest.push(row);
   });
-  writeConflicts(rest);
+  writeConflicts(rest, uid);
   return taken;
 }
 
-function notifyConflictsOnPage(matchId) {
-  var items = takeConflicts(matchId);
+function notifyConflictsOnPage(matchId, uid) {
+  var items = takeConflicts(matchId, uid);
   if (!items.length) return items;
   var holes = [];
   items.forEach(function (row) {
@@ -265,13 +272,15 @@ function defaultHandlers() {
   };
 }
 
-function flush(handlers) {
+var _flushInFlight = null;
+
+function runFlush(handlers) {
   var uid = trustedUid();
   if (!uid) {
     return Promise.resolve({ ok: true, flushed: 0, remain: 0, skipped: 'no_identity' });
   }
   var h = handlers || defaultHandlers();
-  var list = readOutbox();
+  var list = readOutbox(uid);
   if (!list.length) {
     return Promise.resolve({ ok: true, flushed: 0, remain: 0 });
   }
@@ -287,12 +296,12 @@ function flush(handlers) {
         function (got) {
           var match = (got && (got.match || got.data)) || null;
           if (got && got.ok && matchClosed(match)) {
-            holdRow(row, 'match_closed');
+            holdRow(row, 'match_closed', null, uid);
             held += 1;
             return null;
           }
           if (got && !got.ok && (got.code === 'forbidden' || got.code === 'need_login')) {
-            holdRow(row, 'permission_lost');
+            holdRow(row, 'permission_lost', null, uid);
             held += 1;
             return null;
           }
@@ -305,29 +314,34 @@ function flush(handlers) {
               conflicts += 1;
               var cloud =
                 (res && (res.current || (res.data && res.data.current))) || null;
-              holdRow(row, 'conflict', {
-                cloud: cloud
-                  ? { strokes: cloud.strokes, putts: cloud.putts, version: cloud.version }
-                  : null,
-                autoReplay: false
-              });
-              recordConflict(row, res);
+              holdRow(
+                row,
+                'conflict',
+                {
+                  cloud: cloud
+                    ? { strokes: cloud.strokes, putts: cloud.putts, version: cloud.version }
+                    : null,
+                  autoReplay: false
+                },
+                uid
+              );
+              recordConflict(row, res, uid);
               if (row.matchId && h.getMatch) {
                 return Promise.resolve(h.getMatch(row.matchId)).then(function () {
-                  notifyConflictsOnPage(row.matchId);
+                  notifyConflictsOnPage(row.matchId, uid);
                   return res;
                 });
               }
-              notifyConflictsOnPage(row.matchId);
+              notifyConflictsOnPage(row.matchId, uid);
               return res;
             }
             if (res && (res.code === 'forbidden' || res.code === 'permission_lost')) {
-              holdRow(row, 'permission_lost');
+              holdRow(row, 'permission_lost', null, uid);
               held += 1;
               return null;
             }
             if (res && res.code === 'match_closed') {
-              holdRow(row, 'match_closed');
+              holdRow(row, 'match_closed', null, uid);
               held += 1;
               return null;
             }
@@ -340,7 +354,7 @@ function flush(handlers) {
     });
   });
   return chain.then(function () {
-    writeOutbox(remain);
+    writeOutbox(remain, uid);
     return {
       ok: remain.length === 0,
       flushed: flushed,
@@ -349,6 +363,21 @@ function flush(handlers) {
       conflicts: conflicts
     };
   });
+}
+
+function flush(handlers) {
+  if (_flushInFlight) return _flushInFlight;
+  _flushInFlight = runFlush(handlers).then(
+    function (res) {
+      _flushInFlight = null;
+      return res;
+    },
+    function (err) {
+      _flushInFlight = null;
+      throw err;
+    }
+  );
+  return _flushInFlight;
 }
 
 function flatten(match) {

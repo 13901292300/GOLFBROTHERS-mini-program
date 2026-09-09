@@ -599,8 +599,319 @@ async function main() {
 
   var scorePage = fs.readFileSync(path.join(mini, 'subpackages', 'scoring', 'pages', 'score', 'index.js'), 'utf8');
   assert('记分页 onShow 消费冲突提示', scorePage.indexOf('notifyConflictsOnPage') >= 0);
+  assert(
+    '记分页仅当前 matchId pending 才 flush',
+    scorePage.indexOf('_tryFlushPendingScoreSync') >= 0 &&
+      scorePage.indexOf('hasPending(matchId)') >= 0 &&
+      scorePage.indexOf("hasPending('')") < 0 &&
+      scorePage.indexOf('if (this._isGameStoreContext()) return') >= 0
+  );
   var appSrc = fs.readFileSync(path.join(mini, 'app.js'), 'utf8');
   assert('启动仅在云身份成功后 flush', appSrc.indexOf('if (!ident || !ident.ok) return') >= 0);
+  assert(
+    'App 网络恢复与 onShow 补同步且 listener 只绑一次',
+    appSrc.indexOf('_scoreSyncNetworkBound') >= 0 &&
+      appSrc.indexOf('wx.onNetworkStatusChange') >= 0 &&
+      appSrc.indexOf('isConnected === true') >= 0 &&
+      /onShow:\s*function\s*\(\)\s*\{[\s\S]*_tryFlushScoreSync/.test(appSrc)
+  );
+
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  scoreSync.enqueue({
+    matchId: 'gm_p2',
+    hole: 1,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 4,
+    operationId: 'p2-c12'
+  });
+  var submitIds = [];
+  var secondHandlersUsed = 0;
+  var liveMatch = function () {
+    return Promise.resolve({ ok: true, match: { status: 'live' } });
+  };
+  var flushSharedA = scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function (row) {
+      submitIds.push(row && row.operationId);
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ ok: true, data: { score: row } });
+        }, 40);
+      });
+    }
+  });
+  var flushSharedB = scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      secondHandlersUsed += 1;
+      return Promise.resolve({ ok: true });
+    }
+  });
+  var sharedRes = await flushSharedA;
+  await flushSharedB;
+  assert(
+    'CASE12 并发 flush 共享 inFlight 且每 row submit 一次',
+    flushSharedA === flushSharedB &&
+      submitIds.length === 1 &&
+      submitIds[0] === 'p2-c12' &&
+      secondHandlersUsed === 0 &&
+      sharedRes.flushed === 1 &&
+      scoreSync.readOutbox().length === 0
+  );
+
+  scoreSync.enqueue({
+    matchId: 'gm_p2',
+    hole: 2,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 5,
+    operationId: 'p2-c13'
+  });
+  var firstFail = await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      return Promise.resolve({ ok: false, code: 'network' });
+    }
+  });
+  var retryCount = 0;
+  var secondOk = await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function (row) {
+      retryCount += 1;
+      return Promise.resolve({ ok: true, data: { score: row } });
+    }
+  });
+  assert(
+    'CASE13 失败后释放 inFlight 可再 flush',
+    firstFail.remain === 1 &&
+      retryCount === 1 &&
+      secondOk.flushed === 1 &&
+      scoreSync.readOutbox().length === 0
+  );
+
+  scoreSync.enqueue({
+    matchId: 'gm_p2',
+    hole: 3,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 4,
+    operationId: 'p2-c14-ok'
+  });
+  scoreSync.enqueue({
+    matchId: 'gm_p2',
+    hole: 4,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 6,
+    operationId: 'p2-c14-fail'
+  });
+  var partial = await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function (row) {
+      if (row && row.operationId === 'p2-c14-ok') return Promise.resolve({ ok: true, data: row });
+      return Promise.resolve({ ok: false, code: 'network' });
+    }
+  });
+  assert(
+    'CASE14 部分成功只 remain 失败 row',
+    partial.flushed === 1 &&
+      partial.remain === 1 &&
+      scoreSync.readOutbox().length === 1 &&
+      scoreSync.readOutbox()[0].operationId === 'p2-c14-fail'
+  );
+
+  var leftoverP2 = scoreSync.readOutbox();
+  identity.clearSession();
+  var skipFlush = await scoreSync.flush({
+    getMatch: function () {
+      throw new Error('no identity must not getMatch');
+    },
+    submit: function () {
+      throw new Error('no identity must not submit');
+    }
+  });
+  assert(
+    'CASE15 无 uid skip 且不写匿名队列',
+    skipFlush.skipped === 'no_identity' &&
+      Array.isArray(storage[persistKey]) &&
+      storage[persistKey].length === leftoverP2.length &&
+      scoreSync.readOutbox().length === 0
+  );
+
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  scoreSync.enqueue({
+    matchId: 'gm_p2',
+    hole: 5,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 3,
+    operationId: 'p2-c16-a'
+  });
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  var bSubmit = 0;
+  await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      bSubmit += 1;
+      return Promise.resolve({ ok: true });
+    }
+  });
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  assert(
+    'CASE16 B flush 不消费 A outbox',
+    bSubmit === 0 &&
+      scoreSync.readOutbox().some(function (r) {
+        return r && r.operationId === 'p2-c16-a';
+      })
+  );
+
+  await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      return Promise.resolve({ ok: true });
+    }
+  });
+  var persistKeyB = scoreSync.PREFIX + b.data.userId;
+  var heldKeyA = scoreSync.HELD_PREFIX + a.data.userId;
+  var heldKeyB = scoreSync.HELD_PREFIX + b.data.userId;
+  var conflictKeyA = scoreSync.CONFLICT_PREFIX + a.data.userId;
+  var conflictKeyB = scoreSync.CONFLICT_PREFIX + b.data.userId;
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  scoreSync.enqueue({
+    matchId: 'gm_p25',
+    hole: 1,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 4,
+    operationId: 'p25-row-a'
+  });
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  scoreSync.enqueue({
+    matchId: 'gm_p25',
+    hole: 1,
+    entityKind: 'player',
+    entityId: b.data.userId,
+    strokes: 5,
+    operationId: 'p25-row-b'
+  });
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  var switchedToB = 0;
+  var aFlushFail = scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+      switchedToB += 1;
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ ok: false, code: 'network' });
+        }, 30);
+      });
+    }
+  });
+  var bJoinedFail = scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      throw new Error('B must share A inFlight');
+    }
+  });
+  assert('CASEA 切换中 B 共享 A inFlight', aFlushFail === bJoinedFail);
+  await aFlushFail;
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  var aRemain = scoreSync.readOutbox();
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  var bRemain = scoreSync.readOutbox();
+  assert(
+    'CASEA 失败 remain 仍在 A 且 B 未被污染',
+    switchedToB >= 1 &&
+      aRemain.length === 1 &&
+      aRemain[0].operationId === 'p25-row-a' &&
+      bRemain.length === 1 &&
+      bRemain[0].operationId === 'p25-row-b' &&
+      Array.isArray(storage[persistKeyB]) &&
+      storage[persistKeyB].some(function (r) {
+        return r && r.operationId === 'p25-row-b';
+      })
+  );
+
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  var aFlushOk = scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ ok: true, data: {} });
+        }, 30);
+      });
+    }
+  });
+  await aFlushOk;
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  var aAfterOk = scoreSync.readOutbox();
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  var bAfterOk = scoreSync.readOutbox();
+  assert(
+    'CASEB A 成功清空自己队列且不写空数组到 B',
+    aAfterOk.length === 0 &&
+      bAfterOk.length === 1 &&
+      bAfterOk[0].operationId === 'p25-row-b'
+  );
+
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  scoreSync.enqueue({
+    matchId: 'gm_p25',
+    hole: 2,
+    entityKind: 'player',
+    entityId: a.data.userId,
+    strokes: 6,
+    operationId: 'p25-conflict-a'
+  });
+  storage[heldKeyA] = [];
+  storage[heldKeyB] = [{ reason: 'keep-b', matchId: 'gm_p25' }];
+  storage[conflictKeyA] = [];
+  storage[conflictKeyB] = [{ matchId: 'gm_keep_b' }];
+  await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function () {
+      identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+      return Promise.resolve({
+        ok: false,
+        code: 'conflict',
+        current: { strokes: 3, putts: null, version: 2 }
+      });
+    }
+  });
+  identity.setTestSession({ userId: a.data.userId, displayName: 'A' });
+  var heldA = scoreSync.readHeld();
+  var conflictsA = scoreSync.readConflicts();
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  var heldB = scoreSync.readHeld();
+  var conflictsB = scoreSync.readConflicts();
+  assert(
+    'CASEC conflict/held 写 A 桶且不改 B',
+    heldA.some(function (r) {
+      return r && r.reason === 'conflict' && r.operationId === 'p25-conflict-a';
+    }) &&
+      conflictsA.length === 0 &&
+      heldB.length === 1 &&
+      heldB[0].reason === 'keep-b' &&
+      conflictsB.length === 1 &&
+      conflictsB[0].matchId === 'gm_keep_b'
+  );
+
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  var bFlushed = await scoreSync.flush({
+    getMatch: liveMatch,
+    submit: function (row) {
+      return Promise.resolve({ ok: true, data: { score: row } });
+    }
+  });
+  identity.setTestSession({ userId: b.data.userId, displayName: 'B' });
+  assert(
+    'CASED A settle 后 B 可独立 flush',
+    bFlushed.flushed === 1 && scoreSync.readOutbox().length === 0
+  );
 
   console.log('\n---- teamClub.outbox.selftest ----');
   console.log('passed=' + passed + ' failed=' + failed + ' skipped=0');
