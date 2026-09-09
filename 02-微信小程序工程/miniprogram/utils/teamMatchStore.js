@@ -1595,6 +1595,28 @@ function hydrateCreatePageFromMatch(match) {
   };
 }
 
+function _applyCloudScoreProtection(prev, incoming) {
+  if (!prev || !incoming) return incoming;
+  try {
+    var protection = require('./teamClub/scorePendingProtection.js');
+    var rows = [];
+    try {
+      var scoreSync = require('./teamClub/scoreSync.js');
+      rows = (scoreSync.readOutbox() || []).concat(scoreSync.readHeld() || []);
+    } catch (eRows) {
+      rows = [];
+    }
+    incoming.scoreData = protection.mergeRemoteScoreDataWithLocalProtection(
+      prev.scoreData,
+      incoming.scoreData,
+      { matchId: incoming.matchId, pendingRows: rows }
+    );
+  } catch (eProt) {
+    /* 保护失败时不阻断 cache 写入 */
+  }
+  return incoming;
+}
+
 function saveMatch(match, options) {
   if (!match || !match.matchId) return null;
   var seriesGuard = require('./seriesFinishLock.js').assertWritableForMatch(match);
@@ -1605,6 +1627,9 @@ function saveMatch(match, options) {
   }
   match.scoreData = normalizeScoreData(match.scoreData);
   const prev = _readAll().find((item) => item && item.matchId === match.matchId) || null;
+  if (options && options.cacheOnly) {
+    _applyCloudScoreProtection(prev, match);
+  }
   const list = _readAll();
   const next = [match].concat(list.filter((item) => item && item.matchId !== match.matchId));
   _writeAll(next);

@@ -10,7 +10,7 @@ var CONFLICT_PREFIX = 'gb_team_score_conflicts_v1__';
 var HELD_PREFIX = 'gb_team_score_held_v1__';
 
 var CONFLICT_PAGE_MESSAGE =
-  '该洞成绩已被其他成员更新。\n当前显示已刷新为云端最新值。\n你本次未同步的修改没有覆盖云端。';
+  '该洞成绩已被其他成员更新。\n本机未同步成绩已保留，不会被云端覆盖。\n可稍后处理冲突。';
 
 function _wx() {
   return typeof wx !== 'undefined' && wx
@@ -172,6 +172,11 @@ function holdRow(row, reason, extra) {
       hole: row && row.hole,
       entityId: row && row.entityId,
       entityKind: row && row.entityKind,
+      groupId: row && row.groupId,
+      roundId: row && row.roundId,
+      operationId: row && row.operationId,
+      strokes: row && row.strokes,
+      putts: row && row.putts,
       localAttempt: {
         strokes: row && row.strokes,
         putts: row && row.putts
@@ -298,6 +303,14 @@ function flush(handlers) {
             }
             if (res && res.code === 'conflict') {
               conflicts += 1;
+              var cloud =
+                (res && (res.current || (res.data && res.data.current))) || null;
+              holdRow(row, 'conflict', {
+                cloud: cloud
+                  ? { strokes: cloud.strokes, putts: cloud.putts, version: cloud.version }
+                  : null,
+                autoReplay: false
+              });
               recordConflict(row, res);
               if (row.matchId && h.getMatch) {
                 return Promise.resolve(h.getMatch(row.matchId)).then(function () {

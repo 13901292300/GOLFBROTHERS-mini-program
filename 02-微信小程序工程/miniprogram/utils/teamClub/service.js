@@ -1030,7 +1030,10 @@ module.exports = {
       return asResult(r.getMatch(matchId)).then(function (res) {
         if (!res.ok) return failEnvelope(res);
         try {
-          require('../teamMatchStore.js').saveMatch(res.data, { cacheOnly: true });
+          var store = require('../teamMatchStore.js');
+          store.saveMatch(res.data, { cacheOnly: true });
+          var stored = store.getMatchById(matchId);
+          return { ok: true, match: stored || res.data };
         } catch (e) {
           /* ignore */
         }

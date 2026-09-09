@@ -215,15 +215,364 @@ async function main() {
       scoreSync.readOutbox().length === 0 &&
       modals.length >= 1 &&
       String(modals[0].content).indexOf('该洞成绩已被其他成员更新') >= 0 &&
-      String(modals[0].content).indexOf('当前显示已刷新为云端最新值') >= 0 &&
-      String(modals[0].content).indexOf('没有覆盖云端') >= 0
+      String(modals[0].content).indexOf('本机未同步成绩已保留') >= 0 &&
+      String(modals[0].content).indexOf('不会被云端覆盖') >= 0
   );
   var leftoverOutbox = scoreSync.readOutbox();
   var conflictKept = scoreSync.readConflicts();
+  var heldConflict = scoreSync.readHeld().filter(function (r) { return r && r.reason === 'conflict'; });
   assert(
     '冲突本地尝试不自动重放',
     leftoverOutbox.length === 0 && (conflictKept.length === 0 || conflictKept[0].autoReplay === false)
   );
+  assert(
+    '冲突后 pending 进入 durable held 且保留两端值',
+    heldConflict.length >= 1 &&
+      Number(heldConflict[heldConflict.length - 1].localAttempt.strokes) === 8 &&
+      Number(heldConflict[heldConflict.length - 1].cloud.strokes) === 4 &&
+      heldConflict[heldConflict.length - 1].autoReplay === false
+  );
+
+  var teamMatchStore = require(path.join(mini, 'utils', 'teamMatchStore.js'));
+  var protection = require(path.join(mini, 'utils', 'teamClub', 'scorePendingProtection.js'));
+
+  function holeStroke(match, gid, pid, hole) {
+    var rec =
+      match &&
+      match.scoreData &&
+      match.scoreData[gid] &&
+      match.scoreData[gid].scoresByPlayer &&
+      match.scoreData[gid].scoresByPlayer[pid];
+    return rec && rec.scores ? rec.scores[hole - 1] : undefined;
+  }
+  function holePutt(match, gid, pid, hole) {
+    var rec =
+      match &&
+      match.scoreData &&
+      match.scoreData[gid] &&
+      match.scoreData[gid].scoresByPlayer &&
+      match.scoreData[gid].scoresByPlayer[pid];
+    return rec && rec.putts ? rec.putts[hole - 1] : undefined;
+  }
+  function playerRecord(gid, pid, scores, putts, extra) {
+    var rec = { scores: scores.slice(), putts: (putts || []).slice() };
+    if (extra) Object.keys(extra).forEach(function (k) { rec[k] = extra[k]; });
+    return rec;
+  }
+  function seedMatch(matchId, scoreData) {
+    return teamMatchStore.saveMatch(
+      {
+        matchId: matchId,
+        teamId: teamId,
+        matchType: 'team-internal',
+        status: 'live',
+        scoreData: scoreData
+      },
+      { cacheOnly: true }
+    );
+  }
+  function hydrateCloud(matchId, scoreData) {
+    return teamMatchStore.saveMatch(
+      {
+        matchId: matchId,
+        teamId: teamId,
+        matchType: 'team-internal',
+        status: 'live',
+        scoreData: scoreData
+      },
+      { cacheOnly: true }
+    );
+  }
+
+  var pid = a.data.userId;
+  var p0gid = 'g1';
+
+  seedMatch('gm_p0_c1', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [4]) } }
+  });
+  scoreSync.enqueue({
+    matchId: 'gm_p0_c1',
+    roundId: 'r1',
+    groupId: 'g1',
+    hole: 1,
+    entityKind: 'player',
+    entityId: pid,
+    strokes: 4,
+    mode: 'score',
+    operationId: 'gm_p0_c1:r1:1:player:' + pid + ':score'
+  });
+  hydrateCloud('gm_p0_c1', {});
+  var c1 = teamMatchStore.getMatchById('gm_p0_c1');
+  assert(
+    'CASE1 pending score 不被 cloud missing 覆盖',
+    Number(holeStroke(c1, 'g1', pid, 1)) === 4 &&
+      scoreSync.readOutbox().some(function (r) { return r && r.matchId === 'gm_p0_c1'; })
+  );
+
+  seedMatch('gm_p0_c2', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [undefined, 5]) } }
+  });
+  var conflictsBeforeC2 = scoreSync.readConflicts().length;
+  scoreSync.enqueue({
+    matchId: 'gm_p0_c2',
+    roundId: 'r1',
+    groupId: 'g1',
+    hole: 2,
+    entityKind: 'player',
+    entityId: pid,
+    strokes: 5,
+    mode: 'score',
+    operationId: 'gm_p0_c2:r1:2:player:' + pid + ':score'
+  });
+  hydrateCloud('gm_p0_c2', {
+    g1: { scoresByPlayer: { [pid]: { scores: [null, 6], putts: [] } } }
+  });
+  var c2 = teamMatchStore.getMatchById('gm_p0_c2');
+  assert(
+    'CASE2 普通 hydrate 值不同不制造 conflict 且保留 local pending',
+    Number(holeStroke(c2, 'g1', pid, 2)) === 5 &&
+      scoreSync.readConflicts().length === conflictsBeforeC2 &&
+      scoreSync.readOutbox().some(function (r) { return r && r.matchId === 'gm_p0_c2' && Number(r.strokes) === 5; })
+  );
+
+  seedMatch('gm_p0_c3', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [undefined, undefined, 4]) } }
+  });
+  hydrateCloud('gm_p0_c3', {
+    g1: { scoresByPlayer: { [pid]: { scores: [null, null, 5], putts: [] } } }
+  });
+  var c3 = teamMatchStore.getMatchById('gm_p0_c3');
+  assert('CASE3 无 pending 接受 remote 明确值', Number(holeStroke(c3, 'g1', pid, 3)) === 5);
+
+  seedMatch('gm_p0_c4', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [3], [2]) } }
+  });
+  scoreSync.enqueue({
+    matchId: 'gm_p0_c4',
+    roundId: 'r1',
+    groupId: 'g1',
+    hole: 1,
+    entityKind: 'player',
+    entityId: pid,
+    putts: 2,
+    mode: 'putt',
+    operationId: 'gm_p0_c4:r1:1:player:' + pid + ':putt'
+  });
+  hydrateCloud('gm_p0_c4', {
+    g1: { scoresByPlayer: { [pid]: { scores: [3], putts: [null] } } }
+  });
+  var c4 = teamMatchStore.getMatchById('gm_p0_c4');
+  assert('CASE4 pending putt 不被 remote null 覆盖', Number(holePutt(c4, 'g1', pid, 1)) === 2);
+
+  seedMatch('gm_p0_c5', {
+    g1: {
+      scoresByPlayer: {
+        [pid]: playerRecord(p0gid, pid, [4], [1], { puttsManual: [true] })
+      }
+    }
+  });
+  hydrateCloud('gm_p0_c5', {
+    g1: { scoresByPlayer: { [pid]: { scores: [4], putts: [1] } } }
+  });
+  var c5 = teamMatchStore.getMatchById('gm_p0_c5');
+  var c5rec = c5.scoreData.g1.scoresByPlayer[pid];
+  assert(
+    'CASE5 puttsManual 在 remote assemble 缺失时保留',
+    Array.isArray(c5rec.puttsManual) && c5rec.puttsManual[0] === true
+  );
+
+  var scores16 = [4, 5, 4, 5, 6, 5];
+  seedMatch('gm_p0_c6', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, scores16) } }
+  });
+  scores16.forEach(function (st, i) {
+    scoreSync.enqueue({
+      matchId: 'gm_p0_c6',
+      roundId: 'r1',
+      groupId: 'g1',
+      hole: i + 1,
+      entityKind: 'player',
+      entityId: pid,
+      strokes: st,
+      mode: 'score',
+      operationId: 'gm_p0_c6:r1:' + (i + 1) + ':player:' + pid + ':score'
+    });
+  });
+  hydrateCloud('gm_p0_c6', {});
+  var c6 = teamMatchStore.getMatchById('gm_p0_c6');
+  var c6ok = true;
+  for (var h6 = 1; h6 <= 6; h6++) {
+    if (Number(holeStroke(c6, 'g1', pid, h6)) !== scores16[h6 - 1]) c6ok = false;
+  }
+  assert('CASE6 空 cloud getMatch 后 1-6 洞仍在', c6ok);
+
+  seedMatch('gm_p0_c7', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [4, 5, 4, 5, 6, 5]) } }
+  });
+  for (var h7i = 1; h7i <= 6; h7i++) {
+    scoreSync.enqueue({
+      matchId: 'gm_p0_c7',
+      roundId: 'r1',
+      groupId: 'g1',
+      hole: h7i,
+      entityKind: 'player',
+      entityId: pid,
+      strokes: scores16[h7i - 1],
+      mode: 'score',
+      operationId: 'gm_p0_c7:r1:' + h7i + ':player:' + pid + ':score'
+    });
+  }
+  var ackOnlyHole1 = {
+    g1: { scoresByPlayer: { [pid]: { scores: [4], putts: [] } } }
+  };
+  hydrateCloud('gm_p0_c7', ackOnlyHole1);
+  var c7 = teamMatchStore.getMatchById('gm_p0_c7');
+  var c7ok = Number(holeStroke(c7, 'g1', pid, 1)) === 4;
+  for (var h7b = 2; h7b <= 6; h7b++) {
+    if (Number(holeStroke(c7, 'g1', pid, h7b)) !== scores16[h7b - 1]) c7ok = false;
+  }
+  assert('CASE7 ACK hole1 不清空其余 pending 洞', c7ok);
+
+  seedMatch('gm_p0_c8', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [4]) } }
+  });
+  scoreSync.enqueue({
+    matchId: 'gm_p0_c8',
+    roundId: 'r1',
+    groupId: 'g1',
+    hole: 1,
+    entityKind: 'player',
+    entityId: pid,
+    strokes: 4,
+    mode: 'score',
+    operationId: 'gm_p0_c8:r1:1:player:' + pid + ':score'
+  });
+  var flushedAck = await scoreSync.flush({
+    getMatch: function () {
+      return Promise.resolve({ ok: true, match: { status: 'live' } });
+    },
+    submit: function (row) {
+      if (row && row.matchId === 'gm_p0_c8') return Promise.resolve({ ok: true, data: { score: row } });
+      return Promise.resolve({ ok: false, code: 'network' });
+    }
+  });
+  hydrateCloud('gm_p0_c8', {
+    g1: { scoresByPlayer: { [pid]: { scores: [7], putts: [] } } }
+  });
+  var c8 = teamMatchStore.getMatchById('gm_p0_c8');
+  assert(
+    'CASE8 ACK 出队后可接受 remote 明确值',
+    flushedAck.flushed >= 1 &&
+      !scoreSync.readOutbox().some(function (r) { return r && r.matchId === 'gm_p0_c8'; }) &&
+      Number(holeStroke(c8, 'g1', pid, 1)) === 7
+  );
+
+  seedMatch('gm_p0_c9', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [undefined, undefined, undefined, undefined, undefined, 5]) } }
+  });
+  scoreSync.enqueue({
+    matchId: 'gm_p0_c9',
+    roundId: 'r1',
+    groupId: 'g1',
+    hole: 6,
+    entityKind: 'player',
+    entityId: pid,
+    strokes: 5,
+    mode: 'score',
+    operationId: 'gm_p0_c9:r1:6:player:' + pid + ':score'
+  });
+  var c9flush = await scoreSync.flush({
+    getMatch: function (matchId) {
+      if (String(matchId) === 'gm_p0_c9') {
+        hydrateCloud('gm_p0_c9', {
+          g1: { scoresByPlayer: { [pid]: { scores: [null, null, null, null, null, 4], putts: [] } } }
+        });
+      }
+      return Promise.resolve({ ok: true, match: { status: 'live' } });
+    },
+    submit: function (row) {
+      if (row && row.matchId === 'gm_p0_c9') {
+        return Promise.resolve({
+          ok: false,
+          code: 'conflict',
+          current: { strokes: 4, putts: null, version: 2 }
+        });
+      }
+      return Promise.resolve({ ok: false, code: 'network' });
+    }
+  });
+  var c9 = teamMatchStore.getMatchById('gm_p0_c9');
+  var held9 = scoreSync.readHeld().filter(function (r) {
+    return r && r.reason === 'conflict' && String(r.matchId) === 'gm_p0_c9';
+  });
+  scoreSync.notifyConflictsOnPage('gm_p0_c9');
+  hydrateCloud('gm_p0_c9', {
+    g1: { scoresByPlayer: { [pid]: { scores: [null, null, null, null, null, 4], putts: [] } } }
+  });
+  var c9after = teamMatchStore.getMatchById('gm_p0_c9');
+  var held9after = scoreSync.readHeld().filter(function (r) {
+    return r && r.reason === 'conflict' && String(r.matchId) === 'gm_p0_c9';
+  });
+  assert(
+    'CASE9 明确 conflict 保留 local 且 notification 消费后仍 durable',
+    c9flush.conflicts >= 1 &&
+      Number(holeStroke(c9, 'g1', pid, 6)) === 5 &&
+      Number(holeStroke(c9after, 'g1', pid, 6)) === 5 &&
+      held9.length >= 1 &&
+      Number(held9[0].localAttempt.strokes) === 5 &&
+      Number(held9[0].cloud.strokes) === 4 &&
+      held9after.length >= 1 &&
+      scoreSync.readConflicts().filter(function (r) { return r && r.matchId === 'gm_p0_c9'; }).length === 0
+  );
+
+  seedMatch('gm_p0_c10', {
+    g1: {
+      scoresByPlayer: {},
+      scoresBySide: {
+        sideA: { sideId: 'sideA', sideKey: 'A', scores: [4, 5], putts: [] }
+      }
+    }
+  });
+  hydrateCloud('gm_p0_c10', {
+    g1: { scoresByPlayer: {}, teamScoresByEntity: [] }
+  });
+  var c10 = teamMatchStore.getMatchById('gm_p0_c10');
+  assert(
+    'CASE10 remote 缺失 scoresBySide 不删除 local',
+    c10.scoreData.g1.scoresBySide &&
+      c10.scoreData.g1.scoresBySide.sideA &&
+      Number(c10.scoreData.g1.scoresBySide.sideA.scores[0]) === 4
+  );
+
+  seedMatch('gm_p0_c11', {
+    g1: { scoresByPlayer: { [pid]: playerRecord(p0gid, pid, [6]) } }
+  });
+  hydrateCloud('gm_p0_c11', {
+    g1: { scoresByPlayer: { [pid]: { scores: [null], putts: [] } } }
+  });
+  var c11 = teamMatchStore.getMatchById('gm_p0_c11');
+  assert(
+    'CASE11 无 tombstone 时 remote null 不删除非 pending local',
+    Number(holeStroke(c11, 'g1', pid, 1)) === 6
+  );
+
+  var mergedPure = protection.mergeRemoteScoreDataWithLocalProtection(
+    { g1: { scoresByPlayer: { p1: { scores: [4], putts: [2], puttsManual: [true] } } } },
+    {},
+    {
+      matchId: 'gm_mask',
+      pendingRows: [
+        { matchId: 'gm_mask', hole: 1, entityKind: 'player', entityId: 'p1', strokes: 4, groupId: 'g1' }
+      ]
+    }
+  );
+  assert(
+    'pending mask helper 保护 strokes/puttsManual',
+    Number(mergedPure.g1.scoresByPlayer.p1.scores[0]) === 4 &&
+      mergedPure.g1.scoresByPlayer.p1.puttsManual[0] === true
+  );
+
+  storage[persistKey] = [];
 
   scoreSync.enqueue({
     matchId: 'gm_ob',
