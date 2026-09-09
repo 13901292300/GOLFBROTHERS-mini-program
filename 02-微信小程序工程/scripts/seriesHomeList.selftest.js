@@ -413,7 +413,7 @@ assert(
       !!regCard &&
       regCard.titleSub === '副标题' &&
       !!plazaCard &&
-      plazaCard.titleSub === '副标题 · R1' &&
+      plazaCard.titleSub === '副标题【R1】' &&
       plazaManaged.length === 0
     );
   })()

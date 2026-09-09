@@ -596,9 +596,9 @@ assert('12 最终化后只读', mutation.blocked === true && mutation.scope === 
 
 var regCard = listAdapter.toSeriesClubCard(makeSeries({ seriesSubtitle: '' }), 'registration');
 assert(
-  '13 广场报名显示当前轮赛制且进入详情',
+  '13 广场报名只显示 canonical 且进入详情',
   regCard.statusLabel === '报名中' &&
-    regCard.titleSub === '第一轮 · 个人比洞赛' &&
+    regCard.titleSub === '' &&
     regCard.typeLabel === '系列赛' &&
     regCard.matchId === '' &&
     /series-detail/.test(regCard.navUrl)
@@ -609,8 +609,8 @@ var scheduledCard = listAdapter.toSeriesClubCard(
   'registration'
 );
 assert(
-  '13b 待赛展示当前轮赛制且无比分字段',
-  scheduledCard.titleSub === '第一轮 · 个人比洞赛' &&
+  '13b 待赛报名卡只显示 canonical 且无比分字段',
+  scheduledCard.titleSub === '' &&
     scheduledCard.ryderScoreText == null
 );
 

@@ -186,13 +186,14 @@ assert(
   '19 Rx 不计入输入长度',
   policy.countTitleChars(userSub) === 4 &&
     policy.countTitleChars(userSub) <= policy.SERIES_SUBTITLE_MAX &&
-    withRx === '春季对决 · R1' &&
-    policy.normalizeSubtitleInput(withRx).value === '春季对决'
+    withRx === '春季对决【R1】' &&
+    policy.normalizeSubtitleInput(userSub).value === '春季对决' &&
+    policy.normalizeSubtitleInput('春季对决 · R1').value === '春季对决'
 );
 assert(
   '20 多次投影不叠加 Rx',
-  plazaSub.appendPlazaLiveRoundSubtitle(withRx, 'R1') === '春季对决 · R1' &&
-    plazaSub.appendPlazaLiveRoundSubtitle('春季对决（R1）', 'R2') === '春季对决 · R2'
+  plazaSub.appendPlazaLiveRoundSubtitle(withRx, 'R1') === '春季对决【R1】' &&
+    plazaSub.appendPlazaLiveRoundSubtitle('春季对决（R1）', 'R2') === '春季对决【R2】'
 );
 
 var historic = seriesModel.normalizeSeries({

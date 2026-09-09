@@ -220,9 +220,10 @@ var plazaHero = viewModel.buildSeriesDetailViewModel(
   Object.assign({ heroEntryContext: 'plaza' }, plazaLiveDeps)
 );
 assert(
-  '11 广场 LIVE 卡片与详情 Hero 文案一致',
-  plazaCard.titleSub === plazaHero.hero.titleSub &&
-    plazaCard.titleSub === '第二轮 · 四人四球比洞赛'
+  '11 广场 LIVE 卡片用【R2】，详情 Hero 仍走莱德杯投影',
+  plazaCard.titleSub === '【R2】' &&
+    plazaHero.ok &&
+    plazaHero.hero.titleSub === '第二轮 · 四人四球比洞赛'
 );
 
 var namedCard = listAdapter.toSeriesClubCard(
@@ -235,8 +236,8 @@ var namedHero = viewModel.buildSeriesDetailViewModel(
   Object.assign({ heroEntryContext: 'plaza' }, plazaLiveDeps)
 );
 assert(
-  '11b 当前轮一致：卡片用圆点 Rx，Hero 保留括号格式',
-  namedCard.titleSub === '春季对决 · R2' &&
+  '11b 当前轮一致：卡片用【Rx】，Hero 保留括号格式',
+  namedCard.titleSub === '春季对决【R2】' &&
     namedHero.ok &&
     namedHero.hero.titleSub === '春季对决（R2）' &&
     named.seriesSubtitle === '春季对决'

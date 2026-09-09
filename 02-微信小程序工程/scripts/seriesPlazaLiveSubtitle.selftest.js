@@ -192,12 +192,12 @@ assert(
   })[0];
   var labels = labelsUtil.buildSeriesRoundDisplayLabels(series, series.rounds);
   assert(
-    '普通 Series 有用户副标题 + R1 LIVE → 副标题 · R1',
-    hit && hit.titleSub === '原副标题 · R1' && String(hit.titleSub).indexOf('（R') < 0
+    '普通 Series 有用户副标题 + R1 LIVE → 副标题【R1】',
+    hit && hit.titleSub === '原副标题【R1】' && String(hit.titleSub).indexOf('（R') < 0
   );
   assert(
-    '普通 Series 卡片使用圆点 Rx 而非括号',
-    labels.r1 === 'R1' && hit.titleSub.indexOf(' · ' + labels.r1) >= 0
+    '普通 Series 卡片使用【Rx】而非圆点或全角括号',
+    labels.r1 === 'R1' && hit.titleSub.indexOf('【' + labels.r1 + '】') >= 0
   );
   assert(
     '点击仍进系列赛详情',
@@ -218,7 +218,7 @@ assert(
   var hit = cards.filter(function (c) {
     return c && c.seriesId === 's-plaza';
   })[0];
-  assert('普通 Series 有用户副标题 + R2 LIVE → 副标题 · R2', hit && hit.titleSub === '原副标题 · R2');
+  assert('普通 Series 有用户副标题 + R2 LIVE → 副标题【R2】', hit && hit.titleSub === '原副标题【R2】');
   var emptyR2 = makeSeries([r1, r2, r3], { seriesSubtitle: '' });
   var emptyR2Hit = adapter
     .buildPlazaTournamentCards(plazaDeps(emptyR2, stations))
@@ -226,8 +226,8 @@ assert(
       return c && c.seriesId === 's-plaza';
     })[0];
   assert(
-    '空副标题 R2 LIVE 显示第2轮-比杆赛',
-    emptyR2Hit && emptyR2Hit.titleSub === '第2轮-比杆赛'
+    '空副标题 R2 LIVE 显示【R2】',
+    emptyR2Hit && emptyR2Hit.titleSub === '【R2】'
   );
 })();
 
@@ -242,7 +242,7 @@ assert(
   var hit = cards.filter(function (c) {
     return c && c.seriesId === 's-plaza';
   })[0];
-  assert('多 LIVE → 最早有效 LIVE Rx', hit && hit.titleSub === '原副标题 · R1');
+  assert('多 LIVE → 最早有效 LIVE Rx', hit && hit.titleSub === '原副标题【R1】');
 })();
 
 (function testLiveThenNext() {
@@ -267,7 +267,7 @@ assert(
   })[0];
   assert(
     'LIVE 从 R1 切换到 R2 → 尾缀更新为 R2',
-    first.titleSub === '原副标题 · R1' && second.titleSub === '原副标题 · R2'
+    first.titleSub === '原副标题【R1】' && second.titleSub === '原副标题【R2】'
   );
 })();
 
@@ -285,7 +285,7 @@ assert(
   })[0];
   assert(
     '全部 LIVE 结束后仍为原副标题且不写回',
-    live.titleSub === '原副标题 · R1' && done && done.titleSub === '原副标题'
+    live.titleSub === '原副标题【R1】' && done && done.titleSub === '原副标题'
   );
 })();
 
@@ -318,12 +318,12 @@ assert(
     return c && c.seriesId === 's-plaza';
   })[0];
   assert(
-    '同日多 COURSE 有用户副标题仍按最早 LIVE 追加 · Rx，不猜日期',
+    '同日多 COURSE 有用户副标题仍按最早 LIVE 追加【Rx】，不猜日期',
     multi.r1 === true &&
       multi.r2 === true &&
       hit &&
       hit.statusLabel === 'LIVE' &&
-      hit.titleSub === '原副标题 · R1' &&
+      hit.titleSub === '原副标题【R1】' &&
       hit.titleSub.indexOf('（R') < 0 &&
       hit.titleSub.indexOf('（C') < 0 &&
       hit.titleSub.indexOf('第') < 0
@@ -337,8 +337,8 @@ assert(
       return c && c.seriesId === 's-plaza';
     })[0];
   assert(
-    '同日多 COURSE 空副标题走第N轮-赛制，不猜日期改 LIVE',
-    venueEmptyHit && venueEmptyHit.titleSub === '第1轮-比杆赛'
+    '同日多 COURSE 空副标题显示【R1】，不猜日期改 LIVE',
+    venueEmptyHit && venueEmptyHit.titleSub === '【R1】'
   );
 })();
 
@@ -401,10 +401,10 @@ assert(
     return c && c.seriesId === 's-plaza';
   })[0];
   assert(
-    '空字符串副标题显示第1轮-比杆赛，无孤立括号、不写回',
+    '空字符串副标题显示【R1】，不含赛制、不写回',
     emptyHit &&
-      emptyHit.titleSub === '第1轮-比杆赛' &&
-      String(emptyHit.titleSub).indexOf('（') < 0 &&
+      emptyHit.titleSub === '【R1】' &&
+      String(emptyHit.titleSub).indexOf('比杆') < 0 &&
       String(emptyHit.titleSub).indexOf('undefined') < 0 &&
       emptySeries.seriesSubtitle === ''
   );
@@ -418,8 +418,8 @@ assert(
       return c && c.seriesId === 's-plaza';
     })[0];
   assert(
-    '纯空格副标题视为空，显示第1轮-比杆赛',
-    spaceHit && spaceHit.titleSub === '第1轮-比杆赛'
+    '纯空格副标题视为空，显示【R1】',
+    spaceHit && spaceHit.titleSub === '【R1】'
   );
 
   var nullSeries = makeSeries([r1, r2], { seriesSubtitle: null });
@@ -429,9 +429,9 @@ assert(
     matchMap([station('r1', 'ongoing'), station('r2', 'registering')])
   );
   assert(
-    'null / undefined 副标题显示第1轮',
-    plazaSub.projectPlazaSeriesTitleSub(nullSeries, liveGetter) === '第1轮' &&
-      plazaSub.projectPlazaSeriesTitleSub(undefSeries, liveGetter) === '第1轮'
+    'null / undefined 副标题显示【R1】',
+    plazaSub.projectPlazaSeriesTitleSub(nullSeries, liveGetter) === '【R1】' &&
+      plazaSub.projectPlazaSeriesTitleSub(undefSeries, liveGetter) === '【R1】'
   );
 
   var emptyDone = adapter
@@ -469,12 +469,12 @@ assert(
   var twice = plazaSub.appendPlazaLiveRoundSubtitle('原副标题（R1）', 'R1');
   var thrice = plazaSub.appendPlazaLiveRoundSubtitle(twice, 'R1');
   assert(
-    '多次投影不重复：剥系统尾缀后再追加 · R1',
-    ha.titleSub === '原副标题 · R1' &&
-      hb.titleSub === '原副标题 · R1' &&
-      twice === '原副标题 · R1' &&
-      thrice === '原副标题 · R1' &&
-      twice.indexOf(' · R1 · R1') < 0
+    '多次投影不重复：剥系统尾缀后再追加【R1】',
+    ha.titleSub === '原副标题【R1】' &&
+      hb.titleSub === '原副标题【R1】' &&
+      twice === '原副标题【R1】' &&
+      thrice === '原副标题【R1】' &&
+      twice.indexOf('【R1】【R1】') < 0
   );
 })();
 
@@ -504,12 +504,12 @@ assert(
       return c && c.seriesId === 's-plaza';
     })[0];
   assert(
-    '取消轮不重编号：空副标题用 round.index 为第2轮-比杆赛',
-    emptyHit && emptyHit.titleSub === '第2轮-比杆赛'
+    '取消轮不重编号：空副标题用 round.index 为【R2】',
+    emptyHit && emptyHit.titleSub === '【R2】'
   );
   assert(
     'R1 cancelled、R2 LIVE → 用户副标题 · R2',
-    namedHit && namedHit.titleSub === '春季队际系列赛 · R2'
+    namedHit && namedHit.titleSub === '春季队际系列赛【R2】'
   );
 })();
 
@@ -549,10 +549,10 @@ assert(
     }
   });
   assert(
-    '显式莱德杯无用户副标题：第一轮 · 四人四球比洞赛',
+    '显式莱德杯无用户副标题：广场 LIVE 卡【R1】，Hero 仍走莱德杯投影',
     projected.text === '第一轮 · 四人四球比洞赛' &&
       hit &&
-      hit.titleSub === projected.text &&
+      hit.titleSub === '【R1】' &&
       hero.ok &&
       hero.hero.titleSub === projected.text &&
       String(hit.titleSub).indexOf('第1轮-') < 0
@@ -572,9 +572,9 @@ assert(
     getMatchById: getMatchById
   });
   assert(
-    '显式莱德杯广场 LIVE 卡片用圆点 Rx，Hero 保留括号格式',
+    '显式莱德杯广场 LIVE 卡片用【Rx】，Hero 保留括号格式',
     named &&
-      named.titleSub === '春季对决 · R1' &&
+      named.titleSub === '春季对决【R1】' &&
       namedProj.text === '春季对决（R1）' &&
       namedHero.ok &&
       namedHero.hero.titleSub === '春季对决（R1）' &&
@@ -600,7 +600,7 @@ assert(
     '仅 templateId=ryder 无显式类型：不走莱德杯投影',
     proj.source === 'fallback' &&
       hit &&
-      hit.titleSub === '用户填的 · R1' &&
+      hit.titleSub === '用户填的【R1】' &&
       String(hit.titleSub).indexOf('第一轮') < 0 &&
       String(hit.titleSub).indexOf('（R') < 0
   );
@@ -613,7 +613,7 @@ assert(
       station('r1', 'ongoing'),
       station('r2', 'registering')
     ]);
-    assert(mode + ' 同规则：副标题 · R1', hit && hit.titleSub === '原副标题 · R1');
+    assert(mode + ' 同规则：副标题【R1】', hit && hit.titleSub === '原副标题【R1】');
   });
   var division = makeSeries([r1, r2], {
     hostMode: 'team',
@@ -624,13 +624,13 @@ assert(
     station('r1', 'ongoing'),
     station('r2', 'registering')
   ]);
-  assert('队内分队系列比杆赛同规则', dHit && dHit.titleSub === '原副标题 · R1');
+  assert('队内分队系列比杆赛同规则', dHit && dHit.titleSub === '原副标题【R1】');
   var inter = makeSeries([r1, r2], { templateId: 'inter_team_series' });
   var iHit = plazaHit(inter, [
     station('r1', 'ongoing'),
     station('r2', 'registering')
   ]);
-  assert('队际系列比杆赛同规则', iHit && iHit.titleSub === '原副标题 · R1');
+  assert('队际系列比杆赛同规则', iHit && iHit.titleSub === '原副标题【R1】');
 })();
 
 (function testMissingAndIdentityConflict() {
@@ -680,7 +680,7 @@ assert(
   assert(
     '原数据已带（R1）不生成双后缀且不写回',
     persistedHit &&
-      persistedHit.titleSub === '春季对决 · R1' &&
+      persistedHit.titleSub === '春季对决【R1】' &&
       persisted.seriesSubtitle === '春季对决（R1）' &&
       JSON.stringify(persisted) === snap
   );
@@ -692,7 +692,7 @@ assert(
   ]);
   assert(
     '用户正文中间含 R1 不误删',
-    midHit && midHit.titleSub === '含 R1 的春季对决 · R1'
+    midHit && midHit.titleSub === '含 R1 的春季对决【R1】'
   );
 
   var liveSeries = makeSeries([r1, r2]);
@@ -723,6 +723,145 @@ assert(
       heroAfter.ok &&
       heroBefore.hero.titleSub === '春季对决' &&
       heroAfter.hero.titleSub === '春季对决'
+  );
+})();
+
+(function testProductLiveSubtitleRules() {
+  var autumn = makeSeries([r1, r2], { seriesSubtitle: '秋季赛' });
+  var empty = makeSeries([r1, r2], { seriesSubtitle: '' });
+  var liveStations = [station('r1', 'ongoing'), station('r2', 'registering')];
+  var noLiveStations = [station('r1', 'registering'), station('r2', 'registering')];
+  var r1DoneR2Up = [station('r1', 'finished'), station('r2', 'registering')];
+  var liveDeps = plazaDeps(autumn, liveStations);
+  var noLiveGetter = plazaDeps(autumn, noLiveStations).getMatchById;
+  var gapGetter = plazaDeps(autumn, r1DoneR2Up).getMatchById;
+
+  var standingsLive = adapter.toSeriesClubCard(autumn, 'live', {
+    context: 'standings',
+    getMatchById: liveDeps.getMatchById
+  });
+  assert(
+    '1 普通 SERIES canonical + R1 LIVE standings → 秋季赛【R1】',
+    standingsLive && standingsLive.titleSub === '秋季赛【R1】'
+  );
+
+  var emptyLive = adapter.toSeriesClubCard(empty, 'live', {
+    context: 'standings',
+    getMatchById: plazaDeps(empty, liveStations).getMatchById
+  });
+  assert(
+    '2 普通 SERIES 空 canonical + R1 LIVE standings → 【R1】',
+    emptyLive && emptyLive.titleSub === '【R1】'
+  );
+
+  var autumnReg = adapter.toSeriesClubCard(autumn, 'registration', {
+    context: 'registration',
+    getMatchById: noLiveGetter
+  });
+  assert(
+    '3 普通 SERIES 无 LIVE registration → 秋季赛',
+    autumnReg && autumnReg.titleSub === '秋季赛'
+  );
+
+  var emptyReg = adapter.toSeriesClubCard(empty, 'registration', {
+    context: 'registration',
+    getMatchById: plazaDeps(empty, noLiveStations).getMatchById
+  });
+  assert(
+    '4 普通 SERIES 空 canonical 无 LIVE registration → 空',
+    emptyReg && emptyReg.titleSub === ''
+  );
+
+  var gapReg = adapter.toSeriesClubCard(autumn, 'registration', {
+    context: 'registration',
+    getMatchById: gapGetter
+  });
+  assert(
+    '5 R1 completed R2 upcoming registration → canonical only',
+    gapReg &&
+      gapReg.titleSub === '秋季赛' &&
+      String(gapReg.titleSub).indexOf('【R2】') < 0 &&
+      String(gapReg.titleSub).indexOf('R2') < 0
+  );
+
+  var gapStandings = adapter.toSeriesClubCard(autumn, 'live', {
+    context: 'standings',
+    getMatchById: gapGetter
+  });
+  assert(
+    '6 R1 completed R2 upcoming standings 无 liveLabel → canonical only',
+    plazaSub.resolvePlazaLiveRoundLabel(autumn, gapGetter) === '' &&
+      gapStandings &&
+      gapStandings.titleSub === '秋季赛'
+  );
+
+  var dualReg = adapter.toSeriesClubCard(autumn, 'registration', {
+    context: 'registration',
+    getMatchById: liveDeps.getMatchById
+  });
+  assert(
+    '7 报名 TAB 即使另一轮 LIVE 仍 canonical only',
+    dualReg && dualReg.titleSub === '秋季赛'
+  );
+
+  var ryderPending = makeSeries([r1, r2], {
+    seriesId: 's-ryder-reg',
+    seriesSubtitle: '春季对决',
+    seriesCompetitionType: 'ryder_cup'
+  });
+  var ryderPendingCard = adapter.toSeriesClubCard(ryderPending, 'registration', {
+    context: 'registration',
+    getMatchById: function () {
+      return null;
+    }
+  });
+  assert(
+    '8 莱德杯 registration 未开始 → 春季对决',
+    ryderPendingCard &&
+      ryderPendingCard.titleSub === '春季对决' &&
+      String(ryderPendingCard.titleSub).indexOf('（R') < 0 &&
+      String(ryderPendingCard.titleSub).indexOf('第一轮') < 0
+  );
+
+  var ryderSid = { seriesId: 's-ryder-reg' };
+  var ryderLiveStations = [
+    station('r1', 'ongoing', ryderSid),
+    station('r2', 'registering', ryderSid)
+  ];
+  var ryderLiveReg = adapter.toSeriesClubCard(ryderPending, 'registration', {
+    context: 'registration',
+    getMatchById: plazaDeps(ryderPending, ryderLiveStations).getMatchById
+  });
+  assert(
+    '9 莱德杯 registration 即使已有 LIVE 仍 canonical',
+    ryderLiveReg && ryderLiveReg.titleSub === '春季对决'
+  );
+
+  var ryderLiveStandings = adapter.toSeriesClubCard(ryderPending, 'live', {
+    context: 'standings',
+    getMatchById: plazaDeps(ryderPending, ryderLiveStations).getMatchById
+  });
+  assert(
+    '10 莱德杯 standings canonical + R1 LIVE → 春季对决【R1】',
+    ryderLiveStandings && ryderLiveStandings.titleSub === '春季对决【R1】'
+  );
+
+  var stripped = plazaSub.appendPlazaLiveRoundSubtitle('秋季赛【R1】', 'R1');
+  var fromDot = plazaSub.appendPlazaLiveRoundSubtitle('秋季赛 · R1', 'R1');
+  var fromParen = plazaSub.appendPlazaLiveRoundSubtitle('秋季赛（R1）', 'R2');
+  assert(
+    '11 重复构建按 strip 去重，不生成双 suffix',
+    stripped === '秋季赛【R1】' &&
+      fromDot === '秋季赛【R1】' &&
+      fromParen === '秋季赛【R2】' &&
+      stripped.indexOf('【R1】【R1】') < 0
+  );
+
+  assert(
+    'standings 不再 fallback 第N轮-赛制',
+    adapterSrc.indexOf('if (flags.hasLive) return formatStandingsLiveTitleSub') < 0 &&
+      String(emptyLive.titleSub).indexOf('第') < 0 &&
+      String(emptyLive.titleSub).indexOf('比杆') < 0
   );
 })();
 

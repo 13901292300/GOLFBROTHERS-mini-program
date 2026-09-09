@@ -1,9 +1,9 @@
 /**
  * 广场「团体比赛」系列赛卡片副标题投影
- * - 有用户副标题 + 有效 LIVE：原文 + 「 · Rx」
- * - 有用户副标题 + 无 LIVE：只显示原副标题
- * - 空副标题：交回调用方既有系统规则
- * 只读；不写 series.seriesSubtitle / rounds。
+ * - 有用户副标题 + 有效 LIVE：原文 + 「【Rx】」
+ * - 空副标题 + 有效 LIVE：「【Rx】」
+ * - 无 LIVE：只显示 canonical 副标题
+ * 只读；不写 series.subtitle / series.seriesSubtitle / rounds。
  */
 
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
@@ -206,7 +206,7 @@ function formatChineseRoundTitle(roundIndex) {
   return '第' + n + '轮';
 }
 
-var TRAILING_PLAZA_RX_SUFFIX = /(?:[（(]R\d+[）)]| · R\d+)\s*$/;
+var TRAILING_PLAZA_RX_SUFFIX = /(?:[（(]R\d+[）)]| · R\d+|【R\d+】)\s*$/;
 
 /** 只剥字符串末尾明确系统轮次尾缀，不改正文中间的 R1。 */
 function stripTrailingPlazaLiveSuffixes(text) {
@@ -222,14 +222,14 @@ function stripTrailingPlazaLiveSuffixes(text) {
 }
 
 /**
- * 有原副标题时末尾追加「 · Rx」；空原串不造孤立圆点。
+ * 有 canonical 时末尾追加「【Rx】」；空 canonical 仅输出「【Rx】」。
  */
 function appendPlazaLiveRoundSubtitle(baseTitleSub, liveLabel) {
   var base = stripTrailingPlazaLiveSuffixes(baseTitleSub);
   var label = asString(liveLabel);
-  if (!base) return '';
   if (!isRxDisplayLabel(label)) return base;
-  return base + ' · ' + label;
+  var wrapped = '【' + label + '】';
+  return base ? base + wrapped : wrapped;
 }
 
 function resolvePlazaLiveRoundInfo(series, getMatchByIdOrOptions) {
@@ -250,19 +250,17 @@ function projectPlazaSeriesTitleSub(series, getMatchByIdOrOptions) {
   var base = readUserPlazaSubtitle(series);
   var info = resolvePlazaLiveRoundInfo(series, getMatchByIdOrOptions);
   if (!info.label) return base;
-  if (base) return appendPlazaLiveRoundSubtitle(base, info.label);
-  return formatChineseRoundTitle(info.roundIndex);
+  return appendPlazaLiveRoundSubtitle(base, info.label);
 }
 
 /**
  * 广场卡片副标题权威入口。
- * 仅 context === standings/plaza 且存在真实 LIVE 时，给用户副标题追加 · Rx。
- * 无用户副标题时返回 ''，由 adapter 沿用各类型既有系统副标题。
+ * 仅 context === standings/plaza 且存在真实 LIVE 时追加【Rx】。
+ * 无 LIVE 时返回 canonical；空 canonical + LIVE 返回【Rx】。
  */
 function buildPlazaSeriesSubtitle(series, options) {
   var opts = resolvePlazaDeps(options);
   var userSub = readUserPlazaSubtitle(series);
-  if (!userSub) return '';
   if (!isPlazaSubtitleContext(opts)) return userSub;
   var liveLabel = resolvePlazaLiveRoundLabel(series, opts);
   if (!liveLabel) return userSub;

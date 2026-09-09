@@ -511,37 +511,33 @@ function formatStandingsLiveTitleSub(series, options) {
   return roundPart || mode || '';
 }
 
+function readCanonicalCardSubtitle(series) {
+  return sanitizeCardSubtitle(
+    series &&
+      (series.subtitle != null && String(series.subtitle).trim() !== ''
+        ? series.subtitle
+        : series.seriesSubtitle)
+  );
+}
+
 /**
- * 卡片副标题。广场 LIVE 用户副标题追加 · Rx 集中在 buildPlazaSeriesSubtitle。
+ * 卡片副标题。报名只出 canonical；广场 LIVE / standings 由 buildPlazaSeriesSubtitle 追加【Rx】。
  * @param {'standings'|'plaza'|'registration'|string} context
  */
 function buildTitleSub(series, options) {
   var ctx = asString(options && options.context);
-  var isPlaza = ctx === 'standings' || ctx === 'plaza';
-  if (isPlaza) {
-    var plazaSub = seriesPlazaLiveSubtitle.buildPlazaSeriesSubtitle(series, options);
-    if (plazaSub) return plazaSub;
-    if (seriesRyderCup.isRyderCupSeries(series)) {
-      return asString(
-        seriesRyderCupAccumulate.buildRyderCupDisplaySubtitle(series, options).text
-      );
-    }
-    var flags = inspectSeriesRoundFlags(series, options);
-    if (flags.hasLive) return formatStandingsLiveTitleSub(series, options);
-    return '';
+  if (ctx === 'registration') {
+    return readCanonicalCardSubtitle(series);
+  }
+  if (ctx === 'standings' || ctx === 'plaza') {
+    return seriesPlazaLiveSubtitle.buildPlazaSeriesSubtitle(series, options);
   }
   if (seriesRyderCup.isRyderCupSeries(series)) {
     return asString(
       seriesRyderCupAccumulate.buildRyderCupDisplaySubtitle(series, options).text
     );
   }
-  var manual = sanitizeCardSubtitle(
-    series && (series.subtitle != null && String(series.subtitle).trim() !== ''
-      ? series.subtitle
-      : series.seriesSubtitle)
-  );
-  if (manual) return manual;
-  return '';
+  return readCanonicalCardSubtitle(series);
 }
 
 /**
@@ -560,7 +556,11 @@ function toSeriesClubCard(series, listPhase, options) {
   var isRegistrationOpen = resolveIsRegistrationOpen(series, listPhase, options);
   var cardStatus = resolveCardStatus(isLive, isRegistrationOpen, listPhase);
   var registrationStatus = resolveRegistrationStatus(roundFlags, series);
-  var titleSub = buildTitleSub(series, options);
+  var titleOpts = options && typeof options === 'object' ? options : {};
+  if (!asString(titleOpts.context) && listPhase === 'registration') {
+    titleOpts = Object.assign({}, titleOpts, { context: 'registration' });
+  }
+  var titleSub = buildTitleSub(series, titleOpts);
   var statusLabel = '报名中';
   var statusTone = 'default';
   var tab = '';
