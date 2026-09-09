@@ -3,8 +3,21 @@
  * 不读写 storage，不含假人员、假成绩或游戏实例。
  */
 var rec = require('./sideGameRecord.js');
+var derivedNotify = require('../../../utils/sideGameDerivedNotify.js');
 
 var bag = {};
+
+function hostPublicFp(ctx) {
+  var c = ctx || {};
+  var labels = Array.isArray(c.holeOrder) ? c.holeOrder.map(String) : [];
+  var pars = c.pars && typeof c.pars === 'object' ? c.pars : {};
+  var compact = {};
+  labels.forEach(function (label) {
+    var n = Number(pars[label]);
+    compact[label] = n === 3 || n === 4 || n === 5 ? n : 4;
+  });
+  return JSON.stringify({ holeOrder: labels, pars: compact });
+}
 
 function asScope(scope) {
   return rec.asString(scope) === 'match' ? 'match' : 'group';
@@ -29,7 +42,13 @@ function setHostContext(context) {
   if (!context || typeof context !== 'object') return false;
   var q = queryOf(context);
   if (!q.matchId) return false;
-  bag[keyOf(q)] = rec.jsonClone(context);
+  var key = keyOf(q);
+  var prev = bag[key];
+  var next = rec.jsonClone(context);
+  bag[key] = next;
+  if (prev && hostPublicFp(prev) !== hostPublicFp(next)) {
+    derivedNotify.notifyAllGamesReplay('host-structure');
+  }
   return true;
 }
 

@@ -209,6 +209,27 @@ function parseEq(code, expect) {
 
 assert('4 6421 → 小鸟6 PAR4 +1=2 +2=1', parseEq('6421', { m1: 6, par: 4, p1: 2, p2: 1, p3: 0 }));
 assert('5 8431 → 8/4/3/1', parseEq('8431', { m1: 8, par: 4, p1: 3, p2: 1, p3: 0 }));
+assert('8421 四位 digits= m1/par/p1/p2 不是 +1/+2/+3/+4', parseEq('8421', { m1: 8, par: 4, p1: 2, p2: 1, p3: 0 }));
+
+function bandTable(code) {
+  var map = scoreMapUtil.expandScoreCode(code);
+  var deduct = settle8421.deductCfg(
+    { scoreCode: code },
+    { deductMode: 'on', deductWay: 'plus-n', deductPlusN: 4, deductCap: 'none' }
+  );
+  return [0, 1, 2, 3, 4].map(function (rel) {
+    return settle8421.personalScore(rel, map, deduct, 4);
+  });
+}
+assert('8421 PAR/+1/+2/+3/+4 = 4,2,1,0,-1', bandTable('8421').join(',') === '4,2,1,0,-1');
+assert('8431 PAR/+1/+2/+3/+4 = 4,3,1,0,-1', bandTable('8431').join(',') === '4,3,1,0,-1');
+assert(
+  '8431 与 8421 仅 p1 不同',
+  scoreMapUtil.expandScoreCode('8431').p1 === 3 &&
+    scoreMapUtil.expandScoreCode('8421').p1 === 2 &&
+    scoreMapUtil.expandScoreCode('8431').p3 === 0 &&
+    scoreMapUtil.expandScoreCode('8421').p3 === 0
+);
 assert('6 8532 → 8/5/3/2', parseEq('8532', { m1: 8, par: 5, p1: 3, p2: 2, p3: 0 }));
 
 var five = scoreMapUtil.expandScoreCode('84321');

@@ -2,7 +2,15 @@
  * 多半场 COURSE 选择（与球场选择页 buildHalves / confirmHalf 规则一致）
  */
 
-const { COURSE_DB } = require('./courseDatabase.js');
+const {
+  COURSE_DB,
+  findCourseById: findDbCourseById,
+  canonicalizeQinghewanBaseName,
+  isQinghewanBaseName,
+  canonicalCourseId,
+  QHW_CANONICAL_ID,
+  QHW_DISPLAY_NAME
+} = require('./courseDatabase.js');
 
 const DEFAULT_PAR9 = [4, 4, 4, 3, 4, 5, 4, 3, 4];
 
@@ -42,8 +50,7 @@ function buildHalves(course) {
 }
 
 function findCourseById(courseId) {
-  if (!courseId) return null;
-  return COURSE_DB.find((c) => c.courseId === courseId) || null;
+  return findDbCourseById(courseId);
 }
 
 function findCourseByName(courseName) {
@@ -51,7 +58,14 @@ function findCourseByName(courseName) {
   if (!name) return null;
   const exact = COURSE_DB.find((c) => c.courseName === name);
   if (exact) return exact;
-  // 模糊时取最长命中，避免「清河湾 A&B」抢掉「清河湾 C&D」
+  const stripped = stripHalfComboSuffix(name);
+  const canon = canonicalizeQinghewanBaseName(stripped.base || name);
+  const byCanon = COURSE_DB.find((c) => c.courseName === canon);
+  if (byCanon) return byCanon;
+  if (isQinghewanBaseName(name) || isQinghewanBaseName(stripped.base)) {
+    return findDbCourseById('c-qhw');
+  }
+  // 模糊时取最长命中，避免短名抢掉更具体球场
   let best = null;
   let bestLen = 0;
   COURSE_DB.forEach((c) => {
@@ -67,26 +81,220 @@ function findCourseByName(courseName) {
   return best;
 }
 
-function formatHalfCombo(front9, back9) {
-  if (front9 && back9) return front9 + '/' + back9;
-  return front9 || back9 || '';
+function stripHalfComboSuffix(name) {
+  var s = _trim(name);
+  var paren = stripParenHalfSuffix(s);
+  if (paren.hit) {
+    return {
+      base: paren.base,
+      front9Course: paren.front9Course,
+      back9Course: paren.back9Course
+    };
+  }
+  var m = s.match(/^(.*?)([A-Za-z0-9]{1,3})场?\s*[/／+＋&＆]\s*([A-Za-z0-9]{1,3})场?\s*$/i);
+  if (m) {
+    var a = normalizeHalfCode(m[2]);
+    var b = normalizeHalfCode(m[3]);
+    if (a && b) {
+      return { base: _trim(m[1]), front9Course: a, back9Course: b };
+    }
+  }
+  return { base: s, front9Course: null, back9Course: null };
 }
 
-function formatCourseHalfText(combo) {
-  return combo ? '（' + combo + '）' : '';
+function _trim(v) {
+  return v == null ? '' : String(v).trim();
 }
 
-/** 从「（A/B）」类文案解析前九/后九（兼容仅有 courseHalfText 的旧球队赛） */
-function parseCourseHalfText(text) {
-  const raw = String(text || '').trim();
+function foldFullwidthAscii(s) {
+  return _trim(s).replace(/[\uFF01-\uFF5E]/g, function (ch) {
+    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+  });
+}
+
+/** 半场代码：A–Z / 1–3 位字母数字，去掉「场」 */
+function normalizeHalfCode(raw) {
+  var t = foldFullwidthAscii(raw).replace(/\s+/g, '').replace(/场$/i, '');
+  if (!/^[A-Za-z0-9]{1,3}$/.test(t)) return '';
+  return t.toUpperCase();
+}
+
+function isHalfCode(raw) {
+  return !!normalizeHalfCode(raw);
+}
+
+/**
+ * 仅识别明确半场组合：A/B、A&B、A+B、（A/D）、(A) 等。
+ * 不把「前九」「18洞」「（国际）」当成半场。
+ */
+function parseHalfPair(text) {
+  var raw = foldFullwidthAscii(text);
   if (!raw) return { front9Course: null, back9Course: null };
-  const inner = raw.replace(/^[（(]/, '').replace(/[）)]$/, '').trim();
+  var inner = raw
+    .replace(/^[（(]/, '')
+    .replace(/[）)]$/, '')
+    .trim()
+    .replace(/^Course\s+/i, '')
+    .replace(/\s+/g, '');
   if (!inner) return { front9Course: null, back9Course: null };
-  const parts = inner.split(/[/／]/).map((s) => String(s || '').trim()).filter(Boolean);
+  var m = inner.match(/^([A-Za-z0-9]{1,3})场?(?:[/／+＋&＆]([A-Za-z0-9]{1,3})场?)?$/i);
+  if (!m) return { front9Course: null, back9Course: null };
+  var a = normalizeHalfCode(m[1]);
+  var b = m[2] ? normalizeHalfCode(m[2]) : '';
+  if (!a) return { front9Course: null, back9Course: null };
+  return { front9Course: a, back9Course: b || null };
+}
+
+function formatHalfCombo(front9, back9) {
+  var a = normalizeHalfCode(front9);
+  var b = normalizeHalfCode(back9);
+  if (a && b) return a + '&' + b;
+  return a || b || '';
+}
+
+/** 存盘/表单后缀：有半场时前导空格 + A&D，无括号 */
+function formatCourseHalfText(combo) {
+  var parsed = parseHalfPair(combo);
+  var text = formatHalfCombo(parsed.front9Course, parsed.back9Course);
+  return text ? ' ' + text : '';
+}
+
+/** 从「（A/B）」/「A&D」类文案解析前九/后九（兼容旧球队赛） */
+function parseCourseHalfText(text) {
+  return parseHalfPair(text);
+}
+
+var PAREN_HALF_SUFFIX =
+  /[（(]\s*([A-Za-z0-9]{1,3})场?\s*(?:[/／+＋&＆]\s*([A-Za-z0-9]{1,3})场?\s*)?[）)]\s*$/i;
+var BARE_PAIR_SUFFIX =
+  /\s+([A-Za-z0-9]{1,3})场?\s*[/／+＋&＆]\s*([A-Za-z0-9]{1,3})场?\s*$/i;
+
+function stripParenHalfSuffix(name) {
+  var s = _trim(name);
+  var m = s.match(PAREN_HALF_SUFFIX);
+  if (!m) return { base: s, front9Course: null, back9Course: null, hit: false };
+  var a = normalizeHalfCode(m[1]);
+  var b = m[2] ? normalizeHalfCode(m[2]) : '';
+  if (!a) return { base: s, front9Course: null, back9Course: null, hit: false };
   return {
-    front9Course: parts[0] || null,
-    back9Course: parts[1] || null
+    base: s.slice(0, m.index).trimEnd(),
+    front9Course: a,
+    back9Course: b || null,
+    hit: true
   };
+}
+
+function stripBarePairSuffixIfMatch(name, combo) {
+  var s = _trim(name);
+  if (!combo) return s;
+  var m = s.match(BARE_PAIR_SUFFIX);
+  if (!m) return s;
+  var got = formatHalfCombo(m[1], m[2]);
+  if (got !== combo) return s;
+  return s.slice(0, m.index).trimEnd();
+}
+
+function stripBareSingleSuffixIfMatch(name, combo) {
+  var s = _trim(name);
+  if (!combo || /[&＆+/／]/.test(combo)) return s;
+  var re = new RegExp('\\s+' + combo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '场?\\s*$', 'i');
+  if (!re.test(s)) return s;
+  return s.replace(re, '').trimEnd();
+}
+
+function resolveDisplayHalves(input) {
+  var o = input && typeof input === 'object' ? input : {};
+  var f = normalizeHalfCode(o.front9Course || o.front9);
+  var b = normalizeHalfCode(o.back9Course || o.back9);
+  if (f || b) return { front9Course: f || null, back9Course: b || null };
+  var fromText = parseHalfPair(o.courseHalfText || o.halfText || o.courseHalf || '');
+  if (fromText.front9Course || fromText.back9Course) return fromText;
+  var fromName = stripParenHalfSuffix(o.courseName || o.course || '');
+  if (fromName.hit) {
+    return { front9Course: fromName.front9Course, back9Course: fromName.back9Course };
+  }
+  return { front9Course: null, back9Course: null };
+}
+
+/**
+ * 展示用球场名：原始名 + 空格 + A&D（保留选择顺序）。
+ * 无半场时不加空格、&、括号或 undefined。
+ */
+function formatCourseDisplayName(input) {
+  var o = input && typeof input === 'object' ? input : {};
+  var rawName = _trim(o.courseName || o.course || '');
+  var halves = resolveDisplayHalves(o);
+  var fromName = stripHalfComboSuffix(rawName);
+  if (!halves.front9Course && !halves.back9Course) {
+    if (fromName.front9Course || fromName.back9Course) {
+      halves = { front9Course: fromName.front9Course, back9Course: fromName.back9Course };
+    }
+  }
+  var combo = formatHalfCombo(halves.front9Course, halves.back9Course);
+  var name = fromName.base || rawName;
+  name = stripBarePairSuffixIfMatch(name, combo);
+  name = stripBareSingleSuffixIfMatch(name, combo);
+  if (
+    canonicalCourseId(o.courseId) === QHW_CANONICAL_ID ||
+    isQinghewanBaseName(name) ||
+    isQinghewanBaseName(rawName)
+  ) {
+    name = QHW_DISPLAY_NAME;
+  } else {
+    name = canonicalizeQinghewanBaseName(name);
+  }
+  if (!name) return combo || '';
+  if (!combo) return name;
+  return name + ' ' + combo;
+}
+
+/** 半场码走 formatCourseDisplayName；「前九」等非半场备注用 · 追加，不伪造第二半场 */
+function formatCourseLineForUi(input) {
+  var o = input && typeof input === 'object' ? input : {};
+  var display = formatCourseDisplayName(o);
+  var raw = _trim(o.courseHalfText || o.halfText);
+  if (!raw) return display;
+  var parsed = parseHalfPair(raw);
+  if (parsed.front9Course || parsed.back9Course) return display;
+  var note = raw.replace(/^[（(]/, '').replace(/[）)]$/, '').trim();
+  if (!note || /^undefined$/i.test(note)) return display;
+  if (display && display.indexOf(note) >= 0) return display;
+  return display ? display + ' · ' + note : note;
+}
+
+function buildCourseSelectionFields(payload) {
+  var p = payload && typeof payload === 'object' ? payload : {};
+  var courseHalfText = halfTextFromPayload(p);
+  var courseName = _trim(p.courseName);
+  var front9 = p.front9Course != null ? p.front9Course : p.front9;
+  var back9 = p.back9Course != null ? p.back9Course : p.back9;
+  var fields = {
+    courseId: p.courseId || '',
+    courseName: courseName,
+    courseLocation: p.courseLocation || '',
+    front9Course: front9 || null,
+    back9Course: back9 || null,
+    courseHalfText: courseHalfText,
+    courseDisplayName: formatCourseDisplayName({
+      courseId: p.courseId || '',
+      courseName: courseName,
+      front9Course: front9,
+      back9Course: back9,
+      courseHalfText: courseHalfText
+    })
+  };
+  if (p.courseLayoutRevision != null) fields.courseLayoutRevision = p.courseLayoutRevision;
+  return fields;
+}
+
+function halfTextFromPayload(payload) {
+  var p = payload && typeof payload === 'object' ? payload : {};
+  var combo = formatHalfCombo(p.front9Course || p.front9, p.back9Course || p.back9);
+  if (!combo) {
+    var parsed = parseHalfPair(p.halfText || p.courseHalfText || '');
+    combo = formatHalfCombo(parsed.front9Course, parsed.back9Course);
+  }
+  return formatCourseHalfText(combo);
 }
 
 function resolveHalfCourseRecord(courseId, courseName) {
@@ -103,7 +311,15 @@ module.exports = {
   findCourseByName,
   formatHalfCombo,
   formatCourseHalfText,
+  formatCourseDisplayName,
+  formatCourseLineForUi,
+  buildCourseSelectionFields,
   parseCourseHalfText,
+  parseHalfPair,
+  resolveDisplayHalves,
+  normalizeHalfCode,
+  halfTextFromPayload,
   resolveHalfCourseRecord,
-  canEditHalfCourse
+  canEditHalfCourse,
+  stripHalfComboSuffix
 };

@@ -24,20 +24,21 @@ const COURSE_DB = [
       { code: 'F', name: 'Championship F', holes: 9, par: [4, 4, 3, 4, 5, 4, 3, 5, 4] }
     ]
   },
-  { courseId: 'c-qhw', courseName: '北京清河湾高尔夫乡村俱乐部 A&B', location: '北京 · 昌平', lat: 40.218, lng: 116.231, useCount: 18, lastUsed: '2026-06-21', pinyin: 'beijingqinghewangaoerfuxiangcunjulebu', abbr: 'qhw', halfCourseCount: 2 },
   {
-    courseId: 'c-honghua',
-    courseName: '北京清河湾乡村高尔夫俱乐部C&D',
+    courseId: 'c-qhw',
+    courseName: '北京清河湾乡村高尔夫俱乐部',
     location: '北京 · 昌平',
     lat: 40.218,
     lng: 116.231,
-    useCount: 17,
-    lastUsed: '2026-06-20',
-    pinyin: 'beijingqinghewanxiangcungaoerfujulebucd honghua honghuagaoerfuqiuhui',
-    abbr: 'qhwcd',
-    searchKeys: '红花 红花高尔夫 c&d cd',
-    halfCourseCount: 2,
+    useCount: 35,
+    lastUsed: '2026-06-21',
+    pinyin: 'beijingqinghewanxiangcungaoerfujulebu beijingqinghewangaoerfuxiangcunjulebu',
+    abbr: 'qhw',
+    searchKeys: '清河湾 红花 红花高尔夫 c&d cd qhw a&b 高尔夫乡村',
+    halfCourseCount: 4,
     halfCourses: [
+      { code: 'A', name: 'A', holes: 9, par: [4, 3, 4, 4, 4, 3, 5, 4, 5] },
+      { code: 'B', name: 'B', holes: 9, par: [4, 4, 4, 4, 3, 5, 4, 3, 5] },
       { code: 'C', name: 'C', holes: 9, par: [4, 4, 4, 4, 4, 3, 5, 4, 5] },
       { code: 'D', name: 'D', holes: 9, par: [4, 3, 5, 3, 4, 5, 3, 4, 4] }
     ]
@@ -69,6 +70,127 @@ const COURSE_DB = [
     ]
   }
 ];
+
+/** 清河湾合并后的稳定主记录；旧 c-honghua / 旧名称只做查找映射，不另建球场 */
+const QHW_CANONICAL_ID = 'c-qhw';
+const QHW_DISPLAY_NAME = '北京清河湾乡村高尔夫俱乐部';
+const COURSE_ID_ALIASES = { 'c-honghua': QHW_CANONICAL_ID };
+const QHW_NAME_ALIASES = [
+  '北京清河湾乡村高尔夫俱乐部',
+  '北京清河湾高尔夫乡村俱乐部',
+  '清河湾 A&B',
+  '清河湾 C&D',
+  '清河湾A&B',
+  '清河湾C&D',
+  '红花高尔夫',
+  '红花高尔夫俱乐部'
+];
+/** 未重新选场的旧 A&B 局：当时库内无半场 PAR，记分走 DEFAULT_PAR9 */
+const QHW_LEGACY_AB_PAR = [4, 4, 4, 3, 4, 5, 4, 3, 4];
+const QHW_PAR_A = [4, 3, 4, 4, 4, 3, 5, 4, 5];
+const QHW_PAR_B = [4, 4, 4, 4, 3, 5, 4, 3, 5];
+const QHW_PAR_C = [4, 4, 4, 4, 4, 3, 5, 4, 5];
+const QHW_PAR_D = [4, 3, 5, 3, 4, 5, 3, 4, 4];
+const COURSE_LAYOUT_REVISION = 2;
+
+function canonicalCourseId(courseId) {
+  const raw = courseId == null ? '' : String(courseId).trim();
+  if (!raw) return '';
+  return COURSE_ID_ALIASES[raw] || raw;
+}
+
+function _normName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, '');
+}
+
+function isQinghewanBaseName(name) {
+  const folded = _normName(name);
+  if (!folded) return false;
+  for (let i = 0; i < QHW_NAME_ALIASES.length; i += 1) {
+    if (_normName(QHW_NAME_ALIASES[i]) === folded) return true;
+  }
+  return false;
+}
+
+function canonicalizeQinghewanBaseName(name) {
+  return isQinghewanBaseName(name) ? QHW_DISPLAY_NAME : String(name || '').trim();
+}
+
+function findCourseById(courseId) {
+  const id = canonicalCourseId(courseId);
+  if (!id) return null;
+  for (let i = 0; i < COURSE_DB.length; i += 1) {
+    if (COURSE_DB[i] && COURSE_DB[i].courseId === id) return COURSE_DB[i];
+  }
+  return null;
+}
+
+function listVisibleCourses() {
+  return COURSE_DB.filter((c) => c && !c.hidden && !c.aliasOf);
+}
+
+function usesCatalogPars(ctx) {
+  const r = ctx && (ctx.courseLayoutRevision != null ? ctx.courseLayoutRevision : ctx.courseParRevision);
+  if (r === 'catalog' || r === 'qhw-v2') return true;
+  const n = Number(r);
+  return Number.isFinite(n) && n >= COURSE_LAYOUT_REVISION;
+}
+
+function isQinghewanCourse(course, ctx) {
+  const id = canonicalCourseId((ctx && ctx.courseId) || (course && course.courseId) || '');
+  if (id === QHW_CANONICAL_ID) return true;
+  return isQinghewanBaseName((ctx && ctx.courseName) || (course && course.courseName) || '');
+}
+
+function shouldUseLegacyQinghewanAB(course, halfKey, ctx) {
+  if (!isQinghewanCourse(course, ctx)) return false;
+  if (usesCatalogPars(ctx)) return false;
+  const key = String(halfKey || '').trim().toUpperCase();
+  return key === 'A' || key === 'B';
+}
+
+function layoutContextFromSource(src) {
+  const o = src && typeof src === 'object' ? src : {};
+  const course = o.course && typeof o.course === 'object' ? o.course : {};
+  return {
+    courseId: o.courseId || course.courseId || '',
+    courseName: o.courseName || course.courseName || '',
+    courseHalfText: o.courseHalfText || course.courseHalfText || course.halfText || '',
+    front9Course: o.front9Course != null ? o.front9Course : course.front9Course,
+    back9Course: o.back9Course != null ? o.back9Course : course.back9Course,
+    courseLayoutRevision: o.courseLayoutRevision != null ? o.courseLayoutRevision : course.courseLayoutRevision
+  };
+}
+
+function stampCatalogRevision(target) {
+  if (!target || typeof target !== 'object') return target;
+  target.courseLayoutRevision = COURSE_LAYOUT_REVISION;
+  return target;
+}
+
+function applyQinghewanCatalogCompat() {
+  try {
+    const groupsStore = require('./groupsStore.js');
+    if (!groupsStore || typeof groupsStore.getTournamentCourseMeta !== 'function') return;
+    const meta = groupsStore.getTournamentCourseMeta();
+    if (!meta) return;
+    const rawName = String(meta.courseName || '').trim();
+    const base = rawName.replace(/\s*[A-Za-z0-9]{1,3}\s*[&＆/+／]\s*[A-Za-z0-9]{1,3}\s*$/i, '').trim();
+    if (canonicalCourseId(meta.courseId) !== QHW_CANONICAL_ID && !isQinghewanBaseName(base) && !isQinghewanBaseName(rawName)) {
+      return;
+    }
+    const nextName = QHW_DISPLAY_NAME;
+    if (meta.courseId === QHW_CANONICAL_ID && meta.courseName === nextName) return;
+    groupsStore.setTournamentCourseHalf({
+      courseId: QHW_CANONICAL_ID,
+      courseName: nextName
+    });
+  } catch (e) {
+    /* ignore */
+  }
+}
 
 const FALLBACK_ORIGIN = { lat: 39.9087, lng: 116.3975 };
 const UNKNOWN_DISTANCE_TEXT = '距离未知';
@@ -152,7 +274,7 @@ function resolveFirstTwoCourses(course) {
   if (Array.isArray(course.halfCourses) && course.halfCourses.length) {
     const front9 = course.halfCourses[0] ? course.halfCourses[0].code : null;
     const back9 = course.halfCourses[1] ? course.halfCourses[1].code : null;
-    const halfText = front9 && back9 ? front9 + '/' + back9 : front9 || back9 || '';
+    const halfText = front9 && back9 ? front9 + '&' + back9 : front9 || back9 || '';
     return { front9Course: front9, back9Course: back9, halfText: halfText };
   }
   const count = course.halfCourseCount || 0;
@@ -166,7 +288,7 @@ function findNearestCourse(origin) {
   const o = origin || FALLBACK_ORIGIN;
   let nearest = null;
   let minDist = Infinity;
-  COURSE_DB.forEach((c) => {
+  listVisibleCourses().forEach((c) => {
     if (!hasCoords(c)) return;
     const d = distanceKm(o, c);
     if (!Number.isFinite(d)) return;
@@ -204,6 +326,15 @@ function locateNearestCourseWithHalves() {
 
 module.exports = {
   COURSE_DB,
+  QHW_CANONICAL_ID,
+  QHW_DISPLAY_NAME,
+  COURSE_ID_ALIASES,
+  QHW_LEGACY_AB_PAR,
+  QHW_PAR_A,
+  QHW_PAR_B,
+  QHW_PAR_C,
+  QHW_PAR_D,
+  COURSE_LAYOUT_REVISION,
   FALLBACK_ORIGIN,
   UNKNOWN_DISTANCE_TEXT,
   NEARBY_LIMIT,
@@ -214,5 +345,16 @@ module.exports = {
   resolveFirstTwoCourses,
   findNearestCourse,
   getNearestCourseWithHalves,
-  locateNearestCourseWithHalves
+  locateNearestCourseWithHalves,
+  canonicalCourseId,
+  findCourseById,
+  listVisibleCourses,
+  isQinghewanBaseName,
+  canonicalizeQinghewanBaseName,
+  usesCatalogPars,
+  isQinghewanCourse,
+  shouldUseLegacyQinghewanAB,
+  layoutContextFromSource,
+  stampCatalogRevision,
+  applyQinghewanCatalogCompat
 };

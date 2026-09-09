@@ -3,6 +3,7 @@
  */
 
 const halfCourse = require('./halfCourse.js');
+const courseDatabase = require('./courseDatabase.js');
 
 const DEFAULT_PAR9 = [4, 4, 4, 3, 4, 5, 4, 3, 4];
 const SPECIAL_IDX = [9, 19, 20];
@@ -13,7 +14,10 @@ function sumPar(arr) {
   return (arr || []).reduce((s, v) => s + v, 0);
 }
 
-function par9ForHalf(course, key) {
+function par9ForHalf(course, key, ctx) {
+  if (courseDatabase.shouldUseLegacyQinghewanAB(course, key, ctx)) {
+    return (courseDatabase.QHW_LEGACY_AB_PAR || DEFAULT_PAR9).slice();
+  }
   if (!key) return DEFAULT_PAR9.slice();
   const halves = halfCourse.buildHalves(course);
   const half = halves.find((h) => h.key === key);
@@ -22,11 +26,11 @@ function par9ForHalf(course, key) {
 }
 
 /** 由球场 + 前9/后9 COURSE 代码构建 18 洞布局 */
-function buildHoleLayout(course, front9Key, back9Key) {
+function buildHoleLayout(course, front9Key, back9Key, ctx) {
   const frontKey = front9Key || 'A';
   const backKey = back9Key || front9Key || 'B';
-  const frontPars = par9ForHalf(course, frontKey);
-  const backPars = par9ForHalf(course, backKey);
+  const frontPars = par9ForHalf(course, frontKey, ctx);
+  const backPars = par9ForHalf(course, backKey, ctx);
   const holePars = frontPars.concat(backPars);
   const frontLabels = frontPars.map((_, i) => frontKey + (i + 1));
   const backLabels = backPars.map((_, i) => backKey + (i + 1));
@@ -106,7 +110,7 @@ function resolveLayoutFromContext(ctx) {
   if (!course) return createDefaultLayout();
   const keys = resolveHalfKeys(course, c);
   if (!keys.front9 && !keys.back9) return createDefaultLayout();
-  return buildHoleLayout(course, keys.front9, keys.back9);
+  return buildHoleLayout(course, keys.front9, keys.back9, c);
 }
 
 module.exports = {

@@ -7,7 +7,22 @@
  */
 const core = require("./settleCore.js");
 
-function applyHolePot(mode, nPer, remaining, ledger, ids) {
+function stakeScale(unscaled, actual) {
+  const b = Number(unscaled) || 0;
+  const a = Number(actual) || 0;
+  if (!(b > 0) || !(a > 0)) return 1;
+  const s = a / b;
+  return isFinite(s) && s > 0 ? core.round1(s) : 1;
+}
+
+function winnerWant(mode, nSafe, displayVal, scale) {
+  if (mode === "all" || mode === "big-pot") return displayVal;
+  const s = Number(scale);
+  const mul = isFinite(s) && s > 0 ? s : 1;
+  return Math.min(core.round1(nSafe * mul), displayVal);
+}
+
+function applyHolePot(mode, nPer, remaining, ledger, ids, scaleById) {
   const display = {};
   const donated = {};
   (ids || []).forEach(function (id) {
@@ -28,8 +43,8 @@ function applyHolePot(mode, nPer, remaining, ledger, ids) {
   const n = Number(nPer);
   const nSafe = isFinite(n) && n > 0 ? n : 0;
   const wants = winners.map(function (id) {
-    if (mode === "all" || mode === "big-pot") return display[id];
-    return Math.min(nSafe, display[id]);
+    const scale = scaleById && Object.prototype.hasOwnProperty.call(scaleById, id) ? scaleById[id] : 1;
+    return winnerWant(mode, nSafe, display[id], scale);
   });
   let totalWant = 0;
   wants.forEach(function (w) {
@@ -98,5 +113,7 @@ function bigPotMoney(totalsRaw, inPot, fundS) {
 
 module.exports = {
   applyHolePot,
-  bigPotMoney
+  bigPotMoney,
+  stakeScale,
+  winnerWant
 };

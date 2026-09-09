@@ -46,6 +46,20 @@ function currentUserId() {
   }
 }
 
+function courseContextOf(src) {
+  var rec = src || {};
+  var out = {
+    courseId: rec.courseId || '',
+    courseName: rec.courseName || '',
+    front9Course: rec.front9Course != null ? rec.front9Course : null,
+    back9Course: rec.back9Course != null ? rec.back9Course : null,
+    courseHalfText: rec.courseHalfText || rec.halfText || ''
+  };
+  if (rec.courseLayoutRevision != null) out.courseLayoutRevision = rec.courseLayoutRevision;
+  if (rec.courseParRevision != null) out.courseParRevision = rec.courseParRevision;
+  return out;
+}
+
 function emptySnapshot(patch) {
   var out = {
     source: 'gameStore',
@@ -59,13 +73,7 @@ function emptySnapshot(patch) {
     revisionSource: '0',
     allowBigPot: false,
     gameMode: '',
-    courseContext: {
-      courseId: '',
-      courseName: '',
-      front9Course: null,
-      back9Course: null,
-      courseHalfText: ''
-    },
+    courseContext: courseContextOf({}),
     groups: [],
     scoreData: {},
     scoreEntities: {},
@@ -119,13 +127,7 @@ function fromGame(game, options) {
     revisionSource: g.updatedAt || g.createdAt || '0',
     allowBigPot: !!opts.allowBigPot,
     gameMode: g.gameMode || '',
-    courseContext: {
-      courseId: g.courseId || '',
-      courseName: g.courseName || '',
-      front9Course: g.front9Course || null,
-      back9Course: g.back9Course || null,
-      courseHalfText: g.courseHalfText || g.halfText || ''
-    },
+    courseContext: courseContextOf(g),
     groups: listGameGroups(g),
     scoreData: {},
     scoreEntities: {},
@@ -160,13 +162,7 @@ function fromTeamMatch(match, options) {
     revisionSource: m.updatedAt || m.createdAt || '0',
     allowBigPot: !!opts.allowBigPot,
     gameMode: m.gameMode || m.selectedGameMode || '',
-    courseContext: {
-      courseId: m.courseId || '',
-      courseName: m.courseName || '',
-      front9Course: m.front9Course || null,
-      back9Course: m.back9Course || null,
-      courseHalfText: m.courseHalfText || m.halfText || ''
-    },
+    courseContext: courseContextOf(m),
     groups: Array.isArray(m.groups) ? m.groups : [],
     scoreData: m.scoreData && typeof m.scoreData === 'object' ? m.scoreData : {},
     scoreEntities: m.scoreEntities && typeof m.scoreEntities === 'object' ? m.scoreEntities : {},

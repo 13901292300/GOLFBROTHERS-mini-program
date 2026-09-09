@@ -327,6 +327,99 @@ assert(
   core.round1((t32.A || 0) + (t32.B || 0) + (t32.C || 0) + (t32[core.POT_ID] || 0)) === 0
 );
 
+var hRels = { '1': { A: 3, B: 1, C: 3, D: 1 } };
+
+function mappedOf(code, rel) {
+  var player = { id: 'x', scoreCode: code };
+  var rule = baseRule();
+  return s8421.personalScore(
+    rel,
+    s8421.scoreMapFor(player, rule, { players: [player] }),
+    s8421.deductCfg(player, rule),
+    4
+  );
+}
+
+assert('对照 8421 PAR→4', mappedOf('8421', 0) === 4);
+assert('对照 8431 PAR→4', mappedOf('8431', 0) === 4);
+assert('对照 8421 +1→2', mappedOf('8421', 1) === 2);
+assert('对照 8431 +1→3', mappedOf('8431', 1) === 3);
+assert('对照 8421 +2→1', mappedOf('8421', 2) === 1);
+assert('对照 8431 +2→1', mappedOf('8431', 2) === 1);
+assert('对照 8421 +3→0', mappedOf('8421', 3) === 0);
+assert('对照 8431 +3→0', mappedOf('8431', 3) === 0);
+assert('对照 8421 +4→-1', mappedOf('8421', 4) === -1);
+assert('对照 8431 +4→-1', mappedOf('8431', 4) === -1);
+
+var h2 = settle4.settle(fourGame(), ctx(hRels)).byHole['1'];
+assert(
+  'H2 全员8421 +3/+1/+3/+1 打平',
+  h2.A === 0 && h2.B === 0 && h2.C === 0 && h2.D === 0,
+  JSON.stringify(h2)
+);
+assert('H2 零和', holeSum(h2) === 0);
+
+var h1players = [
+  { id: 'A', scoreCode: '8431' },
+  { id: 'B', scoreCode: '8421' },
+  { id: 'C', scoreCode: '8421' },
+  { id: 'D', scoreCode: '8421' }
+];
+var h1 = settle4.settle(fourGame({}, h1players), ctx(hRels)).byHole['1'];
+assert(
+  'H1 A=8431 其余8421 必须打平 0',
+  h1.A === 0 && h1.B === 0 && h1.C === 0 && h1.D === 0,
+  JSON.stringify(h1)
+);
+assert('H1 零和', holeSum(h1) === 0);
+
+var h3 = settle4.settle(fourGame({}, h1players), ctx(hRels)).byHole['1'];
+assert(
+  'H3 仅改 A 的 scoreCode 仍打平',
+  h3.A === 0 && h3.B === 0 && h3.C === 0 && h3.D === 0,
+  JSON.stringify(h3)
+);
+
+var staleRows = [
+  { id: 'hio', value: 32 },
+  { id: 'm2', value: 16 },
+  { id: 'm1', value: 8 },
+  { id: 'par', value: 4 },
+  { id: 'p1', value: 2 },
+  { id: 'p2', value: 1 },
+  { id: 'p3', value: 2 }
+];
+var h1stale = settle4.settle(
+  fourGame({}, [
+    { id: 'A', scoreCode: '8431', scoreRows: staleRows },
+    { id: 'B', scoreCode: '8421' },
+    { id: 'C', scoreCode: '8421' },
+    { id: 'D', scoreCode: '8421' }
+  ]),
+  ctx(hRels)
+).byHole['1'];
+assert(
+  'H1 scoreCode 优先于残留 scoreRows',
+  h1stale.A === 0 && h1stale.B === 0 && h1stale.C === 0 && h1stale.D === 0,
+  JSON.stringify(h1stale)
+);
+
+var fork = settle4.settle(
+  fourGame({}, [
+    { id: 'A', scoreRows: staleRows },
+    { id: 'B', scoreCode: '8421' },
+    { id: 'C', scoreCode: '8421' },
+    { id: 'D', scoreCode: '8421' }
+  ]),
+  ctx(hRels)
+).byHole['1'];
+assert(
+  '无 scoreCode 且 rows.p3=2 才会出现历史 ±2',
+  fork.A === 2 && fork.B === 2 && fork.C === -2 && fork.D === -2,
+  JSON.stringify(fork)
+);
+assert('该分叉仍零和', holeSum(fork) === 0);
+
 console.log('---');
 console.log('passed ' + passed + '  failed ' + failed);
 if (failed) process.exit(1);

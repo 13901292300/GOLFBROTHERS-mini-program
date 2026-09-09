@@ -1428,8 +1428,10 @@ function mergeScoreFields(selected, players) {
     if (!src) return item;
     return Object.assign({}, item, {
       scoreCode: src.scoreCode != null && src.scoreCode !== "" ? src.scoreCode : item.scoreCode,
-      scoreRows: src.scoreRows || item.scoreRows,
-      scoreOverrides: src.scoreOverrides || item.scoreOverrides
+      scoreRows: takeScoreRows(src, item),
+      scoreOverrides: Object.prototype.hasOwnProperty.call(src, "scoreOverrides")
+        ? src.scoreOverrides
+        : item.scoreOverrides
     });
   });
 }
@@ -1452,9 +1454,15 @@ function pickPlayerScoreMeta(src) {
   if (!src) return {};
   const out = {};
   if (src.scoreCode != null && src.scoreCode !== "") out.scoreCode = src.scoreCode;
-  if (src.scoreRows) out.scoreRows = src.scoreRows;
+  if (Object.prototype.hasOwnProperty.call(src, "scoreRows")) out.scoreRows = src.scoreRows;
   if (src.scoreOverrides) out.scoreOverrides = src.scoreOverrides;
   return out;
+}
+
+function takeScoreRows(primary, fallback) {
+  if (primary && Object.prototype.hasOwnProperty.call(primary, "scoreRows")) return primary.scoreRows;
+  if (fallback && Object.prototype.hasOwnProperty.call(fallback, "scoreRows")) return fallback.scoreRows;
+  return null;
 }
 
 const PAGE_FOLD_FIELDS = [
@@ -2002,6 +2010,7 @@ Page(pageBoot.bindPageTheme({
     const showInstanceHoleOrder = entry === "hub" || entry === "match";
     const gameId = decodeURIComponent((query && query.gameId) || "");
     const existing = gameId ? session.getGame(entry, gameId) : null;
+    this._repoRevision = existing && existing.revision != null ? Number(existing.revision) : null;
     const fullView = session.getFullHoleOrder(entry);
     const globalHoleOrder = (fullView.holes || []).map(function (h) {
       return h.holeId;
@@ -2179,7 +2188,7 @@ Page(pageBoot.bindPageTheme({
             avatarModel: item.avatarModel,
             displayName: item.displayName || item.name,
             scoreCode: (hit && hit.scoreCode != null && hit.scoreCode !== "") ? hit.scoreCode : (item.scoreCode || defaultScoreCode),
-            scoreRows: (hit && hit.scoreRows) || item.scoreRows || null,
+            scoreRows: takeScoreRows(hit, item),
             hcp: (hit && hit.hcp) || item.hcp || "18",
             hcapPar3: hit && hit.hcapPar3 != null && hit.hcapPar3 !== "" ? String(hit.hcapPar3) : "0",
             hcapPar4: hit && hit.hcapPar4 != null && hit.hcapPar4 !== "" ? String(hit.hcapPar4) : "0",
@@ -2193,7 +2202,7 @@ Page(pageBoot.bindPageTheme({
         return Object.assign({}, item, pickPlayerScoreMeta(hit), {
           selected: true,
           scoreCode: (hit.scoreCode != null && hit.scoreCode !== "") ? hit.scoreCode : (item.scoreCode || defaultScoreCode),
-          scoreRows: hit.scoreRows || item.scoreRows || null,
+          scoreRows: takeScoreRows(hit, item),
           hcp: hit.hcp || item.hcp || "18",
           hcapPar3: hit.hcapPar3 != null && hit.hcapPar3 !== "" ? String(hit.hcapPar3) : "0",
           hcapPar4: hit.hcapPar4 != null && hit.hcapPar4 !== "" ? String(hit.hcapPar4) : "0",
@@ -3199,7 +3208,24 @@ Page(pageBoot.bindPageTheme({
           });
         }
       }
-    });
+    }    );
+  },
+
+  persistExistingScorePlayers(players) {
+    if (!this.data.gameId) return { ok: true };
+    if (typeof session.persistLivePlayerScores !== "function") return { ok: true };
+    const saved = session.persistLivePlayerScores(
+      this.data.entry,
+      this.data.gameId,
+      players || this.data.players || [],
+      this._repoRevision != null ? { expectedRevision: this._repoRevision } : {}
+    );
+    if (saved && saved.__fail) {
+      wx.showToast({ title: saved.message || "保存失败", icon: "none" });
+      return saved;
+    }
+    if (saved && saved.revision != null) this._repoRevision = Number(saved.revision);
+    return saved;
   },
 
   applyScoreConfig(updated) {
@@ -3212,10 +3238,16 @@ Page(pageBoot.bindPageTheme({
       if (!hit) return item;
       return Object.assign({}, item, {
         scoreCode: hit.scoreCode != null && hit.scoreCode !== "" ? hit.scoreCode : item.scoreCode,
-        scoreRows: hit.scoreRows || item.scoreRows,
-        scoreOverrides: hit.scoreOverrides || item.scoreOverrides
+        scoreRows: takeScoreRows(hit, item),
+        scoreOverrides: Object.prototype.hasOwnProperty.call(hit, "scoreOverrides")
+          ? hit.scoreOverrides
+          : item.scoreOverrides
       });
     });
+    if (this.data.gameId) {
+      const saved = this.persistExistingScorePlayers(players);
+      if (saved && saved.__fail) return;
+    }
     this.setData(
       Object.assign(
         {
@@ -4476,8 +4508,10 @@ Page(pageBoot.bindPageTheme({
         return;
       }
     }
-    const players = this.data.players.slice();
     const idx = this.data.scorePlayerIndex;
+    const players = (this.data.players || []).map(function (item, i) {
+      return i === idx ? Object.assign({}, item) : item;
+    });
     const player = players[idx];
     if (!player) {
       this.setData({ showScoreSheet: false });
@@ -4494,6 +4528,13 @@ Page(pageBoot.bindPageTheme({
         playerScoreCfg.deductFormFromUi(this.data),
         this._scoreSheetStart || playerScoreCfg.deductFormFromUi(this.data)
       );
+    }
+    if (this.data.gameId) {
+      const saved = this.persistExistingScorePlayers(players);
+      if (saved && saved.__fail) {
+        this.setData({ showScoreSheet: false });
+        return;
+      }
     }
     this.setData(
       Object.assign(
@@ -4855,7 +4896,10 @@ Page(pageBoot.bindPageTheme({
   },
 
     confirmAdd() {
+    if (this._confirmAdding) return;
     if (this._assertCanEdit && !this._assertCanEdit()) return;
+    this._confirmAdding = true;
+    try {
     let selected = (this.data.orderedPlayers && this.data.orderedPlayers.length
       ? this.data.orderedPlayers
       : this.data.players.filter(function (item) {
@@ -5255,11 +5299,17 @@ Page(pageBoot.bindPageTheme({
     }
     if (this.data.gameId) {
       const prev = session.getGame(this.data.entry, this.data.gameId);
-      const saved = session.updateGame(this.data.entry, this.data.gameId, payload);
-      if (!saved) {
-        wx.showToast({ title: "保存失败", icon: "none" });
+      const saved = session.updateGame(
+        this.data.entry,
+        this.data.gameId,
+        payload,
+        this._repoRevision != null ? { expectedRevision: this._repoRevision } : {}
+      );
+      if (!saved || saved.__fail) {
+        wx.showToast({ title: (saved && saved.message) || "保存失败", icon: "none" });
         return;
       }
+      if (saved.revision != null) this._repoRevision = Number(saved.revision);
       if (this._markSaved) this._markSaved();
       if (saved && (!prev || session.orderKey(prev) !== session.orderKey(saved))) {
         session.addOrderLog(this.data.entry, saved, prev && prev.playerOrder && prev.playerOrder.length ? "update" : "start");
@@ -5270,12 +5320,13 @@ Page(pageBoot.bindPageTheme({
         Object.assign({ id: "g-" + Date.now() }, payload)
       );
       if (!saved || saved.__fail) {
-        wx.showToast({ title: (saved && saved.reason) || "保存失败", icon: "none" });
+        wx.showToast({ title: (saved && (saved.message || saved.reason)) || "保存失败", icon: "none" });
         return;
       }
       if (this._markSaved) this._markSaved();
       session.addOrderLog(this.data.entry, saved, "start");
     }
+    this._confirmCommitted = true;
     nav.callOnPage("pages/list/index", "refreshGames");
     nav.navigateBackTo(
       "pages/list/index",
@@ -5286,5 +5337,8 @@ Page(pageBoot.bindPageTheme({
           encodeURIComponent(this.data.maxPlayers || 4)
       )
     );
+    } finally {
+      if (!this._confirmCommitted) this._confirmAdding = false;
+    }
   }
 }));

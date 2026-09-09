@@ -8,6 +8,7 @@
  */
 const core = require("./settleCore.js");
 const s8421 = require("./settle8421.js");
+const settlePot = require("./settlePot.js");
 
 function addPts(ledger, id, n) {
   ledger[id] = core.round1((Number(ledger[id]) || 0) + n);
@@ -132,6 +133,7 @@ function settle8421Three(game, ctx) {
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const donateScaleByHole = {};
   let rankedNext = false;
   let startMarked = false;
   let prefixBlocked = false;
@@ -179,7 +181,9 @@ function settle8421Three(game, ctx) {
     const dualWins = teamSum > soloTwice;
     const isPush = !!flag.push;
     const mult = allDouble ? comboMul : 1;
+    const baseUnit = core.round1(d * k);
     const unit = core.round1(d * k * mult);
+    let meatPoints = 0;
 
     if (d === 0) {
       addPts(ledger, solo, 0);
@@ -206,6 +210,7 @@ function settle8421Three(game, ctx) {
           if (eat > 0) {
             const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
             applyTeam(meatLedger, solo, mates, dualWins, meatPts);
+            meatPoints = meatPts;
             meatPool -= eat;
             core.consumeTopHoles(topHoleTracker, eat);
           }
@@ -220,11 +225,21 @@ function settle8421Three(game, ctx) {
         if (eat > 0) {
           const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
           applyTeam(meatLedger, solo, mates, dualWins, meatPts);
+          meatPoints = meatPts;
           meatPool -= eat;
           core.consumeTopHoles(topHoleTracker, eat);
         }
       }
       s8421.mergeLedger(ledger, meatLedger);
+      const unscaled = core.holeLedger();
+      applyTeam(unscaled, solo, mates, dualWins, baseUnit);
+      const donateScale = {};
+      order.forEach(function (id) {
+        const base = Number(unscaled[id]) || 0;
+        if (!(base > 0)) return;
+        donateScale[id] = settlePot.stakeScale(base, Number(ledger[id]) || 0);
+      });
+      donateScaleByHole[label] = donateScale;
       if (!dualWins) applyBaoNeg(ledger, solo, mates, rec, rule, d);
     }
 
@@ -240,6 +255,7 @@ function settle8421Three(game, ctx) {
   return {
     byHole: byHole,
     orderByHole: orderByHole,
+    donateScaleByHole: donateScaleByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "8421-3",
     settleVersion: s8421.SETTLE_8421_VERSION,

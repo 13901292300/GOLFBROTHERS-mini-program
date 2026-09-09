@@ -20,6 +20,7 @@ var partyFormation = require("./partyFormation.js");
 var entitlement = require("./sideGameEntitlementProvider.js");
 var scoreMapUtil = require("./sideGameScoreMap.js");
 var settleThreeSet = require("./settleThreeSet.js");
+var derivedNotify = require("../../../utils/sideGameDerivedNotify.js");
 
 var settingsStore = settingsMod.getDefault();
 var activeHostQuery = { matchId: "", groupId: "", scope: "group" };
@@ -33,11 +34,16 @@ function showToast(title) {
   } catch (e) {}
 }
 
-function attachHost(query) {
+var recoveringDerived = false;
+
+function attachHost(query, opts) {
   activeHostQuery = hostSession.queryOf(query);
   try {
     entitlement.bindHostContext(currentHost());
   } catch (e) {}
+  if (!(opts && opts.skipDerivedRecover)) {
+    recoverStaleDerivedResults("attachHost");
+  }
   return activeHostQuery;
 }
 
@@ -646,7 +652,9 @@ function persistToSetup(entry, game, existingId) {
   );
   if (existingId) {
     var hit = findDraftGame(entry, existingId);
-    if (!hit) return null;
+    if (!hit) {
+      return persistFail("not_found");
+    }
     Object.assign(hit, next, { id: rec.asString(existingId) });
     markDraftUpdated(setup, existingId);
     return hydrateUiGame(hit);
@@ -682,6 +690,44 @@ function failMessage(reason, meta) {
   return prefix + body;
 }
 
+  var derivedReplayLog = [];
+
+function noteDerivedReplay(scope, gameId, reason) {
+  derivedReplayLog.push({
+    scope: rec.asString(scope) || "CURRENT_GAME",
+    gameId: rec.asString(gameId),
+    reason: rec.asString(reason)
+  });
+}
+
+function takeDerivedReplayLog() {
+  var out = derivedReplayLog.slice();
+  derivedReplayLog = [];
+  return out;
+}
+
+function setupCommitImpact(setup, entry) {
+  var prev = settingsStore.get((setup && setup.matchId) || matchIdOf(), String(entry || "score"));
+  var next = (setup && setup.globalSettings) || {};
+  var prevFp = JSON.stringify({
+    full: prev && prev.fullHoleOrder,
+    created: prev && prev.createdHoleOrder,
+    rev: prev && prev.fullHoleOrderRevision,
+    holeOrder: prev && prev.holeOrder
+  });
+  var nextFp = JSON.stringify({
+    full: next.fullHoleOrder,
+    created: next.createdHoleOrder,
+    rev: next.fullHoleOrderRevision,
+    holeOrder: next.holeOrder
+  });
+  if (prevFp !== nextFp) return "ALL_GAMES";
+  if (((setup && setup.added) || []).length || ((setup && setup.updated) || []).length) {
+    return "CURRENT_GAME";
+  }
+  return "NONE";
+}
+
 function commitSetupDraft(entry) {
   var blocked = assertWritable();
   if (blocked) return { ok: false, reason: blocked.reason, message: blocked.message };
@@ -701,12 +747,16 @@ function commitSetupDraft(entry) {
   var creates = [];
   var updates = [];
   var settleIds = [];
+  var mutatedIds = [];
+  var allIds = [];
   var i;
+  var impact = setupCommitImpact(setup, key);
 
   for (i = 0; i < (setup.games || []).length; i++) {
     var game = setup.games[i];
     var id = rec.asString(game && game.id);
     if (!id) continue;
+    allIds.push(id);
     // 各游戏深拷贝，避免共享 matchups/parties 引用互相污染
     game = rec.jsonClone(game);
     setup.games[i] = game;
@@ -740,7 +790,7 @@ function commitSetupDraft(entry) {
       payload.sideGameId = id;
       payload.idempotencyKey = id;
       creates.push(payload);
-      settleIds.push(id);
+      mutatedIds.push(id);
     } else if ((setup.updated || []).indexOf(id) >= 0) {
       updates.push({
         sideGameId: id,
@@ -753,11 +803,11 @@ function commitSetupDraft(entry) {
           ruleSnapshot: payload.ruleSnapshot
         }
       });
-      settleIds.push(id);
-    } else {
-      settleIds.push(id);
+      mutatedIds.push(id);
     }
   }
+
+  settleIds = impact === "ALL_GAMES" ? allIds.slice() : mutatedIds.slice();
 
   var out = repository.commitSetupDraft({
     matchId: setup.matchId,
@@ -786,7 +836,19 @@ function commitSetupDraft(entry) {
     };
   }
   draftMod.clearSetupDraft();
-  return { ok: true, reason: "", data: out.data };
+  try {
+    if (typeof global !== "undefined" && global.__gbSideGameReplayFail) {
+      throw new Error("test_replay_fail");
+    }
+    if (impact === "ALL_GAMES") {
+      replayAllDerived(key);
+    } else {
+      mutatedIds.forEach(function (sid) {
+        replayDerivedGame(key, sid);
+      });
+    }
+  } catch (eReplay) {}
+  return { ok: true, reason: "", data: out.data, impact: impact };
 }
 
 function withHost(url) {
@@ -1313,39 +1375,147 @@ function stampCreatedHoleOrder(game, host) {
   game.createdHoleOrder = fromHoles.length ? fromHoles : fromOrder;
 }
 
-function persistInstance(entry, game, existingId) {
+function isPublishedSideGameId(id) {
+  var sid = rec.asString(id);
+  if (!sid) return false;
+  try {
+    var got = repository.getById(sid);
+    return !!(got && got.ok && got.data && got.data.status !== "deleted");
+  } catch (ePub) {
+    return false;
+  }
+}
+
+function isDraftAddedId(entry, id) {
+  if (!inSetup(entry)) return false;
+  var setup = draftMod.getSetupDraftRaw();
+  if (!setup) return false;
+  return (setup.added || []).indexOf(rec.asString(id)) >= 0;
+}
+
+function syncSetupExpectedRevision(id) {
+  var setup = draftMod.getSetupDraftRaw();
+  if (!setup) return;
+  var sid = rec.asString(id);
+  if (!sid) return;
+  var got = repository.getById(sid);
+  if (!got.ok || !got.data) return;
+  if (!setup.expectedRevisions) setup.expectedRevisions = {};
+  setup.expectedRevisions[sid] = Number(got.data.revision) || 0;
+}
+
+function persistFail(reason, extra) {
+  return Object.assign(
+    {
+      __fail: true,
+      reason: rec.asString(reason),
+      message: failMessage(reason)
+    },
+    extra || {}
+  );
+}
+
+function derivedResultWritePatch(result, prevRow, host) {
+  if (result && result.byHole && !result.mulMissing && !result.rewardMissing) {
+    return {
+      resultSnapshot: rec.jsonClone(result),
+      resultRevision: ((prevRow && prevRow.resultRevision) || 0) + 1,
+      hostRevisionAtSettle: rec.asString(host && host.revision),
+      status: "settled"
+    };
+  }
+  return {
+    resultSnapshot: null,
+    resultRevision: 0,
+    hostRevisionAtSettle: ""
+  };
+}
+
+function persistInstance(entry, game, existingId, opts) {
   var blocked = assertWritable();
   if (blocked) return blocked;
   stampCreatedHoleOrder(game, currentHost());
-  if (inSetup(entry)) {
+  var id = rec.asString(existingId) || rec.asString(game && game.id);
+  var published = isPublishedSideGameId(id) && !isDraftAddedId(entry, id);
+  if (game) {
+    game.holeResults = null;
+    game.resultSnapshot = null;
+  }
+  if (inSetup(entry) && !published) {
     return persistToSetup(entry, game, existingId);
   }
+  if (inSetup(entry) && published) {
+    persistToSetup(entry, game, id);
+  }
   var host = currentHost();
-  var payload = buildInstancePayload(entry, game, existingId);
-  if (existingId) {
-    var cur = repository.getById(existingId);
-    if (!cur.ok) return null;
-    var out = repository.update(existingId, cur.data.revision, {
-      title: payload.title,
-      visibility: payload.visibility,
-      participantParties: payload.participantParties,
-      config: payload.config,
-      ruleSnapshot: rec.mergeRuleSnapshot(
-        rec.buildRuleSnapshot(payload.ruleId || game.catalogId),
-        rec.unwrapGameplaySnapshot(game.ruleSnapshot || cur.data.ruleSnapshot)
-      ),
-      idempotencyKey: "upd_" + existingId + "_" + Date.now()
+  var payload = buildInstancePayload(entry, game, id);
+  var replayed = computeResults(entry, game, false);
+  if (id && (existingId || published)) {
+    var cur = repository.getById(id);
+    if (!cur.ok) return persistFail((cur && cur.reason) || "not_found");
+    var expect =
+      opts && opts.expectedRevision != null && opts.expectedRevision !== ""
+        ? Number(opts.expectedRevision)
+        : Number(cur.data.revision);
+    var actual = Number(cur.data.revision);
+    if (expect !== actual) {
+      return persistFail("revision_conflict", {
+        expectedVersion: expect,
+        actualVersion: actual
+      });
+    }
+    var out = repository.update(
+      id,
+      expect,
+      Object.assign(
+        {
+          title: payload.title,
+          visibility: payload.visibility,
+          participantParties: payload.participantParties,
+          config: payload.config,
+          ruleSnapshot: rec.mergeRuleSnapshot(
+            rec.buildRuleSnapshot(payload.ruleId || game.catalogId),
+            rec.unwrapGameplaySnapshot(game.ruleSnapshot || cur.data.ruleSnapshot)
+          ),
+          idempotencyKey: "upd_" + id + "_" + Date.now()
+        },
+        derivedResultWritePatch(replayed, cur.data, host)
+      )
+    );
+    if (!out.ok) {
+      return persistFail(out.reason, {
+        expectedVersion: expect,
+        actualVersion: out.revision
+      });
+    }
+    if (replayed && replayed.byHole) game.holeResults = replayed;
+    syncSetupExpectedRevision(id);
+    if (!(opts && opts.skipDerivedLog)) {
+      noteDerivedReplay("CURRENT_GAME", id, "persistInstance");
+    }
+    return runPublished(function () {
+      return getGame(entry, id);
     });
-    if (!out.ok) return null;
-    repository.refreshResult(existingId, host);
-    return getGame(entry, existingId);
   }
   var created = repository.create(payload);
   if (!created.ok) {
-    return { __fail: true, reason: created.reason };
+    return persistFail(created.reason);
   }
-  repository.refreshResult(created.data.sideGameId, host);
-  return getGame(entry, created.data.sideGameId);
+  var newId = created.data.sideGameId;
+  if (game) game.id = newId;
+  if (replayed && replayed.byHole && !replayed.mulMissing && !replayed.rewardMissing) {
+    repository.update(
+      newId,
+      created.data.revision,
+      derivedResultWritePatch(replayed, created.data, host)
+    );
+    game.holeResults = replayed;
+  }
+  syncSetupExpectedRevision(newId);
+  if (!(opts && opts.skipDerivedLog)) {
+    noteDerivedReplay("CURRENT_GAME", newId, "persistInstance");
+  }
+  return getGame(entry, newId);
 }
 
 function addGame(entry, game) {
@@ -1360,17 +1530,17 @@ function addGame(entry, game) {
   }
   var saved = persistInstance(entry, game, "");
   if (saved && saved.__fail) return saved;
+  if (!saved) return persistFail("persist_failed");
   syncPotGameIds(entry);
   syncWindGameIds(entry);
   return saved;
 }
 
-function updateGame(entry, gameId, patch) {
+function updateGame(entry, gameId, patch, opts) {
   var game = getGame(entry, gameId);
-  if (!game) return null;
+  if (!game) return persistFail("not_found");
   Object.assign(game, patch || {});
-  var saved = persistInstance(entry, game, gameId);
-  return saved && saved.__fail ? null : saved;
+  return persistInstance(entry, game, gameId, opts);
 }
 
 function getBoardView(entry) {
@@ -1679,13 +1849,22 @@ function setHoleOrder(entry, order) {
     fullHoleOrderRevision: rev,
     holeOrder: holeOrder
   });
-  mirrorFullHoleOrderToGames(entry, holeOrder, st.created);
-  if (!inSetup(entry)) {
+  if (inSetup(entry)) {
+    mirrorFullHoleOrderToGames(entry, holeOrder, st.created);
+  } else {
+    var persistOk = true;
     listGames(entry).forEach(function (game) {
-      if (game && game.id) persistInstance(entry, game, game.id);
+      if (!game || !game.id) return;
+      game.fullHoleOrder = holeOrder.slice();
+      game.holeOrder = holeOrder.slice();
+      game.fullHoleOrderRevision = rev;
+      game.holes = holeOrderUtil.alignHolesToFullOrder(game.holes, holeOrder);
+      var saved = persistInstance(entry, game, game.id, { skipDerivedLog: true });
+      if (saved && saved.__fail) persistOk = false;
     });
-    refreshActiveGames(entry);
+    if (!persistOk) return holeOrder;
   }
+  replayAllDerived(entry, "setHoleOrder");
   return holeOrder;
 }
 
@@ -2200,6 +2379,97 @@ function is8421Catalog(game) {
   return id === "8421-2" || id === "8421-3" || id === "8421-4";
 }
 
+function omitDerivedGame(game) {
+  var copy = stripDisplayFields(rec.jsonClone(game || {}));
+  delete copy.holeResults;
+  delete copy.resultSnapshot;
+  delete copy.revision;
+  delete copy.status;
+  delete copy.endedAt;
+  delete copy._match2MulState;
+  delete copy._stroke2RewardState;
+  delete copy._8421MapState;
+  delete copy._8421MigrateNote;
+  delete copy.coeffText;
+  delete copy.wayLabel;
+  return copy;
+}
+
+function gameplaySettleFingerprint(game) {
+  var copy = rec.jsonClone(game || {});
+  prepareMatch2Game(copy);
+  prepareStroke2Game(copy);
+  prepare8421Game(copy);
+  return JSON.stringify(omitDerivedGame(copy));
+}
+
+function hostStructureFingerprint(entry, game) {
+  var host = currentHost();
+  var labels = holeOrderUtil.uniqueLabels(
+    (game && (game.fullHoleOrder || game.holeOrder)) ||
+      getGlobal(entry).fullHoleOrder ||
+      getGlobal(entry).holeOrder ||
+      (host && host.holeOrder)
+  );
+  var pars = {};
+  (labels || []).forEach(function (label) {
+    var n = Number(host && host.pars && host.pars[label]);
+    pars[String(label)] = n === 3 || n === 4 || n === 5 ? n : 4;
+  });
+  return JSON.stringify({
+    matchId: rec.asString(host && host.matchId),
+    holeOrder: labels,
+    holeOrderRevision: Number(getGlobal(entry).fullHoleOrderRevision) || 0,
+    pars: pars
+  });
+}
+
+function derivedResultsStale(entry, game) {
+  var hr = game && game.holeResults;
+  if (!hr) return true;
+  var id = settle.catalogIdOf(game);
+  if (id === "match-2" && hr.settleVersion !== settle.MATCH2_SETTLE_VERSION) return true;
+  if (id === "stroke-2" && hr.settleVersion !== settle.STROKE2_SETTLE_VERSION) return true;
+  if (is8421Catalog(game) && hr.settleVersion !== settle.SETTLE_8421_VERSION) return true;
+  if (id === "lasuo-4" && hr.settleVersion !== settle.SETTLE_LASUO4_VERSION) return true;
+  if (hr.scoreConfigFp !== gameplaySettleFingerprint(game)) return true;
+  if (hr.hostStructureFp !== hostStructureFingerprint(entry, game)) return true;
+  return false;
+}
+
+function derivedStaleScope(entry, game) {
+  if (!derivedResultsStale(entry, game)) return "";
+  var hr = game && game.holeResults;
+  var hostFp = hostStructureFingerprint(entry, game);
+  if (!hr || hr.hostStructureFp !== hostFp) return "ALL_GAMES";
+  return "CURRENT_GAME";
+}
+
+function recoverStaleDerivedResults(reason) {
+  if (recoveringDerived) return;
+  if (!matchIdOf()) return;
+  recoveringDerived = true;
+  try {
+    ["score", "hub", "match"].forEach(function (entry) {
+      listRepoGames(entry).forEach(function (game) {
+        if (!game || !game.id) return;
+        var scope = derivedStaleScope(entry, game);
+        if (!scope) return;
+        game.holeResults = null;
+        noteDerivedReplay(scope, game.id, reason || "recover-stale");
+        refreshGameResults(entry, game, false);
+      });
+    });
+  } finally {
+    recoveringDerived = false;
+  }
+}
+
+function persistLivePlayerScores(entry, gameId, players, opts) {
+  if (!gameId) return persistFail("not_found");
+  return updateGame(entry, gameId, { players: players, holeResults: null }, opts);
+}
+
 function prepare8421Game(game) {
   if (!game || !is8421Catalog(game)) return game;
   var lib = getMyRuleById(game.ruleLibId || game.libId);
@@ -2231,10 +2501,11 @@ function stroke2MissingToast(game, writeFail) {
 
 function computeResults(entry, game, notify) {
   try {
-    prepareMatch2Game(game);
-    prepareStroke2Game(game);
-    prepare8421Game(game);
-    if (game && game._match2MulState === "missing") {
+    var settleGame = rec.jsonClone(game);
+    prepareMatch2Game(settleGame);
+    prepareStroke2Game(settleGame);
+    prepare8421Game(settleGame);
+    if (settleGame && settleGame._match2MulState === "missing") {
       var writeFail = !isEndedGame(game);
       var missTitle = writeFail
         ? "倍率配置未写入"
@@ -2244,61 +2515,67 @@ function computeResults(entry, game, notify) {
           console.error("[match-2] " + (writeFail ? "mul_write_error" : "mul_history_unrecoverable"), {
             gameId: game.id,
             ruleLibId: game.ruleLibId || "",
-            sources: rec.describeMatch2MulSources({ game: game, record: persistRowFor(game) })
+            sources: rec.describeMatch2MulSources({ game: settleGame, record: persistRowFor(game) })
           });
         }
       } catch (e0) {}
       if (notify !== false) showToast(missTitle);
-      var blank = settle.emptyResults(game, holeLabelsOf(entry, game));
+      var blank = settle.emptyResults(settleGame, holeLabelsOf(entry, settleGame));
       blank.settleVersion = settle.MATCH2_SETTLE_VERSION;
       blank.mulMissing = true;
       blank.mulState = "missing";
       blank.resultSource = writeFail ? "mul_write_error" : "mul_history_unrecoverable";
       logHole5SettleAudit(
         entry,
-        game,
+        settleGame,
         blank,
-        getScorecard(entry, game),
-        parsForGame(entry, game)
+        getScorecard(entry, settleGame),
+        parsForGame(entry, settleGame)
       );
       return blank;
     }
-    if (game && game._stroke2RewardState === "missing") {
+    if (settleGame && settleGame._stroke2RewardState === "missing") {
       var strokeWriteFail = !isEndedGame(game);
-      var strokeTitle = stroke2MissingToast(game, strokeWriteFail);
+      var strokeTitle = stroke2MissingToast(settleGame, strokeWriteFail);
       try {
         if (typeof console !== "undefined" && console.error) {
           console.error("[stroke-2] " + (strokeWriteFail ? "reward_write_error" : "reward_history_unrecoverable"), {
             gameId: game.id,
             ruleLibId: game.ruleLibId || "",
-            sources: rec.describeStroke2RewardSources({ game: game, record: persistRowFor(game) })
+            sources: rec.describeStroke2RewardSources({ game: settleGame, record: persistRowFor(game) })
           });
         }
       } catch (e1) {}
       if (notify !== false) showToast(strokeTitle);
-      var strokeBlank = settle.emptyResults(game, holeLabelsOf(entry, game));
+      var strokeBlank = settle.emptyResults(settleGame, holeLabelsOf(entry, settleGame));
       strokeBlank.settleVersion = settle.STROKE2_SETTLE_VERSION;
       strokeBlank.rewardMissing = true;
       strokeBlank.rewardState = "missing";
       strokeBlank.resultSource = strokeWriteFail ? "reward_write_error" : "reward_history_unrecoverable";
       logHole5SettleAudit(
         entry,
-        game,
+        settleGame,
         strokeBlank,
-        getScorecard(entry, game),
-        parsForGame(entry, game)
+        getScorecard(entry, settleGame),
+        parsForGame(entry, settleGame)
       );
       return strokeBlank;
     }
-    var settleScores = getScorecard(entry, game);
-    var settlePars = parsForGame(entry, game);
-    var settleOut = settle.settleGame(game, {
+    var settleScores = getScorecard(entry, settleGame);
+    var settlePars = parsForGame(entry, settleGame);
+    var scoreFp = gameplaySettleFingerprint(settleGame);
+    var hostFp = hostStructureFingerprint(entry, settleGame);
+    var settleOut = settle.settleGame(settleGame, {
       scores: settleScores,
-      holeOrder: holeLabelsOf(entry, game),
+      holeOrder: holeLabelsOf(entry, settleGame),
       pars: settlePars,
-      windOn: windOnFor(entry, game),
+      windOn: windOnFor(entry, settleGame),
       libraryRuleSnapshot: null
     });
+    if (settleOut && typeof settleOut === "object") {
+      settleOut.scoreConfigFp = scoreFp;
+      settleOut.hostStructureFp = hostFp;
+    }
     logHole5SettleAudit(entry, game, settleOut, settleScores, settlePars);
     return settleOut;
   } catch (e) {
@@ -2320,41 +2597,46 @@ function computeResults(entry, game, notify) {
 function persistLiveResult(game, result) {
   if (!game || !game.id || !result) return;
   if (result.mulMissing || result.rewardMissing) return;
-  if (draftMod.getSetupDraftRaw()) return;
   try {
     var got = repository.getById(game.id);
     if (!got.ok || !got.data) return;
-    repository.update(game.id, got.data.revision, {
-      resultSnapshot: rec.jsonClone(result),
-      resultRevision: (got.data.resultRevision || 0) + 1,
-      hostRevisionAtSettle: rec.asString(currentHost().revision),
-      status: "settled"
-    });
+    var prevSnap = got.data.resultSnapshot;
+    if (
+      prevSnap &&
+      result &&
+      result.scoreConfigFp &&
+      prevSnap.scoreConfigFp === result.scoreConfigFp &&
+      result.hostStructureFp &&
+      prevSnap.hostStructureFp === result.hostStructureFp &&
+      JSON.stringify(prevSnap.byHole || {}) === JSON.stringify(result.byHole || {})
+    ) {
+      return;
+    }
+    repository.update(
+      game.id,
+      got.data.revision,
+      derivedResultWritePatch(result, got.data, currentHost())
+    );
+    syncSetupExpectedRevision(game.id);
+    noteDerivedReplay("FALLBACK", game.id, "persistLiveResult");
   } catch (e) {}
 }
 
 function refreshGameResults(entry, game, notify) {
   if (!game) return null;
   if (catalog.isUnavailableRule(game.catalogId || game.ruleId)) return game;
-  var match2 = settle.catalogIdOf(game) === "match-2";
-  var stroke2 = settle.catalogIdOf(game) === "stroke-2";
-  var is8421 = is8421Catalog(game);
-  var lasuo4 = settle.catalogIdOf(game) === "lasuo-4";
-  var stale =
-    (match2 &&
-      (!game.holeResults || game.holeResults.settleVersion !== settle.MATCH2_SETTLE_VERSION)) ||
-    (stroke2 &&
-      (!game.holeResults || game.holeResults.settleVersion !== settle.STROKE2_SETTLE_VERSION)) ||
-    (is8421 &&
-      (!game.holeResults || game.holeResults.settleVersion !== settle.SETTLE_8421_VERSION)) ||
-    (lasuo4 &&
-      (!game.holeResults || game.holeResults.settleVersion !== settle.SETTLE_LASUO4_VERSION));
-  if (isEndedGame(game) && !stale) return game;
+  var stale = derivedResultsStale(entry, game);
+  if (isEndedGame(game) && !stale) {
+    return game;
+  }
   var prev = game.holeResults;
+  if (stale) game.holeResults = null;
   var next = computeResults(entry, game, notify);
   if (next && next.byHole) {
     game.holeResults = next;
     persistLiveResult(game, next);
+  } else if (stale) {
+    game.holeResults = next || null;
   } else {
     game.holeResults = prev || game.holeResults;
     if (notify !== false) showToast("结算失败，仍显示上次结果");
@@ -2362,10 +2644,25 @@ function refreshGameResults(entry, game, notify) {
   return game;
 }
 
-function refreshActiveGames(entry) {
+function replayDerivedGame(entry, gameId) {
+  var game = getGame(entry, gameId);
+  if (!game || !game.id) return;
+  game.holeResults = null;
+  noteDerivedReplay("CURRENT_GAME", game.id, "replayDerivedGame");
+  refreshGameResults(entry, game, false);
+}
+
+function replayAllDerived(entry, reason) {
   listGames(entry).forEach(function (game) {
-    refreshGameResults(entry, game);
+    if (!game || !game.id) return;
+    game.holeResults = null;
+    noteDerivedReplay("ALL_GAMES", game.id, reason || "replayAllDerived");
+    refreshGameResults(entry, game, false);
   });
+}
+
+function refreshActiveGames(entry) {
+  replayAllDerived(entry);
 }
 
 function holeOn(game, label) {
@@ -2804,8 +3101,13 @@ const labels = getHoleOrder(entry);
       const potBefore = potRemain;
       const inPotGame = !!(showPot && potGameSet[String(game.id)]);
       let shown = ledger;
+      const scaleById =
+        (game.holeResults &&
+          game.holeResults.donateScaleByHole &&
+          game.holeResults.donateScaleByHole[label]) ||
+        null;
       if (inPotGame) {
-        const applied = settle.applyHolePot(potMode, potN, potRemain, ledger, ids);
+        const applied = settle.applyHolePot(potMode, potN, potRemain, ledger, ids, scaleById);
         shown = applied.display;
         if (!isBigPot) potRemain = applied.remaining;
         players.forEach(function (player, pi) {
@@ -3007,6 +3309,14 @@ module.exports = {
   recordToGame,
   addGame,
   updateGame,
+  persistLivePlayerScores,
+  gameplaySettleFingerprint,
+  hostStructureFingerprint,
+  derivedResultsStale,
+  recoverStaleDerivedResults,
+  takeDerivedReplayLog,
+  replayDerivedGame,
+  replayAllDerived,
   removeGame,
   remapPlayerId: function (fromId, toId, profile) {
     return repository.remapPlayerId(matchIdOf(), fromId, toId, profile);
@@ -3088,3 +3398,10 @@ module.exports = {
   restoreKick,
   listKickFactors
 };
+
+derivedNotify.onAllGamesReplay(function (reason) {
+  if (recoveringDerived) return;
+  replayAllDerived("score", reason);
+  replayAllDerived("hub", reason);
+  replayAllDerived("match", reason);
+});

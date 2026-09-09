@@ -319,6 +319,10 @@ var EXPECTED = {
       A1: { __pot__: 0, p1: 4, p2: -4 },
       A2: { __pot__: 0, p1: 2, p2: -2 }
     },
+    donateScaleByHole: {
+      A1: { p1: 1 },
+      A2: { p1: 1 }
+    },
     initial: { p1: 0, p2: 0, __pot__: 0 },
     catalogId: '8421-2',
     settleVersion: 'v53-4.1.3',
@@ -367,6 +371,10 @@ var EXPECTED = {
       A2: { __pot__: 0, p2: 20, p1: -10, p3: -10 }
     },
     orderByHole: { A1: ['p1', 'p2', 'p3'], A2: ['p1', 'p2', 'p3'] },
+    donateScaleByHole: {
+      A1: { p1: 1, p3: 1 },
+      A2: { p2: 1 }
+    },
     initial: { p1: 0, p2: 0, p3: 0, __pot__: 0 },
     catalogId: '8421-3',
     settleVersion: 'v53-4.1.3',
@@ -425,6 +433,10 @@ var EXPECTED = {
       A2: { __pot__: 0, p1: 2, p2: 2, p3: -2, p4: -2 }
     },
     orderByHole: { A1: ['p1', 'p2', 'p3', 'p4'], A2: ['p1', 'p2', 'p3', 'p4'] },
+    donateScaleByHole: {
+      A1: { p1: 1, p2: 1 },
+      A2: { p1: 1, p2: 1 }
+    },
     initial: { p1: 0, p2: 0, p3: 0, p4: 0, __pot__: 0 },
     catalogId: '8421-4',
     settleVersion: 'v53-4.1.3',

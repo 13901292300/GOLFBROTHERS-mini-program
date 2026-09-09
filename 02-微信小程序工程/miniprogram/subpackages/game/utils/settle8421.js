@@ -10,6 +10,7 @@
 const core = require("./settleCore.js");
 const scoreMapUtil = require("./sideGameScoreMap.js");
 const playerScoreCfg = require("./sideGame8421PlayerConfig.js");
+const settlePot = require("./settlePot.js");
 
 const SETTLE_8421_VERSION = scoreMapUtil.SETTLE_VERSION_2;
 const MEAT_DEFAULTS = { "le-2": 1, m1: 1, par: 1, p1: 1, "ge-2": 1 };
@@ -147,8 +148,7 @@ function mappedAt(diff, map) {
 function personalScore(diff, map, deduct, par) {
   if (diff <= 3) {
     const raw = mappedAt(diff, map);
-    if (raw != null && raw > 0) return raw;
-    return deductScore(diff, deduct, par);
+    if (raw != null) return raw;
   }
   return deductScore(diff, deduct, par);
 }
@@ -161,7 +161,7 @@ function personalScoreDebug(diff, map, deduct, par) {
   const from = isFinite(fromStart) ? fromStart : 4;
   if (diff <= 3) {
     const raw = mappedAt(diff, map);
-    if (raw != null && raw > 0) {
+    if (raw != null) {
       return { mappedScore: raw, from: from, nRaw: 0, nFinal: 0, usedDeduct: false };
     }
   }
@@ -256,8 +256,10 @@ function settle8421(game, ctx) {
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
   const byHole = {};
+  const donateScaleByHole = {};
   holeOrder.forEach(function (label) {
     const ledger = core.holeLedger();
+    const donateScale = {};
     const isLast = String(label) === lastLabel;
     if (core.holeOn(game, label)) {
       const par = holePar(ctx, label);
@@ -301,19 +303,25 @@ function settle8421(game, ctx) {
         const winner = leftWins ? left : right;
         const loser = leftWins ? right : left;
         const winnerRel = leftWins ? leftRel : rightRel;
+        const unscaledPts = core.round1(spread * k);
         const holePts = core.round1(spread * k * mult);
         addPts(ledger, winner, holePts);
         addPts(ledger, loser, -holePts);
+        let meatPts = 0;
 
         if (flag.push) {
           bumpPush(allDouble, comboMul, meatPool, key, skipMeat);
           if (!skipMeat) core.enqueueTopHole(topHoleTrackers[key], label);
-          if (!(windOn && isLast && !allDouble && spread !== 0)) return;
+          if (!(windOn && isLast && !allDouble && spread !== 0)) {
+            donateScale[winner] = settlePot.stakeScale(unscaledPts, holePts);
+            return;
+          }
         }
 
         if (allDouble) {
           comboMul[key] = 1;
           core.consumeAllTopHoles(topHoleTrackers[key]);
+          donateScale[winner] = settlePot.stakeScale(unscaledPts, holePts);
           return;
         }
 
@@ -321,16 +329,18 @@ function settle8421(game, ctx) {
         if (pool > 0) {
           const eat = core.meatEatCount(meatWanted(rule, winnerRel, pool), pool, isLast, windOn);
           if (eat > 0) {
-            const meatPts = core.round1(eat * meatUnit(rule, holePts, k));
+            meatPts = core.round1(eat * meatUnit(rule, holePts, k));
             addPts(ledger, winner, meatPts);
             addPts(ledger, loser, -meatPts);
             meatPool[key] = pool - eat;
             core.consumeTopHoles(topHoleTrackers[key], eat);
           }
         }
+        donateScale[winner] = settlePot.stakeScale(unscaledPts, holePts + meatPts);
       });
     }
     byHole[label] = ledger;
+    donateScaleByHole[label] = donateScale;
   });
 
   const topHoleStates = {};
@@ -341,6 +351,7 @@ function settle8421(game, ctx) {
 
   return {
     byHole: byHole,
+    donateScaleByHole: donateScaleByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "8421-2",
     settleVersion: SETTLE_8421_VERSION,

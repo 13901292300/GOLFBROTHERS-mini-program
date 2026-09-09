@@ -9,6 +9,7 @@
  */
 const core = require("./settleCore.js");
 const s8421 = require("./settle8421.js");
+const settlePot = require("./settlePot.js");
 
 function applySides(ledger, win, lose, unit) {
   s8421.addPts(ledger, win[0], unit);
@@ -104,7 +105,7 @@ function nextOrder(order, rec, hist, game, isPush) {
   return stableSort(order, cmp);
 }
 
-function mapScore(game, rule, id, rel, par, hole) {
+function mapScore(game, rule, id, rel, par) {
   const player = s8421.playerOf(game, id);
   const deduct = s8421.deductCfg(player, rule);
   const map = s8421.scoreMapFor(player, rule, game);
@@ -166,6 +167,7 @@ function settle8421Four(game, ctx) {
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const donateScaleByHole = {};
   let rankedNext = false;
   let startMarked = false;
   let prefixBlocked = false;
@@ -214,7 +216,9 @@ function settle8421Four(game, ctx) {
     const aWins = aSum > bSum;
     const isPush = !!flag.push;
     const mult = allDouble ? comboMul : 1;
+    const baseUnit = core.round1(d * k);
     const unit = core.round1(d * k * mult);
+    let meatPoints = 0;
 
     if (d === 0) {
       order.forEach(function (id) {
@@ -244,6 +248,7 @@ function settle8421Four(game, ctx) {
           if (eat > 0) {
             const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
             applySides(meatLedger, win, lose, meatPts);
+            meatPoints = meatPts;
             meatPool -= eat;
             core.consumeTopHoles(topHoleTracker, eat);
           }
@@ -257,11 +262,17 @@ function settle8421Four(game, ctx) {
         if (eat > 0) {
           const meatPts = core.round1(eat * s8421.meatUnit(rule, unit, k));
           applySides(meatLedger, win, lose, meatPts);
+          meatPoints = meatPts;
           meatPool -= eat;
           core.consumeTopHoles(topHoleTracker, eat);
         }
       }
       s8421.mergeLedger(ledger, meatLedger);
+      const donateScale = {};
+      win.forEach(function (id) {
+        donateScale[id] = settlePot.stakeScale(baseUnit, unit + meatPoints);
+      });
+      donateScaleByHole[label] = donateScale;
       applyBaoNegTeam(ledger, aTeam, bTeam, rec, rule, d);
       applyBaoNegTeam(ledger, bTeam, aTeam, rec, rule, d);
     }
@@ -278,6 +289,7 @@ function settle8421Four(game, ctx) {
   return {
     byHole: byHole,
     orderByHole: orderByHole,
+    donateScaleByHole: donateScaleByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "8421-4",
     settleVersion: s8421.SETTLE_8421_VERSION,
