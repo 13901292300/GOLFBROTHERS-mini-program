@@ -6,18 +6,7 @@ const gameEdit = require('../../utils/gameEdit.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const halfCourse = require('../../../../utils/halfCourse.js');
 const temporaryCourse = require('../../../../utils/temporaryCourse.js');
-const subpackageLoader = require('../../../../utils/subpackageLoader.js');
-const networkStatus = require('../../../../utils/networkStatus.js');
 
-function showPlayerLoadFailure() {
-  const app = typeof getApp === 'function' ? getApp() : null;
-  const connected = networkStatus.readFromGlobal(app && app.globalData).networkConnected;
-  wx.showToast({
-    title:
-      connected === false ? '当前无网络，该功能尚未加载到本机' : '功能加载失败，请稍后重试',
-    icon: 'none'
-  });
-}
 
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
@@ -423,8 +412,7 @@ Page({
     });
     // 其它组已用 → 灰态不可选；本组成员 → 默认选中、可取消
     const usedIds = this._gameUsedIds(t.gIdx);
-    subpackageLoader.ensureLoaded('player').then(() => {
-      wx.navigateTo({
+    wx.navigateTo({
         url:
           '/subpackages/player/pages/friends/index?matchId=&slotId=' +
           (t.pIdx + 1) +
@@ -439,9 +427,6 @@ Page({
         },
         fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
       });
-    }).catch(() => {
-      showPlayerLoadFailure();
-    });
   },
 
   // 好友页确认返回：取消选中→移出；新增→从前往后补本组空位（全局去重：跳过其它组已用）
@@ -484,8 +469,7 @@ Page({
     const t = this._addTarget;
     if (!t) return;
     const usedIds = this._gameUsedIds(null); // 组合：全 Game 已用都不可重复
-    subpackageLoader.ensureLoaded('player').then(() => {
-      wx.navigateTo({
+    wx.navigateTo({
         url:
           '/subpackages/player/pages/combos/index?matchId=&slotId=' +
           (t.pIdx + 1) +
@@ -496,9 +480,6 @@ Page({
         },
         fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
       });
-    }).catch(() => {
-      showPlayerLoadFailure();
-    });
   },
 
   // 组合页确认返回：按 slot 顺序批量补本组空位（不动已占用、不改顺序；全局去重跳过已用）
@@ -531,8 +512,7 @@ Page({
     const t = this._addTarget;
     if (!t) return;
     const usedIds = this._gameUsedIds(null);
-    subpackageLoader.ensureLoaded('player').then(() => {
-      wx.navigateTo({
+    wx.navigateTo({
         url:
           '/subpackages/player/pages/manual/index?matchId=&slotId=' +
           (t.pIdx + 1) +
@@ -543,9 +523,6 @@ Page({
         },
         fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
       });
-    }).catch(() => {
-      showPlayerLoadFailure();
-    });
   },
 
   // 手工页确认返回：单人填回目标 slot（被占用则退到本组第一个空位；全局去重拦截）
