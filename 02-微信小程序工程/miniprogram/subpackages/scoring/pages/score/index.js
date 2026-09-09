@@ -76,6 +76,19 @@ const caddieScoringAccess = require('../../../../utils/caddieScoringAccess.js');
 const userDirectory = require('../../../../utils/userDirectory.js');
 const userStore = require('../../utils/userStore.js');
 const contactStore = require('../../../../utils/contactStore.js');
+const subpackageLoader = require('../../../../utils/subpackageLoader.js');
+const networkStatus = require('../../../../utils/networkStatus.js');
+
+function showPlayerLoadFailure() {
+  const app = typeof getApp === 'function' ? getApp() : null;
+  const connected = networkStatus.readFromGlobal(app && app.globalData).networkConnected;
+  wx.showToast({
+    title:
+      connected === false ? '当前无网络，该功能尚未加载到本机' : '功能加载失败，请稍后重试',
+    icon: 'none'
+  });
+}
+
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
@@ -16520,12 +16533,16 @@ Page({
       encodeURIComponent(groupPlayerIds.join(',')) +
       '&used=' +
       encodeURIComponent(usedIds.join(','));
-    wx.navigateTo({
-      url: url,
-      events: {
-        friendsSelected: (payload) => this._onFriendsSelected(payload && payload.friends)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    subpackageLoader.ensureLoaded('player').then(() => {
+      wx.navigateTo({
+        url: url,
+        events: {
+          friendsSelected: (payload) => this._onFriendsSelected(payload && payload.friends)
+        },
+        fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+      });
+    }).catch(() => {
+      showPlayerLoadFailure();
     });
   },
 
@@ -16625,18 +16642,22 @@ Page({
     this.setData({ addSheetVisible: false });
     const usedIds = this._otherGroupsUsedIds().concat(this._currentGroupUsedIds());
     const ctx = this._buildSlotCtx();
-    wx.navigateTo({
-      url:
-        '/subpackages/player/pages/combos/index?matchId=' +
-        encodeURIComponent(ctx.matchId || '') +
-        '&slotId=' +
-        encodeURIComponent(ctx.slotId || '') +
-        '&used=' +
-        encodeURIComponent(usedIds.join(',')),
-      events: {
-        comboSelected: (payload) => this._onComboSelected(payload && payload.combo)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    subpackageLoader.ensureLoaded('player').then(() => {
+      wx.navigateTo({
+        url:
+          '/subpackages/player/pages/combos/index?matchId=' +
+          encodeURIComponent(ctx.matchId || '') +
+          '&slotId=' +
+          encodeURIComponent(ctx.slotId || '') +
+          '&used=' +
+          encodeURIComponent(usedIds.join(',')),
+        events: {
+          comboSelected: (payload) => this._onComboSelected(payload && payload.combo)
+        },
+        fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+      });
+    }).catch(() => {
+      showPlayerLoadFailure();
     });
   },
 

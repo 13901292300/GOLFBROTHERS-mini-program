@@ -6,6 +6,18 @@ const gameEdit = require('../../utils/gameEdit.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const halfCourse = require('../../../../utils/halfCourse.js');
 const temporaryCourse = require('../../../../utils/temporaryCourse.js');
+const subpackageLoader = require('../../../../utils/subpackageLoader.js');
+const networkStatus = require('../../../../utils/networkStatus.js');
+
+function showPlayerLoadFailure() {
+  const app = typeof getApp === 'function' ? getApp() : null;
+  const connected = networkStatus.readFromGlobal(app && app.globalData).networkConnected;
+  wx.showToast({
+    title:
+      connected === false ? '当前无网络，该功能尚未加载到本机' : '功能加载失败，请稍后重试',
+    icon: 'none'
+  });
+}
 
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
@@ -411,20 +423,24 @@ Page({
     });
     // 其它组已用 → 灰态不可选；本组成员 → 默认选中、可取消
     const usedIds = this._gameUsedIds(t.gIdx);
-    wx.navigateTo({
-      url:
-        '/subpackages/player/pages/friends/index?matchId=&slotId=' +
-        (t.pIdx + 1) +
-        '&emptyCount=' +
-        emptyCount +
-        '&groupPlayers=' +
-        encodeURIComponent(groupPlayerIds.join(',')) +
-        '&used=' +
-        encodeURIComponent(usedIds.join(',')),
-      events: {
-        friendsSelected: (payload) => this._onFriendsSelected(payload && payload.friends)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    subpackageLoader.ensureLoaded('player').then(() => {
+      wx.navigateTo({
+        url:
+          '/subpackages/player/pages/friends/index?matchId=&slotId=' +
+          (t.pIdx + 1) +
+          '&emptyCount=' +
+          emptyCount +
+          '&groupPlayers=' +
+          encodeURIComponent(groupPlayerIds.join(',')) +
+          '&used=' +
+          encodeURIComponent(usedIds.join(',')),
+        events: {
+          friendsSelected: (payload) => this._onFriendsSelected(payload && payload.friends)
+        },
+        fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+      });
+    }).catch(() => {
+      showPlayerLoadFailure();
     });
   },
 
@@ -468,16 +484,20 @@ Page({
     const t = this._addTarget;
     if (!t) return;
     const usedIds = this._gameUsedIds(null); // 组合：全 Game 已用都不可重复
-    wx.navigateTo({
-      url:
-        '/subpackages/player/pages/combos/index?matchId=&slotId=' +
-        (t.pIdx + 1) +
-        '&used=' +
-        encodeURIComponent(usedIds.join(',')),
-      events: {
-        comboSelected: (payload) => this._onComboSelected(payload && payload.combo)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    subpackageLoader.ensureLoaded('player').then(() => {
+      wx.navigateTo({
+        url:
+          '/subpackages/player/pages/combos/index?matchId=&slotId=' +
+          (t.pIdx + 1) +
+          '&used=' +
+          encodeURIComponent(usedIds.join(',')),
+        events: {
+          comboSelected: (payload) => this._onComboSelected(payload && payload.combo)
+        },
+        fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+      });
+    }).catch(() => {
+      showPlayerLoadFailure();
     });
   },
 
@@ -511,16 +531,20 @@ Page({
     const t = this._addTarget;
     if (!t) return;
     const usedIds = this._gameUsedIds(null);
-    wx.navigateTo({
-      url:
-        '/subpackages/player/pages/manual/index?matchId=&slotId=' +
-        (t.pIdx + 1) +
-        '&used=' +
-        encodeURIComponent(usedIds.join(',')),
-      events: {
-        playerPicked: (payload) => this._onPlayerPicked(payload && payload.player)
-      },
-      fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+    subpackageLoader.ensureLoaded('player').then(() => {
+      wx.navigateTo({
+        url:
+          '/subpackages/player/pages/manual/index?matchId=&slotId=' +
+          (t.pIdx + 1) +
+          '&used=' +
+          encodeURIComponent(usedIds.join(',')),
+        events: {
+          playerPicked: (payload) => this._onPlayerPicked(payload && payload.player)
+        },
+        fail: (err) => wx.showToast({ title: '跳转失败：' + (err && err.errMsg ? err.errMsg : ''), icon: 'none' })
+      });
+    }).catch(() => {
+      showPlayerLoadFailure();
     });
   },
 

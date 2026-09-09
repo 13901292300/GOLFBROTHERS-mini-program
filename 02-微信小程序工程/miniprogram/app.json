@@ -139,6 +139,10 @@
     "pages/team-invite/index": {
       "network": "all",
       "packages": ["player"]
+    },
+    "subpackages/create/pages/normal/index": {
+      "network": "all",
+      "packages": ["player"]
     }
   },
   "sitemapLocation": "sitemap.json",
