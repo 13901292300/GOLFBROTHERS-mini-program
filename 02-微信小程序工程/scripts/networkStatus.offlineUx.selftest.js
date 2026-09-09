@@ -159,6 +159,19 @@ assert(
     selectJs.indexOf('networkStatus.unsubscribe') >= 0
 );
 
+assert(
+  'CASE19 cold launch known=false',
+  networkStatus.readFromGlobal({ networkConnected: true, networkType: 'unknown' })
+    .networkStatusKnown === false
+);
+
+var knownG = { networkConnected: true, networkType: 'unknown' };
+networkStatus.writeToGlobal(knownG, networkStatus.fromGetNetworkType({ networkType: 'none' }));
+assert(
+  'CASE20 probe success 才 known=true，且不因 fail 路径写入',
+  knownG.networkStatusKnown === true && knownG.networkConnected === false
+);
+
 networkStatus.unsubscribe(pageFn);
 networkStatus._resetListenersForTest();
 

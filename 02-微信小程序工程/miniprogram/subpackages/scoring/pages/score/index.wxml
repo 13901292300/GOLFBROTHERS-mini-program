@@ -27,6 +27,14 @@
     </view>
   </view>
 
+  <view
+    wx:if="{{offlineScoringPillVisible || offlineScoringSyncedBanner}}"
+    class="offline-scoring-bar {{offlineScoringSyncedBanner && !offlineScoringPillVisible ? 'offline-scoring-bar--ok' : ''}}"
+    bindtap="openOfflineScoringDetail"
+  >
+    <text>{{offlineScoringSyncedBanner && !offlineScoringPillVisible ? '网络已恢复，成绩已同步' : offlineScoringPillText}}</text>
+  </view>
+
   <!-- Navigation Tabs -->
   <view class="tab-nav">
     <view
@@ -2031,5 +2039,25 @@
     bind:seatvisualstate="onReactionOverlaySeatVisualState"
     bind:closemodal="onReactionOverlayCloseModal"
   ></player-reaction-overlay>
+
+
+  <view wx:if="{{offlineScoringDetailVisible}}" class="offline-scoring-mask" bindtap="closeOfflineScoringDetail"></view>
+  <view wx:if="{{offlineScoringDetailVisible}}" class="offline-scoring-sheet {{themeClass}}" catchtap="noop">
+    <text class="offline-scoring-sheet__title">网络与同步状态</text>
+    <view class="offline-scoring-sheet__row">
+      <text class="offline-scoring-sheet__k">当前网络</text>
+      <text class="offline-scoring-sheet__v">{{offlineScoringDetailNetwork}}</text>
+    </view>
+    <view class="offline-scoring-sheet__row">
+      <text class="offline-scoring-sheet__k">记分模式</text>
+      <text class="offline-scoring-sheet__v">{{offlineScoringDetailMode}}</text>
+    </view>
+    <view wx:if="{{offlineScoringDetailRound}}" class="offline-scoring-sheet__row">
+      <text class="offline-scoring-sheet__k">当前球局</text>
+      <text class="offline-scoring-sheet__v">{{offlineScoringDetailRound}}</text>
+    </view>
+    <view wx:if="{{offlineScoringCanRetry}}" class="offline-scoring-sheet__retry" bindtap="retryOfflineScoringSync">立即同步并恢复在线</view>
+    <view class="offline-scoring-sheet__close" bindtap="closeOfflineScoringDetail">关闭</view>
+  </view>
 
 </view>

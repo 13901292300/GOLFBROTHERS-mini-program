@@ -15,6 +15,10 @@ const scheduleStore = require('../../utils/scheduleStore.js');
 const { sortSchedules } = require('../../utils/scheduleSort.js');
 const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 const contactNotifyStore = require('../../utils/contactNotifyStore.js');
+const networkStatus = require('../../utils/networkStatus.js');
+const offlineScoringState = require('../../utils/offlineScoringState.js');
+const offlineScoringRecovery = require('../../utils/offlineScoringRecovery.js');
+const offlineScoringUi = require('../../utils/offlineScoringUi.js');
 
 const FAVORITES_STORAGE_KEY = 'favorites';
 function decorateTournamentCard(match, card) {
@@ -135,6 +139,14 @@ Page({
     tertiaryTabText: '报名',
     registrationSegment: 'all',
     heroTabsVisible: true,
+    offlineScoringBannerVisible: false,
+    offlineScoringBannerText: '',
+    offlineScoringDetailVisible: false,
+    offlineScoringDetailNetwork: '',
+    offlineScoringDetailMode: '',
+    offlineScoringDetailRound: '',
+    offlineScoringCanRetry: false,
+    offlineScoringSyncedBanner: false,
     showMyContent: true,
     showScheduleContent: false,
     showTournamentContent: false,
@@ -330,6 +342,7 @@ Page({
     this._baseMyCards = this.data.myCards.slice();
     this._baseTournamentCards = this.data.tournamentCards.slice();
     this.initHeaderNav();
+    this._bindOfflineScoringHome();
     this.initGlobalTheme();
     this._syncFontScale();
     this.refreshUserProfile();
@@ -378,6 +391,7 @@ Page({
         contactNotifyStore.TARGET.CONTACTS
       )
     });
+    this._syncOfflineScoringHome();
   },
 
   /** 从 scheduleStore 读取并映射为 UI scheduleCards（空库保持 []，无演示种子） */
@@ -1990,5 +2004,74 @@ Page({
     scheduleStore.updateSchedule(card.id, { members: members });
     this._refreshScheduleCards();
     this.closeScheduleRemindeePicker();
+  },
+
+  _bindOfflineScoringHome() {
+    if (this._offlineScoringBound) return;
+    this._onOfflineScoringHome = () => this._syncOfflineScoringHome();
+    networkStatus.subscribe(this._onOfflineScoringHome);
+    offlineScoringState.subscribe(this._onOfflineScoringHome);
+    this._offlineScoringBound = true;
+    this._syncOfflineScoringHome();
+  },
+
+  onUnload() {
+    if (this._onOfflineScoringHome) {
+      networkStatus.unsubscribe(this._onOfflineScoringHome);
+      offlineScoringState.unsubscribe(this._onOfflineScoringHome);
+    }
+    this._offlineScoringBound = false;
+    if (this._offlineHomeSyncedTimer) {
+      clearTimeout(this._offlineHomeSyncedTimer);
+      this._offlineHomeSyncedTimer = null;
+    }
+  },
+
+  _syncOfflineScoringHome() {
+    const snap = offlineScoringState.get();
+    const app = typeof getApp === 'function' ? getApp() : null;
+    const connected = networkStatus.readFromGlobal(app && app.globalData).networkConnected !== false;
+    const show = offlineScoringUi.homeShouldShowBanner(snap);
+    const text = offlineScoringUi.homeBannerText(snap.mode);
+    const detail = offlineScoringUi.buildStatusDetail({ networkConnected: connected, snapshot: snap });
+    const prev = this._lastOfflineScoringMode || 'ONLINE';
+    const patch = {
+      offlineScoringBannerVisible: show,
+      offlineScoringBannerText: text,
+      offlineScoringDetailNetwork: detail.networkText,
+      offlineScoringDetailMode: detail.modeText,
+      offlineScoringDetailRound: detail.roundName,
+      offlineScoringCanRetry: !!detail.canRetry
+    };
+    if (prev === offlineScoringState.MODE_SYNCING && snap.mode === offlineScoringState.MODE_ONLINE) {
+      patch.offlineScoringSyncedBanner = true;
+      patch.offlineScoringDetailVisible = false;
+      if (this._offlineHomeSyncedTimer) clearTimeout(this._offlineHomeSyncedTimer);
+      this._offlineHomeSyncedTimer = setTimeout(() => {
+        this._offlineHomeSyncedTimer = null;
+        this.setData({ offlineScoringSyncedBanner: false });
+      }, 4000);
+    }
+    this._lastOfflineScoringMode = snap.mode;
+    this.setData(patch);
+  },
+
+  openOfflineScoringDetail() {
+    if (!this.data.offlineScoringBannerVisible && !this.data.offlineScoringSyncedBanner) return;
+    this._syncOfflineScoringHome();
+    this.setData({ offlineScoringDetailVisible: true, offlineScoringSyncedBanner: false });
+  },
+
+  closeOfflineScoringDetail() {
+    this.setData({ offlineScoringDetailVisible: false });
+  },
+
+  retryOfflineScoringSync() {
+    const app = typeof getApp === 'function' ? getApp() : null;
+    if (networkStatus.readFromGlobal(app && app.globalData).networkConnected === false) {
+      wx.showToast({ title: '当前无网络', icon: 'none' });
+      return;
+    }
+    offlineScoringRecovery.retryNow().then(() => this._syncOfflineScoringHome());
   }
 });

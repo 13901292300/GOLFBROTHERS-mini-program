@@ -11,6 +11,11 @@ const teamDirectory = require('../../../../utils/teamDirectory.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const weatherService = require('../../utils/weatherService.js');
 const matchState = require('../../../../utils/matchState.js');
+const networkStatus = require('../../../../utils/networkStatus.js');
+const offlineScoringState = require('../../../../utils/offlineScoringState.js');
+const offlineScoringPrompt = require('../../../../utils/offlineScoringPrompt.js');
+const offlineScoringRecovery = require('../../../../utils/offlineScoringRecovery.js');
+const offlineScoringUi = require('../../../../utils/offlineScoringUi.js');
 const sideGameHostSnapshot = require('../../utils/sideGameHostSnapshot.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const matchStatus = require('../../../../utils/matchStatus.js');
@@ -2599,7 +2604,16 @@ Page({
         avatar: mockAvatars.pickMockAvatar('大雷'),
         text: '前组节奏不错，我们保持就行。'
       }
-    ]
+    ],
+    offlineScoringMode: 'ONLINE',
+    offlineScoringPillVisible: false,
+    offlineScoringPillText: '',
+    offlineScoringDetailVisible: false,
+    offlineScoringDetailNetwork: '',
+    offlineScoringDetailMode: '',
+    offlineScoringDetailRound: '',
+    offlineScoringCanRetry: false,
+    offlineScoringSyncedBanner: false
   },
 
   // 记分页 onLoad 只做一件事：读取 matchState → 据此渲染 UI。
@@ -2628,6 +2642,7 @@ Page({
     }
 
     this._matchState = ms;
+    this._bindOfflineScoring();
     const mode = this._resolvePageMode(ms);
     const gameId = ms.gameId || '';
     const groupIndex = ms.groupIndex != null ? Number(ms.groupIndex) || 0 : 0;
@@ -5116,6 +5131,155 @@ Page({
     this.initHeaderNav();
   },
 
+  _bindOfflineScoring() {
+    if (this._offlineScoringBound) return;
+    this._onOfflineScoringNet = (state) => {
+      this._syncOfflineScoringView();
+      if (state && state.networkConnected === false) this._maybeProposeOfflineScoring();
+    };
+    this._onOfflineScoringSession = () => {
+      this._syncOfflineScoringView();
+    };
+    networkStatus.subscribe(this._onOfflineScoringNet);
+    offlineScoringState.subscribe(this._onOfflineScoringSession);
+    this._offlineScoringBound = true;
+    this._syncOfflineScoringView();
+    this._maybeProposeOfflineScoring();
+  },
+
+  _unbindOfflineScoring() {
+    if (this._onOfflineScoringNet) networkStatus.unsubscribe(this._onOfflineScoringNet);
+    if (this._onOfflineScoringSession) offlineScoringState.unsubscribe(this._onOfflineScoringSession);
+    this._offlineScoringBound = false;
+    if (this._offlineSyncedTimer) {
+      clearTimeout(this._offlineSyncedTimer);
+      this._offlineSyncedTimer = null;
+    }
+  },
+
+  _offlineScoreContext() {
+    return offlineScoringUi.resolveScoreContext(this);
+  },
+
+  _syncOfflineScoringView() {
+    const snap = offlineScoringState.get();
+    const ctx = this._offlineScoreContext();
+    const matched = offlineScoringState.matchesContext(snap.session, ctx);
+    const viewMode = offlineScoringUi.scoreViewMode(snap, ctx);
+    const app = typeof getApp === 'function' ? getApp() : null;
+    const connected = networkStatus.readFromGlobal(app && app.globalData).networkConnected !== false;
+    const pill = matched ? offlineScoringUi.scorePillText(viewMode) : '';
+    const detail = offlineScoringUi.buildStatusDetail({
+      networkConnected: connected,
+      snapshot: matched ? snap : { mode: offlineScoringState.MODE_ONLINE, session: null },
+      roundName: (this.data.gameContext && this.data.gameContext.title) || ''
+    });
+    const prev = this._lastOfflineScoringMode || 'ONLINE';
+    const patch = {
+      offlineScoringMode: viewMode,
+      offlineScoringPillVisible: !!pill,
+      offlineScoringPillText: pill,
+      offlineScoringDetailNetwork: detail.networkText,
+      offlineScoringDetailMode: detail.modeText,
+      offlineScoringDetailRound: detail.roundName,
+      offlineScoringCanRetry: !!detail.canRetry
+    };
+    if (prev === offlineScoringState.MODE_SYNCING && viewMode === offlineScoringState.MODE_ONLINE) {
+      patch.offlineScoringSyncedBanner = true;
+      patch.offlineScoringDetailVisible = false;
+      if (this._offlineSyncedTimer) clearTimeout(this._offlineSyncedTimer);
+      this._offlineSyncedTimer = setTimeout(() => {
+        this._offlineSyncedTimer = null;
+        this.setData({ offlineScoringSyncedBanner: false });
+      }, 4000);
+    }
+    this._lastOfflineScoringMode = viewMode;
+    this.setData(patch);
+    const attempt = snap.session && snap.session.lastSyncAttemptAt;
+    if (
+      matched &&
+      snap.mode === offlineScoringState.MODE_SYNC_FAILED &&
+      connected &&
+      attempt &&
+      this._offlineFailPromptedAt !== attempt
+    ) {
+      this._offlineFailPromptedAt = attempt;
+      wx.showModal({
+        title: '成绩尚未完成同步',
+        content:
+          '网络已经恢复，但部分本地成绩暂未成功同步。\n本机成绩仍会受到保护，请勿清除小程序数据。',
+        cancelText: '稍后重试',
+        confirmText: '立即重试',
+        success: (res) => {
+          if (res && res.confirm) this.retryOfflineScoringSync();
+        }
+      });
+    }
+  },
+
+  _maybeProposeOfflineScoring() {
+    if (this.data.noMatch) return;
+    const app = typeof getApp === 'function' ? getApp() : null;
+    const connected = networkStatus.readFromGlobal(app && app.globalData).networkConnected !== false;
+    const ctx = this._offlineScoreContext();
+    const snap = offlineScoringState.get();
+    if (
+      !offlineScoringPrompt.shouldProposeOffline({
+        scoreVisible: true,
+        networkConnected: connected,
+        mode: snap.mode,
+        context: ctx
+      })
+    ) {
+      return;
+    }
+    offlineScoringPrompt.markProposalShown();
+    wx.showModal({
+      title: '网络连接不稳定',
+      content:
+        '当前网络较差，是否进入离线记分模式？\n进入后，成绩将先安全保存在本机，网络恢复后自动同步。部分实时在线功能暂时不可用。',
+      cancelText: '继续在线',
+      confirmText: '进入离线模式',
+      success: (res) => {
+        if (res && res.confirm) {
+          const live = this._offlineScoreContext() || ctx;
+          if (live) {
+            const entered = offlineScoringState.enter(live);
+            if (!entered.ok && entered.reason === 'OTHER_CONTEXT_ACTIVE') {
+              wx.showModal({
+                title: '已有比赛处于离线记分',
+                content:
+                  '另一场比赛的本地成绩尚未完成同步，请先恢复该比赛的同步后再进入新的离线记分模式。',
+                showCancel: false,
+                confirmText: '知道了'
+              });
+            }
+          }
+        }
+        this._syncOfflineScoringView();
+      }
+    });
+  },
+
+  openOfflineScoringDetail() {
+    if (!this.data.offlineScoringPillVisible && !this.data.offlineScoringSyncedBanner) return;
+    this._syncOfflineScoringView();
+    this.setData({ offlineScoringDetailVisible: true, offlineScoringSyncedBanner: false });
+  },
+
+  closeOfflineScoringDetail() {
+    this.setData({ offlineScoringDetailVisible: false });
+  },
+
+  retryOfflineScoringSync() {
+    const app = typeof getApp === 'function' ? getApp() : null;
+    if (networkStatus.readFromGlobal(app && app.globalData).networkConnected === false) {
+      wx.showToast({ title: '当前无网络', icon: 'none' });
+      return;
+    }
+    offlineScoringRecovery.retryNow().then(() => this._syncOfflineScoringView());
+  },
+
   onUnload() {
     this._pendingReactionPlay = null;
     this._activeReactionTarget = null;
@@ -5133,6 +5297,7 @@ Page({
       /* ignore */
     }
     this._clearDiscussionReactionDetach();
+    this._unbindOfflineScoring();
   },
 
   onHide() {
@@ -5149,6 +5314,8 @@ Page({
   // 只读取全局主题并渲染，本页不允许修改主题
   onShow() {
     this.applyTheme(getApp().getTheme());
+    this._maybeProposeOfflineScoring();
+    this._syncOfflineScoringView();
     try {
       const scoreSync = require('../../../../utils/teamClub/scoreSync.js');
       const ms = this._matchState || (this._readMatchState && this._readMatchState());

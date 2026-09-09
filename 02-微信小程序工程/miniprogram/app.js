@@ -2,6 +2,7 @@
 const THEME_KEY = 'gb-theme';
 const { envList } = require('./envList.js');
 const networkStatus = require('./utils/networkStatus.js');
+const offlineScoringRecovery = require('./utils/offlineScoringRecovery.js');
 
 function normalizeTheme(theme) {
   return theme === 'dark' ? 'dark' : 'bright';
@@ -31,7 +32,8 @@ App({
     // 全局唯一主题状态：'bright' | 'dark'（仅首页可写）
     theme: 'bright',
     networkConnected: true,
-    networkType: 'unknown'
+    networkType: 'unknown',
+    networkStatusKnown: false
   },
   _networkEpoch: 0,
 
@@ -79,6 +81,11 @@ App({
 
   _applyNetworkState: function (state) {
     networkStatus.applyToGlobalAndPublish(this.globalData, state);
+    try {
+      offlineScoringRecovery.handleNetworkState(networkStatus.readFromGlobal(this.globalData));
+    } catch (eOff) {
+      /* ignore */
+    }
   },
 
   _probeInitialNetworkType: function () {
@@ -122,6 +129,13 @@ App({
   _tryFlushScoreSync: function () {
     try {
       var p = require('./utils/teamClub/scoreSync.js').flush();
+      if (this.globalData && this.globalData.networkConnected !== false) {
+        try {
+          offlineScoringRecovery.followFlush(p);
+        } catch (eFollow) {
+          /* ignore */
+        }
+      }
       if (p && typeof p.then === 'function') {
         p.then(
           function () {},

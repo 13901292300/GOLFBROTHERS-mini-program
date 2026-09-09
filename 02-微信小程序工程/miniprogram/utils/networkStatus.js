@@ -4,7 +4,8 @@
 
 var DEFAULT_STATE = {
   networkConnected: true,
-  networkType: 'unknown'
+  networkType: 'unknown',
+  networkStatusKnown: false
 };
 
 var _listeners = [];
@@ -17,18 +18,26 @@ function _typeOf(res) {
 function fromGetNetworkType(res) {
   var networkType = _typeOf(res);
   if (networkType === 'none') {
-    return { networkConnected: false, networkType: 'none' };
+    return { networkConnected: false, networkType: 'none', networkStatusKnown: true };
   }
-  return { networkConnected: true, networkType: networkType };
+  return { networkConnected: true, networkType: networkType, networkStatusKnown: true };
 }
 
 function fromStatusChange(res) {
   var networkType = _typeOf(res);
   if (res && res.isConnected === false) {
-    return { networkConnected: false, networkType: networkType === 'unknown' ? 'none' : networkType };
+    return {
+      networkConnected: false,
+      networkType: networkType === 'unknown' ? 'none' : networkType,
+      networkStatusKnown: true
+    };
   }
   if (res && res.isConnected === true) {
-    return { networkConnected: true, networkType: networkType === 'none' ? 'unknown' : networkType };
+    return {
+      networkConnected: true,
+      networkType: networkType === 'none' ? 'unknown' : networkType,
+      networkStatusKnown: true
+    };
   }
   return fromGetNetworkType(res);
 }
@@ -38,15 +47,19 @@ function writeToGlobal(globalData, state) {
   var next = state && typeof state === 'object' ? state : DEFAULT_STATE;
   globalData.networkConnected = next.networkConnected !== false;
   globalData.networkType = next.networkType || 'unknown';
+  if (next.networkStatusKnown === true) {
+    globalData.networkStatusKnown = true;
+  }
 }
 
 function readFromGlobal(globalData) {
   if (!globalData) {
-    return { networkConnected: true, networkType: 'unknown' };
+    return { networkConnected: true, networkType: 'unknown', networkStatusKnown: false };
   }
   return {
     networkConnected: globalData.networkConnected !== false,
-    networkType: globalData.networkType || 'unknown'
+    networkType: globalData.networkType || 'unknown',
+    networkStatusKnown: globalData.networkStatusKnown === true
   };
 }
 

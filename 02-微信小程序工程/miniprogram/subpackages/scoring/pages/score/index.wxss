@@ -7581,4 +7581,76 @@ page {
   font-size: 28rpx;
 }
 
+
+.offline-scoring-bar {
+  flex-shrink: 0;
+  z-index: 20;
+  padding: 10rpx 28rpx;
+  background: #002d62;
+  color: #fff8e7;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.score-page.dark-mode .offline-scoring-bar {
+  background: #0b1c38;
+  color: #f3d48a;
+}
+.offline-scoring-bar--ok {
+  background: #0f5132;
+  color: #d1f5e1;
+}
+.offline-scoring-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 80;
+}
+.offline-scoring-sheet {
+  position: fixed;
+  left: 32rpx;
+  right: 32rpx;
+  bottom: 80rpx;
+  z-index: 81;
+  background: var(--bg-card, #fff);
+  color: var(--text-primary, #111);
+  border-radius: 24rpx;
+  padding: 36rpx 32rpx 28rpx;
+}
+.offline-scoring-sheet__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  margin-bottom: 24rpx;
+}
+.offline-scoring-sheet__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 12rpx 0;
+  font-size: 26rpx;
+}
+.offline-scoring-sheet__k {
+  color: var(--text-muted, #888);
+}
+.offline-scoring-sheet__v {
+  font-weight: 700;
+  text-align: right;
+  flex: 1;
+}
+.offline-scoring-sheet__retry,
+.offline-scoring-sheet__close {
+  margin-top: 20rpx;
+  text-align: center;
+  padding: 18rpx 0;
+  font-weight: 700;
+}
+.offline-scoring-sheet__retry {
+  color: #002d62;
+}
+
 @import '../../styles/classic-app-replica.wxss';

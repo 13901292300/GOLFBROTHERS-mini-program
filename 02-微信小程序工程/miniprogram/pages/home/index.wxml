@@ -85,6 +85,15 @@
       </view>
     </view>
 
+
+    <view
+      wx:if="{{offlineScoringBannerVisible || offlineScoringSyncedBanner}}"
+      class="offline-scoring-home-bar {{offlineScoringSyncedBanner && !offlineScoringBannerVisible ? 'offline-scoring-home-bar--ok' : ''}}"
+      bindtap="openOfflineScoringDetail"
+    >
+      <text>{{offlineScoringSyncedBanner && !offlineScoringBannerVisible ? '成绩已同步' : offlineScoringBannerText}}</text>
+    </view>
+
     <!-- 唯一滚动容器：使用 view + overflow-y，sticky 在 scroll-view 内不生效 -->
     <view id="home-scroll-main" class="ds-scroll-main no-scrollbar z-10">
       <!-- Background Banner -->
@@ -788,6 +797,26 @@
         </button>
       </view>
     </view>
+  </view>
+
+
+  <view wx:if="{{offlineScoringDetailVisible}}" class="offline-scoring-mask" bindtap="closeOfflineScoringDetail"></view>
+  <view wx:if="{{offlineScoringDetailVisible}}" class="offline-scoring-sheet">
+    <text class="offline-scoring-sheet__title">网络与同步状态</text>
+    <view class="offline-scoring-sheet__row">
+      <text class="offline-scoring-sheet__k">当前网络</text>
+      <text class="offline-scoring-sheet__v">{{offlineScoringDetailNetwork}}</text>
+    </view>
+    <view class="offline-scoring-sheet__row">
+      <text class="offline-scoring-sheet__k">记分模式</text>
+      <text class="offline-scoring-sheet__v">{{offlineScoringDetailMode}}</text>
+    </view>
+    <view wx:if="{{offlineScoringDetailRound}}" class="offline-scoring-sheet__row">
+      <text class="offline-scoring-sheet__k">当前球局</text>
+      <text class="offline-scoring-sheet__v">{{offlineScoringDetailRound}}</text>
+    </view>
+    <view wx:if="{{offlineScoringCanRetry}}" class="offline-scoring-sheet__retry" bindtap="retryOfflineScoringSync">立即同步并恢复在线</view>
+    <view class="offline-scoring-sheet__close" bindtap="closeOfflineScoringDetail">关闭</view>
   </view>
 
 </view>
