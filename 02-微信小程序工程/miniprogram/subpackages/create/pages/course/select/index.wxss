@@ -224,6 +224,27 @@ page {
   justify-content: center;
 }
 
+.net-banner {
+  margin: 16rpx 24rpx 8rpx;
+  padding: 24rpx 24rpx 28rpx;
+  border-radius: 16rpx;
+  background: var(--bg-card, rgba(0, 0, 0, 0.04));
+  box-sizing: border-box;
+}
+.net-banner__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.net-banner__desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 /* ===== 二级弹窗：选择半场（全屏覆盖，HEADER 统一，双主题继承自 .course-page） ===== */
 .half-popup {
   position: fixed;

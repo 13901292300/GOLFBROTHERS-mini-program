@@ -178,11 +178,12 @@ newJs.replace(/require\(['"]([^'"]+)['"]\)/g, function (match, request) {
 });
 assert(
   'headerEngine/courseDatabase/halfCourse require 均可解析',
-  requiredFiles.length === 3 &&
-    requiredFiles.every(fs.existsSync) &&
+  requiredFiles.every(fs.existsSync) &&
     requiredMap['headerEngine.js'] &&
     requiredMap['courseDatabase.js'] &&
-    requiredMap['halfCourse.js']
+    requiredMap['halfCourse.js'] &&
+    requiredMap['networkStatus.js'] &&
+    requiredFiles.length === 4
 );
 
 var dbImport = newJs.match(/\{([^}]*)\}\s*=\s*require\(['"]([^'"]*courseDatabase\.js)['"]\)/);

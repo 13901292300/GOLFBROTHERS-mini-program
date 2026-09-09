@@ -11,6 +11,7 @@
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const { COURSE_DB, FALLBACK_ORIGIN, hasCoords, formatDistanceMeta, buildCourseDistanceViews, resolveFirstTwoCourses } = require('../../../../../utils/courseDatabase.js');
 const halfCourse = require('../../../../../utils/halfCourse.js');
+const networkStatus = require('../../../../../utils/networkStatus.js');
 
 Page({
   data: {
@@ -31,6 +32,10 @@ Page({
     searchMode: false,
     searchResults: [],
 
+    networkConnected: true,
+    networkType: 'unknown',
+    offlineModeConfirmed: false,
+
     // 半场选择二级弹窗（多半场球场：halfCourseCount >= 3 时触发）
     halfPopupVisible: false,
     halfCourse: { id: '', name: '', location: '' },
@@ -45,10 +50,44 @@ Page({
     this.setData({ selectedId: (options && options.selectedId) || '' });
     this.buildFrequent();
     this.locateAndBuildNearby();
+    this._onNetworkStatus = (state) => this._applyNetworkUi(state);
+    networkStatus.subscribe(this._onNetworkStatus);
+    this._applyNetworkUi(this._readAppNetworkState());
   },
 
   onShow() {
     this.applyTheme(getApp().getTheme());
+    this._applyNetworkUi(this._readAppNetworkState());
+  },
+
+  onUnload() {
+    if (this._onNetworkStatus) {
+      networkStatus.unsubscribe(this._onNetworkStatus);
+      this._onNetworkStatus = null;
+    }
+  },
+
+  _readAppNetworkState() {
+    try {
+      const app = getApp();
+      return networkStatus.readFromGlobal(app && app.globalData);
+    } catch (e) {
+      return networkStatus.DEFAULT_STATE;
+    }
+  },
+
+  _applyNetworkUi(state) {
+    const connected = !!(state && state.networkConnected);
+    this.setData({
+      networkConnected: connected,
+      networkType: (state && state.networkType) || 'unknown',
+      offlineModeConfirmed: connected ? false : !!this.data.offlineModeConfirmed
+    });
+  },
+
+  onEnterOfflineMode() {
+    if (this.data.networkConnected) return;
+    this.setData({ offlineModeConfirmed: true });
   },
 
   applyTheme(theme) {

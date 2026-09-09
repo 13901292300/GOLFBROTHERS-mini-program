@@ -31,6 +31,17 @@
     </view>
   </view>
 
+  <view wx:if="{{!networkConnected && !offlineModeConfirmed}}" class="net-banner">
+    <text class="net-banner__title">当前无网络</text>
+    <text class="net-banner__desc">仍可继续选择本地球场。</text>
+    <view class="temp-course-btn" bindtap="onEnterOfflineMode">进入离线模式</view>
+  </view>
+  <view wx:elif="{{!networkConnected && offlineModeConfirmed}}" class="net-banner">
+    <text class="net-banner__title">离线模式</text>
+    <text class="net-banner__desc">当前可继续选择本地球场。找不到球场时，也可以创建临时球场。</text>
+    <view class="temp-course-btn" bindtap="onCreateTemporaryCourse">创建临时球场</view>
+  </view>
+
   <!-- 吸顶 TAB（仅非搜索模式显示；搜索模式隐藏 TAB，展示搜索结果） -->
   <view wx:if="{{!searchMode}}" class="tab-scroll-wrap">
     <view class="gb-tabs">
