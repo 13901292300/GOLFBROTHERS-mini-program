@@ -1579,8 +1579,8 @@ Page({
       game.temporaryCourseId = this.data.temporaryCourseId || temporaryCourse.nextTemporaryCourseId();
       game.courseId = '';
       game.courseName = (this.data.courseName || '').trim();
-      game.front9Course = 'A';
-      game.back9Course = 'B';
+      game.front9Course = temporaryCourse.normalizeCourseKey(this.data.front9Course) || 'A';
+      game.back9Course = temporaryCourse.normalizeCourseKey(this.data.back9Course) || 'B';
       game.holePars = temporaryCourse.cloneHolePars(this.data.holePars);
       game.courseLayoutRevision = null;
     }

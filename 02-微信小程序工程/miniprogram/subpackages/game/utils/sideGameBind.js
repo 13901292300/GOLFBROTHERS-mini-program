@@ -12,6 +12,7 @@ var repository = require("./sideGameRepository.js");
 var ruleLibrary = require("./sideGameRuleLibrary.js");
 var settingsMod = require("./localSideGameSettings.js");
 var hostMod = require("./gameHostContext.js");
+var temporaryCourse = require("../../../utils/temporaryCourse.js");
 var identity = require("./sideGameIdentityProvider.js");
 var nav = require("./nav.js");
 var resultTone = require("./resultTone.js");
@@ -2109,7 +2110,7 @@ function hole5AuditAbsAndPar(entry, game) {
   var hostKey = hostKeyForLabel(HOLE5_AUDIT_LABEL, entry, game);
   var pars = parsForGame(entry, game);
   var par = Number(pars[HOLE5_AUDIT_LABEL]);
-  if (!(par === 3 || par === 4 || par === 5)) par = 4;
+  if (!temporaryCourse.isValidPar(par)) par = 4;
   return {
     absoluteScores: engine[HOLE5_AUDIT_LABEL] || engine[hostKey] || {},
     par: par,
@@ -2239,7 +2240,7 @@ function remapParsByHoleIndex(pars, fromOrder, toOrder) {
   var out = {};
   to.forEach(function (glabel, i) {
     var n = Number(src[from[i]]);
-    out[glabel] = n === 3 || n === 4 || n === 5 ? n : fallback[glabel] || 4;
+    out[glabel] = temporaryCourse.keepStandardPar(n, fallback[glabel]);
   });
   return out;
 }
@@ -2262,7 +2263,7 @@ function getScorecard(entry, game) {
     var hostKey = hostKeyForLabel(glabel, entry, game);
     var src = engine[glabel] || engine[hostKey] || {};
     var par = Number(pars[glabel] != null ? pars[glabel] : pars[hostKey]);
-    if (!(par === 3 || par === 4 || par === 5)) par = Number(fallbackPars[glabel]) || 4;
+    if (!temporaryCourse.isValidPar(par)) par = Number(fallbackPars[glabel]) || 4;
     parMap[glabel] = par;
     absByHole[glabel] = src;
   });
@@ -2278,7 +2279,7 @@ function parsForGame(entry, game) {
   labels.forEach(function (label) {
     var hostKey = hostKeyForLabel(label, entry, game);
     var n = Number(hostPars[label] != null ? hostPars[label] : hostPars[hostKey]);
-    out[label] = n === 3 || n === 4 || n === 5 ? n : fallback[label] || 4;
+    out[label] = temporaryCourse.keepStandardPar(n, fallback[label]);
   });
   return out;
 }
@@ -2414,7 +2415,7 @@ function hostStructureFingerprint(entry, game) {
   var pars = {};
   (labels || []).forEach(function (label) {
     var n = Number(host && host.pars && host.pars[label]);
-    pars[String(label)] = n === 3 || n === 4 || n === 5 ? n : 4;
+    pars[String(label)] = temporaryCourse.keepStandardPar(n);
   });
   return JSON.stringify({
     matchId: rec.asString(host && host.matchId),

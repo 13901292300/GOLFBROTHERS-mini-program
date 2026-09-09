@@ -98,6 +98,8 @@ assert(
       courseSource: 'temporary',
       courseId: '',
       courseName: '',
+      front9Course: 'A',
+      back9Course: 'B',
       holePars: CUSTOM_PARS
     })
   ) == null
@@ -116,7 +118,7 @@ assert(
       courseSource: 'temporary',
       holePars: CUSTOM_PARS.slice(0, 17)
     })
-  ) === '请完成18洞标准杆（每洞3/4/5）'
+  ) === '请完成18洞标准杆（每洞3/4/5/6）'
 );
 
 var withPar2 = CUSTOM_PARS.slice();
@@ -124,11 +126,9 @@ withPar2[0] = 2;
 var withPar6 = CUSTOM_PARS.slice();
 withPar6[17] = 6;
 assert(
-  'CASE6 temporary 含 par2/par6 创建失败',
+  'CASE6 temporary 含 par2 创建失败',
   gameEdit.validateSubmitForm(validForm({ courseSource: 'temporary', holePars: withPar2 })) ===
-    '请完成18洞标准杆（每洞3/4/5）' &&
-    gameEdit.validateSubmitForm(validForm({ courseSource: 'temporary', holePars: withPar6 })) ===
-      '请完成18洞标准杆（每洞3/4/5）'
+    '请完成18洞标准杆（每洞3/4/5/6）'
 );
 
 storage = {};
@@ -230,6 +230,8 @@ assert(
         courseSource: 'temporary',
         courseId: '',
         courseName: '',
+        front9Course: 'A',
+        back9Course: 'B',
         holePars: CUSTOM_PARS
       })
     ) == null
@@ -334,6 +336,8 @@ assert(
         courseSource: 'temporary',
         courseId: '',
         courseName: '',
+        front9Course: 'A',
+        back9Course: 'B',
         holePars: CUSTOM_PARS
       })
     ) == null
@@ -393,6 +397,426 @@ assert(
 assert(
   'CASE23 正式球场仍追加 A&B',
   officialPlain === '北京乡村高尔夫俱乐部 A&B'
+);
+
+var CF_PARS = [4, 4, 6, 4, 5, 3, 4, 5, 4, 3, 4, 4, 5, 6, 4, 4, 3, 5];
+var cfPayload = {
+  courseSource: 'temporary',
+  temporaryCourseId: 'tc-cf-1',
+  courseId: '',
+  courseName: '',
+  front9Course: 'C',
+  back9Course: 'F',
+  holePars: CF_PARS.slice()
+};
+var cfFields = halfCourse.buildCourseSelectionFields(cfPayload);
+assert(
+  'CASE24 front=C back=F payload 保留 C/F',
+  cfFields.front9Course === 'C' &&
+    cfFields.back9Course === 'F' &&
+    cfFields.holePars.join(',') === CF_PARS.join(',') &&
+    gameEdit.validateSubmitForm(validForm(cfPayload)) == null
+);
+
+storage = {};
+var savedCf = gameStore.saveGame({
+  gameId: 'g-temp-cf',
+  courseSource: 'temporary',
+  temporaryCourseId: 'tc-cf-1',
+  courseId: '',
+  courseName: '',
+  front9Course: 'C',
+  back9Course: 'F',
+  holePars: CF_PARS.slice(),
+  status: 'active',
+  groups: []
+});
+storage = JSON.parse(JSON.stringify(storage));
+var reloadedCf = gameStore.getGameById('g-temp-cf');
+assert(
+  'CASE25 C/F 保存 reload 后不变',
+  !!(savedCf && reloadedCf) &&
+    reloadedCf.front9Course === 'C' &&
+    reloadedCf.back9Course === 'F' &&
+    reloadedCf.holePars.join(',') === CF_PARS.join(',')
+);
+
+assert(
+  'CASE26 非法 COURSE 失败',
+  gameEdit.validateSubmitForm(
+    validForm({
+      courseSource: 'temporary',
+      holePars: CUSTOM_PARS,
+      front9Course: 'G',
+      back9Course: 'F'
+    })
+  ) === '请选择前后九 COURSE' &&
+    gameEdit.validateSubmitForm(
+      validForm({
+        courseSource: 'temporary',
+        holePars: CUSTOM_PARS,
+        front9Course: '',
+        back9Course: 'B'
+      })
+    ) === '请选择前后九 COURSE'
+);
+
+assert(
+  'CASE27 PAR 3/4/5/6 可确认',
+  temporaryCourse.isValidHolePars(CF_PARS) === true &&
+    temporaryCourse.isValidTemporaryCourse(cfPayload) === true
+);
+
+var emptyOne = CF_PARS.slice();
+emptyOne[3] = null;
+assert(
+  'CASE28 任一洞空 invalid',
+  temporaryCourse.isValidHolePars(emptyOne) === false
+);
+
+assert(
+  'CASE29 PAR=2 invalid',
+  temporaryCourse.parseParInput('2') == null &&
+    temporaryCourse.isValidPar(2) === false
+);
+
+assert(
+  'CASE30 PAR=7 invalid',
+  temporaryCourse.parseParInput('7') == null &&
+    temporaryCourse.isValidPar(7) === false
+);
+
+assert(
+  'CASE31 PAR=6 valid',
+  temporaryCourse.parseParInput('6') === 6 &&
+    temporaryCourse.isValidPar(6) === true &&
+    gameEdit.validateSubmitForm(
+      validForm({
+        courseSource: 'temporary',
+        front9Course: 'A',
+        back9Course: 'B',
+        holePars: withPar6
+      })
+    ) == null
+);
+
+assert(
+  'CASE32 前九 subtotal',
+  temporaryCourse.front9ParTotal(CF_PARS) === 4 + 4 + 6 + 4 + 5 + 3 + 4 + 5 + 4
+);
+
+assert(
+  'CASE33 后九 subtotal',
+  temporaryCourse.back9ParTotal(CF_PARS) === 3 + 4 + 4 + 5 + 6 + 4 + 4 + 3 + 5
+);
+
+assert(
+  'CASE34 TOTAL = front + back',
+  temporaryCourse.totalPar(CF_PARS) ===
+    temporaryCourse.front9ParTotal(CF_PARS) + temporaryCourse.back9ParTotal(CF_PARS)
+);
+
+var mutated = CF_PARS.slice();
+mutated[2] = 3;
+assert(
+  'CASE35 改一洞后三个 total 更新',
+  temporaryCourse.front9ParTotal(mutated) === temporaryCourse.front9ParTotal(CF_PARS) - 3 &&
+    temporaryCourse.back9ParTotal(mutated) === temporaryCourse.back9ParTotal(CF_PARS) &&
+    temporaryCourse.totalPar(mutated) === temporaryCourse.totalPar(CF_PARS) - 3
+);
+
+var par6Only = CUSTOM_PARS.slice();
+par6Only[2] = 6;
+storage = {};
+gameStore.saveGame({
+  gameId: 'g-par6',
+  courseSource: 'temporary',
+  temporaryCourseId: 'tc-p6',
+  courseId: '',
+  courseName: '',
+  front9Course: 'C',
+  back9Course: 'F',
+  holePars: par6Only.slice(),
+  status: 'active',
+  groups: []
+});
+storage = JSON.parse(JSON.stringify(storage));
+var reloadedP6 = gameStore.getGameById('g-par6');
+assert(
+  'CASE36 PAR6 payload/game/reload 保留 6',
+  par6Only[2] === 6 &&
+    reloadedP6.holePars[2] === 6 &&
+    temporaryCourse.cloneHolePars(par6Only)[2] === 6
+);
+
+var layoutP6 = holeLayout.resolveLayoutFromContext({
+  courseSource: 'temporary',
+  courseName: '',
+  holePars: par6Only,
+  front9Course: 'C',
+  back9Course: 'F'
+});
+assert(
+  'CASE37 holeLayout 该洞仍 6',
+  layoutP6.holePars[2] === 6 &&
+    layoutP6.front9Key === 'C' &&
+    layoutP6.back9Key === 'F'
+);
+
+assert(
+  'CASE38 gross 6 on PAR6 = par',
+  groupsStore.getScoreStatus(6 - 6) === 'par'
+);
+
+assert(
+  'CASE39 gross 5 on PAR6 = birdie',
+  groupsStore.getScoreStatus(5 - 6) === 'birdie'
+);
+
+holeLayout.applyLayout(layoutP6);
+var p6Agg = { total: 0, parThru: 0 };
+p6Agg.total += 6;
+p6Agg.parThru += gameLeaderboard.holePars()[2];
+assert(
+  'CASE40 leaderboard To Par 按 PAR6',
+  gameLeaderboard.holePars()[2] === 6 && p6Agg.total - p6Agg.parThru === 0
+);
+
+var hostSnapP6 = sideGameHostSnapshot.fromGame(
+  {
+    gameId: 'g-temp-p6',
+    courseSource: 'temporary',
+    courseId: '',
+    courseName: '',
+    front9Course: 'C',
+    back9Course: 'F',
+    holePars: par6Only.slice(),
+    groups: [{ groupId: 'g1', playersSlots: [{ playerId: 'p1', name: 'A' }], scoresByPlayer: {} }]
+  },
+  { matchId: 'g-temp-p6' }
+);
+var holeCtxP6 = gameHostContext.resolveOfficialHoleContext(hostSnapP6.courseContext);
+assert(
+  'CASE41 side-game PAR6 不变 4',
+  holeCtxP6.pars.C3 === 6 && holeCtxP6.pars.C3 !== 4
+);
+
+var cfOrder = [];
+for (var ci = 1; ci <= 9; ci++) cfOrder.push('C' + ci);
+for (var fi = 1; fi <= 9; fi++) cfOrder.push('F' + fi);
+var cfParsAligned = cfOrder.map(function (lab) {
+  return holeCtxP6.pars[lab];
+});
+assert(
+  'CASE42 C1-C9 F1-F9 对应 holePars',
+  holeCtxP6.holeOrder.join(',') === cfOrder.join(',') &&
+    cfParsAligned.join(',') === par6Only.join(',')
+);
+
+var AA_MATCH_PARS = [4, 4, 3, 5, 4, 4, 3, 5, 4, 4, 4, 3, 5, 4, 4, 3, 5, 4];
+var aaCtx = gameHostContext.resolveOfficialHoleContext({
+  courseSource: 'temporary',
+  front9Course: 'A',
+  back9Course: 'A',
+  holePars: AA_MATCH_PARS.slice()
+});
+assert(
+  'CASE43 A+A 允许且洞号 A1-A9 两遍',
+  temporaryCourse.isValidTemporaryCourse({
+    courseSource: 'temporary',
+    front9Course: 'A',
+    back9Course: 'A',
+    holePars: AA_MATCH_PARS
+  }) === true &&
+    aaCtx.holeContextReady === true &&
+    aaCtx.holeOrder.slice(0, 9).join(',') === 'A1,A2,A3,A4,A5,A6,A7,A8,A9' &&
+    aaCtx.holeOrder.slice(9).join(',') === 'A1,A2,A3,A4,A5,A6,A7,A8,A9'
+);
+
+assert(
+  'CASE44 空名 C/F display 仍 临时球场',
+  halfCourse.formatCourseDisplayName({
+    courseSource: 'temporary',
+    courseName: '',
+    front9Course: 'C',
+    back9Course: 'F'
+  }) === '临时球场' &&
+    halfCourse.formatCourseDisplayName({
+      courseSource: 'temporary',
+      courseName: '',
+      front9Course: 'C',
+      back9Course: 'F'
+    }).indexOf('C&F') < 0
+);
+
+assert(
+  'CASE45 有名称 C/F 不拼 COURSE',
+  halfCourse.formatCourseDisplayName({
+    courseSource: 'temporary',
+    courseName: '我的临时场',
+    front9Course: 'C',
+    back9Course: 'F'
+  }) === '我的临时场'
+);
+
+assert(
+  'CASE46 正式球场 A&B 仍旧逻辑',
+  officialPlain === '北京乡村高尔夫俱乐部 A&B'
+);
+
+assert(
+  'CASE47 清河湾 layout 回归',
+  qhwOfficial.holePars.slice(0, 9).join(',') === '4,3,4,4,4,3,5,4,5'
+);
+
+var tempWxml = fs.readFileSync(
+  path.join(mini, 'subpackages', 'create', 'pages', 'course', 'temporary', 'index.wxml'),
+  'utf8'
+);
+var tempJs = fs.readFileSync(
+  path.join(mini, 'subpackages', 'create', 'pages', 'course', 'temporary', 'index.js'),
+  'utf8'
+);
+assert(
+  'Temporary WXML 数字键盘 + COURSE A-F + 汇总',
+  tempWxml.indexOf('type="number"') >= 0 &&
+    tempWxml.indexOf('onParInput') >= 0 &&
+    tempWxml.indexOf('onCyclePar') < 0 &&
+    tempWxml.indexOf('front9ParTotal') >= 0 &&
+    tempWxml.indexOf('back9ParTotal') >= 0 &&
+    tempWxml.indexOf('totalPar') >= 0 &&
+    tempWxml.indexOf('onSelectFrontCourse') >= 0 &&
+    tempJs.indexOf('cyclePar') < 0 &&
+    tempJs.indexOf("front9Course: 'A'") >= 0
+);
+
+var normalJs = fs.readFileSync(
+  path.join(mini, 'subpackages', 'create', 'pages', 'normal', 'index.js'),
+  'utf8'
+);
+assert(
+  'normal 不再写死 temporary A/B',
+  /isTemporary[\s\S]*game\.front9Course = 'A'/.test(normalJs) === false &&
+    normalJs.indexOf('temporaryCourse.normalizeCourseKey(this.data.front9Course)') >= 0
+);
+
+var aaSame = {
+  courseSource: 'temporary',
+  front9Course: 'A',
+  back9Course: 'A',
+  holePars: [4, 4, 3, 5, 4, 4, 3, 5, 4, 4, 4, 3, 5, 4, 4, 3, 5, 4]
+};
+assert(
+  'CASE48 A+A 前后9洞相同 → valid',
+  temporaryCourse.isValidTemporaryCourse(aaSame) === true &&
+    temporaryCourse.hasConflictingDuplicateCourse(aaSame) === false
+);
+
+var aaDiffOne = aaSame.holePars.slice();
+aaDiffOne[9] = 5;
+var aaDiffRec = {
+  courseSource: 'temporary',
+  front9Course: 'A',
+  back9Course: 'A',
+  holePars: aaDiffOne
+};
+assert(
+  'CASE49 A+A 仅一洞不同 → invalid',
+  temporaryCourse.isValidTemporaryCourse(aaDiffRec) === false &&
+    temporaryCourse.hasConflictingDuplicateCourse(aaDiffRec) === true &&
+    gameEdit.validateSubmitForm(validForm(aaDiffRec)) ===
+      temporaryCourse.DUPLICATE_COURSE_PAR_ERROR
+);
+
+var sameTotalDiffHoles = {
+  courseSource: 'temporary',
+  front9Course: 'A',
+  back9Course: 'A',
+  holePars: [3, 4, 5, 4, 4, 4, 4, 4, 4, 4, 3, 5, 4, 4, 4, 4, 4, 4]
+};
+assert(
+  'CASE50 总 PAR 相同但逐洞不同 → invalid',
+  temporaryCourse.front9ParTotal(sameTotalDiffHoles.holePars) ===
+    temporaryCourse.back9ParTotal(sameTotalDiffHoles.holePars) &&
+    temporaryCourse.isValidTemporaryCourse(sameTotalDiffHoles) === false &&
+    temporaryCourse.hasConflictingDuplicateCourse(sameTotalDiffHoles) === true
+);
+
+assert(
+  'CASE51 A+B 两组 PAR 不同仍 valid',
+  temporaryCourse.isValidTemporaryCourse({
+    courseSource: 'temporary',
+    front9Course: 'A',
+    back9Course: 'B',
+    holePars: CUSTOM_PARS
+  }) === true &&
+    temporaryCourse.hasConflictingDuplicateCourse({
+      courseSource: 'temporary',
+      front9Course: 'A',
+      back9Course: 'B',
+      holePars: CUSTOM_PARS
+    }) === false
+);
+
+var ccPar6 = [6, 4, 3, 5, 4, 4, 3, 5, 4, 6, 4, 3, 5, 4, 4, 3, 5, 4];
+assert(
+  'CASE52 C+C 相同且含 PAR6 → valid',
+  temporaryCourse.isValidTemporaryCourse({
+    courseSource: 'temporary',
+    front9Course: 'C',
+    back9Course: 'C',
+    holePars: ccPar6
+  }) === true
+);
+
+var ccPar6Shift = ccPar6.slice();
+ccPar6Shift[0] = 4;
+ccPar6Shift[9] = 6;
+assert(
+  'CASE53 C+C PAR6 所在洞不同 → invalid',
+  temporaryCourse.isValidTemporaryCourse({
+    courseSource: 'temporary',
+    front9Course: 'C',
+    back9Course: 'C',
+    holePars: ccPar6Shift
+  }) === false &&
+    temporaryCourse.hasConflictingDuplicateCourse({
+      courseSource: 'temporary',
+      front9Course: 'C',
+      back9Course: 'C',
+      holePars: ccPar6Shift
+    }) === true
+);
+
+assert(
+  'CASE54 冲突时页面 error + confirm disabled',
+  tempWxml.indexOf('duplicateCourseParError') >= 0 &&
+    tempWxml.indexOf('相同 COURSE 的标准 PAR 必须一致') >= 0 &&
+    tempJs.indexOf('duplicateCourseParError: temporaryCourse.hasConflictingDuplicateCourse') >= 0 &&
+    tempJs.indexOf('canConfirm: temporaryCourse.isValidTemporaryCourse') >= 0
+);
+
+var recovered = {
+  courseSource: 'temporary',
+  front9Course: 'A',
+  back9Course: 'B',
+  holePars: aaDiffOne
+};
+assert(
+  'CASE55 改为不同 COURSE 后冲突消失',
+  temporaryCourse.hasConflictingDuplicateCourse(aaDiffRec) === true &&
+    temporaryCourse.hasConflictingDuplicateCourse(recovered) === false &&
+    temporaryCourse.isValidTemporaryCourse(recovered) === true
+);
+
+assert(
+  '未填完后九不报 duplicate COURSE 冲突',
+  temporaryCourse.hasConflictingDuplicateCourse({
+    courseSource: 'temporary',
+    front9Course: 'A',
+    back9Course: 'A',
+    holePars: [4, 4, 3, 5, 4, 4, 3, 5, 4, null, null, null, null, null, null, null, null, null]
+  }) === false
 );
 
 console.log('\n---- temporaryCourse.normalCreate.selftest ----');

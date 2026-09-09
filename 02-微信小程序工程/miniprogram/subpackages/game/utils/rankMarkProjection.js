@@ -7,6 +7,7 @@ var settle = require('./settle.js');
 var catalog = require('./catalog.js');
 var rec = require('./sideGameRecord.js');
 var visual = require('../../../utils/rankMarkVisual.js');
+var temporaryCourse = require('../../../utils/temporaryCourse.js');
 
 var STORAGE_KEY = 'gb_side_games_v1';
 
@@ -260,7 +261,7 @@ function relScorecard(game, official) {
     var par = 4;
     if (Array.isArray(pars)) par = Number(pars[i]);
     else if (pars && pars[label] != null) par = Number(pars[label]);
-    if (!(par === 3 || par === 4 || par === 5)) par = 4;
+    if (!temporaryCourse.isValidPar(par)) par = 4;
     players.forEach(function (p) {
       var pid = asString(p && (p.playerId || p.id));
       if (!pid) return;
@@ -282,7 +283,7 @@ function parsMap(game, official) {
   var out = {};
   labels.forEach(function (label, i) {
     var n = Array.isArray(src) ? Number(src[i]) : Number(src && src[label]);
-    out[label] = n === 3 || n === 4 || n === 5 ? n : 4;
+    out[label] = temporaryCourse.keepStandardPar(n);
   });
   return out;
 }

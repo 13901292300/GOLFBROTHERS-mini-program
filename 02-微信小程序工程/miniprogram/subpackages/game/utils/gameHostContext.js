@@ -9,6 +9,7 @@ var playerManage = require('../../../utils/playerManage.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
 var mockAvatars = require('../../../utils/mockAvatars.js');
 var catalog = require('./catalog.js');
+var temporaryCourse = require('../../../utils/temporaryCourse.js');
 
 var SCORE_FIELDS = ['holes.score'];
 
@@ -156,7 +157,7 @@ function resolveOfficialHoleContext(src) {
   for (i = 0; i < 9; i++) holeOrder.push(back + (i + 1));
   for (i = 0; i < holeOrder.length; i++) {
     var n = Number(holePars[i]);
-    pars[holeOrder[i]] = n === 3 || n === 4 || n === 5 ? n : 4;
+    pars[holeOrder[i]] = temporaryCourse.keepStandardPar(n);
   }
   return { holeContextReady: true, holeOrder: holeOrder, pars: pars };
 }

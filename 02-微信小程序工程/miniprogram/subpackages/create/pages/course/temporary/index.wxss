@@ -56,7 +56,30 @@ page {
 .section { margin-bottom: 40rpx; }
 .section-label { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16rpx; gap: 24rpx; }
 .section-label__h2 { font-size: 28rpx; line-height: 1.5; font-weight: 700; color: var(--text-secondary); }
-.section-count { font-size: 22rpx; font-weight: 700; color: var(--champion-gold); white-space: nowrap; }
+.course-chips {
+  display: flex;
+  gap: 10rpx;
+  margin-bottom: 20rpx;
+}
+.course-chip {
+  flex: 1;
+  min-width: 0;
+  height: 64rpx;
+  border-radius: 12rpx;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+.course-chip.is-on {
+  border-color: var(--champion-gold);
+  background: rgba(206, 146, 36, 0.12);
+  color: var(--text-primary);
+}
 
 .ds-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16rpx; box-shadow: var(--shadow-card); }
 .ds-field { min-height: 112rpx; padding: 0 32rpx; display: flex; align-items: center; }
@@ -79,7 +102,29 @@ page {
 }
 .par-cell.filled { border-color: var(--champion-gold); background: rgba(206, 146, 36, 0.1); }
 .par-cell__hole { display: block; font-size: 18rpx; font-weight: 700; color: var(--text-muted); }
-.par-cell__par { display: block; margin-top: 4rpx; font-size: 32rpx; font-weight: 900; color: var(--text-primary); font-style: italic; }
+.par-input {
+  width: 100%;
+  height: 48rpx;
+  padding: 0;
+  margin-top: 2rpx;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--text-primary);
+}
+.par-ph { color: var(--text-disabled); font-weight: 800; }
+.subtotal-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 16rpx;
+  padding: 0 8rpx;
+}
+.subtotal-label { font-size: 24rpx; font-weight: 700; color: var(--text-muted); }
+.subtotal-value { font-size: 32rpx; font-weight: 900; color: var(--text-primary); font-style: italic; }
 
 .total-row {
   display: flex;
@@ -89,6 +134,13 @@ page {
 }
 .total-label { font-size: 28rpx; font-weight: 700; color: var(--text-secondary); }
 .total-value { font-size: 44rpx; font-weight: 900; color: var(--text-primary); font-style: italic; }
+.par-error {
+  margin: 0 8rpx 24rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #b45309;
+  line-height: 1.5;
+}
 
 .footer {
   flex-shrink: 0;

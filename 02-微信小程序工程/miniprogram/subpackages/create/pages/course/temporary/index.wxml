@@ -32,45 +32,89 @@
 
     <view class="section">
       <view class="section-label">
-        <text class="section-label__h2">前九</text>
-        <text class="section-count">点选循环 3 / 4 / 5</text>
+        <text class="section-label__h2">COURSE 1</text>
+      </view>
+      <view class="course-chips">
+        <view
+          wx:for="{{courseKeys}}"
+          wx:key="*this"
+          class="course-chip {{front9Course === item ? 'is-on' : ''}}"
+          bindtap="onSelectFrontCourse"
+          data-key="{{item}}"
+        >
+          <text>{{item}}</text>
+        </view>
       </view>
       <view class="par-grid">
         <view
           wx:for="{{frontHoles}}"
           wx:key="hole"
-          class="par-cell {{item.par ? 'filled' : ''}}"
-          bindtap="onCyclePar"
-          data-index="{{item.hole - 1}}"
+          class="par-cell {{item.filled ? 'filled' : ''}}"
         >
           <text class="par-cell__hole">{{item.hole}}</text>
-          <text class="par-cell__par">{{item.parText}}</text>
+          <input
+            class="par-input"
+            type="number"
+            maxlength="1"
+            value="{{item.parText}}"
+            placeholder="—"
+            placeholder-class="par-ph"
+            bindinput="onParInput"
+            data-index="{{item.hole - 1}}"
+          />
         </view>
+      </view>
+      <view class="subtotal-row">
+        <text class="subtotal-label">前九 PAR</text>
+        <text class="subtotal-value">{{front9ParTotal}}</text>
       </view>
     </view>
 
     <view class="section">
       <view class="section-label">
-        <text class="section-label__h2">后九</text>
+        <text class="section-label__h2">COURSE 2</text>
+      </view>
+      <view class="course-chips">
+        <view
+          wx:for="{{courseKeys}}"
+          wx:key="*this"
+          class="course-chip {{back9Course === item ? 'is-on' : ''}}"
+          bindtap="onSelectBackCourse"
+          data-key="{{item}}"
+        >
+          <text>{{item}}</text>
+        </view>
       </view>
       <view class="par-grid">
         <view
           wx:for="{{backHoles}}"
           wx:key="hole"
-          class="par-cell {{item.par ? 'filled' : ''}}"
-          bindtap="onCyclePar"
-          data-index="{{item.hole - 1}}"
+          class="par-cell {{item.filled ? 'filled' : ''}}"
         >
           <text class="par-cell__hole">{{item.hole}}</text>
-          <text class="par-cell__par">{{item.parText}}</text>
+          <input
+            class="par-input"
+            type="number"
+            maxlength="1"
+            value="{{item.parText}}"
+            placeholder="—"
+            placeholder-class="par-ph"
+            bindinput="onParInput"
+            data-index="{{item.hole - 1}}"
+          />
         </view>
+      </view>
+      <view class="subtotal-row">
+        <text class="subtotal-label">后九 PAR</text>
+        <text class="subtotal-value">{{back9ParTotal}}</text>
       </view>
     </view>
 
     <view class="total-row">
-      <text class="total-label">总 PAR</text>
-      <text class="total-value">{{totalParText}}</text>
+      <text class="total-label">TOTAL PAR</text>
+      <text class="total-value">{{totalPar}}</text>
     </view>
+    <view wx:if="{{duplicateCourseParError}}" class="par-error">相同 COURSE 的标准 PAR 必须一致</view>
   </scroll-view>
 
   <view class="footer">

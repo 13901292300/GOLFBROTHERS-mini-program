@@ -168,7 +168,12 @@ function mergeFormWithExistingGame(existing, form) {
   const courseId = isTemporary ? '' : f.courseId || existing.courseId || '';
   const courseName = (f.courseName || existing.courseName || '').trim();
   const halfResolved = isTemporary
-    ? { front9Course: 'A', back9Course: 'B' }
+    ? {
+        front9Course:
+          temporaryCourse.normalizeCourseKey(f.front9Course || existing.front9Course) || 'A',
+        back9Course:
+          temporaryCourse.normalizeCourseKey(f.back9Course || existing.back9Course) || 'B'
+      }
     : resolveHalfCourses(
         courseId,
         courseName,
@@ -231,7 +236,16 @@ function validateSubmitForm(form, helpers) {
   const h = helpers || {};
   if (temporaryCourse.isTemporarySource(form)) {
     if (!temporaryCourse.isValidHolePars(form && form.holePars)) {
-      return '请完成18洞标准杆（每洞3/4/5）';
+      return '请完成18洞标准杆（每洞3/4/5/6）';
+    }
+    if (
+      !temporaryCourse.isValidCourseKey(form && form.front9Course) ||
+      !temporaryCourse.isValidCourseKey(form && form.back9Course)
+    ) {
+      return '请选择前后九 COURSE';
+    }
+    if (temporaryCourse.hasConflictingDuplicateCourse(form)) {
+      return temporaryCourse.DUPLICATE_COURSE_PAR_ERROR;
     }
   } else {
     const courseId = form.courseId;
