@@ -146,7 +146,7 @@ var lib = localLib.createLocalSideGameRuleLibrary({
   }
 });
 var first = lib.listAll();
-assert('空库初始化 9 条默认', first.ok && first.data.items.length === 9, String(first.data.items.length));
+assert('空库初始化 10 条默认', first.ok && first.data.items.length === 10, String(first.data.items.length));
 assert(
   '默认实例不是模板锁定 ID',
   first.data.items.every(function (item) {
@@ -167,7 +167,7 @@ assert('拉丝三点复用 lasuo-4 模板', first.data.items.some(function (item
   return item.sourceTemplateId === 'lasuo-4' && item.name === '拉丝三点' && item.catalogId === 'lasuo-4';
 }));
 var second = lib.listAll();
-assert('二次初始化不重复', second.data.items.length === 9);
+assert('二次初始化不重复', second.data.items.length === 10);
 assert('schemaVersion=4', second.data.schemaVersion === localLib.RULE_LIBRARY_SCHEMA_VERSION);
 assert(
   'processedSourceTemplateIds 覆盖默认模板',
@@ -181,6 +181,7 @@ function namesAt(n) {
 
 assert('库 2 人', namesAt(2) === '单挂8421,比杆,比洞');
 assert('库 3 人含 2 人', namesAt(3).indexOf('比杆') >= 0 && namesAt(3).indexOf('斗二地主') >= 0);
+assert('库 3 人含 3人8421', namesAt(3).indexOf('3人8421') >= 0);
 assert('库 3 人无 4 人', namesAt(3).indexOf('4人8421') < 0 && namesAt(3).indexOf('拉丝三点') < 0);
 assert('库 4 人含 2 人', namesAt(4).indexOf('比杆') >= 0);
 assert('库 4 人含 3 人', namesAt(4).indexOf('斗二地主') >= 0);

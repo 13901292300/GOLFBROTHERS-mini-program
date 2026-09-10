@@ -11,7 +11,7 @@ var SCORE_MAP_IDS = ["hio", "m2", "m1", "par", "p1", "p2", "p3"];
 var SCORE_MAP_VALUES = ["32", "16", "8", "4", "2", "1", "0"];
 
 var TWO_PLAYER_DEFAULT_TEMPLATE_IDS = ["stroke-2", "match-2", "8421-2"];
-var THREE_PLAYER_DEFAULT_TEMPLATE_IDS = ["landlord-mid"];
+var THREE_PLAYER_DEFAULT_TEMPLATE_IDS = ["landlord-mid", "8421-3"];
 
 function rowsFrom(ids, values) {
   return (ids || []).map(function (id, i) {
@@ -59,6 +59,22 @@ function landlordMidMeatRows() {
   ];
 }
 
+function apply8421GameplayDefaults(out) {
+  out.scoreCode = "8421";
+  out.scoreRows = scoreMapRows();
+  out.deductMode = "on";
+  out.deductWay = "plus-n";
+  out.deductPlusN = "4";
+  out.deductCap = "cap";
+  out.deductCapN = "2";
+  out.pushRule = "tie";
+  out.meatRows = meatRows8421AllOne();
+  out.meatValueType = "double";
+  out.meatCap = "none";
+  out.meatEatMode = "by-score";
+  return out;
+}
+
 function defaultGameplaySnapshot(templateId, base) {
   var id = String(templateId || "");
   var out = Object.assign({}, base && typeof base === "object" ? base : {});
@@ -77,18 +93,11 @@ function defaultGameplaySnapshot(templateId, base) {
     return out;
   }
   if (id === "8421-2") {
-    out.scoreCode = "8421";
-    out.scoreRows = scoreMapRows();
-    out.deductMode = "on";
-    out.deductWay = "plus-n";
-    out.deductPlusN = "4";
-    out.deductCap = "cap";
-    out.deductCapN = "2";
-    out.pushRule = "tie";
-    out.meatRows = meatRows8421AllOne();
-    out.meatValueType = "double";
-    out.meatCap = "none";
-    out.meatEatMode = "by-score";
+    return apply8421GameplayDefaults(out);
+  }
+  if (id === "8421-3") {
+    apply8421GameplayDefaults(out);
+    out.baoNeg = "none";
     return out;
   }
   if (id === "landlord-mid") {
@@ -115,5 +124,6 @@ module.exports = {
   matchMeatRows: matchMeatRows,
   meatRows8421AllOne: meatRows8421AllOne,
   landlordMidMeatRows: landlordMidMeatRows,
+  apply8421GameplayDefaults: apply8421GameplayDefaults,
   defaultGameplaySnapshot: defaultGameplaySnapshot
 };

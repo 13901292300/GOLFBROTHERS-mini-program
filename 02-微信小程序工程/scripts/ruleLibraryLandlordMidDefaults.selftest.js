@@ -96,15 +96,13 @@ assert(
   threeIds.join(',')
 );
 assert(
-  'CASE1 3人默认顺序仅斗二地主',
-  threeIds.join(',') === 'landlord-mid' && three[0] && three[0].name === '斗二地主',
+  'CASE1 3人默认含斗二地主且在 8421-3 之前',
+  threeIds.indexOf('landlord-mid') === 0 && three[0] && three[0].name === '斗二地主',
   threeIds.join(',')
 );
 assert(
-  '现状：首次 seed 不含斗大地主/斗小地主/3人8421',
-  !byTemplate(items, 'landlord-big') &&
-    !byTemplate(items, 'landlord-small') &&
-    !byTemplate(items, '8421-3')
+  '现状：首次 seed 不含斗大地主/斗小地主',
+  !byTemplate(items, 'landlord-big') && !byTemplate(items, 'landlord-small')
 );
 
 var mid = byTemplate(items, 'landlord-mid');

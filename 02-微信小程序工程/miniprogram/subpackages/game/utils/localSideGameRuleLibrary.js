@@ -14,6 +14,7 @@ var LEGACY_SEEDED_TEMPLATE_IDS = [
   'match-2',
   '8421-2',
   'landlord-mid',
+  '8421-3',
   '8421-4',
   'lasuo-4',
   'three-vs-one',

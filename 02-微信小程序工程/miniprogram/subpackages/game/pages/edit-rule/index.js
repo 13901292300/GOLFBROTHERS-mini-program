@@ -546,6 +546,7 @@ Page({
     const is8421 = catalog.is8421(ruleId);
     const is8421Two = String(ruleId) === "8421-2";
     const is8421Three = catalog.is8421Three(ruleId);
+    const is8421Canon = is8421Two || is8421Three;
     const is8421Fold = is8421;
     const isLandlord = catalog.isLandlordFamily(ruleId);
     const isMid = catalog.isLandlordMid(ruleId);
@@ -698,14 +699,16 @@ Page({
         ? existing.deductCap === "cap"
           ? "cap"
           : "none"
-        : is8421Two
-          ? "cap"
+        : is8421Canon
+          ? canonSnap.deductCap === "cap"
+            ? "cap"
+            : "none"
           : "none",
       deductCapN:
         existing && existing.deductCapN != null && existing.deductCapN !== ""
           ? String(existing.deductCapN)
-          : is8421Two
-            ? "2"
+          : is8421Canon && canonSnap.deductCapN != null && canonSnap.deductCapN !== ""
+            ? String(canonSnap.deductCapN)
             : "3",
       foldDeduct: false,
       deductText: deductThumb({
@@ -723,14 +726,16 @@ Page({
           ? existing.deductCap === "cap"
             ? "cap"
             : "none"
-          : is8421Two
-            ? "cap"
+          : is8421Canon
+            ? canonSnap.deductCap === "cap"
+              ? "cap"
+              : "none"
             : "none",
         deductCapN:
           existing && existing.deductCapN != null && existing.deductCapN !== ""
             ? String(existing.deductCapN)
-            : is8421Two
-              ? "2"
+            : is8421Canon && canonSnap.deductCapN != null && canonSnap.deductCapN !== ""
+              ? String(canonSnap.deductCapN)
               : "3"
       }),
       comboMulRows: comboMulRows,
@@ -802,8 +807,10 @@ Page({
           ? existing.meatValueType === "double"
             ? "double"
             : "fixed"
-          : is8421Two
-            ? "double"
+          : is8421Canon
+            ? canonSnap.meatValueType === "double"
+              ? "double"
+              : "fixed"
             : "fixed",
       meatValueN: existing && existing.meatValueN != null && existing.meatValueN !== ""
         ? String(existing.meatValueN)
