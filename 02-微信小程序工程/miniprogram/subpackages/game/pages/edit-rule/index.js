@@ -579,13 +579,46 @@ Page({
           ? "within-n"
           : "push";
     const lasuoDraft = {
-      pkBetter: !existing || existing.pkBetter !== false,
-      pkWorse: !existing || existing.pkWorse !== false,
-      pkTotal: !existing || existing.pkTotal !== false,
-      pkBetterW: existing && existing.pkBetterW != null && existing.pkBetterW !== "" ? String(existing.pkBetterW) : "1",
-      pkWorseW: existing && existing.pkWorseW != null && existing.pkWorseW !== "" ? String(existing.pkWorseW) : "1",
-      pkTotalW: existing && existing.pkTotalW != null && existing.pkTotalW !== "" ? String(existing.pkTotalW) : "1",
-      pkTotalMode: existing && existing.pkTotalMode === "product" ? "product" : "sum",
+      pkBetter: existing
+        ? existing.pkBetter !== false
+        : isLasuo
+          ? canonSnap.pkBetter !== false
+          : true,
+      pkWorse: existing
+        ? existing.pkWorse !== false
+        : isLasuo
+          ? canonSnap.pkWorse !== false
+          : true,
+      pkTotal: existing
+        ? existing.pkTotal !== false
+        : isLasuo
+          ? canonSnap.pkTotal !== false
+          : true,
+      pkBetterW:
+        existing && existing.pkBetterW != null && existing.pkBetterW !== ""
+          ? String(existing.pkBetterW)
+          : isLasuo && canonSnap.pkBetterW != null && canonSnap.pkBetterW !== ""
+            ? String(canonSnap.pkBetterW)
+            : "1",
+      pkWorseW:
+        existing && existing.pkWorseW != null && existing.pkWorseW !== ""
+          ? String(existing.pkWorseW)
+          : isLasuo && canonSnap.pkWorseW != null && canonSnap.pkWorseW !== ""
+            ? String(canonSnap.pkWorseW)
+            : "1",
+      pkTotalW:
+        existing && existing.pkTotalW != null && existing.pkTotalW !== ""
+          ? String(existing.pkTotalW)
+          : isLasuo && canonSnap.pkTotalW != null && canonSnap.pkTotalW !== ""
+            ? String(canonSnap.pkTotalW)
+            : "1",
+      pkTotalMode: existing
+        ? existing.pkTotalMode === "product"
+          ? "product"
+          : "sum"
+        : isLasuo && canonSnap.pkTotalMode === "product"
+          ? "product"
+          : "sum",
       reward: existing ? existing.reward : "none",
       pushRule: lasuoPush,
       pushWithinN: existing && existing.pushWithinN != null && existing.pushWithinN !== "" ? String(existing.pushWithinN) : "1",

@@ -76,6 +76,17 @@ function apply8421GameplayDefaults(out) {
   return out;
 }
 
+function applyLasuoThreePointDefaults(out) {
+  out.pkBetter = true;
+  out.pkWorse = true;
+  out.pkTotal = true;
+  out.pkBetterW = "1";
+  out.pkWorseW = "1";
+  out.pkTotalW = "1";
+  out.pkTotalMode = "sum";
+  return out;
+}
+
 function defaultGameplaySnapshot(templateId, base) {
   var id = String(templateId || "");
   var out = Object.assign({}, base && typeof base === "object" ? base : {});
@@ -110,6 +121,9 @@ function defaultGameplaySnapshot(templateId, base) {
     out.baoMode = "none";
     return out;
   }
+  if (id === "lasuo-4") {
+    return applyLasuoThreePointDefaults(out);
+  }
   return out;
 }
 
@@ -127,5 +141,6 @@ module.exports = {
   meatRows8421AllOne: meatRows8421AllOne,
   landlordMidMeatRows: landlordMidMeatRows,
   apply8421GameplayDefaults: apply8421GameplayDefaults,
+  applyLasuoThreePointDefaults: applyLasuoThreePointDefaults,
   defaultGameplaySnapshot: defaultGameplaySnapshot
 };

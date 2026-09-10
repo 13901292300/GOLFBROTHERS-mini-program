@@ -163,24 +163,16 @@ function buildDefaultRule(templateId, clock, idGen) {
   var item = catalog.findRule(templateId);
   if (!item || catalog.isUnavailableRule(item)) return null;
   var cap = catalog.rulePlayerCapability(item);
-  var name = templateId === 'lasuo-4' ? catalog.lasuoDefaultName({}) : item.name;
   var snapshot = {
     catalogId: item.id,
     ruleId: item.id,
-    name: name,
+    name: item.name,
     players: cap.playerMode === 'exact' ? cap.playerCount : cap.minPlayers
   };
-  if (templateId === 'lasuo-4') {
-    snapshot.pkBetter = true;
-    snapshot.pkWorse = true;
-    snapshot.pkTotal = true;
-    snapshot.pkBetterW = '1';
-    snapshot.pkWorseW = '1';
-    snapshot.pkTotalW = '1';
-    snapshot.pkTotalMode = 'sum';
-  }
   if (catalog.is8421(templateId)) snapshot.scoreCode = '8421';
   snapshot = ruleDefaults.defaultGameplaySnapshot(templateId, snapshot);
+  var name = templateId === 'lasuo-4' ? catalog.lasuoDefaultName(snapshot) : item.name;
+  snapshot.name = name;
   return normalizeRule({
     id: idGen(),
     name: name,
