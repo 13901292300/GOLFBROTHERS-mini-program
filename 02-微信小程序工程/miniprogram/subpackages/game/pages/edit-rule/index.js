@@ -188,9 +188,12 @@ const MEAT_ROWS_LANDLORD = [
 ];
 
 function defaultLandlordMeatRows() {
-  const values = ["3", "2", "1", "0"];
-  return MEAT_ROWS_LANDLORD.map(function (row, i) {
-    return Object.assign({}, row, { value: values[i] });
+  const seeded = ruleDefaults.landlordMidMeatRows();
+  return MEAT_ROWS_LANDLORD.map(function (row) {
+    const hit = seeded.find(function (item) {
+      return item.id === row.id;
+    });
+    return Object.assign({}, row, { value: hit ? String(hit.value) : "0" });
   });
 }
 
@@ -551,6 +554,10 @@ Page({
     const isTvo = catalog.isThreeVsOne(ruleId);
     const isDizhubo = catalog.isDizhubo4(ruleId);
     const isVegas = catalog.isVegas(ruleId);
+    const canonSnap = ruleDefaults.defaultGameplaySnapshot(ruleId, {
+      catalogId: ruleId,
+      ruleId: ruleId
+    });
     const addRows = hydrateRewardRows(existing && existing.addRows, ruleDefaults.ADD_REWARD_VALUES);
     const catalogItem = catalog.findRule(ruleId);
     const matchPlay =
@@ -562,7 +569,8 @@ Page({
     const mulRows = hydrateRewardRows(existing && existing.mulRows, ruleDefaults.MUL_REWARD_VALUES);
     const scoreRows = hydrateScoreMapRows(existing && existing.scoreRows);
     const comboMulRows = hydrateComboMulRows(existing && existing.comboMulRows);
-    const landlordPush = (existing && existing.pushRule) || "push";
+    const landlordPush =
+      (existing && existing.pushRule) || (isMid ? canonSnap.pushRule : "") || "push";
     const lasuoPush =
       existing && existing.pushRule === "none"
         ? "none"
@@ -648,7 +656,15 @@ Page({
       pushOptions: PUSH_OPTIONS_8421,
       reward: isVegas
         ? "none"
-        : isLandlord || isTvo || isDizhubo
+        : isMid
+          ? existing
+            ? existing.reward === "mul"
+              ? "mul"
+              : "none"
+            : canonSnap.reward === "mul"
+              ? "mul"
+              : "none"
+          : isLandlord || isTvo || isDizhubo
           ? ((existing && existing.reward) === "mul" ? "mul" : "none")
           : isLasuo
             ? lasuoDraft.reward
@@ -746,13 +762,22 @@ Page({
         : (existing && existing.reorderOnPush) === "yes"
           ? "yes"
           : "no",
-      meatInclude: (existing && existing.meatInclude) || "no",
+      meatInclude:
+        (existing && existing.meatInclude) ||
+        (isMid ? canonSnap.meatInclude : "") ||
+        "no",
       meatRows: isTvo
         ? hydrateTvoMeatRows(existing && existing.meatRows, existing && existing.meatCount)
         : matchPlay
           ? hydrateMatchMeatRows(existing && existing.meatRows)
           : (isLandlord && !isSmall) || isLasuo || isDizhubo || isVegas
-            ? hydrateLandlordMeatRows(existing && existing.meatRows)
+            ? hydrateLandlordMeatRows(
+                existing && existing.meatRows
+                  ? existing.meatRows
+                  : isMid
+                    ? canonSnap.meatRows
+                    : null
+              )
             : hydrateMeatRows(existing && existing.meatRows),
       baoMode: (existing && existing.baoMode) || "none",
       baoPlusN: existing && existing.baoPlusN != null && existing.baoPlusN !== ""

@@ -704,7 +704,6 @@
               <view class="radio-dot"></view>
               <text class="opt-title">是（顶洞也按成绩调整组合）</text>
             </view>
-            <view wx:if="{{!showLandlordReorder}}" class="sec-hint">顶洞时固定不换组合，此项不可改。</view>
           </view>
         </view>
 
