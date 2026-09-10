@@ -704,7 +704,15 @@ Page({
             : canonSnap.reward === "mul"
               ? "mul"
               : "none"
-          : isLandlord || isTvo || isDizhubo
+          : isDizhubo
+            ? existing
+              ? existing.reward === "mul"
+                ? "mul"
+                : "none"
+              : canonSnap.reward === "mul"
+                ? "mul"
+                : "none"
+          : isLandlord || isTvo
           ? ((existing && existing.reward) === "mul" ? "mul" : "none")
           : isLasuo
             ? lasuoDraft.reward

@@ -10,6 +10,7 @@ const scoreMapUtil = require("../../utils/sideGameScoreMap.js");
 const partyFormation = require("../../utils/partyFormation.js");
 const threeSetPairReset = require("../../utils/threeSetPairReset.js");
 const playerScoreCfg = require("../../utils/sideGame8421PlayerConfig.js");
+const ruleDefaults = require("../../utils/sideGameRuleDefaults.js");
 const normalizeHoleOrder = holeOrderUtil.normalizeHoleOrder;
 const rotateHoleOrderToStart = holeOrderUtil.rotateHoleOrderToStart;
 const holeOrderTextOf = holeOrderUtil.holeOrderTextOf;
@@ -1870,7 +1871,7 @@ Page(pageBoot.bindPageTheme({
     showLandlordBig: false,
     showThreeVsOne: false,
     showDizhubo: false,
-    dizhuboMode: "big",
+    dizhuboMode: "mid",
     showOrderDrag: false,
     showLandlordFamily: false,
     showLandlordGroup: false,
@@ -2059,14 +2060,8 @@ Page(pageBoot.bindPageTheme({
       catalog.is8421Three(catalogId) ||
       usesLasuoGroupUi(catalogId);
     const showOrderDrag = showLandlordGroup || showThreeVsOne || showDizhubo || showLasuoFamily;
-    const dizhuboMode = existing && existing.dizhuboMode === "mid" ? "mid" : "big";
-    const defaultGroupMode = showDizhubo
-      ? "fixed"
-      : showLandlordGroup
-        ? catalog.isLandlordMid(catalogId) || catalog.is8421Three(catalogId) || usesLasuoGroupUi(catalogId)
-          ? "random"
-          : "fixed"
-        : "random";
+    const dizhuboMode = ruleDefaults.defaultDizhuboMode(existing);
+    const defaultGroupMode = ruleDefaults.defaultGroupMode(catalogId, existing);
     const showSetHandicap = false;
     const showThreeSet = showTwoParty && catalogId === "three-set";
     const showYoucai = showTwoParty && catalogId === "youcai";
@@ -2387,8 +2382,7 @@ Page(pageBoot.bindPageTheme({
     if (showLasuoFamily) groupMode = "random";
     const formation =
       existing && existing.formation === "haidao" ? "haidao" : "jianghu";
-    const sortUpdate =
-      existing && existing.sortUpdate === "fixed" ? "fixed" : "dynamic";
+    const sortUpdate = ruleDefaults.defaultSortUpdate(existing);
     const bandMode =
       showHorn || sortUpdate === "fixed"
         ? "all"

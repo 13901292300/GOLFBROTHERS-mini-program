@@ -14,6 +14,17 @@ var TWO_PLAYER_DEFAULT_TEMPLATE_IDS = ["stroke-2", "match-2", "8421-2"];
 var THREE_PLAYER_DEFAULT_TEMPLATE_IDS = ["landlord-mid", "8421-3"];
 var FOUR_PLAYER_DEFAULT_TEMPLATE_IDS = ["8421-4"];
 
+/** 开局分组：固拉 / 乱拉 / 高手不见面（groupMode 或 lasuo-n/horn 的 sortUpdate） */
+var PULL_FORMATION_TEMPLATE_IDS = ["lasuo-4", "8421-4", "vegas", "lasuo-n", "horn"];
+/** 开局分组：固斗 / 乱斗 / 高手不见面（dizhubo 无高手不见面，仍用 groupMode） */
+var FIGHT_FORMATION_TEMPLATE_IDS = [
+  "landlord-big",
+  "landlord-mid",
+  "landlord-small",
+  "8421-3",
+  "dizhubo-4"
+];
+
 function rowsFrom(ids, values) {
   return (ids || []).map(function (id, i) {
     return { id: id, value: String(values[i]) };
@@ -76,6 +87,50 @@ function apply8421GameplayDefaults(out) {
   return out;
 }
 
+function applyDizhuboGameplayDefaults(out) {
+  out.reward = "mul";
+  out.mulRows = mulRewardRows();
+  out.dizhuboMode = "mid";
+  out.groupMode = "random";
+  return out;
+}
+
+function usesPullFormation(templateId) {
+  return PULL_FORMATION_TEMPLATE_IDS.indexOf(String(templateId || "")) >= 0;
+}
+
+function usesFightFormation(templateId) {
+  return FIGHT_FORMATION_TEMPLATE_IDS.indexOf(String(templateId || "")) >= 0;
+}
+
+function usesSortUpdateFormation(templateId) {
+  var id = String(templateId || "");
+  return id === "lasuo-n" || id === "horn";
+}
+
+function legacyMissingGroupMode(templateId) {
+  var id = String(templateId || "");
+  if (id === "dizhubo-4" || id === "landlord-big" || id === "landlord-small") return "fixed";
+  return "random";
+}
+
+/** 新建无 existing → random（乱拉/乱斗）。已有实例沿用 groupMode；缺字段保持旧 implicit。 */
+function defaultGroupMode(templateId, existing) {
+  if (existing && existing.groupMode) return existing.groupMode;
+  if (existing) return legacyMissingGroupMode(templateId);
+  return "random";
+}
+
+function defaultDizhuboMode(existing) {
+  if (existing) return existing.dizhuboMode === "mid" ? "mid" : "big";
+  return "mid";
+}
+
+function defaultSortUpdate(existing) {
+  if (existing && existing.sortUpdate === "fixed") return "fixed";
+  return "dynamic";
+}
+
 function applyLasuoThreePointDefaults(out) {
   out.pkBetter = true;
   out.pkWorse = true;
@@ -133,6 +188,17 @@ function defaultGameplaySnapshot(templateId, base) {
   if (id === "lasuo-4") {
     return applyLasuoThreePointDefaults(out);
   }
+  if (id === "dizhubo-4") {
+    return applyDizhuboGameplayDefaults(out);
+  }
+  if (usesPullFormation(id) && usesSortUpdateFormation(id)) {
+    out.sortUpdate = "dynamic";
+    return out;
+  }
+  if (usesPullFormation(id) || usesFightFormation(id)) {
+    out.groupMode = "random";
+    return out;
+  }
   return out;
 }
 
@@ -150,6 +216,15 @@ module.exports = {
   meatRows8421AllOne: meatRows8421AllOne,
   landlordMidMeatRows: landlordMidMeatRows,
   apply8421GameplayDefaults: apply8421GameplayDefaults,
+  applyDizhuboGameplayDefaults: applyDizhuboGameplayDefaults,
   applyLasuoThreePointDefaults: applyLasuoThreePointDefaults,
+  PULL_FORMATION_TEMPLATE_IDS: PULL_FORMATION_TEMPLATE_IDS,
+  FIGHT_FORMATION_TEMPLATE_IDS: FIGHT_FORMATION_TEMPLATE_IDS,
+  usesPullFormation: usesPullFormation,
+  usesFightFormation: usesFightFormation,
+  usesSortUpdateFormation: usesSortUpdateFormation,
+  defaultGroupMode: defaultGroupMode,
+  defaultDizhuboMode: defaultDizhuboMode,
+  defaultSortUpdate: defaultSortUpdate,
   defaultGameplaySnapshot: defaultGameplaySnapshot
 };
