@@ -4,6 +4,7 @@
  */
 var rec = require('./sideGameRecord.js');
 var catalog = require('./catalog.js');
+var ruleDefaults = require('./sideGameRuleDefaults.js');
 
 var STORAGE_KEY = 'gb_side_game_rules_v1';
 var RULE_LIBRARY_SCHEMA_VERSION = 4;
@@ -178,6 +179,7 @@ function buildDefaultRule(templateId, clock, idGen) {
     snapshot.pkTotalMode = 'sum';
   }
   if (catalog.is8421(templateId)) snapshot.scoreCode = '8421';
+  snapshot = ruleDefaults.defaultGameplaySnapshot(templateId, snapshot);
   return normalizeRule({
     id: idGen(),
     name: name,
@@ -224,16 +226,23 @@ function migrateEnvelope(schemaVersion, items, dismissed, processed, clock, idGe
     var tid = templateIdOf(row);
     if (tid && processedIds.indexOf(tid) < 0) processedIds.push(tid);
   });
-  DEFAULT_LIBRARY_RULE_IDS.forEach(function (tid) {
-    if (processedIds.indexOf(tid) >= 0) return;
-    processedIds.push(tid);
-    dirty = true;
-    if (dismissedIds.indexOf(tid) >= 0) return;
-    if (hasTemplateInstance(next, tid)) return;
-    var seeded = buildDefaultRule(tid, clock, idGen);
-    if (!seeded) return;
-    next.push(seeded);
-  });
+  var uninitialized =
+    !(Number(schemaVersion) > 0) &&
+    !next.length &&
+    !processedIds.length &&
+    !dismissedIds.length;
+  if (uninitialized) {
+    DEFAULT_LIBRARY_RULE_IDS.forEach(function (tid) {
+      if (processedIds.indexOf(tid) >= 0) return;
+      processedIds.push(tid);
+      dirty = true;
+      if (dismissedIds.indexOf(tid) >= 0) return;
+      if (hasTemplateInstance(next, tid)) return;
+      var seeded = buildDefaultRule(tid, clock, idGen);
+      if (!seeded) return;
+      next.push(seeded);
+    });
+  }
   processedIds = uniqIds(processedIds);
   if (schemaVersion !== RULE_LIBRARY_SCHEMA_VERSION) {
     schemaVersion = RULE_LIBRARY_SCHEMA_VERSION;

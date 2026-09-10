@@ -5,6 +5,7 @@ const catalog = require("../../utils/catalog.js");
 const nav = require("../../utils/nav.js");
 const numField = require("../../utils/numField.js");
 const configGuard = require("../../utils/sideGameConfigGuard.js");
+const ruleDefaults = require("../../utils/sideGameRuleDefaults.js");
 
 const MUL_THUMB_LABEL = {
   m2: "鹰",
@@ -90,7 +91,7 @@ const SCORE_MAP_ROWS = [
   { id: "p3", label: "+3" }
 ];
 
-const SCORE_MAP_DEFAULTS = ["32", "16", "8", "4", "2", "1", "0"];
+const SCORE_MAP_DEFAULTS = ruleDefaults.SCORE_MAP_VALUES;
 
 function hydrateScoreMapRows(saved) {
   return SCORE_MAP_ROWS.map(function (row, i) {
@@ -138,8 +139,12 @@ const MEAT_ROWS_8421 = [
 ];
 
 function defaultMeatRows() {
+  const seeded = ruleDefaults.meatRows8421AllOne();
   return MEAT_ROWS_8421.map(function (row) {
-    return Object.assign({}, row, { value: "1" });
+    const hit = seeded.find(function (item) {
+      return item.id === row.id;
+    });
+    return Object.assign({}, row, { value: hit ? String(hit.value) : "1" });
   });
 }
 
@@ -204,9 +209,12 @@ const MEAT_ROWS_MATCH = [
 ];
 
 function defaultMatchMeatRows() {
-  const values = ["3", "2", "1", "0"];
+  const seeded = ruleDefaults.matchMeatRows();
   return MEAT_ROWS_MATCH.map(function (row, i) {
-    return Object.assign({}, row, { value: values[i] });
+    const hit = seeded.find(function (item) {
+      return item.id === row.id;
+    });
+    return Object.assign({}, row, { value: hit ? String(hit.value) : ["3", "2", "1", "0"][i] });
   });
 }
 
@@ -543,7 +551,7 @@ Page({
     const isTvo = catalog.isThreeVsOne(ruleId);
     const isDizhubo = catalog.isDizhubo4(ruleId);
     const isVegas = catalog.isVegas(ruleId);
-    const addRows = hydrateRewardRows(existing && existing.addRows, ["10", "4", "1", "0", "0", "0"]);
+    const addRows = hydrateRewardRows(existing && existing.addRows, ruleDefaults.ADD_REWARD_VALUES);
     const catalogItem = catalog.findRule(ruleId);
     const matchPlay =
       String(ruleId) === "match-2" ||
@@ -551,7 +559,7 @@ Page({
       !!(existing && existing.matchPlay) ||
       (query && query.matchPlay) === "1";
     const noSettings = catalog.isNoSettings(catalogItem || ruleId) || !!(existing && existing.noSettings);
-    const mulRows = hydrateRewardRows(existing && existing.mulRows, ["10", "5", "2", "1", "1", "1"]);
+    const mulRows = hydrateRewardRows(existing && existing.mulRows, ruleDefaults.MUL_REWARD_VALUES);
     const scoreRows = hydrateScoreMapRows(existing && existing.scoreRows);
     const comboMulRows = hydrateComboMulRows(existing && existing.comboMulRows);
     const landlordPush = (existing && existing.pushRule) || "push";
@@ -670,11 +678,19 @@ Page({
         existing && existing.deductDoubleN != null && existing.deductDoubleN !== ""
           ? String(existing.deductDoubleN)
           : "0",
-      deductCap: existing && existing.deductCap === "cap" ? "cap" : "none",
+      deductCap: existing
+        ? existing.deductCap === "cap"
+          ? "cap"
+          : "none"
+        : is8421Two
+          ? "cap"
+          : "none",
       deductCapN:
         existing && existing.deductCapN != null && existing.deductCapN !== ""
           ? String(existing.deductCapN)
-          : "3",
+          : is8421Two
+            ? "2"
+            : "3",
       foldDeduct: false,
       deductText: deductThumb({
         deductMode: is8421Fold && existing && existing.deductMode === "none" ? "none" : "on",
@@ -687,11 +703,19 @@ Page({
           existing && existing.deductDoubleN != null && existing.deductDoubleN !== ""
             ? String(existing.deductDoubleN)
             : "0",
-        deductCap: existing && existing.deductCap === "cap" ? "cap" : "none",
+        deductCap: existing
+          ? existing.deductCap === "cap"
+            ? "cap"
+            : "none"
+          : is8421Two
+            ? "cap"
+            : "none",
         deductCapN:
           existing && existing.deductCapN != null && existing.deductCapN !== ""
             ? String(existing.deductCapN)
-            : "3"
+            : is8421Two
+              ? "2"
+              : "3"
       }),
       comboMulRows: comboMulRows,
       pushRule: is8421
@@ -749,9 +773,13 @@ Page({
             : "none",
       meatValueType: isLasuo
         ? (existing && existing.meatValueType === "fixed" ? "fixed" : "double")
-        : (existing && existing.meatValueType) === "double"
-          ? "double"
-          : "fixed",
+        : existing
+          ? existing.meatValueType === "double"
+            ? "double"
+            : "fixed"
+          : is8421Two
+            ? "double"
+            : "fixed",
       meatValueN: existing && existing.meatValueN != null && existing.meatValueN !== ""
         ? String(existing.meatValueN)
         : isVegas

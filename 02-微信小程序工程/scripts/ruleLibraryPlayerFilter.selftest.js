@@ -248,12 +248,17 @@ assert(
   })
 );
 assert(
-  '老用户补缺失默认模板',
-  localLib.DEFAULT_LIBRARY_RULE_IDS.every(function (id) {
+  '老用户不补缺失默认模板',
+  !localLib.DEFAULT_LIBRARY_RULE_IDS.every(function (id) {
     return migrated.some(function (item) {
       return item.sourceTemplateId === id || item.id === id || item.catalogId === id;
     });
-  })
+  }) &&
+    migrated.length === 2 &&
+    stroke &&
+    stroke.ruleSnapshot &&
+    stroke.ruleSnapshot.reward === 'mul' &&
+    stroke.ruleSnapshot.k === 99
 );
 assert('旧实例 ID 保留', stroke && stroke.id === 'stroke-2');
 assert(
@@ -767,10 +772,14 @@ var newTemplateLib = localLib.createLocalSideGameRuleLibrary({
   }
 });
 assert(
-  '从未处理的新模板会补种',
-  newTemplateLib.listAll().data.items.some(function (item) {
-    return item.sourceTemplateId === 'horn';
-  })
+  '已有库不因 processed 缺项而补种',
+  newTemplateLib.listAll().data.items.every(function (item) {
+    return item.sourceTemplateId !== 'horn';
+  }) &&
+    newTemplateLib.listAll().data.items.length ===
+      first.data.items.filter(function (item) {
+        return item.sourceTemplateId !== 'horn';
+      }).length
 );
 
 console.log('\nruleLibraryPlayerFilter.selftest passed=' + passed + ' failed=' + failed);
