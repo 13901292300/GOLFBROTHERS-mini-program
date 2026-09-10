@@ -84,6 +84,15 @@ function applyLasuoThreePointDefaults(out) {
   out.pkWorseW = "1";
   out.pkTotalW = "1";
   out.pkTotalMode = "sum";
+  out.reward = "add";
+  out.addRows = addRewardRows();
+  out.addPre = "win";
+  out.pushRule = "push";
+  out.meatRows = landlordMidMeatRows();
+  out.meatValueType = "double";
+  out.meatInclude = "no";
+  out.meatCap = "none";
+  out.baoMode = "none";
   return out;
 }
 

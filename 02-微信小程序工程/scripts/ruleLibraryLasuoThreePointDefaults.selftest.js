@@ -58,6 +58,22 @@ function byTemplate(items, tid) {
   });
 }
 
+function rowVal(rows, id) {
+  var hit = (rows || []).filter(function (row) {
+    return row && row.id === id;
+  })[0];
+  return hit ? String(hit.value) : '';
+}
+
+function meatOf(s) {
+  return {
+    worse: rowVal(s.meatRows, 'ge-1'),
+    par: rowVal(s.meatRows, 'par'),
+    birdie: rowVal(s.meatRows, 'm1'),
+    eagle: rowVal(s.meatRows, 'le-2')
+  };
+}
+
 var emptyLib = createLib();
 var first = emptyLib.listAll();
 var items = first.data.items;
@@ -105,11 +121,66 @@ assert(
     byTemplate(items, 'lasuo-4').length === 1
 );
 assert(
-  'CASE7 未给拉丝 seed 写入 8421/斗地主字段',
-  snap.reward == null &&
-    snap.scoreRows == null &&
-    snap.baoMode == null &&
+  'CASE7 未给拉丝 seed 写入 8421 分值图',
+  snap.scoreRows == null && snap.pushPolicy == null && snap.deductMode == null
+);
+assert(
+  'CASE1 默认 reward=add（加法奖励，现有字段不是 additive）',
+  snap.reward === 'add' && canon.reward === 'add'
+);
+assert(
+  'CASE2 加法表 PAR0/鸟1/鹰3/HIO10',
+  rowVal(snap.addRows, 'par') === '0' &&
+    rowVal(snap.addRows, 'm1') === '1' &&
+    rowVal(snap.addRows, 'm2') === '3' &&
+    rowVal(snap.addRows, 'hio') === '10' &&
+    rowVal(canon.addRows, 'par') === '0' &&
+    rowVal(canon.addRows, 'm1') === '1' &&
+    rowVal(canon.addRows, 'm2') === '3' &&
+    rowVal(canon.addRows, 'hio') === '10'
+);
+assert('CASE3 加法前置=总成绩赢才奖 addPre=win', snap.addPre === 'win' && canon.addPre === 'win');
+assert('CASE4 顶洞定义=得分打平 pushRule=push', snap.pushRule === 'push' && canon.pushRule === 'push');
+assert(
+  'CASE5 canonical 不含 reorderOnPush / pushPolicy（顶洞后排序属 settlement）',
+  !Object.prototype.hasOwnProperty.call(canon, 'reorderOnPush') &&
+    !Object.prototype.hasOwnProperty.call(canon, 'pushPolicy') &&
+    snap.reorderOnPush == null &&
     snap.pushPolicy == null
+);
+assert(
+  'CASE6 吃肉 worse0/par1/birdie2/eagle+3',
+  meatOf(snap).worse === '0' &&
+    meatOf(snap).par === '1' &&
+    meatOf(snap).birdie === '2' &&
+    meatOf(snap).eagle === '3',
+  JSON.stringify(meatOf(snap))
+);
+assert(
+  'CASE7 肉分值翻倍不含奖励',
+  snap.meatValueType === 'double' &&
+    snap.meatInclude === 'no' &&
+    canon.meatValueType === 'double' &&
+    canon.meatInclude === 'no'
+);
+assert('CASE8 肉值不封顶 meatCap=none', snap.meatCap === 'none' && canon.meatCap === 'none');
+assert('CASE9 默认不包洞 baoMode=none', snap.baoMode === 'none' && canon.baoMode === 'none');
+assert(
+  'CASE10 三点结构三项全开 1/1/1 sum',
+  snap.pkBetter === true &&
+    snap.pkWorse === true &&
+    snap.pkTotal === true &&
+    String(snap.pkBetterW) === '1' &&
+    String(snap.pkWorseW) === '1' &&
+    String(snap.pkTotalW) === '1' &&
+    snap.pkTotalMode === 'sum' &&
+    canon.pkBetter === true &&
+    canon.pkWorse === true &&
+    canon.pkTotal === true &&
+    String(canon.pkBetterW) === '1' &&
+    String(canon.pkWorseW) === '1' &&
+    String(canon.pkTotalW) === '1' &&
+    canon.pkTotalMode === 'sum'
 );
 assert(
   'CASE7 8421-4 canonical 仍独立',
@@ -152,7 +223,9 @@ assert(
     old.name === '头尾两点' &&
     old.ruleSnapshot.pkTotal === false &&
     String(old.ruleSnapshot.pkBetterW) === '2' &&
-    old.ruleSnapshot.pkTotalMode === 'product'
+    old.ruleSnapshot.pkTotalMode === 'product' &&
+    old.ruleSnapshot.reward == null &&
+    old.ruleSnapshot.baoMode == null
   )
 );
 

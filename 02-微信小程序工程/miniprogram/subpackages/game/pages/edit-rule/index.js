@@ -577,7 +577,7 @@ Page({
         ? "none"
         : existing && existing.pushRule === "within-n"
           ? "within-n"
-          : "push";
+          : (isLasuo && canonSnap.pushRule) || "push";
     const lasuoDraft = {
       pkBetter: existing
         ? existing.pkBetter !== false
@@ -619,13 +619,19 @@ Page({
         : isLasuo && canonSnap.pkTotalMode === "product"
           ? "product"
           : "sum",
-      reward: existing ? existing.reward : "none",
+      reward: existing
+        ? existing.reward || "none"
+        : isLasuo
+          ? canonSnap.reward || "none"
+          : "none",
       pushRule: lasuoPush,
       pushWithinN: existing && existing.pushWithinN != null && existing.pushWithinN !== "" ? String(existing.pushWithinN) : "1",
       meatRows: isLasuo
-        ? hydrateLandlordMeatRows(existing && existing.meatRows)
+        ? hydrateLandlordMeatRows(
+            existing && existing.meatRows ? existing.meatRows : canonSnap.meatRows
+          )
         : hydrateMeatRows(existing && existing.meatRows),
-      baoMode: (existing && existing.baoMode) || "none",
+      baoMode: (existing && existing.baoMode) || (isLasuo ? canonSnap.baoMode : "") || "none",
       baoPlusN: existing && existing.baoPlusN != null && existing.baoPlusN !== "" ? String(existing.baoPlusN) : "4",
       baoDoubleN: existing && existing.baoDoubleN != null && existing.baoDoubleN !== "" ? String(existing.baoDoubleN) : "0",
       baoDiffN: existing && existing.baoDiffN != null && existing.baoDiffN !== "" ? String(existing.baoDiffN) : "3",
@@ -802,7 +808,7 @@ Page({
           : "no",
       meatInclude:
         (existing && existing.meatInclude) ||
-        (isMid ? canonSnap.meatInclude : "") ||
+        (isMid || isLasuo ? canonSnap.meatInclude : "") ||
         "no",
       meatRows: isTvo
         ? hydrateTvoMeatRows(existing && existing.meatRows, existing && existing.meatCount)
@@ -812,12 +818,12 @@ Page({
             ? hydrateLandlordMeatRows(
                 existing && existing.meatRows
                   ? existing.meatRows
-                  : isMid
+                  : isMid || isLasuo
                     ? canonSnap.meatRows
                     : null
               )
             : hydrateMeatRows(existing && existing.meatRows),
-      baoMode: (existing && existing.baoMode) || "none",
+      baoMode: (existing && existing.baoMode) || (isLasuo ? canonSnap.baoMode : "") || "none",
       baoPlusN: existing && existing.baoPlusN != null && existing.baoPlusN !== ""
         ? String(existing.baoPlusN)
         : "4",
@@ -835,7 +841,13 @@ Page({
             ? "ignore"
             : "none",
       meatValueType: isLasuo
-        ? (existing && existing.meatValueType === "fixed" ? "fixed" : "double")
+        ? existing
+          ? existing.meatValueType === "fixed"
+            ? "fixed"
+            : "double"
+          : canonSnap.meatValueType === "fixed"
+            ? "fixed"
+            : "double"
         : existing
           ? existing.meatValueType === "double"
             ? "double"
@@ -859,7 +871,7 @@ Page({
       pkTotalW: lasuoDraft.pkTotalW,
       pkTotalMode: lasuoDraft.pkTotalMode,
       pkWeightTotal: lasuoUi.pkWeightTotal,
-      addPre: (existing && existing.addPre) || "win",
+      addPre: (existing && existing.addPre) || (isLasuo ? canonSnap.addPre : "") || "win",
       pushWithinN: isVegas
         ? existing && existing.pushWithinN != null && existing.pushWithinN !== ""
           ? String(existing.pushWithinN)
@@ -869,7 +881,15 @@ Page({
       comboCapN: existing && existing.comboCapN != null && existing.comboCapN !== ""
         ? String(existing.comboCapN)
         : "99",
-      meatCap: existing && existing.meatCap === "cap" ? "cap" : "none",
+      meatCap: existing
+        ? existing.meatCap === "cap"
+          ? "cap"
+          : "none"
+        : isLasuo
+          ? canonSnap.meatCap === "cap"
+            ? "cap"
+            : "none"
+          : "none",
       meatCapN: existing && existing.meatCapN != null && existing.meatCapN !== ""
         ? String(existing.meatCapN)
         : "3",
