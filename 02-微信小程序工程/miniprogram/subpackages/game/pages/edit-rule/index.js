@@ -546,7 +546,7 @@ Page({
     const is8421 = catalog.is8421(ruleId);
     const is8421Two = String(ruleId) === "8421-2";
     const is8421Three = catalog.is8421Three(ruleId);
-    const is8421Canon = is8421Two || is8421Three;
+    const is8421Canon = is8421Two || is8421Three || catalog.is8421Four(ruleId);
     const is8421Fold = is8421;
     const isLandlord = catalog.isLandlordFamily(ruleId);
     const isMid = catalog.isLandlordMid(ruleId);

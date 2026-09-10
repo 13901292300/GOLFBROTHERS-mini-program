@@ -12,6 +12,7 @@ var SCORE_MAP_VALUES = ["32", "16", "8", "4", "2", "1", "0"];
 
 var TWO_PLAYER_DEFAULT_TEMPLATE_IDS = ["stroke-2", "match-2", "8421-2"];
 var THREE_PLAYER_DEFAULT_TEMPLATE_IDS = ["landlord-mid", "8421-3"];
+var FOUR_PLAYER_DEFAULT_TEMPLATE_IDS = ["8421-4"];
 
 function rowsFrom(ids, values) {
   return (ids || []).map(function (id, i) {
@@ -95,7 +96,7 @@ function defaultGameplaySnapshot(templateId, base) {
   if (id === "8421-2") {
     return apply8421GameplayDefaults(out);
   }
-  if (id === "8421-3") {
+  if (id === "8421-3" || id === "8421-4") {
     apply8421GameplayDefaults(out);
     out.baoNeg = "none";
     return out;
@@ -115,6 +116,7 @@ function defaultGameplaySnapshot(templateId, base) {
 module.exports = {
   TWO_PLAYER_DEFAULT_TEMPLATE_IDS: TWO_PLAYER_DEFAULT_TEMPLATE_IDS,
   THREE_PLAYER_DEFAULT_TEMPLATE_IDS: THREE_PLAYER_DEFAULT_TEMPLATE_IDS,
+  FOUR_PLAYER_DEFAULT_TEMPLATE_IDS: FOUR_PLAYER_DEFAULT_TEMPLATE_IDS,
   ADD_REWARD_VALUES: ADD_REWARD_VALUES,
   MUL_REWARD_VALUES: MUL_REWARD_VALUES,
   SCORE_MAP_VALUES: SCORE_MAP_VALUES,

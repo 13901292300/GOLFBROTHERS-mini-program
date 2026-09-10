@@ -1,6 +1,6 @@
 /**
- * 「我的规则库」3 人首次默认：3人8421。
- * 运行：node scripts/ruleLibrary8421ThreeDefaults.selftest.js
+ * 「我的规则库」4 人首次默认：4人8421。
+ * 运行：node scripts/ruleLibrary8421FourDefaults.selftest.js
  */
 if (typeof global.wx !== 'object') {
   global.wx = {
@@ -65,24 +65,27 @@ function rowVal(rows, id) {
   return hit ? String(hit.value) : '';
 }
 
+assert(
+  'seed 已有 8421-4 且不重复',
+  localLib.DEFAULT_LIBRARY_RULE_IDS.filter(function (id) {
+    return id === '8421-4';
+  }).length === 1
+);
+
 var emptyLib = createLib();
 var first = emptyLib.listAll();
 var items = first.data.items;
-var seeded = byTemplate(items, '8421-3');
+var seeded = byTemplate(items, '8421-4');
 var snap = seeded && seeded.ruleSnapshot;
-var canon = ruleDefaults.defaultGameplaySnapshot('8421-3', {
-  catalogId: '8421-3',
-  ruleId: '8421-3'
+var canon = ruleDefaults.defaultGameplaySnapshot('8421-4', {
+  catalogId: '8421-4',
+  ruleId: '8421-4'
 });
 var canon2 = ruleDefaults.defaultGameplaySnapshot('8421-2', { catalogId: '8421-2' });
+var canon3 = ruleDefaults.defaultGameplaySnapshot('8421-3', { catalogId: '8421-3' });
 
-assert('CASE1 空库首次 seed 含 8421-3', !!(seeded && seeded.name === '3人8421'), seeded && seeded.name);
-assert(
-  'CASE1 seed 顺序 landlord-mid 后接 8421-3',
-  localLib.DEFAULT_LIBRARY_RULE_IDS.indexOf('landlord-mid') >= 0 &&
-    localLib.DEFAULT_LIBRARY_RULE_IDS.indexOf('8421-3') ===
-      localLib.DEFAULT_LIBRARY_RULE_IDS.indexOf('landlord-mid') + 1
-);
+assert('CASE1 空库首次 seed 含 8421-4', !!(seeded && seeded.name === '4人8421'), seeded && seeded.name);
+assert('CASE1 总数仍为 10', items.length === 10, String(items.length));
 
 assert(
   'CASE2 映射 32/16/8/4/2/1/0',
@@ -120,15 +123,10 @@ assert(
   'CASE3 扣分 +4=-1 +5/+6=-2',
   settle8421.deductScore(4, deduct, 4) === -1 &&
     settle8421.deductScore(5, deduct, 4) === -2 &&
-    settle8421.deductScore(6, deduct, 4) === -2,
-  JSON.stringify({
-    d4: settle8421.deductScore(4, deduct, 4),
-    d5: settle8421.deductScore(5, deduct, 4),
-    d6: settle8421.deductScore(6, deduct, 4)
-  })
+    settle8421.deductScore(6, deduct, 4) === -2
 );
 
-assert('CASE4 顶洞=得分打平', canon.pushRule === 'tie' && snap.pushRule === 'tie' && settle8421.pushKind(canon) === 'tie');
+assert('CASE4 顶洞=tie', canon.pushRule === 'tie' && snap.pushRule === 'tie' && settle8421.pushKind(canon) === 'tie');
 
 assert(
   'CASE5 各档吃1块',
@@ -147,15 +145,26 @@ assert('CASE7 包负分默认 none', (canon.baoNeg || 'none') === 'none' && (sna
 
 var again = emptyLib.listAll();
 assert('CASE8 重复进入不重复 seed', again.data.items.length === items.length);
-assert('CASE8 8421-3 仍一条', byTemplate(again.data.items, '8421-3').id === seeded.id);
+assert('CASE8 8421-4 仍一条', byTemplate(again.data.items, '8421-4').id === seeded.id);
 
 assert(
-  '与 8421-2 共用同一套成绩/扣分/肉默认',
-  rowVal(canon2.scoreRows, 'hio') === rowVal(canon.scoreRows, 'hio') &&
-    String(canon2.deductCapN) === String(canon.deductCapN) &&
-    canon2.pushRule === canon.pushRule &&
-    canon2.meatValueType === canon.meatValueType &&
-    rowVal(canon2.meatRows, 'par') === '1'
+  'CASE9 8421-2/3/4 共用 helper 且默认一致',
+  rowVal(canon2.scoreRows, 'hio') === '32' &&
+    rowVal(canon3.scoreRows, 'hio') === '32' &&
+    rowVal(canon.scoreRows, 'hio') === '32' &&
+    String(canon2.deductCapN) === '2' &&
+    String(canon3.deductCapN) === '2' &&
+    String(canon.deductCapN) === '2' &&
+    canon2.pushRule === 'tie' &&
+    canon3.pushRule === 'tie' &&
+    canon.pushRule === 'tie' &&
+    canon2.meatValueType === 'double' &&
+    canon3.meatValueType === 'double' &&
+    canon.meatValueType === 'double' &&
+    canon2.meatCap === 'none' &&
+    canon3.meatCap === 'none' &&
+    rowVal(canon2.meatRows, 'par') === '1' &&
+    rowVal(canon3.meatRows, 'par') === '1'
 );
 
 var existingStore = memStorage();
@@ -163,71 +172,51 @@ existingStore.setItem(localLib.STORAGE_KEY, {
   schemaVersion: 4,
   items: [
     {
-      id: 'rl_old_8421_3',
-      name: '旧三人8421',
-      catalogId: '8421-3',
-      ruleId: '8421-3',
-      sourceTemplateId: '8421-3',
-      players: 3,
-      revision: 4,
+      id: 'rl_old_8421_4',
+      name: '旧四人8421',
+      catalogId: '8421-4',
+      ruleId: '8421-4',
+      sourceTemplateId: '8421-4',
+      players: 4,
+      revision: 6,
       ruleSnapshot: {
-        catalogId: '8421-3',
-        scoreRows: [{ id: 'hio', value: '50' }],
+        catalogId: '8421-4',
+        scoreRows: [{ id: 'hio', value: '99' }],
         deductCap: 'none',
         baoNeg: 'ahead',
         meatValueType: 'fixed',
-        meatRows: [{ id: 'par', value: '9' }]
+        meatRows: [{ id: 'par', value: '7' }]
       }
     }
   ],
-  processedSourceTemplateIds: ['stroke-2', 'match-2', '8421-2', 'landlord-mid'],
+  processedSourceTemplateIds: localLib.DEFAULT_LIBRARY_RULE_IDS.slice(),
   dismissedDefaultRuleIds: []
 });
 var existingLib = createLib(existingStore);
 var afterItems = existingLib.listAll().data.items;
-var old = byTemplate(afterItems, '8421-3');
-assert('已有用户不补第二条 8421-3', afterItems.length === 1);
+var old = byTemplate(afterItems, '8421-4');
+assert('已有用户不补第二条 8421-4', afterItems.length === 1);
 assert(
   '已有用户不覆盖自定义 snapshot',
   !!(
     old &&
-    old.id === 'rl_old_8421_3' &&
-    old.revision === 4 &&
+    old.id === 'rl_old_8421_4' &&
+    old.revision === 6 &&
     old.ruleSnapshot.deductCap === 'none' &&
     old.ruleSnapshot.baoNeg === 'ahead' &&
-    rowVal(old.ruleSnapshot.scoreRows, 'hio') === '50' &&
-    rowVal(old.ruleSnapshot.meatRows, 'par') === '9'
+    rowVal(old.ruleSnapshot.scoreRows, 'hio') === '99' &&
+    rowVal(old.ruleSnapshot.meatRows, 'par') === '7'
   )
 );
-
-var missingStore = memStorage();
-missingStore.setItem(localLib.STORAGE_KEY, {
-  schemaVersion: 4,
-  items: [
-    {
-      id: 'rl_custom_stroke',
-      name: '我的比杆',
-      catalogId: 'stroke-2',
-      ruleId: 'stroke-2',
-      sourceTemplateId: 'stroke-2',
-      players: 2,
-      revision: 1,
-      ruleSnapshot: { catalogId: 'stroke-2', reward: 'add' }
-    }
-  ],
-  processedSourceTemplateIds: ['stroke-2', 'match-2', '8421-2', 'landlord-mid'],
-  dismissedDefaultRuleIds: []
-});
-assert('已有库缺 8421-3 不补种', !byTemplate(createLib(missingStore).listAll().data.items, '8421-3'));
 
 var defaultsSrc = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram/subpackages/game/utils/sideGameRuleDefaults.js'),
   'utf8'
 );
 assert(
-  '8421-2/3 走 apply8421GameplayDefaults',
+  '8421-4 走 apply8421GameplayDefaults',
   defaultsSrc.indexOf('function apply8421GameplayDefaults') >= 0 &&
-    defaultsSrc.indexOf('id === "8421-3"') >= 0
+    defaultsSrc.indexOf('id === "8421-4"') >= 0
 );
 
 var editSrc = fs.readFileSync(
@@ -235,9 +224,9 @@ var editSrc = fs.readFileSync(
   'utf8'
 );
 assert(
-  '新建页 8421-3 初值走 canonical',
-  editSrc.indexOf('is8421Canon') >= 0 && editSrc.indexOf('canonSnap.deductCap') >= 0
+  '新建页 8421-4 初值走 canonical',
+  editSrc.indexOf('is8421Canon') >= 0 && editSrc.indexOf('is8421Four') >= 0
 );
 
-console.log('\nruleLibrary8421ThreeDefaults.selftest passed=' + passed + ' failed=' + failed);
+console.log('\nruleLibrary8421FourDefaults.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);
