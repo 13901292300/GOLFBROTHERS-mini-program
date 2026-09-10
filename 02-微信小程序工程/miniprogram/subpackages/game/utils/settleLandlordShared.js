@@ -197,9 +197,11 @@ function nextOrder(order, rec, hist, game, spec, isPush) {
   if (mode === "fixed") policy = "fixed";
   else if (mode === "split-high" && !(spec && spec.allowSplitHigh === false)) policy = "split-high";
   const pushPolicy =
-    spec && spec.keepOrderOnPush
-      ? "keep-combination"
-      : holeOrder.pushPolicyFromReorderOnPush(game && game.ruleSnapshot);
+    spec && spec.pushPolicy
+      ? holeOrder.pushPolicyOf(spec.pushPolicy)
+      : spec && spec.keepOrderOnPush
+        ? "keep-combination"
+        : holeOrder.pushPolicyFromReorderOnPush(game && game.ruleSnapshot);
   return holeOrder.resolveNextHoleOrder({
     currentOrder: order,
     holeScores: rec,
