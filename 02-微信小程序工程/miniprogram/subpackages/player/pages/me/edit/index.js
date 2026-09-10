@@ -7,6 +7,7 @@ const genderNormalize = require('../../../../../utils/genderNormalize.js');
 const geoCatalog = require('../../../../../utils/geoCatalog.js');
 const profileOnboard = require('../../../../../utils/teamClub/profileOnboard.js');
 const profileFields = require('../../../../../utils/teamClub/profileFields.js');
+const mockAvatars = require('../../../../../utils/mockAvatars.js');
 
 const IDENTITY_PLAYER = userProfileStore.IDENTITY_PLAYER || 'PLAYER';
 const IDENTITY_CADDIE = userProfileStore.IDENTITY_CADDIE || 'CADDIE';
@@ -249,10 +250,11 @@ Page({
     const commitBoth = (cloudAvatar, localPath, unlinkPreviousLocal) => {
       const next = String(cloudAvatar || '').trim();
       if (!profileFields.isDurableAvatar(next)) return false;
-      const payload = {
-        avatar: next,
-        avatarLocalPath: String(localPath || '')
-      };
+      const payload = { avatar: next };
+      const local = String(localPath || '').trim();
+      if (local && mockAvatars.isDurableLocalUserFile(local)) {
+        payload.avatarLocalPath = local;
+      }
       if (typeof userProfileStore.commitAvatarCanonicalAndLocal === 'function') {
         userProfileStore.commitAvatarCanonicalAndLocal(payload, {
           unlinkPreviousLocal: unlinkPreviousLocal !== false
@@ -266,7 +268,7 @@ Page({
     const persistThenUploadCanonical = (done) => {
       userProfileStore.persistAvatarFile(path, (res) => {
         const saved = res && res.ok ? String(res.path || '').trim() : '';
-        const localPath = saved && !profileFields.isDurableAvatar(saved) ? saved : '';
+        const localPath = mockAvatars.isDurableLocalUserFile(saved) ? saved : '';
         done({
           localPath: localPath,
           persistOk: !!saved

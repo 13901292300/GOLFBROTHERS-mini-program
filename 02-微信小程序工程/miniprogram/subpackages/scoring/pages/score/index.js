@@ -86,6 +86,7 @@ const contactStore = require('../../../../utils/contactStore.js');
 
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
+const scoreAvatarFastPath = require('../../../../utils/scoreAvatarFastPath.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
 const {
@@ -3329,14 +3330,17 @@ Page({
       isFourball40StrokeShell: isFourball40StrokeShell,
       // TEAM SCORE 文案仅正式 4+0/3+0/3+1；fallback 用头像+昵称，不占赛制文案
       strokeShellFormatLabel: isFourball40StrokeShell ? label : '',
-      playersView: isFourball40StrokeShell
-        ? this._buildFourball40PlayersView(this.data.scoreDisplayMode, label, hasMatch)
-        : isFourballIndividualFallback
-          ? this._buildFourballIndividualFallbackPlayersView(
-              this.data.scoreDisplayMode,
-              hasMatch
-            )
-          : this.data.playersView
+      playersView: scoreAvatarFastPath.reuseUnchangedAvatarRows(
+        this.data.playersView,
+        isFourball40StrokeShell
+          ? this._buildFourball40PlayersView(this.data.scoreDisplayMode, label, hasMatch)
+          : isFourballIndividualFallback
+            ? this._buildFourballIndividualFallbackPlayersView(
+                this.data.scoreDisplayMode,
+                hasMatch
+              )
+            : this.data.playersView
+      )
     });
 
     // 球场信息继承：球场名称 / 开球时间等全部来自 matchState.course
@@ -6259,6 +6263,12 @@ Page({
         diffOpacity: 1,
         nameWidth: 96
       });
+    }
+    if (Array.isArray(patch.playersView)) {
+      patch.playersView = scoreAvatarFastPath.reuseUnchangedAvatarRows(
+        this.data.playersView,
+        patch.playersView
+      );
     }
     const painted = this._rankMarkProjection || {};
     paintViewRowsTriColor(patch.playersView, painted);

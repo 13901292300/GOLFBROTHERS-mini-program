@@ -17,6 +17,8 @@ const mockAvatars = require('./mockAvatars.js');
 
 const STORAGE_KEY = 'gb_user_profile_v1';
 
+let _ensureAvatarLocalInflight = false;
+
 const IDENTITY_PLAYER = 'PLAYER';
 const IDENTITY_CADDIE = 'CADDIE';
 
@@ -363,25 +365,26 @@ function commitAvatarCanonicalAndLocal(input, opts) {
   const nextPath = _normalizeAvatarLocalPath(input && input.avatarLocalPath);
   const current = loadProfile();
   const oldPath = _normalizeAvatarLocalPath(current.avatarLocalPath);
+  const patch = { avatar: canonical };
+  // 空 localPath 不得清掉已有 usr 缓存（onboard 上传成功但 persist 失败时仍保留旧 local）
+  if (nextPath) patch.avatarLocalPath = nextPath;
   let saved;
   try {
-    saved = updateProfile({
-      avatar: canonical,
-      avatarLocalPath: nextPath
-    });
+    saved = updateProfile(patch);
   } catch (e) {
-    discardUnusedAvatarLocalFile(nextPath, oldPath);
+    if (nextPath) discardUnusedAvatarLocalFile(nextPath, oldPath);
     throw e;
   }
   const raw = _readRaw() || {};
   const persistedAvatar = String(raw.avatar || '').trim();
   const persistedLocal = _normalizeAvatarLocalPath(raw.avatarLocalPath);
-  if (persistedAvatar !== canonical || persistedLocal !== nextPath) {
-    discardUnusedAvatarLocalFile(nextPath, oldPath);
+  const localOk = nextPath ? persistedLocal === nextPath : persistedLocal === oldPath;
+  if (persistedAvatar !== canonical || !localOk) {
+    if (nextPath) discardUnusedAvatarLocalFile(nextPath, oldPath);
     throw new Error('avatar_commit_not_persisted');
   }
   const unlinkPrevious = !opts || opts.unlinkPreviousLocal !== false;
-  if (unlinkPrevious) {
+  if (nextPath && unlinkPrevious) {
     discardUnusedAvatarLocalFile(oldPath, saved && saved.avatarLocalPath);
   }
   return saved;
@@ -484,6 +487,70 @@ function persistAvatarFile(tempPath, callback) {
   _wxSaveFileFallback(path, done);
 }
 
+function hasValidAvatarLocalPath(profile) {
+  const p = profile && typeof profile === 'object' ? profile : {};
+  const local = _normalizeAvatarLocalPath(p.avatarLocalPath);
+  return !!(local && _localAvatarFileExists(local));
+}
+
+/**
+ * 仅当 canonical 为 cloud:// 且本机 usr 缓存缺失时，后台下载并写入 avatarLocalPath。
+ * 不改 canonical、不阻塞 UI、不给页面回调去替换 <image src>。
+ * callback({ ok, skipped, path, reason })
+ */
+function ensureAvatarLocalCopy(callback) {
+  const done = typeof callback === 'function' ? callback : function () {};
+  if (_ensureAvatarLocalInflight) {
+    done({ ok: false, skipped: true, reason: 'inflight' });
+    return;
+  }
+  let profile;
+  try {
+    profile = loadProfile() || {};
+  } catch (eLoad) {
+    done({ ok: false, reason: 'load_failed' });
+    return;
+  }
+  if (hasValidAvatarLocalPath(profile)) {
+    done({ ok: true, skipped: true, path: _normalizeAvatarLocalPath(profile.avatarLocalPath) });
+    return;
+  }
+  const canonical = String(profile.avatar || '').trim();
+  if (!/^cloud:\/\//i.test(canonical)) {
+    done({ ok: true, skipped: true, reason: 'not_cloud' });
+    return;
+  }
+  if (typeof wx === 'undefined' || !wx.cloud || typeof wx.cloud.downloadFile !== 'function') {
+    done({ ok: false, reason: 'download_unavailable' });
+    return;
+  }
+  _ensureAvatarLocalInflight = true;
+  wx.cloud.downloadFile({
+    fileID: canonical,
+    success: (res) => {
+      const temp = String((res && res.tempFilePath) || '').trim();
+      persistAvatarFile(temp, (saved) => {
+        _ensureAvatarLocalInflight = false;
+        const localPath = saved && saved.ok ? String(saved.path || '').trim() : '';
+        if (!localPath || !mockAvatars.isDurableLocalUserFile(localPath)) {
+          done({ ok: false, reason: 'persist_failed' });
+          return;
+        }
+        try {
+          commitAvatarLocalPath(localPath);
+          done({ ok: true, path: localPath });
+        } catch (eCommit) {
+          done({ ok: false, reason: 'commit_failed' });
+        }
+      });
+    },
+    fail: () => {
+      _ensureAvatarLocalInflight = false;
+      done({ ok: false, reason: 'download_failed' });
+    }
+  });
+}
+
 module.exports = {
   STORAGE_KEY,
   DEFAULT_AVATAR,
@@ -504,5 +571,7 @@ module.exports = {
   resolveCurrentUserAvatarDisplay,
   commitAvatarLocalPath,
   commitAvatarCanonicalAndLocal,
-  discardUnusedAvatarLocalFile
+  discardUnusedAvatarLocalFile,
+  hasValidAvatarLocalPath,
+  ensureAvatarLocalCopy
 };

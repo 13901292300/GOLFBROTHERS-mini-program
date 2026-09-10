@@ -71,12 +71,32 @@ App({
       } catch (e) {
         /* 云身份失败由球队页展示，不在启动时静默回落本地仓储 */
       }
+      self._scheduleAvatarLocalCopy();
     }
   },
 
 
   onShow: function () {
     this._tryFlushScoreSync();
+  },
+
+  _scheduleAvatarLocalCopy: function () {
+    var run = function () {
+      try {
+        require('./utils/userProfileStore.js').ensureAvatarLocalCopy();
+      } catch (eCopy) {
+        /* ignore */
+      }
+    };
+    try {
+      if (typeof wx !== 'undefined' && typeof wx.nextTick === 'function') {
+        wx.nextTick(run);
+        return;
+      }
+    } catch (eTick) {
+      /* ignore */
+    }
+    setTimeout(run, 0);
   },
 
   _applyNetworkState: function (state) {
