@@ -3,6 +3,7 @@
  */
 const core = require("./settleCore.js");
 const lasuo = require("./settleLasuoN.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
 
 const TRI_BLUE = "#007AFF";
 const TRI_RED = "#FF3B30";
@@ -112,6 +113,7 @@ function settle(game, payload) {
   const ledger = core.emptyLedger(ids);
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   const hist = [];
   let meatPool = 0;
   let meatEaten = 0;
@@ -128,7 +130,7 @@ function settle(game, payload) {
     if (prefixBlocked) return;
 
     if (isFixed || !startMarked || rankedNext) {
-      orderByHole[hole] = order.slice();
+      assignmentNormalize.stamp(orderByHole, assignmentsByHole, hole, order, layout(order, game), game);
     }
     startMarked = true;
 
@@ -225,6 +227,7 @@ function settle(game, payload) {
     byHole: byHole,
     totals: ledger,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     meatEatCount: meatEaten,
     topHoleStates: topHoleTracker.states
   };

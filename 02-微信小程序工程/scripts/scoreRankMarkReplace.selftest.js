@@ -19,6 +19,12 @@ var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var scoreRank = require('../miniprogram/subpackages/scoring/utils/scoreRankMark.js');
 var projectMod = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
+var coord = require('../miniprogram/subpackages/game/utils/sideGameSettleCoordinator.js');
+
+function settleThenProject(input) {
+  coord.settleSideGamesForScoreMutation(input);
+  return projectMod.project(input);
+}
 
 var mini = path.join(__dirname, '..', 'miniprogram');
 var passed = 0;
@@ -118,10 +124,6 @@ function allEmptyFrom(cells, fromHi) {
 }
 
 var scoreJs = fs.readFileSync(path.join(mini, 'subpackages/scoring/pages/score/index.js'), 'utf8');
-var engineJs = fs.readFileSync(
-  path.join(mini, 'subpackages/game/components/rank-mark-engine/index.js'),
-  'utf8'
-);
 var projJs = fs.readFileSync(
   path.join(mini, 'subpackages/game/utils/rankMarkProjection.js'),
   'utf8'
@@ -133,8 +135,16 @@ assert(
     /replaceRankMarkProjection/.test(scoreJs) &&
     /completeProjection/.test(scoreJs)
 );
-assert('onRankMarkChange 走完整替换', /replaceRankMarkProjection\(this, d\.projection/.test(scoreJs));
-assert('失败时整体清空', /!d\.ok[\s\S]*replaceRankMarkProjection\(this, \{\}/.test(scoreJs));
+assert(
+  'onRankMarkChange 成功时不以 engine 覆盖 storage',
+  /onRankMarkChange/.test(scoreJs) &&
+    !/replaceRankMarkProjection\(this, d\.projection/.test(scoreJs)
+);
+assert(
+  '成绩成功写入后调用 side-game settle',
+  /_settleSideGamesAfterScoreMutation/.test(scoreJs) &&
+    /_afterScoresPersisted[\s\S]{0,400}_settleSideGamesAfterScoreMutation/.test(scoreJs)
+);
 assert('刷新前 blankThenPaint cells', /blankThenPaintCells/.test(scoreJs));
 assert('首屏同步 projectFromStorage', /projectFromStorage\(official\)/.test(scoreJs));
 assert(
@@ -142,7 +152,7 @@ assert(
   !/_rankMarkScopeKey !== scopeKey[\s\S]{0,180}replaceRankMarkProjection\(page, \{\}/.test(scoreJs)
 );
 assert('投影写入全部 18 洞含空 mark', /holes\[String\(hi\)\] = visual\.normalizeMark/.test(projJs));
-assert('engine 仍 emit projection', /triggerEvent\('rankmarkchange'/.test(engineJs));
+assert('rankMarkProjection 不再 emitGuard/persist 写盘', !/engineEmitGuard/.test(projJs) && !/persistWanted/.test(projJs));
 
 global.__gb_side_games = [makeRecord()];
 var filled5 = {
@@ -151,7 +161,7 @@ var filled5 = {
   pC: filledScores(5),
   pD: filledScores(5)
 };
-var proj5 = projectMod.project(officialInput(filled5));
+var proj5 = settleThenProject(officialInput(filled5));
 var keys5 = Object.keys(proj5.pA || {});
 assert(
   '完整投影每个 player 都有 0..17',
@@ -188,7 +198,7 @@ afterClearHole2Scores.pC[1] = '';
 afterClearHole2Scores.pD[1] = '';
 
 global.__gb_side_games = [makeRecord()];
-var projAfter = projectMod.project(officialInput(afterClearHole2Scores));
+var projAfter = settleThenProject(officialInput(afterClearHole2Scores));
 var completeAfter = mark.completeProjection(projAfter, ['pA', 'pB', 'pC', 'pD']);
 
 var staleMerged = Object.assign({}, sparseKeep);
@@ -235,7 +245,7 @@ assert(
 );
 
 global.__gb_side_games = [makeRecord()];
-var restored = projectMod.project(officialInput(filled5));
+var restored = settleThenProject(officialInput(filled5));
 var paintedRestored = mark.blankThenPaintCells(paintedNew, 'pA', mark.completeProjection(proj5, ['pA']));
 assert(
   '6. 补全洞2 后后续三角恢复',
@@ -253,7 +263,7 @@ clearHole1.pA[0] = '';
 clearHole1.pB[0] = '';
 clearHole1.pC[0] = '';
 clearHole1.pD[0] = '';
-var projClear1 = mark.completeProjection(projectMod.project(officialInput(clearHole1)), ['pA']);
+var projClear1 = mark.completeProjection(settleThenProject(officialInput(clearHole1)), ['pA']);
 var paintedClear1 = mark.blankThenPaintCells(cells5, 'pA', projClear1);
 assert('7. 清除洞1 后洞2–18 旧三角清除', allEmptyFrom(paintedClear1, 1));
 
@@ -272,7 +282,7 @@ clearMid.pA[3] = '';
 clearMid.pB[3] = '';
 clearMid.pC[3] = '';
 clearMid.pD[3] = '';
-var projTwoGap = mark.completeProjection(projectMod.project(officialInput(clearMid)), ['pA']);
+var projTwoGap = mark.completeProjection(settleThenProject(officialInput(clearMid)), ['pA']);
 var paintedGap = mark.blankThenPaintCells(cells5, 'pA', projTwoGap);
 assert(
   '8. 连续清除两个中间洞无跨缺口残留',

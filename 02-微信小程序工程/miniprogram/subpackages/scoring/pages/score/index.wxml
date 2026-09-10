@@ -1425,6 +1425,7 @@
       </scroll-view>
     </view>
 
+    <side-game-settle-host id="sideGameSettleHost"></side-game-settle-host>
     <rank-mark-engine
       wx:if="{{rankMarkEngineOn}}"
       input="{{rankMarkInput}}"

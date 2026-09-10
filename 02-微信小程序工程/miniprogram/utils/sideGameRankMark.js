@@ -367,22 +367,22 @@ function holeLabelAtIndex(game, holeIndex) {
   return defaultAbLabels()[i] || '';
 }
 
-function colorForGameCell(game, label, playerId) {
-  var id = catalogIdOf(game);
-  if (!usesRankMark(id)) return '';
-  var orderId = resolveOrderId(game, playerId);
-  if (!orderId) return '';
-  if (!holeOn(game, label)) return '';
-  var order = gameOrderForHole(game, label);
-  if (!order || !order.length) return '';
-  var idx = order.indexOf(orderId);
-  if (idx < 0) return '';
-  if (isLasuoN(id)) return lasuoNTriColor(game, order, orderId);
-  if (isHorn(id)) return hornTriColor(game, order, orderId);
-  return rankTriColor(id, order.length, game.groupMode, idx, game.dizhuboMode);
+var legacyMarkForGameCellCalls = 0;
+
+function resetLegacyMarkCalls() {
+  legacyMarkForGameCellCalls = 0;
 }
 
-function markForGameCell(game, label, playerId) {
+function getLegacyMarkCalls() {
+  return legacyMarkForGameCellCalls;
+}
+
+function colorForGameCell(game, label, playerId) {
+  return markForGameCell(game, label, playerId).triColor;
+}
+
+function markForGameCellLegacy(game, label, playerId) {
+  legacyMarkForGameCellCalls += 1;
   var id = catalogIdOf(game);
   if (!usesRankMark(id)) return visual.emptyMark();
   var orderId = resolveOrderId(game, playerId);
@@ -403,6 +403,16 @@ function markForGameCell(game, label, playerId) {
   return visual.fromSandboxColor(
     rankTriColor(id, order.length, game.groupMode, idx, game.dizhuboMode)
   );
+}
+
+function markForGameCell(game, label, playerId) {
+  var orderId = resolveOrderId(game, playerId) || asString(playerId);
+  var resolved = visual.resolveAssignmentForHole(game, label, orderId);
+  if (resolved.source === 'assignment') {
+    if (!resolved.assignment) return visual.emptyMark();
+    return visual.markFromAssignment(resolved.assignment);
+  }
+  return markForGameCellLegacy(game, label, playerId);
 }
 
 function colorForGameCellAtIndex(game, holeIndex, playerId) {
@@ -687,6 +697,8 @@ module.exports = {
   colorForGameCell: colorForGameCell,
   markForGameCell: markForGameCell,
   markForGameCellAtIndex: markForGameCellAtIndex,
+  resetLegacyMarkCalls: resetLegacyMarkCalls,
+  getLegacyMarkCalls: getLegacyMarkCalls,
   colorForCell: colorForCell,
   recordToGame: recordToGame,
   recordsForScorePage: recordsForScorePage,
@@ -705,6 +717,8 @@ module.exports = {
   colorForGameCellAtIndex: colorForGameCellAtIndex,
   emptyMark: visual.emptyMark,
   normalizeMark: visual.normalizeMark,
+  markFromAssignment: visual.markFromAssignment,
+  resolveAssignmentForHole: visual.resolveAssignmentForHole,
   fromRank: visual.fromRank,
   inspect: inspect
 };

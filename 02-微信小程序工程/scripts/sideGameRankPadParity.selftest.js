@@ -19,6 +19,7 @@ if (typeof global.wx !== 'object') {
 var officialSettle = require('../miniprogram/subpackages/game/utils/settle.js');
 var officialCatalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var officialProj = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
+var coord = require('../miniprogram/subpackages/game/utils/sideGameSettleCoordinator.js');
 var officialMark = require('../miniprogram/utils/sideGameRankMark.js');
 var visual = require('../miniprogram/utils/rankMarkVisual.js');
 
@@ -48,11 +49,13 @@ function holeLabels(game) {
 
 function officialPad(record, relScores) {
   global.__gb_side_games = [JSON.parse(JSON.stringify(record))];
-  var projection = officialProj.project({
+  var official = {
     matchId: record.matchId,
     groupId: record.groupId,
     relScores: relScores
-  });
+  };
+  coord.settleSideGamesForScoreMutation(official);
+  var projection = officialProj.project(official);
   var game = officialProj.recordToGame(record);
   var pids = (game.players || []).map(function (p) {
     return String(p.id);
@@ -278,10 +281,10 @@ assert(
   fs.readFileSync(path.join(scoringRoot, 'pages', 'score', 'index.wxss'), 'utf8').indexOf('subpackages/game') < 0
 );
 assert(
-  'scoring 异步引用 rank-mark-engine',
-  /rank-mark-engine/.test(scoreJson) &&
+  'scoring 异步引用 side-game-settle-host',
+  /side-game-settle-host/.test(scoreJson) &&
     /componentPlaceholder/.test(scoreJson) &&
-    /wx:if="\{\{rankMarkEngineOn\}\}"/.test(scoreWxml)
+    /id="sideGameSettleHost"/.test(scoreWxml)
 );
 assert(
   '主包无 sideGameSettle 副本',
@@ -314,16 +317,20 @@ assert(
   '无分边游戏时检测为假',
   officialMark.hasRankMarkGames({ matchId: 'm-parity', groupId: 'casual-match-g1' }) === false
 );
-assert('记分页按 hasRankMarkGames 决定实例化', /hasRankMarkGames/.test(scoreJs) && /rankMarkEngineOn/.test(scoreJs));
+assert('记分页按 hasRankMarkGames 决定着色', /hasRankMarkGames/.test(scoreJs) && /projectFromStorage/.test(scoreJs));
 
 var engineJs = fs.readFileSync(
   path.join(__dirname, '..', 'miniprogram', 'subpackages', 'game', 'components', 'rank-mark-engine', 'index.js'),
   'utf8'
 );
-assert('计算组件调用 project 并回传', /project\.project/.test(engineJs) && /rankmarkchange/.test(engineJs));
-assert('组件失败回传空投影', /ok: false/.test(engineJs) && /projection: \{\}/.test(engineJs));
+var hostJs = fs.readFileSync(
+  path.join(__dirname, '..', 'miniprogram', 'subpackages', 'game', 'components', 'side-game-settle-host', 'index.js'),
+  'utf8'
+);
+assert('rank-mark-engine 只 project 不 saveRecords', /project\.project/.test(engineJs) && engineJs.indexOf('saveRecords') < 0);
+assert('settle-host 只提供显式 settleForOfficial', /settleForOfficial/.test(hostJs));
 assert('换 match/group 清除旧投影', /_rankMarkScopeKey/.test(scoreJs) && /replaceRankMarkProjection\(page, \{\}\)/.test(scoreJs));
-assert('组件失败不影响正式记分', /onRankMarkChange/.test(scoreJs) && scoreJs.indexOf('player.scores[') >= 0);
+assert('组件失败不影响正式记分', /_afterScoresPersisted/.test(scoreJs) && /persistSession/.test(scoreJs));
 
 console.log('\nsideGameRankPadParity.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

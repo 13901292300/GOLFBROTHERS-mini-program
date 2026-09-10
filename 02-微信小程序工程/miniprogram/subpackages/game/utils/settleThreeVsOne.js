@@ -7,6 +7,7 @@
  */
 const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
 
 const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
 const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
@@ -204,6 +205,7 @@ function settleThreeVsOne(game, ctx) {
   let meatPool = 0;
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   const lastLabel = core.lastOnLabel(game, holeOrder);
   const windOn = !!(ctx && ctx.windOn);
 
@@ -214,7 +216,17 @@ function settleThreeVsOne(game, ctx) {
       byHole[label] = ledger;
       return;
     }
-    orderByHole[label] = order.slice();
+    assignmentNormalize.stamp(
+      orderByHole,
+      assignmentsByHole,
+      label,
+      order,
+      {
+        aTeam: [order[0]],
+        bTeam: order.slice(1, 4)
+      },
+      game
+    );
     const par = holePar(ctx, label);
     const rec = {};
     let ready = true;
@@ -270,6 +282,7 @@ function settleThreeVsOne(game, ctx) {
   return {
     byHole: byHole,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "three-vs-one",
     topHoleStates: topHoleTracker.states

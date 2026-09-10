@@ -54,6 +54,82 @@ function fromAbSide(side) {
   return emptyMark();
 }
 
+function markFromAssignment(assignment) {
+  var side = asString(assignment && assignment.side);
+  var role = asString(assignment && assignment.role);
+  if (side === 'gold' || side === 'flower') {
+    return {
+      triColor: VIS_GOLD,
+      gameCornerRank: null,
+      triangleClass: 'triangle-gold',
+      hasWaist: false
+    };
+  }
+  var waist = role === 'secondary';
+  if (side === 'blue') {
+    return {
+      triColor: VIS_BLUE,
+      gameCornerRank: null,
+      triangleClass: 'triangle-blue',
+      hasWaist: waist
+    };
+  }
+  if (side === 'red') {
+    return {
+      triColor: VIS_RED,
+      gameCornerRank: null,
+      triangleClass: 'triangle-red',
+      hasWaist: waist
+    };
+  }
+  return emptyMark();
+}
+
+function resultSnapshotOf(game) {
+  return (game && (game.holeResults || game.resultSnapshot)) || {};
+}
+
+function holeAssignments(game, label) {
+  var rs = resultSnapshotOf(game);
+  var map = rs.assignmentsByHole;
+  if (!map || typeof map !== 'object') return null;
+  var key = asString(label);
+  if (!Object.prototype.hasOwnProperty.call(map, key)) return null;
+  var list = map[key];
+  if (!Array.isArray(list)) return null;
+  return list;
+}
+
+/**
+ * Assignment authority for one hole.
+ * If resultSnapshot.assignmentsByHole exists (new GAME / new settle), never fall back to order.
+ * Legacy only when the map field is missing entirely.
+ */
+function resolveAssignmentForHole(game, label, playerId) {
+  var rs = resultSnapshotOf(game);
+  var map = rs.assignmentsByHole;
+  if (!map || typeof map !== 'object') {
+    return { source: 'legacy', assignment: null };
+  }
+  var list = holeAssignments(game, label) || [];
+  var pid = asString(playerId);
+  var i;
+  for (i = 0; i < list.length; i++) {
+    if (asString(list[i] && list[i].playerId) === pid) {
+      return { source: 'assignment', assignment: list[i] };
+    }
+  }
+  return { source: 'assignment', assignment: null };
+}
+
+function assignmentForPlayer(game, label, playerId) {
+  var resolved = resolveAssignmentForHole(game, label, playerId);
+  if (resolved.source !== 'assignment') {
+    return { foundHole: false, assignment: null };
+  }
+  return { foundHole: true, assignment: resolved.assignment };
+}
+
 function toneOfColor(color) {
   var c = asString(color).toLowerCase();
   if (!c) return '';
@@ -223,6 +299,10 @@ module.exports = {
   emptyMark: emptyMark,
   fromRank: fromRank,
   fromAbSide: fromAbSide,
+  markFromAssignment: markFromAssignment,
+  holeAssignments: holeAssignments,
+  resolveAssignmentForHole: resolveAssignmentForHole,
+  assignmentForPlayer: assignmentForPlayer,
   fromSandboxColor: fromSandboxColor,
   providesHoleRanks: providesHoleRanks,
   isSplitHighGroupMode: isSplitHighGroupMode,

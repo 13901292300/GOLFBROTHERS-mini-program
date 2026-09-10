@@ -137,7 +137,10 @@ assert(
   !/_rankMarkScopeKey !== scopeKey[\s\S]{0,180}replaceRankMarkProjection\(page, \{\}/.test(scoreJs)
 );
 assert('不 require 游戏分包投影模块', scoreJs.indexOf("game/utils/rankMarkProjection") < 0);
-assert('engine 仍可校验', /rankMarkEngineOn/.test(scoreJs) && /onRankMarkChange/.test(scoreJs));
+assert(
+  '成绩 mutation 后显式 settle',
+  /_settleSideGamesAfterScoreMutation/.test(scoreJs) && /sideGameSettleHost/.test(scoreJs)
+);
 
 console.log('\nscoreRankMarkFirstPaint.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);

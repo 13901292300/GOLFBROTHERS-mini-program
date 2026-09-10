@@ -8,6 +8,8 @@
  * 分差≤N：得分照算并攒 1 块肉，本洞不吃肉。
  */
 const core = require("./settleCore.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
+const holeOrder = require("./resolveNextHoleOrder.js");
 
 const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
 
@@ -162,19 +164,16 @@ function stableSort(arr, cmp) {
   return a;
 }
 
-function nextOrder(order, rec, hist, game, rule, isPush) {
-  const mode = (game && game.groupMode) || "fixed";
-  if (mode === "fixed") return order.slice();
-  const reorderOnPush = (rule && rule.reorderOnPush) === "yes";
-  if (isPush && !reorderOnPush) return order.slice();
-  const rankId = (game && game.rankId) || "gross-origin";
-  const cmp = function (x, y) {
-    return cmpPlayers(x, y, rec, hist, rankId);
-  };
-  if (mode === "split-high" && order.length >= 4) {
-    return stableSort(order.slice(0, 2), cmp).concat(stableSort(order.slice(2, 4), cmp));
-  }
-  return stableSort(order, cmp);
+function nextOrder(order, rec, hist, game, isPush) {
+  return holeOrder.resolveNextHoleOrder({
+    currentOrder: order,
+    holeScores: rec,
+    rankingPolicy: holeOrder.rankingPolicyOf(game),
+    rankingRule: { rankId: (game && game.rankId) || "gross-origin" },
+    pushPolicy: holeOrder.pushPolicyFromReorderOnPush(game && game.ruleSnapshot),
+    isPush: isPush === true,
+    tieBreakContext: { history: hist }
+  });
 }
 
 function teamsOf(order, mode) {
@@ -289,6 +288,7 @@ function settleVegas(game, ctx) {
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   let rankedNext = false;
   let startMarked = false;
   let prefixBlocked = false;
@@ -306,7 +306,16 @@ function settleVegas(game, ctx) {
       byHole[label] = ledger;
       return;
     }
-    if (!startMarked || rankedNext) orderByHole[label] = order.slice();
+    if (!startMarked || rankedNext) {
+      assignmentNormalize.stamp(
+        orderByHole,
+        assignmentsByHole,
+        label,
+        order,
+        teamsOf(order, (game && game.groupMode) || "fixed"),
+        game
+      );
+    }
     startMarked = true;
     const par = holePar(ctx, label);
     const rec = {};
@@ -390,7 +399,7 @@ function settleVegas(game, ctx) {
       rec[id].pts = Number(ledger[id]) || 0;
     });
     hist.push(rec);
-    order = nextOrder(order, rec, hist, game, rule, isPush);
+    order = nextOrder(order, rec, hist, game, isPush === true);
     rankedNext = true;
     byHole[label] = ledger;
   });
@@ -398,6 +407,7 @@ function settleVegas(game, ctx) {
   return {
     byHole: byHole,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "vegas",
     topHoleStates: topHoleTracker.states

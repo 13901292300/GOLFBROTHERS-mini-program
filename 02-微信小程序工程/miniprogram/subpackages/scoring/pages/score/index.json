@@ -8,11 +8,13 @@
     "player-action-modal": "/components/player-action-modal/index",
     "player-reaction-overlay": "/subpackages/reaction/components/player-reaction-overlay/index",
     "game-tab": "/subpackages/game/components/game-tab/index",
-    "rank-mark-engine": "/subpackages/game/components/rank-mark-engine/index"
+    "rank-mark-engine": "/subpackages/game/components/rank-mark-engine/index",
+    "side-game-settle-host": "/subpackages/game/components/side-game-settle-host/index"
   },
   "componentPlaceholder": {
     "player-reaction-overlay": "view",
     "game-tab": "view",
-    "rank-mark-engine": "view"
+    "rank-mark-engine": "view",
+    "side-game-settle-host": "view"
   }
 }

@@ -9,6 +9,8 @@
 const core = require("./settleCore.js");
 const s8421 = require("./settle8421.js");
 const settlePot = require("./settlePot.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
+const holeOrder = require("./resolveNextHoleOrder.js");
 
 function addPts(ledger, id, n) {
   ledger[id] = core.round1((Number(ledger[id]) || 0) + n);
@@ -75,11 +77,17 @@ function stableSort(arr, cmp) {
 
 function nextOrder(order, rec, hist, game, isPush) {
   const mode = (game && game.groupMode) || "fixed";
-  if (mode === "fixed") return order.slice();
-  if (isPush) return order.slice();
-  const rankId = (game && game.rankId) || "gross-origin";
-  return stableSort(order, function (a, b) {
-    return cmpByScore(a, b, rec, hist, rankId);
+  return holeOrder.resolveNextHoleOrder({
+    currentOrder: order,
+    holeScores: rec,
+    rankingPolicy: mode === "fixed" ? "fixed" : "dynamic",
+    rankingRule: {
+      rankId: (game && game.rankId) || "gross-origin",
+      metric: "score"
+    },
+    pushPolicy: "rerank",
+    isPush: isPush === true,
+    tieBreakContext: { history: hist }
   });
 }
 
@@ -133,6 +141,7 @@ function settle8421Three(game, ctx) {
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   const donateScaleByHole = {};
   let rankedNext = false;
   let startMarked = false;
@@ -151,7 +160,19 @@ function settle8421Three(game, ctx) {
       byHole[label] = ledger;
       return;
     }
-    if (!startMarked || rankedNext) orderByHole[label] = order.slice();
+    if (!startMarked || rankedNext) {
+      assignmentNormalize.stamp(
+        orderByHole,
+        assignmentsByHole,
+        label,
+        order,
+        {
+          aTeam: [order[0], order[2]],
+          bTeam: [order[1]]
+        },
+        game
+      );
+    }
     startMarked = true;
     const par = s8421.holePar(ctx, label);
     const rec = {};
@@ -247,7 +268,7 @@ function settle8421Three(game, ctx) {
     rec[mates[0]].pts = Number(ledger[mates[0]]) || 0;
     rec[mates[1]].pts = Number(ledger[mates[1]]) || 0;
     hist.push(rec);
-    order = nextOrder(order, rec, hist, game, isPush);
+    order = nextOrder(order, rec, hist, game, isPush === true);
     rankedNext = true;
     byHole[label] = ledger;
   });
@@ -255,6 +276,7 @@ function settle8421Three(game, ctx) {
   return {
     byHole: byHole,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     donateScaleByHole: donateScaleByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "8421-3",

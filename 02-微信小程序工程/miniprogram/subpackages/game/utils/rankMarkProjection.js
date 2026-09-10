@@ -1,12 +1,11 @@
 /**
- * 记分页红蓝三角投影：在 game 分包内跑沙盒
- * refreshActiveGames → settle.settleGame → rankTriColorForCell。
- * 只适配正式成绩下标，不另写推进规则。
+ * 记分页红蓝三角投影：只读已有 side-game snapshot，不 settle、不写盘。
  */
 var settle = require('./settle.js');
 var catalog = require('./catalog.js');
 var rec = require('./sideGameRecord.js');
 var visual = require('../../../utils/rankMarkVisual.js');
+var sideGameRankMark = require('../../../utils/sideGameRankMark.js');
 var temporaryCourse = require('../../../utils/temporaryCourse.js');
 
 var STORAGE_KEY = 'gb_side_games_v1';
@@ -203,41 +202,11 @@ function resolveOrderId(game, playerId) {
 }
 
 function colorForGameCell(game, label, playerId) {
-  var id = catalogIdOf(game);
-  if (!catalog.usesRankMark(id)) return '';
-  var orderId = resolveOrderId(game, playerId);
-  if (!orderId) return '';
-  if (!holeOn(game, label)) return '';
-  var order = gameOrderForHole(game, label);
-  if (!order || !order.length) return '';
-  var idx = order.indexOf(orderId);
-  if (idx < 0) return '';
-  if (catalog.isLasuoN(id)) return settle.lasuoNTriColor(game, order, orderId);
-  if (catalog.isHorn(id)) return settle.hornTriColor(game, order, orderId);
-  return catalog.rankTriColor(id, order.length, game.groupMode, idx, game.dizhuboMode);
+  return sideGameRankMark.colorForGameCell(game, label, playerId);
 }
 
 function markForGameCell(game, label, playerId) {
-  var id = catalogIdOf(game);
-  if (!catalog.usesRankMark(id)) return visual.emptyMark();
-  var orderId = resolveOrderId(game, playerId);
-  if (!orderId) return visual.emptyMark();
-  if (!holeOn(game, label)) return visual.emptyMark();
-  var order = gameOrderForHole(game, label);
-  if (!order || !order.length) return visual.emptyMark();
-  var idx = order.indexOf(orderId);
-  if (idx < 0) return visual.emptyMark();
-  if (catalog.isLasuoN(id)) return visual.fromSandboxColor(settle.lasuoNTriColor(game, order, orderId));
-  if (catalog.isHorn(id)) return visual.fromSandboxColor(settle.hornTriColor(game, order, orderId));
-  if (visual.providesHoleRanks(id, game.groupMode, order.length)) {
-    var rank = visual.isSplitHighGroupMode(game.groupMode)
-      ? visual.splitHighDisplayRank(game, order, orderId)
-      : idx + 1;
-    if (rank >= 1 && rank <= 4) return visual.fromRank(rank);
-  }
-  return visual.fromSandboxColor(
-    catalog.rankTriColor(id, order.length, game.groupMode, idx, game.dizhuboMode)
-  );
+  return sideGameRankMark.markForGameCell(game, label, playerId);
 }
 
 function colorForGameCellAtIndex(game, holeIndex, playerId) {
@@ -292,6 +261,23 @@ function isEndedGame(game, row) {
   return asString((game && game.status) || (row && row.status)) === 'ended';
 }
 
+function lastCompleteHoleIndex(official) {
+  var players = (official && official.players) || [];
+  if (!players.length) return -1;
+  var last = -1;
+  var hi;
+  for (hi = 0; hi < 18; hi++) {
+    var filled = players.every(function (p) {
+      var g = ((p && p.scores) || [])[hi];
+      if (g == null || g === '') return false;
+      return isFinite(Number(g));
+    });
+    if (!filled) break;
+    last = hi;
+  }
+  return last;
+}
+
 function refreshGameResults(row, official) {
   var game = recordToGame(row);
   if (isEndedGame(game, row)) return game;
@@ -324,12 +310,9 @@ function refreshGameResults(row, official) {
 function refreshActiveGames(query, official) {
   var all = loadRecords();
   var matched = recordsForScorePage(all, query);
-  var games = [];
-  matched.forEach(function (row) {
-    games.push(refreshGameResults(row, official || {}));
+  return matched.map(function (row) {
+    return recordToGame(row);
   });
-  saveRecords(all);
-  return games;
 }
 
 function collectPlayerIds(games, official) {
@@ -403,6 +386,23 @@ function chainAllowByGame(games, official) {
   });
 }
 
+function alwaysAllowByGame(games) {
+  return (games || []).map(function () {
+    var flags = [];
+    var hi;
+    for (hi = 0; hi < 18; hi++) flags[hi] = true;
+    return flags;
+  });
+}
+
+function holeLabelForProject(game, official, holeIndex) {
+  if (official && Array.isArray(official.holeLabels) && official.holeLabels[holeIndex] != null) {
+    var fromOfficial = asString(official.holeLabels[holeIndex]);
+    if (fromOfficial) return fromOfficial;
+  }
+  return holeLabelAtIndex(game, holeIndex);
+}
+
 function project(input) {
   var query = {
     matchId: asString(input && input.matchId),
@@ -411,7 +411,7 @@ function project(input) {
   var official = input || {};
   var games = refreshActiveGames(query, official);
   var pids = collectPlayerIds(games, official);
-  var allow = chainAllowByGame(games, official);
+  var allow = alwaysAllowByGame(games);
   var projection = {};
   pids.forEach(function (pid) {
     var holes = {};
@@ -421,7 +421,7 @@ function project(input) {
       var gi;
       for (gi = 0; gi < games.length; gi++) {
         if (!(allow[gi] && allow[gi][hi])) continue;
-        mark = markForGameCellAtIndex(games[gi], hi, pid);
+        mark = markForGameCell(games[gi], holeLabelForProject(games[gi], official, hi), pid);
         if (mark && mark.triangleClass) break;
       }
       holes[String(hi)] = visual.normalizeMark(mark);
@@ -449,10 +449,15 @@ function colorAt(projection, playerId, holeIndex) {
 module.exports = {
   STORAGE_KEY: STORAGE_KEY,
   project: project,
+  lastCompleteHoleIndex: lastCompleteHoleIndex,
+  loadRecords: loadRecords,
+  saveRecords: saveRecords,
+  recordsForScorePage: recordsForScorePage,
   refreshActiveGames: refreshActiveGames,
   refreshGameResults: refreshGameResults,
   colorAt: colorAt,
   markAt: markAt,
+  markForGameCell: markForGameCell,
   markForGameCellAtIndex: markForGameCellAtIndex,
   recordToGame: recordToGame,
   colorForGameCellAtIndex: colorForGameCellAtIndex

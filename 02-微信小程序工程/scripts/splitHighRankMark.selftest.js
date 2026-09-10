@@ -20,6 +20,11 @@ var visual = require('../miniprogram/utils/rankMarkVisual.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var projectMod = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
+var coord = require('../miniprogram/subpackages/game/utils/sideGameSettleCoordinator.js');
+function settleThenProject(input) {
+  coord.settleSideGamesForScoreMutation(input);
+  return projectMod.project(input);
+}
 var settleLasuo4 = require('../miniprogram/subpackages/game/utils/settleLasuo4.js');
 
 var mini = path.join(__dirname, '..', 'miniprogram');
@@ -236,22 +241,25 @@ function officialInput(scoresByPid) {
 
 global.__gb_side_games = [makeRecord('split-high')];
 var acceptScores = { pA: 5, pB: 6, pC: 3, pD: 4 };
-var projA = mark.completeProjection(projectMod.project(officialInput(acceptScores)), [
+var projA = mark.completeProjection(settleThenProject(officialInput(acceptScores)), [
   'pA',
   'pB',
   'pC',
   'pD'
 ]);
 assert(
-  '10 投影进入：低手最好仍腰线、高手蓝/红全色',
-  isSolidBlue(projectMod.markAt(projA, 'pA', 1)) &&
-    isSolidRed(projectMod.markAt(projA, 'pB', 1)) &&
-    isRegularMark(projectMod.markAt(projA, 'pC', 1)) &&
-    isRegularMark(projectMod.markAt(projA, 'pD', 1))
+  '10 投影进入：assignment 画出 side/role（无 gameCornerRank）；expert 不在 schema 里',
+  projectMod.markAt(projA, 'pA', 1).triangleClass === 'triangle-blue' &&
+    projectMod.markAt(projA, 'pA', 1).hasWaist === false &&
+    projectMod.markAt(projA, 'pB', 1).triangleClass === 'triangle-red' &&
+    projectMod.markAt(projA, 'pB', 1).hasWaist === false &&
+    projectMod.markAt(projA, 'pC', 1).hasWaist === true &&
+    projectMod.markAt(projA, 'pD', 1).hasWaist === true &&
+    projectMod.markAt(projA, 'pA', 1).gameCornerRank == null
 );
 
 global.__gb_side_games = [makeRecord('split-high')];
-var projB = mark.completeProjection(projectMod.project(officialInput(acceptScores)), [
+var projB = mark.completeProjection(settleThenProject(officialInput(acceptScores)), [
   'pA',
   'pB',
   'pC',
@@ -261,7 +269,7 @@ assert(
   '10 退出再进入标识一致',
   projectMod.markAt(projA, 'pA', 1).triangleClass === projectMod.markAt(projB, 'pA', 1).triangleClass &&
     projectMod.markAt(projA, 'pC', 1).hasWaist === projectMod.markAt(projB, 'pC', 1).hasWaist &&
-    projectMod.markAt(projB, 'pC', 1).gameCornerRank === 3
+    projectMod.markAt(projB, 'pC', 1).hasWaist === true
 );
 
 var randomGame = splitHighGame({ groupMode: 'random', holeResults: { orderByHole: {} } });
@@ -286,23 +294,25 @@ assert(
 );
 
 var srcLasuo = fs.readFileSync(path.join(mini, 'subpackages', 'game', 'utils', 'settleLasuo4.js'), 'utf8');
+var srcResolver = fs.readFileSync(
+  path.join(mini, 'subpackages', 'game', 'utils', 'resolveNextHoleOrder.js'),
+  'utf8'
+);
 assert(
   '12 分队仍按分区切片排序，未改 nextOrder',
-  /mode === "split-high" && order.length >= 4/.test(srcLasuo) &&
-    /stableSort\(order.slice\(0, 2\), cmp\).concat\(stableSort\(order.slice\(2, 4\), cmp\)\)/.test(srcLasuo)
+  /policy === 'split-high'/.test(srcResolver) &&
+    /stableSort\(body.slice\(0, 2\), cmp\)/.test(srcResolver) &&
+    /stableSort\(body.slice\(2, 4\), cmp\)/.test(srcResolver)
 );
 assert(
   '12 teamsOf 交叉编队未改',
   /aTeam: \[order\[0\], order\[3\]\]/.test(srcLasuo) && /bTeam: \[order\[1\], order\[2\]\]/.test(srcLasuo)
 );
 
-var settleSrc8421 = fs.readFileSync(
-  path.join(mini, 'subpackages', 'game', 'utils', 'settle8421Four.js'),
-  'utf8'
-);
 assert(
   '12 8421-4 分队切片未改',
-  /stableSort\(order.slice\(0, 2\), cmp\).concat\(stableSort\(order.slice\(2, 4\), cmp\)\)/.test(settleSrc8421)
+  /stableSort\(body.slice\(0, 2\), cmp\)/.test(srcResolver) &&
+    /stableSort\(body.slice\(2, 4\), cmp\)/.test(srcResolver)
 );
 
 assert('13 WXML 无修改约束：仍用历史贴角 class', /triangleClass/.test(wxml) && /corner-waist/.test(wxml));
@@ -334,10 +344,10 @@ assert(
 
 assert('未开球后续洞无三角', visual.isEmptyMark(mark.markForGameCell(g3, nextHole, 'pA')));
 
-var srcVegas = fs.readFileSync(path.join(mini, 'subpackages', 'game', 'utils', 'settleVegas.js'), 'utf8');
 assert(
   '12 vegas 分区排序未改',
-  /stableSort\(order.slice\(0, 2\), cmp\).concat\(stableSort\(order.slice\(2, 4\), cmp\)\)/.test(srcVegas)
+  /stableSort\(body.slice\(0, 2\), cmp\)/.test(srcResolver) &&
+    /stableSort\(body.slice\(2, 4\), cmp\)/.test(srcResolver)
 );
 
 assert(

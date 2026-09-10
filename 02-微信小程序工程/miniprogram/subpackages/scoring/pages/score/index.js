@@ -32,6 +32,7 @@ const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
 const holeLayout = require('../../../../utils/holeLayout.js');
 const mockAvatars = require('../../../../utils/mockAvatars.js');
 const scoreRankMark = require('../../utils/scoreRankMark.js');
+const scoreSideGameSettle = require('../../utils/scoreSideGameSettle.js');
 const groupManageIdentityDiff = require('../../utils/groupManageIdentityDiff.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
 const classicAppReplicaScoreDigits = require('../../utils/classicAppReplicaScoreDigits.js');
@@ -5892,6 +5893,65 @@ Page({
     });
   },
 
+  _collectOfficialForSideGameSettle() {
+    const ms = this._matchState || (this._readMatchState && this._readMatchState()) || {};
+    const snap = sideGameHostSnapshot.buildForScorePage(ms) || {};
+    const matchId = String(snap.matchId || (ms && (ms.matchId || ms.gameId)) || '');
+    const groupId = String(snap.groupId || '');
+    const labels = columnLabels();
+    const parsRow = columnPars();
+    const pars = [];
+    const holeLabels = [];
+    for (let i = 0; i < labels.length; i++) {
+      if (!SPECIAL_IDX.includes(i)) {
+        pars.push(parsRow[i]);
+        holeLabels.push(labels[i]);
+      }
+    }
+    const official = scoreRankMark.collectOfficialFromScorePage(this);
+    official.pars = pars;
+    official.matchId = matchId;
+    official.groupId = groupId;
+    official.holeLabels = holeLabels;
+    return official;
+  },
+
+  _settleSideGamesAfterScoreMutation() {
+    if (this._applyingSideGameSettle) return { ok: true, skipped: 'reentrant' };
+    this._applyingSideGameSettle = true;
+    try {
+      const official = this._collectOfficialForSideGameSettle();
+      if (!official.matchId || !scoreRankMark.hasRankMarkGames({
+        matchId: official.matchId,
+        groupId: official.groupId
+      })) {
+        return { ok: true, skipped: 'no-rank-mark-games' };
+      }
+      const host =
+        typeof this.selectComponent === 'function'
+          ? this.selectComponent('#sideGameSettleHost')
+          : null;
+      const result = scoreSideGameSettle.settleSideGamesForScoreMutation(official, host);
+      this._rankMarkStamp = '';
+      if (!this._refreshingAfterSideGameSettle) {
+        this._refreshingAfterSideGameSettle = true;
+        try {
+          this.refreshPlayers();
+        } finally {
+          this._refreshingAfterSideGameSettle = false;
+        }
+      }
+      return result || { ok: true };
+    } catch (e) {
+      try {
+        console.log('[side-game-settle] failed', String((e && e.message) || e));
+      } catch (logErr) {}
+      return { ok: false, keptOfficialScores: true };
+    } finally {
+      this._applyingSideGameSettle = false;
+    }
+  },
+
   _attachRankMarkEngineToPatch(patch) {
     const p = patch || {};
     if (this._applyingRankMark) return p;
@@ -10908,6 +10968,9 @@ Page({
     const scoresCompleted = !!(ctx && scoreCompleteness.isComplete(ctx));
     this.setData({ scoresCompleted: scoresCompleted });
     this._syncGameFinishedState();
+    if (persistedOk !== false) {
+      this._settleSideGamesAfterScoreMutation();
+    }
     if (persistedOk === false || !ctx) return;
     const projection = scoreCompleteness.projectGroupCompleteness(ctx);
     scoreGroupCompletePrompt.noteAfterPersist(

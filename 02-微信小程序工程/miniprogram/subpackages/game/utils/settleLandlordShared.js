@@ -4,6 +4,8 @@
  */
 const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
+const holeOrder = require("./resolveNextHoleOrder.js");
 
 const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
 const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
@@ -189,26 +191,24 @@ function stableSort(arr, cmp) {
   return a;
 }
 
-function nextOrder(order, rec, hist, game, rule, isPush, opts) {
+function nextOrder(order, rec, hist, game, spec, isPush) {
   const mode = (game && game.groupMode) || "fixed";
-  if (mode === "fixed") return order.slice();
-  const lockNo = opts && opts.keepOrderOnPush;
-  const reorderOnPush = lockNo ? false : (rule && rule.reorderOnPush) === "yes";
-  if (isPush && !reorderOnPush) return order.slice();
-  const rankId = (game && game.rankId) || "gross-origin";
-  const cmp = function (a, b) {
-    return cmpPlayers(a, b, rec, hist, rankId);
-  };
-  const catalogId = core.catalogIdOf(game);
-  const allowSplitHigh =
-    catalogId !== "landlord-mid" &&
-    catalogId !== "landlord-small" &&
-    catalogId !== "8421-3";
-  if (allowSplitHigh && mode === "split-high" && order.length >= 3) {
-    const highs = stableSort(order.slice(0, 2), cmp);
-    return highs.concat(order.slice(2));
-  }
-  return stableSort(order, cmp);
+  let policy = "dynamic";
+  if (mode === "fixed") policy = "fixed";
+  else if (mode === "split-high" && !(spec && spec.allowSplitHigh === false)) policy = "split-high";
+  const pushPolicy =
+    spec && spec.keepOrderOnPush
+      ? "keep-combination"
+      : holeOrder.pushPolicyFromReorderOnPush(game && game.ruleSnapshot);
+  return holeOrder.resolveNextHoleOrder({
+    currentOrder: order,
+    holeScores: rec,
+    rankingPolicy: policy,
+    rankingRule: { rankId: (game && game.rankId) || "gross-origin" },
+    pushPolicy: pushPolicy,
+    isPush: isPush === true,
+    tieBreakContext: { history: hist }
+  });
 }
 
 function pickTeamBest(ids, rec) {
@@ -287,6 +287,7 @@ function settleThree(game, ctx, spec) {
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   const holeDebug = {};
   const orderHistory = [];
   const soloIndex = spec && spec.soloIndex != null ? spec.soloIndex : 0;
@@ -313,7 +314,17 @@ function settleThree(game, ctx, spec) {
       return;
     }
     const orderBefore = order.slice();
-    if (!startMarked || rankedNext) orderByHole[label] = orderBefore;
+    if (!startMarked || rankedNext) {
+      const solo = orderBefore[soloIndex];
+      const mates = orderBefore.filter(function (id) {
+        return id !== solo;
+      });
+      const holeSides =
+        soloIndex === 0
+          ? { aTeam: [solo], bTeam: mates }
+          : { aTeam: mates, bTeam: [solo] };
+      assignmentNormalize.stamp(orderByHole, assignmentsByHole, label, orderBefore, holeSides, game);
+    }
     startMarked = true;
     const par = holePar(ctx, label);
     const rec = {};
@@ -422,7 +433,7 @@ function settleThree(game, ctx, spec) {
     rec[mates[0]].pts = Number(ledger[mates[0]]) || 0;
     rec[mates[1]].pts = Number(ledger[mates[1]]) || 0;
     hist.push(rec);
-    const orderAfter = nextOrder(order, rec, hist, game, rule, isPush, spec);
+    const orderAfter = nextOrder(order, rec, hist, game, spec, isPush === true);
     orderHistory.push({ hole: label, orderBefore: orderBefore, orderAfter: orderAfter.slice() });
     order = orderAfter;
     rankedNext = true;
@@ -465,6 +476,7 @@ function settleThree(game, ctx, spec) {
   const out = {
     byHole: byHole,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: (spec && spec.catalogId) || core.catalogIdOf(game),
     topHoleStates: topHoleTracker.states

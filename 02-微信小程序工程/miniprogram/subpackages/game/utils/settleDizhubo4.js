@@ -7,6 +7,8 @@
  */
 const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
+const holeOrder = require("./resolveNextHoleOrder.js");
 
 const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
 const MEAT_DEFAULTS = { "le-2": 3, m1: 2, par: 1, "ge-1": 0 };
@@ -184,16 +186,20 @@ function stableSort(arr, cmp) {
   return a;
 }
 
-function nextOrder(order, rec, hist, game, rule, isPush) {
-  const mode = (game && game.groupMode) || "fixed";
-  if (mode === "fixed") return order.slice();
-  const reorderOnPush = (rule && rule.reorderOnPush) === "yes";
-  if (isPush && !reorderOnPush) return order.slice();
-  const rankId = (game && game.rankId) || "gross-origin";
-  const head = stableSort(order.slice(0, 3), function (a, b) {
-    return cmpPlayers(a, b, rec, hist, rankId);
+function nextOrder(order, rec, hist, game, isPush) {
+  const policy = holeOrder.rankingPolicyOf(game);
+  return holeOrder.resolveNextHoleOrder({
+    currentOrder: order,
+    holeScores: rec,
+    rankingPolicy: policy === "fixed" ? "fixed" : "dynamic",
+    rankingRule: {
+      rankId: (game && game.rankId) || "gross-origin",
+      pinLast: 1
+    },
+    pushPolicy: holeOrder.pushPolicyFromReorderOnPush(game && game.ruleSnapshot),
+    isPush: isPush === true,
+    tieBreakContext: { history: hist }
   });
-  return head.concat(order[3]);
 }
 
 function sidesOf(order, mid) {
@@ -242,6 +248,7 @@ function settleDizhubo4(game, ctx) {
   const hist = [];
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   let rankedNext = false;
   let startMarked = false;
   let prefixBlocked = false;
@@ -259,7 +266,16 @@ function settleDizhubo4(game, ctx) {
       byHole[label] = ledger;
       return;
     }
-    if (!startMarked || rankedNext) orderByHole[label] = order.slice();
+    if (!startMarked || rankedNext) {
+      assignmentNormalize.stamp(
+        orderByHole,
+        assignmentsByHole,
+        label,
+        order,
+        sidesOf(order, mid),
+        game
+      );
+    }
     startMarked = true;
     const par = holePar(ctx, label);
     const rec = {};
@@ -323,7 +339,7 @@ function settleDizhubo4(game, ctx) {
       rec[id].pts = Number(ledger[id]) || 0;
     });
     hist.push(rec);
-    order = nextOrder(order, rec, hist, game, rule, isPush);
+    order = nextOrder(order, rec, hist, game, isPush === true);
     rankedNext = true;
     byHole[label] = ledger;
   });
@@ -331,6 +347,7 @@ function settleDizhubo4(game, ctx) {
   return {
     byHole: byHole,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     initial: core.emptyLedger(core.playerIdsOf(game)),
     catalogId: "dizhubo-4",
     topHoleStates: topHoleTracker.states

@@ -20,6 +20,11 @@ var visual = require('../miniprogram/utils/rankMarkVisual.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var projectMod = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
+var coord = require('../miniprogram/subpackages/game/utils/sideGameSettleCoordinator.js');
+function settleThenProject(input) {
+  coord.settleSideGamesForScoreMutation(input);
+  return projectMod.project(input);
+}
 
 var mini = path.join(__dirname, '..', 'miniprogram');
 var scoringRoot = path.join(mini, 'subpackages', 'scoring');
@@ -181,7 +186,7 @@ var filled5 = {
   pC: filledScores(5),
   pD: filledScores(5)
 };
-var proj5 = mark.completeProjection(projectMod.project(officialInput(filled5)), ['pA', 'pB', 'pC', 'pD']);
+var proj5 = mark.completeProjection(settleThenProject(officialInput(filled5)), ['pA', 'pB', 'pC', 'pD']);
 var cells5 = [];
 var hi;
 for (hi = 0; hi < 18; hi++) {
@@ -204,7 +209,7 @@ afterClear.pB[1] = '';
 afterClear.pC[1] = '';
 afterClear.pD[1] = '';
 global.__gb_side_games = [makeRecord('8421-4', 'random')];
-var projClear = mark.completeProjection(projectMod.project(officialInput(afterClear)), ['pA', 'pB', 'pC', 'pD']);
+var projClear = mark.completeProjection(settleThenProject(officialInput(afterClear)), ['pA', 'pB', 'pC', 'pD']);
 var paintedClear = mark.blankThenPaintCells(painted5, 'pC', projClear);
 var laterEmpty = true;
 for (hi = 2; hi < 18; hi++) {
@@ -223,7 +228,7 @@ assert(
 );
 
 global.__gb_side_games = [makeRecord('8421-4', 'random')];
-var restored = mark.completeProjection(projectMod.project(officialInput(filled5)), ['pC']);
+var restored = mark.completeProjection(settleThenProject(officialInput(filled5)), ['pC']);
 var paintedRestored = mark.blankThenPaintCells(paintedClear, 'pC', restored);
 assert(
   '10. 补录后正确恢复',
@@ -239,11 +244,12 @@ var beforeScores = {
   pC: [6].concat(filledScores(0).slice(1)),
   pD: [7].concat(filledScores(0).slice(1))
 };
-var before = mark.completeProjection(projectMod.project(officialInput(beforeScores)), ['pA', 'pD']);
+var before = mark.completeProjection(settleThenProject(officialInput(beforeScores)), ['pA', 'pD']);
 assert(
   '开球洞后一洞名次 1=A 蓝 4=D 蓝腰',
-  projectMod.markAt(before, 'pA', 1).gameCornerRank === 1 &&
-    projectMod.markAt(before, 'pD', 1).gameCornerRank === 4 &&
+  projectMod.markAt(before, 'pA', 1).triangleClass === 'triangle-blue' &&
+    projectMod.markAt(before, 'pA', 1).hasWaist === false &&
+    projectMod.markAt(before, 'pD', 1).triangleClass === 'triangle-blue' &&
     projectMod.markAt(before, 'pD', 1).hasWaist === true
 );
 var flippedScores = {
@@ -253,7 +259,7 @@ var flippedScores = {
   pD: [4].concat(filledScores(0).slice(1))
 };
 global.__gb_side_games = [makeRecord('8421-4', 'random')];
-var afterFlip = mark.completeProjection(projectMod.project(officialInput(flippedScores)), ['pA', 'pD']);
+var afterFlip = mark.completeProjection(settleThenProject(officialInput(flippedScores)), ['pA', 'pD']);
 var paintedFlip = mark.blankThenPaintCells(
   mark.blankThenPaintCells(cells5, 'pA', before),
   'pA',
@@ -261,10 +267,9 @@ var paintedFlip = mark.blankThenPaintCells(
 );
 assert(
   '11. 修改成绩导致名次变化时 class 与腰线同时更新',
-  paintedFlip[1].gameCornerRank === 4 &&
-    paintedFlip[1].triangleClass === 'triangle-blue' &&
+  paintedFlip[1].triangleClass === 'triangle-blue' &&
     paintedFlip[1].hasWaist === true &&
-    projectMod.markAt(afterFlip, 'pD', 1).gameCornerRank === 1 &&
+    projectMod.markAt(afterFlip, 'pD', 1).triangleClass === 'triangle-blue' &&
     projectMod.markAt(afterFlip, 'pD', 1).hasWaist === false
 );
 

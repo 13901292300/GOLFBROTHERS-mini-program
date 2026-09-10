@@ -2,6 +2,8 @@
  * 多人拉丝：无让杆 1V1 + 可选总杆 PK；编队与设置页一致。
  */
 const core = require("./settleCore.js");
+const assignmentNormalize = require("./assignmentNormalize.js");
+const holeOrder = require("./resolveNextHoleOrder.js");
 
 const TRI_BLUE = "#007AFF";
 const TRI_RED = "#FF3B30";
@@ -187,11 +189,14 @@ function stableSort(arr, cmp) {
 }
 
 function nextOrder(order, rec, hist, game, isPush) {
-  if ((game && game.sortUpdate) === "fixed") return order.slice();
-  if (isPush) return order.slice();
-  const rankId = (game && game.rankId) || "gross-origin";
-  return stableSort(order, function (a, b) {
-    return cmpPlayers(a, b, rec, hist, rankId);
+  return holeOrder.resolveNextHoleOrder({
+    currentOrder: order,
+    holeScores: rec,
+    rankingPolicy: (game && game.sortUpdate) === "fixed" ? "fixed" : "dynamic",
+    rankingRule: { rankId: (game && game.rankId) || "gross-origin" },
+    pushPolicy: "rerank",
+    isPush: isPush === true,
+    tieBreakContext: { history: hist }
   });
 }
 
@@ -251,6 +256,7 @@ function settle(game, payload) {
   const ledger = core.emptyLedger(ids);
   const byHole = {};
   const orderByHole = {};
+  const assignmentsByHole = {};
   const hist = [];
   let meatPool = 0;
   let meatEaten = 0;
@@ -267,7 +273,7 @@ function settle(game, payload) {
     if (prefixBlocked) return;
 
     if (isFixed || !startMarked || rankedNext) {
-      orderByHole[hole] = order.slice();
+      assignmentNormalize.stamp(orderByHole, assignmentsByHole, hole, order, matchup(order, game), game);
     }
     startMarked = true;
 
@@ -368,6 +374,7 @@ function settle(game, payload) {
     byHole: byHole,
     totals: ledger,
     orderByHole: orderByHole,
+    assignmentsByHole: assignmentsByHole,
     meatEatCount: meatEaten,
     topHoleStates: topHoleTracker.states
   };

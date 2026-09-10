@@ -18,6 +18,9 @@ Component({
     _emit: function (input) {
       var matchId = input && input.matchId != null ? String(input.matchId) : '';
       var groupId = input && input.groupId != null ? String(input.groupId) : '';
+      var sig = JSON.stringify(input || {});
+      if (this._lastEmitSig === sig) return;
+      this._lastEmitSig = sig;
       try {
         var projection = project.project(input || {});
         this.triggerEvent('rankmarkchange', {

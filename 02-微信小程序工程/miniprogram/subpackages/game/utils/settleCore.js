@@ -167,6 +167,7 @@ function pendingStartResults(game, holeOrder) {
     initial: {},
     catalogId: catalogIdOf(game),
     orderByHole: orderByHole,
+    assignmentsByHole: {},
     pendingStart: true
   };
 }
@@ -231,7 +232,9 @@ function emptyResults(game, holeOrder) {
   return {
     byHole: byHole,
     initial: emptyLedger(ids),
-    catalogId: catalogIdOf(game)
+    catalogId: catalogIdOf(game),
+    orderByHole: {},
+    assignmentsByHole: {}
   };
 }
 
