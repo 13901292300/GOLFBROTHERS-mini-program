@@ -159,7 +159,7 @@ function cloneLayout(layout) {
 
 const CONFLICT_MESSAGE = '比赛数据已更新，请重新进入后再试';
 const SIDE_SETTINGS_KEY = matchHoleOrderRebuild.SETTINGS_KEY;
-const SIDE_GAMES_KEY = matchHoleOrderRebuild.GAMES_KEY;
+const sideGameRepositoryPort = require('./sideGameRepositoryPort.js');
 
 function restoreSideEffects(msSnap, layoutSnap) {
   if (msSnap) matchState.setMatchState(cloneJson(msSnap));
@@ -218,11 +218,25 @@ function alreadyRestored(cur, beforeGame) {
     String(cur.front9Course || '') === String(beforeGame.front9Course || '');
 }
 
+
+function snapshotSideGameRows(matchId) {
+  if (!matchId) return [];
+  const listed = sideGameRepositoryPort.listByMatchId({ matchId: matchId, includeDeleted: true });
+  if (listed && listed.ok && listed.data && Array.isArray(listed.data.items)) {
+    return cloneJson(listed.data.items);
+  }
+  return [];
+}
+
+function restoreSideGameRows(rows) {
+  sideGameRepositoryPort.restoreExactRecords(Array.isArray(rows) ? rows : []);
+}
+
 function restoreProjectionSnapshot(job) {
   const j = job || {};
   if (j.matchSnap) teamMatchStore.saveMatch(j.matchSnap);
   restoreWx(SIDE_SETTINGS_KEY, j.sideGameSettingsSnap);
-  restoreWx(SIDE_GAMES_KEY, j.sideGameRowsSnap);
+  restoreSideGameRows(j.sideGameRowsSnap);
   if (j.restoreTournamentMeta) {
     if (j.holeParsSnap && groupsStore.setHolePars) groupsStore.setHolePars(j.holeParsSnap);
     if (j.tournamentMetaSnap && groupsStore.setTournamentCourseHalf) {
@@ -356,7 +370,6 @@ function apply(ctx, front9, back9) {
   const msSnap = cloneJson(readMatchState());
   const layoutSnap = holeLayout.getLayout ? cloneLayout(holeLayout.getLayout()) : null;
   const sideGameSettingsSnap = snapshotWx(SIDE_SETTINGS_KEY);
-  const sideGameRowsSnap = snapshotWx(SIDE_GAMES_KEY);
   const holeParsSnap = groupsStore.getHolePars ? groupsStore.getHolePars() : null;
   const tournamentMetaSnap = groupsStore.getTournamentCourseMeta
     ? groupsStore.getTournamentCourseMeta()
@@ -368,6 +381,7 @@ function apply(ctx, front9, back9) {
     matchId: (ctx && ctx.matchId) || '',
     gameId: (ctx && ctx.gameId) || (msSnap && msSnap.gameId) || ''
   });
+  const sideGameRowsSnap = snapshotSideGameRows(matchId);
 
   function buildRollbackJob() {
     const job = {

@@ -10,11 +10,20 @@ global.wx.getStorageSync = function (key) {
 global.wx.setStorageSync = function (key, value) {
   bag[key] = JSON.parse(JSON.stringify(value));
 };
+global.wx.removeStorageSync = function (key) {
+  delete bag[key];
+};
+global.wx.getStorageInfoSync = function () {
+  return { keys: Object.keys(bag) };
+};
 global.wx.showToast = function () {};
 
 var fs = require('fs');
 var path = require('path');
 var rebuild = require('../miniprogram/utils/matchHoleOrderRebuild.js');
+var localMod = require('../miniprogram/subpackages/game/utils/localSideGameRepository.js');
+var facade = require('../miniprogram/subpackages/game/utils/sideGameRepository.js');
+var port = require('../miniprogram/utils/sideGameRepositoryPort.js');
 
 var passed = 0;
 var failed = 0;
@@ -57,8 +66,15 @@ function seedSettings(matchId, labels, rev) {
   bag[rebuild.SETTINGS_KEY] = map;
 }
 
+function bindRepo() {
+  var repo = localMod.createLocalSideGameRepository();
+  facade.setImplementation(repo);
+  port.bind(facade);
+  return repo;
+}
+
 function seedGameRow(matchId, sideGameId, labels, extra) {
-  var list = Array.isArray(bag[rebuild.GAMES_KEY]) ? bag[rebuild.GAMES_KEY] : [];
+  var list = Array.isArray(bag[localMod.STORAGE_KEY]) ? bag[localMod.STORAGE_KEY] : [];
   var holes = labels.map(function (id) {
     return { label: id, holeId: id, on: true };
   });
@@ -92,7 +108,7 @@ function seedGameRow(matchId, sideGameId, labels, extra) {
   row.resultSnapshot.byHole['ZZ9'] = { pts: 9 };
   if (extra) Object.assign(row, extra);
   list.push(row);
-  bag[rebuild.GAMES_KEY] = list;
+  bag[localMod.STORAGE_KEY] = list;
   return row;
 }
 
@@ -100,13 +116,23 @@ function settingsOf(matchId) {
   return rebuild.getSettings(matchId, 'score');
 }
 
-function rowOf(id) {
-  var list = bag[rebuild.GAMES_KEY] || [];
+function bagRow(id) {
+  var list = bag[localMod.STORAGE_KEY] || [];
   var i;
   for (i = 0; i < list.length; i++) {
     if (list[i].sideGameId === id) return list[i];
   }
   return null;
+}
+
+function rowOf(id) {
+  var listed = port.listByMatchId({ includeDeleted: true });
+  var list = listed && listed.ok && listed.data && listed.data.items ? listed.data.items : [];
+  var i;
+  for (i = 0; i < list.length; i++) {
+    if (list[i].sideGameId === id) return list[i];
+  }
+  return bagRow(id);
 }
 
 // --- detect ---
@@ -159,11 +185,11 @@ seedSettings('m1', nines('C', 'D'), 3);
 seedGameRow('m1', 'sg1', nines('C', 'D'));
 seedGameRow('m2', 'sg-other', nines('C', 'D')); // 隔离
 
-var out1 = rebuild.syncAfterCourseHalfChange({
+var out1 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: 'D' },
   after: { courseId: 'y', front9Course: 'A', back9Course: 'B' }
-});
+}));
 assert('7 C/D→A/B ok', !!(out1 && out1.ok && out1.rebuilt));
 assert('8 revision 3→4', out1.fullHoleOrderRevision === 4 && out1.previousRevision === 3);
 assert(
@@ -207,21 +233,21 @@ assert(
 // --- only back D→E ---
 bag = {};
 seedSettings('m1', nines('C', 'D'), 1);
-var out2 = rebuild.syncAfterCourseHalfChange({
+var out2 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: 'D' },
   after: { courseId: 'x', front9Course: 'C', back9Course: 'E' }
-});
+}));
 assert('17 只改后半 → C/E', out2.ok && out2.fullHoleOrder.join(',') === nines('C', 'E').join(','));
 
 // --- only front C→F ---
 bag = {};
 seedSettings('m1', nines('C', 'D'), 2);
-var out3 = rebuild.syncAfterCourseHalfChange({
+var out3 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: 'D' },
   after: { courseId: 'x', front9Course: 'F', back9Course: 'D' }
-});
+}));
 assert('18 只改前半 → F/D', out3.ok && out3.fullHoleOrder.join(',') === nines('F', 'D').join(','));
 
 // --- swap ---
@@ -229,33 +255,33 @@ bag = {};
 seedSettings('m1', nines('C', 'D'), 5);
 var custom = nines('C', 'D').slice().reverse();
 bag[rebuild.SETTINGS_KEY]['m1::score'].fullHoleOrder = custom;
-var out4 = rebuild.syncAfterCourseHalfChange({
+var out4 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: 'D' },
   after: { courseId: 'x', front9Course: 'D', back9Course: 'C' }
-});
+}));
 assert('19 交换 → D/C 且覆盖旧自定义排序', out4.ok && out4.fullHoleOrder.join(',') === nines('D', 'C').join(','));
 assert('20 revision +1', out4.fullHoleOrderRevision === 6);
 
 // --- skip name ---
 bag = {};
 seedSettings('m1', nines('C', 'D'), 9);
-var out5 = rebuild.syncAfterCourseHalfChange({
+var out5 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: 'D' },
   after: { courseId: 'x', front9Course: 'C', back9Course: 'D', courseName: '改名' }
-});
+}));
 assert('21 改名跳过且 revision 不变', out5.skipped === true && settingsOf('m1').fullHoleOrderRevision === 9);
 
 // --- shared holeId keep ---
 bag = {};
 seedSettings('m1', nines('C', 'D'), 1);
 seedGameRow('m1', 'sg2', nines('C', 'D'));
-var out6 = rebuild.syncAfterCourseHalfChange({
+var out6 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: 'D' },
   after: { courseId: 'x', front9Course: 'C', back9Course: 'E' }
-});
+}));
 assert('22 共有 C1 引用保留', out6.ok && rowOf('sg2').config.instance.holes[0].label === 'C1');
 assert(
   '23 失效 D3 不再在 holes 中',
@@ -268,13 +294,13 @@ assert(
 bag = {};
 seedSettings('m1', nines('C', null), 1);
 seedGameRow('m1', 'sg9', nines('C', null));
-rowOf('sg9').config.instance.kicks = [{ id: 'k', fromHole: 'C2', fromIndex: 1, multiplier: 2 }];
-rowOf('sg9').config.instance.holeResults.byHole = { C2: { pts: 1 } };
-var out7 = rebuild.syncAfterCourseHalfChange({
+bagRow('sg9').config.instance.kicks = [{ id: 'k', fromHole: 'C2', fromIndex: 1, multiplier: 2 }];
+bagRow('sg9').config.instance.holeResults.byHole = { C2: { pts: 1 } };
+var out7 = (bindRepo(), rebuild.syncAfterCourseHalfChange({
   matchId: 'm1',
   before: { courseId: 'x', front9Course: 'C', back9Course: '' },
   after: { courseId: 'x', front9Course: 'A', back9Course: 'B' }
-});
+}));
 assert('24 长度不等仍重建', out7.ok && out7.fullHoleOrder.length === 18);
 assert(
   '25 不可稳定映射时 kick 不串到错误洞（无 C2→错误）',
@@ -294,12 +320,13 @@ assert(
 bag = {};
 seedSettings('m1', nines('C', 'D'), 3);
 seedGameRow('m1', 'sg3', nines('C', 'D'));
+bindRepo();
 var origSettings = JSON.stringify(settingsOf('m1'));
-var origGames = JSON.stringify(bag[rebuild.GAMES_KEY]);
+var origOrder = rowOf('sg3').config.instance.fullHoleOrder[0];
 var realSet = global.wx.setStorageSync;
 var blows = 0;
 global.wx.setStorageSync = function (key, value) {
-  if (key === rebuild.GAMES_KEY) {
+  if (String(key).indexOf('gb_side_game_v2:') === 0 || String(key) === 'gb_side_games_tx_v2') {
     blows += 1;
     if (blows === 1) throw new Error('boom');
   }
@@ -317,7 +344,7 @@ assert(
   '29 回滚后 full 仍 C/D',
   settingsOf('m1').fullHoleOrder.join(',') === nines('C', 'D').join(',')
 );
-assert('30 回滚后游戏未改', JSON.stringify(bag[rebuild.GAMES_KEY]) === origGames || rowOf('sg3').config.instance.fullHoleOrder[0] === 'C1');
+assert('30 回滚后游戏未改', rowOf('sg3').config.instance.fullHoleOrder[0] === origOrder);
 
 // --- halfCourseEdit wiring (source) ---
 var halfJs = fs.readFileSync(

@@ -1,4 +1,5 @@
 var coord = require('../../utils/sideGameSettleCoordinator.js');
+require('../../utils/sideGameRepository.js');
 
 Component({
   methods: {

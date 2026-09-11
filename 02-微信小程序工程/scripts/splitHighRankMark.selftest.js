@@ -17,6 +17,7 @@ if (typeof global.wx !== 'object') {
 }
 
 var visual = require('../miniprogram/utils/rankMarkVisual.js');
+var bind = require('./sideGameRepoTestBind.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var projectMod = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
@@ -239,7 +240,7 @@ function officialInput(scoresByPid) {
   };
 }
 
-global.__gb_side_games = [makeRecord('split-high')];
+bind.seed([makeRecord('split-high')]);
 var acceptScores = { pA: 5, pB: 6, pC: 3, pD: 4 };
 var projA = mark.completeProjection(settleThenProject(officialInput(acceptScores)), [
   'pA',
@@ -258,7 +259,7 @@ assert(
     projectMod.markAt(projA, 'pA', 1).gameCornerRank == null
 );
 
-global.__gb_side_games = [makeRecord('split-high')];
+bind.seed([makeRecord('split-high')]);
 var projB = mark.completeProjection(settleThenProject(officialInput(acceptScores)), [
   'pA',
   'pB',

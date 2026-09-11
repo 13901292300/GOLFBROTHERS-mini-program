@@ -1,5 +1,6 @@
 /**
- * 本机 SideGameRepository。仅此文件读写 gb_side_games_v1。
+ * 本机 SideGameRepository。业务读写仍仅走 gb_side_games_v1。
+ * 初始化时做 Storage V2 Phase 1 只读迁移（副本），不删 v1。
  */
 var rec = require('./sideGameRecord.js');
 var catalog = require('./catalog.js');
@@ -10,6 +11,8 @@ var hostMod = require('./gameHostContext.js');
 var settleCore = require('./settleCore.js');
 var settleMatch2 = require('./settleMatch2.js');
 var settleStroke2 = require('./settleStroke2.js');
+var v2mig = require('./sideGameStorageV2Migration.js');
+var v2store = require('./sideGameStorageV2Store.js');
 
 var STORAGE_KEY = 'gb_side_games_v1';
 
@@ -22,6 +25,60 @@ function envelope(ok, reason, data, revision) {
   };
 }
 
+function stringifySize(value) {
+  try {
+    var json = JSON.stringify(value);
+    if (typeof json !== 'string') return { chars: 0, approxBytes: 0 };
+    return { chars: json.length, approxBytes: json.length * 2 };
+  } catch (e) {
+    return {
+      chars: -1,
+      approxBytes: -1,
+      stringifyError: rec.asString(e && (e.message || e.errMsg))
+    };
+  }
+}
+
+function readStorageInfo() {
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getStorageInfoSync !== 'function') return null;
+    return wx.getStorageInfoSync() || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function topStorageKeys(info) {
+  var keys = (info && info.keys) || [];
+  var rows = [];
+  var i;
+  if (typeof wx === 'undefined' || typeof wx.getStorageSync !== 'function') return rows;
+  for (i = 0; i < keys.length; i++) {
+    var key = rec.asString(keys[i]);
+    if (!key) continue;
+    var approxBytes = -1;
+    try {
+      var raw = wx.getStorageSync(key);
+      var sized = stringifySize(raw);
+      approxBytes = sized.approxBytes;
+    } catch (eKey) {
+      approxBytes = -1;
+    }
+    rows.push({ key: key, approxBytes: approxBytes });
+  }
+  rows.sort(function (a, b) {
+    return (b.approxBytes || 0) - (a.approxBytes || 0);
+  });
+  return rows.slice(0, 10);
+}
+
+function logStorageWriteFailed(detail) {
+  try {
+    if (typeof console === 'undefined' || typeof console.error !== 'function') return;
+    console.error('[side-game-storage] write failed', detail);
+  } catch (eLog) {}
+}
+
 function wxStorageAdapter() {
   return {
     getItem: function (key) {
@@ -31,12 +88,33 @@ function wxStorageAdapter() {
         return { __fail: true };
       }
     },
-    setItem: function (key, value) {
+    setItem: function (key, value, onError) {
       try {
         wx.setStorageSync(key, value);
         return true;
       } catch (e) {
+        if (typeof onError === 'function') {
+          try {
+            onError(e);
+          } catch (eCb) {}
+        }
         return false;
+      }
+    },
+    removeItem: function (key) {
+      try {
+        wx.removeStorageSync(key);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+    listKeys: function () {
+      try {
+        var info = wx.getStorageInfoSync() || {};
+        return info.keys || [];
+      } catch (e) {
+        return [];
       }
     }
   };
@@ -52,6 +130,34 @@ function createLocalSideGameRepository(deps) {
   var idGen = d.idGen || newSideGameId;
   var clock = d.clock || rec.nowMs;
   var listeners = [];
+  var migrationReadyLogged = false;
+  var indexRepairDone = false;
+
+  function ensureReady() {
+    var state = v2mig.ensureMigrated(storage, clock, { logSkipped: !migrationReadyLogged });
+    if (state && state.status === 'migrated') {
+      migrationReadyLogged = true;
+      v2store.recoverJournal(storage, clock);
+      if (!indexRepairDone) {
+        v2store.repairIndex(storage, clock);
+        indexRepairDone = true;
+      }
+    }
+    return state;
+  }
+
+  function isV2Canonical() {
+    var state = ensureReady();
+    return !!(state && state.status === 'migrated');
+  }
+
+  var initState = v2mig.runOnInit(storage, clock, { logSkipped: !migrationReadyLogged });
+  if (initState && initState.status === 'migrated') {
+    migrationReadyLogged = true;
+    v2store.recoverJournal(storage, clock);
+    v2store.repairIndex(storage, clock);
+    indexRepairDone = true;
+  }
 
   function readAll() {
     var raw = storage.getItem(STORAGE_KEY);
@@ -61,10 +167,56 @@ function createLocalSideGameRepository(deps) {
   }
 
   function writeAll(list) {
+    var mig = storage.getItem(v2mig.MIGRATION_KEY);
+    if (mig && !mig.__fail && rec.asString(mig.status) === 'migrated') {
+      logStorageWriteFailed({
+        key: STORAGE_KEY,
+        skipped: 'v1_frozen_after_migrate',
+        pendingChars: 0,
+        pendingBytes: 0
+      });
+      return false;
+    }
     var payload = rec.jsonClone(list || []);
-    var ok = storage.setItem(STORAGE_KEY, payload);
-    if (!ok) return false;
-    return true;
+    var pending = stringifySize(payload);
+    var existingRaw = null;
+    try {
+      existingRaw = storage.getItem(STORAGE_KEY);
+    } catch (eExist) {
+      existingRaw = { __fail: true };
+    }
+    var existingUnreadable = !!(existingRaw && existingRaw.__fail);
+    var existingList = Array.isArray(existingRaw) ? existingRaw : [];
+    var existingSize = existingUnreadable ? { chars: -1, approxBytes: -1 } : stringifySize(existingRaw);
+    var existingItemCount = existingUnreadable ? -1 : existingList.length;
+    var nextItemCount = Array.isArray(payload) ? payload.length : 0;
+    var writeErr = null;
+    var ok = storage.setItem(STORAGE_KEY, payload, function (err) {
+      writeErr = err;
+    });
+    if (ok) return true;
+    try {
+      var info = readStorageInfo();
+      var keys = (info && info.keys) || [];
+      logStorageWriteFailed({
+        key: STORAGE_KEY,
+        pendingChars: pending.chars,
+        pendingBytes: pending.approxBytes,
+        pendingStringifyError: pending.stringifyError || '',
+        existingGbSideGamesBytes: existingSize.approxBytes,
+        existingGbSideGamesChars: existingSize.chars,
+        existingItemCount: existingItemCount,
+        nextItemCount: nextItemCount,
+        currentSize: info ? info.currentSize : undefined,
+        limitSize: info ? info.limitSize : undefined,
+        keysLength: keys.length,
+        hasGbSideGames: keys.indexOf(STORAGE_KEY) >= 0,
+        errMessage: rec.asString(writeErr && (writeErr.message || writeErr.errMsg)),
+        errMsg: writeErr && writeErr.errMsg ? String(writeErr.errMsg) : '',
+        topKeys: topStorageKeys(info)
+      });
+    } catch (eLogAll) {}
+    return false;
   }
 
   function notify(event) {
@@ -81,8 +233,32 @@ function createLocalSideGameRepository(deps) {
     return rec.jsonClone(rec.normalizeRecord(row));
   }
 
+  function persistV2(row) {
+    var out = v2store.persistRecord(storage, row, clock);
+    if (out && out.instanceOk && !out.indexOk) indexRepairDone = false;
+    return out;
+  }
+
+  function readCanonicalList() {
+    if (!isV2Canonical()) return readAll();
+    return v2store.loadAllFromIndex(storage);
+  }
+
   function listVisible(query) {
     var q = query || {};
+    if (isV2Canonical()) {
+      var idx = v2store.loadIndex(storage);
+      if (!idx.ok) return envelope(false, idx.reason, { items: [] }, 0);
+      var hits = v2store.filterIndexHits(idx.index.items || [], q);
+      var loadedV2 = v2store.loadRecordsForIndexItems(storage, hits);
+      if (!loadedV2.ok) return envelope(false, loadedV2.reason, { items: [] }, 0);
+      var viewer2 = rec.asString(q.viewerUserId) || identity.getCurrentUserId();
+      var host2 = q.hostContext || null;
+      var items2 = loadedV2.list.filter(function (row) {
+        return rec.viewerCanSee(row, q, host2, viewer2);
+      });
+      return envelope(true, '', { items: items2.map(publicRecord) }, 0);
+    }
     var loaded = readAll();
     if (!loaded.ok) return envelope(false, loaded.reason, { items: [] }, 0);
     var viewer = rec.asString(q.viewerUserId) || identity.getCurrentUserId();
@@ -94,6 +270,40 @@ function createLocalSideGameRepository(deps) {
   }
 
   function getById(sideGameId) {
+    if (isV2Canonical()) {
+      var id2 = rec.asString(sideGameId);
+      var got = v2store.getInstance(storage, id2);
+      if (!got.ok && got.reason === 'storage_read_failed') {
+        return envelope(false, 'storage_read_failed', null, 0);
+      }
+      if (!got.ok) {
+        var idxG = v2store.loadIndex(storage);
+        var hasIndex = false;
+        var gi;
+        if (idxG.ok) {
+          for (gi = 0; gi < (idxG.index.items || []).length; gi++) {
+            if (rec.asString(idxG.index.items[gi].sideGameId) === id2) {
+              hasIndex = true;
+              break;
+            }
+          }
+        }
+        if (hasIndex) {
+          try {
+            if (typeof console !== 'undefined' && typeof console.log === 'function') {
+              console.log('[side-game-storage-v2] index-repair', {
+                stage: 'getById-instance-gap',
+                error: 'not_found',
+                idCount: 1
+              });
+            }
+          } catch (eGap) {}
+        }
+        return envelope(false, 'not_found', null, 0);
+      }
+      if (got.record.status === 'deleted') return envelope(false, 'not_found', null, 0);
+      return envelope(true, '', publicRecord(got.record), got.record.revision);
+    }
     var id = rec.asString(sideGameId);
     var loaded = readAll();
     if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
@@ -121,7 +331,7 @@ function createLocalSideGameRepository(deps) {
     var userId = identity.getCurrentUserId();
     var gate = entitlement.canCreate({ userId: userId, hostContext: host, input: input });
     if (!gate.ok) return envelope(false, gate.reason || 'no_entitlement', null, 0);
-    var loaded = readAll();
+    var loaded = readCanonicalList();
     if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
     var key = rec.asString(input && input.idempotencyKey);
     var existing = findByIdempotency(loaded.list, key);
@@ -156,7 +366,12 @@ function createLocalSideGameRepository(deps) {
     row.revision = 1;
     row.idempotencyKey = key;
     var next = loaded.list.concat([row]);
-    if (!writeAll(next)) return envelope(false, 'storage_write_failed', null, 0);
+    if (isV2Canonical()) {
+      var savedCreate = persistV2(row);
+      if (!savedCreate.ok) return envelope(false, 'storage_write_failed', null, 0);
+    } else if (!writeAll(next)) {
+      return envelope(false, 'storage_write_failed', null, 0);
+    }
     notify({ type: 'create', sideGameId: row.sideGameId });
     return envelope(true, '', publicRecord(row), 1);
   }
@@ -164,20 +379,34 @@ function createLocalSideGameRepository(deps) {
   function update(sideGameId, expectedRevision, patch) {
     var id = rec.asString(sideGameId);
     var userId = identity.getCurrentUserId();
-    var loaded = readAll();
-    if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
+    var v2 = isV2Canonical();
+    var loaded = null;
     var idx = -1;
+    var current;
     var i;
-    for (i = 0; i < loaded.list.length; i++) {
-      if (loaded.list[i].sideGameId === id) {
-        idx = i;
-        break;
+    if (v2) {
+      var gotU = v2store.getInstance(storage, id);
+      if (!gotU.ok && gotU.reason === 'storage_read_failed') {
+        return envelope(false, 'storage_read_failed', null, 0);
       }
+      if (!gotU.ok || gotU.record.status === 'deleted') {
+        return envelope(false, 'not_found', null, 0);
+      }
+      current = gotU.record;
+    } else {
+      loaded = readAll();
+      if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
+      for (i = 0; i < loaded.list.length; i++) {
+        if (loaded.list[i].sideGameId === id) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0 || loaded.list[idx].status === 'deleted') {
+        return envelope(false, 'not_found', null, 0);
+      }
+      current = loaded.list[idx];
     }
-    if (idx < 0 || loaded.list[idx].status === 'deleted') {
-      return envelope(false, 'not_found', null, 0);
-    }
-    var current = loaded.list[idx];
     var gate = entitlement.canUpdate({ userId: userId, record: current });
     if (!gate.ok) return envelope(false, gate.reason || 'no_entitlement', null, current.revision);
     var expect = Number(expectedRevision);
@@ -213,9 +442,14 @@ function createLocalSideGameRepository(deps) {
     if (nextRow.scope === 'match' && nextRow.visibility === 'group') {
       return envelope(false, 'invalid_visibility', publicRecord(current), current.revision);
     }
-    var copy = loaded.list.slice();
-    copy[idx] = nextRow;
-    if (!writeAll(copy)) return envelope(false, 'storage_write_failed', publicRecord(current), current.revision);
+    if (v2) {
+      var savedUpd = persistV2(nextRow);
+      if (!savedUpd.ok) return envelope(false, 'storage_write_failed', publicRecord(current), current.revision);
+    } else {
+      var copy = loaded.list.slice();
+      copy[idx] = nextRow;
+      if (!writeAll(copy)) return envelope(false, 'storage_write_failed', publicRecord(current), current.revision);
+    }
     notify({ type: 'update', sideGameId: id });
     return envelope(true, '', publicRecord(nextRow), nextRow.revision);
   }
@@ -223,20 +457,34 @@ function createLocalSideGameRepository(deps) {
   function remove(sideGameId, expectedRevision) {
     var id = rec.asString(sideGameId);
     var userId = identity.getCurrentUserId();
-    var loaded = readAll();
-    if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
+    var v2 = isV2Canonical();
+    var loaded = null;
     var idx = -1;
     var i;
-    for (i = 0; i < loaded.list.length; i++) {
-      if (loaded.list[i].sideGameId === id) {
-        idx = i;
-        break;
+    var current;
+    if (v2) {
+      var gotR = v2store.getInstance(storage, id);
+      if (!gotR.ok && gotR.reason === 'storage_read_failed') {
+        return envelope(false, 'storage_read_failed', null, 0);
       }
+      if (!gotR.ok || gotR.record.status === 'deleted') {
+        return envelope(false, 'not_found', null, 0);
+      }
+      current = gotR.record;
+    } else {
+      loaded = readAll();
+      if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
+      for (i = 0; i < loaded.list.length; i++) {
+        if (loaded.list[i].sideGameId === id) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0 || loaded.list[idx].status === 'deleted') {
+        return envelope(false, 'not_found', null, 0);
+      }
+      current = loaded.list[idx];
     }
-    if (idx < 0 || loaded.list[idx].status === 'deleted') {
-      return envelope(false, 'not_found', null, 0);
-    }
-    var current = loaded.list[idx];
     var gate = entitlement.canRemove({ userId: userId, record: current });
     if (!gate.ok) return envelope(false, gate.reason || 'no_entitlement', null, current.revision);
     if (Number(expectedRevision) !== current.revision) {
@@ -251,9 +499,14 @@ function createLocalSideGameRepository(deps) {
         revision: current.revision + 1
       })
     );
-    var copy = loaded.list.slice();
-    copy[idx] = nextRow;
-    if (!writeAll(copy)) return envelope(false, 'storage_write_failed', publicRecord(current), current.revision);
+    if (v2) {
+      var savedRm = persistV2(nextRow);
+      if (!savedRm.ok) return envelope(false, 'storage_write_failed', publicRecord(current), current.revision);
+    } else {
+      var copyRm = loaded.list.slice();
+      copyRm[idx] = nextRow;
+      if (!writeAll(copyRm)) return envelope(false, 'storage_write_failed', publicRecord(current), current.revision);
+    }
     notify({ type: 'remove', sideGameId: id });
     return envelope(true, '', { deleted: true, sideGameId: id }, nextRow.revision);
   }
@@ -347,6 +600,7 @@ function createLocalSideGameRepository(deps) {
   }
 
   function refreshResult(sideGameId, hostContext) {
+    ensureReady();
     var got = getById(sideGameId);
     if (!got.ok) return got;
     var row = rec.normalizeRecord(got.data);
@@ -370,6 +624,7 @@ function createLocalSideGameRepository(deps) {
   }
 
   function inspectPlayerIdsRemap(matchId, idMap) {
+    ensureReady();
     var mid = rec.asString(matchId);
     var map = {};
     Object.keys(idMap || {}).forEach(function (key) {
@@ -380,7 +635,7 @@ function createLocalSideGameRepository(deps) {
     if (!mid || !Object.keys(map).length) {
       return envelope(true, '', { conflictSideGameIds: [] }, 0);
     }
-    var loaded = readAll();
+    var loaded = readCanonicalList();
     if (!loaded.ok) return envelope(false, loaded.reason, { conflictSideGameIds: [] }, 0);
     var fromIds = Object.keys(map);
     var conflicts = [];
@@ -406,6 +661,7 @@ function createLocalSideGameRepository(deps) {
   }
 
   function remapPlayerIds(matchId, idMap, profiles) {
+    ensureReady();
     var mid = rec.asString(matchId);
     var map = {};
     Object.keys(idMap || {}).forEach(function (key) {
@@ -418,7 +674,7 @@ function createLocalSideGameRepository(deps) {
     }
     var inspected = inspectPlayerIdsRemap(mid, map);
     if (!inspected.ok) return inspected;
-    var loaded = readAll();
+    var loaded = readCanonicalList();
     if (!loaded.ok) return envelope(false, loaded.reason, { updatedSideGameIds: [] }, 0);
     var fromIds = Object.keys(map);
     var updated = [];
@@ -438,7 +694,16 @@ function createLocalSideGameRepository(deps) {
       return mapped;
     });
     if (!updated.length) return envelope(true, '', { updatedSideGameIds: [] }, 0);
-    if (!writeAll(next)) return envelope(false, 'storage_write_failed', { updatedSideGameIds: [] }, 0);
+    if (isV2Canonical()) {
+      var ri;
+      for (ri = 0; ri < next.length; ri++) {
+        if (updated.indexOf(next[ri].sideGameId) < 0) continue;
+        var savedMap = persistV2(next[ri]);
+        if (!savedMap.ok) return envelope(false, 'storage_write_failed', { updatedSideGameIds: [] }, 0);
+      }
+    } else if (!writeAll(next)) {
+      return envelope(false, 'storage_write_failed', { updatedSideGameIds: [] }, 0);
+    }
     notify({ type: 'remap', matchId: mid, idMap: map });
     return envelope(true, '', { updatedSideGameIds: updated }, 0);
   }
@@ -453,10 +718,11 @@ function createLocalSideGameRepository(deps) {
   }
 
   function removeGamesTouchingPlayer(matchId, playerId) {
+    ensureReady();
     var mid = rec.asString(matchId);
     var pid = rec.asString(playerId);
     if (!mid || !pid) return envelope(false, 'invalid_args', { removedSideGameIds: [] }, 0);
-    var loaded = readAll();
+    var loaded = readCanonicalList();
     if (!loaded.ok) return envelope(false, loaded.reason, { removedSideGameIds: [] }, 0);
     var userId = identity.getCurrentUserId();
     var removed = [];
@@ -472,16 +738,26 @@ function createLocalSideGameRepository(deps) {
       return copy;
     });
     if (!removed.length) return envelope(true, '', { removedSideGameIds: [] }, 0);
-    if (!writeAll(next)) return envelope(false, 'storage_write_failed', { removedSideGameIds: [] }, 0);
+    if (isV2Canonical()) {
+      var rj;
+      for (rj = 0; rj < next.length; rj++) {
+        if (removed.indexOf(next[rj].sideGameId) < 0) continue;
+        var savedDel = persistV2(next[rj]);
+        if (!savedDel.ok) return envelope(false, 'storage_write_failed', { removedSideGameIds: [] }, 0);
+      }
+    } else if (!writeAll(next)) {
+      return envelope(false, 'storage_write_failed', { removedSideGameIds: [] }, 0);
+    }
     notify({ type: 'remove-by-player', matchId: mid, playerId: pid });
     return envelope(true, '', { removedSideGameIds: removed }, 0);
   }
 
   function commitSetupDraft(input) {
+    ensureReady();
     var bag = input || {};
     var userId = identity.getCurrentUserId();
     var host = bag.hostContext || null;
-    var loaded = readAll();
+    var loaded = readCanonicalList();
     if (!loaded.ok) return envelope(false, loaded.reason, null, 0);
     var list = loaded.list.slice();
     var expected = bag.expectedRevisions || {};
@@ -590,7 +866,33 @@ function createLocalSideGameRepository(deps) {
       list.push(row);
     }
 
-    if (!writeAll(list)) return envelope(false, 'storage_write_failed', null, 0);
+    if (isV2Canonical()) {
+      var ops = [];
+      var beforeById = {};
+      loaded.list.forEach(function (row) {
+        beforeById[rec.asString(row.sideGameId)] = row;
+      });
+      for (i = 0; i < list.length; i++) {
+        var after = list[i];
+        var aid = rec.asString(after.sideGameId);
+        var prev = beforeById[aid];
+        if (!prev) {
+          ops.push({ type: 'create', beforeRevision: 0, after: after });
+        } else if ((Number(after.revision) || 0) !== (Number(prev.revision) || 0) || rec.asString(after.status) !== rec.asString(prev.status)) {
+          ops.push({
+            type: rec.asString(after.status) === 'deleted' ? 'remove' : 'update',
+            beforeRevision: Number(prev.revision) || 0,
+            after: after
+          });
+        }
+      }
+      if (ops.length) {
+        var tx = v2store.commitOps(storage, { matchId: bag.matchId, ops: ops }, clock);
+        if (!tx.ok) return envelope(false, tx.reason || 'storage_write_failed', null, 0);
+      }
+    } else if (!writeAll(list)) {
+      return envelope(false, 'storage_write_failed', null, 0);
+    }
 
     if (bag.settings != null) {
       var settingsOk = true;
@@ -605,7 +907,26 @@ function createLocalSideGameRepository(deps) {
         settingsOk = false;
       }
       if (!settingsOk) {
-        writeAll(loaded.list);
+        if (isV2Canonical()) {
+          var beforeIds = {};
+          var rb;
+          for (rb = 0; rb < loaded.list.length; rb++) {
+            beforeIds[rec.asString(loaded.list[rb].sideGameId)] = true;
+            persistV2(loaded.list[rb]);
+          }
+          for (rb = 0; rb < list.length; rb++) {
+            var nid = rec.asString(list[rb].sideGameId);
+            if (beforeIds[nid]) continue;
+            var ghost = rec.normalizeRecord(list[rb]);
+            ghost.status = 'deleted';
+            ghost.deletedAt = clock();
+            ghost.updatedAt = clock();
+            ghost.revision = (Number(ghost.revision) || 1) + 1;
+            persistV2(ghost);
+          }
+        } else {
+          writeAll(loaded.list);
+        }
         return envelope(false, 'settings_write_failed', null, 0);
       }
     }
@@ -625,6 +946,79 @@ function createLocalSideGameRepository(deps) {
     return envelope(true, '', { settledIds: settledIds }, 0);
   }
 
+  function listByMatchId(query) {
+    ensureReady();
+    var q = query || {};
+    var mid = rec.asString(q.matchId);
+    var loaded = readCanonicalList();
+    if (!loaded.ok) return envelope(false, loaded.reason, { items: [] }, 0);
+    var gid = rec.asString(q.groupId);
+    var items = loaded.list.filter(function (row) {
+      if (!row) return false;
+      if (mid && rec.asString(row.matchId) !== mid) return false;
+      if (!q.includeDeleted && row.status === 'deleted') return false;
+      if (gid && rec.asString(row.groupId) !== gid) return false;
+      return true;
+    });
+    return envelope(true, '', { items: items.map(publicRecord) }, 0);
+  }
+
+  function listRankMarkView(query) {
+    return listByMatchId({
+      matchId: query && query.matchId,
+      groupId: query && query.groupId,
+      includeDeleted: false
+    });
+  }
+
+  function updateHoleOrderForMatch(input) {
+    ensureReady();
+    var bag = input || {};
+    var rows = Array.isArray(bag.records) ? bag.records : [];
+    if (!rows.length) return envelope(true, '', { updatedCount: 0 }, 0);
+    if (isV2Canonical()) {
+      var ops = rows.map(function (after) {
+        var row = rec.normalizeRecord(after);
+        return {
+          type: 'update',
+          beforeRevision: Math.max(0, (Number(row.revision) || 1) - 1),
+          after: row
+        };
+      });
+      var tx = v2store.commitOps(storage, { matchId: bag.matchId, ops: ops }, clock);
+      if (!tx.ok) return envelope(false, tx.reason || 'storage_write_failed', { updatedCount: 0 }, 0);
+      return envelope(true, '', { updatedCount: rows.length }, 0);
+    }
+    var loaded = readAll();
+    if (!loaded.ok) return envelope(false, loaded.reason, { updatedCount: 0 }, 0);
+    var byId = {};
+    rows.forEach(function (row) {
+      var id = rec.asString(row && row.sideGameId);
+      if (id) byId[id] = rec.normalizeRecord(row);
+    });
+    var next = loaded.list.map(function (row) {
+      var id = rec.asString(row.sideGameId);
+      return byId[id] ? byId[id] : row;
+    });
+    if (!writeAll(next)) return envelope(false, 'storage_write_failed', { updatedCount: 0 }, 0);
+    return envelope(true, '', { updatedCount: rows.length }, 0);
+  }
+
+  function restoreExactRecords(records) {
+    ensureReady();
+    var rows = Array.isArray(records) ? records : [];
+    if (isV2Canonical()) {
+      var i;
+      for (i = 0; i < rows.length; i++) {
+        var saved = persistV2(rows[i]);
+        if (!saved.ok) return envelope(false, 'storage_write_failed', null, 0);
+      }
+      return envelope(true, '', { restoredCount: rows.length }, 0);
+    }
+    if (!writeAll(rows)) return envelope(false, 'storage_write_failed', null, 0);
+    return envelope(true, '', { restoredCount: rows.length }, 0);
+  }
+
   function subscribe(query, callback) {
     if (typeof callback !== 'function') return null;
     listeners.push(callback);
@@ -641,6 +1035,10 @@ function createLocalSideGameRepository(deps) {
   return {
     implementation: 'local',
     STORAGE_KEY: STORAGE_KEY,
+    INDEX_KEY_V2: v2mig.INDEX_KEY,
+    INSTANCE_PREFIX_V2: v2mig.INSTANCE_PREFIX,
+    MIGRATION_KEY_V2: v2mig.MIGRATION_KEY,
+    JOURNAL_KEY_V2: v2store.JOURNAL_KEY,
     listVisible: listVisible,
     getById: getById,
     create: create,
@@ -653,17 +1051,26 @@ function createLocalSideGameRepository(deps) {
     remapPlayerIds: remapPlayerIds,
     removeGamesTouchingPlayer: removeGamesTouchingPlayer,
     commitSetupDraft: commitSetupDraft,
+    listByMatchId: listByMatchId,
+    listRankMarkView: listRankMarkView,
+    updateHoleOrderForMatch: updateHoleOrderForMatch,
+    restoreExactRecords: restoreExactRecords,
     subscribe: subscribe,
     unsubscribe: unsubscribe
   };
 }
 
-var defaultRepo = createLocalSideGameRepository();
+var defaultRepo = null;
 
 module.exports = {
   STORAGE_KEY: STORAGE_KEY,
+  INDEX_KEY_V2: v2mig.INDEX_KEY,
+  INSTANCE_PREFIX_V2: v2mig.INSTANCE_PREFIX,
+  MIGRATION_KEY_V2: v2mig.MIGRATION_KEY,
+  JOURNAL_KEY_V2: v2store.JOURNAL_KEY,
   createLocalSideGameRepository: createLocalSideGameRepository,
   getDefault: function () {
+    if (!defaultRepo) defaultRepo = createLocalSideGameRepository();
     return defaultRepo;
   }
 };

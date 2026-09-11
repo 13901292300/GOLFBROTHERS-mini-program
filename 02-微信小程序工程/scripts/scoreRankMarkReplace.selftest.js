@@ -16,6 +16,7 @@ if (typeof global.wx !== 'object') {
 var fs = require('fs');
 var path = require('path');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
+var bind = require('./sideGameRepoTestBind.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var scoreRank = require('../miniprogram/subpackages/scoring/utils/scoreRankMark.js');
 var projectMod = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
@@ -154,7 +155,7 @@ assert(
 assert('投影写入全部 18 洞含空 mark', /holes\[String\(hi\)\] = visual\.normalizeMark/.test(projJs));
 assert('rankMarkProjection 不再 emitGuard/persist 写盘', !/engineEmitGuard/.test(projJs) && !/persistWanted/.test(projJs));
 
-global.__gb_side_games = [makeRecord()];
+bind.seed([makeRecord()]);
 var filled5 = {
   pA: filledScores(5),
   pB: filledScores(5),
@@ -197,7 +198,7 @@ afterClearHole2Scores.pB[1] = '';
 afterClearHole2Scores.pC[1] = '';
 afterClearHole2Scores.pD[1] = '';
 
-global.__gb_side_games = [makeRecord()];
+bind.seed([makeRecord()]);
 var projAfter = settleThenProject(officialInput(afterClearHole2Scores));
 var completeAfter = mark.completeProjection(projAfter, ['pA', 'pB', 'pC', 'pD']);
 
@@ -244,7 +245,7 @@ assert(
     !!paintedNew[0].triColor
 );
 
-global.__gb_side_games = [makeRecord()];
+bind.seed([makeRecord()]);
 var restored = settleThenProject(officialInput(filled5));
 var paintedRestored = mark.blankThenPaintCells(paintedNew, 'pA', mark.completeProjection(proj5, ['pA']));
 assert(
@@ -252,7 +253,7 @@ assert(
   paintedRestored[1].triColor && paintedRestored[2].triColor && paintedRestored[4].triColor
 );
 
-global.__gb_side_games = [makeRecord()];
+bind.seed([makeRecord()]);
 var clearHole1 = {
   pA: filledScores(5),
   pB: filledScores(5),
@@ -267,7 +268,7 @@ var projClear1 = mark.completeProjection(settleThenProject(officialInput(clearHo
 var paintedClear1 = mark.blankThenPaintCells(cells5, 'pA', projClear1);
 assert('7. 清除洞1 后洞2–18 旧三角清除', allEmptyFrom(paintedClear1, 1));
 
-global.__gb_side_games = [makeRecord()];
+bind.seed([makeRecord()]);
 var clearMid = {
   pA: filledScores(5),
   pB: filledScores(5),
@@ -308,7 +309,7 @@ assert(
   allEmptyFrom(paintedFail, 0) && mark.colorFromProjection(emptyAll, 'pA', 0) === ''
 );
 
-global.__gb_side_games = [makeRecord()];
+bind.seed([makeRecord()]);
 assert(
   '11. 完整投影与 colorAt 一致',
   projectMod.colorAt(proj5, 'pA', 0) === mark.colorFromProjection(proj5, 'pA', 0) &&

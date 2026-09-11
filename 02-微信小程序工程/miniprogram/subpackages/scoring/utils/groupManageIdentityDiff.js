@@ -2,6 +2,7 @@
  * 人员调整 diff：同一次删除 A + 添加 B 折成身份纠错 replace。
  */
 var comboDisplayName = require('../../../utils/comboDisplayName.js');
+var port = require('../../../utils/sideGameRepositoryPort.js');
 
 function asId(v) {
   return v == null ? '' : String(v).trim();
@@ -252,30 +253,28 @@ function refreshComboNamesDeep(value) {
   });
 }
 
-function readSideGameList(wxApi) {
-  var raw = null;
-  try {
-    raw = wxApi && wxApi.getStorageSync ? wxApi.getStorageSync('gb_side_games_v1') : null;
-  } catch (e) {
-    return { ok: false, reason: 'storage_read_failed', list: [], snapshot: null };
+function clearAutoComboName(value) {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    value.forEach(clearAutoComboName);
+    return;
   }
-  var list = Array.isArray(raw) ? raw : [];
-  return {
-    ok: true,
-    reason: '',
-    list: list,
-    snapshot: raw
-  };
+  if (Array.isArray(value.members) && value.members.length > 1) {
+    value.displayName = '';
+    if (typeof value.name === 'string' && value.name.indexOf('+') >= 0) value.name = '';
+  }
+  Object.keys(value).forEach(function (key) {
+    if (key === 'members') return;
+    clearAutoComboName(value[key]);
+  });
 }
 
-function writeSideGameList(wxApi, list) {
-  try {
-    if (!wxApi || typeof wxApi.setStorageSync !== 'function') return false;
-    wxApi.setStorageSync('gb_side_games_v1', list);
-    return true;
-  } catch (e) {
-    return false;
+function snapshotMatchRows(matchId) {
+  var listed = port.listByMatchId({ matchId: matchId, includeDeleted: true });
+  if (listed && listed.ok && listed.data && Array.isArray(listed.data.items)) {
+    return listed.data.items;
   }
+  return [];
 }
 
 function applyGroupManageStorageDiff(wxApi, matchId, diff, opts) {
@@ -284,15 +283,19 @@ function applyGroupManageStorageDiff(wxApi, matchId, diff, opts) {
   if (!mid) {
     return { ok: false, reason: 'invalid_args', message: '缺少比赛' };
   }
-  var loaded = readSideGameList(wxApi);
-  if (!loaded.ok) {
-    return { ok: false, reason: loaded.reason, message: '保存失败' };
-  }
-  var inspected = inspectStorageRemap(loaded.list, mid, (diff && diff.replaced) || []);
-  if (!inspected.ok) return inspected;
-  var next = loaded.list.slice();
+  var snapshot = snapshotMatchRows(mid);
   var replaced = (diff && diff.replaced) || [];
   var idMap = buildRemapTable(replaced);
+  if (Object.keys(idMap).length) {
+    var inspected = port.inspectPlayerIdsRemap(mid, idMap);
+    if (!inspected || inspected.ok === false) {
+      return {
+        ok: false,
+        reason: (inspected && inspected.reason) || 'identity_conflict',
+        message: '目标球员已在本场比赛中'
+      };
+    }
+  }
   var profiles = opts.profiles || {};
   Object.keys(idMap).forEach(function (fromId) {
     var toId = idMap[fromId];
@@ -309,16 +312,35 @@ function applyGroupManageStorageDiff(wxApi, matchId, diff, opts) {
       }
     }
   });
-  var k;
   if (Object.keys(idMap).length) {
-    for (k = 0; k < next.length; k++) {
-      var row = next[k];
-      if (!row || asId(row.matchId) !== mid || row.status === 'deleted') continue;
-      var touched = Object.keys(idMap).some(function (fromId) {
-        return rowTouchesPlayer(row, fromId);
+    var remapped = port.remapPlayerIds(mid, idMap, profiles);
+    if (!remapped || !remapped.ok) {
+      return { ok: false, reason: (remapped && remapped.reason) || 'storage_write_failed', message: '保存失败' };
+    }
+    var updatedIds = (remapped.data && remapped.data.updatedSideGameIds) || [];
+    var u;
+    for (u = 0; u < updatedIds.length; u++) {
+      var got = port.getById(updatedIds[u]);
+      var live = got && got.data;
+      if (!live) continue;
+      live.participantParties = (live.participantParties || []).map(function (p) {
+        if (!p || p.partyType !== 'combination') return p;
+        return Object.assign({}, p, { displayName: '' });
       });
-      if (!touched) continue;
-      next[k] = remapRecordMap(row, idMap, profiles);
+      Object.keys(idMap).forEach(function (fromId) {
+        var toId = idMap[fromId];
+        stampProfileDeep(live.config, toId, profiles[toId] || null);
+        stampProfileDeep(live.resultSnapshot, toId, profiles[toId] || null);
+      });
+      clearAutoComboName(live.config);
+      clearAutoComboName(live.resultSnapshot);
+      refreshComboNamesDeep(live.config);
+      refreshComboNamesDeep(live.resultSnapshot);
+      port.update(live.sideGameId, live.revision, {
+        config: live.config,
+        resultSnapshot: live.resultSnapshot,
+        participantParties: live.participantParties
+      });
     }
   }
   var stillPresent = opts.stillPresentIds || {};
@@ -327,28 +349,18 @@ function applyGroupManageStorageDiff(wxApi, matchId, diff, opts) {
   for (i = 0; i < dropped.length; i++) {
     var pid = asId(dropped[i].fromPlayerId);
     if (!pid || stillPresent[pid]) continue;
-    for (k = 0; k < next.length; k++) {
-      var delRow = next[k];
-      if (!delRow || asId(delRow.matchId) !== mid || delRow.status === 'deleted') continue;
-      if (!rowTouchesPlayer(delRow, pid)) continue;
-      next[k] = Object.assign({}, delRow, { status: 'deleted' });
+    var del = port.removeGamesTouchingPlayer(mid, pid);
+    if (!del || !del.ok) {
+      return { ok: false, reason: (del && del.reason) || 'storage_write_failed', message: '保存失败' };
     }
   }
-  if (!writeSideGameList(wxApi, next)) {
-    return { ok: false, reason: 'storage_write_failed', message: '保存失败' };
-  }
-  return { ok: true, reason: '', snapshot: loaded.snapshot };
+  return { ok: true, reason: '', snapshot: snapshot };
 }
 
 function restoreSideGameSnapshot(wxApi, snapshot) {
-  try {
-    if (!wxApi || typeof wxApi.setStorageSync !== 'function') return false;
-    if (snapshot == null) wxApi.setStorageSync('gb_side_games_v1', []);
-    else wxApi.setStorageSync('gb_side_games_v1', snapshot);
-    return true;
-  } catch (e) {
-    return false;
-  }
+  var rows = Array.isArray(snapshot) ? snapshot : snapshot == null ? [] : [];
+  var out = port.restoreExactRecords(rows);
+  return !!(out && out.ok);
 }
 
 module.exports = {

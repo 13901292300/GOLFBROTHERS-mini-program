@@ -2,7 +2,7 @@
  * 记分页红蓝三角：主包只做存储探测与投影着色，不跑 settle。
  */
 var visual = require('./rankMarkVisual.js');
-var STORAGE_KEY = 'gb_side_games_v1';
+var port = require('./sideGameRepositoryPort.js');
 
 var TRI_BLUE = '#007AFF';
 var TRI_RED = '#FF3B30';
@@ -477,21 +477,20 @@ function recordsForScorePage(records, query) {
   });
 }
 
-function loadRecords() {
-  try {
-    var raw = typeof wx !== 'undefined' && wx.getStorageSync ? wx.getStorageSync(STORAGE_KEY) : null;
-    return Array.isArray(raw) ? raw : [];
-  } catch (e) {
-    return [];
+function loadRecords(query) {
+  var listed = port.listRankMarkView(query || {});
+  if (listed && listed.ok && listed.data && Array.isArray(listed.data.items)) {
+    return listed.data.items;
   }
+  return [];
 }
 
 function gamesForScorePage(query, records) {
-  return recordsForScorePage(records || loadRecords(), query).map(recordToGame);
+  return recordsForScorePage(records || loadRecords(query), query).map(recordToGame);
 }
 
 function hasRankMarkGames(query) {
-  var matched = recordsForScorePage(loadRecords(), query);
+  var matched = recordsForScorePage(loadRecords(query), query);
   var i;
   for (i = 0; i < matched.length; i++) {
     var row = matched[i];
@@ -585,7 +584,7 @@ function markAtStoredGames(games, holeIndex, playerId, holeLabel) {
 }
 
 function authoritySignature(query, official) {
-  var records = recordsForScorePage(loadRecords(), query);
+  var records = recordsForScorePage(loadRecords(query), query);
   var parts = records.map(function (row) {
     var inst = (row && row.config && row.config.instance) || {};
     return [
@@ -642,7 +641,7 @@ function projectFromStorage(official) {
 
 function inspect(query, sample) {
   var s = sample || {};
-  var stored = loadRecords();
+  var stored = loadRecords(query);
   var matched = recordsForScorePage(stored, query);
   var games = matched.map(recordToGame);
   var ruleIds = [];
@@ -680,7 +679,6 @@ function inspect(query, sample) {
 }
 
 module.exports = {
-  STORAGE_KEY: STORAGE_KEY,
   TRI_BLUE: TRI_BLUE,
   TRI_RED: TRI_RED,
   TRI_GOLD: TRI_GOLD,

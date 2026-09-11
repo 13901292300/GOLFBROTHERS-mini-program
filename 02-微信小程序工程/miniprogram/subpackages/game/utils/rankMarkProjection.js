@@ -7,8 +7,7 @@ var rec = require('./sideGameRecord.js');
 var visual = require('../../../utils/rankMarkVisual.js');
 var sideGameRankMark = require('../../../utils/sideGameRankMark.js');
 var temporaryCourse = require('../../../utils/temporaryCourse.js');
-
-var STORAGE_KEY = 'gb_side_games_v1';
+var repository = require('./sideGameRepository.js');
 
 function asString(v) {
   return v == null ? '' : String(v);
@@ -19,24 +18,21 @@ function jsonClone(v) {
   return JSON.parse(JSON.stringify(v));
 }
 
-function loadRecords() {
-  try {
-    var raw = typeof wx !== 'undefined' && wx.getStorageSync ? wx.getStorageSync(STORAGE_KEY) : null;
-    if (Array.isArray(raw)) return raw;
-    if (typeof global !== 'undefined' && Array.isArray(global.__gb_side_games)) return global.__gb_side_games;
-    return [];
-  } catch (e) {
-    return [];
+function loadRecords(query) {
+  var q = query || {};
+  var listed = repository.listByMatchId({
+    matchId: q.matchId,
+    groupId: q.groupId,
+    includeDeleted: false
+  });
+  if (listed && listed.ok && listed.data && Array.isArray(listed.data.items)) {
+    return listed.data.items;
   }
+  return [];
 }
 
-function saveRecords(list) {
-  try {
-    if (typeof global !== 'undefined') global.__gb_side_games = list;
-  } catch (e) {}
-  try {
-    if (typeof wx !== 'undefined' && wx.setStorageSync) wx.setStorageSync(STORAGE_KEY, list);
-  } catch (e) {}
+function saveRecords() {
+  /* projection 不写盘；结果回写走 repository.update */
 }
 
 function recordsForScorePage(records, query) {
@@ -308,8 +304,7 @@ function refreshGameResults(row, official) {
 }
 
 function refreshActiveGames(query, official) {
-  var all = loadRecords();
-  var matched = recordsForScorePage(all, query);
+  var matched = loadRecords(query);
   return matched.map(function (row) {
     return recordToGame(row);
   });
@@ -447,7 +442,6 @@ function colorAt(projection, playerId, holeIndex) {
 }
 
 module.exports = {
-  STORAGE_KEY: STORAGE_KEY,
   project: project,
   lastCompleteHoleIndex: lastCompleteHoleIndex,
   loadRecords: loadRecords,

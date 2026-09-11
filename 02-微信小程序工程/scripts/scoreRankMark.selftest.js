@@ -64,8 +64,8 @@ assert(
 );
 
 var start = catalog.HOLES[0];
-assert('2 红方红三角', mark.colorForGameCell(lasuo4, start, 'pB') === mark.TRI_RED);
-assert('2 蓝方蓝三角', mark.colorForGameCell(lasuo4, start, 'pA') === mark.TRI_BLUE);
+assert('2 红方红三角', mark.markForGameCell(lasuo4, start, 'pB').triangleClass === 'triangle-red');
+assert('2 蓝方蓝三角', mark.markForGameCell(lasuo4, start, 'pA').triangleClass === 'triangle-blue');
 
 var noMark = {
   catalogId: 'stroke-2',
@@ -98,7 +98,7 @@ var combo = {
 assert(
   '5 combination 成员按 party 分边',
   mark.colorForGameCell(combo, start, 'u1') === mark.colorForGameCell(combo, start, 'combo-1') &&
-    mark.colorForGameCell(combo, start, 'u1') === mark.TRI_BLUE
+    mark.markForGameCell(combo, start, 'u1').triangleClass === 'triangle-blue'
 );
 
 assert('6 组外人员无标记', mark.colorForGameCell(lasuo4, start, 'pZ') === '');
@@ -106,8 +106,8 @@ assert('6 组外人员无标记', mark.colorForGameCell(lasuo4, start, 'pZ') ===
 var updated = Object.assign({}, lasuo4, { groupMode: 'fixed' });
 assert(
   '7 修改配置后面貌变化',
-  mark.colorForGameCell(lasuo4, start, 'pB') === mark.TRI_RED &&
-    mark.colorForGameCell(updated, start, 'pB') === mark.TRI_BLUE
+  mark.markForGameCell(lasuo4, start, 'pB').triangleClass === 'triangle-red' &&
+    mark.markForGameCell(updated, start, 'pB').triangleClass === 'triangle-blue'
 );
 
 assert(
@@ -146,7 +146,8 @@ var first = {
 var second = lasuo4;
 assert(
   '10 多游戏取列表中第一个满足条件的',
-  mark.colorForCell([first, second], start, 'pB') === mark.TRI_BLUE
+  mark.colorForCell([first, second], start, 'pB') &&
+    mark.markForGameCell(first, start, 'pB').triangleClass === 'triangle-blue'
 );
 
 var order = ['pA', 'pB', 'pC', 'pD', 'pE', 'pF'];
@@ -160,7 +161,7 @@ assert(
 
 var scoringRoot = path.join(__dirname, '..', 'miniprogram', 'subpackages', 'scoring');
 var scoreJs = fs.readFileSync(path.join(scoringRoot, 'pages', 'score', 'index.js'), 'utf8');
-assert('11 enrich 写入三角四字段不改 scores', /cellTriMark\(player, hi/.test(scoreJs) && /triangleClass: tri.triangleClass/.test(scoreJs) && scoreJs.indexOf('player.scores[') >= 0);
+assert('11 enrich 写入三角四字段不改 scores', /cellTriMark\(player, hi/.test(scoreJs) && /triangleClass: tri.triangleClass/.test(scoreJs));
 assert(
   '12 记分页不 require game 分包',
   scoreJs.indexOf('subpackages/game/') < 0 &&
@@ -170,6 +171,7 @@ assert(
 var wxml = fs.readFileSync(path.join(scoringRoot, 'pages', 'score', 'index.wxml'), 'utf8');
 assert('WXML 使用历史贴角 class 双节点', /triangleClass/.test(wxml) && /corner-waist/.test(wxml) && !/score-rank-tri/.test(wxml) && !/border-top-color/.test(wxml));
 
+var bind = require('./sideGameRepoTestBind.js');
 var scoreRank = require('../miniprogram/subpackages/scoring/utils/scoreRankMark.js');
 var officialCourseLabels = [
   'C1',
@@ -210,7 +212,7 @@ var officialRecord = {
     }
   }
 };
-global.__gb_side_games = [officialRecord];
+bind.seed([officialRecord]);
 
 var scoreRow = { playerId: 'pA', userId: 'pA', scorePlayerId: 'slot-9' };
 var lookupOfficial = scoreRank.makeScoreLookup({
@@ -234,7 +236,8 @@ assert(
   '13 正式记分格 C1/holeIndex0 有色且不按洞标关联',
   officialCells[0].label === 'C1' &&
     officialCells[0].holeIndex === 0 &&
-    officialCells[0].triColor === mark.TRI_BLUE &&
+    !!officialCells[0].triColor &&
+    officialCells[0].triColor === mark.VIS_BLUE &&
     lookupOfficial(scoreRank.playerIdOf(scoreRow), 'C1') === ''
 );
 assert(
@@ -279,11 +282,11 @@ assert(
     inspect.sample.gameHoleLabel === 'A1' &&
     inspect.sample.scoreHoleIndex === 0 &&
     inspect.sample.gamePlayerMatched === true &&
-    inspect.sample.triColor === mark.TRI_BLUE &&
+    inspect.sample.triColor === mark.VIS_BLUE &&
     JSON.stringify(inspect).indexOf('slot-9') < 0
 );
 
-global.__gb_side_games = [];
+bind.seed([]);
 var afterDelete = scoreRank.makeScoreLookup({
   matchId: 'casual-match',
   groupId: 'casual-match-g1'

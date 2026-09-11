@@ -82,6 +82,13 @@ function memStorage(failWrite, failRead) {
       bag[key] = JSON.parse(JSON.stringify(value));
       return true;
     },
+    removeItem: function (key) {
+      delete bag[key];
+      return true;
+    },
+    listKeys: function () {
+      return Object.keys(bag);
+    },
     _bag: bag
   };
 }

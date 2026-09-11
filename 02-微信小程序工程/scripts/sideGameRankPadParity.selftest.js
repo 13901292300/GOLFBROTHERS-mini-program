@@ -17,6 +17,7 @@ if (typeof global.wx !== 'object') {
 }
 
 var officialSettle = require('../miniprogram/subpackages/game/utils/settle.js');
+var bind = require('./sideGameRepoTestBind.js');
 var officialCatalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var officialProj = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
 var coord = require('../miniprogram/subpackages/game/utils/sideGameSettleCoordinator.js');
@@ -48,7 +49,7 @@ function holeLabels(game) {
 }
 
 function officialPad(record, relScores) {
-  global.__gb_side_games = [JSON.parse(JSON.stringify(record))];
+  bind.seed([JSON.parse(JSON.stringify(record))]);
   var official = {
     matchId: record.matchId,
     groupId: record.groupId,
@@ -257,7 +258,7 @@ assert(
   anyMark(officialPad(recHorn, fillRel(gameHorn, 5, hornVals)), 0, 5)
 );
 
-global.__gb_side_games = [];
+bind.seed([]);
 var emptyProj = officialProj.project({
   matchId: 'm-parity',
   groupId: 'casual-match-g1',
@@ -299,12 +300,12 @@ assert(
     ).indexOf('settleLasuo4') >= 0
 );
 
-global.__gb_side_games = [JSON.parse(JSON.stringify(recRandom))];
+bind.seed([JSON.parse(JSON.stringify(recRandom))]);
 assert(
   '有分边游戏时检测为真',
   officialMark.hasRankMarkGames({ matchId: 'm-parity', groupId: 'casual-match-g1' }) === true
 );
-global.__gb_side_games = [
+bind.seed([
   {
     matchId: 'm-parity',
     groupId: 'casual-match-g1',
@@ -312,7 +313,7 @@ global.__gb_side_games = [
     ruleId: 'stroke-2',
     config: { instance: { catalogId: 'stroke-2' } }
   }
-];
+]);
 assert(
   '无分边游戏时检测为假',
   officialMark.hasRankMarkGames({ matchId: 'm-parity', groupId: 'casual-match-g1' }) === false

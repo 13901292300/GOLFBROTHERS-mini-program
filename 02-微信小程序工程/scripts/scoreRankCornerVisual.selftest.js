@@ -17,6 +17,7 @@ if (typeof global.wx !== 'object') {
 }
 
 var visual = require('../miniprogram/utils/rankMarkVisual.js');
+var bind = require('./sideGameRepoTestBind.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
 var projectMod = require('../miniprogram/subpackages/game/utils/rankMarkProjection.js');
@@ -179,7 +180,7 @@ function officialInput(scoresByPid) {
   };
 }
 
-global.__gb_side_games = [makeRecord('8421-4', 'random')];
+bind.seed([makeRecord('8421-4', 'random')]);
 var filled5 = {
   pA: filledScores(5),
   pB: filledScores(5),
@@ -208,7 +209,7 @@ afterClear.pA[1] = '';
 afterClear.pB[1] = '';
 afterClear.pC[1] = '';
 afterClear.pD[1] = '';
-global.__gb_side_games = [makeRecord('8421-4', 'random')];
+bind.seed([makeRecord('8421-4', 'random')]);
 var projClear = mark.completeProjection(settleThenProject(officialInput(afterClear)), ['pA', 'pB', 'pC', 'pD']);
 var paintedClear = mark.blankThenPaintCells(painted5, 'pC', projClear);
 var laterEmpty = true;
@@ -227,7 +228,7 @@ assert(
     !projClear.pC['2'].triangleClass
 );
 
-global.__gb_side_games = [makeRecord('8421-4', 'random')];
+bind.seed([makeRecord('8421-4', 'random')]);
 var restored = mark.completeProjection(settleThenProject(officialInput(filled5)), ['pC']);
 var paintedRestored = mark.blankThenPaintCells(paintedClear, 'pC', restored);
 assert(
@@ -237,7 +238,7 @@ assert(
     paintedRestored[4].hasWaist === true
 );
 
-global.__gb_side_games = [makeRecord('8421-4', 'random')];
+bind.seed([makeRecord('8421-4', 'random')]);
 var beforeScores = {
   pA: [4].concat(filledScores(0).slice(1)),
   pB: [5].concat(filledScores(0).slice(1)),
@@ -258,7 +259,7 @@ var flippedScores = {
   pC: [5].concat(filledScores(0).slice(1)),
   pD: [4].concat(filledScores(0).slice(1))
 };
-global.__gb_side_games = [makeRecord('8421-4', 'random')];
+bind.seed([makeRecord('8421-4', 'random')]);
 var afterFlip = mark.completeProjection(settleThenProject(officialInput(flippedScores)), ['pA', 'pD']);
 var paintedFlip = mark.blankThenPaintCells(
   mark.blankThenPaintCells(cells5, 'pA', before),

@@ -6,11 +6,23 @@ var localMod = require('./localSideGameRepository.js');
 
 var current = localMod.getDefault();
 
+function bindPort() {
+  try {
+    var port = require('../../../utils/sideGameRepositoryPort.js');
+    port.bind(module.exports);
+    if (typeof getApp === 'function') {
+      var app = getApp();
+      if (app) app._sideGameRepository = module.exports;
+    }
+  } catch (eBind) {}
+}
+
 function setImplementation(next) {
   if (!next || typeof next.listVisible !== 'function' || typeof next.create !== 'function') {
     throw new Error('invalid_repository');
   }
   current = next;
+  bindPort();
 }
 
 function getImplementation() {
@@ -95,6 +107,34 @@ function commitSetupDraft(input) {
   return current.commitSetupDraft(input);
 }
 
+function listByMatchId(query) {
+  if (!current || typeof current.listByMatchId !== 'function') {
+    return { ok: true, reason: '', data: { items: [] }, revision: 0 };
+  }
+  return current.listByMatchId(query);
+}
+
+function listRankMarkView(query) {
+  if (!current || typeof current.listRankMarkView !== 'function') {
+    return listByMatchId(query);
+  }
+  return current.listRankMarkView(query);
+}
+
+function updateHoleOrderForMatch(input) {
+  if (!current || typeof current.updateHoleOrderForMatch !== 'function') {
+    return { ok: false, reason: 'unsupported', data: null, revision: 0 };
+  }
+  return current.updateHoleOrderForMatch(input);
+}
+
+function restoreExactRecords(records) {
+  if (!current || typeof current.restoreExactRecords !== 'function') {
+    return { ok: false, reason: 'unsupported' };
+  }
+  return current.restoreExactRecords(records);
+}
+
 function subscribe(query, callback) {
   return current.subscribe(query, callback);
 }
@@ -119,6 +159,13 @@ module.exports = {
   inspectPlayerIdsRemap: inspectPlayerIdsRemap,
   removeGamesTouchingPlayer: removeGamesTouchingPlayer,
   commitSetupDraft: commitSetupDraft,
+  listByMatchId: listByMatchId,
+  listRankMarkView: listRankMarkView,
+  updateHoleOrderForMatch: updateHoleOrderForMatch,
+  restoreExactRecords: restoreExactRecords,
   subscribe: subscribe,
   unsubscribe: unsubscribe
 };
+
+bindPort();
+

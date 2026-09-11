@@ -4,6 +4,7 @@
  */
 var path = require('path');
 var diffUtil = require('../miniprogram/subpackages/scoring/utils/groupManageIdentityDiff.js');
+var bind = require('./sideGameRepoTestBind.js');
 
 var passed = 0;
 var failed = 0;
@@ -19,16 +20,16 @@ function assert(name, cond, detail) {
 }
 
 function makeWx(list) {
-  var bag = { gb_side_games_v1: JSON.parse(JSON.stringify(list || [])) };
+  var seeded = bind.seed(list);
   return {
-    getStorageSync: function (key) {
-      return bag[key];
-    },
-    setStorageSync: function (key, value) {
-      bag[key] = JSON.parse(JSON.stringify(value));
-    },
-    _bag: bag
+    _repo: seeded.repo,
+    _bag: seeded.bag
   };
+}
+
+function stored0(wxApi, matchId) {
+  var listed = wxApi._repo.listByMatchId({ matchId: matchId || 'm1', includeDeleted: true });
+  return listed && listed.data && listed.data.items ? listed.data.items[0] : null;
 }
 
 var folded = diffUtil.foldIdentityCorrection({
@@ -87,7 +88,7 @@ var applied = diffUtil.applyGroupManageStorageDiff(
   { replaced: folded.replaced, removed: [], added: [] },
   { profiles: { B: { displayName: 'Bee', name: 'Bee', avatar: 'b.png' } }, stillPresentIds: { B: true, C: true } }
 );
-var stored = wxApi._bag.gb_side_games_v1[0];
+var stored = stored0(wxApi);
 assert('纠错后游戏仍存在', applied.ok === true && stored.status !== 'deleted');
 assert('参与方 A 改为 B', stored.participantParties[0].partyId === 'B' && stored.participantParties[0].memberPlayerIds[0] === 'B');
 assert('结果归属改挂 B 且杆数不变', stored.resultSnapshot.ranking.B === 1 && stored.resultSnapshot.scores.B === 72 && stored.resultSnapshot.scores.A == null);
@@ -142,7 +143,7 @@ diffUtil.applyGroupManageStorageDiff(
   { replaced: folded.replaced, removed: [], added: [] },
   { profiles: { B: { displayName: 'Bee', name: 'Bee' } }, stillPresentIds: { B: true, C: true } }
 );
-var comboStored = wxCombo._bag.gb_side_games_v1[0];
+var comboStored = stored0(wxCombo);
 assert(
   '纠错后实例组合名为 / 且 A→B',
   comboStored.config.instance.players[0].displayName === 'Bee/Pal' &&
@@ -167,7 +168,7 @@ assert(
       { replaced: folded.replaced, removed: [], added: [] },
       { profiles: { B: { displayName: 'Bee', name: 'Bee' } }, stillPresentIds: { B: true, C: true } }
     );
-    return wxNamed._bag.gb_side_games_v1[0].config.instance.players[0].displayName === '铁三角';
+    return stored0(wxNamed).config.instance.players[0].displayName === '铁三角';
   })()
 );
 
@@ -178,7 +179,7 @@ var deleted = diffUtil.applyGroupManageStorageDiff(
   { replaced: [], removed: [{ fromPlayerId: 'A' }], added: [] },
   { stillPresentIds: { C: true } }
 );
-assert('纯删除 A 时删除触及 A 的游戏', deleted.ok === true && wxDel._bag.gb_side_games_v1[0].status === 'deleted');
+assert('纯删除 A 时删除触及 A 的游戏', deleted.ok === true && stored0(wxDel).status === 'deleted');
 
 var wxKeep = makeWx([gameRow]);
 var kept = diffUtil.applyGroupManageStorageDiff(
@@ -187,7 +188,7 @@ var kept = diffUtil.applyGroupManageStorageDiff(
   { replaced: [], removed: [{ fromPlayerId: 'A' }], added: [] },
   { stillPresentIds: { A: true, C: true } }
 );
-assert('A 仍在其他组时不删游戏', kept.ok === true && wxKeep._bag.gb_side_games_v1[0].status !== 'deleted');
+assert('A 仍在其他组时不删游戏', kept.ok === true && stored0(wxKeep).status !== 'deleted');
 
 var fourball = {
   sideGameId: 'sg-22',
@@ -283,7 +284,7 @@ var applied22 = diffUtil.applyGroupManageStorageDiff(
     stillPresentIds: { A: true, B: true, C: true, D: true }
   }
 );
-var stored22 = wx22._bag.gb_side_games_v1[0];
+var stored22 = stored0(wx22);
 assert('2+2 互换保存成功且游戏仍在', applied22.ok === true && stored22.status !== 'deleted');
 assert(
   '2+2 组合成员变为 A/C 与 B/D',
@@ -311,7 +312,7 @@ assert(
 );
 
 var wxFail = makeWx([gameRow]);
-var snap = wxFail._bag.gb_side_games_v1;
+var snap = wxFail._repo.listByMatchId({ matchId: 'm1', includeDeleted: true }).data.items;
 diffUtil.applyGroupManageStorageDiff(
   wxFail,
   'm1',
@@ -319,7 +320,7 @@ diffUtil.applyGroupManageStorageDiff(
   { profiles: { B: { displayName: 'Bee' } }, stillPresentIds: { B: true } }
 );
 diffUtil.restoreSideGameSnapshot(wxFail, snap);
-assert('保存失败可回滚 side-game', wxFail._bag.gb_side_games_v1[0].participantParties[0].partyId === 'A');
+assert('保存失败可回滚 side-game', stored0(wxFail).participantParties[0].partyId === 'A');
 
 var fs = require('fs');
 var scoreJs = fs.readFileSync(

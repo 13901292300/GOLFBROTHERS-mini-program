@@ -3,6 +3,7 @@
  * 只编排已有 settleGame，不改各游戏算法。
  */
 var proj = require('./rankMarkProjection.js');
+var repository = require('./sideGameRepository.js');
 
 var settleCalls = 0;
 var inFlight = false;
@@ -24,15 +25,33 @@ function settleSideGamesForScoreMutation(official) {
   }
   inFlight = true;
   try {
-    var all = proj.loadRecords();
-    var matched = proj.recordsForScorePage(all, query);
+    var listed = repository.listByMatchId({
+      matchId: query.matchId,
+      groupId: query.groupId,
+      includeDeleted: false
+    });
+    var matched =
+      listed && listed.ok && listed.data && Array.isArray(listed.data.items) ? listed.data.items : [];
     if (!matched.length) {
       return { ok: true, skipped: 'no-games', settleCalls: settleCalls, gameCount: 0 };
     }
     for (var i = 0; i < matched.length; i++) {
-      proj.refreshGameResults(matched[i], official || {});
+      var row = matched[i];
+      var expected = Number(row && row.revision) || 0;
+      proj.refreshGameResults(row, official || {});
+      var saved = repository.update(row.sideGameId, expected, {
+        resultSnapshot: row.resultSnapshot,
+        resultRevision: row.resultRevision
+      });
+      if (!saved || !saved.ok) {
+        return {
+          ok: false,
+          error: (saved && saved.reason) || 'storage_write_failed',
+          keptOfficialScores: true,
+          settleCalls: settleCalls
+        };
+      }
     }
-    proj.saveRecords(all);
     settleCalls += 1;
     return {
       ok: true,

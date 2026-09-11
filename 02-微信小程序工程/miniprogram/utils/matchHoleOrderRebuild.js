@@ -1,10 +1,10 @@
 /**
  * 比赛球场/半场变更后重建全程洞序（主包写入点）。
- * 存储键与游戏分包一致：gb_side_game_settings_v1 / gb_side_games_v1。
+ * 存储键与游戏分包一致：gb_side_game_settings_v1；游戏实例走 repository 门面。
  * 运行期消费者仍只读 settings.fullHoleOrder / fullHoleOrderRevision。
  */
+var port = require('./sideGameRepositoryPort.js');
 var SETTINGS_KEY = 'gb_side_game_settings_v1';
-var GAMES_KEY = 'gb_side_games_v1';
 
 var SETTINGS_EMPTY = {
   privacy: 'public',
@@ -276,27 +276,23 @@ function replaceSettings(matchId, entry, value) {
   return true;
 }
 
-function readAllGames() {
-  var raw = readStorage(GAMES_KEY);
-  if (Array.isArray(raw)) return raw;
-  if (raw && Array.isArray(raw.list)) return raw.list;
+function listRowsForMatch(matchId) {
+  var mid = asStr(matchId);
+  var listed = port.listByMatchId({ matchId: mid, includeDeleted: false });
+  if (listed && listed.ok && listed.data && Array.isArray(listed.data.items)) {
+    return listed.data.items;
+  }
   return [];
 }
 
-function writeAllGames(list) {
-  var raw = readStorage(GAMES_KEY);
-  if (raw && !Array.isArray(raw) && typeof raw === 'object') {
-    var next = Object.assign({}, raw, { list: list });
-    return writeStorage(GAMES_KEY, next);
-  }
-  return writeStorage(GAMES_KEY, list);
+function persistMatchRows(matchId, rows) {
+  var saved = port.updateHoleOrderForMatch({ matchId: matchId, records: rows || [] });
+  return !!(saved && saved.ok);
 }
 
-function listRowsForMatch(matchId) {
-  var mid = asStr(matchId);
-  return readAllGames().filter(function (row) {
-    return row && asStr(row.matchId) === mid && asStr(row.status) !== 'deleted';
-  });
+function restoreMatchRows(rows) {
+  var saved = port.restoreExactRecords(rows || []);
+  return !!(saved && saved.ok);
 }
 
 function rebuildMatchHoleOrder(opts) {
@@ -314,8 +310,8 @@ function rebuildMatchHoleOrder(opts) {
   var prevRev = Number(prevSettings.fullHoleOrderRevision) || 0;
   var nextRev = prevRev + 1;
 
-  var allGames = readAllGames();
-  var prevGames = cloneJson(allGames);
+  var matchRows = listRowsForMatch(matchId);
+  var prevGames = cloneJson(matchRows);
   var mapping = buildHoleIdMap(oldCreated.length ? oldCreated : newCreated, newCreated);
 
   try {
@@ -331,8 +327,7 @@ function rebuildMatchHoleOrder(opts) {
       throw new Error('settings_write_failed');
     }
 
-    var nextGames = allGames.map(function (row) {
-      if (!row || asStr(row.matchId) !== matchId || asStr(row.status) === 'deleted') return row;
+    var nextGames = matchRows.map(function (row) {
       var nextRow = cloneJson(row);
       if (!nextRow.config) nextRow.config = {};
       nextRow.config.instance = migrateGameInstance(
@@ -357,7 +352,7 @@ function rebuildMatchHoleOrder(opts) {
       return nextRow;
     });
 
-    if (!writeAllGames(nextGames)) throw new Error('games_write_failed');
+    if (!persistMatchRows(matchId, nextGames)) throw new Error('games_write_failed');
 
     return {
       ok: true,
@@ -374,7 +369,7 @@ function rebuildMatchHoleOrder(opts) {
       replaceSettings(matchId, entry, prevSettings);
     } catch (e1) {}
     try {
-      writeAllGames(prevGames);
+      restoreMatchRows(prevGames);
     } catch (e2) {}
     return {
       ok: false,
@@ -408,7 +403,8 @@ function rebuildAllEntriesForMatch(opts) {
   });
   if (entriesToWrite.indexOf('score') < 0) entriesToWrite.unshift('score');
 
-  var prevGames = cloneJson(readAllGames());
+  var matchRows = listRowsForMatch(matchId);
+  var prevGames = cloneJson(matchRows);
   var primaryOld = uniqueLabels(
     settingsSnaps.score.createdHoleOrder ||
       settingsSnaps.score.fullHoleOrder ||
@@ -438,8 +434,7 @@ function rebuildAllEntriesForMatch(opts) {
       }
     }
 
-    var nextGames = readAllGames().map(function (row) {
-      if (!row || asStr(row.matchId) !== matchId || asStr(row.status) === 'deleted') return row;
+    var nextGames = matchRows.map(function (row) {
       var nextRow = cloneJson(row);
       if (!nextRow.config) nextRow.config = {};
       nextRow.config.instance = migrateGameInstance(
@@ -463,7 +458,7 @@ function rebuildAllEntriesForMatch(opts) {
       nextRow.updatedAt = Date.now();
       return nextRow;
     });
-    if (!writeAllGames(nextGames)) throw new Error('games_write_failed');
+    if (!persistMatchRows(matchId, nextGames)) throw new Error('games_write_failed');
 
     return {
       ok: true,
@@ -480,7 +475,7 @@ function rebuildAllEntriesForMatch(opts) {
     Object.keys(settingsSnaps).forEach(function (entry) {
       replaceSettings(matchId, entry, settingsSnaps[entry]);
     });
-    writeAllGames(prevGames);
+    restoreMatchRows(prevGames);
     return {
       ok: false,
       rebuilt: false,
@@ -503,11 +498,17 @@ function syncAfterCourseHalfChange(opts) {
   if (!labels.length) {
     return { ok: false, reason: 'empty_hole_order', message: '洞序同步失败' };
   }
-  return rebuildAllEntriesForMatch(
+  var rebuilt = rebuildAllEntriesForMatch(
     Object.assign({}, o, {
       createdHoleOrder: labels
     })
   );
+  if (rebuilt && rebuilt.ok && rebuilt.rebuilt) {
+    try {
+      require('./sideGameDerivedNotify.js').notifyAllGamesReplay('hole-mapping');
+    } catch (eNotify) {}
+  }
+  return rebuilt;
 }
 
 function resolveMatchId(ctx) {
@@ -517,7 +518,6 @@ function resolveMatchId(ctx) {
 
 module.exports = {
   SETTINGS_KEY: SETTINGS_KEY,
-  GAMES_KEY: GAMES_KEY,
   buildHoleLabelsFromHalves: buildHoleLabelsFromHalves,
   signatureOf: signatureOf,
   needsHoleOrderRebuild: needsHoleOrderRebuild,

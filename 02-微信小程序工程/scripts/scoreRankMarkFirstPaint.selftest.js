@@ -16,6 +16,7 @@ if (typeof global.wx !== 'object') {
 var fs = require('fs');
 var path = require('path');
 var catalog = require('../miniprogram/subpackages/game/utils/catalog.js');
+var bind = require('./sideGameRepoTestBind.js');
 var mark = require('../miniprogram/utils/sideGameRankMark.js');
 var scoreRank = require('../miniprogram/subpackages/scoring/utils/scoreRankMark.js');
 
@@ -49,7 +50,7 @@ function filledScores(n) {
   return a;
 }
 
-global.__gb_side_games = [
+bind.seed([
   {
     matchId: 'm-home',
     groupId: 'grp-1',
@@ -72,7 +73,7 @@ global.__gb_side_games = [
       }
     }
   }
-];
+]);
 
 var official = {
   matchId: 'm-home',
@@ -108,7 +109,9 @@ official.players[0].scores[0] = 5;
 var scoreStamp = scoreRank.authoritySignature({ matchId: 'm-home', groupId: 'grp-1' }, official);
 assert('改成绩后面签名变化', scoreStamp !== sameStamp);
 
-global.__gb_side_games[0].config.instance.playerOrder = ['pB', 'pA', 'pC', 'pD'];
+var flippedRec = JSON.parse(JSON.stringify(bind.row0('m-home')));
+flippedRec.config.instance.playerOrder = ['pB', 'pA', 'pC', 'pD'];
+bind.seed([flippedRec]);
 var orderStamp = scoreRank.authoritySignature({ matchId: 'm-home', groupId: 'grp-1' }, official);
 assert('改人员顺序后面签名变化', orderStamp !== scoreStamp);
 
@@ -119,7 +122,7 @@ assert(
     scoreRank.markFromProjection(flipped, 'pA', 0).triangleClass === 'triangle-red'
 );
 
-global.__gb_side_games = [];
+bind.seed([]);
 var empty = scoreRank.projectFromStorage(official);
 assert(
   '删除游戏后同步投影全空',

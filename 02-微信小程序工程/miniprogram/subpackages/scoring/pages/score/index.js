@@ -34,6 +34,7 @@ const mockAvatars = require('../../../../utils/mockAvatars.js');
 const scoreRankMark = require('../../utils/scoreRankMark.js');
 const scoreSideGameSettle = require('../../utils/scoreSideGameSettle.js');
 const groupManageIdentityDiff = require('../../utils/groupManageIdentityDiff.js');
+const sideGameRepositoryPort = require('../../../../utils/sideGameRepositoryPort.js');
 const demoWeekendAmateurGame = require('../../../../utils/demoWeekendAmateurGame.js');
 const classicAppReplicaScoreDigits = require('../../utils/classicAppReplicaScoreDigits.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
@@ -13200,13 +13201,17 @@ Page({
     if (!hasWork) return { ok: true };
     const matchId = this._sideGameMatchId();
     if (!matchId) return { ok: true };
-    let records = [];
-    try {
-      records = wx.getStorageSync('gb_side_games_v1') || [];
-    } catch (err) {
-      return { ok: false, reason: 'storage_read_failed', message: '保存失败' };
+    const idMap = groupManageIdentityDiff.buildRemapTable((diff && diff.replaced) || []);
+    if (!Object.keys(idMap).length) return { ok: true };
+    const inspected = sideGameRepositoryPort.inspectPlayerIdsRemap(matchId, idMap);
+    if (!inspected || inspected.ok === false) {
+      return {
+        ok: false,
+        reason: (inspected && inspected.reason) || 'identity_conflict',
+        message: '目标球员已在本场比赛中'
+      };
     }
-    return groupManageIdentityDiff.inspectStorageRemap(records, matchId, (diff && diff.replaced) || []);
+    return { ok: true };
   },
 
   _applyGroupManageIdentityNow(diff) {
