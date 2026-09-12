@@ -135,15 +135,17 @@
                     <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'mulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="mulRows" data-num-handler="onMulRow" bindinput="onNumInput" />
                   </view>
                 </view>
-                <view class="sec-label">组合奖励</view>
-                <view class="sec-hint">按胜队两人成绩配对计倍，只计这三档，倍数可改。</view>
-                <view wx:for="{{comboMulRows}}" wx:key="id" class="reward-row">
-                  <text>{{item.label}}</text>
-                  <view class="reward-input">
-                    <text class="reward-op">✖</text>
-                    <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'comboMulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="comboMulRows" data-num-handler="onComboMulRow" bindinput="onNumInput" />
+                <block wx:if="{{lasuoShowComboMultiplier}}">
+                  <view class="sec-label">组合奖励</view>
+                  <view class="sec-hint">按胜队两人成绩配对计倍，只计这三档，倍数可改。</view>
+                  <view wx:for="{{comboMulRows}}" wx:key="id" class="reward-row">
+                    <text>{{item.label}}</text>
+                    <view class="reward-input">
+                      <text class="reward-op">✖</text>
+                      <input class="mini-input" type="digit" bindfocus="onNumFocus" bindblur="onNumBlur" value="{{numEditing && numEditList === 'comboMulRows' && numEditId == item.id ? numEditDraft : item.value}}" data-id="{{item.id}}" data-num-list="comboMulRows" data-num-handler="onComboMulRow" bindinput="onNumInput" />
+                    </view>
                   </view>
-                </view>
+                </block>
               </view>
             </view>
           </view>

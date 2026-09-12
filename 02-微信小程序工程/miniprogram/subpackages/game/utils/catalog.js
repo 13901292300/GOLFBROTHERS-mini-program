@@ -661,9 +661,13 @@ function lasuoRewardText(rule, forSummary) {
     return parts.length ? parts.join(" · ") : "全部+0";
   }
   if (reward === "mul") {
-    const parts = lasuoRewardParts(rule.mulRows, "×", "1", personLabels).concat(
-      lasuoRewardParts(rule.comboMulRows, "×", "1", comboLabels)
-    );
+    const parts = lasuoRewardParts(rule.mulRows, "×", "1", personLabels);
+    if (lasuoShowComboMultiplier(rule)) {
+      Array.prototype.push.apply(
+        parts,
+        lasuoRewardParts(rule.comboMulRows, "×", "1", comboLabels)
+      );
+    }
     return parts.length ? parts.join(" · ") : "全部×1";
   }
   return "无奖励";
@@ -774,6 +778,26 @@ function lasuoBaoText(rule) {
   if (mode === "none") return "不包洞";
   const pre = (rule && rule.baoPre) === "ignore" ? "" : "顶头·";
   return pre + baoSummary(rule);
+}
+
+function isLasuoBestOnePoint(rule) {
+  return !!(rule && rule.pkBetter !== false && rule.pkWorse === false && rule.pkTotal === false);
+}
+
+function isLasuoWorstOnePoint(rule) {
+  return !!(rule && rule.pkBetter === false && rule.pkWorse !== false && rule.pkTotal === false);
+}
+
+function isLasuoHeadTotalTwoPoint(rule) {
+  return !!(rule && rule.pkBetter !== false && rule.pkWorse === false && rule.pkTotal !== false);
+}
+
+function lasuoShowComboMultiplier(rule) {
+  return !(
+    isLasuoBestOnePoint(rule) ||
+    isLasuoWorstOnePoint(rule) ||
+    isLasuoHeadTotalTwoPoint(rule)
+  );
 }
 
 function lasuoDefaultName(rule) {
@@ -1072,6 +1096,10 @@ module.exports = {
   lasuoNWayLabel,
   lasuoHubSummaries,
   lasuoDefaultName,
+  isLasuoBestOnePoint,
+  isLasuoWorstOnePoint,
+  isLasuoHeadTotalTwoPoint,
+  lasuoShowComboMultiplier,
   isNoSettings,
   supportsPairHoleHandicap,
   usesMatchPlayPairSettings,

@@ -452,6 +452,7 @@ Page({
     showBaoNeg: false,
     baoNeg: "none",
     showLasuo: false,
+    lasuoShowComboMultiplier: true,
     showThreeVsOne: false,
     tvoCompare: "best",
     tvoCompareText: "最好成绩",
@@ -689,6 +690,7 @@ Page({
       showBaoHole: isMid || isSmall,
       showBaoNeg: is8421 && !is8421Two,
       showLasuo: isLasuo,
+      lasuoShowComboMultiplier: catalog.lasuoShowComboMultiplier(lasuoDraft),
       showPush8421: is8421 && !is8421Fold,
       show8421Two: is8421Fold,
       show8421Three: is8421Fold,
@@ -1401,10 +1403,16 @@ Page({
       }, 0);
       return;
     }
-    this.setData({
+    const shape = {
       pkBetter: vals.indexOf("better") >= 0,
       pkWorse: vals.indexOf("worse") >= 0,
       pkTotal: vals.indexOf("total") >= 0
+    };
+    this.setData({
+      pkBetter: shape.pkBetter,
+      pkWorse: shape.pkWorse,
+      pkTotal: shape.pkTotal,
+      lasuoShowComboMultiplier: catalog.lasuoShowComboMultiplier(shape)
     });
     this.refreshLasuo();
   },
