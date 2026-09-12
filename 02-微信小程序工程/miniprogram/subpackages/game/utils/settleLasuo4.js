@@ -387,6 +387,9 @@ function resolveMultiplier(rule, rec, winTeam) {
   if (rule && rule.pkBetter !== false && rule.pkWorse !== false && rule.pkTotal === false) {
     return resolveComboThenPersonalProduct(rule, rec, winTeam);
   }
+  if (rule && rule.pkBetter !== false && rule.pkWorse !== false && rule.pkTotal !== false) {
+    return resolveComboThenPersonalProduct(rule, rec, winTeam);
+  }
   const ck = comboKey(rec[winTeam[0]].rel, rec[winTeam[1]].rel);
   const comboMap = rowMap(rule && rule.comboMulRows);
   if (ck && comboMap[ck] != null) {
