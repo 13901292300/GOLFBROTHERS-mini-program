@@ -210,6 +210,13 @@ function sidesOf(order, mid) {
   return { land: [order[0], d], farm: [order[1], order[2]] };
 }
 
+/** Visual assignment only. Mid: farm=blue, land=red. Scoring still uses land/farm. */
+function assignmentHoleSides(sides, mid) {
+  if (!sides) return sides;
+  if (!mid) return sides;
+  return { aTeam: sides.farm, bTeam: sides.land };
+}
+
 function bestRel(rec, ids) {
   return rec[ids[0]].rel <= rec[ids[1]].rel ? rec[ids[0]].rel : rec[ids[1]].rel;
 }
@@ -267,12 +274,13 @@ function settleDizhubo4(game, ctx) {
       return;
     }
     if (!startMarked || rankedNext) {
+      const settleSides = sidesOf(order, mid);
       assignmentNormalize.stamp(
         orderByHole,
         assignmentsByHole,
         label,
         order,
-        sidesOf(order, mid),
+        assignmentHoleSides(settleSides, mid),
         game
       );
     }
