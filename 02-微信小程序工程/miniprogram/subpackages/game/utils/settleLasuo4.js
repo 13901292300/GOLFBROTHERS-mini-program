@@ -348,6 +348,18 @@ function resolveWorstPersonalMultiplier(rule, rec, winTeam) {
   return { m: personalMulOf(rec[worstId].rel, rule), source: "worst" };
 }
 
+function resolveComboThenPersonalProduct(rule, rec, winTeam) {
+  const idA = winTeam[0];
+  const idB = winTeam[1];
+  const ck = comboKey(rec[idA].rel, rec[idB].rel);
+  const comboMap = rowMap(rule && rule.comboMulRows);
+  if (ck && comboMap[ck] != null) {
+    return { m: comboMap[ck], source: ck };
+  }
+  const m = personalMulOf(rec[idA].rel, rule) * personalMulOf(rec[idB].rel, rule);
+  return { m: m, source: "personal-product" };
+}
+
 function resolveHeadTotalMultiplier(rule, rec, winTeam) {
   let best = null;
   winTeam.forEach(function (id) {
@@ -368,6 +380,9 @@ function resolveMultiplier(rule, rec, winTeam) {
   }
   if (rule && rule.pkBetter === false && rule.pkWorse !== false && rule.pkTotal === false) {
     return resolveWorstPersonalMultiplier(rule, rec, winTeam);
+  }
+  if (rule && rule.pkBetter === false && rule.pkWorse === false && rule.pkTotal !== false) {
+    return resolveComboThenPersonalProduct(rule, rec, winTeam);
   }
   const ck = comboKey(rec[winTeam[0]].rel, rec[winTeam[1]].rel);
   const comboMap = rowMap(rule && rule.comboMulRows);
