@@ -127,7 +127,7 @@
           <view
             wx:for="{{item.cells}}"
             wx:for-item="cell"
-            wx:key="index"
+            wx:key="playerId"
             class="board-cell board-cell--player board-cell--axis {{cell.cls}}"
             style="{{cell.fitStyle}}"
           >{{cell.text}}</view>
@@ -141,7 +141,7 @@
           <view
             wx:for="{{item.cells}}"
             wx:for-item="cell"
-            wx:key="index"
+            wx:key="playerId"
             class="board-cell board-cell--player board-cell--axis {{cell.cls}}"
             style="{{cell.fitStyle}}"
           >{{cell.text}}</view>
@@ -153,7 +153,7 @@
           <view class="board-cell board-cell--hole board-cell--axis">汇总</view>
           <view
             wx:for="{{board.totals}}"
-            wx:key="index"
+            wx:key="playerId"
             class="board-cell board-cell--player board-cell--axis {{item.cls}}"
             style="{{item.fitStyle}}"
           >{{item.text}}</view>
@@ -162,7 +162,7 @@
           <view class="board-cell board-cell--hole board-cell--axis">{{board.potRowLabel}}</view>
           <view
             wx:for="{{board.pots}}"
-            wx:key="index"
+            wx:key="playerId"
             class="board-cell board-cell--player board-cell--axis {{item.cls}}"
             style="{{item.fitStyle}}"
           >{{item.text}}</view>
@@ -262,7 +262,7 @@
               <view
                 wx:for="{{item.cells}}"
                 wx:for-item="cell"
-                wx:key="index"
+                wx:key="playerId"
                 class="board-cell board-cell--player board-cell--axis board-cell--row {{cell.cls}}"
                 style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{cell.fitStyle}}"
               >{{cell.text}}</view>
@@ -273,7 +273,7 @@
               <view
                 wx:for="{{item.cells}}"
                 wx:for-item="cell"
-                wx:key="index"
+                wx:key="playerId"
                 class="board-cell board-cell--player board-cell--axis board-cell--row {{cell.cls}}"
                 style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{cell.fitStyle}}"
               >{{cell.text}}</view>
@@ -283,7 +283,7 @@
           <view wx:if="{{!layoutIsFlow}}" class="board-h-track board-h-track--foot">
             <view
               wx:for="{{board.totals}}"
-              wx:key="index"
+              wx:key="playerId"
               class="board-cell board-cell--player board-cell--axis {{item.cls}}"
               style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
             >{{item.text}}</view>
@@ -291,7 +291,7 @@
           <view wx:if="{{!layoutIsFlow && board.showPot}}" class="board-h-track board-h-track--foot board-h-track--pot">
             <view
               wx:for="{{board.pots}}"
-              wx:key="index"
+              wx:key="playerId"
               class="board-cell board-cell--player board-cell--axis {{item.cls}}"
               style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
             >{{item.text}}</view>
@@ -311,7 +311,7 @@
             <view class="board-cell board-cell--hole board-cell--axis">汇总</view>
             <view
               wx:for="{{board.totals}}"
-              wx:key="index"
+              wx:key="playerId"
               class="board-cell board-cell--player board-cell--axis {{item.cls}}"
               style="{{item.fitStyle}}"
             >{{item.text}}</view>
@@ -320,7 +320,7 @@
             <view class="board-cell board-cell--hole board-cell--axis">{{board.potRowLabel}}</view>
             <view
               wx:for="{{board.pots}}"
-              wx:key="index"
+              wx:key="playerId"
               class="board-cell board-cell--player board-cell--axis {{item.cls}}"
               style="{{item.fitStyle}}"
             >{{item.text}}</view>
@@ -346,7 +346,7 @@
             <view class="board-h-track board-h-track--foot">
               <view
                 wx:for="{{board.totals}}"
-                wx:key="index"
+                wx:key="playerId"
                 class="board-cell board-cell--player board-cell--axis {{item.cls}}"
                 style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
               >{{item.text}}</view>
@@ -354,7 +354,7 @@
             <view wx:if="{{board.showPot}}" class="board-h-track board-h-track--foot board-h-track--pot">
               <view
                 wx:for="{{board.pots}}"
-                wx:key="index"
+                wx:key="playerId"
                 class="board-cell board-cell--player board-cell--axis {{item.cls}}"
                 style="width:{{colPx}}px;flex:0 0 {{colPx}}px;{{item.fitStyle}}"
               >{{item.text}}</view>

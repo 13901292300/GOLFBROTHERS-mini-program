@@ -2983,6 +2983,52 @@ function boardViewOf(entry, game, pairId) {
   return view;
 }
 
+/** 记分表从上到下的展示列主键：host.scoreParties / listPlayers，不是 game.playerOrder。 */
+function scoreTableDisplayIds(entry) {
+  var ids = [];
+  var seen = {};
+  function add(id) {
+    var s = rec.asString(id);
+    if (!s || seen[s]) return;
+    seen[s] = true;
+    ids.push(s);
+  }
+  (listPlayers(entry) || []).forEach(function (p) {
+    add(p && (p.id || p.playerId || p.subjectId || p.partyId));
+  });
+  if (!ids.length) {
+    var host = currentHost();
+    (host.players || []).forEach(function (p) {
+      add(p && (p.playerId || p.id));
+    });
+  }
+  return ids;
+}
+
+function orderBoardPlayersByScoreTable(entry, collected) {
+  var list = Array.isArray(collected) ? collected : [];
+  if (!list.length) return list;
+  var byId = {};
+  list.forEach(function (p) {
+    var id = rec.asString(p && (p.id || p.playerId || p.subjectId));
+    if (id && !byId[id]) byId[id] = p;
+  });
+  var out = [];
+  var used = {};
+  scoreTableDisplayIds(entry).forEach(function (id) {
+    if (!byId[id] || used[id]) return;
+    used[id] = true;
+    out.push(byId[id]);
+  });
+  list.forEach(function (p) {
+    var id = rec.asString(p && (p.id || p.playerId || p.subjectId));
+    if (!id || used[id]) return;
+    used[id] = true;
+    out.push(p);
+  });
+  return out;
+}
+
 function defaultPairId(game) {
   const hit = catalog.findRule(game && game.catalogId);
   if (!(hit && Number(hit.players) === 2)) return "";
@@ -3043,14 +3089,14 @@ function listBoard(entry, gameId, pairId) {
     selectedGame
       ? (selectedGame.holeResults && selectedGame.holeResults.topHoleStates) || {}
       : {};
-  const players = [];
+  const collectedPlayers = [];
   const seen = {};
   focusGames.forEach(function (game) {
     var hydrated = hydrateGamePlayers(game);
     hydrated.forEach(function (face) {
       if (seen[face.id]) return;
       seen[face.id] = true;
-      players.push({
+      collectedPlayers.push({
         id: face.id,
         subjectId: face.subjectId,
         subjectType: face.subjectType,
@@ -3069,7 +3115,8 @@ function listBoard(entry, gameId, pairId) {
       });
     });
   });
-const labels = getHoleOrder(entry);
+  const players = orderBoardPlayersByScoreTable(entry, collectedPlayers);
+  const labels = getHoleOrder(entry);
   const potMode = global.potMode || "none";
   const isBigPot = potMode === "big-pot";
   const viewHasPot = focusGames.some(function (game) {
@@ -3184,13 +3231,14 @@ const labels = getHoleOrder(entry);
         });
       }
     });
-    const cells = acc.map(function (item) {
+    const cells = acc.map(function (item, pi) {
       const cell = resultFormat.formatBoardCell({
         inGame: item.inGame,
         played: item.played,
         raw: item.raw,
         cls: item.played ? cellCls(item.raw) : ""
       });
+      cell.playerId = players[pi] && players[pi].id ? String(players[pi].id) : "";
       return cell;
     });
     if (String(label) === HOLE5_AUDIT_LABEL) {
@@ -3256,11 +3304,14 @@ const labels = getHoleOrder(entry);
         settledCount += 1;
       });
     }
-    return resultFormat.formatBoardTotal({
-      settledCount: settledCount,
-      value: raw,
-      cls: settledCount ? cellCls(raw) : ""
-    });
+    return Object.assign(
+      resultFormat.formatBoardTotal({
+        settledCount: settledCount,
+        value: raw,
+        cls: settledCount ? cellCls(raw) : ""
+      }),
+      { playerId: player && player.id ? String(player.id) : "" }
+    );
   });
   const inPot = players.map(function (player) {
     return focusGames.some(function (game) {
@@ -3279,29 +3330,39 @@ const labels = getHoleOrder(entry);
       inPot,
       global.potS
     );
-    pots = money.map(function (raw) {
+    pots = money.map(function (raw, pi) {
+      const pid = players[pi] && players[pi].id ? String(players[pi].id) : "";
       if (raw == null) {
-        return resultFormat.formatBoardCell({ inGame: false, played: false });
+        return Object.assign(resultFormat.formatBoardCell({ inGame: false, played: false }), {
+          playerId: pid
+        });
       }
       return {
         text: settle.formatMoney(raw),
         raw: raw,
         cls: cellCls(raw),
         status: resultFormat.STATUS_SETTLED,
-        played: true
+        played: true,
+        playerId: pid
       };
     });
   } else {
-    pots = players.map(function (_player, pi) {
+    pots = players.map(function (player, pi) {
+      const pid = player && player.id ? String(player.id) : "";
       const raw = potSum[pi] || 0;
       if (!raw) {
-        return resultFormat.formatBoardTotal({ settledCount: 0, value: 0 });
+        return Object.assign(resultFormat.formatBoardTotal({ settledCount: 0, value: 0 }), {
+          playerId: pid
+        });
       }
-      return resultFormat.formatBoardTotal({
-        settledCount: 1,
-        value: raw,
-        cls: cellCls(raw)
-      });
+      return Object.assign(
+        resultFormat.formatBoardTotal({
+          settledCount: 1,
+          value: raw,
+          cls: cellCls(raw)
+        }),
+        { playerId: pid }
+      );
     });
   }
   const board = {
