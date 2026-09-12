@@ -4,6 +4,7 @@
  */
 
 var seriesModel = require('../../../../utils/seriesModel.js');
+var createTeeTimeNow = require('../../../../utils/createTeeTimeNow.js');
 
 var DEFAULT_TOP_N = 3;
 var FEE_PATTERN = /^(0|[1-9]\d*)(\.\d{1,2})?$/;
@@ -170,41 +171,15 @@ function isDefaultTopNValue(topN) {
 
 /**
  * 空轮次打开时间选择器时的动态默认值。
- * - now 可注入（Date 或可被 Date 解析的值）；未传用当前时间
- * - 向上取整到下一个 10 分钟档；恰好落在整 10 分钟（秒毫秒均为 0）时取当前档
- * - 永不早于注入/当前时刻对应的整分墙钟结果（恰好整档时等于当前档）
+ * - now 可注入（Date 或可被 Date 解析的值）；未传用当前本地时间
+ * - 按公共 10 分钟档取整（5 分钟为界），跨日走 Date
  * @param {Date|number|string=} now
  * @returns {string} YYYY-MM-DD HH:mm
  */
 function createDefaultLocalDateTime(now) {
-  var base;
-  if (now instanceof Date) {
-    base = new Date(now.getTime());
-  } else if (now == null || now === '') {
-    base = new Date();
-  } else {
-    base = new Date(now);
-  }
-  if (isNaN(base.getTime())) {
-    base = new Date();
-  }
-
-  var y = base.getFullYear();
-  var mo = base.getMonth();
-  var d = base.getDate();
-  var h = base.getHours();
-  var mi = base.getMinutes();
-  var s = base.getSeconds();
-  var ms = base.getMilliseconds();
-
-  // 统一策略：恰好整 10 分钟档（秒/毫秒为 0）→ 当前档；否则向上取下一档
-  if (mi % 10 === 0 && s === 0 && ms === 0) {
-    return formatLocalDateTime(new Date(y, mo, d, h, mi, 0, 0));
-  }
-
-  var nextMinute = mi - (mi % 10) + 10;
-  var out = new Date(y, mo, d, h, nextMinute, 0, 0);
-  return formatLocalDateTime(out);
+  return createTeeTimeNow.formatIsoLocal(
+    createTeeTimeNow.roundDraftToTenMinutes(createTeeTimeNow.partsFromDate(now))
+  );
 }
 
 function copyCourseSnapshot(fromRound, toRound) {

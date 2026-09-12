@@ -3,7 +3,8 @@
  * 页面只需：注册组件、绑定 WXML、调用此处方法完成字段映射。
  */
 
-const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
+const createTeeTimeNow = require('../../../utils/createTeeTimeNow.js');
+const MINUTE_VALUES = createTeeTimeNow.MINUTE_VALUES;
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -14,23 +15,7 @@ function daysInMonth(year, month) {
 }
 
 function parseTimeToDraft(timeString) {
-  const m = String(timeString || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
-  if (!m) {
-    return { year: 2026, month: 6, day: 3, hour: 9, minute: 0 };
-  }
-  let minute = parseInt(m[5], 10);
-  if (MINUTE_VALUES.indexOf(minute) < 0) {
-    minute = MINUTE_VALUES.reduce((best, cur) =>
-      Math.abs(cur - minute) < Math.abs(best - minute) ? cur : best
-    );
-  }
-  return {
-    year: parseInt(m[1], 10),
-    month: parseInt(m[2], 10),
-    day: parseInt(m[3], 10),
-    hour: parseInt(m[4], 10),
-    minute
-  };
+  return createTeeTimeNow.parseTimeToDraftForWheel(timeString);
 }
 
 function formatDateTime(draft) {
@@ -47,16 +32,29 @@ function formatDateTime(draft) {
   );
 }
 
+function minuteSlotIndex(minute) {
+  const idx = MINUTE_VALUES.indexOf(minute);
+  return idx < 0 ? 0 : idx;
+}
+
 function buildWheelPayload(draft) {
-  const t = draft;
+  const rounded = createTeeTimeNow.roundDraftToTenMinutes(draft);
+  if (draft) {
+    draft.year = rounded.year;
+    draft.month = rounded.month;
+    draft.day = rounded.day;
+    draft.hour = rounded.hour;
+    draft.minute = rounded.minute;
+  }
+  const t = draft || rounded;
   const months = Array.from({ length: 12 }, (_, i) => pad2(i + 1));
   const dayCount = daysInMonth(t.year, t.month);
-  if (t.day > dayCount) t.day = dayCount;
   const days = Array.from({ length: dayCount }, (_, i) => pad2(i + 1));
   const hours = Array.from({ length: 24 }, (_, i) => pad2(i));
   const minutes = MINUTE_VALUES.map((m) => pad2(m));
-  const minuteIdx = Math.max(0, MINUTE_VALUES.indexOf(t.minute));
-  const teeIndex = [t.month - 1, t.day - 1, t.hour, minuteIdx];
+  const minuteIdx = minuteSlotIndex(t.minute);
+  const hourIdx = createTeeTimeNow.clampInt(t.hour, 0, 23);
+  const teeIndex = [t.month - 1, t.day - 1, hourIdx, minuteIdx];
 
   return {
     teeYear: t.year,
@@ -66,20 +64,23 @@ function buildWheelPayload(draft) {
     hours,
     minutes,
     teeIndex,
-    timePickerValue: teeIndex
+    timePickerValue: teeIndex,
+    wheelIndex: teeIndex
   };
 }
 
 function applyPickerValue(draft, value) {
   const t = draft;
-  const [mIdx, dIdx, hIdx, minIdx] = value;
+  const raw = Array.isArray(value) ? value : [];
+  const mIdx = createTeeTimeNow.clampInt(raw[0], 0, 11);
+  const hIdx = createTeeTimeNow.clampInt(raw[2], 0, 23);
+  const minIdx = createTeeTimeNow.clampInt(raw[3], 0, MINUTE_VALUES.length - 1);
   t.month = mIdx + 1;
   t.hour = hIdx;
   t.minute = MINUTE_VALUES[minIdx];
 
   const dayCount = daysInMonth(t.year, t.month);
-  let dayIdx = dIdx;
-  if (dayIdx > dayCount - 1) dayIdx = dayCount - 1;
+  let dayIdx = createTeeTimeNow.clampInt(raw[1], 0, dayCount - 1);
   t.day = dayIdx + 1;
 
   const days = Array.from({ length: dayCount }, (_, i) => pad2(i + 1));
@@ -98,20 +99,22 @@ function singleFieldPageData(overrides) {
   return Object.assign(
     {
       showTimePicker: false,
-      teeYear: 2026,
+      teeYear: 0,
       months: [],
       days: [],
       hours: [],
       minutes: [],
       teeIndex: [0, 0, 0, 0],
-      timeDraft: { year: 2026, month: 6, day: 3, hour: 9, minute: 0 }
+      timeDraft: { year: 0, month: 1, day: 1, hour: 0, minute: 0 }
     },
     overrides || {}
   );
 }
 
 function initSingleFieldPage(page, defaultTime) {
-  page._editingTime = parseTimeToDraft(defaultTime);
+  page._editingTime = defaultTime
+    ? parseTimeToDraft(defaultTime)
+    : createTeeTimeNow.cloneParts(createTeeTimeNow.partsFromDate());
   page._timeStore = Object.assign({}, page._editingTime);
 }
 
@@ -122,13 +125,13 @@ function dualFieldPageData(overrides) {
       showTimePicker: false,
       activeTimeTarget: 'tee',
       timePickerTitle: '选择开球时间',
-      teeYear: 2026,
+      teeYear: 0,
       months: [],
       days: [],
       hours: [],
       minutes: [],
       teeIndex: [0, 0, 0, 0],
-      timeDraft: { year: 2026, month: 6, day: 3, hour: 9, minute: 0 },
+      timeDraft: { year: 0, month: 1, day: 1, hour: 0, minute: 0 },
       teeTime: '',
       deadlineTime: '',
       teeTimeText: '',
@@ -139,10 +142,15 @@ function dualFieldPageData(overrides) {
 }
 
 function initDualFieldPage(page, defaults) {
-  const tee = defaults.teeTime || '2026-06-03 09:00';
-  const deadline = defaults.deadlineTime || '2026-06-02 18:00';
-  page._tee = parseTimeToDraft(tee);
-  page._deadline = parseTimeToDraft(deadline);
+  const created = createTeeTimeNow.buildCreateTimes();
+  const src = defaults || {};
+  const storedTee = createTeeTimeNow.resolveStoredDraft(src.teeTime, src.teeTimeText);
+  const storedDeadline = createTeeTimeNow.resolveStoredDraft(
+    src.deadlineTime,
+    src.deadlineTimeText
+  );
+  page._tee = storedTee || created.tee;
+  page._deadline = storedDeadline || created.deadline;
   page._editingTime = Object.assign({}, page._tee);
   page._activeTimeTarget = 'tee';
 }
@@ -172,8 +180,9 @@ function createSingleFieldMethods(options) {
     },
     openTimePicker() {
       this._editingTime = Object.assign({}, parseTimeToDraft(getTimeString.call(this)));
-      this._buildWheels();
-      this.setData({ [showKey]: true });
+      this.setData(
+        Object.assign({}, buildWheelPayload(this._editingTime), { [showKey]: true })
+      );
     },
     closeTimePicker() {
       this.setData({ [showKey]: false });
@@ -211,12 +220,13 @@ function createDualFieldMethods() {
       this._editingTime = Object.assign({}, parseTimeToDraft(timeString));
       this._activeTimeTarget = isDeadline ? 'deadline' : 'tee';
       const title = isDeadline ? '选择报名截止时间' : '选择开球时间';
-      this._buildWheels();
-      this.setData({
-        showTimePicker: true,
-        activeTimeTarget: target,
-        timePickerTitle: title
-      });
+      this.setData(
+        Object.assign({}, buildWheelPayload(this._editingTime), {
+          showTimePicker: true,
+          activeTimeTarget: target,
+          timePickerTitle: title
+        })
+      );
     },
     closeTimePicker() {
       this.setData({ showTimePicker: false });

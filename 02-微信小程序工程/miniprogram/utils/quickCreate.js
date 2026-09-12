@@ -5,8 +5,12 @@
 const gameStore = require('./gameStore.js');
 const matchStateUtil = require('./matchState.js');
 const { locateNearestCourseWithHalves } = require('./courseDatabase.js');
+const createTeeTimeNow = require('./createTeeTimeNow.js');
 
-function buildQuickCreateGame(courseInfo, user) {
+function buildQuickCreateGame(courseInfo, user, now) {
+  const teeTime = createTeeTimeNow.formatChineseTeeText(
+    createTeeTimeNow.roundDraftToTenMinutes(createTeeTimeNow.partsFromDate(now))
+  );
   const creatorId = user.userId;
   const roundName = (user.name || '我') + '的球局';
   const playerSlot = {
@@ -32,7 +36,7 @@ function buildQuickCreateGame(courseInfo, user) {
     front9Course: courseInfo.front9Course || null,
     back9Course: courseInfo.back9Course || null,
     courseHalfText: courseHalfText,
-    teeTime: '',
+    teeTime: teeTime,
     roundName: roundName,
     gameMode: '个人比杆赛',
     visibility: 'public',
@@ -59,7 +63,7 @@ function buildQuickCreateGame(courseInfo, user) {
       courseName: courseInfo.courseName,
       courseLocation: courseInfo.courseLocation || '',
       halfText: courseHalfText,
-      teeTime: '',
+      teeTime: teeTime,
       roundName: roundName,
       front9Course: courseInfo.front9Course || null,
       back9Course: courseInfo.back9Course || null
