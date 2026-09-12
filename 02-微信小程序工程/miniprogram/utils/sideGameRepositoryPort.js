@@ -3,9 +3,24 @@
  * 不含 storage key；由 game 分包 sideGameRepository 在加载时 bind。
  */
 var impl = null;
+var readyFns = [];
+
+function logFirstPaint(payload) {
+  try {
+    console.log('[side-game-first-paint]', payload);
+  } catch (eLog) {}
+}
 
 function bind(next) {
-  if (next && typeof next.listVisible === 'function') impl = next;
+  if (!next) {
+    impl = null;
+    return;
+  }
+  if (typeof next.listVisible !== 'function') return;
+  var wasBound = !!get();
+  impl = next;
+  logFirstPaint({ stage: 'port-bind' });
+  if (!wasBound) notifyReady();
 }
 
 function get() {
@@ -17,6 +32,34 @@ function get() {
     }
   } catch (e0) {}
   return impl;
+}
+
+function isBound() {
+  return !!get();
+}
+
+function notifyReady() {
+  var i;
+  var list = readyFns.slice();
+  for (i = 0; i < list.length; i++) {
+    try {
+      list[i]();
+    } catch (e1) {}
+  }
+}
+
+function subscribeReady(fn) {
+  if (typeof fn === 'function' && readyFns.indexOf(fn) < 0) {
+    readyFns.push(fn);
+  }
+  return isBound();
+}
+
+function unsubscribeReady(fn) {
+  if (typeof fn !== 'function') return;
+  readyFns = readyFns.filter(function (item) {
+    return item !== fn;
+  });
 }
 
 function call(name, fallback) {
@@ -38,8 +81,18 @@ function listByMatchId(query) {
 
 function listRankMarkView(query) {
   var api = get();
-  if (api && typeof api.listRankMarkView === 'function') return api.listRankMarkView(query);
-  return listByMatchId(query);
+  var bound = !!api;
+  var listed;
+  if (api && typeof api.listRankMarkView === 'function') listed = api.listRankMarkView(query);
+  else listed = listByMatchId(query);
+  var items =
+    listed && listed.data && Array.isArray(listed.data.items) ? listed.data.items : [];
+  logFirstPaint({
+    stage: 'port-read',
+    bound: bound,
+    resultCount: items.length
+  });
+  return listed;
 }
 
 function inspectPlayerIdsRemap(matchId, idMap) {
@@ -97,6 +150,9 @@ function update(sideGameId, expectedRevision, patch) {
 module.exports = {
   bind: bind,
   get: get,
+  isBound: isBound,
+  subscribeReady: subscribeReady,
+  unsubscribeReady: unsubscribeReady,
   listByMatchId: listByMatchId,
   listRankMarkView: listRankMarkView,
   inspectPlayerIdsRemap: inspectPlayerIdsRemap,

@@ -502,6 +502,16 @@ function rankColorOptions(page, extra) {
   const groupId = String(snap.groupId || '');
   const scopeKey = matchId + '::' + groupId;
   if (page) page._rankMarkScopeKey = scopeKey;
+  try {
+    console.log('[side-game-first-paint]', {
+      stage: 'rank-request',
+      portBound: !!(sideGameRepositoryPort && typeof sideGameRepositoryPort.isBound === 'function'
+        ? sideGameRepositoryPort.isBound()
+        : sideGameRepositoryPort.get && sideGameRepositoryPort.get()),
+      matchId: !!matchId,
+      groupId: !!groupId
+    });
+  } catch (eRankReq) {}
   const need = !!scoreRankMark.hasRankMarkGames({ matchId: matchId, groupId: groupId });
   if (!need) {
     if (page) {
@@ -2645,6 +2655,7 @@ Page({
     }
 
     this._matchState = ms;
+    this._subscribeSideGameRepositoryReady();
     this._bindOfflineScoring();
     const mode = this._resolvePageMode(ms);
     const gameId = ms.gameId || '';
@@ -5287,6 +5298,7 @@ Page({
   },
 
   onUnload() {
+    this._unsubscribeSideGameRepositoryReady();
     this._pendingReactionPlay = null;
     this._activeReactionTarget = null;
     this._reactionBridge = null;
@@ -5896,6 +5908,48 @@ Page({
         ]
       }
     });
+  },
+
+  _subscribeSideGameRepositoryReady() {
+    if (this._sideGameRepoReadyHandler) return;
+    const self = this;
+    this._sideGameRepoReadyHandler = function () {
+      self._onSideGameRepositoryReady();
+    };
+    const alreadyBound = !!(
+      sideGameRepositoryPort &&
+      typeof sideGameRepositoryPort.subscribeReady === 'function' &&
+      sideGameRepositoryPort.subscribeReady(this._sideGameRepoReadyHandler)
+    );
+    if (alreadyBound) this._sideGameRepoReadyRefreshDone = true;
+  },
+
+  _unsubscribeSideGameRepositoryReady() {
+    if (
+      this._sideGameRepoReadyHandler &&
+      sideGameRepositoryPort &&
+      typeof sideGameRepositoryPort.unsubscribeReady === 'function'
+    ) {
+      sideGameRepositoryPort.unsubscribeReady(this._sideGameRepoReadyHandler);
+    }
+    this._sideGameRepoReadyHandler = null;
+    this._sideGameRepoReadyRefreshDone = false;
+  },
+
+  _onSideGameRepositoryReady() {
+    if (this._sideGameRepoReadyRefreshDone) return;
+    this._sideGameRepoReadyRefreshDone = true;
+    try {
+      const ms = this._matchState || (this._readMatchState && this._readMatchState()) || {};
+      const snap = sideGameHostSnapshot.buildForScorePage(ms) || {};
+      const matchId = String(snap.matchId || (ms && (ms.matchId || ms.gameId)) || '');
+      const groupId = String(snap.groupId || '');
+      if (!matchId || !scoreRankMark.hasRankMarkGames({ matchId: matchId, groupId: groupId })) {
+        return;
+      }
+    } catch (eReady) {}
+    this._rankMarkStamp = '';
+    if (typeof this.refreshPlayers === 'function') this.refreshPlayers();
   },
 
   _collectOfficialForSideGameSettle() {

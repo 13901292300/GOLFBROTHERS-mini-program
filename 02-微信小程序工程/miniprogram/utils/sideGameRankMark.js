@@ -8,6 +8,12 @@ var TRI_BLUE = '#007AFF';
 var TRI_RED = '#FF3B30';
 var TRI_GOLD = '#ce9224';
 
+function logFirstPaint(payload) {
+  try {
+    console.log('[side-game-first-paint]', payload);
+  } catch (eLog) {}
+}
+
 function asString(v) {
   return v == null ? '' : String(v);
 }
@@ -625,7 +631,14 @@ function projectFromStorage(official) {
     })
     .filter(Boolean);
   var games = gamesForScorePage(query);
+  var assignmentGameCount = 0;
+  games.forEach(function (g) {
+    var rs = g && g.holeResults;
+    var map = rs && rs.assignmentsByHole;
+    if (map && typeof map === 'object' && Object.keys(map).length) assignmentGameCount += 1;
+  });
   var proj = {};
+  var markCount = 0;
   ids.forEach(function (pid) {
     var holes = {};
     var hi;
@@ -633,8 +646,15 @@ function projectFromStorage(official) {
       var layoutLabel =
         official && Array.isArray(official.holeLabels) ? asString(official.holeLabels[hi]) : '';
       holes[String(hi)] = markAtStoredGames(games, hi, pid, layoutLabel);
+      if (holes[String(hi)] && holes[String(hi)].triColor) markCount += 1;
     }
     proj[pid] = holes;
+  });
+  logFirstPaint({
+    stage: 'projection',
+    recordCount: games.length,
+    assignmentGameCount: assignmentGameCount,
+    markCount: markCount
   });
   return completeProjection(proj, ids);
 }

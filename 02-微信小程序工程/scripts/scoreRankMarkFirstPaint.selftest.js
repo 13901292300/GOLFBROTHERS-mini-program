@@ -122,6 +122,11 @@ assert(
     scoreRank.markFromProjection(flipped, 'pA', 0).triangleClass === 'triangle-red'
 );
 
+var recForColdStart = JSON.parse(JSON.stringify(flippedRec));
+if (recForColdStart.config && recForColdStart.config.instance) {
+  recForColdStart.config.instance.playerOrder = ['pA', 'pB', 'pC', 'pD'];
+}
+
 bind.seed([]);
 var empty = scoreRank.projectFromStorage(official);
 assert(
@@ -144,6 +149,72 @@ assert(
   '成绩 mutation 后显式 settle',
   /_settleSideGamesAfterScoreMutation/.test(scoreJs) && /sideGameSettleHost/.test(scoreJs)
 );
+assert(
+  'port 未 bind 时不把空投影当最终结果卡住',
+  /subscribeReady/.test(scoreJs) &&
+    /_onSideGameRepositoryReady/.test(scoreJs) &&
+    /_sideGameRepoReadyRefreshDone/.test(scoreJs) &&
+    /unsubscribeReady/.test(scoreJs)
+);
+assert('repository ready 后清 stamp 再 refreshPlayers', /_rankMarkStamp = ''[\s\S]{0,180}refreshPlayers/.test(scoreJs));
+assert('onUnload 解除 repository ready 订阅', /onUnload\([\s\S]{0,80}_unsubscribeSideGameRepositoryReady/.test(scoreJs));
+
+var port = require('../miniprogram/utils/sideGameRepositoryPort.js');
+port.bind(null);
+assert('unbound 时 isBound=false', port.isBound() === false);
+var unboundListed = port.listRankMarkView({ matchId: 'm-home', groupId: 'grp-1' });
+assert(
+  '未 bind 时 listRankMarkView 返回空 items 信封',
+  !!(unboundListed && unboundListed.ok && unboundListed.data && unboundListed.data.items && unboundListed.data.items.length === 0)
+);
+var unboundProj = scoreRank.projectFromStorage(official);
+assert(
+  '未 bind 时首屏投影无三角',
+  !scoreRank.colorFromProjection(unboundProj, 'pA', 0) &&
+    !scoreRank.colorFromProjection(unboundProj, 'pB', 0)
+);
+
+var readyHits = 0;
+function onPortReady() {
+  readyHits += 1;
+}
+assert('未 bind 时 subscribeReady 返回 false', port.subscribeReady(onPortReady) === false);
+assert('未 bind 时不立即回调', readyHits === 0);
+
+bind.seed([recForColdStart]);
+assert('bind 后通知 subscribeReady 一次', readyHits === 1 && port.isBound() === true);
+var rebound = scoreRank.projectFromStorage(official);
+assert(
+  'bind 后再投影三角恢复',
+  scoreRank.markFromProjection(rebound, 'pA', 0).triangleClass === 'triangle-blue' &&
+    scoreRank.markFromProjection(rebound, 'pB', 0).triangleClass === 'triangle-red'
+);
+
+var lateHits = 0;
+assert('已 bound 时 subscribeReady 返回 true', port.subscribeReady(function () {
+  lateHits += 1;
+}) === true);
+assert('已 bound 时不立即再回调', lateHits === 0);
+port.unsubscribeReady(onPortReady);
+
+var refreshCount = 0;
+var page = {
+  _sideGameRepoReadyRefreshDone: false,
+  _rankMarkStamp: 'stale',
+  refreshPlayers: function () {
+    refreshCount += 1;
+  }
+};
+function pageReady() {
+  if (page._sideGameRepoReadyRefreshDone) return;
+  page._sideGameRepoReadyRefreshDone = true;
+  page._rankMarkStamp = '';
+  page.refreshPlayers();
+}
+page._sideGameRepoReadyRefreshDone = port.subscribeReady(pageReady);
+assert('已 bound 页面不因 ready 再刷', page._sideGameRepoReadyRefreshDone === true && refreshCount === 0);
+
+port.unsubscribeReady(pageReady);
 
 console.log('\nscoreRankMarkFirstPaint.selftest passed=' + passed + ' failed=' + failed);
 if (failed) process.exit(1);
