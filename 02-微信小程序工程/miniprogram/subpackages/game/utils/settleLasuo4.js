@@ -10,6 +10,7 @@ const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
 const assignmentNormalize = require("./assignmentNormalize.js");
 const holeOrder = require("./resolveNextHoleOrder.js");
+const catalog = require("./catalog.js");
 
 const ADD_DEFAULTS = { hio: 10, m2: 4, m1: 1, par: 0, p1: 0, ge2: 0 };
 const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
@@ -204,6 +205,12 @@ function addValueOf(rel, rule) {
   return bandValue(rule && rule.addRows, rel, ADD_DEFAULTS);
 }
 
+function weightedAddReward(rel, rule, weight) {
+  const w = Number(weight);
+  if (!isFinite(w) || w <= 0) return 0;
+  return addValueOf(rel, rule) * w;
+}
+
 function pickSlotPlayer(rec, team, worst) {
   let id = team[0];
   team.forEach(function (x) {
@@ -267,8 +274,34 @@ function teamAddReward(rule, rec, team) {
   return sum;
 }
 
+function headTailPersonalAdds(rule, rec, team) {
+  const bw = weightOf(rule, "pkBetter", "pkBetterW");
+  const ww = weightOf(rule, "pkWorse", "pkWorseW");
+  let bestId = pickSlotPlayer(rec, team, false);
+  let worstId = pickSlotPlayer(rec, team, true);
+  if (String(bestId) === String(worstId) && team[1] != null) {
+    worstId = String(team[0]) === String(bestId) ? team[1] : team[0];
+  }
+  const personal = {};
+  personal[bestId] = weightedAddReward(rec[bestId].rel, rule, bw);
+  personal[worstId] = (personal[worstId] || 0) + weightedAddReward(rec[worstId].rel, rule, ww);
+  return personal;
+}
+
 function addRewards(rule, rec, aTeam, bTeam, par) {
-  if (rewardModeOf(rule) !== "add") return { a: 0, b: 0 };
+  if (rewardModeOf(rule) !== "add") return { a: 0, b: 0, personal: null };
+  if (catalog.isLasuoHeadTailTwoPoint(rule)) {
+    const personal = Object.assign(
+      {},
+      headTailPersonalAdds(rule, rec, aTeam),
+      headTailPersonalAdds(rule, rec, bTeam)
+    );
+    return {
+      a: personal[aTeam[0]] + personal[aTeam[1]],
+      b: personal[bTeam[0]] + personal[bTeam[1]],
+      personal: personal
+    };
+  }
   const totalW = weightOf(rule, "pkTotal", "pkTotalW");
   const tot = totalCmp(rule, rec, aTeam, bTeam, par);
   const signA = totalSign(tot);
@@ -276,7 +309,8 @@ function addRewards(rule, rec, aTeam, bTeam, par) {
   const bOn = addEligible(rule, !!totalW, -signA);
   return {
     a: aOn ? teamAddReward(rule, rec, aTeam) : 0,
-    b: bOn ? teamAddReward(rule, rec, bTeam) : 0
+    b: bOn ? teamAddReward(rule, rec, bTeam) : 0,
+    personal: null
   };
 }
 
@@ -586,6 +620,7 @@ function settleLasuo4(game, ctx) {
       rewardMode: mode,
       addRewardA: adds.a,
       addRewardB: adds.b,
+      addByPlayer: adds.personal || null,
       winningTeam: winningTeam,
       multiplierSource: mulInfo.source,
       multiplier: mulInfo.m,
