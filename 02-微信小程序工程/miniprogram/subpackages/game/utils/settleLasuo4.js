@@ -333,8 +333,21 @@ function personalMulOf(rel, rule) {
   return fb != null && isFinite(Number(fb)) ? Number(fb) : 1;
 }
 
+function resolveHeadTotalMultiplier(rule, rec, winTeam) {
+  let best = null;
+  winTeam.forEach(function (id) {
+    const m = personalMulOf(rec[id].rel, rule);
+    if (best == null || m > best) best = m;
+  });
+  if (best == null) return { m: 1, source: "default" };
+  return { m: best, source: "head-total-max" };
+}
+
 function resolveMultiplier(rule, rec, winTeam) {
   if (rewardModeOf(rule) !== "mul") return { m: 1, source: "none" };
+  if (rule && rule.pkBetter !== false && rule.pkWorse === false && rule.pkTotal !== false) {
+    return resolveHeadTotalMultiplier(rule, rec, winTeam);
+  }
   const ck = comboKey(rec[winTeam[0]].rel, rec[winTeam[1]].rel);
   const comboMap = rowMap(rule && rule.comboMulRows);
   if (ck && comboMap[ck] != null) {
