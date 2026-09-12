@@ -174,15 +174,17 @@
               <text class="opt-title">无顶洞</text>
             </view>
             <view class="sec-hint">得分≤N 时本洞仍正常计分，并累积 1 块肉。</view>
-            <view class="sec-label">顶洞时是否重新排序</view>
-            <view class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
-              <view class="radio-dot"></view>
-              <text class="opt-title">否（顶洞不换组合）</text>
-            </view>
-            <view class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
-              <view class="radio-dot"></view>
-              <text class="opt-title">是（顶洞也按成绩调整组合）</text>
-            </view>
+            <block wx:if="{{lasuoShowReorderOnPush && pushRule !== 'none'}}">
+              <view class="sec-label">顶洞是否更换组合</view>
+              <view class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
+                <view class="radio-dot"></view>
+                <text class="opt-title">不更换组合</text>
+              </view>
+              <view class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
+                <view class="radio-dot"></view>
+                <text class="opt-title">更换组合</text>
+              </view>
+            </block>
           </view>
         </view>
 

@@ -800,6 +800,10 @@ function lasuoShowComboMultiplier(rule) {
   );
 }
 
+function lasuoShowReorderOnPush(rule) {
+  return !!(isLasuoBestOnePoint(rule) || isLasuoWorstOnePoint(rule));
+}
+
 function lasuoDefaultName(rule) {
   const head = !rule || rule.pkBetter !== false;
   const tail = !rule || rule.pkWorse !== false;
@@ -1100,6 +1104,7 @@ module.exports = {
   isLasuoWorstOnePoint,
   isLasuoHeadTotalTwoPoint,
   lasuoShowComboMultiplier,
+  lasuoShowReorderOnPush,
   isNoSettings,
   supportsPairHoleHandicap,
   usesMatchPlayPairSettings,

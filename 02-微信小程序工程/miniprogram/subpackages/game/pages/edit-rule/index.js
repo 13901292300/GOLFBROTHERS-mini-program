@@ -72,6 +72,41 @@ function baoNegFoldThumb(d) {
   return "同伴顶头才包负分";
 }
 
+function isExplicitReorderOnPush(value) {
+  return value === "yes" || value === "no";
+}
+
+/** missing → 视觉 rerank（yes）；新建一点默认 no。explicit 才写入保存。 */
+function hydrateLasuoReorderOnPushState(existing, isBestOrWorst) {
+  if (!existing) {
+    if (isBestOrWorst) {
+      return { reorderOnPush: "no", reorderOnPushExplicit: true };
+    }
+    return { reorderOnPush: "yes", reorderOnPushExplicit: false };
+  }
+  if (isExplicitReorderOnPush(existing.reorderOnPush)) {
+    return { reorderOnPush: existing.reorderOnPush, reorderOnPushExplicit: true };
+  }
+  return { reorderOnPush: "yes", reorderOnPushExplicit: false };
+}
+
+function applySavedLasuoReorderOnPush(rule, pageData, existing) {
+  if (!rule || !pageData || !pageData.showLasuo) return;
+  if (catalog.isLasuoBestOnePoint(pageData) || catalog.isLasuoWorstOnePoint(pageData)) {
+    if (pageData.reorderOnPushExplicit) {
+      rule.reorderOnPush = pageData.reorderOnPush === "yes" ? "yes" : "no";
+    } else {
+      delete rule.reorderOnPush;
+    }
+    return;
+  }
+  if (existing && Object.prototype.hasOwnProperty.call(existing, "reorderOnPush")) {
+    rule.reorderOnPush = existing.reorderOnPush;
+  } else {
+    delete rule.reorderOnPush;
+  }
+}
+
 function pushThumb8421(pushRule) {
   if (pushRule === "none") return "无顶洞";
   if (pushRule === "skip") return "顶洞即过";
@@ -444,6 +479,7 @@ Page({
     comboCapN: "99",
     showBaoHole: false,
     reorderOnPush: "no",
+    reorderOnPushExplicit: false,
     baoMode: "none",
     baoPlusN: "4",
     baoDoubleN: "0",
@@ -452,6 +488,7 @@ Page({
     showBaoNeg: false,
     baoNeg: "none",
     showLasuo: false,
+    lasuoShowReorderOnPush: false,
     lasuoShowComboMultiplier: true,
     showThreeVsOne: false,
     tvoCompare: "best",
@@ -644,6 +681,10 @@ Page({
           ? "ahead"
           : "ignore"
     };
+    const lasuoReorderHydrate = hydrateLasuoReorderOnPushState(
+      existing,
+      catalog.isLasuoBestOnePoint(lasuoDraft) || catalog.isLasuoWorstOnePoint(lasuoDraft)
+    );
     const lasuoUi = catalog.lasuoHubSummaries(lasuoDraft);
     this.setData({
       headerRootStyle: header.headerRootStyle,
@@ -690,6 +731,7 @@ Page({
       showBaoHole: isMid || isSmall,
       showBaoNeg: is8421 && !is8421Two,
       showLasuo: isLasuo,
+      lasuoShowReorderOnPush: catalog.lasuoShowReorderOnPush(lasuoDraft),
       lasuoShowComboMultiplier: catalog.lasuoShowComboMultiplier(lasuoDraft),
       showPush8421: is8421 && !is8421Fold,
       show8421Two: is8421Fold,
@@ -813,9 +855,12 @@ Page({
         : "",
       reorderOnPush: isMid
         ? "no"
-        : (existing && existing.reorderOnPush) === "yes"
-          ? "yes"
-          : "no",
+        : isLasuo
+          ? lasuoReorderHydrate.reorderOnPush
+          : (existing && existing.reorderOnPush) === "yes"
+            ? "yes"
+            : "no",
+      reorderOnPushExplicit: isLasuo ? lasuoReorderHydrate.reorderOnPushExplicit : false,
       meatInclude:
         (existing && existing.meatInclude) ||
         (isMid || isLasuo ? canonSnap.meatInclude : "") ||
@@ -953,7 +998,10 @@ Page({
   },
 
   setReorder(e) {
-    this.setData({ reorderOnPush: e.currentTarget.dataset.value });
+    this.setData({
+      reorderOnPush: e.currentTarget.dataset.value,
+      reorderOnPushExplicit: true
+    });
     this.refreshLasuo();
   },
 
@@ -1225,6 +1273,7 @@ Page({
     }
     if (this.data.showLasuo) {
       const extra = catalog.lasuoHubSummaries(this.data);
+      extra.lasuoShowReorderOnPush = catalog.lasuoShowReorderOnPush(this.data);
       if (!this.data.nameDirty) extra.ruleName = catalog.lasuoDefaultName(this.data);
       this.setData(extra);
       return;
@@ -1408,12 +1457,18 @@ Page({
       pkWorse: vals.indexOf("worse") >= 0,
       pkTotal: vals.indexOf("total") >= 0
     };
-    this.setData({
+    const pkPatch = {
       pkBetter: shape.pkBetter,
       pkWorse: shape.pkWorse,
       pkTotal: shape.pkTotal,
-      lasuoShowComboMultiplier: catalog.lasuoShowComboMultiplier(shape)
-    });
+      lasuoShowComboMultiplier: catalog.lasuoShowComboMultiplier(shape),
+      lasuoShowReorderOnPush: catalog.lasuoShowReorderOnPush(shape)
+    };
+    if (!this.data.isEditing && catalog.lasuoShowReorderOnPush(shape)) {
+      pkPatch.reorderOnPush = "no";
+      pkPatch.reorderOnPushExplicit = true;
+    }
+    this.setData(pkPatch);
     this.refreshLasuo();
   },
 
@@ -1584,7 +1639,12 @@ Page({
           : this.data.showVegas
             ? "2"
             : "1",
-      reorderOnPush: this.data.showLandlordReorder || this.data.showLasuo || this.data.showVegas ? this.data.reorderOnPush || "no" : "no",
+      reorderOnPush:
+        this.data.showLandlordReorder || this.data.showVegas
+          ? this.data.reorderOnPush || "no"
+          : this.data.showLasuo
+            ? this.data.reorderOnPush
+            : "no",
       meatInclude: this.data.meatInclude,
       meatRows: this.data.meatRows,
       meatValueType: this.data.meatValueType,
@@ -1624,6 +1684,7 @@ Page({
       noSettings: !!this.data.noSettings,
       scoreCode: catalog.is8421(this.data.ruleId) ? "8421" : ""
     };
+    applySavedLasuoReorderOnPush(rule, this.data, existing);
     rule.ruleSnapshot = rec.stripLibraryMeta(rule);
     return session.upsertMyRule(rule);
   },
