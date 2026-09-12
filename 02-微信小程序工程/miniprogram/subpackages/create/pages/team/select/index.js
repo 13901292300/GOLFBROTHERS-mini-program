@@ -317,9 +317,12 @@ Page({
 
   onShow() {
     this.applyTheme(getApp().getTheme());
-    if (this._clubDefaultReady && !isEventOrgSelectMode(this.data.selectMode)) {
+    if (isEventOrgSelectMode(this.data.selectMode)) return;
+    if (this._clubDefaultReady) {
       this.refreshTeams();
+      return;
     }
+    this._loadDefaultClubTeams();
   },
 
   initHeaderNav() {
@@ -359,10 +362,15 @@ Page({
   },
 
   _loadDefaultClubTeams() {
-    if (this._loadingDefault) return;
+    if (this._loadingDefault || this._clubDefaultReady) return;
     this._loadingDefault = true;
     this.setData({ teamsLoading: true });
-    const finish = (list) => {
+    const abort = () => {
+      this._loadingDefault = false;
+      this._clubDefaultReady = false;
+      this.setData({ teamsLoading: false });
+    };
+    const succeed = (list) => {
       this._loadingDefault = false;
       this._clubDefaultReady = true;
       this._defaultTeams = Array.isArray(list) ? list : [];
@@ -370,9 +378,20 @@ Page({
     };
     bootstrap
       .ensureCloudIdentity()
-      .then(() => teamClub.listTeamsForCreateDefault())
-      .then((res) => finish(res && res.ok ? res.list || [] : []))
-      .catch(() => finish([]));
+      .then((ident) => {
+        if (!ident || ident.ok !== true) {
+          abort();
+          return;
+        }
+        return teamClub.listTeamsForCreateDefault().then((res) => {
+          if (!res || !res.ok) {
+            abort();
+            return;
+          }
+          succeed(res.list || []);
+        });
+      })
+      .catch(() => abort());
   },
 
   _resetClubSearchState() {
