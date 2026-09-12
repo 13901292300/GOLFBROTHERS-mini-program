@@ -11,7 +11,6 @@ const stroke = require("./settleStroke2.js");
 const assignmentNormalize = require("./assignmentNormalize.js");
 const assignmentHoleSides = require("../../../utils/assignmentHoleSides.js");
 const holeOrder = require("./resolveNextHoleOrder.js");
-const catalog = require("./catalog.js");
 
 const ADD_DEFAULTS = { hio: 10, m2: 4, m1: 1, par: 0, p1: 0, ge2: 0 };
 const MUL_DEFAULTS = { hio: 10, m2: 5, m1: 2, par: 1, p1: 1, ge2: 1 };
@@ -289,9 +288,18 @@ function headTailPersonalAdds(rule, rec, team) {
   return personal;
 }
 
+function isHeadTailTwoPoint(rule) {
+  return !!(
+    rule &&
+    rule.pkBetter !== false &&
+    rule.pkWorse !== false &&
+    rule.pkTotal === false
+  );
+}
+
 function addRewards(rule, rec, aTeam, bTeam, par) {
   if (rewardModeOf(rule) !== "add") return { a: 0, b: 0, personal: null };
-  if (catalog.isLasuoHeadTailTwoPoint(rule)) {
+  if (isHeadTailTwoPoint(rule)) {
     const personal = Object.assign(
       {},
       headTailPersonalAdds(rule, rec, aTeam),
