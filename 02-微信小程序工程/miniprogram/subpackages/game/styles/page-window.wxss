@@ -1,0 +1,6 @@
+/* 仅游戏分包页面引入。覆盖 app.wxss 的 page #f6f6f6，让窗口色（pageBoot.paintNativeTheme）在首帧可见。
+   不把全局 page 永久改黑；浅色窗口仍由 applyTheme 设为 #FCFCFC。 */
+page {
+  height: 100%;
+  background-color: transparent;
+}

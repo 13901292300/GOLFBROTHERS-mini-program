@@ -2,6 +2,7 @@ const { createHeaderStyle } = require("../../../../utils/headerEngine.js");
 const catalog = require("../../utils/catalog.js");
 const session = require("../../utils/sideGameBind.js");
 const nav = require("../../utils/nav.js");
+const pageBoot = require("../../utils/pageBoot.js");
 
 function flattenCatalogIds(groups) {
   const ids = [];
@@ -13,7 +14,7 @@ function flattenCatalogIds(groups) {
   return ids;
 }
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -21,7 +22,8 @@ Page({
     maxPlayers: 4,
     participantCount: 0,
     emptyHint: "",
-    catalogGroups: []
+    catalogGroups: [],
+    themeClass: ""
   },
 
   onLoad(query) {
@@ -75,6 +77,7 @@ Page({
       lasuoNInData: renderedCatalogIds.indexOf("lasuo-n") >= 0,
       hornInData: renderedCatalogIds.indexOf("horn") >= 0
     };
+    pageBoot.applyTheme(this);
   },
 
   onReady() {
@@ -82,6 +85,7 @@ Page({
   },
 
   onShow() {
+    pageBoot.applyTheme(this);
     this.measureCatalogScroll("onShow");
   },
 
@@ -191,4 +195,4 @@ Page({
       }
     });
   }
-});
+}));

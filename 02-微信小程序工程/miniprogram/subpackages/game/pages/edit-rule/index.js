@@ -5,6 +5,7 @@ const catalog = require("../../utils/catalog.js");
 const nav = require("../../utils/nav.js");
 const numField = require("../../utils/numField.js");
 const configGuard = require("../../utils/sideGameConfigGuard.js");
+const pageBoot = require("../../utils/pageBoot.js");
 const ruleDefaults = require("../../utils/sideGameRuleDefaults.js");
 
 const MUL_THUMB_LABEL = {
@@ -434,7 +435,7 @@ function exclusiveFoldPatch(data, field) {
   return patch;
 }
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -560,7 +561,8 @@ Page({
     canEdit: true,
     canView: true,
     pageMode: "edit",
-    readonlyHint: ""
+    readonlyHint: "",
+    themeClass: ""
   },
 
   onNumFocus: numField.onNumFocus,
@@ -569,6 +571,7 @@ Page({
 
   onLoad(query) {
     if (!session.ensureHost(query)) return;
+    pageBoot.applyTheme(this);
     const libId = decodeURIComponent((query && query.libId) || "");
     const entry = (query && query.entry) || "score";
     if (!session.requireSetupDraft(entry)) return;
@@ -966,6 +969,10 @@ Page({
   _bootConfigGuard() {
     configGuard.attach(this, {});
     if (this._captureInitialSnapshot) this._captureInitialSnapshot();
+  },
+
+  onShow() {
+    pageBoot.applyTheme(this);
   },
 
   onBack() {
@@ -1775,4 +1782,4 @@ Page({
       });
     });
   }
-});
+}));

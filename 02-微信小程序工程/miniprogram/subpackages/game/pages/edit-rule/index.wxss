@@ -1,5 +1,6 @@
 @import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
+@import "../../styles/page-window.wxss";
 .field + .rule-lib {
   margin-top: 24rpx;
 }
@@ -119,3 +120,4 @@
   padding: 0 28rpx 24rpx;
   border-top: 1px solid var(--border);
 }
+

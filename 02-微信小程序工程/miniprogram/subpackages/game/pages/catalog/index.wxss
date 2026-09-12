@@ -1,5 +1,6 @@
 @import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
+@import "../../styles/page-window.wxss";
 
 /* 宿主 app.wxss 未设 page height:100%。
    disableScroll + .gb-page overflow:hidden 时，必须给 page 定高，
