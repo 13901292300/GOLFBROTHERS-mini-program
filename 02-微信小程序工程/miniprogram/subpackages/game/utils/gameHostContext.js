@@ -8,6 +8,7 @@ var matchStatus = require('../../../utils/matchStatus.js');
 var playerManage = require('../../../utils/playerManage.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
 var mockAvatars = require('../../../utils/mockAvatars.js');
+var playerCanonicalDisplay = require('../../../utils/playerCanonicalDisplay.js');
 var catalog = require('./catalog.js');
 var temporaryCourse = require('../../../utils/temporaryCourse.js');
 
@@ -91,7 +92,8 @@ function emptyContext(patch) {
     canEditSideGames: undefined,
     scoreKind: 'player',
     playerPresentationById: {},
-    partyPresentationById: {}
+    partyPresentationById: {},
+    legacyAliasToPlayerId: {}
   };
   if (patch && typeof patch === 'object') {
     Object.keys(patch).forEach(function (key) {
@@ -208,18 +210,27 @@ function resolveOfficialAvatar(obj, playerId, registerMap) {
   if (!raw && registerMap && id && registerMap[id]) {
     raw = pickAvatarRaw(registerMap[id]);
   }
-  return mockAvatars.resolveAvatar(raw);
+  return playerCanonicalDisplay.resolveSeededDisplayAvatar(raw, id);
 }
 
 function officialDefaultAvatar() {
   return mockAvatars.DEFAULT_AVATAR;
 }
 
-function playerView(id, name, avatar, groupId, teamId) {
+function playerView(id, name, avatar, groupId, teamId, extra) {
+  var more = extra && typeof extra === 'object' ? extra : {};
+  var pid = asString(id);
+  var canonical = asString(more.canonicalAvatar || avatar);
+  var display = asString(more.displayAvatar);
+  if (!display) display = playerCanonicalDisplay.resolveSeededDisplayAvatar(canonical, pid);
   return {
-    playerId: asString(id),
+    playerId: pid,
     displayName: asString(name),
-    avatar: asString(avatar),
+    avatar: canonical,
+    displayAvatar: display,
+    canonicalAvatar: canonical,
+    accountUserId: more.accountUserId == null ? null : more.accountUserId,
+    identityType: asString(more.identityType),
     groupId: asString(groupId),
     teamId: asString(teamId)
   };
@@ -242,19 +253,23 @@ function makeParty(input) {
 function attachPartyAvatars(ctx) {
   var byId = {};
   (ctx.players || []).forEach(function (p) {
-    if (p && p.playerId) byId[p.playerId] = p.avatar || mockAvatars.DEFAULT_AVATAR;
+    if (p && p.playerId) {
+      byId[p.playerId] =
+        asString(p.displayAvatar) ||
+        playerCanonicalDisplay.resolveSeededDisplayAvatar(p.canonicalAvatar || p.avatar, p.playerId);
+    }
   });
   (ctx.scoreParties || []).forEach(function (party) {
     if (!party) return;
     party.memberAvatars = (party.memberPlayerIds || []).map(function (id) {
       var pid = asString(id);
-      return byId[pid] || mockAvatars.DEFAULT_AVATAR;
+      return byId[pid] || playerCanonicalDisplay.resolveSeededDisplayAvatar('', pid);
     });
-    if (party.partyType === 'player') {
-      party.avatar = byId[party.partyId] || party.memberAvatars[0] || mockAvatars.DEFAULT_AVATAR;
-    } else {
-      party.avatar = party.memberAvatars[0] || mockAvatars.DEFAULT_AVATAR;
-    }
+    var pid = asString(party.partyId);
+    party.displayAvatar =
+      (party.partyType === 'player' ? byId[pid] : '') ||
+      party.memberAvatars[0] ||
+      playerCanonicalDisplay.resolveSeededDisplayAvatar('', pid);
   });
   return ctx;
 }
@@ -262,42 +277,70 @@ function attachPartyAvatars(ctx) {
 function buildPresentation(ctx) {
   var playerPresentationById = {};
   var partyPresentationById = {};
+  var legacyAliasToPlayerId = Object.assign({}, ctx.legacyAliasToPlayerId || {});
   (ctx.players || []).forEach(function (p) {
     if (!p || !p.playerId) return;
+    var canonical = asString(p.canonicalAvatar || p.avatar);
+    var display =
+      asString(p.displayAvatar) ||
+      playerCanonicalDisplay.resolveSeededDisplayAvatar(canonical, p.playerId);
     playerPresentationById[p.playerId] = {
       playerId: p.playerId,
+      id: p.playerId,
+      accountUserId: p.accountUserId == null ? null : p.accountUserId,
+      identityType: asString(p.identityType),
       displayName: asString(p.displayName) || p.playerId,
-      avatar: asString(p.avatar) || mockAvatars.DEFAULT_AVATAR
+      canonicalAvatar: canonical,
+      displayAvatar: display,
+      avatar: canonical
     };
   });
   (ctx.scoreParties || []).forEach(function (party) {
     if (!party || !party.partyId) return;
     var members = (party.memberPlayerIds || []).map(function (id) {
       var pid = asString(id);
-      if (playerPresentationById[pid]) return jsonClone(playerPresentationById[pid]);
+      var mapped = playerCanonicalDisplay.lookupPresentation(
+        playerPresentationById,
+        legacyAliasToPlayerId,
+        pid
+      );
+      if (mapped) return jsonClone(mapped);
+      var fallback = playerCanonicalDisplay.resolveSeededDisplayAvatar('', pid);
       return {
         playerId: pid,
+        id: pid,
         displayName: '',
-        avatar: mockAvatars.DEFAULT_AVATAR
+        canonicalAvatar: '',
+        displayAvatar: fallback,
+        avatar: ''
       };
     });
+    var partyHit =
+      playerCanonicalDisplay.lookupPresentation(
+        playerPresentationById,
+        legacyAliasToPlayerId,
+        party.partyId
+      ) || playerPresentationById[party.partyId];
     var face =
       party.partyType === 'player'
-        ? (playerPresentationById[party.partyId] && playerPresentationById[party.partyId].avatar) ||
-          (members[0] && members[0].avatar) ||
-          mockAvatars.DEFAULT_AVATAR
-        : (members[0] && members[0].avatar) || mockAvatars.DEFAULT_AVATAR;
+        ? (partyHit && partyHit.displayAvatar) ||
+          (members[0] && members[0].displayAvatar) ||
+          playerCanonicalDisplay.resolveSeededDisplayAvatar('', party.partyId)
+        : (members[0] && members[0].displayAvatar) ||
+          playerCanonicalDisplay.resolveSeededDisplayAvatar('', party.partyId);
     partyPresentationById[party.partyId] = {
       partyId: party.partyId,
       partyType: party.partyType || 'player',
       displayName: asString(party.displayName) || party.partyId,
       memberPlayerIds: (party.memberPlayerIds || []).map(asString).filter(Boolean),
       members: members,
-      avatar: face
+      displayAvatar: face,
+      avatar: asString(party.avatar || (partyHit && partyHit.avatar) || '')
     };
   });
   ctx.playerPresentationById = jsonClone(playerPresentationById);
   ctx.partyPresentationById = jsonClone(partyPresentationById);
+  ctx.legacyAliasToPlayerId = jsonClone(legacyAliasToPlayerId);
   return ctx;
 }
 
@@ -393,7 +436,7 @@ function collectCompositionMembers(snap, group, teamId) {
   if (!Array.isArray(members)) return [];
   return members
     .map(function (m) {
-      return asString(m && (m.playerId || m.userId || m.id));
+      return playerCanonicalDisplay.resolveRosterPlayerId(m) || asString(m && (m.playerId || m.userId || m.id));
     })
     .filter(Boolean);
 }
@@ -451,9 +494,9 @@ function buildFromGameHostSnapshot(snap) {
     var slots = slotsOfGroup(group);
     slots.forEach(function (slot) {
       if (!slot) return;
-      var pid = asString(slot.playerId || slot.userId);
+      var pid = playerCanonicalDisplay.resolveRosterPlayerId(slot);
       if (!pid) return;
-      ctx.players.push(playerView(pid, slot.name, resolveOfficialAvatar(slot, pid, registerMap), gid, ''));
+      pushPlayerFromSlot(ctx, slot, pid, gid, '', registerMap);
     });
     if (useCombo) {
       var entities = Array.isArray(group.teamScoresByEntity) ? group.teamScoresByEntity : [];
@@ -479,7 +522,7 @@ function buildFromGameHostSnapshot(snap) {
     var byPlayer = group.scoresByPlayer && typeof group.scoresByPlayer === 'object' ? group.scoresByPlayer : {};
     slots.forEach(function (slot) {
       if (!slot) return;
-      var pid = asString(slot.playerId || slot.userId);
+      var pid = playerCanonicalDisplay.resolveRosterPlayerId(slot);
       if (!pid) return;
       var rec = byPlayer[pid] || {};
       var party = makeParty({
@@ -516,7 +559,7 @@ function teamNameById(snap, teamId) {
 function occupiedSetOfGroup(group) {
   var set = {};
   (Array.isArray(group && group.players) ? group.players : []).forEach(function (p) {
-    var id = asString(playerManage.resolveUserId(p) || (p && (p.userId || p.playerId)));
+    var id = playerCanonicalDisplay.resolveRosterPlayerId(p);
     if (id) set[id] = p;
   });
   return set;
@@ -527,9 +570,7 @@ function slotsOfGroup(group) {
   var seen = {};
   function add(slot) {
     if (!slot) return;
-    var pid = asString(
-      playerManage.resolveUserId(slot) || slot.playerId || slot.userId || slot.id
-    );
+    var pid = playerCanonicalDisplay.resolveRosterPlayerId(slot);
     if (!pid || seen[pid]) return;
     seen[pid] = true;
     out.push(slot);
@@ -537,6 +578,38 @@ function slotsOfGroup(group) {
   (Array.isArray(group && group.playersSlots) ? group.playersSlots : []).forEach(add);
   (Array.isArray(group && group.players) ? group.players : []).forEach(add);
   return out;
+}
+
+function presentationFromSlot(slot, pid, registerMap, currentUserId) {
+  var pres = playerCanonicalDisplay.resolvePlayerPresentation(
+    Object.assign({}, slot || {}, { playerId: pid || (slot && slot.playerId) }),
+    { currentUserId: currentUserId, playerId: pid }
+  );
+  return pres;
+}
+
+function pushPlayerFromSlot(ctx, slot, pid, gid, teamId, registerMap) {
+  var pres = presentationFromSlot(slot, pid, registerMap, ctx.currentUserId);
+  var nick = '';
+  try {
+    nick = asString(playerManage.resolveMatchNickname(slot));
+  } catch (eNick) {
+    nick = '';
+  }
+  if (nick) pres.displayName = nick;
+  else if (!pres.displayName && slot && slot.name) pres.displayName = asString(slot.name);
+  var aliases = playerCanonicalDisplay.buildLegacyAliasToPlayerId(
+    Object.assign({}, slot || {}, { playerId: pid })
+  );
+  ctx.legacyAliasToPlayerId = Object.assign(ctx.legacyAliasToPlayerId || {}, aliases);
+  ctx.players.push(
+    playerView(pid, pres.displayName || pid, pres.canonicalAvatar || pickAvatarRaw(slot), gid, teamId, {
+      displayAvatar: pres.displayAvatar,
+      canonicalAvatar: pres.canonicalAvatar || pickAvatarRaw(slot),
+      accountUserId: pres.accountUserId,
+      identityType: pres.identityType
+    })
+  );
 }
 
 function buildFromTeamMatchHostSnapshot(snap) {
@@ -581,15 +654,7 @@ function buildFromTeamMatchHostSnapshot(snap) {
     var occupied = occupiedSetOfGroup(group);
     Object.keys(occupied).forEach(function (pid) {
       var p = occupied[pid];
-      ctx.players.push(
-        playerView(
-          pid,
-          playerManage.resolveMatchNickname(p) || pid,
-          resolveOfficialAvatar(p, pid, registerMap),
-          gid,
-          asString(teamMap[pid])
-        )
-      );
+      pushPlayerFromSlot(ctx, p, pid, gid, asString(teamMap[pid]), registerMap);
     });
     var bucket = scoreData[gid] && typeof scoreData[gid] === 'object' ? scoreData[gid] : {};
     if (kind === 'combination') {
@@ -606,7 +671,7 @@ function buildFromTeamMatchHostSnapshot(snap) {
           .map(function (m) {
             if (m == null) return '';
             if (typeof m === 'string' || typeof m === 'number') return asString(m);
-            return asString(m.userId || m.playerId || m.id);
+            return playerCanonicalDisplay.resolveRosterPlayerId(m) || asString(m.userId || m.playerId || m.id);
           })
           .filter(Boolean);
         if (!members.length) return;
@@ -878,5 +943,6 @@ module.exports = {
   pickAvatarRaw: pickAvatarRaw,
   resolveOfficialAvatar: resolveOfficialAvatar,
   officialDefaultAvatar: officialDefaultAvatar,
-  buildPresentation: buildPresentation
+  buildPresentation: buildPresentation,
+  lookupPresentation: playerCanonicalDisplay.lookupPresentation
 };

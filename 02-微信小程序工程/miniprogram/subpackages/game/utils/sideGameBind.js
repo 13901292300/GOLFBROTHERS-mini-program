@@ -13,6 +13,7 @@ var ruleLibrary = require("./sideGameRuleLibrary.js");
 var settingsMod = require("./localSideGameSettings.js");
 var hostMod = require("./gameHostContext.js");
 var temporaryCourse = require("../../../utils/temporaryCourse.js");
+var playerCanonicalDisplay = require("../../../utils/playerCanonicalDisplay.js");
 var identity = require("./sideGameIdentityProvider.js");
 var nav = require("./nav.js");
 var resultTone = require("./resultTone.js");
@@ -110,23 +111,44 @@ function hideBigPotFor(entry) {
 
 function presentPlayer(playerId) {
   var id = rec.asString(playerId);
-  var maps = currentHost().playerPresentationById || {};
-  if (id && maps[id]) {
-    var hit = rec.jsonClone(maps[id]);
+  var host = currentHost();
+  var maps = host.playerPresentationById || {};
+  var aliases = host.legacyAliasToPlayerId || {};
+  var hitSrc = playerCanonicalDisplay.lookupPresentation(maps, aliases, id);
+  if (hitSrc) {
+    var hit = rec.jsonClone(hitSrc);
     var liveName = rec.asString(hit.displayName || hit.name);
-    if (!liveName || liveName === id || liveName === "球员") {
-      var resolved = nicknameFromCurrentGame(id);
+    var rosterId = rec.asString(hit.playerId || hit.id) || id;
+    if (!liveName || liveName === id || liveName === rosterId || liveName === "球员") {
+      var resolved = nicknameFromCurrentGame(rosterIdOrAlias(host, id));
       if (resolved) hit.displayName = resolved;
       else if (liveName === "球员") hit.displayName = "";
     }
+    if (!hit.displayAvatar) {
+      hit.displayAvatar = playerCanonicalDisplay.resolveSeededDisplayAvatar(
+        hit.canonicalAvatar || "",
+        rosterId
+      );
+    }
+    if (!hit.canonicalAvatar) hit.canonicalAvatar = rec.asString(hit.avatar);
+    if (!hit.id) hit.id = hit.playerId || rosterId;
+    if (!hit.playerId) hit.playerId = rosterId;
     return hit;
   }
   var fromGame = nicknameFromCurrentGame(id);
+  var fallback = playerCanonicalDisplay.resolveSeededDisplayAvatar("", id);
   return {
     playerId: id,
     displayName: fromGame || "",
     avatar: hostMod.officialDefaultAvatar()
   };
+}
+
+function rosterIdOrAlias(host, playerId) {
+  var id = rec.asString(playerId);
+  var aliases = (host && host.legacyAliasToPlayerId) || {};
+  if (id && aliases[id]) return aliases[id];
+  return id;
 }
 
 function nicknameFromCurrentGame(playerId) {
@@ -1199,7 +1221,8 @@ function listScoreSlots(entry) {
       slots.push({
         id: person.id,
         name: person.name,
-        avatar: person.avatar || hostMod.officialDefaultAvatar(),
+        displayAvatar: person.displayAvatar || playerCanonicalDisplay.resolveSeededDisplayAvatar(person.avatar, person.id),
+        avatar: person.avatar || "",
         selected: true
       });
       cursor += 1;
@@ -2745,7 +2768,8 @@ function listScorePlayers(entry) {
     return {
       id: person.id,
       name: person.name || "",
-      avatar: person.avatar || hostMod.officialDefaultAvatar(),
+      displayAvatar: person.displayAvatar || playerCanonicalDisplay.resolveSeededDisplayAvatar(person.avatar, person.id),
+      avatar: person.avatar || "",
       hcp: person.hcp != null ? String(person.hcp) : ""
     };
   });
