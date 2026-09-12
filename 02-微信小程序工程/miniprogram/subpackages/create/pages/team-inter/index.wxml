@@ -112,7 +112,7 @@
       <view class="ds-card ds-field" bindtap="onSelectCourse">
         <view class="field-main">
           <block wx:if="{{courseName}}">
-            <text class="field-value strong italic">{{courseName}}{{courseHalfText}}</text>
+            <text class="field-value strong italic">{{courseDisplayName}}</text>
             <text wx:if="{{courseLocation}}" class="field-subvalue ds-desc-text">{{courseLocation}}</text>
           </block>
           <text wx:else class="field-placeholder">选择球场</text>
