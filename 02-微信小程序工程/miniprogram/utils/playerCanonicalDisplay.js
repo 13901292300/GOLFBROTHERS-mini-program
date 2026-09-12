@@ -7,6 +7,7 @@ const playerIdentityGuard = require('./playerIdentityGuard.js');
 const mockAvatars = require('./mockAvatars.js');
 const userProfileStore = require('./userProfileStore.js');
 const gameStore = require('./gameStore.js');
+const wxRuntime = require('./wxRuntime.js');
 
 function _trim(value) {
   return playerIdentityGuard.normalizePlayerUserId(value);
@@ -144,6 +145,63 @@ function resolveSeededDisplayAvatar(raw, rosterPlayerId) {
   return mockAvatars.resolveAvatar(raw, id || undefined);
 }
 
+/**
+ * 当前 runtime 可直接绑给 <image> 的 src。
+ * fs exists 不能单独决定；devtools 下 usr 会改写成 http://usr 并 CORS。
+ */
+function isLocalUsrImageRenderable(src, runtime) {
+  const s = _asString(src);
+  if (!s || !mockAvatars.isDurableLocalUserFile(s)) return false;
+  if (runtime === 'devtools') return false;
+  return true;
+}
+
+function resolveDisplayAvatarForRuntime(canonicalAvatar, localPath, runtimeCtx) {
+  const runtime = wxRuntime.resolveImageRuntime(runtimeCtx && runtimeCtx.runtime);
+  const local = _asString(localPath);
+  if (isLocalUsrImageRenderable(local, runtime)) return local;
+  const canonical = _asString(canonicalAvatar);
+  if (canonical && !mockAvatars.isDurableLocalUserFile(canonical) && mockAvatars.isDurableAvatarSrc(canonical)) {
+    return canonical;
+  }
+  if (canonical && /^https:\/\//i.test(canonical)) return canonical;
+  if (canonical && /^cloud:\/\//i.test(canonical)) return canonical;
+  return '';
+}
+
+function resolveSelfDisplayAvatar(runtimeCtx) {
+  try {
+    const profile = userProfileStore.loadProfile() || {};
+    const canonical = _asString(profile.avatar);
+    const local = mockAvatars.isDurableLocalUserFile(profile.avatarLocalPath)
+      ? _asString(profile.avatarLocalPath)
+      : '';
+    const hasLocal =
+      typeof userProfileStore.hasValidAvatarLocalPath === 'function'
+        ? userProfileStore.hasValidAvatarLocalPath(profile)
+        : !!local;
+    const picked = resolveDisplayAvatarForRuntime(
+      canonical,
+      hasLocal ? local : '',
+      runtimeCtx
+    );
+    if (picked) return picked;
+  } catch (e) {
+    /* ignore */
+  }
+  return '';
+}
+
+/**
+ * @returns {{
+ *   playerId: string,
+ *   accountUserId: string|null,
+ *   identityType: string,
+ *   displayName: string,
+ *   canonicalAvatar: string,
+ *   displayAvatar: string
+ * }}
+ */
 function resolvePlayerPresentation(player, ctx) {
   const p = player && typeof player === 'object' ? player : {};
   const currentUserId = _trim(ctx && ctx.currentUserId) || currentAccountUserId();
@@ -155,7 +213,16 @@ function resolvePlayerPresentation(player, ctx) {
     _asString(p.displayName || p.nickname || p.matchNickname || p.name || p.competitionName) ||
     playerId;
   const canonicalAvatar = resolveCanonicalAvatar(p);
-  let displayAvatar = resolveSeededDisplayAvatar(canonicalAvatar, playerId);
+  let displayAvatar = '';
+  if (identityType === 'self' || (accountUserIdRaw && currentUserId && accountUserIdRaw === currentUserId)) {
+    displayAvatar =
+      resolveSelfDisplayAvatar({ runtime: ctx && ctx.runtime }) ||
+      resolveSeededDisplayAvatar(canonicalAvatar, playerId);
+  } else if (identityType === 'manual') {
+    displayAvatar = resolveSeededDisplayAvatar(canonicalAvatar, playerId);
+  } else {
+    displayAvatar = resolveSeededDisplayAvatar(canonicalAvatar, playerId);
+  }
   if (!displayAvatar) displayAvatar = resolveSeededDisplayAvatar('', playerId);
   return {
     playerId: playerId,
@@ -202,6 +269,8 @@ module.exports = {
   resolveIdentityType,
   resolvePlayerPresentation,
   resolveSeededDisplayAvatar,
+  resolveDisplayAvatarForRuntime,
+  isLocalUsrImageRenderable,
   buildLegacyAliasToPlayerId,
   lookupPresentation,
   manualPlayerIdFromGuestUserId,

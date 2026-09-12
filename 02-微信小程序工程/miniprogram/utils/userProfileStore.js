@@ -14,6 +14,7 @@
 const gameStore = require('./gameStore.js');
 const geoCatalog = require('./geoCatalog.js');
 const mockAvatars = require('./mockAvatars.js');
+const wxRuntime = require('./wxRuntime.js');
 
 const STORAGE_KEY = 'gb_user_profile_v1';
 
@@ -263,13 +264,41 @@ function persistRegisterCompetitionDraft(draft) {
   return setDisplayName(value);
 }
 
+/** fs / env 返回的 usr 路径 → 契约存储形态 wxfile://usr/...（hydration，不批量写盘） */
+function _toStoredUsrPath(value) {
+  const v = String(value == null ? '' : value).trim();
+  if (!v) return '';
+  if (/^wxfile:\/\/usr/i.test(v)) {
+    return v.replace(/^wxfile:\/\/usr\/+/i, 'wxfile://usr/');
+  }
+  const httpUsr = v.match(/^https?:\/\/usr\/+(.*)$/i);
+  if (httpUsr) return 'wxfile://usr/' + String(httpUsr[1] || '').replace(/\\/g, '/');
+  const loopback = v.match(/^https?:\/\/127\.0\.0\.1(?::\d+)?\/__usr__\/+(.*)$/i);
+  if (loopback) return 'wxfile://usr/' + String(loopback[1] || '').replace(/\\/g, '/');
+  try {
+    const root = typeof wx !== 'undefined' && wx.env && wx.env.USER_DATA_PATH;
+    const base = root ? String(root).replace(/[\\/]+$/, '') : '';
+    if (base && (v === base || v.indexOf(base + '/') === 0 || v.indexOf(base + '\\') === 0)) {
+      const rest = v.slice(base.length).replace(/^[\\/]+/, '').replace(/\\/g, '/');
+      if (rest) return 'wxfile://usr/' + rest;
+      return 'wxfile://usr';
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return v;
+}
+
 function _normalizeAvatarLocalPath(value) {
   const v = String(value == null ? '' : value).trim();
   if (!v) return '';
   if (/^cloud:\/\//i.test(v)) return '';
   if (mockAvatars.isTempWeChatFile(v)) return '';
-  if (!mockAvatars.isDurableLocalUserFile(v)) return '';
-  return v;
+  const stored = _toStoredUsrPath(v);
+  if (!mockAvatars.isDurableLocalUserFile(stored) && !mockAvatars.isDurableLocalUserFile(v)) return '';
+  if (mockAvatars.isDurableLocalUserFile(stored)) return stored;
+  if (mockAvatars.isDurableLocalUserFile(v)) return _toStoredUsrPath(v) || v;
+  return '';
 }
 
 function _isManagedGbAvatarFile(filePath) {
@@ -280,8 +309,8 @@ function _isManagedGbAvatarFile(filePath) {
   return /^gb_avatar_/i.test(name);
 }
 
-function _localAvatarFileExists(filePath) {
-  const v = _normalizeAvatarLocalPath(filePath);
+function _fsAccess(filePath) {
+  const v = String(filePath || '').trim();
   if (!v) return false;
   try {
     if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') return false;
@@ -292,6 +321,21 @@ function _localAvatarFileExists(filePath) {
   } catch (e) {
     return false;
   }
+}
+
+function _localAvatarFileExists(filePath) {
+  const v = _normalizeAvatarLocalPath(filePath);
+  if (!v) return false;
+  if (_fsAccess(v)) return true;
+  try {
+    const root = typeof wx !== 'undefined' && wx.env && wx.env.USER_DATA_PATH;
+    const base = root ? String(root).replace(/[\\/]+$/, '') : '';
+    const name = (v.split(/[\\/]/).pop() || '').split('?')[0];
+    if (base && name) return _fsAccess(base + '/' + name);
+  } catch (e2) {
+    /* ignore */
+  }
+  return false;
 }
 
 function _tryUnlinkLocalAvatarFile(filePath) {
@@ -328,13 +372,18 @@ function resolveDisplayAvatar(profile) {
 }
 
 /**
- * 当前登录用户本人 UI src：有效本机缓存优先，否则 canonical avatar。
+ * 当前登录用户本人 UI src。
+ * fs exists 不等于 <image> 可渲染；devtools 下不返回 usr local。
  * 不写回 profile，不下载 cloud 文件。
  */
 function resolveCurrentUserAvatarDisplay(profile) {
   const p = profile && typeof profile === 'object' ? profile : {};
   const local = _normalizeAvatarLocalPath(p.avatarLocalPath);
-  if (local && _localAvatarFileExists(local)) return local;
+  const canRenderLocal =
+    local &&
+    _localAvatarFileExists(local) &&
+    wxRuntime.resolveImageRuntime() !== 'devtools';
+  if (canRenderLocal) return local;
   return resolveDisplayAvatar(p);
 }
 
@@ -456,8 +505,8 @@ function persistAvatarFile(tempPath, callback) {
     dest = '';
   }
   const finishIfDurable = (saved) => {
-    const next = String(saved || '').trim();
-    if (mockAvatars.isDurableAvatarSrc(next)) {
+    const next = _normalizeAvatarLocalPath(saved) || String(saved || '').trim();
+    if (mockAvatars.isDurableAvatarSrc(next) || mockAvatars.isDurableLocalUserFile(next)) {
       done({ ok: true, path: next });
       return;
     }

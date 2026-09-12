@@ -37,7 +37,7 @@ function viewOf(party, layout) {
     return {
       playerId: m.playerId || m.id || "",
       displayName: m.displayName || m.name || "",
-      avatar: m.avatar || ""
+      displayAvatar: m.displayAvatar || ""
     };
   });
   var kind = kindOf(p);
@@ -89,7 +89,7 @@ function viewOf(party, layout) {
     resolvedLayout: resolvedLayout,
     faceMode: resolvedLayout === "compact" ? "folded" : resolvedLayout === "board" ? "spread" : "slot",
     showNames: showNames,
-    avatar: p.avatar || (members[0] && members[0].avatar) || "",
+    displayAvatar: p.displayAvatar || (members[0] && members[0].displayAvatar) || "",
     name: headerName,
     subjectName: subjectName,
     members: members,

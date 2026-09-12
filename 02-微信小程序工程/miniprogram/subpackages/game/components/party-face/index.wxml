@@ -1,7 +1,7 @@
 <view class="party-face party-face--{{resolvedLayout}} party-face--{{kind}}">
   <block wx:if="{{kind === 'single'}}">
     <view class="party-face__avatar">
-      <image class="party-face__av" src="{{avatar}}" mode="aspectFill" />
+      <image class="party-face__av" src="{{displayAvatar}}" mode="aspectFill" />
     </view>
     <view wx:if="{{showNames}}" class="party-face__names">
       <text class="party-face__name">{{name}}</text>
@@ -13,7 +13,7 @@
         wx:for="{{members}}"
         wx:key="playerId"
         class="party-face__av"
-        src="{{item.avatar}}"
+        src="{{item.displayAvatar}}"
         mode="aspectFill"
       />
     </view>
@@ -35,7 +35,7 @@
         wx:key="playerId"
         class="party-face__stack-item"
       >
-        <image class="party-face__av" src="{{item.avatar}}" mode="aspectFill" />
+        <image class="party-face__av" src="{{item.displayAvatar}}" mode="aspectFill" />
       </view>
     </view>
     <view wx:if="{{showNames}}" class="party-face__names">

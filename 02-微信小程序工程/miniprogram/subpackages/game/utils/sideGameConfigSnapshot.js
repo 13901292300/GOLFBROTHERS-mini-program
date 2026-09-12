@@ -86,6 +86,8 @@ var UI_KEY = {
 /** 参与方/对决上的纯展示投影字段 */
 var PRESENTATION_KEY = {
   name: true,
+  displayAvatar: true,
+  canonicalAvatar: true,
   avatar: true,
   displayName: true,
   initial: true,

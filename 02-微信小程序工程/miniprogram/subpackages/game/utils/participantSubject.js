@@ -43,7 +43,7 @@ function buildParticipantSubject(party, opts) {
     typeof opts.presentPlayer === "function"
       ? opts.presentPlayer
       : function (id) {
-          return { playerId: id, displayName: id, avatar: "" };
+          return { playerId: id, displayName: id, displayAvatar: "", avatar: "" };
         };
 
   var hostFace = null;
@@ -62,8 +62,11 @@ function buildParticipantSubject(party, opts) {
     if (rawName === id) rawName = "";
     return {
       playerId: id,
+      id: id,
       displayName: rawName,
-      avatar: asString(p.avatar) || ""
+      canonicalAvatar: asString(p.canonicalAvatar),
+      displayAvatar: asString(p.displayAvatar),
+      avatar: asString(p.avatar)
     };
   });
   // host party members 可补全头像/昵称
@@ -80,7 +83,10 @@ function buildParticipantSubject(party, opts) {
       if (hitName === m.playerId) hitName = "";
       return {
         playerId: m.playerId,
+        id: m.playerId,
         displayName: hitName || m.displayName,
+        canonicalAvatar: asString(hit.canonicalAvatar) || m.canonicalAvatar,
+        displayAvatar: asString(hit.displayAvatar) || m.displayAvatar,
         avatar: asString(hit.avatar) || m.avatar
       };
     });
@@ -114,10 +120,11 @@ function buildParticipantSubject(party, opts) {
 
   var faceKind =
     subjectType === "person" ? "single" : members.length === 2 ? "pair" : "stack";
-  var avatar =
+  var displayAvatar =
     subjectType === "person"
-      ? (members[0] && members[0].avatar) || ""
-      : (members[0] && members[0].avatar) || "";
+      ? (members[0] && members[0].displayAvatar) || ""
+      : (members[0] && members[0].displayAvatar) || "";
+  var avatar = (members[0] && members[0].avatar) || "";
 
   return {
     // 业务身份：始终 partyId
@@ -132,16 +139,19 @@ function buildParticipantSubject(party, opts) {
     // 统一主体展示
     name: displayName,
     displayName: displayName,
+    displayAvatar: displayAvatar,
+    canonicalAvatar: (members[0] && members[0].canonicalAvatar) || "",
     avatar: avatar,
     avatarModel: {
       kind: faceKind,
       members: members,
+      displayAvatar: displayAvatar,
       avatar: avatar
     },
     members: members,
     memberPlayerIds: playerIds.slice(),
     memberAvatars: members.map(function (m) {
-      return m.avatar;
+      return m.displayAvatar;
     }),
     memberNames: members.map(function (m) {
       return m.displayName;

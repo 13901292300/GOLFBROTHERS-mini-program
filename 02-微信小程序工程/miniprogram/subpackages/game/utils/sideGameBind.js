@@ -140,7 +140,9 @@ function presentPlayer(playerId) {
   return {
     playerId: id,
     displayName: fromGame || "",
-    avatar: hostMod.officialDefaultAvatar()
+    displayAvatar: fallback,
+    canonicalAvatar: "",
+    avatar: ""
   };
 }
 
@@ -192,6 +194,8 @@ function presentParty(partyId) {
     displayName: player.displayName,
     memberPlayerIds: id ? [id] : [],
     members: id ? [player] : [],
+    displayAvatar: player.displayAvatar,
+    canonicalAvatar: player.canonicalAvatar,
     avatar: player.avatar
   };
 }
@@ -237,6 +241,8 @@ function presentPerson(id) {
       displayName: player.displayName,
       memberPlayerIds: key ? [key] : [],
       members: key ? [player] : [],
+      displayAvatar: player.displayAvatar,
+      canonicalAvatar: player.canonicalAvatar,
       avatar: player.avatar
     };
   }
@@ -353,10 +359,10 @@ function hydratePairings(pairings, game) {
     );
     return Object.assign({}, pair, {
       leftName: left.name,
-      leftAvatar: left.avatar,
+      leftAvatar: left.displayAvatar,
       leftFace: left,
       rightName: right.name,
-      rightAvatar: right.avatar,
+      rightAvatar: right.displayAvatar,
       rightFace: right
     });
   });
@@ -369,6 +375,8 @@ function stripDisplayFields(instance) {
       var next = Object.assign({}, p);
       delete next.name;
       delete next.avatar;
+      delete next.displayAvatar;
+      delete next.canonicalAvatar;
       delete next.initial;
       delete next.memberAvatars;
       delete next.members;
@@ -401,6 +409,8 @@ function stripDisplayFields(instance) {
       var next = Object.assign({}, p);
       delete next.name;
       delete next.avatar;
+      delete next.displayAvatar;
+      delete next.canonicalAvatar;
       delete next.initial;
       delete next.faceKind;
       delete next.members;
@@ -3046,6 +3056,8 @@ function listBoard(entry, gameId, pairId) {
         subjectType: face.subjectType,
         name: face.name,
         displayName: face.displayName,
+        displayAvatar: face.displayAvatar,
+        canonicalAvatar: face.canonicalAvatar,
         avatar: face.avatar,
         partyType: face.partyType,
         faceKind: face.faceKind,

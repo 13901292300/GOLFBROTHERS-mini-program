@@ -9,6 +9,7 @@ const seriesStore = require('../../utils/seriesStore.js');
 const seriesListCardAdapter = require('../../utils/seriesListCardAdapter.js');
 const seriesRegistration = require('../../utils/seriesRegistration.js');
 const userProfileStore = require('../../utils/userProfileStore.js');
+const playerLiveDisplay = require('../../utils/playerLiveDisplay.js');
 const geoCatalog = require('../../utils/geoCatalog.js');
 const bannerConfig = require('../../utils/bannerConfig.js');
 const scheduleStore = require('../../utils/scheduleStore.js');
@@ -827,7 +828,7 @@ Page({
         nickname: profile.nickname || '',
         competitionName: profile.competitionName || '',
         gender: profile.gender || '男',
-        avatar: profile.avatar || userProfileStore.DEFAULT_AVATAR,
+        avatar: userProfileStore.resolveDisplayAvatar(profile),
         handicap: profile.handicap,
         floatCoef: profile.floatCoef,
         nationalityName: nationalityName,
@@ -1108,7 +1109,10 @@ Page({
       (g.playersSlots || []).forEach((p) => { if (p) allPlayers.push(p); });
     }
     const avatars = allPlayers
-      .map((p) => mockAvatars.resolveAvatar(p.avatar, p.playerId))
+      .map((p) => {
+        const live = playerLiveDisplay.applyLiveDisplayToView(p, { gameId: g.gameId });
+        return live.displayAvatar || mockAvatars.resolveAvatar(p.avatar, p.playerId);
+      })
       .filter(Boolean);
     const displayAvatars = avatars.slice(0, 9);
     // 多组 Game → 进入 Game Hub 控制页；单组 → 直接进入记分

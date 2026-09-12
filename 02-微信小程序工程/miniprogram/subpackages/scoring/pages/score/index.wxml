@@ -100,7 +100,7 @@
                 <image
                   id="fb-player-avatar-{{item.playerId}}"
                   class="bestball-player-avatar {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == item.playerId ? 'is-reaction-detached' : ''}}"
-                  src="{{item.avatar}}"
+                  src="{{item.displayAvatar}}"
                   mode="aspectFill"
                   data-player-id="{{item.playerId || ''}}"
                   data-avatar="{{item.avatar}}"
@@ -151,7 +151,7 @@
                 <image
                   id="fb-player-avatar-{{item.playerId || item.id}}"
                   class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
-                  src="{{item.avatar}}"
+                  src="{{item.displayAvatar}}"
                   mode="aspectFill"
                   data-player-id="{{item.playerId || item.id || ''}}"
                   catchtap="onScorePlayerAvatarTap"
@@ -334,7 +334,7 @@
                     <image
                       id="fb-player-avatar-{{item.memberPlayerId || item.playerId || item.id}}"
                       class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.memberPlayerId || reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
-                      src="{{item.avatar}}"
+                      src="{{item.displayAvatar}}"
                       mode="aspectFill"
                       data-player-id="{{item.memberPlayerId || item.playerId || item.id || ''}}"
                       catchtap="onScorePlayerAvatarTap"
@@ -358,7 +358,7 @@
                         <image
                           id="fb-player-avatar-{{pm.playerId}}"
                           class="avatar-group__avatar {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
-                          src="{{pm.avatar}}"
+                          src="{{pm.displayAvatar}}"
                           mode="aspectFill"
                         ></image>
                       </view>
@@ -636,7 +636,7 @@
                       <image
                         id="fb-player-avatar-{{m.playerId || m.id}}"
                         class="avatar-group__avatar {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == m.playerId || reactionAvatarDetachedPlayerId == m.id) ? 'is-reaction-detached' : ''}}"
-                        src="{{m.avatar}}"
+                        src="{{m.displayAvatar}}"
                         mode="aspectFill"
                       ></image>
                     </view>
@@ -832,7 +832,7 @@
                 <image
                   id="fb-player-avatar-{{item.playerId || item.id}}"
                   class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
-                  src="{{item.avatar}}"
+                  src="{{item.displayAvatar}}"
                   mode="aspectFill"
                   data-player-id="{{item.playerId || item.id || ''}}"
                   catchtap="onScorePlayerAvatarTap"
@@ -983,7 +983,7 @@
                         <image
                           id="fb-player-avatar-{{item.playerId || item.id || item.memberPlayerId}}"
                           class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id || reactionAvatarDetachedPlayerId == item.memberPlayerId) ? 'is-reaction-detached' : ''}}"
-                          src="{{item.avatar}}"
+                          src="{{item.displayAvatar}}"
                           mode="aspectFill"
                           data-player-id="{{item.playerId || item.id || item.memberPlayerId || ''}}"
                           catchtap="onScorePlayerAvatarTap"
@@ -1008,7 +1008,7 @@
                     <image
                       id="fb-player-avatar-{{item.playerId || item.id}}"
                       class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
-                      src="{{item.avatar}}"
+                      src="{{item.displayAvatar}}"
                       mode="aspectFill"
                       data-player-id="{{item.playerId || item.id || ''}}"
                       catchtap="onScorePlayerAvatarTap"
@@ -1030,7 +1030,7 @@
                         <image
                           id="fb-player-avatar-{{pm.playerId}}"
                           class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
-                          src="{{pm.avatar}}"
+                          src="{{pm.displayAvatar}}"
                           mode="aspectFill"
                           style="border-color:{{pm.teeColor}};"
                           data-player-id="{{pm.playerId || ''}}"
@@ -1136,7 +1136,7 @@
                     <image
                       id="fb-player-avatar-{{item.playerId || item.id || item.entityId}}"
                       class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id || reactionAvatarDetachedPlayerId == item.entityId) ? 'is-reaction-detached' : ''}}"
-                      src="{{item.avatar}}"
+                      src="{{item.displayAvatar}}"
                       mode="aspectFill"
                       data-player-id="{{item.playerId || item.id || item.entityId || ''}}"
                       catchtap="onScorePlayerAvatarTap"
@@ -1157,7 +1157,7 @@
                         <image
                           id="fb-player-avatar-{{pm.playerId}}"
                           class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
-                          src="{{pm.avatar}}"
+                          src="{{pm.displayAvatar}}"
                           mode="aspectFill"
                           style="border-color:{{pm.teeColor}};"
                           data-player-id="{{pm.playerId || ''}}"
@@ -1243,7 +1243,7 @@
                     <image
                       id="fb-player-avatar-{{item.memberPlayerId || item.playerId || item.id}}"
                       class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.memberPlayerId || reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
-                      src="{{item.avatar}}"
+                      src="{{item.displayAvatar}}"
                       mode="aspectFill"
                       data-player-id="{{item.memberPlayerId || item.playerId || item.id || ''}}"
                       catchtap="onScorePlayerAvatarTap"
@@ -1264,7 +1264,7 @@
                         <image
                           id="fb-player-avatar-{{pm.playerId}}"
                           class="player-avatar-img {{reactionAvatarDetached && reactionActiveMode === 'self' && reactionAvatarDetachedPlayerId == pm.playerId ? 'is-reaction-detached' : ''}}"
-                          src="{{pm.avatar}}"
+                          src="{{pm.displayAvatar}}"
                           mode="aspectFill"
                           style="border-color:{{pm.teeColor}};"
                           data-player-id="{{pm.playerId || ''}}"
@@ -1365,7 +1365,7 @@
                   <image
                     id="fb-player-avatar-{{item.playerId || item.id}}"
                     class="player-avatar-img {{item.colorClass}} {{reactionAvatarDetached && reactionActiveMode === 'self' && (reactionAvatarDetachedPlayerId == item.playerId || reactionAvatarDetachedPlayerId == item.id) ? 'is-reaction-detached' : ''}}"
-                    src="{{item.avatar}}"
+                    src="{{item.displayAvatar}}"
                     mode="aspectFill"
                     data-player-id="{{item.playerId || item.id || ''}}"
                     catchtap="onScorePlayerAvatarTap"
@@ -1534,7 +1534,7 @@
             class="sheet-player-item {{scorePanelMode === 'tech' && item.active ? 'sheet-player-item--active' : 'sheet-player-item--inactive'}}"
           >
             <view class="sheet-player-avatar-wrap">
-              <image class="sheet-player-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+              <image class="sheet-player-avatar" src="{{item.displayAvatar}}" mode="aspectFill"></image>
               <text class="sheet-player-name">{{item.name}}</text>
             </view>
             <view class="sheet-hole-score {{item.isDraftScore ? 'sheet-hole-score--draft' : ''}} {{(!item.holeScore && item.holeScore !== 0) ? 'sheet-hole-score--empty' : ''}}">{{item.holeScore}}</view>
@@ -1658,7 +1658,7 @@
             <text class="slot-index">{{item.seatIndex || item.slotId}}</text>
             <view class="avatar-wrap">
               <block wx:if="{{item.status === 'occupied'}}">
-                <image src="{{item.player.avatar}}" mode="aspectFill"></image>
+                <image src="{{item.player.displayAvatar}}" mode="aspectFill"></image>
                 <view
                   catchtap="removeGroupSlot"
                   data-seat-index="{{item.seatIndex}}"
@@ -1743,7 +1743,7 @@
           data-index="{{sourceIdx}}"
           bindtap="onPlayerSourceListItemTap"
         >
-          <image class="player-source-list__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <image class="player-source-list__avatar" src="{{item.displayAvatar}}" mode="aspectFill"></image>
           <view class="player-source-list__main">
             <text class="player-source-list__title">{{item.title}}</text>
             <text class="player-source-list__subtitle">{{item.subtitle}}</text>
@@ -1909,7 +1909,7 @@
         class="edit-tee-row"
       >
         <view class="edit-tee-row__player">
-          <image class="edit-tee-row__avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <image class="edit-tee-row__avatar" src="{{item.displayAvatar}}" mode="aspectFill"></image>
           <text class="edit-tee-row__name">{{item.name}}</text>
         </view>
         <view class="edit-tee-row__dots">

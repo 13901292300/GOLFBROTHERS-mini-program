@@ -6,7 +6,7 @@
 
 function avatarRowKey(row) {
   const p = row && typeof row === 'object' ? row : {};
-  return String(p.playerId || p.id || '') + '\0' + String(p.avatar || '');
+  return String(p.playerId || p.id || '') + '\0' + String(p.displayAvatar || '');
 }
 
 function reuseUnchangedAvatarRows(prevList, nextList) {
@@ -19,6 +19,7 @@ function reuseUnchangedAvatarRows(prevList, nextList) {
     if (!prev || !next) return nextList;
     if (avatarRowKey(prev) !== avatarRowKey(next)) return nextList;
     Object.assign(prev, next);
+    prev.displayAvatar = next.displayAvatar;
     prev.avatar = next.avatar;
     out.push(prev);
   }

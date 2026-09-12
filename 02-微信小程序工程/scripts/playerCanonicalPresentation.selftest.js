@@ -1,5 +1,5 @@
 /**
- * 局内 canonical presentation 契约（identity / shuffle / seeded fallback）。
+ * 局内 canonical presentation 契约。
  * 运行：node scripts/playerCanonicalPresentation.selftest.js
  */
 var fs = require('fs');
@@ -25,10 +25,20 @@ global.wx = {
   setStorageSync: function (key, val) {
     store[key] = val;
   },
-  env: { USER_DATA_PATH: 'wxfile://usr' }
+  env: { USER_DATA_PATH: 'wxfile://usr' },
+  getFileSystemManager: function () {
+    return {
+      accessSync: function (filePath) {
+        var p = String(filePath || '');
+        if (p.indexOf('gb_avatar_self') >= 0) return;
+        throw new Error('missing');
+      }
+    };
+  }
 };
 
 var canon = require('../miniprogram/utils/playerCanonicalDisplay.js');
+var live = require('../miniprogram/utils/playerLiveDisplay.js');
 var hostMod = require('../miniprogram/subpackages/game/utils/gameHostContext.js');
 var mockAvatars = require('../miniprogram/utils/mockAvatars.js');
 
@@ -40,6 +50,8 @@ store['gb_user_profile_v1'] = {
   gender: '男',
   updatedAt: '2026-01-01T00:00:00.000Z'
 };
+
+var LOCAL_SELF = 'wxfile://usr/gb_avatar_self.jpg';
 
 assert(
   'manual: playerId=m_* 且 guest userId → roster 主键 m_*',
@@ -63,6 +75,11 @@ var manualPres = canon.resolvePlayerPresentation({
 assert('manual accountUserId 为 null', manualPres.accountUserId == null);
 assert('manual identityType=manual', manualPres.identityType === 'manual');
 assert('manual presentation.playerId=m_*', manualPres.playerId === 'm_abc1');
+assert(
+  'manual 不拿 self local/cloud',
+  manualPres.displayAvatar !== LOCAL_SELF &&
+    String(manualPres.displayAvatar).indexOf('cloud://') !== 0
+);
 assert(
   'manual 使用 snapshot https',
   manualPres.displayAvatar === 'https://cdn.example.com/guest/golf-swing-01.jpg'
@@ -98,7 +115,75 @@ var selfPres = canon.resolvePlayerPresentation(selfSlot, { currentUserId: 'acct-
 assert('self playerId 稳定', selfPres.playerId === 'acct-self');
 assert('self accountUserId 正确', selfPres.accountUserId === 'acct-self');
 assert('self identityType=self', selfPres.identityType === 'self');
-assert('self seeded fallback 非空', !!selfPres.displayAvatar);
+assert(
+  'CASE 1 device: self displayAvatar = local usr',
+  selfPres.displayAvatar === LOCAL_SELF
+);
+
+var selfDevtools = canon.resolvePlayerPresentation(selfSlot, {
+  currentUserId: 'acct-self',
+  runtime: 'devtools'
+});
+assert(
+  'CASE 2 devtools: self displayAvatar = canonical cloud',
+  selfDevtools.displayAvatar === 'cloud://env/self-avatar.png' &&
+    selfDevtools.canonicalAvatar === 'cloud://env/self-avatar.png' &&
+    selfDevtools.displayAvatar !== LOCAL_SELF
+);
+
+var httpsSelfSlot = {
+  playerId: 'acct-self',
+  userId: 'acct-self',
+  avatar: 'https://cdn.example.com/self-https.jpg'
+};
+store['gb_user_profile_v1'].avatar = 'https://cdn.example.com/self-https.jpg';
+var httpsDevtools = canon.resolvePlayerPresentation(httpsSelfSlot, {
+  currentUserId: 'acct-self',
+  runtime: 'devtools'
+});
+assert(
+  'CASE 3 canonical https + devtools → https',
+  httpsDevtools.displayAvatar === 'https://cdn.example.com/self-https.jpg'
+);
+store['gb_user_profile_v1'].avatar = 'cloud://env/self-avatar.png';
+
+var prevLocal = store['gb_user_profile_v1'].avatarLocalPath;
+store['gb_user_profile_v1'].avatarLocalPath = 'wxfile://usr/gb_avatar_stale_missing.jpg';
+var stalePres = canon.resolvePlayerPresentation(selfSlot, {
+  currentUserId: 'acct-self',
+  runtime: 'device'
+});
+assert(
+  'CASE 4 stale local → canonical',
+  stalePres.displayAvatar === 'cloud://env/self-avatar.png'
+);
+store['gb_user_profile_v1'].avatarLocalPath = prevLocal;
+
+var manualDevtools = canon.resolvePlayerPresentation(
+  {
+    playerId: 'm_abc1',
+    userId: 'guest_m_abc1',
+    userType: 'guest',
+    source: 'manual',
+    name: '甲',
+    avatar: 'https://cdn.example.com/guest/golf-swing-01.jpg'
+  },
+  { runtime: 'devtools' }
+);
+assert(
+  'CASE 5 manual https 不受 self runtime 策略影响',
+  manualDevtools.displayAvatar === 'https://cdn.example.com/guest/golf-swing-01.jpg'
+);
+
+var liveView = live.applyLiveDisplayToView(selfSlot, { currentUserId: 'acct-self' });
+assert(
+  'score applyLiveDisplayToView.displayAvatar 与 canonical 一致',
+  liveView.displayAvatar === selfPres.displayAvatar
+);
+assert(
+  'score live.avatar 保持 canonical 不冒充 display',
+  liveView.avatar === selfPres.canonicalAvatar && liveView.avatar !== liveView.displayAvatar
+);
 
 var snap = {
   source: 'gameStore',
@@ -153,9 +238,19 @@ assert(
   'legacy alias guest→m',
   ctx.legacyAliasToPlayerId && ctx.legacyAliasToPlayerId['guest_m_aaa'] === 'm_aaa'
 );
+assert('lookup guest 别名落到 m_*', canon.lookupPresentation(byId, ctx.legacyAliasToPlayerId, 'guest_m_aaa').playerId === 'm_aaa');
+
+var hostSelf = byId['acct-self'];
 assert(
-  'lookup guest 别名落到 m_*',
-  canon.lookupPresentation(byId, ctx.legacyAliasToPlayerId, 'guest_m_aaa').playerId === 'm_aaa'
+  'CASE 6 score/home/game 同 runtime 同 player displayAvatar 一致',
+  liveView.displayAvatar === selfPres.displayAvatar &&
+    hostSelf.displayAvatar === selfPres.displayAvatar
+);
+assert(
+  'gameHost self.avatar 保持 cloud canonical，不等于 displayAvatar',
+  hostSelf.avatar === 'cloud://env/self-avatar.png' &&
+    hostSelf.displayAvatar === LOCAL_SELF &&
+    hostSelf.avatar !== hostSelf.displayAvatar
 );
 
 var emptyA = byId['m_bbb'].displayAvatar;
@@ -163,7 +258,7 @@ var emptyB = byId['m_ccc'].displayAvatar;
 assert('无 avatar 的两个 manual fallback 不同', emptyA && emptyB && emptyA !== emptyB);
 assert(
   'manual fallback 不是 self display',
-  emptyA !== byId['acct-self'].displayAvatar && emptyB !== byId['acct-self'].displayAvatar
+  emptyA !== selfPres.displayAvatar && emptyB !== selfPres.displayAvatar
 );
 
 function shuffleIds(ids) {
@@ -203,11 +298,9 @@ roster.forEach(function (p) {
 var mixedOk = true;
 var i;
 for (i = 0; i < 20; i++) {
-  var order = shuffleIds(
-    roster.map(function (p) {
-      return p.id;
-    })
-  );
+  var order = shuffleIds(roster.map(function (p) {
+    return p.id;
+  }));
   var rows = orderedPlayersOf(roster, order);
   rows.forEach(function (row, idx) {
     if (row.id !== order[idx]) mixedOk = false;
@@ -266,6 +359,67 @@ assert(
   String(mixMap['fr-1001'].displayAvatar).indexOf('https://') === 0
 );
 
+var participantSubject = require('../miniprogram/subpackages/game/utils/participantSubject.js');
+var splitFace = participantSubject.buildParticipantSubject(
+  { partyId: 'm_split', playerIds: ['m_split'] },
+  {
+    presentPlayer: function () {
+      return {
+        playerId: 'm_split',
+        displayName: '甲',
+        canonicalAvatar: 'cloud://env/self',
+        displayAvatar: 'wxfile://usr/gb_avatar_self.jpg',
+        avatar: 'https://evil.example/legacy-bypass.jpg'
+      };
+    }
+  }
+);
+assert(
+  'CASE participantSubject: displayAvatar 不丢且不回退 legacy avatar',
+  splitFace.displayAvatar === 'wxfile://usr/gb_avatar_self.jpg' &&
+    splitFace.members[0].displayAvatar === 'wxfile://usr/gb_avatar_self.jpg' &&
+    splitFace.avatar === 'https://evil.example/legacy-bypass.jpg'
+);
+
+var partyFaceJs = fs.readFileSync(
+  path.join(__dirname, '../miniprogram/subpackages/game/components/party-face/index.js'),
+  'utf8'
+);
+var partyFaceWxml = fs.readFileSync(
+  path.join(__dirname, '../miniprogram/subpackages/game/components/party-face/index.wxml'),
+  'utf8'
+);
+assert(
+  'CASE party-face 不再 raw avatar fallback',
+  partyFaceJs.indexOf('p.avatar') < 0 &&
+    partyFaceJs.indexOf('m.avatar') < 0 &&
+    partyFaceJs.indexOf('members[0].avatar') < 0 &&
+    partyFaceWxml.indexOf('src="{{displayAvatar}}"') >= 0 &&
+    partyFaceWxml.indexOf('src="{{item.displayAvatar}}"') >= 0 &&
+    partyFaceWxml.indexOf('src="{{avatar}}"') < 0 &&
+    partyFaceWxml.indexOf('src="{{item.avatar}}"') < 0
+);
+
+var bindSrc = fs.readFileSync(
+  path.join(__dirname, '../miniprogram/subpackages/game/utils/sideGameBind.js'),
+  'utf8'
+);
+assert(
+  'CASE board.players 写入 displayAvatar',
+  bindSrc.indexOf('displayAvatar: face.displayAvatar') >= 0
+);
+
+var configSrc = fs.readFileSync(
+  path.join(__dirname, '../miniprogram/subpackages/game/pages/config/index.js'),
+  'utf8'
+);
+assert(
+  'CASE config faceOf 保留 displayAvatar',
+  configSrc.indexOf('displayAvatar: face.displayAvatar') >= 0 &&
+    configSrc.indexOf('hcapLeftAvatar: faceOf(hit).displayAvatar') >= 0 &&
+    configSrc.indexOf('scorePlayerAvatar: faceOf(player).displayAvatar') >= 0
+);
+
 var hostSrc = fs.readFileSync(
   path.join(__dirname, '../miniprogram/subpackages/game/utils/gameHostContext.js'),
   'utf8'
@@ -273,9 +427,13 @@ var hostSrc = fs.readFileSync(
 assert(
   'CASE attachPartyAvatars 不再无 seed DEFAULT_AVATAR',
   /attachPartyAvatars[\s\S]*function buildPresentation/.test(hostSrc) &&
-    hostSrc.indexOf(
-      'party.avatar = byId[party.partyId] || party.memberAvatars[0] || mockAvatars.DEFAULT_AVATAR'
-    ) < 0
+    hostSrc.indexOf('party.avatar = byId[party.partyId] || party.memberAvatars[0] || mockAvatars.DEFAULT_AVATAR') < 0
+);
+
+assert(
+  'CASE 人为 avatar != displayAvatar 时 UI contract 选 displayAvatar',
+  splitFace.displayAvatar !== splitFace.avatar &&
+    splitFace.displayAvatar === LOCAL_SELF
 );
 
 var orderBoard = fs.readFileSync(

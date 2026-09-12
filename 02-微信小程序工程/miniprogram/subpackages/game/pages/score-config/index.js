@@ -28,6 +28,8 @@ function decoratePlayers(players, defaultCode) {
     return Object.assign({}, item, {
       id: face.id,
       name: face.name,
+      displayAvatar: face.displayAvatar,
+      canonicalAvatar: face.canonicalAvatar,
       avatar: face.avatar,
       members: face.members,
       partyType: face.partyType,
@@ -163,7 +165,7 @@ Page(pageBoot.bindPageTheme({
       showScoreSheet: true,
       scorePlayerIndex: idx,
       scorePlayerName: session.presentPerson(player.id).name,
-      scorePlayerAvatar: session.presentPerson(player.id).avatar,
+      scorePlayerAvatar: session.presentPerson(player.id).displayAvatar,
       scorePlayerFace: session.presentPerson(player.id),
       scoreDraft: isPreset ? code : "",
       scoreUsingCustom: !isPreset,

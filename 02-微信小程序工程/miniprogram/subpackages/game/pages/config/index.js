@@ -39,6 +39,8 @@ function faceOf(item) {
   const next = Object.assign({}, item || {}, {
     id: face.id,
     name: face.name,
+    displayAvatar: face.displayAvatar,
+    canonicalAvatar: face.canonicalAvatar,
     avatar: face.avatar,
     members: face.members,
     memberAvatars: face.memberAvatars,
@@ -57,10 +59,10 @@ function pairFaces(pair) {
     pair && pair.rightSubject ? faceOf(pair.rightSubject) : session.presentPerson(rightId);
   const next = Object.assign({}, pair || {}, {
     leftName: left.name,
-    leftAvatar: left.avatar,
+    leftAvatar: left.displayAvatar,
     leftFace: left,
     rightName: right.name,
-    rightAvatar: right.avatar,
+    rightAvatar: right.displayAvatar,
     rightFace: right
   });
   delete next.leftInitial;
@@ -3984,7 +3986,7 @@ Page(pageBoot.bindPageTheme({
       hcapEditIndex: editIndex,
       hcapCanDelete: editIndex >= 0,
       hcapLeftName: faceOf(hit).name,
-      hcapLeftAvatar: faceOf(hit).avatar,
+      hcapLeftAvatar: faceOf(hit).displayAvatar,
       hcapLeftFace: faceOf(hit),
       hcapRightName: "",
       hcapRightAvatar: "",
@@ -4018,7 +4020,7 @@ Page(pageBoot.bindPageTheme({
       hcapEditIndex: idx,
       hcapCanDelete: true,
       hcapLeftName: faceOf(hit).name,
-      hcapLeftAvatar: faceOf(hit).avatar,
+      hcapLeftAvatar: faceOf(hit).displayAvatar,
       hcapLeftFace: faceOf(hit),
       hcapRightName: "",
       hcapRightAvatar: "",
@@ -4431,7 +4433,7 @@ Page(pageBoot.bindPageTheme({
       showScoreSheet: true,
       scorePlayerIndex: idx,
       scorePlayerName: faceOf(player).name,
-      scorePlayerAvatar: faceOf(player).avatar,
+      scorePlayerAvatar: faceOf(player).displayAvatar,
       scorePlayerFace: faceOf(player),
       scoreDraft: isPreset ? code : "",
       scoreUsingCustom: !isPreset,
@@ -4854,7 +4856,7 @@ Page(pageBoot.bindPageTheme({
       hcapPlayerId: id,
       hcapCanDelete: false,
       hcapLeftName: faceOf(hit).name,
-      hcapLeftAvatar: faceOf(hit).avatar,
+      hcapLeftAvatar: faceOf(hit).displayAvatar,
       hcapLeftFace: faceOf(hit),
       hcapRightName: "",
       hcapRightAvatar: "",

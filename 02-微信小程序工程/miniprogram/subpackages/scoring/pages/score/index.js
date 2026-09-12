@@ -87,6 +87,7 @@ const contactStore = require('../../../../utils/contactStore.js');
 
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
+const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
 const scoreAvatarFastPath = require('../../../../utils/scoreAvatarFastPath.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
@@ -1130,6 +1131,7 @@ function buildBestRoster(players) {
     return {
       playerId: (p && (p.playerId || p.id)) || ('seat-' + i),
       name: shortName || (p && p.name) || '球员',
+      displayAvatar: p && p.displayAvatar,
       avatar: p && p.avatar,
       tee: style.tee,
       teeColor: style.teeColor
@@ -1576,6 +1578,7 @@ function buildMatchPlaySideMember(player) {
   return {
     playerId: playerId,
     name: (player && player.name) || '',
+    displayAvatar: (player && player.displayAvatar) || '',
     avatar: (player && player.avatar) || '',
     scorePlayerId: scorePlayerId || playerId,
     tPosition: tPosition,
@@ -1946,11 +1949,14 @@ function buildMatchPlayPairMembers(members) {
   return list.map((m, mi) => {
     const style = resolveScoreTeeStyle(m, mi);
     const playerId = m && m.playerId ? String(m.playerId) : '';
-    const name = (m && m.name) || '球员';
+    const live = playerLiveDisplay.applyLiveDisplayToView(m || {});
+    const name = live.name || (m && m.name) || '球员';
     return {
       playerId: playerId,
       name: name,
-      avatar: mockAvatars.resolveAvatar(m && m.avatar, playerId || name),
+      displayAvatar: live.displayAvatar,
+      canonicalAvatar: live.canonicalAvatar,
+      avatar: live.canonicalAvatar,
       teeColor: style.teeColor,
       left: PAIR_LEFT[mi] || 24 + mi * 104 + 'rpx',
       tf: mi === 1 ? 'translateX(var(--pair-second-shift, 0rpx))' : 'none'
@@ -1965,6 +1971,15 @@ function buildMatchPlayPairMembers(members) {
  */
 function enrichMatchPlaySide(side, sIdx, displayMode, match) {
   const members = Array.isArray(side && side.members) ? side.members : [];
+  const liveMembers = members.map((m) => {
+    const live = playerLiveDisplay.applyLiveDisplayToView(m || {});
+    return Object.assign({}, m, {
+      name: live.name || (m && m.name),
+      displayAvatar: live.displayAvatar,
+      canonicalAvatar: live.canonicalAvatar,
+      avatar: live.canonicalAvatar
+    });
+  });
   const scoreSource = side && side.scoreSource === 'combo' ? 'combo' : 'member';
   const kind = scoreSource === 'combo' ? 'pair' : 'single';
   const primary = (side && Array.isArray(side._players) && side._players[0]) || null;
@@ -1972,8 +1987,9 @@ function enrichMatchPlaySide(side, sIdx, displayMode, match) {
   const pseudo = {
     id: (side && side.sideId) || String(sIdx),
     playerId: (side && side.sideId) || String(sIdx),
-    name: (members[0] && members[0].name) || '',
-    avatar: (members[0] && members[0].avatar) || '',
+    name: (liveMembers[0] && liveMembers[0].name) || '',
+    displayAvatar: (liveMembers[0] && liveMembers[0].displayAvatar) || '',
+    avatar: (liveMembers[0] && liveMembers[0].canonicalAvatar) || '',
     colorClass: 'border-white',
     scores: scores,
     putts: primary && Array.isArray(primary.putts) ? primary.putts.slice() : [],
@@ -2031,7 +2047,8 @@ function enrichMatchPlaySide(side, sIdx, displayMode, match) {
     name: displayName,
     // 队际/队内短名侧栏；logo 字段预留，未改现有记分行布局
     sideLogo: sideLogo,
-    avatar: mockAvatars.resolveAvatar(m0 && m0.avatar, (m0 && m0.playerId) || ''),
+    displayAvatar: (m0 && m0.displayAvatar) || '',
+    avatar: (m0 && m0.canonicalAvatar) || (m0 && m0.avatar) || '',
     colorClass: kind === 'single' ? teeStyle.colorClass : 'border-white',
     relScoreStr: relScoreStr,
     relClass: relClass,
@@ -2278,8 +2295,11 @@ function enrichPlayer(player, pIdx, displayMode, options) {
   const totalFilled = outFilled + inFilled;
   const relScore = outDiff + inDiff;
 
+  const live = playerLiveDisplay.applyLiveDisplayToView(player || {});
   return Object.assign({}, player, {
-    avatar: mockAvatars.resolveAvatar(player.avatar, player.playerId || player.id || player.name),
+    displayAvatar: live.displayAvatar,
+    canonicalAvatar: live.canonicalAvatar,
+    avatar: live.canonicalAvatar,
     relScoreStr: totalFilled > 0 ? formatDiff(relScore) : '-',
     relScore,
     relClass: relScore < 0 ? 'diff-under' : relScore === 0 ? 'diff-even' : '',
@@ -3453,7 +3473,9 @@ Page({
           playerId: m.playerId,
           userId: m.userId || m.playerId,
           name: m.name || live.name,
-          avatar: m.avatar != null && m.avatar !== '' ? m.avatar : live.avatar || ''
+          displayAvatar: live.displayAvatar,
+          canonicalAvatar: live.canonicalAvatar || live.avatar,
+          avatar: m.avatar != null && m.avatar !== '' ? m.avatar : live.canonicalAvatar || ''
         });
       });
       return {
@@ -3514,10 +3536,13 @@ Page({
           ? style.teeColor || (palette && palette.teeColor) || ''
           : (palette && palette.teeColor) || style.teeColor || '';
         const shortName = m.name && m.name.indexOf('.') >= 0 ? m.name.split('.').pop().trim() : m.name;
+        const live = playerLiveDisplay.applyLiveDisplayToView(m);
         roster.push({
           playerId: m.playerId || ('seat-' + i),
-          name: shortName || m.name || '球员',
-          avatar: m.avatar || '',
+          name: live.name || shortName || m.name || '球员',
+          displayAvatar: live.displayAvatar,
+          canonicalAvatar: live.canonicalAvatar,
+          avatar: live.canonicalAvatar,
           tee: tee,
           teeColor: teeColor,
           groupIndex: gi,
@@ -3855,7 +3880,9 @@ Page({
         pairMembers = members.map((m, mi) => {
           const style = resolveScoreTeeStyle(m, gpos);
           gpos += 1;
-          const name = this._shortName(m.name) || m.name || '球员';
+          const live = playerLiveDisplay.applyLiveDisplayToView(m || {});
+          const overlayName = this._resolveScoreViewerDisplayName(m) || live.name || m.name;
+          const name = this._shortName(overlayName) || overlayName || '球员';
           // 仅 fourball pair 展示用；原 name 保留完整短名
           const dn = name.length > 2 ? name.charAt(0) + '…' : name;
           const rawPid = m && (m.playerId || m.id || m.userId);
@@ -3864,7 +3891,9 @@ Page({
             playerId: playerId,
             name: name,
             displayName: dn,
-            avatar: m.avatar || '',
+            displayAvatar: live.displayAvatar,
+            canonicalAvatar: live.canonicalAvatar,
+            avatar: live.canonicalAvatar,
             gender: (m && m.gender) || '',
             teeColor: style.teeColor,
             left: PAIR_LEFT[mi] || (24 + mi * 104) + 'rpx',
@@ -3908,7 +3937,8 @@ Page({
         label: bestLabel,
         name: shortName,
         displayName: kind === 'single' ? displayName : '',
-        avatar: m0.avatar || '',
+        displayAvatar: playerLiveDisplay.applyLiveDisplayToView(m0).displayAvatar || '',
+        avatar: playerLiveDisplay.applyLiveDisplayToView(m0).canonicalAvatar || m0.avatar || '',
         // reaction 契约：single 行真实球员 id（id 仍为 group id）
         playerId: kind === 'single' ? singlePlayerId : '',
         colorClass: kind === 'single' ? colorClass : '',
@@ -4367,7 +4397,8 @@ Page({
   /** 记分页展示名（View Model）；不写回 _playersSource / Entity */
   _resolveScoreViewerDisplayName(player) {
     const p = player || {};
-    const uid = String(p.userId || p.playerId || p.id || '').trim();
+    const live = playerLiveDisplay.overlayScorePlayerDisplay(p);
+    const uid = String(live.userId || p.userId || p.playerUserId || '').trim();
     const snapshotName = String(
       p.matchNickname || p.competitionName || p.name || ''
     ).trim();
@@ -4407,15 +4438,24 @@ Page({
         (user.displayName && String(user.displayName).trim()) ||
         (user.name && String(user.name).trim()) ||
         '';
-      map[uid] = playerDisplayName.resolvePlayerDisplayNameForViewer({
-        viewerUserId: ctx.viewer,
-        targetUserId: uid,
-        publicName: publicName,
-        snapshotName: snapshotName || publicName,
-        identityMasked: !!user.identityMasked,
-        remarkNameMap: ctx.map,
-        defaultName: uid
-      }).displayName;
+      const live = playerLiveDisplay.overlayScorePlayerDisplay({
+        userId: uid,
+        playerId: uid,
+        nickname: publicName,
+        name: snapshotName || publicName,
+        avatar: user.avatar || user.avatarUrl || ''
+      });
+      map[uid] = live.applied
+        ? live.name
+        : playerDisplayName.resolvePlayerDisplayNameForViewer({
+            viewerUserId: ctx.viewer,
+            targetUserId: uid,
+            publicName: publicName,
+            snapshotName: snapshotName || publicName,
+            identityMasked: !!user.identityMasked,
+            remarkNameMap: ctx.map,
+            defaultName: uid
+          }).displayName;
     });
     return map;
   },
@@ -4490,11 +4530,17 @@ Page({
           (groupPlayer.name || groupPlayer.nickname || groupPlayer.competitionName) ||
           key ||
           '球员';
-        const avatarRaw =
-          (profile && profile.avatar) ||
-          groupPlayer.avatar ||
-          groupPlayer.avatarUrl ||
-          '';
+        const live = playerLiveDisplay.applyLiveDisplayToView({
+          userId: key,
+          playerId: key,
+          name: name,
+          nickname: (profile && profile.nickname) || groupPlayer.nickname || '',
+          avatar:
+            (profile && profile.avatar) ||
+            groupPlayer.avatar ||
+            groupPlayer.avatarUrl ||
+            ''
+        });
         const tPosition = isEditTeeKey(groupPlayer.tPosition)
           ? groupPlayer.tPosition
           : isEditTeeKey(groupPlayer.tee)
@@ -4509,8 +4555,10 @@ Page({
         );
         return {
           userId: key,
-          name: this._shortName(name) || name || '球员',
-          avatar: mockAvatars.resolveAvatar(avatarRaw, key),
+          name: this._shortName(live.name || name) || live.name || name || '球员',
+          displayAvatar: live.displayAvatar,
+          canonicalAvatar: live.canonicalAvatar,
+          avatar: live.canonicalAvatar,
           tPosition: tPosition,
           gender: gender
         };
@@ -4527,6 +4575,7 @@ Page({
       gpos += 1;
       return {
         name: (m && m.name) || '球员',
+        displayAvatar: (m && m.displayAvatar) || '',
         avatar: (m && m.avatar) || '',
         teeColor: style.teeColor,
         left: PAIR_LEFT[mi] || 24 + mi * 104 + 'rpx',
@@ -4559,6 +4608,7 @@ Page({
    * 第一列复用 fourball 的 single/pair/team 视觉字段（kind / avatar / pairMembers）
    */
   refreshEntities() {
+    playerLiveDisplay.setLiveDisplayGameContext(this.data.gameId || '');
     rankColorOptions(this);
     const displayMode = this.data.scoreDisplayMode;
     const nameMap = this._resolveEntityMemberNameMap();
@@ -4780,13 +4830,16 @@ Page({
         const sourceIdx = (this._playersSource || []).findIndex(
           (p) => p && isSameUserIdentity(p.playerId || p.id || p.userId, pid)
         );
+        const live = playerLiveDisplay.applyLiveDisplayToView(sourcePlayer || m0);
         const style = resolveScoreTeeStyle(sourcePlayer, sourceIdx >= 0 ? sourceIdx : gi * 4);
         const enriched = enrichPlayer(
           {
             id: (g && g.id) || 'team-' + gi,
             playerId: pid,
-            name: (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
-            avatar: (sourcePlayer && sourcePlayer.avatar) || (m0 && m0.avatar) || '',
+            name: live.name || (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
+            displayAvatar: live.displayAvatar,
+            canonicalAvatar: live.canonicalAvatar,
+            avatar: live.canonicalAvatar,
             colorClass: style.colorClass || 'border-light',
             tPosition: sourcePlayer.tPosition || m0.tPosition || '',
             gender: sourcePlayer.gender || m0.gender || '',
@@ -4868,13 +4921,16 @@ Page({
         const sourceIdx = (this._playersSource || []).findIndex(
           (p) => p && isSameUserIdentity(p.playerId || p.id || p.userId, pid)
         );
+        const live = playerLiveDisplay.applyLiveDisplayToView(sourcePlayer || m0);
         const style = resolveScoreTeeStyle(sourcePlayer, sourceIdx >= 0 ? sourceIdx : gi * 4);
         const enriched = enrichPlayer(
           {
             id: (g && g.id) || 'team-' + gi,
             playerId: pid,
-            name: (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
-            avatar: (sourcePlayer && sourcePlayer.avatar) || (m0 && m0.avatar) || '',
+            name: live.name || (sourcePlayer && sourcePlayer.name) || (m0 && m0.name) || '球员',
+            displayAvatar: live.displayAvatar,
+            canonicalAvatar: live.canonicalAvatar,
+            avatar: live.canonicalAvatar,
             colorClass: style.colorClass || 'border-light',
             tPosition: sourcePlayer.tPosition || m0.tPosition || '',
             gender: sourcePlayer.gender || m0.gender || '',
@@ -6074,6 +6130,7 @@ Page({
   },
 
   refreshPlayers() {
+    playerLiveDisplay.setLiveDisplayGameContext(this.data.gameId || '');
     rankColorOptions(this);
     if (this.data.mode === 'stroke_entity') {
       this.refreshEntities();
@@ -6115,7 +6172,11 @@ Page({
       this._matchSidesSource = [];
       players = this._playersSource.map((p, i) =>
         enrichPlayerG5(
-          Object.assign({}, p, { name: this._resolveScoreViewerDisplayName(p) }),
+          Object.assign({}, p, {
+            name: this._resolveScoreViewerDisplayName(p),
+            displayAvatar: playerLiveDisplay.applyLiveDisplayToView(p).displayAvatar,
+            avatar: playerLiveDisplay.applyLiveDisplayToView(p).canonicalAvatar || p.avatar
+          }),
           i,
           displayMode
         )
@@ -6125,7 +6186,11 @@ Page({
       // 洞格右下角统一 formatCellDiff（0/+N/-N）；头像旁 relScore 仍用 formatDiff
       players = this._playersSource.map((p, i) =>
         enrichPlayer(
-          Object.assign({}, p, { name: this._resolveScoreViewerDisplayName(p) }),
+          Object.assign({}, p, {
+            name: this._resolveScoreViewerDisplayName(p),
+            displayAvatar: playerLiveDisplay.applyLiveDisplayToView(p).displayAvatar,
+            avatar: playerLiveDisplay.applyLiveDisplayToView(p).canonicalAvatar || p.avatar
+          }),
           i,
           displayMode,
           {
@@ -6725,20 +6790,31 @@ Page({
   _resolveMatchSideSheetMeta(side, sideIdx) {
     const members = Array.isArray(side && side.members) ? side.members : [];
     const key = (side && side.sideKey) || (sideIdx === 1 ? 'B' : 'A');
-    if (members.length >= 2) {
-      const names = members.map((m) => (m && m.name) || '').filter(Boolean);
-      const m0 = members[0] || {};
+    const liveMembers = members.map((m) => {
+      const live = playerLiveDisplay.applyLiveDisplayToView(m || {});
+      return Object.assign({}, m, {
+        name: live.name || (m && m.name),
+        displayAvatar: live.displayAvatar,
+        canonicalAvatar: live.canonicalAvatar,
+        avatar: live.canonicalAvatar
+      });
+    });
+    if (liveMembers.length >= 2) {
+      const names = liveMembers.map((m) => (m && m.name) || '').filter(Boolean);
+      const m0 = liveMembers[0] || {};
       return {
         name: names.length
           ? comboDisplayName.joinMemberDisplayNames(names)
           : 'Side ' + key,
-        avatar: mockAvatars.resolveAvatar(m0.avatar, m0.playerId || '')
+        displayAvatar: m0.displayAvatar || '',
+        avatar: m0.canonicalAvatar || ''
       };
     }
     const m0 = members[0] || {};
     return {
       name: m0.name || 'Side ' + key,
-      avatar: mockAvatars.resolveAvatar(m0.avatar, m0.playerId || '')
+      displayAvatar: m0.displayAvatar || '',
+      avatar: m0.canonicalAvatar || ''
     };
   },
 
@@ -7336,11 +7412,12 @@ Page({
               ? this.data.bestLabel || g.name
               : g.name;
         const displayAvatar =
-          members.length === 1 && m0 ? m0.avatar || g.avatar || '' : g.avatar || '';
+          members.length === 1 && m0 ? m0.displayAvatar || '' : g.displayAvatar || '';
         return {
           id: g.id,
           name: displayName,
-          avatar: displayAvatar,
+          avatar: m0 && m0.avatar ? m0.avatar : g.avatar || '',
+          displayAvatar: displayAvatar,
           active: clearDraft ? false : gi === activePlayerIdx,
           holeScore,
           isDraftScore
@@ -7435,6 +7512,7 @@ Page({
         id: p.id,
         name: shortName,
         avatar: p.avatar,
+        displayAvatar: p.displayAvatar,
         active: clearDraft ? false : idx === activePlayerIdx,
         holeScore: holeScore,
         isDraftScore: isDraftScore
@@ -8103,6 +8181,16 @@ Page({
             { gender: genderRaw },
             key
           );
+    const liveOver = playerLiveDisplay.overlayScorePlayerDisplay(
+      source || member || { userId: key, playerId: key, name: name, avatar: avatar, gender: genderRaw }
+    );
+    if (liveOver.applied) {
+      if (liveOver.name) name = liveOver.name;
+      if (liveOver.avatar) avatar = liveOver.avatar;
+      if (liveOver.gender === 'female' || liveOver.gender === 'male') {
+        gender = liveOver.gender;
+      }
+    }
     const genderLabel = gender === 'female' ? '女' : gender === 'male' ? '男' : '未设置';
     const genderSymbol = gender === 'female' ? '♀' : gender === 'male' ? '♂' : '';
 
@@ -10007,13 +10095,13 @@ Page({
       const name =
         (raw && (raw.name || raw.nickname || raw.competitionName || raw.matchNickname)) ||
         playerId;
+      const live = playerLiveDisplay.applyLiveDisplayToView(raw || { playerId: playerId });
       rows.push({
         playerId: playerId,
-        name: this._shortName(name) || name || '球员',
-        avatar: mockAvatars.resolveAvatar(
-          (raw && (raw.avatar || raw.avatarUrl)) || '',
-          playerId
-        ),
+        name: this._shortName(name) || live.name || name || '球员',
+        displayAvatar: live.displayAvatar,
+        canonicalAvatar: live.canonicalAvatar,
+        avatar: live.canonicalAvatar,
         gender: gender,
         tPosition: tPosition,
         teeDots: EDIT_TEE_OPTIONS.map((opt) => ({
@@ -11506,6 +11594,13 @@ Page({
       user.name ||
       fb.name ||
       uid;
+    const live = playerLiveDisplay.applyLiveDisplayToView({
+      userId: uid,
+      playerId: uid,
+      name: displayName,
+      nickname: user.nickname || fb.nickname || '',
+      avatar: user.avatar || user.avatarUrl || fb.avatar || ''
+    });
     return {
       userId: uid,
       playerId: uid,
@@ -11514,7 +11609,9 @@ Page({
       nickname: user.nickname || displayName,
       competitionName: user.competitionName || user.matchNickname || displayName,
       matchNickname: user.matchNickname || user.competitionName || displayName,
-      avatar: user.avatar || user.avatarUrl || fb.avatar || '',
+      displayAvatar: live.displayAvatar,
+      canonicalAvatar: live.canonicalAvatar,
+      avatar: live.canonicalAvatar || user.avatar || user.avatarUrl || fb.avatar || '',
       gender: user.gender || fb.gender || '',
       matchGender: user.matchGender || user.gender || fb.matchGender || '',
       handicap: user.handicap != null ? user.handicap : (fb.handicap != null ? fb.handicap : ''),
@@ -16190,7 +16287,9 @@ Page({
         player: {
           playerId: p.playerId || p.id,
           name: p.name,
-          avatar: p.avatar,
+          displayAvatar: playerLiveDisplay.applyLiveDisplayToView(p).displayAvatar,
+          canonicalAvatar: playerLiveDisplay.applyLiveDisplayToView(p).canonicalAvatar,
+          avatar: playerLiveDisplay.applyLiveDisplayToView(p).canonicalAvatar || p.avatar,
           gender: p.gender || '',
           tPosition: p.tPosition || '',
           tee: p.tee || p.tPosition || ''
@@ -16725,11 +16824,13 @@ Page({
     if (!id) return null;
     const title = this._sourcePlayerDisplayName(p) || id;
     const meta = extra || p.phone || p.teamName || p.identitySource || '';
+    const live = playerLiveDisplay.applyLiveDisplayToView(p);
     return {
       id: id,
       title: title,
       subtitle: meta,
-      avatar: p.avatar || mockAvatars.pickMockAvatar(id || title),
+      displayAvatar: live.displayAvatar,
+      avatar: live.canonicalAvatar,
       source: source,
       player: p
     };
