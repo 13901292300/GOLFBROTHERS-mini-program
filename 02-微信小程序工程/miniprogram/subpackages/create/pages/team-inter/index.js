@@ -1833,19 +1833,37 @@ Page({
     }
 
     const match = teamMatchStore.buildMatchFromCreatePage(this.data);
-    teamMatchStore.saveMatch(match);
+    const saved = teamMatchStore.saveMatch(match) || match;
+    const matchId = saved && saved.matchId != null ? String(saved.matchId).trim() : '';
 
     wx.showModal({
       title: '提示',
-      content: '创建比赛成功，请到赛事菜单查看',
+      content: '创建比赛成功',
       showCancel: false,
       confirmText: '确认',
       success: (res) => {
         if (!res.confirm) return;
+        const homeFallback = '/pages/home/index?section=tournament';
+        if (!matchId) {
+          wx.redirectTo({
+            url: homeFallback,
+            fail: () => {
+              wx.reLaunch({ url: homeFallback });
+            }
+          });
+          return;
+        }
         wx.redirectTo({
-          url: '/pages/home/index?section=tournament',
+          url:
+            '/subpackages/tournament/pages/detail/index?matchId=' +
+            encodeURIComponent(matchId),
           fail: () => {
-            wx.reLaunch({ url: '/pages/home/index?section=tournament' });
+            wx.redirectTo({
+              url: homeFallback,
+              fail: () => {
+                wx.reLaunch({ url: homeFallback });
+              }
+            });
           }
         });
       }
