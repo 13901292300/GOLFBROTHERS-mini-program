@@ -8,6 +8,7 @@ const groupsStore = require('../../../../utils/groupsStore.js');
 const playerSlots = require('../../utils/playerSlots.js');
 const { getGenderById } = require('../../../../utils/playerDirectory.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
+const teamClub = require('../../../../utils/teamClub/service.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const weatherService = require('../../utils/weatherService.js');
 const matchState = require('../../../../utils/matchState.js');
@@ -4005,6 +4006,15 @@ Page({
 
   _buildTeamMatchIndividualPlayersFromScoreData(match, groupId, ms) {
     if (!match || !groupId) return null;
+    const group = Array.isArray(match.groups)
+      ? match.groups.find((item) => String(item && item.groupId) === String(groupId || ''))
+      : null;
+    const groupPlayers = Array.isArray(group && group.players) ? group.players : [];
+    const occupied = groupPlayers.filter((entry) => {
+      const id = entry && (entry.userId || entry.playerId || entry.id);
+      return id != null && String(id).trim() !== '';
+    });
+    if (!occupied.length) return null;
     const scoreData = match.scoreData && typeof match.scoreData === 'object' && !Array.isArray(match.scoreData)
       ? match.scoreData
       : null;
@@ -4013,32 +4023,9 @@ Page({
       : null;
     const scoresByPlayer = groupScoreData && groupScoreData.scoresByPlayer && typeof groupScoreData.scoresByPlayer === 'object'
       ? groupScoreData.scoresByPlayer
-      : null;
-    if (!scoresByPlayer) return null;
-    const players = ms && Array.isArray(ms.players) ? ms.players : [];
-    if (!players.length) return null;
-    const group = Array.isArray(match.groups)
-      ? match.groups.find((item) => String(item && item.groupId) === String(groupId || ''))
-      : null;
-    const groupPlayers = Array.isArray(group && group.players) ? group.players : [];
-    const entryByPlayerId = {};
-    groupPlayers.forEach((entry) => {
-      const id = entry && (entry.userId || entry.playerId || entry.id);
-      const key = id != null ? String(id).trim() : '';
-      if (key && !entryByPlayerId[key]) entryByPlayerId[key] = entry;
-    });
-    const findEntryByPosition = (position) => {
-      const pos = Number(position) || 0;
-      if (!pos) return null;
-      return groupPlayers.find((entry) =>
-        Number(entry && (entry.position != null ? entry.position : entry.slotIndex)) === pos
-      ) || null;
-    };
-    return players.map((player, index) => {
-      const playerId = player && (player.playerId || player.id);
-      const playerKey = playerId != null ? String(playerId).trim() : '';
-      const position = Number(player && (player.position != null ? player.position : player.slotIndex)) || 0;
-      const entry = (playerKey && entryByPlayerId[playerKey]) || findEntryByPosition(position) || findEntryByPosition(index + 1) || {};
+      : {};
+    return occupied.map((entry, index) => {
+      const playerKey = String(entry.userId || entry.playerId || entry.id).trim();
       const scorePlayerId = entry && (entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId)
         ? String(entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId).trim()
         : '';
@@ -4049,18 +4036,14 @@ Page({
           : entry && isEditTeeKey(entry.tee)
             ? entry.tee
             : '';
-      const profile = this._buildScoreTeamMatchPlayerProfile(
-        match,
-        playerKey,
-        Object.assign({}, entry, player || {})
-      );
+      const profile = this._buildScoreTeamMatchPlayerProfile(match, playerKey, entry);
       const teeFields = applyScorePlayerTeeFields(
         {
           playerId: playerKey,
           tPosition: rawTp,
           tee: entry && entry.tee,
-          gender: profile.gender || entry.gender || (player && player.gender) || '',
-          matchGender: profile.matchGender || entry.matchGender || (player && player.matchGender) || ''
+          gender: profile.gender || entry.gender || '',
+          matchGender: profile.matchGender || entry.matchGender || ''
         },
         index
       );
@@ -4068,8 +4051,8 @@ Page({
         id: playerKey || '',
         playerId: playerKey || '',
         scorePlayerId: scorePlayerId || playerKey || '',
-        name: (player && player.name) || '球员',
-        avatar: (player && player.avatar) || '',
+        name: (profile && profile.name) || entry.name || playerKey || '球员',
+        avatar: (profile && profile.avatar) || entry.avatar || '',
         gender: teeFields.gender,
         tPosition: teeFields.tPosition,
         colorClass: teeFields.colorClass,
@@ -4091,8 +4074,13 @@ Page({
     const matchGroup = match && Array.isArray(match.groups)
       ? match.groups.find((item) => String(item && item.groupId) === String(groupId || ''))
       : null;
-    const matchPlayers = this._buildTeamMatchIndividualPlayersFromScoreData(match, groupId, ms);
+    const isTeamMatchLive = !!(match && isTeamMatchFamily(match));
     const group = groupsStore.getGroup(groupId);
+    if (isTeamMatchLive) {
+      const hydrated = this._hydrateTeamMatchIndividualFromSession();
+      if (!hydrated) this._playersSource = [];
+    } else {
+    const matchPlayers = this._buildTeamMatchIndividualPlayersFromScoreData(match, groupId, ms);
     const loaded = groupsStore.loadGroupForScoring(groupId);
     const statePlayers = ms && Array.isArray(ms.players) && ms.players.length
       ? ms.players.map((p, i) => {
@@ -4164,9 +4152,10 @@ Page({
       : PLAYER_SEEDS.map((p) =>
           Object.assign({}, JSON.parse(JSON.stringify(p)), { scores: [], putts: [], fairways: [], penalties: [], sands: [] })
         ));
+    }
     scoreDebugLog('[score-load-source]', {
       matchId: matchId,
-      source: matchPlayers ? 'teamMatch.scoreData' : 'groupsStore',
+      source: isTeamMatchLive ? 'teamMatch.groups' : 'groupsStore',
       groupId: groupId || '',
       playerCount: (this._playersSource || []).length
     });
@@ -11360,6 +11349,33 @@ Page({
     return match.groups.find((group) => String(group && group.groupId) === groupId) || null;
   },
 
+  /** 球队赛正式 groups.players → matchState.players（入口契约：playerId/name/avatar） */
+  _teamMatchGroupToMatchStatePlayers(match, group) {
+    const list = group && Array.isArray(group.players) ? group.players : [];
+    const out = [];
+    list.forEach((entry) => {
+      if (!entry) return;
+      const playerId = String(entry.userId || entry.playerId || entry.id || '').trim();
+      if (!playerId) return;
+      const profile = match
+        ? this._buildScoreTeamMatchPlayerProfile(match, playerId, entry)
+        : {};
+      out.push({
+        playerId: playerId,
+        name: (profile && profile.name) || entry.name || playerId,
+        avatar: (profile && profile.avatar) || entry.avatar || entry.avatarUrl || ''
+      });
+    });
+    return out;
+  },
+
+  _syncMatchStatePlayersFromTeamMatchGroup(match) {
+    const live = match || this._readScoreTeamMatch();
+    const group = this._findScoreTeamMatchGroup(live);
+    if (!live || !group) return;
+    this._syncMatchStatePlayers(this._teamMatchGroupToMatchStatePlayers(live, group));
+  },
+
   _buildScoreTeamMatchPlayerLookup(match) {
     const lookup = {};
     const users = match && match.registerInfo && Array.isArray(match.registerInfo.users)
@@ -12221,7 +12237,7 @@ Page({
           teamId: teamId,
           occupied: true,
           status: 'occupied',
-          player: p,
+          player: this._applyGroupManagePlayerLiveDisplay(p),
           playerId: (p && p.playerId) || hit.playerId || seatPid,
           source: (hit.slot && hit.slot.source) || (p && p.source) || null,
           hasCache: !!(hit.slot && hit.slot.hasCache)
@@ -12269,6 +12285,16 @@ Page({
   },
 
   // 添加/删除 UI：fourball_best 优先 seats 序；其它仍从 _draftSlots 刷新
+  /** 添加/删除页 view：占用席位走正式 displayAvatar，不写回 draft / store */
+  _applyGroupManagePlayerLiveDisplay(player) {
+    if (!player) return null;
+    const live = playerLiveDisplay.applyLiveDisplayToView(player);
+    const next = Object.assign({}, player);
+    if (live && live.displayAvatar) next.displayAvatar = live.displayAvatar;
+    if (live && live.name) next.name = live.name;
+    return next;
+  },
+
   _refreshGroupManageFromDraft() {
     const seatViews = this._buildGroupManageSeatsViewFromDraft();
     if (seatViews) {
@@ -12282,7 +12308,12 @@ Page({
       });
       return;
     }
-    const slots = this._cloneGroupSlots(this._draftSlots || []);
+    const slots = (this._cloneGroupSlots(this._draftSlots || []) || []).map((s) => {
+      if (!s || s.status !== 'occupied' || !s.player) return s;
+      return Object.assign({}, s, {
+        player: this._applyGroupManagePlayerLiveDisplay(s.player)
+      });
+    });
     let occupied = 0;
     slots.forEach((s) => {
       if (s && s.status === 'occupied') occupied += 1;
@@ -13006,6 +13037,7 @@ Page({
     // 与 group-editor LIVE 一致：groups 变更后 merge members，保留 entityId / 不碰 teamScoresByEntity
     match.scoreEntities = syncStrokeEntities(match);
     if (!saveWritableTeamMatch(match)) return false;
+    this._syncMatchStatePlayersFromTeamMatchGroup(match);
     this._logScoreSlotMigration('teamMatch-sync-after', {
       draftSlots: this._summarizeScoreSlots(this._draftSlots)
     });
@@ -16980,6 +17012,141 @@ Page({
   },
 
   // 【3】球队列表：本页二级列表，数据源为 teamDirectory/team成员 mock
+  _buildInterTeamTeamGroupListItems(match) {
+    const groups = match && Array.isArray(match.teamGroups) ? match.teamGroups : [];
+    const items = [];
+    groups.forEach((g) => {
+      if (!g) return;
+      const teamGroupId = g.id != null ? String(g.id).trim() : '';
+      if (!teamGroupId) return;
+      const name =
+        String((g.sourceTeamName || g.name || '')).trim() || '未命名球队';
+      const logo =
+        String((g.sourceTeamLogo || '')).trim() || DEFAULT_ORG_LOGO;
+      items.push({
+        id: teamGroupId,
+        title: name,
+        subtitle: '参赛球队',
+        displayAvatar: logo,
+        avatar: logo,
+        source: 'team',
+        kind: 'interTeamTeamGroup',
+        teamGroupId: teamGroupId,
+        sourceTeamId: g.sourceTeamId != null ? String(g.sourceTeamId).trim() : '',
+        teamGroupName: name
+      });
+    });
+    return items;
+  },
+
+  _openInterTeamTeamMembersSheet(teamItem) {
+    const item = teamItem || {};
+    const teamGroupId = String(item.teamGroupId || '').trim();
+    const teamGroupName = String(item.teamGroupName || '').trim() || '参赛球队';
+    const sourceTeamId = String(item.sourceTeamId || '').trim();
+    const openEmpty = (emptyText) => {
+      this._openPlayerSourceListSheet({
+        title: teamGroupName,
+        overline: 'TEAM',
+        emptyText: emptyText,
+        items: []
+      });
+    };
+    if (!teamGroupId) {
+      openEmpty('该参赛球队无效');
+      return;
+    }
+    if (!sourceTeamId) {
+      openEmpty('该参赛球队暂无通讯录成员');
+      return;
+    }
+    const loadId = (this._interTeamMembersLoadSeq = (this._interTeamMembersLoadSeq || 0) + 1);
+    wx.showLoading({ title: '加载成员', mask: true });
+    const finishLoading = () => {
+      if (loadId !== this._interTeamMembersLoadSeq) return;
+      wx.hideLoading();
+    };
+    const renderMembers = (members) => {
+      const list = Array.isArray(members) ? members : [];
+      const team = teamDirectory.getTeamById(sourceTeamId) || {
+        id: sourceTeamId,
+        name: teamGroupName
+      };
+      const used = this._usedCanonicalPlayerMap();
+      const seen = {};
+      const items = [];
+      list.forEach((member) => {
+        const player = this._normalizeTeamSourcePlayer(member, team);
+        if (!player) return;
+        player.selectedTeamGroup = {
+          id: teamGroupId,
+          name: teamGroupName
+        };
+        const canonicalId = resolveCanonicalUserId(player.userId || player.playerId);
+        if (!canonicalId || seen[canonicalId] || used[canonicalId]) return;
+        seen[canonicalId] = true;
+        const meta = [player.teamName, player.phone].filter(Boolean).join(' · ');
+        const listItem = this._sourcePlayerToListItem(player, 'team', meta || '球队成员');
+        if (listItem) items.push(listItem);
+      });
+      this._openPlayerSourceListSheet({
+        title: teamGroupName,
+        overline: 'TEAM',
+        emptyText: list.length ? '球队成员均已在分组中' : '该参赛球队暂无通讯录成员',
+        items: items
+      });
+    };
+    Promise.resolve(teamClub.listTeamMembers(sourceTeamId))
+      .then((res) => {
+        finishLoading();
+        if (loadId !== this._interTeamMembersLoadSeq) return;
+        if (!res || !res.ok) {
+          wx.showToast({
+            title: (res && res.message) || '球队成员加载失败',
+            icon: 'none'
+          });
+          return;
+        }
+        renderMembers(res.list);
+      })
+      .catch(() => {
+        finishLoading();
+        if (loadId !== this._interTeamMembersLoadSeq) return;
+        wx.showToast({ title: '球队成员加载失败', icon: 'none' });
+      });
+  },
+
+  _openInterTeamTeamGroupSheet(match) {
+    const items = this._buildInterTeamTeamGroupListItems(match);
+    this._openPlayerSourceListSheet({
+      title: '选择参赛球队',
+      overline: 'TEAM',
+      emptyText: '本场暂无参赛球队',
+      items: items
+    });
+  },
+
+  _bindUnregisteredPlayerWithKnownTeamGroup(player, bindPlayer, idx, teamGroup) {
+    const registered = this._registerMatchParticipantIfNeeded(player, {
+      source: (player && player.source) || 'team',
+      slotIndex: idx,
+      teamGroup: {
+        id: String(teamGroup.id),
+        name: teamGroup.name || ''
+      }
+    });
+    if (!registered || !registered.ok) {
+      wx.showToast({ title: '加入比赛失败', icon: 'none' });
+      return false;
+    }
+    this._bindDraftPlayerToSlot(
+      idx,
+      registered.player || bindPlayer,
+      (player && player.source) || 'team'
+    );
+    return true;
+  },
+
   addMethodTeam() {
     if (!this._isTeamMatchPlayerSourceContext()) {
       this.setData({ addSheetVisible: false });
@@ -16987,6 +17154,10 @@ Page({
       return;
     }
     const match = this._readScoreTeamMatch();
+    if (isInterTeamMatch(match)) {
+      this._openInterTeamTeamGroupSheet(match);
+      return;
+    }
     const matchTeamId = match && match.teamId ? String(match.teamId).trim() : '';
     const teams = matchTeamId
       ? [teamDirectory.getTeamById(matchTeamId)].filter(Boolean)
@@ -17084,7 +17255,12 @@ Page({
   onPlayerSourceListItemTap(e) {
     const index = Number(e.currentTarget.dataset.index);
     const item = this.data.playerSourceListItems[index];
-    if (!item || !item.player) return;
+    if (!item) return;
+    if (item.kind === 'interTeamTeamGroup') {
+      this._openInterTeamTeamMembersSheet(item);
+      return;
+    }
+    if (!item.player) return;
     const target = this._targetSlotIdx;
     this.closePlayerSourceListSheet();
     this._onPlayerPicked(item.player, target);
@@ -17396,6 +17572,24 @@ Page({
       ? this._ensureMatchParticipant(bindPlayer)
       : { ok: true, registered: false, skipped: true, reason: 'no_stable_user_id', player: bindPlayer };
     if (participant && participant.needRegister) {
+      const knownTeamGroup = player.selectedTeamGroup;
+      if (knownTeamGroup && String(knownTeamGroup.id || '').trim()) {
+        scoreDebugLog('[manual-player-identity]', {
+          source: player.source || 'manual',
+          phoneProvided: !!identity.phoneProvided || !!player.phone,
+          userFound: !!identity.userFound,
+          registered: false,
+          grouped: false,
+          action: 'register_known_team_group'
+        });
+        this._bindUnregisteredPlayerWithKnownTeamGroup(
+          participant.player || bindPlayer,
+          bindPlayer,
+          idx,
+          knownTeamGroup
+        );
+        return;
+      }
       scoreDebugLog('[manual-player-identity]', {
         source: player.source || 'manual',
         phoneProvided: !!identity.phoneProvided || !!player.phone,
