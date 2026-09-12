@@ -320,7 +320,7 @@ function settleDizhubo4(game, ctx) {
       const landWins = landScore < farmScore;
       const win = landWins ? land : farm;
       const lose = landWins ? farm : land;
-      const winRel = mid && !landWins ? Math.round(farmScore) : pickBestRel(rec, win);
+      const winRel = pickBestRel(rec, win);
       const mul = winnerMul(rule, winRel);
       const unit = core.round1(k * mul);
       applySides(ledger, win, lose, unit);
