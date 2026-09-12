@@ -475,13 +475,27 @@ function stableSort(arr, cmp) {
   return a;
 }
 
+function nextPushPolicy(game) {
+  const rule = unwrapRule((game && game.ruleSnapshot) || (game && game.rule) || game);
+  if (rule && rule.pkBetter !== false && rule.pkWorse !== false && rule.pkTotal !== false) {
+    return "rerank";
+  }
+  if (rule && rule.pkBetter !== false && rule.pkWorse === false && rule.pkTotal === false) {
+    return holeOrder.pushPolicyFromReorderOnPush(rule);
+  }
+  if (rule && rule.pkBetter === false && rule.pkWorse !== false && rule.pkTotal === false) {
+    return holeOrder.pushPolicyFromReorderOnPush(rule);
+  }
+  return "rerank";
+}
+
 function nextOrder(order, rec, hist, game, isPush) {
   return holeOrder.resolveNextHoleOrder({
     currentOrder: order,
     holeScores: rec,
     rankingPolicy: holeOrder.rankingPolicyOf(game),
     rankingRule: { rankId: (game && game.rankId) || "gross-origin" },
-    pushPolicy: "rerank",
+    pushPolicy: nextPushPolicy(game),
     isPush: isPush === true,
     tieBreakContext: { history: hist }
   });
