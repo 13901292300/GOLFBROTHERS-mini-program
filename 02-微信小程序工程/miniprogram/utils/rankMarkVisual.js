@@ -101,15 +101,17 @@ function holeAssignments(game, label) {
 }
 
 /**
- * Assignment authority for one hole.
- * If resultSnapshot.assignmentsByHole exists (new GAME / new settle), never fall back to order.
- * Legacy only when the map field is missing entirely.
+ * Settled assignment lookup only.
+ * Empty / missing hole keys are not treated as settled (preview lives in assignmentForHole).
  */
 function resolveAssignmentForHole(game, label, playerId) {
   var rs = resultSnapshotOf(game);
   var map = rs.assignmentsByHole;
   if (!map || typeof map !== 'object') {
     return { source: 'legacy', assignment: null };
+  }
+  if (!Object.prototype.hasOwnProperty.call(map, asString(label))) {
+    return { source: 'none', assignment: null };
   }
   var list = holeAssignments(game, label) || [];
   var pid = asString(playerId);

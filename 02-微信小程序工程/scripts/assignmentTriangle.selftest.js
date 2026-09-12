@@ -177,9 +177,9 @@ var legacyGame = {
 mark.resetLegacyMarkCalls();
 var legacyMark = mark.markForGameCell(legacyGame, 'A1', 'A');
 assert(
-  'CASE9 旧 snapshot 无 assignment → legacy fallback 仍可显示',
-  mark.getLegacyMarkCalls() >= 1 && !!legacyMark.triangleClass,
-  JSON.stringify(legacyMark)
+  'CASE9 旧 snapshot 无 assignment → 仍从 order preview 出三角',
+  mark.getLegacyMarkCalls() === 0 && !!legacyMark.triangleClass,
+  JSON.stringify({ mark: legacyMark, calls: mark.getLegacyMarkCalls() })
 );
 
 mark.resetLegacyMarkCalls();
@@ -207,15 +207,22 @@ var newGameNoHoleKey = {
 mark.resetLegacyMarkCalls();
 var skipped = mark.markForGameCell(newGameNoHoleKey, 'A1', 'A');
 assert(
-  '新 GAME 有 assignmentsByHole 字段 → 不走 legacy（缺洞 key 也不按 order 重算）',
-  mark.getLegacyMarkCalls() === 0 && !skipped.triangleClass,
+  '新 GAME 缺洞 assignment 时用 order 做 preview，不走 legacy',
+  mark.getLegacyMarkCalls() === 0 && skipped.triangleClass === 'triangle-blue',
   JSON.stringify({ skipped: skipped, calls: mark.getLegacyMarkCalls() })
 );
 
 assert(
-  'assignment 存在时 resolve 为 assignment 源',
+  'settled assignment 时 visual resolve 为 assignment 源',
   visual.resolveAssignmentForHole(lasuoView, 'A1', 'A').source === 'assignment' &&
     visual.resolveAssignmentForHole(legacyGame, 'A1', 'A').source === 'legacy'
+);
+
+assert(
+  '公共 resolve 对缺洞 key 走 preview',
+  mark.resolveAssignmentForHole(newGameNoHoleKey, 'A1', 'A').source === 'preview' &&
+    mark.resolveAssignmentForHole(newGameNoHoleKey, 'A1', 'A').assignment &&
+    mark.resolveAssignmentForHole(newGameNoHoleKey, 'A1', 'A').assignment.side === 'blue'
 );
 
 var fnBody = require('fs')

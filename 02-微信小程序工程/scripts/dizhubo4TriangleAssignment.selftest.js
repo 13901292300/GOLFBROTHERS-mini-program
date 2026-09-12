@@ -111,7 +111,7 @@ var src = fs.readFileSync(
   'utf8'
 );
 var assignSrc = fs.readFileSync(
-  path.join(__dirname, '../miniprogram/subpackages/game/utils/assignmentNormalize.js'),
+  path.join(__dirname, '../miniprogram/utils/assignmentNormalize.js'),
   'utf8'
 );
 
@@ -120,10 +120,11 @@ assert(
   /if \(mid\) \{[\s\S]*return \{ land: \[order\[1\], d\], farm: \[order\[0\], order\[2\]\] \}/.test(src)
 );
 assert(
-  'stamp 仅 mid 走 assignmentHoleSides，结算仍 sidesOf',
-  src.indexOf('assignmentHoleSides(settleSides, mid)') >= 0 &&
+  'stamp 走公共 holeSidesFromOrder，结算仍 sidesOf',
+  src.indexOf('holeSidesFromOrder(game, order)') >= 0 &&
     src.indexOf('const sides = sidesOf(order, mid);') >= 0 &&
-    src.indexOf('const land = sides.land;') >= 0
+    src.indexOf('const land = sides.land;') >= 0 &&
+    src.indexOf('assignmentHoleSides(settleSides, mid)') < 0
 );
 assert(
   '未全局改 fromHoleSides land→blue',

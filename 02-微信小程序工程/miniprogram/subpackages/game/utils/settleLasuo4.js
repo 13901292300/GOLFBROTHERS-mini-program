@@ -9,6 +9,7 @@
 const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
 const assignmentNormalize = require("./assignmentNormalize.js");
+const assignmentHoleSides = require("../../../utils/assignmentHoleSides.js");
 const holeOrder = require("./resolveNextHoleOrder.js");
 const catalog = require("./catalog.js");
 
@@ -539,7 +540,7 @@ function settleLasuo4(game, ctx) {
         assignmentsByHole,
         label,
         order,
-        teamsOf(order, (game && game.groupMode) || "fixed"),
+        assignmentHoleSides.holeSidesFromOrder(game, order),
         game
       );
     }

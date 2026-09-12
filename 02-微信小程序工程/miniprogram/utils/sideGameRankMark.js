@@ -3,6 +3,7 @@
  */
 var visual = require('./rankMarkVisual.js');
 var port = require('./sideGameRepositoryPort.js');
+var assignmentForHole = require('./assignmentForHole.js');
 
 var TRI_BLUE = '#007AFF';
 var TRI_RED = '#FF3B30';
@@ -243,52 +244,15 @@ function hornTriColor(game, order, playerId) {
 }
 
 function holeOn(game, label) {
-  var holes = (game && game.holes) || [];
-  if (!holes.length) return true;
-  return holes.some(function (item) {
-    var key = item && item.label != null ? item.label : item;
-    return String(key) === String(label) && item && item.on !== false;
-  });
+  return assignmentForHole.holeOn(game, label);
 }
 
 function gameStartHole(game) {
-  var labels =
-    Array.isArray(game && game.fullHoleOrder) && game.fullHoleOrder.length
-      ? game.fullHoleOrder
-      : Array.isArray(game && game.holeOrder) && game.holeOrder.length
-        ? game.holeOrder
-        : ((game && game.holes) || []).map(function (item) {
-            return item && item.label != null ? item.label : item;
-          });
-  var i;
-  for (i = 0; i < labels.length; i++) {
-    if (holeOn(game, labels[i])) return String(labels[i]);
-  }
-  return '';
+  return assignmentForHole.gameStartHole(game);
 }
 
 function gameOrderForHole(game, label) {
-  if (game && game.holeResults && game.holeResults.pendingStart) {
-    var pending =
-      game.holeResults.orderByHole && game.holeResults.orderByHole[label];
-    return pending && pending.length ? pending.map(String) : null;
-  }
-  var frozen =
-    game &&
-    game.holeResults &&
-    game.holeResults.orderByHole &&
-    game.holeResults.orderByHole[label];
-  if (frozen && frozen.length) return frozen.map(String);
-  if (String(label) === gameStartHole(game)) {
-    var order = ((game && game.playerOrder) || []).map(String).filter(Boolean);
-    if (order.length) return order;
-    return ((game && game.players) || [])
-      .map(function (item) {
-        return item && item.id != null ? String(item.id) : '';
-      })
-      .filter(Boolean);
-  }
-  return null;
+  return assignmentForHole.gameOrderForHole(game, label);
 }
 
 function instanceHoleLabel(game, officialLabel, officialHoleOrder) {
@@ -413,10 +377,12 @@ function markForGameCellLegacy(game, label, playerId) {
 
 function markForGameCell(game, label, playerId) {
   var orderId = resolveOrderId(game, playerId) || asString(playerId);
-  var resolved = visual.resolveAssignmentForHole(game, label, orderId);
-  if (resolved.source === 'assignment') {
-    if (!resolved.assignment) return visual.emptyMark();
+  var resolved = assignmentForHole.resolveAssignmentForHole(game, label, orderId);
+  if (resolved.assignment) {
     return visual.markFromAssignment(resolved.assignment);
+  }
+  if (resolved.source === 'settled' || resolved.source === 'preview') {
+    return visual.emptyMark();
   }
   return markForGameCellLegacy(game, label, playerId);
 }
@@ -736,7 +702,8 @@ module.exports = {
   emptyMark: visual.emptyMark,
   normalizeMark: visual.normalizeMark,
   markFromAssignment: visual.markFromAssignment,
-  resolveAssignmentForHole: visual.resolveAssignmentForHole,
+  resolveAssignmentForHole: assignmentForHole.resolveAssignmentForHole,
+  assignmentsListForHole: assignmentForHole.assignmentsListForHole,
   fromRank: visual.fromRank,
   inspect: inspect
 };
