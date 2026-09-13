@@ -35,7 +35,13 @@ function peekMembers(teamId) {
   if (factory.getMode() === 'local') {
     return require('./repository.js').peekMembers(teamId);
   }
-  return snapshot.peekMembers(teamId).map(function (m) {
+  return snapshot.peekMembers(teamId).map(function (raw) {
+    var m = raw;
+    try {
+      m = require('./liveMemberProfile.js').overlaySelfMember(raw) || raw;
+    } catch (e) {
+      m = raw;
+    }
     return {
       playerId: m.userId,
       userId: m.userId,
