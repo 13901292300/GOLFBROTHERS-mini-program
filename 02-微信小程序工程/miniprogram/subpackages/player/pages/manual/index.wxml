@@ -22,11 +22,28 @@
   </view>
 
   <scroll-view scroll-y class="page-body">
-    <view wx:if="{{showCreate}}" class="create-row" bindtap="createNew">
-      <view class="create-icon"><text>＋</text></view>
-      <view class="create-meta">
-        <text class="create-title">新建球员「{{query}}」</text>
-        <text class="create-sub">创建并加入该位置</text>
+    <view wx:if="{{showCreate}}" class="create-block">
+      <view class="create-row" bindtap="createNew">
+        <view class="create-icon"><text>＋</text></view>
+        <view class="create-meta">
+          <text class="create-title">新建球员「{{query}}」</text>
+          <text class="create-sub">创建并加入该位置</text>
+        </view>
+      </view>
+      <view class="create-gender">
+        <text class="create-gender__label">性别</text>
+        <view class="manual-gender">
+          <view
+            class="manual-gender__tag {{createGender === 'male' ? 'is-active' : ''}}"
+            data-gender="male"
+            catchtap="onCreateGenderSelect"
+          >男</view>
+          <view
+            class="manual-gender__tag {{createGender === 'female' ? 'is-active' : ''}}"
+            data-gender="female"
+            catchtap="onCreateGenderSelect"
+          >女</view>
+        </view>
       </view>
     </view>
 

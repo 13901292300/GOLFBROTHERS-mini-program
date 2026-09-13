@@ -6,7 +6,7 @@
  */
 const { createHeaderStyle } = require('../../../../utils/headerEngine.js');
 const { FRIEND_LIST } = require('../../../../utils/playerDirectory.js');
-const mockAvatars = require('../../../../utils/mockAvatars.js');
+const guestGolfAvatar = require('../../../../utils/guestGolfAvatar.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 
 function randomSuffix() {
@@ -63,7 +63,8 @@ Page({
     query: '',
     results: [],
     disabledMap: {},
-    showCreate: false
+    showCreate: false,
+    createGender: 'male'
   },
 
   onLoad(options) {
@@ -122,7 +123,8 @@ Page({
     this.setData({
       query: '',
       results: this._withDisabledState(FRIEND_LIST.slice(0, 8), this.data.disabledMap),
-      showCreate: false
+      showCreate: false,
+      createGender: 'male'
     });
   },
 
@@ -147,21 +149,33 @@ Page({
     this._return({ playerId: f.playerId, name: f.name, avatar: f.avatar, source: 'friend' });
   },
 
+  onCreateGenderSelect(e) {
+    const gender = e.currentTarget.dataset.gender;
+    if (gender !== 'male' && gender !== 'female') return;
+    this.setData({ createGender: gender });
+  },
+
   createNew() {
     const name = (this.data.query || '').trim();
     if (!name) {
       wx.showToast({ title: '请输入姓名', icon: 'none' });
       return;
     }
-    this._return({
-      userId: createGuestUserId(),
-      playerId: createManualPlayerId(),
-      userType: 'guest',
-      identitySource: 'manual_add',
-      name,
-      avatar: mockAvatars.pickMockAvatar(name),
-      source: 'manual'
-    });
+    const gender = this.data.createGender === 'female' ? 'female' : 'male';
+    const player = guestGolfAvatar.stampNewManualPlayer(
+      {
+        userId: createGuestUserId(),
+        playerId: createManualPlayerId(),
+        userType: 'guest',
+        identitySource: 'manual_add',
+        name: name,
+        gender: gender,
+        avatar: '',
+        source: 'manual'
+      },
+      []
+    );
+    this._return(player);
   },
 
   _return(player) {
