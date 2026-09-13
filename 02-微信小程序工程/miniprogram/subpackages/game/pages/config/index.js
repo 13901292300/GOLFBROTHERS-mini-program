@@ -12,6 +12,7 @@ const threeSetPairReset = require("../../utils/threeSetPairReset.js");
 const playerScoreCfg = require("../../utils/sideGame8421PlayerConfig.js");
 const ruleDefaults = require("../../utils/sideGameRuleDefaults.js");
 const instanceRuleSnapshot = require("../../utils/instanceRuleSnapshot.js");
+const snapUtil = require("../../utils/sideGameConfigSnapshot.js");
 const normalizeHoleOrder = holeOrderUtil.normalizeHoleOrder;
 const rotateHoleOrderToStart = holeOrderUtil.rotateHoleOrderToStart;
 const holeOrderTextOf = holeOrderUtil.holeOrderTextOf;
@@ -2194,11 +2195,8 @@ Page(pageBoot.bindPageTheme({
             displayName: item.displayName || item.name,
             scoreCode: (hit && hit.scoreCode != null && hit.scoreCode !== "") ? hit.scoreCode : (item.scoreCode || defaultScoreCode),
             scoreRows: takeScoreRows(hit, item),
-            hcp: (hit && hit.hcp) || item.hcp || "18",
-            hcapPar3: hit && hit.hcapPar3 != null && hit.hcapPar3 !== "" ? String(hit.hcapPar3) : "0",
-            hcapPar4: hit && hit.hcapPar4 != null && hit.hcapPar4 !== "" ? String(hit.hcapPar4) : "0",
-            hcapPar5: hit && hit.hcapPar5 != null && hit.hcapPar5 !== "" ? String(hit.hcapPar5) : "0"
-          });
+            hcp: (hit && hit.hcp) || item.hcp || "18"
+          }, snapUtil.existingPlayerHcapPatch(hit, item));
         })
       : playersBase;
     if (existing && usePagePick) {
@@ -2208,11 +2206,8 @@ Page(pageBoot.bindPageTheme({
           selected: true,
           scoreCode: (hit.scoreCode != null && hit.scoreCode !== "") ? hit.scoreCode : (item.scoreCode || defaultScoreCode),
           scoreRows: takeScoreRows(hit, item),
-          hcp: hit.hcp || item.hcp || "18",
-          hcapPar3: hit.hcapPar3 != null && hit.hcapPar3 !== "" ? String(hit.hcapPar3) : "0",
-          hcapPar4: hit.hcapPar4 != null && hit.hcapPar4 !== "" ? String(hit.hcapPar4) : "0",
-          hcapPar5: hit.hcapPar5 != null && hit.hcapPar5 !== "" ? String(hit.hcapPar5) : "0"
-        });
+          hcp: hit.hcp || item.hcp || "18"
+        }, snapUtil.existingPlayerHcapPatch(hit, item));
       });
     }
     if (showScoreMap) (function hydrateScoreCodes() {

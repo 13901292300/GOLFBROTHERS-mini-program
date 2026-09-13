@@ -253,9 +253,23 @@ function normalizePlayer(p) {
     scoreCode: raw.scoreCode != null && raw.scoreCode !== '' ? asString(raw.scoreCode) : null,
     scoreRows: raw.scoreRows || null,
     scoreOverrides: raw.scoreOverrides && typeof raw.scoreOverrides === 'object' ? raw.scoreOverrides : null,
-    hcp: raw.hcp != null && raw.hcp !== '' ? normScalar(raw.hcp) : null
+    hcp: raw.hcp != null && raw.hcp !== '' ? normScalar(raw.hcp) : null,
+    hcapList: Array.isArray(raw.hcapList) ? raw.hcapList : null,
+    hcapPar3: raw.hcapPar3 != null && raw.hcapPar3 !== '' ? normScalar(raw.hcapPar3) : null,
+    hcapPar4: raw.hcapPar4 != null && raw.hcapPar4 !== '' ? normScalar(raw.hcapPar4) : null,
+    hcapPar5: raw.hcapPar5 != null && raw.hcapPar5 !== '' ? normScalar(raw.hcapPar5) : null
   };
   return normalize(out);
+}
+
+function existingPlayerHcapPatch(hit, item) {
+  var src = hit || {};
+  return {
+    hcapList: (hit && hit.hcapList) || (item && item.hcapList),
+    hcapPar3: src.hcapPar3 != null && src.hcapPar3 !== '' ? String(src.hcapPar3) : '0',
+    hcapPar4: src.hcapPar4 != null && src.hcapPar4 !== '' ? String(src.hcapPar4) : '0',
+    hcapPar5: src.hcapPar5 != null && src.hcapPar5 !== '' ? String(src.hcapPar5) : '0'
+  };
 }
 
 function normalizePair(pair) {
@@ -422,5 +436,6 @@ module.exports = {
   cloneJson: cloneJson,
   readonlyAllowedPatch: readonlyAllowedPatch,
   isUiOnlyPatch: isUiOnlyPatch,
+  existingPlayerHcapPatch: existingPlayerHcapPatch,
   INSTANCE_BUSINESS_ROOT: INSTANCE_BUSINESS_ROOT
 };
