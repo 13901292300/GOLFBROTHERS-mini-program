@@ -4,6 +4,8 @@
 
 const STORAGE_KEY = 'gb_team_matches_v1';
 const clubDateFormat = require('./clubDateFormat.js');
+const halfCourse = require('./halfCourse.js');
+const seriesGameModeLabel = require('./seriesGameModeLabel.js');
 
 function cacheKey() {
   try {
@@ -49,10 +51,23 @@ function formatClubDate(timeString) {
   return clubDateFormat.formatClubDate(timeString);
 }
 
-function buildVenueLabel(courseName, courseHalfText) {
-  const name = String(courseName || '').trim();
-  const half = String(courseHalfText || '').trim();
-  return name + half;
+function buildVenueLabel(courseName, courseHalfText, match) {
+  return halfCourse.formatCourseDisplayName({
+    courseId: match && match.courseId,
+    courseName: courseName,
+    courseHalfText: courseHalfText,
+    front9Course: match && match.front9Course,
+    back9Course: match && match.back9Course
+  });
+}
+
+/** 卡片赛制文案：复用系列赛显示名解析；无配置不猜默认赛制 */
+function resolveTournamentCardFormatText(match) {
+  const raw = String((match && (match.gameMode || match.selectedGameMode)) || '').trim();
+  const mapped = seriesGameModeLabel.resolveSeriesGameModeLabel(raw);
+  if (mapped) return mapped;
+  if (raw) return raw;
+  return '赛制未设置';
 }
 
 function resolveMatchLogo(pageData) {
@@ -1813,18 +1828,20 @@ function removeMatch(matchId) {
 function resolveTournamentCardStatusLabel(match) {
   const status = String((match && match.status) || '').trim().toLowerCase();
   if (status === 'ongoing') return 'LIVE';
+  if (status === 'finished') return '已结束';
   if (status === 'registering') return '报名中';
   return (match && match.statusLabel) || '报名中';
 }
 
 function toTournamentCard(match) {
   if (!match) return null;
-  const venue = buildVenueLabel(match.courseName, match.courseHalfText);
+  const venue = buildVenueLabel(match.courseName, match.courseHalfText, match);
   const caps = require('./teamMatchCapabilities.js');
   const org = caps.resolveOrganizerDisplay(match);
   const matchType = String((match && match.matchType) || '').trim();
   const typeLabel =
     matchType === 'inter-team' ? '队际赛' : matchType === 'team-internal' ? '队内赛' : '';
+  const courseList = venue ? [venue] : [];
   return {
     id: match.matchId,
     matchId: match.matchId,
@@ -1839,8 +1856,11 @@ function toTournamentCard(match) {
     // 发起主体快照（队际=机构；队内=球队）；不含参赛球队列表
     teamName: org.name || match.teamName || '',
     venue: venue,
+    gameModeText: resolveTournamentCardFormatText(match),
+    courseList: courseList,
     views: '0',
     statusLabel: resolveTournamentCardStatusLabel(match),
+    cardStatus: require('./seriesListCardAdapter.js').resolveOrdinaryMatchCardStatus(match),
     navUrl: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(match.matchId)
   };
 }
