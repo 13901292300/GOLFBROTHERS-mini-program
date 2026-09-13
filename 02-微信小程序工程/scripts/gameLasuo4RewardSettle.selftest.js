@@ -256,7 +256,7 @@ var tieMul = settleLasuo4.settle(
 );
 assert('11 平局不触发乘法', tieMul.holeDebug.A1.multiplier === 1 && ledger(tieMul).A === 0);
 
-assert('12 个人倍率小鸟×2', mulOnce.holeDebug.A1.multiplierSource === 'personal');
+assert('12 个人倍率小鸟×2', mulOnce.holeDebug.A1.multiplierSource === 'personal-product');
 
 var ee = settleLasuo4.settle(
   gameOf({ A: -2, B: 0, C: 2, D: -2 }, { rule: { reward: 'mul', comboMulRows: combos(25, 10, 4), mulRows: mulBands(2, 5, 10) } }),
