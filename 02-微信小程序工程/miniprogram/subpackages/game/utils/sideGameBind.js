@@ -24,6 +24,7 @@ var entitlement = require("./sideGameEntitlementProvider.js");
 var scoreMapUtil = require("./sideGameScoreMap.js");
 var settleThreeSet = require("./settleThreeSet.js");
 var derivedNotify = require("../../../utils/sideGameDerivedNotify.js");
+var threeAssign = require("./threePlayerAssignmentSummary.js");
 
 var settingsStore = settingsMod.getDefault();
 var activeHostQuery = { matchId: "", groupId: "", scope: "group" };
@@ -3297,7 +3298,16 @@ function listBoard(entry, gameId, pairId) {
         }
       } catch (eHole5Display) {}
     }
-    return { label: label, cells: cells, topHoleState: topHoleState };
+    var assignmentText = "";
+    if (isConcreteGameView && selectedGame) {
+      assignmentText = threeAssign.assignmentTextForHole(selectedGame, label, players) || "";
+    }
+    return {
+      label: label,
+      cells: cells,
+      topHoleState: topHoleState,
+      assignmentText: assignmentText
+    };
   });
   const totals = players.map(function (player, pi) {
     let raw = 0;

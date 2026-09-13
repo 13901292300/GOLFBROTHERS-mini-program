@@ -91,6 +91,23 @@
   border-bottom: 0;
 }
 
+.board-hole-block {
+  width: 100%;
+}
+
+.board-assign-line {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 16rpx 8rpx 16rpx;
+  font-size: 22rpx;
+  line-height: 1.3;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
 /* 球员表头：独立样式，避免被 .board-cell 的 nowrap/overflow 裁切 */
 .board-player-cell {
   display: flex;

@@ -120,7 +120,8 @@
         bounces="{{false}}"
         show-scrollbar="{{false}}"
       >
-        <view wx:for="{{board.holes}}" wx:key="label" class="board-row">
+        <view wx:for="{{board.holes}}" wx:key="label" class="board-hole-block">
+          <view class="board-row">
           <view class="board-cell board-cell--hole board-cell--axis">
             <text class="board-cell--hole-badge">{{item.label}}<text wx:if="{{item.topHoleState}}" class="board-hole-dot board-hole-dot--{{item.topHoleState}}"></text></text>
           </view>
@@ -131,10 +132,13 @@
             class="board-cell board-cell--player board-cell--axis {{cell.cls}}"
             style="{{cell.fitStyle}}"
           >{{cell.text}}</view>
+          </view>
+          <view wx:if="{{item.assignmentText}}" class="board-assign-line">{{item.assignmentText}}</view>
         </view>
       </scroll-view>
       <view wx:else class="board-simple-body">
-        <view wx:for="{{board.holes}}" wx:key="label" class="board-row">
+        <view wx:for="{{board.holes}}" wx:key="label" class="board-hole-block">
+          <view class="board-row">
           <view class="board-cell board-cell--hole board-cell--axis">
             <text class="board-cell--hole-badge">{{item.label}}<text wx:if="{{item.topHoleState}}" class="board-hole-dot board-hole-dot--{{item.topHoleState}}"></text></text>
           </view>
@@ -145,6 +149,8 @@
             class="board-cell board-cell--player board-cell--axis {{cell.cls}}"
             style="{{cell.fitStyle}}"
           >{{cell.text}}</view>
+          </view>
+          <view wx:if="{{item.assignmentText}}" class="board-assign-line">{{item.assignmentText}}</view>
         </view>
       </view>
 
