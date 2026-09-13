@@ -3,6 +3,7 @@
 
 /* 根：自包含 flex 面板，填满宿主高度（宿主须给定高度，如 flex:1 容器） */
 .ds-root {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -33,25 +34,43 @@
   background: var(--ds-surface);
 }
 
-/* L1 围观行（scroll-view 容器）：固定高度、横向滚动；不在 scroll-view 上做 flex（其居中不可靠） */
+/* L1 围观行：固定高度、不换行、不横向滚动；超出由「更多」收纳 */
 .tab-watchers-strip {
+  position: relative;
   flex: 0 0 auto;
   height: 112rpx;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  overflow: hidden;
   box-sizing: border-box;
 }
-/* 内层轨道：真正的 flex center 行（强制覆盖任何来源），inline-flex 以便内容超宽时横向滚动 */
 .ws-track {
-  display: inline-flex !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
   align-items: center !important;
   height: 100% !important;
-  min-width: 100%;
+  width: 100%;
   gap: 20rpx;
   padding: 0 28rpx;
   box-sizing: border-box;
-  vertical-align: top;
+  overflow: hidden;
+}
+.ws-measure {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  height: 112rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  pointer-events: none;
+  visibility: hidden;
+}
+.ws-person {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 .discussion-watchers-label { flex: 0 0 auto; align-self: center; color: var(--text-muted); font-size: 22rpx; font-weight: 700; letter-spacing: 0.04em; }
 /* 头像 wrapper：固定尺寸 flex 居中容器，强制垂直居中、零位移；尺寸不受行高影响 */
@@ -89,6 +108,59 @@
 .discussion-more-btn { flex: 0 0 auto; align-self: center; height: 64rpx; line-height: 64rpx; padding: 0 24rpx; border-radius: 9999rpx; border: 1px solid var(--border); background: var(--bg-subtle); font-size: 22rpx; font-weight: 500; white-space: nowrap; }
 .ds-dark .discussion-more-btn { color: var(--champion-gold); }
 .ds-bright .discussion-more-btn { color: var(--cloud-blue); }
+
+.watchers-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+.watchers-sheet {
+  width: 100%;
+  max-height: 72%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 48rpx 48rpx 0 0;
+  overflow: hidden;
+}
+.watchers-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 36rpx;
+  border-bottom: 1px solid var(--border);
+}
+.watchers-sheet-title { display: block; color: var(--text-primary); font-size: 30rpx; font-weight: 700; }
+.watchers-sheet-subtitle { display: block; color: var(--text-muted); font-size: 20rpx; margin-top: 4rpx; }
+.watchers-close-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+}
+.watchers-list { max-height: 52vh; padding: 16rpx 0 36rpx; }
+.watcher-empty { padding: 48rpx 36rpx; color: var(--text-muted); font-size: 26rpx; }
+.watcher-item {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 36rpx;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.watcher-item image { width: 84rpx; height: 84rpx; border-radius: 9999rpx; flex-shrink: 0; }
+.watcher-col { display: flex; flex-direction: column; min-width: 0; }
+.watcher-name { font-size: 28rpx; }
+.watcher-hint { color: var(--text-muted); font-size: 22rpx; margin-top: 4rpx; }
 
 /* L2 聊天流：内部滚动区（flex:1，min-height:0 让其在面板内部独立滚动）
    必须铺 --ds-surface：微信 scroll-view 默认白底，空会话时会露出白块 */

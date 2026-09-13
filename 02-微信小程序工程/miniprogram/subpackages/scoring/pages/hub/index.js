@@ -25,6 +25,9 @@ const teeSheetManage = require('../../../../utils/teeSheetManage.js');
 const gameProgress = require('../../../../utils/gameProgress.js');
 const contactFollowAction = require('../../../../utils/contactFollowAction.js');
 const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
+const discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
+const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const sideGameHostSnapshot = require('../../utils/sideGameHostSnapshot.js');
 
 /** 开发诊断：普通多组进组/返回栈；默认关闭 */
@@ -42,16 +45,16 @@ function holePars() {
 
 /* ===== 讨论区（与球队比赛讨论区逻辑一致：围观 + 评论流） ===== */
 const WATCHERS = [
-  { name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
-  { name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
-  { name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72') },
-  { name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
-  { name: '邵亮', avatar: mockAvatars.pickMockAvatar('邵亮') }
+  { demo: true, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
+  { demo: true, name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
+  { demo: true, name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72') },
+  { demo: true, name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
+  { demo: true, name: '邵亮', avatar: mockAvatars.pickMockAvatar('邵亮') }
 ];
 const CHAT = [
-  { self: false, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex'), text: '各组都开球了吗？领先榜可以刷起来了。', mention: '' },
-  { self: true, name: '我', avatar: mockAvatars.pickMockAvatar('我'), text: '我们组在第 1 组，已经在记分了。', mention: '@Alex' },
-  { self: false, name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72'), text: '收到，第 2 组马上出发。', mention: '' }
+  { self: false, demo: true, userId: 'chat-alex', name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex'), text: '各组都开球了吗？领先榜可以刷起来了。', mention: '' },
+  { self: false, demo: true, userId: 'demo-chat-self', name: '示例球员', avatar: mockAvatars.pickMockAvatar('示例球员'), text: '我们组在第 1 组，已经在记分了。', mention: '@Alex' },
+  { self: false, demo: true, userId: 'chat-yan72', name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72'), text: '收到，第 2 组马上出发。', mention: '' }
 ];
 
 /* ===== 更多功能面板（与球队比赛 100% 复用同一结构/文案/图标） ===== */
@@ -381,9 +384,12 @@ Page({
     featuresPermissionFooter: [],
     scoringDisplay: 'gross', // gross | strokeDiff（风格选择用）
     scorePanel: 'technical', // technical | quick
-    watchers: WATCHERS,
-    // 讨论区聊天数据：传入统一 discussion 组件（聊天/输入/表情逻辑全部由组件承载）
+    watchers: [],
+    watchersSharedHint: '',
     chat: CHAT,
+    discussionSelfAvatar: '',
+    discussionSelfName: '',
+    discussionRoomKey: '',
     currentUserId: '',
     hostSnapshot: {},
     followMap: {},
@@ -460,6 +466,7 @@ Page({
     this._syncHubHoleLayout();
     this.applyMoreAccess();
     this.refreshGame();
+    this._syncLiveIdentitySurfaces();
 
     const openCaddie =
       opt.openCaddie === '1' || opt.openCaddie === 'true' || opt.openCaddie === 1;
@@ -511,6 +518,7 @@ Page({
     this.setData({ scoreDisplayMode: mode, scoringDisplay: mode === 'diff' ? 'strokeDiff' : 'gross' });
     // 从某组记分页返回 → 刷新领先榜/分组状态（数据持久化于 gameStore）
     this.refreshGame();
+    this._syncLiveIdentitySurfaces();
     // 若停留在分组表，重建视口观察器（onHide 会解绑）
     if (this.data.activeTab === 'group') {
       wx.nextTick(() => this.setupTeeObserver());
@@ -2241,6 +2249,43 @@ Page({
   onHalfCourseConfirmed() {
     this.setData({ halfSheetVisible: false });
     this.refreshGame();
+  },
+
+  _discussionRoomKey() {
+    return discussionMessageStore.resolveRoomKey({
+      gameId: this._gameId || this.data.gameId || ''
+    });
+  },
+
+  _hydrateDiscussionMessages() {
+    const key = this._discussionRoomKey();
+    const ctx = { gameId: this._gameId || this.data.gameId || '' };
+    return {
+      discussionRoomKey: key,
+      chat: playerLiveDisplay.overlayChatMessages(
+        discussionMessageStore.viewSource(key, CHAT),
+        ctx
+      )
+    };
+  },
+
+  onDiscussionSend() {
+    this.setData(this._hydrateDiscussionMessages());
+  },
+
+  _syncLiveIdentitySurfaces() {
+    const ctx = { gameId: this._gameId || this.data.gameId || '' };
+    playerLiveDisplay.setLiveDisplayGameContext(ctx.gameId);
+    const selfId = playerLiveDisplay.currentAccountUserId();
+    const live = playerLiveDisplay.applyLiveDisplayToView({
+      userId: selfId,
+      playerUserId: selfId
+    });
+    this.setData(Object.assign(this._hydrateDiscussionMessages(), discussionCardVisit.hydrateWatchersPatch(this._discussionRoomKey(), {
+      discussionSelfAvatar: live.avatar || '',
+      discussionSelfName: live.name || '',
+      currentUserId: selfId
+    })));
   },
 
   _promptCancelGame() {

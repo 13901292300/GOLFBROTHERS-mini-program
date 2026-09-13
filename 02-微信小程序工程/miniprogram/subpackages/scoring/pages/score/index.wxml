@@ -1439,12 +1439,17 @@
       <discussion
         id="score-discussion"
         watchers="{{watchers}}"
+        watchers-shared-hint="{{watchersSharedHint}}"
         messages="{{chatMessages}}"
         theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
         fontScale="{{fontScale}}"
+        self-avatar="{{discussionSelfAvatar}}"
+        self-name="{{discussionSelfName}}"
+        room-key="{{discussionRoomKey}}"
         reaction-detached-message-index="{{discussionReactionDetachedIndex}}"
         reaction-detached-user-id="{{discussionReactionDetachedUserId}}"
         bind:playerAvatarTap="onDiscussionAvatarTap"
+        bind:send="onDiscussionSend"
       ></discussion>
     </view>
   </view>

@@ -1,28 +1,42 @@
 <!-- 统一讨论区聊天系统：自包含 flex 面板，填满宿主高度 -->
 <view class="ds-root {{theme === 'dark' ? 'ds-dark' : 'ds-bright'}} {{fontScale === 'large' ? 'font-large' : 'font-normal'}} {{fixedInput ? 'ds-root--fixed-input' : ''}}">
 
-  <!-- L1：围观行（面板顶部，不随聊天滚动）。垂直居中交给内层 .ws-track（不依赖 scroll-view 自身 flex，规避其居中失效） -->
-  <scroll-view wx:if="{{showWatchersStrip}}" class="tab-watchers-strip" scroll-x>
+  <!-- L1：围观行。不横向滚动，超出进「更多」完整列表 -->
+  <view wx:if="{{showWatchersStrip}}" class="tab-watchers-strip">
     <view class="ws-track">
       <text class="discussion-watchers-label">围观</text>
       <view
-        wx:for="{{watchers}}"
-        wx:key="name"
-        class="discussion-avatar-btn"
-        data-role="watcher"
-        data-userid="{{item.userId}}"
-        data-name="{{item.name}}"
-        data-avatar="{{item.avatar}}"
-        catchtouchstart="onAvatarTouchStart"
-        catchtouchmove="onAvatarTouchMove"
-        catchtouchend="onAvatarTouchEnd"
-        catchtouchcancel="onAvatarTouchEnd"
+        wx:for="{{visibleWatchers}}"
+        wx:key="userId"
+        class="ws-person"
       >
-        <image class="discussion-avatar-img" src="{{item.avatar}}" mode="aspectFill"></image>
+        <view
+          class="discussion-avatar-btn"
+          id="ds-watcher-avatar-{{index}}"
+          hover-class="none"
+          hover-stop-propagation="true"
+          data-role="watcher"
+          data-sel="ds-watcher-avatar-{{index}}"
+          data-userid="{{item.userId}}"
+          data-name="{{item.name}}"
+          data-avatar="{{item.avatar}}"
+          data-demo="{{item.demo}}"
+          catchtap="onAvatarTap"
+          catchlongpress="onAvatarLongPress"
+        >
+          <image class="discussion-avatar-img" src="{{item.avatar}}" mode="aspectFill"></image>
+        </view>
       </view>
-      <view class="discussion-more-btn">更多 ›</view>
+      <view wx:if="{{showWatchersMore}}" class="discussion-more-btn" catchtap="openWatchersSheet">更多</view>
     </view>
-  </scroll-view>
+    <view class="ws-measure" aria-hidden="true">
+      <text class="discussion-watchers-label">围观</text>
+      <view class="ws-person">
+        <view class="discussion-avatar-btn"></view>
+      </view>
+      <view class="discussion-more-btn">更多</view>
+    </view>
+  </view>
 
   <!-- L2：聊天内容（内部滚动） -->
   <scroll-view class="ds-chat-scroll" scroll-y scroll-into-view="{{toView}}" scroll-with-animation>
@@ -45,14 +59,17 @@
               src="{{item.avatar}}"
               mode="aspectFill"
               data-role="chat"
+              data-sel="ds-msg-avatar-{{item.msgIndex}}"
               data-userid="{{item.userId}}"
               data-name="{{item.name}}"
               data-avatar="{{item.avatar}}"
               data-index="{{item.msgIndex}}"
-              catchtouchstart="onAvatarTouchStart"
-              catchtouchmove="onAvatarTouchMove"
-              catchtouchend="onAvatarTouchEnd"
-              catchtouchcancel="onAvatarTouchEnd"
+              data-self="{{false}}"
+              data-demo="{{item.demo}}"
+              hover-class="none"
+              hover-stop-propagation="true"
+              catchtap="onAvatarTap"
+              catchlongpress="onAvatarLongPress"
             ></image>
             <view class="chat-col">
               <text class="chat-meta">{{item.name}}</text>
@@ -65,14 +82,17 @@
               src="{{item.avatar}}"
               mode="aspectFill"
               data-role="chat"
+              data-sel="ds-msg-avatar-{{item.msgIndex}}"
               data-userid="{{item.userId || 'me'}}"
               data-name="{{item.name}}"
               data-avatar="{{item.avatar}}"
               data-index="{{item.msgIndex}}"
-              catchtouchstart="onAvatarTouchStart"
-              catchtouchmove="onAvatarTouchMove"
-              catchtouchend="onAvatarTouchEnd"
-              catchtouchcancel="onAvatarTouchEnd"
+              data-self="{{true}}"
+              data-demo="{{item.demo}}"
+              hover-class="none"
+              hover-stop-propagation="true"
+              catchtap="onAvatarTap"
+              catchlongpress="onAvatarLongPress"
             ></image>
           </view>
         </block>
@@ -93,14 +113,17 @@
               src="{{item.avatar}}"
               mode="aspectFill"
               data-role="chat"
+              data-sel="ds-msg-avatar-{{index}}"
               data-userid="{{item.userId}}"
               data-name="{{item.name}}"
               data-avatar="{{item.avatar}}"
               data-index="{{index}}"
-              catchtouchstart="onAvatarTouchStart"
-              catchtouchmove="onAvatarTouchMove"
-              catchtouchend="onAvatarTouchEnd"
-              catchtouchcancel="onAvatarTouchEnd"
+              data-self="{{false}}"
+              data-demo="{{item.demo}}"
+              hover-class="none"
+              hover-stop-propagation="true"
+              catchtap="onAvatarTap"
+              catchlongpress="onAvatarLongPress"
             ></image>
             <view class="chat-col">
               <text class="chat-meta">{{item.name}}</text>
@@ -113,14 +136,17 @@
               src="{{item.avatar}}"
               mode="aspectFill"
               data-role="chat"
+              data-sel="ds-msg-avatar-{{index}}"
               data-userid="{{item.userId || 'me'}}"
               data-name="{{item.name}}"
               data-avatar="{{item.avatar}}"
               data-index="{{index}}"
-              catchtouchstart="onAvatarTouchStart"
-              catchtouchmove="onAvatarTouchMove"
-              catchtouchend="onAvatarTouchEnd"
-              catchtouchcancel="onAvatarTouchEnd"
+              data-self="{{true}}"
+              data-demo="{{item.demo}}"
+              hover-class="none"
+              hover-stop-propagation="true"
+              catchtap="onAvatarTap"
+              catchlongpress="onAvatarLongPress"
             ></image>
           </view>
         </block>
@@ -159,6 +185,47 @@
     </view>
     <view class="discussion-emoji-btn {{emojiPanelOpen ? 'is-on' : ''}} {{inputDisabled ? 'is-disabled' : ''}}" bindtap="toggleEmojiPanel">☺</view>
     <view class="discussion-send {{!inputDisabled && canSend ? 'is-active' : 'is-disabled'}}" bindtap="onSend">发送</view>
+  </view>
+
+  <view wx:if="{{showWatchersSheet}}" class="watchers-modal" catchtap="closeWatchersSheet">
+    <view class="watchers-sheet" catchtap="noop">
+      <view class="watchers-sheet-header">
+        <view>
+          <text class="watchers-sheet-title">全部围观用户</text>
+          <text class="watchers-sheet-subtitle">{{watchersHint || '长按头像可提及用户'}}</text>
+        </view>
+        <view class="watchers-close-btn" catchtap="closeWatchersSheet">✕</view>
+      </view>
+      <scroll-view scroll-y class="watchers-list">
+        <view wx:if="{{!watchers.length}}" class="watcher-empty">暂无围观用户</view>
+        <view
+          wx:for="{{watchers}}"
+          wx:key="userId"
+          class="watcher-item"
+        >
+          <image
+            id="ds-wlist-avatar-{{index}}"
+            src="{{item.avatar}}"
+            mode="aspectFill"
+            hover-class="none"
+            hover-stop-propagation="true"
+            data-role="watcher-list"
+            data-sel="ds-wlist-avatar-{{index}}"
+            data-userid="{{item.userId}}"
+            data-name="{{item.name}}"
+            data-avatar="{{item.avatar}}"
+            data-index="{{index}}"
+            data-demo="{{item.demo}}"
+            catchtap="onAvatarTap"
+            catchlongpress="onAvatarLongPress"
+          ></image>
+          <view class="watcher-col">
+            <text class="watcher-name">{{item.name}}</text>
+            <text class="watcher-hint">围观用户</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
   </view>
 
   <!-- 表情面板 overlay（wx:if 挂载/卸载，与输入栏 DOM 互不复用） -->

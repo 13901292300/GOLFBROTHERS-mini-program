@@ -36,6 +36,9 @@ const demoJiaobeiMatch = require('../../../../utils/demoJiaobeiMatch.js');
 const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
+const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
+const discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
+const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
 const playerDirectory = require('../../../../utils/playerDirectory.js');
 const tPosition = require('../../../../utils/tPosition.js');
@@ -534,18 +537,19 @@ function buildMockMatchPlayScoreboard() {
 
 /* ===== 讨论区 ===== */
 const WATCHERS = [
-  { name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
-  { name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
-  { name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72') },
-  { name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
-  { name: '邵亮', avatar: mockAvatars.pickMockAvatar('邵亮') },
-  { name: '郝军峰', avatar: mockAvatars.pickMockAvatar('郝军峰') },
-  { name: '大吉', avatar: mockAvatars.pickMockAvatar('大吉') },
-  { name: 'Alexander', avatar: mockAvatars.pickMockAvatar('Alexander') }
+  { demo: true, name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
+  { demo: true, name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
+  { demo: true, name: 'yan72', avatar: mockAvatars.pickMockAvatar('yan72') },
+  { demo: true, name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
+  { demo: true, name: '邵亮', avatar: mockAvatars.pickMockAvatar('邵亮') },
+  { demo: true, name: '郝军峰', avatar: mockAvatars.pickMockAvatar('郝军峰') },
+  { demo: true, name: '大吉', avatar: mockAvatars.pickMockAvatar('大吉') },
+  { demo: true, name: 'Alexander', avatar: mockAvatars.pickMockAvatar('Alexander') }
 ];
 const CHAT = [
   {
     self: false,
+    demo: true,
     userId: 'chat-alex',
     name: 'Alex',
     avatar: mockAvatars.pickMockAvatar('Alex'),
@@ -553,15 +557,17 @@ const CHAT = [
     mention: ''
   },
   {
-    self: true,
-    userId: 'me',
-    name: '我',
-    avatar: mockAvatars.pickMockAvatar('我'),
+    self: false,
+    demo: true,
+    userId: 'demo-chat-self',
+    name: '示例球员',
+    avatar: mockAvatars.pickMockAvatar('示例球员'),
     text: '收到，我在出发表看一下同组开球时间。',
     mention: '@Alex'
   },
   {
     self: false,
+    demo: true,
     userId: 'chat-yan72',
     name: 'yan72',
     avatar: mockAvatars.pickMockAvatar('yan72'),
@@ -1058,8 +1064,12 @@ Page({
     quickEntryVisible: false,
     watchers: WATCHERS.slice(0, 5),
     allWatchers: WATCHERS,
+    watchersSharedHint: '',
     // 讨论区聊天数据：传入统一 discussion 组件（聊天/输入/表情逻辑全部由组件承载）
     chat: CHAT,
+    discussionSelfAvatar: '',
+    discussionSelfName: '',
+    discussionRoomKey: '',
 
     // 讨论区头像互动中央弹窗（主包轻量；打开不下载 reaction）
     playerActionSheetVisible: false,
@@ -4537,10 +4547,7 @@ Page({
     // 出发表 groups 可能在记分页被更新 → 只重算出发表（领先榜已由上方 refreshMatchData 覆盖）
     this.refreshGroupsDerived();
     this.refreshPartnerSection();
-    // 讨论区作者名：仅投影 View Model，不写回消息存储
-    try {
-      this.setData({ chat: this._applyViewerNamesToChat(this.data.chat || []) });
-    } catch (e) { /* ignore */ }
+    this._syncLiveIdentitySurfaces();
     // 仅在已展开逐洞详情时同步刷新，避免每次 onShow 无意义分配 openScorecard
     if (this.data.openIndex != null && this.data.openIndex !== -1 && this.data.openIndex !== '') {
       this.updateOpenScorecard();
@@ -4561,6 +4568,44 @@ Page({
     if (this.data.activeTab === 'groups') wx.nextTick(() => this.computeGroupsPanelMinHeight());
     if (this.data.activeTab === 'game') wx.nextTick(() => this._syncGameDock());
     wx.nextTick(() => this._refreshFabHitZones());
+  },
+
+
+  _discussionRoomKey() {
+    return discussionMessageStore.resolveRoomKey({
+      matchId: this.data.matchId || ''
+    });
+  },
+
+  _hydrateDiscussionMessages() {
+    const key = this._discussionRoomKey();
+    const raw = discussionMessageStore.viewSource(key, CHAT);
+    let mapped = raw;
+    try {
+      mapped = this._applyViewerNamesToChat(raw);
+    } catch (e) {
+      mapped = raw;
+    }
+    return {
+      discussionRoomKey: key,
+      chat: playerLiveDisplay.overlayChatMessages(mapped, {})
+    };
+  },
+
+  onDiscussionSend() {
+    this.setData(this._hydrateDiscussionMessages());
+  },
+
+  _syncLiveIdentitySurfaces() {
+    const selfId = playerLiveDisplay.currentAccountUserId();
+    const live = playerLiveDisplay.applyLiveDisplayToView({
+      userId: selfId,
+      playerUserId: selfId
+    });
+    this.setData(Object.assign(this._hydrateDiscussionMessages(), discussionCardVisit.hydrateWatchersPatch(this._discussionRoomKey(), {
+      discussionSelfAvatar: live.avatar || '',
+      discussionSelfName: live.name || ''
+    })));
   },
 
   onHide() {

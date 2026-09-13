@@ -90,6 +90,8 @@ const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
 const scoreAvatarFastPath = require('../../../../utils/scoreAvatarFastPath.js');
+const discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
+const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const { syncStrokeEntities } = require('../../../../utils/strokeEntityBuilder.js');
 const {
@@ -2334,6 +2336,34 @@ function enrichPlayerG5(player, pIdx, displayMode, options) {
   return Object.assign({}, enriched, { cells: next });
 }
 
+const SCORE_DISCUSSION_DEMO = [
+  {
+    self: false,
+    demo: true,
+    userId: 'chat-alex',
+    name: 'Alex',
+    avatar: mockAvatars.pickMockAvatar('Alex'),
+    text: '今天果岭速度挺快，短推要保守一点。'
+  },
+  {
+    self: false,
+    demo: true,
+    userId: 'demo-chat-self',
+    name: '示例球员',
+    avatar: mockAvatars.pickMockAvatar('示例球员'),
+    text: '收到，A4 洞开始注意落点。'
+  },
+  {
+    self: false,
+    demo: true,
+    userId: 'chat-dalei',
+    name: '大雷',
+    avatar: mockAvatars.pickMockAvatar('大雷'),
+    text: '前组节奏不错，我们保持就行。'
+  }
+];
+
+
 Page({
   data: {
     headerTotalHeight: 92,
@@ -2610,35 +2640,12 @@ Page({
     quickPanelDisplay: ['4', '4', '4', '4'],
     sheetPlayers: [],
 
-    watchers: [
-      { name: 'TigerHoods', avatar: mockAvatars.pickMockAvatar('TigerHoods') },
-      { name: 'Alex', avatar: mockAvatars.pickMockAvatar('Alex') },
-      { name: '大雷', avatar: mockAvatars.pickMockAvatar('大雷') },
-      { name: 'Yan', avatar: mockAvatars.pickMockAvatar('Yan') }
-    ],
-    chatMessages: [
-      {
-        self: false,
-        userId: 'chat-alex',
-        name: 'Alex',
-        avatar: mockAvatars.pickMockAvatar('Alex'),
-        text: '今天果岭速度挺快，短推要保守一点。'
-      },
-      {
-        self: true,
-        userId: 'me',
-        name: '我',
-        avatar: mockAvatars.pickMockAvatar('我'),
-        text: '收到，A4 洞开始注意落点。'
-      },
-      {
-        self: false,
-        userId: 'chat-dalei',
-        name: '大雷',
-        avatar: mockAvatars.pickMockAvatar('大雷'),
-        text: '前组节奏不错，我们保持就行。'
-      }
-    ],
+    discussionSelfAvatar: '',
+    discussionSelfName: '',
+    discussionRoomKey: '',
+    watchers: [],
+    watchersSharedHint: '',
+    chatMessages: SCORE_DISCUSSION_DEMO.slice(),
     offlineScoringMode: 'ONLINE',
     offlineScoringPillVisible: false,
     offlineScoringPillText: '',
@@ -5419,17 +5426,61 @@ Page({
     }
 
     this._syncGameHostContext();
+    this._syncLiveIdentitySurfaces();
 
     // 未改备注时不做讨论区作者名大投影
     if (remarkChanged) {
-      const ctx = this._getScoreViewerRemarkContext();
-      this.setData({
-        chatMessages: playerDisplayName.mapMessageAuthorsForViewer(this.data.chatMessages || [], {
-          viewerUserId: ctx.viewer,
-          remarkNameMap: ctx.map
-        })
-      });
+      this.setData(this._hydrateDiscussionMessages());
     }
+  },
+
+
+  _discussionRoomKey() {
+    const ms = this._matchState || this._readMatchState() || {};
+    return discussionMessageStore.resolveRoomKey({
+      matchId: ms.matchId || '',
+      gameId: this.data.gameId || ms.gameId || ''
+    });
+  },
+
+  _hydrateDiscussionMessages() {
+    const key = this._discussionRoomKey();
+    const ctx = { gameId: this.data.gameId || '' };
+    const raw = discussionMessageStore.viewSource(key, SCORE_DISCUSSION_DEMO);
+    let mapped = raw;
+    try {
+      const remarkCtx = this._getScoreViewerRemarkContext && this._getScoreViewerRemarkContext();
+      if (remarkCtx) {
+        mapped = playerDisplayName.mapMessageAuthorsForViewer(raw, {
+          viewerUserId: remarkCtx.viewer,
+          remarkNameMap: remarkCtx.map
+        });
+      }
+    } catch (e) {
+      mapped = raw;
+    }
+    return {
+      discussionRoomKey: key,
+      chatMessages: playerLiveDisplay.overlayChatMessages(mapped, ctx)
+    };
+  },
+
+  onDiscussionSend() {
+    this.setData(this._hydrateDiscussionMessages());
+  },
+
+  _syncLiveIdentitySurfaces() {
+    const ctx = { gameId: this.data.gameId || '' };
+    playerLiveDisplay.setLiveDisplayGameContext(ctx.gameId);
+    const selfId = playerLiveDisplay.currentAccountUserId();
+    const live = playerLiveDisplay.applyLiveDisplayToView({
+      userId: selfId,
+      playerUserId: selfId
+    });
+    this.setData(Object.assign(this._hydrateDiscussionMessages(), discussionCardVisit.hydrateWatchersPatch(this._discussionRoomKey(), {
+      discussionSelfAvatar: live.displayAvatar || '',
+      discussionSelfName: live.name || ''
+    })));
   },
 
   _tryFlushPendingScoreSync() {

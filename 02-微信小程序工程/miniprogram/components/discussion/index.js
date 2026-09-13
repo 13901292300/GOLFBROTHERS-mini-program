@@ -8,6 +8,11 @@
  */
 
 var discussionTimeline = require('../../utils/discussionTimeline.js');
+var playerLiveDisplay = require('../../utils/playerLiveDisplay.js');
+var discussionMessageStore = require('../../utils/discussionMessageStore.js');
+var discussionWatcherLayout = require('../../utils/discussionWatcherLayout.js');
+var discussionVisitStore = require('../../utils/discussionVisitStore.js');
+var discussionAvatarMention = require('../../utils/discussionAvatarMention.js');
 
 const EMOJI_LIST = [
   '😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😜', '🤔', '😎',
@@ -37,7 +42,8 @@ Component({
     // 字体大小：'normal' | 'large'（与 fontScale_global / 宿主显示设置对齐）
     fontScale: { type: String, value: 'normal' },
     // 当前用户头像（发送的消息使用）
-    selfAvatar: { type: String, value: SELF_AVATAR },
+    selfAvatar: { type: String, value: '' },
+    selfName: { type: String, value: '' },
     // 输入栏是否固定到页面底部（默认 false，保持历史行为）
     fixedInput: { type: Boolean, value: false },
     // 输入栏显隐控制（默认 true）
@@ -63,7 +69,12 @@ Component({
      * -1 表示未隐藏；须与 reactionDetachedUserId 一并由宿主在 onSeatDetach 时写入。
      */
     reactionDetachedMessageIndex: { type: Number, value: -1 },
-    reactionDetachedUserId: { type: String, value: '' }
+    reactionDetachedUserId: { type: String, value: '' },
+    /**
+     * 本地讨论房间键（series:/match:/game:）。有值时发送先落盘再展示。
+     */
+    roomKey: { type: String, value: '' },
+    watchersSharedHint: { type: String, value: '' }
   },
 
   data: {
@@ -79,10 +90,17 @@ Component({
     // @提及：已插入的 mention 对象列表 [{ userId, userName, displayText }]
     mentions: [],
     // 控制 textarea 聚焦（@插入后保持/恢复 focus）
-    inputFocus: false
+    inputFocus: false,
+    visibleWatchers: [],
+    showWatchersMore: false,
+    showWatchersSheet: false,
+    watchersHint: ''
   },
 
   observers: {
+    roomKey() {
+      this._userTouched = false;
+    },
     // 外部 messages 变化时同步内部聊天流（用户已发言后不再被外部覆盖）
     messages(list) {
       if (this._userTouched) return;
@@ -106,6 +124,51 @@ Component({
       };
       if (this.data.emojiPanelOpen) patch.emojiPanelOpen = false;
       this.setData(patch);
+    },
+    watchers() {
+      this._applyWatcherStrip();
+    },
+    watchersSharedHint(hint) {
+      this.setData({
+        watchersHint:
+          hint ||
+          (discussionVisitStore.sharedMeta && discussionVisitStore.sharedMeta().hint) ||
+          ''
+      });
+    }
+  },
+
+  lifetimes: {
+    attached() {
+      var meta = discussionVisitStore.sharedMeta();
+      this.setData({
+        watchersHint: this.properties.watchersSharedHint || meta.hint || ''
+      });
+      this._onWinResize = () => this._scheduleStripMeasure();
+      if (typeof wx !== 'undefined' && typeof wx.onWindowResize === 'function') {
+        wx.onWindowResize(this._onWinResize);
+      }
+      this._applyWatcherStrip();
+    },
+    detached() {
+      if (this._stripMeasureTimer) {
+        clearTimeout(this._stripMeasureTimer);
+        this._stripMeasureTimer = null;
+      }
+      if (
+        this._onWinResize &&
+        typeof wx !== 'undefined' &&
+        typeof wx.offWindowResize === 'function'
+      ) {
+        wx.offWindowResize(this._onWinResize);
+      }
+    }
+  },
+
+  pageLifetimes: {
+    show() {
+      this._applyChat(this.data.chat || [], false);
+      this._scheduleStripMeasure();
     }
   },
 
@@ -114,12 +177,183 @@ Component({
       return !!this.properties.inputDisabled;
     },
 
+    _windowWidth() {
+      try {
+        const info = wx.getSystemInfoSync();
+        if (info && info.windowWidth) return info.windowWidth;
+      } catch (e) {
+        /* ignore */
+      }
+      return 375;
+    },
+
+    _applyWatcherStrip() {
+      const list = Array.isArray(this.properties.watchers)
+        ? this.properties.watchers
+        : [];
+      const ww = this._windowWidth();
+      const fb = discussionWatcherLayout.fallbackMetrics(ww);
+      const layout = discussionWatcherLayout.computeVisibleCount({
+        total: list.length,
+        containerWidth: this._stripWidth || ww,
+        padPx: this._stripPad || fb.padPx,
+        labelWidth: this._stripLabel || fb.labelWidth,
+        itemWidth: this._stripItem || fb.itemWidth,
+        gapPx: this._stripGap || fb.gapPx,
+        moreWidth: this._stripMore || fb.moreWidth
+      });
+      const sliced = discussionWatcherLayout.sliceVisible(list, layout);
+      this.setData(sliced, () => this._scheduleStripMeasure());
+    },
+
+    _scheduleStripMeasure() {
+      if (!this.properties.showWatchersStrip) return;
+      if (this._stripMeasureTimer) clearTimeout(this._stripMeasureTimer);
+      this._stripMeasureTimer = setTimeout(() => this._measureStrip(), 16);
+    },
+
+    _measureStrip() {
+      if (!this.properties.showWatchersStrip) return;
+      const self = this;
+      this.createSelectorQuery()
+        .in(this)
+        .select('.tab-watchers-strip')
+        .boundingClientRect()
+        .select('.ws-measure .discussion-watchers-label')
+        .boundingClientRect()
+        .select('.ws-measure .ws-person')
+        .boundingClientRect()
+        .select('.ws-measure .discussion-more-btn')
+        .boundingClientRect()
+        .exec(function (res) {
+          const strip = res && res[0];
+          const label = res && res[1];
+          const person = res && res[2];
+          const more = res && res[3];
+          if (!strip || !strip.width) return;
+          const ww = self._windowWidth();
+          const fb = discussionWatcherLayout.fallbackMetrics(ww);
+          self._stripWidth = strip.width;
+          self._stripPad = fb.padPx;
+          self._stripLabel = (label && label.width) || fb.labelWidth;
+          self._stripItem = (person && person.width) || fb.itemWidth;
+          self._stripGap = fb.gapPx;
+          self._stripMore = (more && more.width) || fb.moreWidth;
+          const list = Array.isArray(self.properties.watchers)
+            ? self.properties.watchers
+            : [];
+          const layout = discussionWatcherLayout.computeVisibleCount({
+            total: list.length,
+            containerWidth: self._stripWidth,
+            padPx: self._stripPad,
+            labelWidth: self._stripLabel,
+            itemWidth: self._stripItem,
+            gapPx: self._stripGap,
+            moreWidth: self._stripMore
+          });
+          const sliced = discussionWatcherLayout.sliceVisible(list, layout);
+          const vis = self.data.visibleWatchers || [];
+          if (
+            sliced.showWatchersMore === self.data.showWatchersMore &&
+            vis.length === sliced.visibleWatchers.length
+          ) {
+            return;
+          }
+          self.setData(sliced);
+        });
+    },
+
+    openWatchersSheet() {
+      this.setData({ showWatchersSheet: true });
+    },
+    closeWatchersSheet() {
+      this.setData({ showWatchersSheet: false });
+    },
+
+    _currentMentionUserId() {
+      try {
+        return playerLiveDisplay.currentAccountUserId();
+      } catch (e) {
+        return 'me';
+      }
+    },
+
+    _mentionGateFromEvent(e) {
+      const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+      const fields = discussionAvatarMention.fieldsFromDataset(ds);
+      return {
+        ds: ds,
+        fields: fields,
+        gate: discussionAvatarMention.canMentionUser(fields, this._currentMentionUserId())
+      };
+    },
+
+    /**
+     * 原生 longpress：只 @，并吞掉随后可能到达的 tap。
+     * 本人 / 演示用户静默忽略；无发言权限走 insertMention 提示。
+     */
+    onAvatarLongPress(e) {
+      this._skipAvatarTap = true;
+      const hit = this._mentionGateFromEvent(e);
+      if (hit.ds.role === 'watcher-list') this.closeWatchersSheet();
+      if (!hit.gate.ok) {
+        if (hit.gate.reason === 'self' || hit.gate.reason === 'demo') return;
+      }
+      this.insertMention(hit.ds.userid, hit.ds.name);
+    },
+
+    /**
+     * 原生 tap：打开原头像面板。长按已处理后不再打开。
+     */
+    onAvatarTap(e) {
+      if (this._skipAvatarTap) {
+        this._skipAvatarTap = false;
+        return;
+      }
+      const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+      if (ds.role === 'watcher-list') this.closeWatchersSheet();
+      const userId = ds.userid != null ? String(ds.userid).trim() : '';
+      const name = ds.name != null ? String(ds.name).trim() : '';
+      const avatar = ds.avatar != null ? String(ds.avatar) : '';
+      const index = ds.index;
+      const payload = {
+        userId: userId,
+        avatar: avatar,
+        name: name,
+        index: index,
+        avatarRect: null,
+        role: ds.role || ''
+      };
+      const sel = ds.sel != null ? String(ds.sel).trim() : '';
+      if (!sel) {
+        this.triggerEvent('playerAvatarTap', payload);
+        return;
+      }
+      const self = this;
+      this.createSelectorQuery()
+        .in(this)
+        .select('#' + sel)
+        .boundingClientRect((rect) => {
+          if (rect) {
+            payload.avatarRect = {
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height
+            };
+          }
+          self.triggerEvent('playerAvatarTap', payload);
+        })
+        .exec();
+    },
+
     /**
      * @param {Array} chat
      * @param {boolean} scrollToEnd
      */
     _applyChat(chat, scrollToEnd) {
-      const list = Array.isArray(chat) ? chat : [];
+      const raw = Array.isArray(chat) ? chat : [];
+      const list = playerLiveDisplay.overlayChatMessages(raw);
       const patch = { chat: list };
       if (this.properties.enableTimeNodes) {
         patch.chatView = discussionTimeline.projectDiscussionTimeline(list);
@@ -169,25 +403,59 @@ Component({
       this._applyChat(chat, true);
     },
 
-    // 发送：空内容禁止；追加到聊天流，清空草稿/复位发送态/光标并关闭表情面板，滚动到底
+    // 发送：空内容禁止；本地保存成功后才展示并清空草稿
     onSend() {
-      if (this._isInputDisabled()) return;
+      if (this._isInputDisabled()) {
+        wx.showToast({ title: '当前没有发言权限', icon: 'none' });
+        return;
+      }
       const text = (this.data.draft || '').trim();
       if (!text) return;
-      this._userTouched = true;
+      const roomKey = this.properties.roomKey != null ? String(this.properties.roomKey).trim() : '';
+      if (!roomKey) {
+        wx.showToast({ title: '讨论无法保存', icon: 'none' });
+        return;
+      }
       const mentions = (this.data.mentions || []).slice();
       const createdAt = Date.now();
-      const message = {
+      const stamped = playerLiveDisplay.stampCurrentAccountOnWrite({
         self: true,
-        userId: 'me',
-        name: '我',
-        avatar: this.properties.selfAvatar,
-        text,
+        text: text,
         mention: '',
-        mentions,
-        createdAt
-      };
-      const chat = this.data.chat.concat(message);
+        mentions: mentions,
+        createdAt: createdAt
+      });
+      const message = Object.assign(
+        {
+          self: true,
+          userId: 'me',
+          name: this.properties.selfName || '我',
+          avatar: this.properties.selfAvatar || ''
+        },
+        stamped,
+        {
+          id: discussionMessageStore.createMessageId(createdAt),
+          text: text,
+          mention: '',
+          mentions: mentions,
+          createdAt: createdAt,
+          self: true,
+          demo: false
+        }
+      );
+      if (!message.name) message.name = '我';
+      const saved = discussionMessageStore.appendMessage(roomKey, message);
+      if (!saved || !saved.ok) {
+        wx.showToast({
+          title: (saved && saved.error) || '发送失败，请重试',
+          icon: 'none'
+        });
+        return;
+      }
+      this._userTouched = true;
+      const chat = playerLiveDisplay.overlayChatMessages(
+        discussionMessageStore.listMessages(roomKey)
+      );
       const patch = {
         draft: '',
         canSend: false,
@@ -195,93 +463,33 @@ Component({
         emojiPanelOpen: false,
         mentions: []
       };
-      // _applyChat 会 setData chat/chatView/toView；合并一次减少闪烁
       patch.chat = chat;
-      patch.toView = 'ds-msg-' + (chat.length - 1);
+      patch.toView = chat.length ? 'ds-msg-' + (chat.length - 1) : '';
       if (this.properties.enableTimeNodes) {
         patch.chatView = discussionTimeline.projectDiscussionTimeline(chat);
       }
       this.setData(patch);
-      this.triggerEvent('send', { text, mentions, createdAt, message });
+      this.triggerEvent('send', {
+        text: text,
+        mentions: mentions,
+        createdAt: createdAt,
+        message: saved.message,
+        roomKey: roomKey
+      });
     },
 
-    /* ===== @提及：长按头像（≥500ms）触发，与点击互不冲突 ===== */
-    onAvatarTouchStart(e) {
-      if (this._isInputDisabled()) {
-        this._longPressed = false;
-        if (this._lpTimer) {
-          clearTimeout(this._lpTimer);
-          this._lpTimer = null;
-        }
-        return;
-      }
-      const ds = e.currentTarget.dataset || {};
-      this._longPressed = false;
-      if (this._lpTimer) clearTimeout(this._lpTimer);
-      // 自实现 500ms 长按计时；touchmove/touchend 提前结束则视为普通点击。
-      // 微信式即时注入：长按达成后「直接」插入 @用户名，不弹任何菜单/确认。
-      this._lpTimer = setTimeout(() => {
-        this._lpTimer = null;
-        this._longPressed = true;
-        this.insertMention(ds.userid, ds.name);
-      }, 500);
-    },
-    onAvatarTouchMove() {
-      if (this._lpTimer) {
-        clearTimeout(this._lpTimer);
-        this._lpTimer = null;
-      }
-    },
-    onAvatarTouchEnd(e) {
-      if (this._lpTimer) {
-        clearTimeout(this._lpTimer);
-        this._lpTimer = null;
-      }
-      // 短按：仅聊天发言头像上抛给宿主；组件内不打开弹窗（长按仍只做 @）
-      if (this._longPressed) return;
-      const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
-      if (ds.role !== 'chat') return;
-      const userId = ds.userid != null ? String(ds.userid).trim() : '';
-      const name = ds.name != null ? String(ds.name).trim() : '';
-      const avatar = ds.avatar != null ? String(ds.avatar) : '';
-      const index = ds.index;
-      const payload = {
-        userId: userId,
-        avatar: avatar,
-        name: name,
-        index: index,
-        avatarRect: null
-      };
-      const sel =
-        index != null && index !== ''
-          ? '#ds-msg-avatar-' + index
-          : '';
-      if (!sel) {
-        this.triggerEvent('playerAvatarTap', payload);
-        return;
-      }
-      const self = this;
-      this.createSelectorQuery()
-        .in(this)
-        .select(sel)
-        .boundingClientRect((rect) => {
-          if (rect) {
-            payload.avatarRect = {
-              left: rect.left,
-              top: rect.top,
-              width: rect.width,
-              height: rect.height
-            };
-          }
-          self.triggerEvent('playerAvatarTap', payload);
-        })
-        .exec();
-    },
-
-    // 在光标位置插入「@用户名 」，生成 mention 数据结构，保持输入框聚焦（支持多次 @）
+    // 在光标位置插入「@用户名 」，保存稳定 userId；无发言权限时提示且不插入
     insertMention(userId, userName) {
-      if (this._isInputDisabled()) return;
-      const name = userName || '';
+      if (this._isInputDisabled()) {
+        wx.showToast({ title: '当前没有发言权限', icon: 'none' });
+        return;
+      }
+      const uid = userId != null ? String(userId).trim() : '';
+      if (!uid) {
+        wx.showToast({ title: '无法提及该用户', icon: 'none' });
+        return;
+      }
+      const name = userName != null ? String(userName).trim() : '';
       if (!name) return;
       const token = '@' + name + ' ';
       const draft = this.data.draft || '';
@@ -289,7 +497,7 @@ Component({
       let pos = typeof this.data.cursor === 'number' ? this.data.cursor : len;
       if (pos < 0 || pos > len) pos = len;
       const next = draft.slice(0, pos) + token + draft.slice(pos);
-      const mention = { userId: userId || name, userName: name, displayText: '@' + name };
+      const mention = { userId: uid, userName: name, displayText: '@' + name };
       const mentions = (this.data.mentions || []).concat(mention);
       this.setData({
         draft: next,

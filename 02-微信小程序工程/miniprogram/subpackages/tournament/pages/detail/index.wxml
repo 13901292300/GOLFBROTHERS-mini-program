@@ -528,10 +528,14 @@
           fixed-input="{{true}}"
           show-input-bar="{{scrollYState >= 100}}"
           show-watchers-strip="{{false}}"
+          self-avatar="{{discussionSelfAvatar}}"
+          self-name="{{discussionSelfName}}"
+          room-key="{{discussionRoomKey}}"
           bottom-spacer-height="{{contentSpacerHeight}}"
           reaction-detached-message-index="{{discussionReactionDetachedIndex}}"
           reaction-detached-user-id="{{discussionReactionDetachedUserId}}"
           bind:playerAvatarTap="onDiscussionAvatarTap"
+          bind:send="onDiscussionSend"
         ></discussion>
       </block>
 

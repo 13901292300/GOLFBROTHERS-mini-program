@@ -211,9 +211,14 @@
     <discussion
       class="ds-fill"
       watchers="{{watchers}}"
+      watchers-shared-hint="{{watchersSharedHint}}"
       messages="{{chat}}"
       theme="{{themeClass === 'dark-mode' ? 'dark' : 'bright'}}"
       fontScale="{{fontScale}}"
+      self-avatar="{{discussionSelfAvatar}}"
+      self-name="{{discussionSelfName}}"
+      room-key="{{discussionRoomKey}}"
+      bind:send="onDiscussionSend"
     ></discussion>
   </view>
 

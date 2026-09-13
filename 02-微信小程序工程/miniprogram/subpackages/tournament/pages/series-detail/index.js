@@ -39,6 +39,9 @@ var scheduleViewModel = require('./seriesScheduleViewModel.js');
 var seriesLiveSession = require('./seriesLiveSessionProjection.js');
 var seriesScheduleGroupWrite = require('../../../../utils/tournament/seriesScheduleGroupWrite.js');
 var discussionViewModel = require('./seriesDiscussionViewModel.js');
+var discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
+var discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
+var playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
 var matchManageAccess = require('../../../../utils/matchManageAccess.js');
 var playerManage = require('../../../../utils/playerManage.js');
 var teeSheetManage = require('../../../../utils/teeSheetManage.js');
@@ -824,13 +827,16 @@ Page({
     },
     standingsEmpty: {},
     register: registerViewModel.emptyRegisterViewModel(),
-    // 讨论区：页面会话（seriesId 房间），不持久化、不写 store
+    // 讨论区：series:{seriesId} 本地消息
     discussionChat: [],
     discussionWatchers: [],
+    watchersSharedHint: '',
     discussionCanSpeak: false,
     discussionInputDisabled: true,
     discussionInputPlaceholder: '发布后开放讨论',
     discussionSelfAvatar: '',
+    discussionSelfName: '',
+    discussionRoomKey: '',
     discussionPanelMinHeight: 0,
     fontScale: 'normal',
     registerSheetVisible: false,
@@ -2574,19 +2580,16 @@ Page({
   },
 
   /**
-   * 讨论区页面会话投影：房间 = seriesId；不写 store / 分站。
-   * 同 seriesId 保留内存消息；换房清空。
+   * 讨论区：房间 = series:{seriesId}；本地持久化，不写分站 match。
    */
   _buildDiscussionDataPatch: function (series, lifecycleAccess) {
     var sid =
       series && series.seriesId != null
         ? String(series.seriesId).trim()
         : this._seriesId || '';
-    if (!Array.isArray(this._discussionChat)) this._discussionChat = [];
-    if (this._discussionRoomSeriesId !== sid) {
-      this._discussionRoomSeriesId = sid;
-      this._discussionChat = [];
-    }
+    var key = discussionMessageStore.resolveRoomKey({ seriesId: sid });
+    this._discussionRoomSeriesId = sid;
+    this._discussionChat = discussionMessageStore.listMessages(key);
     var currentUser = null;
     try {
       currentUser = gameStore.getCurrentUser ? gameStore.getCurrentUser() : null;
@@ -2596,55 +2599,41 @@ Page({
     var disc = discussionViewModel.buildSeriesDiscussionViewModel({
       seriesId: sid,
       lifecycleAccess: lifecycleAccess || this._lastRegisterAccess || {},
-      currentUser: currentUser
+      currentUser: currentUser,
+      watchers: discussionCardVisit.listWatchersForDisplay(key)
     });
+    var visitPatch = discussionCardVisit.hydrateWatchersPatch(key);
     return {
-      discussionChat: this._discussionChat.slice(),
-      discussionWatchers: disc.watchers,
+      discussionRoomKey: key,
+      discussionChat: playerLiveDisplay.overlayChatMessages(
+        discussionMessageStore.viewSource(key, []),
+        {}
+      ),
+      discussionWatchers: visitPatch.watchers,
+      watchersSharedHint: visitPatch.watchersSharedHint,
       discussionCanSpeak: !!disc.canSpeak,
       discussionShowInputBar: !!disc.showInputBar,
       discussionInputDisabled: !!disc.inputDisabled,
       discussionInputPlaceholder: disc.inputPlaceholder || '说点什么…',
-      discussionSelfAvatar: disc.selfAvatar
+      discussionSelfAvatar: disc.selfAvatar,
+      discussionSelfName: disc.selfName || ''
     };
   },
 
   /**
-   * 页面会话镜像：组件已本地追加；宿主保留以便切 TAB 重挂载后回灌。
-   * 不宣称持久化 / 跨设备同步。
+   * 组件已先落盘；此处回灌宿主，供切 TAB 重挂载。
    */
   onDiscussionSend: function (e) {
-    var detail = (e && e.detail) || {};
     if (!this.data.discussionCanSpeak) return;
-    var message = detail.message;
-    if (!message || typeof message !== 'object') {
-      var text = detail.text != null ? String(detail.text).trim() : '';
-      if (!text) return;
-      var createdAt =
-        detail.createdAt != null && Number.isFinite(Number(detail.createdAt))
-          ? Number(detail.createdAt)
-          : Date.now();
-      message = {
-        self: true,
-        userId: 'me',
-        name: '我',
-        avatar: this.data.discussionSelfAvatar,
-        text: text,
-        mention: '',
-        mentions: Array.isArray(detail.mentions) ? detail.mentions.slice() : [],
-        createdAt: createdAt
-      };
-    } else if (message.createdAt == null) {
-      message = Object.assign({}, message, {
-        createdAt:
-          detail.createdAt != null && Number.isFinite(Number(detail.createdAt))
-            ? Number(detail.createdAt)
-            : Date.now()
-      });
-    }
-    if (!Array.isArray(this._discussionChat)) this._discussionChat = [];
-    this._discussionChat = this._discussionChat.concat([message]);
-    this.setData({ discussionChat: this._discussionChat.slice() });
+    var detail = (e && e.detail) || {};
+    var key =
+      (detail.roomKey && String(detail.roomKey).trim()) ||
+      discussionMessageStore.resolveRoomKey({ seriesId: this._seriesId || this._discussionRoomSeriesId || '' });
+    this._discussionChat = discussionMessageStore.listMessages(key);
+    this.setData({
+      discussionRoomKey: key,
+      discussionChat: playerLiveDisplay.overlayChatMessages(this._discussionChat.slice(), {})
+    });
   },
 
   reloadViewModel: function (options) {
