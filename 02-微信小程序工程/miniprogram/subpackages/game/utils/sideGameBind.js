@@ -18,6 +18,7 @@ var identity = require("./sideGameIdentityProvider.js");
 var nav = require("./nav.js");
 var resultTone = require("./resultTone.js");
 var resultFormat = require("./resultFormat.js");
+var specialResult = require("./specialResult.js");
 var partyFormation = require("./partyFormation.js");
 var entitlement = require("./sideGameEntitlementProvider.js");
 var scoreMapUtil = require("./sideGameScoreMap.js");
@@ -2106,8 +2107,8 @@ function signedText(n) {
   return settle.formatPoints(n);
 }
 
-function cellCls(n) {
-  return resultTone.resultToneClass(n);
+function cellCls(n, infSign) {
+  return resultTone.resultToneClass(n, infSign);
 }
 
 var HOLE5_AUDIT_LABEL = "5";
@@ -2642,7 +2643,7 @@ function persistLiveResult(game, result) {
       prevSnap.scoreConfigFp === result.scoreConfigFp &&
       result.hostStructureFp &&
       prevSnap.hostStructureFp === result.hostStructureFp &&
-      JSON.stringify(prevSnap.byHole || {}) === JSON.stringify(result.byHole || {})
+      specialResult.liveSnapshotEqual(prevSnap, result)
     ) {
       return;
     }
@@ -3158,7 +3159,7 @@ function listBoard(entry, gameId, pairId) {
 
   const holes = labels.map(function (label) {
     const acc = players.map(function () {
-      return { raw: 0, inGame: false, played: false };
+      return { raw: 0, infSign: 0, inGame: false, played: false };
     });
     const topHoleState = selectedTopHoleStates[label] || "";
     const hole5Contrib = [];
@@ -3166,9 +3167,20 @@ function listBoard(entry, gameId, pairId) {
       const ids = [];
       const ledger = {};
       let anyPlayed = false;
+      const infById = {};
       (game.players || []).forEach(function (item) {
         if (!item || item.id == null) return;
         const id = String(item.id);
+        const infSign = specialResult.infSignForPlayer(
+          game.holeResults && game.holeResults.specialByHole,
+          label,
+          id
+        );
+        if (infSign) {
+          infById[id] = infSign;
+          anyPlayed = true;
+          return;
+        }
         const v = holePtsOf(game, label, id);
         if (v == null) return;
         ids.push(id);
@@ -3182,6 +3194,12 @@ function listBoard(entry, gameId, pairId) {
         if (joined) acc[pi].inGame = true;
       });
       if (!anyPlayed) return;
+      players.forEach(function (player, pi) {
+        const id = String(player.id);
+        if (!infById[id]) return;
+        acc[pi].played = true;
+        if (!acc[pi].infSign) acc[pi].infSign = infById[id];
+      });
       const potBefore = potRemain;
       const inPotGame = !!(showPot && potGameSet[String(game.id)]);
       let shown = ledger;
@@ -3201,6 +3219,7 @@ function listBoard(entry, gameId, pairId) {
       }
       players.forEach(function (player, pi) {
         const id = String(player.id);
+        if (acc[pi].infSign) return;
         if (!Object.prototype.hasOwnProperty.call(ledger, id)) return;
         acc[pi].played = true;
         acc[pi].raw = settle.round1(acc[pi].raw + (Number(shown[id]) || 0));
@@ -3235,8 +3254,9 @@ function listBoard(entry, gameId, pairId) {
       const cell = resultFormat.formatBoardCell({
         inGame: item.inGame,
         played: item.played,
-        raw: item.raw,
-        cls: item.played ? cellCls(item.raw) : ""
+        raw: item.infSign ? null : item.raw,
+        infSign: item.infSign || 0,
+        cls: item.played ? cellCls(item.infSign ? null : item.raw, item.infSign) : ""
       });
       cell.playerId = players[pi] && players[pi].id ? String(players[pi].id) : "";
       return cell;
@@ -3281,14 +3301,22 @@ function listBoard(entry, gameId, pairId) {
   });
   const totals = players.map(function (player, pi) {
     let raw = 0;
+    let infSign = 0;
+    let infMixed = false;
     let settledCount = 0;
     holes.forEach(function (hole) {
       const cell = hole.cells[pi];
-      if (cell && cell.played && cell.status === resultFormat.STATUS_SETTLED) {
-        raw = settle.round1(raw + Number(cell.raw));
-        settledCount += 1;
+      if (!(cell && cell.played && cell.status === resultFormat.STATUS_SETTLED)) return;
+      settledCount += 1;
+      const sign = specialResult.asInfSign(cell.infSign);
+      if (sign) {
+        if (!infSign) infSign = sign;
+        else if (infSign !== sign) infMixed = true;
+        return;
       }
+      raw = settle.round1(raw + Number(cell.raw));
     });
+    if (infMixed) infSign = 0;
     if (!isBigPot) {
       focusGames.forEach(function (game) {
         const joined = (game.players || []).some(function (item) {
@@ -3308,7 +3336,8 @@ function listBoard(entry, gameId, pairId) {
       resultFormat.formatBoardTotal({
         settledCount: settledCount,
         value: raw,
-        cls: settledCount ? cellCls(raw) : ""
+        infSign: infSign,
+        cls: settledCount ? cellCls(infSign ? null : raw, infSign) : ""
       }),
       { playerId: player && player.id ? String(player.id) : "" }
     );

@@ -1,15 +1,36 @@
 /**
  * 游戏结果单元格统一格式化。
  * pending / not-applicable → 空白；settled → 含合法 0。
+ * infSign ±1 → ∞ / -∞（不把 Infinity 或 "∞" 当业务 raw）。
  */
 var core = require("./settleCore.js");
+var specialResult = require("./specialResult.js");
+var resultTone = require("./resultTone.js");
 
 var STATUS_PENDING = "pending";
 var STATUS_SETTLED = "settled";
 var STATUS_NA = "not-applicable";
 
+function infSignOf(opts) {
+  return specialResult.asInfSign(opts && opts.infSign);
+}
+
+function infCellBase(opts, infSign) {
+  var text = specialResult.infText(infSign);
+  var cls = opts.cls != null && opts.cls !== "" ? opts.cls : resultTone.resultToneClass(null, infSign);
+  return {
+    text: text,
+    raw: null,
+    infSign: infSign,
+    cls: cls,
+    status: STATUS_SETTLED,
+    played: true,
+    settledCount: opts.settledCount != null ? Number(opts.settledCount) || 1 : 1
+  };
+}
+
 /**
- * @param {{ status?: string, value?: number|null }} result
+ * @param {{ status?: string, value?: number|null, infSign?: number }} result
  * @returns {string}
  */
 function formatGameResultCell(result) {
@@ -17,6 +38,8 @@ function formatGameResultCell(result) {
   var status = String(result.status || "");
   if (status === STATUS_PENDING || status === STATUS_NA) return "";
   if (status !== STATUS_SETTLED) return "";
+  var infSign = infSignOf(result);
+  if (infSign) return specialResult.infText(infSign);
   if (result.value == null || result.value === "") return "";
   var n = Number(result.value);
   if (!isFinite(n)) return "";
@@ -28,19 +51,25 @@ function formatGameResultCell(result) {
  */
 function formatBoardCell(opts) {
   opts = opts || {};
+  var infSign = infSignOf(opts);
   if (!opts.inGame) {
     return {
       text: "",
       raw: null,
+      infSign: 0,
       cls: "",
       status: STATUS_NA,
       played: false
     };
   }
+  if (infSign) {
+    return infCellBase(opts, infSign);
+  }
   if (!opts.played) {
     return {
       text: "",
       raw: null,
+      infSign: 0,
       cls: "",
       status: STATUS_PENDING,
       played: false
@@ -51,6 +80,7 @@ function formatBoardCell(opts) {
   return {
     text: core.formatPoints(n),
     raw: core.round1(n),
+    infSign: 0,
     cls: opts.cls != null ? opts.cls : "",
     status: STATUS_SETTLED,
     played: true,
@@ -64,21 +94,29 @@ function formatBoardCell(opts) {
 function formatBoardTotal(opts) {
   opts = opts || {};
   var count = Number(opts.settledCount) || 0;
-  if (count <= 0) {
+  var infSign = infSignOf(opts);
+  if (count <= 0 && !infSign) {
     return {
       text: "",
       raw: null,
+      infSign: 0,
       cls: "",
       status: STATUS_PENDING,
       played: false,
       settledCount: 0
     };
   }
+  if (infSign) {
+    return Object.assign(infCellBase(opts, infSign), {
+      settledCount: count > 0 ? count : 1
+    });
+  }
   var n = Number(opts.value);
   if (!isFinite(n)) n = 0;
   return {
     text: core.formatPoints(n),
     raw: core.round1(n),
+    infSign: 0,
     cls: opts.cls != null ? opts.cls : "",
     status: STATUS_SETTLED,
     played: true,

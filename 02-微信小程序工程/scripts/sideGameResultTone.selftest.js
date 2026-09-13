@@ -194,7 +194,7 @@ assert('带单位文字不误判', tone('+1元') === '' && tone('1e') === '');
 var bindJs = read('subpackages/game/utils/sideGameBind.js');
 assert('listBoard 使用 cellCls/resultToneClass', /cellCls\(/.test(bindJs) && /resultFormat\.formatBoardCell/.test(bindJs) && /resultFormat\.formatBoardTotal/.test(bindJs));
 assert('listScorePad 仍用 over/under/par', /raw > 0 \? "over"/.test(bindJs) && /"under"/.test(bindJs) && /"par"/.test(bindJs));
-assert('cellCls 不自行比较正负', /function cellCls\(n\) \{\s*return resultTone\.resultToneClass\(n\);/.test(bindJs));
+assert('cellCls 不自行比较正负', /function cellCls\(n, infSign\) \{\s*return resultTone\.resultToneClass\(n, infSign\);/.test(bindJs));
 
 var uiWxss = read('subpackages/game/styles/game-ui.wxss');
 assert(
