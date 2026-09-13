@@ -15,8 +15,10 @@ const CREATED_TEAMS_STORAGE_VERSION = 1;
 const ORG_ADMIN_ROLES = {
   超级管理员: true,
   管理员: true,
+  创建者: true,
   super_admin: true,
-  admin: true
+  admin: true,
+  owner: true
 };
 
 /** 按字符计数（适合中文；非 UTF-8 字节） */
@@ -368,15 +370,34 @@ function isPublicSelectableEventOrg(org) {
  * - 非公共组织：adminUserIds 命中，或（isMine 且 role 为管理员/超级管理员）
  * - 缺字段安全降级：不报错、不授权
  */
+function _candidateUserIds(userId) {
+  const uid = String(userId || '').trim();
+  const out = [];
+  const seen = {};
+  function add(id) {
+    const s = String(id || '').trim();
+    if (!s || seen[s]) return;
+    seen[s] = true;
+    out.push(s);
+  }
+  add(uid);
+  if (uid.toLowerCase() === 'me') {
+    add(_resolveCurrentUserId());
+  }
+  return out;
+}
+
 function isOrganizationAdmin(orgId, userId) {
   const oid = String(orgId || '').trim();
-  const uid = String(userId || '').trim();
-  if (!oid || !uid) return false;
+  const candidates = _candidateUserIds(userId);
+  if (!oid || !candidates.length) return false;
   const org = getTeamById(oid);
   if (!org) return false;
 
   const adminIds = normalizeAdminUserIds(org.adminUserIds);
-  if (adminIds.indexOf(uid) >= 0) return true;
+  for (let i = 0; i < candidates.length; i++) {
+    if (adminIds.indexOf(candidates[i]) >= 0) return true;
+  }
 
   // 公共机构：不得因 isMine / 展示 role 授权
   if (isPublicSelectableEventOrg(org)) return false;
@@ -384,6 +405,47 @@ function isOrganizationAdmin(orgId, userId) {
   // 非公共：兼容旧 mock（role + isMine），且须已加入
   if (!org.isMine) return false;
   return isAdminRoleLabel(org.role);
+}
+
+/**
+ * 俱乐部球队管理员：adminUserIds、花名册 owner/admin、或当前会话在快照中的超管/管理角色。
+ * 不把参赛队管理员升权；仅判断该 teamId 本身。
+ */
+function isClubTeamAdminUser(teamId, userId) {
+  const tid = String(teamId || '').trim();
+  const candidates = _candidateUserIds(userId);
+  if (!tid || !candidates.length) return false;
+  const team = getTeamById(tid);
+  if (!team || !isClubTeam(team)) return false;
+
+  const admins = normalizeAdminUserIds(team.adminUserIds);
+  const currentId = _resolveCurrentUserId();
+  for (let c = 0; c < candidates.length; c++) {
+    const uid = candidates[c];
+    if (admins.indexOf(uid) >= 0) return true;
+
+    const members = getTeamMembers(tid) || [];
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i];
+      if (!m) continue;
+      const mid = String(m.userId || m.playerId || '').trim();
+      if (mid !== uid) continue;
+      const st = String(m.memberStatus || 'active').trim() || 'active';
+      if (st !== 'active') continue;
+      const role = normalizeTeamMemberRole(m.role, team, uid);
+      if (role === 'owner' || role === 'admin') return true;
+    }
+
+    if (currentId && uid === currentId) {
+      const snapRole = normalizeTeamMemberRole(
+        team.role || team.currentUserRole,
+        team,
+        uid
+      );
+      if (snapRole === 'owner' || snapRole === 'admin') return true;
+    }
+  }
+  return false;
 }
 
 function enrichOrganization(team) {
@@ -841,6 +903,7 @@ module.exports = {
   normalizeAdminUserIds,
   isAdminRoleLabel,
   isOrganizationAdmin,
+  isClubTeamAdminUser,
   isEventOrganization,
   isClubTeam,
   getTeamById,

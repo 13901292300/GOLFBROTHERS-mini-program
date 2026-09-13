@@ -22,27 +22,7 @@ function resolveUserId(userOrId) {
  * 不调用 isOrganizationAdmin。
  */
 function isClubTeamAdminUser(teamId, userId) {
-  var tid = asString(teamId);
-  var uid = asString(userId);
-  if (!tid || !uid) return false;
-  var team = teamDirectory.getTeamById(tid);
-  if (!team || !teamDirectory.isClubTeam(team)) return false;
-
-  var admins = teamDirectory.normalizeAdminUserIds(team.adminUserIds);
-  if (admins.indexOf(uid) >= 0) return true;
-
-  var members = teamDirectory.getTeamMembers(tid) || [];
-  for (var i = 0; i < members.length; i++) {
-    var m = members[i];
-    if (!m) continue;
-    var mid = asString(m.userId || m.playerId);
-    if (mid !== uid) continue;
-    var st = asString(m.memberStatus || 'active') || 'active';
-    if (st !== 'active') continue;
-    var role = teamDirectory.normalizeTeamMemberRole(m.role, team, uid);
-    if (role === 'owner' || role === 'admin') return true;
-  }
-  return false;
+  return teamDirectory.isClubTeamAdminUser(teamId, userId);
 }
 
 function isSeriesEventOrgAdmin(series, userId) {

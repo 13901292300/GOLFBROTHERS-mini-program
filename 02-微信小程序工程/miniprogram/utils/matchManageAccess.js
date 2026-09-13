@@ -34,7 +34,9 @@ const COMMON_VIEW_PERMISSIONS = {
   invite_friends_register: true
 };
 
-function resolveUserId(userOrId) {
+const PLACEHOLDER_USER_IDS = { me: true, mock: true, demo: true };
+
+function _rawUserId(userOrId) {
   if (userOrId == null) return '';
   if (typeof userOrId === 'string' || typeof userOrId === 'number') {
     return String(userOrId).trim();
@@ -45,11 +47,67 @@ function resolveUserId(userOrId) {
   return '';
 }
 
-function isCreatorOfMatch(match, userId) {
-  const uid = String(userId || '').trim();
-  if (!uid || !match) return false;
-  const creatorId = String(match.createdBy || match.creatorId || '').trim();
-  return !!(creatorId && creatorId === uid);
+function collectManageActorIds(userOrId) {
+  const out = [];
+  const seen = {};
+  function add(id) {
+    const s = String(id || '').trim();
+    if (!s || seen[s]) return;
+    seen[s] = true;
+    out.push(s);
+  }
+  add(_rawUserId(userOrId));
+  try {
+    add(require('./teamClub/identity.js').currentUserIdOrEmpty());
+  } catch (e) {
+    /* ignore */
+  }
+  try {
+    const alias = require('./userIdentityAlias.js');
+    const snapshot = out.slice();
+    for (let i = 0; i < snapshot.length; i++) {
+      add(alias.resolveCanonicalUserId(snapshot[i]));
+      const aliases = alias.getAliases(snapshot[i]) || [];
+      for (let j = 0; j < aliases.length; j++) {
+        const row = aliases[j];
+        if (!row) continue;
+        add(row.fromUserId);
+        add(row.toUserId);
+      }
+    }
+  } catch (e2) {
+    /* ignore */
+  }
+  return out;
+}
+
+function resolveUserId(userOrId) {
+  const ids = collectManageActorIds(userOrId);
+  for (let i = 0; i < ids.length; i++) {
+    if (!PLACEHOLDER_USER_IDS[ids[i].toLowerCase()]) return ids[i];
+  }
+  return ids[0] || '';
+}
+
+function isCreatorOfMatch(match, userOrId) {
+  if (!match) return false;
+  const actorIds = collectManageActorIds(userOrId);
+  if (!actorIds.length) return false;
+  const creators = [
+    match.createdBy,
+    match.creatorId,
+    match.ownerUserId,
+    match.creatorUserId
+  ];
+  const seen = {};
+  for (let i = 0; i < actorIds.length; i++) {
+    seen[actorIds[i]] = true;
+  }
+  for (let j = 0; j < creators.length; j++) {
+    const cid = String(creators[j] || '').trim();
+    if (cid && seen[cid]) return true;
+  }
+  return false;
 }
 
 /**
@@ -66,6 +124,26 @@ function resolveHostingOrganizationId(match) {
   return String(match.teamId || '').trim();
 }
 
+function isHostingOrgAdminOfMatch(match, userOrId) {
+  const hostingOrgId = resolveHostingOrganizationId(match);
+  if (!hostingOrgId) return false;
+  const actorIds = collectManageActorIds(userOrId);
+  if (!actorIds.length) return false;
+  const org = teamDirectory.getTeamById(hostingOrgId);
+  const useClub =
+    isTeamInternalMatch(match) || !!(org && teamDirectory.isClubTeam(org));
+  for (let i = 0; i < actorIds.length; i++) {
+    const id = actorIds[i];
+    if (!id) continue;
+    if (useClub) {
+      if (teamDirectory.isClubTeamAdminUser(hostingOrgId, id)) return true;
+    } else if (teamDirectory.isOrganizationAdmin(hostingOrgId, id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * @returns {{
  *   userId: string,
@@ -80,13 +158,9 @@ function resolveHostingOrganizationId(match) {
  */
 function resolveMatchManageAccess(match, userOrId) {
   const userId = resolveUserId(userOrId);
-  const isCreator = isCreatorOfMatch(match, userId);
+  const isCreator = isCreatorOfMatch(match, userOrId);
   const hostingOrgId = resolveHostingOrganizationId(match);
-  const isHostingOrgAdmin = !!(
-    userId &&
-    hostingOrgId &&
-    teamDirectory.isOrganizationAdmin(hostingOrgId, userId)
-  );
+  const isHostingOrgAdmin = isHostingOrgAdminOfMatch(match, userOrId);
   const inter = isInterTeamMatch(match);
   const internal = isTeamInternalMatch(match);
   const isPrivilegedUser = !!(isCreator || isHostingOrgAdmin);
@@ -136,8 +210,10 @@ function canManageTempAdmins(match, userOrId) {
 module.exports = {
   PRIVILEGED_BASE_PERMISSIONS,
   resolveUserId,
+  collectManageActorIds,
   isCreatorOfMatch,
   resolveHostingOrganizationId,
+  isHostingOrgAdminOfMatch,
   resolveMatchManageAccess,
   isCommonViewPermission,
   hasMatchManagePermission,
