@@ -3632,7 +3632,10 @@ Page({
         const genderDisplay = playerManage.getGenderDisplay(user);
         const userId = user.userId || '';
         const snapshotName = playerManage.resolveMatchNickname(user) || '';
-        const publicName = String(user.nickname || user.displayName || '').trim();
+        const over = playerLiveDisplay.overlayScorePlayerDisplay(user);
+        const publicName = String(
+          (over.applied && over.name) || user.nickname || user.displayName || ''
+        ).trim();
         const named = playerDisplayName.resolvePlayerDisplayNameForViewer({
           viewerUserId: (this._viewerRemarkCtx && this._viewerRemarkCtx.viewer) || '',
           targetUserId: userId,
@@ -3642,20 +3645,23 @@ Page({
           remarkNameMap: this._getViewerRemarkNameMap(),
           defaultName: '未知球员'
         });
+        const liveGenderDisplay = over.applied && over.gender
+          ? playerManage.getGenderDisplay({ gender: over.gender })
+          : genderDisplay;
         return {
           listKey: user.userId || ('register-user-' + groupId + '-' + index),
           userId: userId,
           playerId: userId,
           // 仅 View Model：备注优先；底层 registerInfo 未被修改
           competitionName: named.displayName,
-          gender: user.gender || '',
+          gender: (over.applied && over.gender) || user.gender || '',
           sex: user.sex || '',
-          genderIcon: user.genderIcon || genderDisplay.icon,
-          genderClass: user.genderClass || genderDisplay.className,
+          genderIcon: liveGenderDisplay.icon || user.genderIcon || genderDisplay.icon,
+          genderClass: liveGenderDisplay.className || user.genderClass || genderDisplay.className,
           // 江湖差点空值统一显示 "-"（0 为有效差点，需保留）
           handicap: (user.handicap != null && user.handicap !== '') ? String(user.handicap) : '-',
           paymentConfirmed: user.paymentConfirmed === true,
-          avatar: user.avatar || '',
+          avatar: (over.applied && over.avatar) || user.avatar || '',
           phone: user.phone || '',
           groupId: user.groupId || '',
           groupName: user.groupName || '',
