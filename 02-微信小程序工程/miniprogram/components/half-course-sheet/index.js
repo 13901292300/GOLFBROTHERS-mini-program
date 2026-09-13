@@ -107,10 +107,20 @@ Component({
       }
       const result = halfCourseEdit.apply(this._ctx(), front9, back9);
       if (result && result.ok === false) {
-        wx.showToast({
-          title: result.message || '比赛已经结束。',
-          icon: 'none'
-        });
+        const details = Array.isArray(result.details) ? result.details.filter(Boolean) : [];
+        const message = result.message || '比赛已经结束。';
+        if (details.length) {
+          wx.showModal({
+            title: '无法更换半场',
+            content: message + '\n' + details.slice(0, 8).join('\n'),
+            showCancel: false
+          });
+        } else {
+          wx.showToast({
+            title: message,
+            icon: 'none'
+          });
+        }
         return;
       }
       this.triggerEvent('confirm', result);
