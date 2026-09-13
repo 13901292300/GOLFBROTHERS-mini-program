@@ -12,6 +12,7 @@ const teamClubRepo = require('../../../../utils/teamClub/access.js');
 const teamClub = require('../../../../utils/teamClub/service.js');
 const createTeeTimeNow = require('../../../../utils/createTeeTimeNow.js');
 const timeWheelBridge = require('../../utils/timeWheelBridge.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
 
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
 
@@ -177,6 +178,7 @@ Page({
     courseId: '',
     courseLocation: '',
     courseHalfText: '',
+    courseDisplayName: '',
     front9Course: null,
     back9Course: null,
 
@@ -469,8 +471,10 @@ Page({
         courseName: form.courseName || '',
         courseLocation: form.courseLocation || '',
         courseHalfText: form.courseHalfText || '',
+        courseDisplayName: halfCourse.formatCourseDisplayName(form),
         front9Course: form.front9Course || null,
         back9Course: form.back9Course || null,
+        courseLayoutRevision: form.courseLayoutRevision,
         teeTime: form.teeTime || (teeDraft ? formatDateTime(teeDraft) : ''),
         teeTimeText: teeTimeText,
         deadlineTime: form.deadlineTime || (deadlineDraft ? formatDateTime(deadlineDraft) : ''),
@@ -692,14 +696,7 @@ Page({
       events: {
         courseSelected: (payload) => {
           if (!payload) return;
-          this.setData({
-            courseId: payload.courseId || '',
-            courseName: payload.courseName || '',
-            courseLocation: payload.courseLocation || '',
-            courseHalfText: payload.halfText ? '（' + payload.halfText + '）' : '',
-            front9Course: payload.front9Course || null,
-            back9Course: payload.back9Course || null
-          });
+          this.setData(halfCourse.buildCourseSelectionFields(payload));
         }
       },
       fail: () => wx.showToast({ title: '页面尚未注册', icon: 'none' })

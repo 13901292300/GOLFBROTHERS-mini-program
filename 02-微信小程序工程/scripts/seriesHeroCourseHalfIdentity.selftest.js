@@ -36,10 +36,10 @@ function assert(name, cond, detail) {
 var club = '北京乡村高尔夫俱乐部';
 
 assert(
-  '单轮默认 A/B 明确显示（A/B）',
+  '单轮默认 A&B 明确显示',
   viewModel.buildSeriesCourseLines([
     { courseId: 'c1', courseName: club, front9Course: 'A', back9Course: 'B' }
-  ]).lines[0] === club + '（A/B）'
+  ]).lines[0] === club + ' A&B'
 );
 
 var acBd = viewModel.buildSeriesCourseLines([
@@ -49,8 +49,8 @@ var acBd = viewModel.buildSeriesCourseLines([
 assert(
   '同一 courseId：A/C 与 B/D 两个条目，且按轮次首次出现序',
   acBd.lines.length === 2 &&
-    acBd.lines[0] === club + '（A/C）' &&
-    acBd.lines[1] === club + '（B/D）'
+    acBd.lines[0] === club + ' A&C' &&
+    acBd.lines[1] === club + ' B&D'
 );
 
 var sameAc = viewModel.buildSeriesCourseLines([
@@ -59,7 +59,7 @@ var sameAc = viewModel.buildSeriesCourseLines([
 ]);
 assert(
   '同一 courseId、同一 A/C 跨多轮去重为一个',
-  sameAc.lines.length === 1 && sameAc.lines[0] === club + '（A/C）'
+  sameAc.lines.length === 1 && sameAc.lines[0] === club + ' A&C'
 );
 
 var diffId = viewModel.buildSeriesCourseLines([
@@ -69,8 +69,8 @@ var diffId = viewModel.buildSeriesCourseLines([
 assert(
   '不同 courseId、同名、同半场保留两个',
   diffId.lines.length === 2 &&
-    diffId.lines[0] === club + '（A/B）' &&
-    diffId.lines[1] === club + '（A/B）'
+    diffId.lines[0] === club + ' A&B' &&
+    diffId.lines[1] === club + ' A&B'
 );
 
 var oldName = viewModel.buildSeriesCourseLines([
@@ -79,7 +79,7 @@ var oldName = viewModel.buildSeriesCourseLines([
 ]);
 assert(
   '无 courseId 旧数据从名称半场后缀 fallback，且中英文括号去重为一个',
-  oldName.lines.length === 1 && oldName.lines[0] === club + '（A/C）'
+  oldName.lines.length === 1 && oldName.lines[0] === club + ' A&C'
 );
 
 assert(
@@ -89,7 +89,7 @@ assert(
     courseName: club + '（A/C）',
     front9Course: 'A',
     back9Course: 'C'
-  }) === club + '（A/C）'
+  }) === club + ' A&C'
 );
 
 var spaced = viewModel.buildSeriesCourseLines([
@@ -98,7 +98,7 @@ var spaced = viewModel.buildSeriesCourseLines([
 ]);
 assert(
   '中文/英文括号与空格规范化后同一身份',
-  spaced.lines.length === 1 && spaced.lines[0] === club + '（A/C）'
+  spaced.lines.length === 1 && spaced.lines[0] === club + ' A&C'
 );
 
 assert(
@@ -114,7 +114,7 @@ assert(
       courseName: club,
       front9Course: 'C',
       back9Course: 'A'
-    }) === club + '（C/A）'
+    }) === club + ' C&A'
 );
 
 assert(
@@ -133,8 +133,8 @@ var order = viewModel.buildSeriesCourseLines([
 assert(
   '轮次首次出现顺序稳定',
   order.lines.length === 2 &&
-    order.lines[0] === '二号球场（A/B）' &&
-    order.lines[1] === '一号球场（A/C）'
+    order.lines[0] === '二号球场 A&B' &&
+    order.lines[1] === '一号球场 A&C'
 );
 
 assert(
@@ -146,9 +146,8 @@ assert(
 );
 
 assert(
-  '普通 detail 球场标题仍用自身 front9/back9 拼接，不走 Series Hero 投影',
+  '普通 detail 球场标题不走 Series Hero 投影',
   detailJs.indexOf('_buildScorecardCourseTitle(match)') >= 0 &&
-    detailJs.indexOf("return courseName + '（' + front9Course + '/' + back9Course + '）'") >= 0 &&
     detailJs.indexOf('buildSeriesCourseLines') < 0
 );
 

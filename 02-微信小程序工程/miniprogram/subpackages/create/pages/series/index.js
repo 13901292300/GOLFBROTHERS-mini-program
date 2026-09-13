@@ -20,6 +20,7 @@ const seriesStationIndex = require('../../../../utils/seriesStationIndex.js');
 const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 const seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 const seriesStoreDefault = require('../../../../utils/seriesStore.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
 
 var PUBLISHED_STRUCTURE_LOCKED_MSG =
   seriesInfoUpdate.PUBLISHED_STRUCTURE_LOCKED_MSG || '系列赛发布后暂不支持修改此项';
@@ -346,7 +347,7 @@ function buildRoundCards(draft, scoringMode, editOpts) {
       courseLocation: round.courseLocation || '',
       courseHalfText: round.courseHalfText || '',
       courseDisplay: round.courseName
-        ? String(round.courseName) + (round.courseHalfText || '')
+        ? halfCourse.formatCourseLineForUi(round)
         : '选择球场',
       gameMode: round.gameMode || '',
       gameModeText: round.gameMode || '选择比赛赛制',
@@ -2153,7 +2154,8 @@ Page({
             courseLocation: payload.courseLocation || '',
             front9Course: payload.front9Course || null,
             back9Course: payload.back9Course || null,
-            courseHalfText: payload.halfText ? '（' + payload.halfText + '）' : ''
+            courseHalfText: halfCourse.halfTextFromPayload(payload),
+            courseLayoutRevision: payload.courseLayoutRevision
           };
           // edit_round：只改当前轮，禁止向后级联
           if (self._editRoundMode) {

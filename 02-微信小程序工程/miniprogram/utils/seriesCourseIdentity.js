@@ -44,13 +44,21 @@ function parseSeriesHalfPairFromText(text) {
   if (isHalfToken(slashFront) && isHalfToken(slashBack)) {
     return { front: slashFront, back: slashBack };
   }
+  if (isHalfToken(slashFront) && !slashBack) {
+    return { front: slashFront, back: '' };
+  }
   var inner = foldFullwidthAscii(raw)
     .replace(/^[（(]/, '')
     .replace(/[）)]$/, '')
     .trim()
     .replace(/\s+/g, '');
   var m = inner.match(/^([A-Za-z0-9]{1,3})[/／+＋&＆]([A-Za-z0-9]{1,3})$/);
-  if (!m) return { front: '', back: '' };
+  if (!m) {
+    if (/^[A-Za-z0-9]{1,3}$/.test(inner) && isHalfToken(inner)) {
+      return { front: normalizeHalfToken(inner), back: '' };
+    }
+    return { front: '', back: '' };
+  }
   return { front: m[1], back: m[2] };
 }
 
@@ -59,46 +67,51 @@ function stripTrailingCourseHalfSuffix(name) {
   var m = s.match(
     /^(.*?)(?:\s*[（(]\s*([A-Za-z0-9]{1,3})\s*[/／+＋&＆]\s*([A-Za-z0-9]{1,3})\s*[）)]\s*)$/
   );
-  if (!m) return { base: asString(name), front: '', back: '' };
-  var front = normalizeHalfToken(m[2]);
-  var back = normalizeHalfToken(m[3]);
-  if (!isHalfToken(front) || !isHalfToken(back)) {
-    return { base: asString(name), front: '', back: '' };
+  if (m) {
+    var front = normalizeHalfToken(m[2]);
+    var back = normalizeHalfToken(m[3]);
+    if (isHalfToken(front) && isHalfToken(back)) {
+      return { base: asString(m[1]), front: front, back: back };
+    }
   }
-  return { base: asString(m[1]), front: front, back: back };
+  var bare = s.match(
+    /^(.*?)\s+([A-Za-z0-9]{1,3})\s*[/／+＋&＆]\s*([A-Za-z0-9]{1,3})\s*$/
+  );
+  if (bare) {
+    var f2 = normalizeHalfToken(bare[2]);
+    var b2 = normalizeHalfToken(bare[3]);
+    if (isHalfToken(f2) && isHalfToken(b2)) {
+      return { base: asString(bare[1]), front: f2, back: b2 };
+    }
+  }
+  return { base: asString(name), front: '', back: '' };
 }
 
 function resolveSeriesRoundHalves(round) {
   var r = round && typeof round === 'object' ? round : {};
   var front = halfCodeFromValue(r.front9Course);
   var back = halfCodeFromValue(r.back9Course);
-  if (isHalfToken(front) && isHalfToken(back)) {
+  if (isHalfToken(front) || isHalfToken(back)) {
     return { front: front, back: back, source: 'fields' };
   }
   var fromText = parseSeriesHalfPairFromText(r.courseHalfText || r.courseHalf || r.halfText);
-  if (fromText.front && fromText.back) {
+  if (fromText.front || fromText.back) {
     return { front: fromText.front, back: fromText.back, source: 'halfText' };
   }
   var fromName = stripTrailingCourseHalfSuffix(r.courseName);
-  if (fromName.front && fromName.back) {
+  if (fromName.front || fromName.back) {
     return { front: fromName.front, back: fromName.back, source: 'name-fallback' };
   }
   return { front: '', back: '', source: '' };
 }
 
-function formatSeriesCourseHalfSuffix(front, back) {
-  if (!isHalfToken(front) || !isHalfToken(back)) return '';
-  return '（' + normalizeHalfToken(front) + '/' + normalizeHalfToken(back) + '）';
+function formatSeriesCourseDisplayName(round) {
+  return halfCourse.formatCourseDisplayName(round);
 }
 
-function formatSeriesCourseDisplayName(round) {
-  var name = asString(round && round.courseName);
-  if (!name) return '';
-  var halves = resolveSeriesRoundHalves(round);
-  var suffix = formatSeriesCourseHalfSuffix(halves.front, halves.back);
-  if (!suffix) return name;
-  var stripped = stripTrailingCourseHalfSuffix(name);
-  return (stripped.base || name) + suffix;
+function formatSeriesCourseHalfSuffix(front, back) {
+  var combo = halfCourse.formatHalfCombo(front, back);
+  return combo ? ' ' + combo : '';
 }
 
 function buildSeriesCourseIdentityKey(round) {

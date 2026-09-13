@@ -9,7 +9,17 @@
  */
 
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
-const { COURSE_DB, FALLBACK_ORIGIN, hasCoords, formatDistanceMeta, buildCourseDistanceViews, resolveFirstTwoCourses } = require('../../../../../utils/courseDatabase.js');
+const {
+  FALLBACK_ORIGIN,
+  hasCoords,
+  formatDistanceMeta,
+  buildCourseDistanceViews,
+  resolveFirstTwoCourses,
+  listVisibleCourses,
+  findCourseById,
+  stampCatalogRevision,
+  canonicalCourseId
+} = require('../../../../../utils/courseDatabase.js');
 const halfCourse = require('../../../../../utils/halfCourse.js');
 const networkStatus = require('../../../../../utils/networkStatus.js');
 
@@ -47,7 +57,7 @@ Page({
   onLoad(options) {
     this.initHeaderNav();
     this.applyTheme(getApp().getTheme());
-    this.setData({ selectedId: (options && options.selectedId) || '' });
+    this.setData({ selectedId: canonicalCourseId((options && options.selectedId) || '') });
     this.buildFrequent();
     this.locateAndBuildNearby();
     this._onNetworkStatus = (state) => this._applyNetworkUi(state);
@@ -120,7 +130,7 @@ Page({
 
   /* ===== 常去球场（userCourseHistory，按使用次数降序，最多 10 条） ===== */
   buildFrequent() {
-    const top = COURSE_DB.filter((c) => c.useCount > 0)
+    const top = listVisibleCourses().filter((c) => c.useCount > 0)
       .slice()
       .sort((a, b) => b.useCount - a.useCount)
       .slice(0, 10);
@@ -148,7 +158,7 @@ Page({
   },
 
   buildNearby(origin) {
-    const views = buildCourseDistanceViews(origin, COURSE_DB);
+    const views = buildCourseDistanceViews(origin, listVisibleCourses());
     this._distanceMap = views.distanceMap;
     this._nearbyIds = {};
     views.nearbyCourses.forEach((item) => {
@@ -188,7 +198,7 @@ Page({
     const q = (query || '').toLowerCase();
     if (!q) return [];
     const ranked = [];
-    COURSE_DB.forEach((c) => {
+    listVisibleCourses().forEach((c) => {
       const nameLower = c.courseName.toLowerCase();
       let rank = -1;
       if (nameLower === q) rank = 0; // 名称完全匹配
@@ -224,7 +234,7 @@ Page({
   /* ===== 选择球场 → 多半场则弹半场选择，否则直接回填 ===== */
   onSelectCourse(e) {
     const courseId = e.currentTarget.dataset.id;
-    const course = COURSE_DB.find((c) => c.courseId === courseId);
+    const course = findCourseById(courseId);
     if (!course) return;
     // 多半场球场（A/B/C…，halfCourseCount >= 3）：弹出二级「选择半场」弹窗
     if ((course.halfCourseCount || 0) >= 3) {
@@ -250,14 +260,14 @@ Page({
   },
 
   _returnCourse(course, front9, back9, halfText) {
-    const payload = {
+    const payload = stampCatalogRevision({
       courseId: course.courseId,
       courseName: course.courseName,
       courseLocation: course.location,
       front9Course: front9 || null,
       back9Course: back9 || null,
       halfText: halfText || ''
-    };
+    });
     this.setData({ selectedId: course.courseId });
     this._emitCourseSelected(payload);
   },
@@ -334,11 +344,9 @@ Page({
       wx.showToast({ title: '请至少选择一个半场', icon: 'none' });
       return;
     }
-    // 组合显示：前后都有 → A/B；单9 → A 或 B；允许前后同场（A/A）
-    let combo = '';
-    if (front9 && back9) combo = front9 + '/' + back9;
-    else combo = front9 || back9;
-    const course = COURSE_DB.find((c) => c.courseId === this.data.halfCourse.id);
+    // 组合显示：前后都有 → A&D（保留选择顺序）；单半场不虚构另一半
+    const combo = halfCourse.formatHalfCombo(front9, back9);
+    const course = findCourseById(this.data.halfCourse.id);
     if (!course) {
       this.setData({ halfPopupVisible: false });
       return;
