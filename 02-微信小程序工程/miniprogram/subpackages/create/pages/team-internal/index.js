@@ -10,8 +10,9 @@ const {
 const matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
 const teamClubRepo = require('../../../../utils/teamClub/access.js');
 const teamClub = require('../../../../utils/teamClub/service.js');
+const createTeeTimeNow = require('../../../../utils/createTeeTimeNow.js');
+const timeWheelBridge = require('../../utils/timeWheelBridge.js');
 
-const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
 
 const TEAM_GAME_MODES = [
@@ -147,23 +148,7 @@ function formatTime(draft) {
 }
 
 function parseTimeToDraft(timeString) {
-  const m = String(timeString || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
-  if (!m) {
-    return { year: 2026, month: 6, day: 3, hour: 9, minute: 0 };
-  }
-  let minute = parseInt(m[5], 10);
-  if (MINUTE_VALUES.indexOf(minute) < 0) {
-    minute = MINUTE_VALUES.reduce((best, cur) =>
-      Math.abs(cur - minute) < Math.abs(best - minute) ? cur : best
-    );
-  }
-  return {
-    year: parseInt(m[1], 10),
-    month: parseInt(m[2], 10),
-    day: parseInt(m[3], 10),
-    hour: parseInt(m[4], 10),
-    minute
-  };
+  return createTeeTimeNow.parseTimeToDraftForWheel(timeString);
 }
 
 Page({
@@ -195,10 +180,10 @@ Page({
     front9Course: null,
     back9Course: null,
 
-    teeTime: '2026-06-03 17:10',
-    deadlineTime: '2026-06-02 18:00',
-    teeTimeText: '2026/06/03 星期三 17:10',
-    deadlineTimeText: '2026/06/02 星期二 18:00',
+    teeTime: '',
+    deadlineTime: '',
+    teeTimeText: '',
+    deadlineTimeText: '',
 
     selectedGameMode: '个人比杆赛',
     gameMode: '个人比杆赛',
@@ -271,16 +256,16 @@ Page({
     activeTimeTarget: 'tee',
     timePickerTitle: '选择开球时间',
     timeWheelTitle: '选择开球时间',
-    timeDraft: { year: 2026, month: 6, day: 3, hour: 17, minute: 10 },
-    timePickerValue: [5, 2, 17, 1],
+    timeDraft: { year: 0, month: 1, day: 1, hour: 0, minute: 0 },
+    timePickerValue: [0, 0, 0, 0],
 
-    teeYear: 2026,
+    teeYear: 0,
     months: [],
     days: [],
     hours: [],
     minutes: [],
-    teeIndex: [5, 2, 17, 1],
-    wheelIndex: [5, 2, 17, 1]
+    teeIndex: [0, 0, 0, 0],
+    wheelIndex: [0, 0, 0, 0]
   },
 
   onLoad(options) {
@@ -295,12 +280,15 @@ Page({
       return;
     }
 
-    this._tee = parseTimeToDraft('2026-06-03 17:10');
-    this._deadline = parseTimeToDraft('2026-06-02 18:00');
+    const created = createTeeTimeNow.buildCreateTimes();
+    this._tee = created.tee;
+    this._deadline = created.deadline;
     this._editingTime = Object.assign({}, this._tee);
     this._activeTimeTarget = 'tee';
     this._freeModeTeamGroups = this._cloneTeamGroups(this.data.teamGroups);
-    this.setData(this._buildEventInfoSortMeta(this.data.eventInfoList));
+    this.setData(
+      Object.assign(this._buildEventInfoSortMeta(this.data.eventInfoList), created.dataPatch)
+    );
     this._prefillTeamFromQuery(options);
   },
 
@@ -402,11 +390,17 @@ Page({
       return;
     }
 
-    const teeDraft = parseTimeToDraft(form.teeTime || '2026-06-03 17:10');
-    const deadlineDraft = parseTimeToDraft(form.deadlineTime || '2026-06-02 18:00');
+    const teeDraft = createTeeTimeNow.resolveStoredDraft(form.teeTime, form.teeTimeText);
+    const deadlineDraft = createTeeTimeNow.resolveStoredDraft(
+      form.deadlineTime,
+      form.deadlineTimeText
+    );
     this._tee = teeDraft;
     this._deadline = deadlineDraft;
-    this._editingTime = Object.assign({}, teeDraft);
+    this._editingTime = Object.assign(
+      {},
+      teeDraft || { year: 0, month: 1, day: 1, hour: 0, minute: 0 }
+    );
     this._activeTimeTarget = 'tee';
     this._editMatchId = matchId;
     this._roundNameManual = true;
@@ -431,8 +425,9 @@ Page({
     const maxFeeId = feeList.reduce((max, f) => Math.max(max, Number(f.id) || 0), 0);
 
     const partnerConfig = partnerConfigUtil.loadPartnerConfig(form.teamName || '');
-    const teeTimeText = form.teeTimeText || formatDisplayDateTime(teeDraft);
-    const deadlineTimeText = form.deadlineTimeText || formatDisplayDateTime(deadlineDraft);
+    const teeTimeText = form.teeTimeText || (teeDraft ? formatDisplayDateTime(teeDraft) : '');
+    const deadlineTimeText =
+      form.deadlineTimeText || (deadlineDraft ? formatDisplayDateTime(deadlineDraft) : '');
 
     if (!matchPlay) {
       this._freeModeTeamGroups = this._cloneTeamGroups(teamGroups);
@@ -476,9 +471,9 @@ Page({
         courseHalfText: form.courseHalfText || '',
         front9Course: form.front9Course || null,
         back9Course: form.back9Course || null,
-        teeTime: form.teeTime || formatDateTime(teeDraft),
+        teeTime: form.teeTime || (teeDraft ? formatDateTime(teeDraft) : ''),
         teeTimeText: teeTimeText,
-        deadlineTime: form.deadlineTime || formatDateTime(deadlineDraft),
+        deadlineTime: form.deadlineTime || (deadlineDraft ? formatDateTime(deadlineDraft) : ''),
         deadlineTimeText: deadlineTimeText,
         selectedGameMode: gameMode,
         gameMode: gameMode,
@@ -1597,49 +1592,18 @@ Page({
 
   /* ===== 开球/截止时间滚轮（与普通创建页一致，共用弹层） ===== */
   _buildWheels() {
-    const t = this._editingTime;
-    const months = Array.from({ length: 12 }, (_, i) => pad2(i + 1));
-    const dayCount = daysInMonth(t.year, t.month);
-    if (t.day > dayCount) t.day = dayCount;
-    const days = Array.from({ length: dayCount }, (_, i) => pad2(i + 1));
-    const hours = Array.from({ length: 24 }, (_, i) => pad2(i));
-    const minutes = MINUTE_VALUES.map((m) => pad2(m));
-    const minuteIdx = Math.max(0, MINUTE_VALUES.indexOf(t.minute));
-    const teeIndex = [t.month - 1, t.day - 1, t.hour, minuteIdx];
-
-    this.setData({
-      teeYear: t.year,
-      timeDraft: Object.assign({}, t),
-      months,
-      days,
-      hours,
-      minutes,
-      teeIndex,
-      timePickerValue: teeIndex,
-      wheelIndex: teeIndex
-    });
+    this.setData(timeWheelBridge.buildWheelPayload(this._editingTime));
   },
 
   onTeeChange(e) {
-    const [mIdx, dIdx, hIdx, minIdx] = e.detail.value;
-    const t = this._editingTime;
-    t.month = mIdx + 1;
-    t.hour = hIdx;
-    t.minute = MINUTE_VALUES[minIdx];
-
-    const dayCount = daysInMonth(t.year, t.month);
-    let dayIdx = dIdx;
-    if (dayIdx > dayCount - 1) dayIdx = dayCount - 1;
-    t.day = dayIdx + 1;
-
-    const days = Array.from({ length: dayCount }, (_, i) => pad2(i + 1));
-    const teeIndex = [mIdx, dayIdx, hIdx, minIdx];
+    const result = timeWheelBridge.applyPickerValue(this._editingTime, e.detail.value);
+    this._editingTime = result.draft;
     this.setData({
-      days,
-      teeIndex,
-      timePickerValue: teeIndex,
-      wheelIndex: teeIndex,
-      timeDraft: Object.assign({}, t)
+      days: result.days,
+      teeIndex: result.teeIndex,
+      timePickerValue: result.teeIndex,
+      wheelIndex: result.teeIndex,
+      timeDraft: result.timeDraft
     });
   },
 
@@ -1656,14 +1620,15 @@ Page({
     this._editingTime = Object.assign({}, parseTimeToDraft(timeString));
     this._activeTimeTarget = isDeadline ? 'deadline' : 'tee';
     const title = isDeadline ? '选择报名截止时间' : '选择开球时间';
-    this._buildWheels();
-    this.setData({
-      showTimePicker: true,
-      showTimeWheel: true,
-      activeTimeTarget: target,
-      timePickerTitle: title,
-      timeWheelTitle: title
-    });
+    this.setData(
+      Object.assign({}, timeWheelBridge.buildWheelPayload(this._editingTime), {
+        showTimePicker: true,
+        showTimeWheel: true,
+        activeTimeTarget: target,
+        timePickerTitle: title,
+        timeWheelTitle: title
+      })
+    );
   },
 
   openTimeWheelSheet(e) {

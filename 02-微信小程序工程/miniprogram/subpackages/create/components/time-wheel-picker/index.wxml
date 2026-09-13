@@ -23,6 +23,7 @@
       <view class="time-wheel-highlight"></view>
 
       <picker-view
+        wx:if="{{pickerReady}}"
         class="time-wheel-picker"
         value="{{innerValue}}"
         bindchange="onPickerChange"

@@ -19,23 +19,17 @@ function isCompositionPersistMode(mode) {
   return isCompositionGameMode(mode) || isFourball2BallGameMode(mode);
 }
 
-const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
-
 function parseTeeTimeText(text) {
   const raw = (text || '').trim();
   if (!raw) return null;
   const m = raw.match(/(\d{4})年(\d{1,2})月(\d{1,2})日[^\d]*(\d{1,2}):(\d{1,2})/);
   if (!m) return null;
-  const minute = Number(m[5]);
-  const snapped = MINUTE_VALUES.reduce((best, v) =>
-    Math.abs(v - minute) < Math.abs(best - minute) ? v : best
-  , MINUTE_VALUES[0]);
   return {
     year: Number(m[1]),
     month: Number(m[2]),
     day: Number(m[3]),
     hour: Number(m[4]),
-    minute: snapped
+    minute: Number(m[5])
   };
 }
 

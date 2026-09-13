@@ -4,12 +4,12 @@ const gameStore = require('../../../../utils/gameStore.js');
 const matchStateUtil = require('../../../../utils/matchState.js');
 const gameEdit = require('../../utils/gameEdit.js');
 const halfCourseEdit = require('../../../../utils/halfCourseEdit.js');
+const createTeeTimeNow = require('../../../../utils/createTeeTimeNow.js');
+const timeWheelBridge = require('../../utils/timeWheelBridge.js');
 const halfCourse = require('../../../../utils/halfCourse.js');
 const temporaryCourse = require('../../../../utils/temporaryCourse.js');
 
-
 const WEEK_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-const MINUTE_VALUES = [0, 10, 20, 30, 40, 50];
 
 const GAME_MODES = [
   { name: '个人比杆赛', desc: '每位球员独立记分，按总杆排名', icon: '🏌' },
@@ -235,8 +235,7 @@ Page({
     this._compositionQueue = [];
     this.setData({ groups: [firstGroup] }, () => this._refreshGroupMeta());
 
-    // 开球时间默认值：2026年05月04日 09:40
-    this._tee = { year: 2026, month: 5, day: 4, hour: 9, minute: 40 };
+    this._tee = createTeeTimeNow.roundDraftToTenMinutes(createTeeTimeNow.partsFromDate());
     this._buildWheels();
     this._applyTeeText();
   },
@@ -257,8 +256,8 @@ Page({
     this._editGameId = gameId;
     this._groupSeq = (form.groups && form.groups.length) || 1;
     const teeParsed = gameEdit.parseTeeTimeText(form.teeTimeText);
-    this._tee = teeParsed || { year: 2026, month: 5, day: 4, hour: 9, minute: 40 };
-    this._buildWheels();
+    this._tee = teeParsed || createTeeTimeNow.parseFlexibleLocalParts(form.teeTimeText);
+    if (this._tee) this._buildWheels();
     const compositionSummaryText = this._buildCompositionSummary(form.groupCompositionMap || {});
     this.setData(
       {
@@ -290,7 +289,7 @@ Page({
       },
       () => this._refreshGroupMeta()
     );
-    if (!form.teeTimeText) this._applyTeeText();
+    if (!form.teeTimeText && this._tee) this._applyTeeText();
   },
 
   onShow() {
@@ -1141,40 +1140,18 @@ Page({
 
   /* ===== 开球时间滚轮 ===== */
   _buildWheels() {
-    const t = this._tee;
-    const months = Array.from({ length: 12 }, (_, i) => pad2(i + 1));
-    const dayCount = daysInMonth(t.year, t.month);
-    if (t.day > dayCount) t.day = dayCount;
-    const days = Array.from({ length: dayCount }, (_, i) => pad2(i + 1));
-    const hours = Array.from({ length: 24 }, (_, i) => pad2(i));
-    const minutes = MINUTE_VALUES.map((m) => pad2(m));
-
-    const minuteIdx = Math.max(0, MINUTE_VALUES.indexOf(t.minute));
-    this.setData({
-      teeYear: t.year,
-      months,
-      days,
-      hours,
-      minutes,
-      teeIndex: [t.month - 1, t.day - 1, t.hour, minuteIdx]
-    });
+    this.setData(timeWheelBridge.buildWheelPayload(this._tee));
   },
 
   onTeeChange(e) {
-    const [mIdx, dIdx, hIdx, minIdx] = e.detail.value;
-    const t = this._tee;
-    t.month = mIdx + 1;
-    t.hour = hIdx;
-    t.minute = MINUTE_VALUES[minIdx];
-
-    // 月份变化可能导致天数变化：重建并钳制
-    const dayCount = daysInMonth(t.year, t.month);
-    let dayIdx = dIdx;
-    if (dayIdx > dayCount - 1) dayIdx = dayCount - 1;
-    t.day = dayIdx + 1;
-
-    const days = Array.from({ length: dayCount }, (_, i) => pad2(i + 1));
-    this.setData({ days, teeIndex: [mIdx, dayIdx, hIdx, minIdx] });
+    const result = timeWheelBridge.applyPickerValue(this._tee, e.detail.value);
+    this._tee = result.draft;
+    this.setData({
+      days: result.days,
+      teeIndex: result.teeIndex,
+      timePickerValue: result.teeIndex,
+      timeDraft: result.timeDraft
+    });
   },
 
   onTimePickerChange(e) {
@@ -1194,8 +1171,14 @@ Page({
   },
 
   openTeeTimeSheet() {
-    this._buildWheels();
-    this.setData({ showTeeTime: true });
+    if (!this._tee) {
+      this._tee =
+        createTeeTimeNow.parseFlexibleLocalParts(this.data.teeTimeText) ||
+        createTeeTimeNow.partsFromDate();
+    }
+    this.setData(
+      Object.assign({}, timeWheelBridge.buildWheelPayload(this._tee), { showTeeTime: true })
+    );
   },
   closeTeeTimeSheet() {
     this.setData({ showTeeTime: false });

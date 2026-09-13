@@ -1,3 +1,5 @@
+const bindGate = require('./bindGate.js');
+
 Component({
   properties: {
     show: {
@@ -5,7 +7,9 @@ Component({
       value: false,
       observer(visible) {
         if (visible) {
-          this._syncInnerValue(this.properties.value);
+          this._mountPicker(this.properties.value);
+        } else {
+          this.setData(bindGate.closePatch());
         }
       }
     },
@@ -15,6 +19,7 @@ Component({
       type: Array,
       value: [0, 0, 0, 0],
       observer(newVal) {
+        if (!this.data.pickerReady) return;
         this._syncInnerValue(newVal);
       }
     },
@@ -27,27 +32,18 @@ Component({
 
   data: {
     innerValue: [0, 0, 0, 0],
+    pickerReady: false,
     monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   },
 
   methods: {
+    _mountPicker(boundValue) {
+      this.setData(bindGate.mountPatch(boundValue));
+    },
+
     _syncInnerValue(newVal) {
-      if (!Array.isArray(newVal) || newVal.length < 4) return;
-      const innerValue = [
-        Number(newVal[0]) || 0,
-        Number(newVal[1]) || 0,
-        Number(newVal[2]) || 0,
-        Number(newVal[3]) || 0
-      ];
-      const cur = this.data.innerValue;
-      if (
-        cur[0] === innerValue[0] &&
-        cur[1] === innerValue[1] &&
-        cur[2] === innerValue[2] &&
-        cur[3] === innerValue[3]
-      ) {
-        return;
-      }
+      const innerValue = bindGate.toIndex4(newVal);
+      if (bindGate.sameIndex4(this.data.innerValue, innerValue)) return;
       this.setData({ innerValue });
     },
 
@@ -60,7 +56,8 @@ Component({
     },
 
     onPickerChange(e) {
-      const value = e.detail.value;
+      if (!bindGate.shouldForwardPickerChange(this.data.pickerReady)) return;
+      const value = bindGate.toIndex4(e && e.detail && e.detail.value);
       this.setData({ innerValue: value });
       this.triggerEvent('change', { value });
     },
