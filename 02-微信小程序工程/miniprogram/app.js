@@ -41,6 +41,11 @@ App({
   onLaunch: function () {
     var self = this;
     this.globalData.theme = this.getTheme();
+    try {
+      require('./utils/courseDatabase.js').applyQinghewanCatalogCompat();
+    } catch (eCompat) {
+      /* ignore */
+    }
     this._bindScoreSyncNetworkListener();
     this._probeInitialNetworkType();
 
