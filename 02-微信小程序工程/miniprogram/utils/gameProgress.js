@@ -12,6 +12,8 @@ const scoreCompleteness = require('./scoreCompleteness.js');
 const TOTAL_HOLES = 18;
 // 与首页 .ds-progress-marker 宽度一致；用于 left 计算避免第18洞溢出
 const MARKER_SIZE_PX = 16;
+/** 与 .ds-progress-marker 2px 边框一致（外宽已含于 border-box 的 16px） */
+const MARKER_BORDER_PX = 2;
 // 五角星约 18px 宽，track 右端内缩半宽与星标中心对齐
 const TRACK_END_INSET_PX = 9;
 /** 出发表 LIVE 角标用时展示封顶（分钟）；不改 firstScoreAt / LIVE 判定 */
@@ -45,15 +47,31 @@ function formatLiveDurationBadgeSuffix(firstScoreAt, endMs) {
   return ' ' + String(minutes) + "'";
 }
 
+function clampProgressPct(pct) {
+  const n = Number(pct);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (n >= 100) return 100;
+  return n;
+}
+
+/** 与填充 width 共用：已完成洞数 / 18，不另走 (hole-1)/17 */
+function formatProgressPos(completedHoles) {
+  const c = Math.min(TOTAL_HOLES, Math.max(0, Number(completedHoles) || 0));
+  return clampProgressPct((c / TOTAL_HOLES) * 100).toFixed(6) + '%';
+}
+
+/**
+ * 指示器 left 字符串（兼容旧调用）：与填充同一百分比，轨道内用 min 夹紧。
+ */
+function buildMarkerLeftFromPos(progressPos) {
+  const pos = String(progressPos || '0%');
+  return 'min(' + pos + ', calc(100% - ' + MARKER_SIZE_PX + 'px))';
+}
+
 function buildMarkerLeft(indicatorHole) {
-  const ratio = TOTAL_HOLES > 1 ? (indicatorHole - 1) / (TOTAL_HOLES - 1) : 0;
-  const r = Math.min(1, Math.max(0, ratio));
-  // 第18洞：左缘锚在 track 末端内侧，避免 left:100% 整颗指示器外溢
-  if (indicatorHole >= TOTAL_HOLES) {
-    return 'calc(100% - ' + MARKER_SIZE_PX + 'px)';
-  }
-  // 第1–17洞：保持原左缘比例定位 ratio * 100%
-  return (r * 100).toFixed(6) + '%';
+  const hole = Math.min(TOTAL_HOLES, Math.max(1, Number(indicatorHole) || 1));
+  const completed = hole >= TOTAL_HOLES ? TOTAL_HOLES : hole - 1;
+  return buildMarkerLeftFromPos(formatProgressPos(completed));
 }
 
 function isFilledScore(s) {
@@ -167,9 +185,11 @@ function isScoringCompleted(game, groupIndex) {
 function buildProgressUi(game, groupIndex) {
   // 仅用户确认结束后才使用已结束置灰样式
   if (isGameEnded(game)) {
+    const progressPos = formatProgressPos(TOTAL_HOLES);
     return {
       progressFinish: true,
-      progressWidth: '100%',
+      progressPos: progressPos,
+      progressWidth: progressPos,
       progressMarkerLeft: '',
       progressMarkerText: 'F',
       completedHoles: TOTAL_HOLES,
@@ -188,12 +208,13 @@ function buildProgressUi(game, groupIndex) {
     const indicatorHole = scoringCompleted
       ? TOTAL_HOLES
       : computeNormalizedIndicatorHole(filledRecords, playerCount);
-    const fillPct = (normalizedCompleted / TOTAL_HOLES) * 100;
+    const progressPos = formatProgressPos(normalizedCompleted);
 
     return {
       progressFinish: false,
-      progressWidth: fillPct.toFixed(2) + '%',
-      progressMarkerLeft: buildMarkerLeft(indicatorHole),
+      progressPos: progressPos,
+      progressWidth: progressPos,
+      progressMarkerLeft: buildMarkerLeftFromPos(progressPos),
       progressMarkerText: indicatorHole < 10 ? '0' + indicatorHole : String(indicatorHole),
       completedHoles: normalizedCompleted,
       indicatorHole: indicatorHole,
@@ -207,12 +228,13 @@ function buildProgressUi(game, groupIndex) {
   const indicatorHole =
     completedHoles >= TOTAL_HOLES ? TOTAL_HOLES : Math.min(completedHoles + 1, TOTAL_HOLES);
   const effectiveCompleted = Math.min(completedHoles, TOTAL_HOLES);
-  const fillPct = (effectiveCompleted / TOTAL_HOLES) * 100;
+  const progressPos = formatProgressPos(effectiveCompleted);
 
   return {
     progressFinish: false,
-    progressWidth: fillPct.toFixed(2) + '%',
-    progressMarkerLeft: buildMarkerLeft(indicatorHole),
+    progressPos: progressPos,
+    progressWidth: progressPos,
+    progressMarkerLeft: buildMarkerLeftFromPos(progressPos),
     progressMarkerText: indicatorHole < 10 ? '0' + indicatorHole : String(indicatorHole),
     completedHoles: completedHoles,
     indicatorHole: indicatorHole,
@@ -267,6 +289,7 @@ function confirmFinishWholeGame(gameId) {
 module.exports = {
   TOTAL_HOLES,
   MARKER_SIZE_PX,
+  MARKER_BORDER_PX,
   TRACK_END_INSET_PX,
   LIVE_DURATION_DISPLAY_CAP_MINUTES,
   isFilledScore,
@@ -278,6 +301,8 @@ module.exports = {
   countTotalFilledRecords,
   isMultiGroupNormalGame,
   computeNormalizedIndicatorHole,
+  formatProgressPos,
+  buildMarkerLeftFromPos,
   buildMarkerLeft,
   buildProgressUi,
   confirmFinishGame,
