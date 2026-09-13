@@ -32,11 +32,11 @@ function getHolePars() {
 /* 赛事级球场名称（单一数据源，供领先榜逐洞详情标题等复用；后续接入真实赛事数据时改此处） */
 const TOURNAMENT_META = {
   courseId: 'c-qhw',
-  courseName: '北京清河湾高尔夫乡村俱乐部 A&B',
+  courseName: '北京清河湾乡村高尔夫俱乐部',
   courseLocation: '北京 · 昌平',
   front9Course: 'A',
   back9Course: 'B',
-  courseHalfText: '（A/B）'
+  courseHalfText: ' A&B'
 };
 
 function getTournamentCourseMeta() {
