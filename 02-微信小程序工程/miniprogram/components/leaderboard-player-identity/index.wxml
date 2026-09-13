@@ -6,9 +6,10 @@
     <view class="sc-avatar-wrap" style="position:relative;flex-shrink:0;width:160rpx;height:160rpx;">
       <image
         class="sc-avatar"
-        src="{{player.avatar}}"
+        src="{{displayAvatar || player.avatar}}"
         mode="aspectFill"
         style="width:160rpx;height:160rpx;border-radius:50%;display:block;overflow:hidden;"
+        binderror="onPlayerAvatarError"
       ></image>
       <!-- 角标节点保留；显隐由 showAvatarBadge（avatarBadge 能力）控制 -->
       <view

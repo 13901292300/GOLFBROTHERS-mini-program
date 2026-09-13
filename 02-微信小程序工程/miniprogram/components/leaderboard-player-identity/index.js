@@ -11,6 +11,7 @@
  */
 const playerIdentityGuard = require('../../utils/playerIdentityGuard.js');
 const { DEFAULT_ORG_LOGO } = require('../../utils/teamMatchCapabilities.js');
+const mockAvatars = require('../../utils/mockAvatars.js');
 
 Component({
   options: {
@@ -120,7 +121,9 @@ Component({
     avatarBadgeIsTeam: false,
     avatarBadgeIsText: false,
     avatarBadgeText: '',
-    avatarBadgeStyle: ''
+    avatarBadgeStyle: '',
+    displayAvatar: '',
+    avatarLoadFailed: false
   },
 
   observers: {
@@ -133,6 +136,7 @@ Component({
     'player, teamGroupLogoById, avatarBadge': function () {
       this._syncAvatarBadge();
       this._syncProfileEntry();
+      this._syncDisplayAvatar();
     }
   },
 
@@ -142,6 +146,7 @@ Component({
       this._syncRelationDisplay();
       this._syncProfileEntry();
       this._syncNameGender();
+      this._syncDisplayAvatar();
     }
   },
 
@@ -303,6 +308,28 @@ Component({
         patch.avatarBadgeStyle = avatarBadgeStyle;
       }
       if (Object.keys(patch).length) this.setData(patch);
+    },
+
+    _syncDisplayAvatar() {
+      const player = this.data.player || {};
+      const src = String(player.avatar || '').trim() || mockAvatars.DEFAULT_AVATAR;
+      if (this.data.avatarLoadFailed && this._avatarFailedSrc === src) {
+        if (this.data.displayAvatar !== mockAvatars.DEFAULT_AVATAR) {
+          this.setData({ displayAvatar: mockAvatars.DEFAULT_AVATAR });
+        }
+        return;
+      }
+      if (this.data.displayAvatar === src && !this.data.avatarLoadFailed) return;
+      this._avatarFailedSrc = '';
+      this.setData({ displayAvatar: src, avatarLoadFailed: false });
+    },
+
+    /** 仅替换展示 src，不写回 player / store，避免 error 循环 */
+    onPlayerAvatarError() {
+      const fallback = mockAvatars.DEFAULT_AVATAR;
+      if (this.data.displayAvatar === fallback) return;
+      this._avatarFailedSrc = this.data.displayAvatar;
+      this.setData({ displayAvatar: fallback, avatarLoadFailed: true });
     },
 
     /** LOGO 加载失败：仅替换展示 URL 为默认图，不写 match/storage */
