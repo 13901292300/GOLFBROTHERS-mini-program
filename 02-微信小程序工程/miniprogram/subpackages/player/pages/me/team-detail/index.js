@@ -9,6 +9,7 @@ const routes = require('../../../../../utils/teamClub/routes.js');
 const bootstrap = require('../../../../../utils/teamClub/bootstrap.js');
 const pageErrors = require('../../../../../utils/teamClub/pageErrors.js');
 const matchRefSync = require('../../../../../utils/teamClub/matchRefSync.js');
+const discussionCardVisit = require('../../../../../utils/discussionCardVisit.js');
 
 const TABS = [
   { key: 'intro', label: '球队简介' },
@@ -450,8 +451,7 @@ Page({
       });
       return;
     }
-    wx.navigateTo({
-      url: url,
+    discussionCardVisit.wrapNavigateTo(url, {
       fail: (err) => {
         wx.showToast({ title: '比赛详情跳转失败，路由未注册', icon: 'none' });
       }

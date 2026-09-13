@@ -7,6 +7,7 @@ const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const publicPlayerProfile = require('../../utils/publicPlayerProfile.js');
+const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 
 function safeDecode(raw) {
@@ -270,8 +271,7 @@ Page({
     if (this._navigating) return;
     this._navigating = true;
     const self = this;
-    wx.navigateTo({
-      url: url,
+    discussionCardVisit.wrapNavigateTo(url, {
       complete: function () {
         self._navigating = false;
       }

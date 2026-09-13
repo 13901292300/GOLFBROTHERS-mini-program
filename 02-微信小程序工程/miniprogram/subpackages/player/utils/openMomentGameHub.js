@@ -15,6 +15,7 @@
 const gameStore = require('../../../utils/gameStore.js');
 const teamMatchStore = require('../../../utils/teamMatchStore.js');
 const matchStateUtil = require('../../../utils/matchState.js');
+const discussionCardVisit = require('../../../utils/discussionCardVisit.js');
 
 const UNAVAILABLE_TIP = '该比赛暂不可进入';
 const GAME_HUB_PATH = '/subpackages/scoring/pages/hub/index';
@@ -111,13 +112,11 @@ function _navigateOnce(url, meta) {
   if (!_acquireNavLock()) {
     return { ok: false, error: 'nav_busy', url: url };
   }
-  wx.navigateTo({
-    url: url,
+  discussionCardVisit.wrapNavigateTo(url, {
     fail: function () {
       _fail('navigate_fail', Object.assign({ url: url }, meta || {}));
     },
     complete: function () {
-      // 成功后保留短冷却，吸收双击的第二次 tap
       _releaseNavLockSoon();
     }
   });
@@ -160,10 +159,10 @@ function _enterSingleGroupScore(game, groupIndex, open) {
 
   matchStateUtil.setMatchState(built);
 
+  const handle = discussionCardVisit.beginCardEnterFromMatchState();
   const entered = matchStateUtil.enterScorePage({
     silentToast: true,
     onFail: function (reason) {
-      // 恢复 / toast 异常不得挡住立即释锁；1200ms 仅作兜底，非正常路径
       try {
         _restoreMatchState(prev);
         try {
@@ -180,10 +179,10 @@ function _enterSingleGroupScore(game, groupIndex, open) {
       }
     },
     onSuccess: function () {
+      discussionCardVisit.confirmCardEnter(handle);
       try {
         /* 导航已成功：无需额外业务 */
       } finally {
-        // 短时冷却吸收双击；不得依赖 1200ms 超时作为正常释锁
         _releaseNavLockSoon();
       }
     }

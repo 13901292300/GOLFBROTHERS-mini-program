@@ -16,6 +16,7 @@ const scheduleStore = require('../../utils/scheduleStore.js');
 const { sortSchedules } = require('../../utils/scheduleSort.js');
 const demoWeekendAmateurGame = require('../../utils/demoWeekendAmateurGame.js');
 const contactNotifyStore = require('../../utils/contactNotifyStore.js');
+const discussionCardVisit = require('../../utils/discussionCardVisit.js');
 const networkStatus = require('../../utils/networkStatus.js');
 const offlineScoringState = require('../../utils/offlineScoringState.js');
 const offlineScoringRecovery = require('../../utils/offlineScoringRecovery.js');
@@ -633,9 +634,9 @@ Page({
     const matchId =
       e && e.detail && e.detail.matchId != null ? String(e.detail.matchId) : '';
     if (!matchId) return;
-    wx.navigateTo({
-      url: '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
-    });
+    discussionCardVisit.wrapNavigateTo(
+      '/subpackages/tournament/pages/detail/index?matchId=' + encodeURIComponent(matchId)
+    );
   },
 
   /** 球队赛日程：打开个人备注编辑（不改 content/date） */
@@ -1634,7 +1635,12 @@ Page({
         groupCount: 1
       });
     }
-    matchStateUtil.enterScorePage();
+    const handle = discussionCardVisit.beginCardEnterFromMatchState();
+    matchStateUtil.enterScorePage({
+      onSuccess: function () {
+        discussionCardVisit.confirmCardEnter(handle);
+      }
+    });
   },
 
   navigateToPage(e) {
@@ -1645,8 +1651,7 @@ Page({
       this._enterScore(url);
       return;
     }
-    wx.navigateTo({
-      url: url,
+    discussionCardVisit.wrapNavigateTo(url, {
       fail: () => {
         wx.showToast({ title: '页面尚未注册', icon: 'none' });
       }

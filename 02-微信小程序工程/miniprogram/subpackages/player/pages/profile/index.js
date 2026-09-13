@@ -10,6 +10,7 @@ const socialRelationStore = require('../../../../utils/socialRelationStore.js');
 const contactStore = require('../../../../utils/contactStore.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const playerIdentityGuard = require('../../../../utils/playerIdentityGuard.js');
 const reactionPopularityLedger = require('../../../../utils/reactionPopularityLedger.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
@@ -1584,8 +1585,7 @@ Page({
       wx.showToast({ title: '暂无赛事详情', icon: 'none' });
       return;
     }
-    wx.navigateTo({
-      url: url,
+    discussionCardVisit.wrapNavigateTo(url, {
       fail: function () {
         wx.showToast({ title: '无法打开赛事详情', icon: 'none' });
       }
