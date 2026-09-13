@@ -9,6 +9,7 @@ const {
   formatPlayerActionMetric,
   isSameUserIdentity
 } = require('./playerActionModal.js');
+const playerLiveDisplay = require('./playerLiveDisplay.js');
 
 /**
  * 仅明确 DEMO GAME 可用的演示度量（与 playerActionModal 对齐）。
@@ -135,7 +136,8 @@ function createMetricsContext(game, overrides) {
     currentUserId: currentUserId,
     meHandicap: meHandicap,
     meFloatCoef: meFloatCoef,
-    allowDemoMetrics: isDemoLeaderboardGame(game)
+    allowDemoMetrics: isDemoLeaderboardGame(game),
+    gameId: String((game && game.gameId) || '').trim()
   };
   if (overrides && typeof overrides === 'object') {
     return Object.assign({}, base, overrides);
@@ -219,7 +221,14 @@ function getGroupComposition(game, group, groupIndex) {
 function enrichPlayerIdentity(m, metricsCtx) {
   const prof = getProfileById(m.playerId, m);
   const hasRawGender = !!(m && (m.gender || m.sex || m.matchGender));
-  const genderSource = hasRawGender || FRIEND_ID_SET[m.playerId] ? prof : m;
+  const live = playerLiveDisplay.applyLiveDisplayToView(m, {
+    gameId: (metricsCtx && metricsCtx.gameId) || ''
+  });
+  const genderSource = live.gender
+    ? { gender: live.gender }
+    : hasRawGender || FRIEND_ID_SET[m.playerId]
+      ? prof
+      : m;
   const genderDisplay = playerManage.getGenderDisplay(genderSource);
   const metrics = resolvePlayerMetrics(m, metricsCtx);
   return {
@@ -228,8 +237,8 @@ function enrichPlayerIdentity(m, metricsCtx) {
     userId: m.userId || m.playerUserId || m.playerId || '',
     userType: m.userType || '',
     identitySource: m.identitySource || '',
-    name: m.name || '',
-    avatar: mockAvatars.resolveAvatar(m.avatar, m.playerId || m.name),
+    name: live.name || m.name || '',
+    avatar: live.avatar || mockAvatars.resolveAvatar(m.avatar, m.playerId || m.name),
     flag: prof.flag || '',
     country: prof.country || '',
     age: prof.age || '',
@@ -383,15 +392,22 @@ function buildPlayerRows(game, metricsCtx) {
       const agg = aggregateScores(scores);
       const prof = getProfileById(p.playerId, p);
       const hasRawGender = !!(p && (p.gender || p.sex || p.matchGender));
-      const genderSource = hasRawGender || FRIEND_ID_SET[p.playerId] ? prof : p;
+      const live = playerLiveDisplay.applyLiveDisplayToView(p, {
+        gameId: (metricsCtx && metricsCtx.gameId) || ''
+      });
+      const genderSource = live.gender
+        ? { gender: live.gender }
+        : hasRawGender || FRIEND_ID_SET[p.playerId]
+          ? prof
+          : p;
       const genderDisplay = playerManage.getGenderDisplay(genderSource);
       const playerVm = enrichPlayerIdentity(p, metricsCtx);
       flat.push({
         rowId: p.playerId,
         isTeam: false,
         playerId: p.playerId,
-        name: p.name,
-        avatar: mockAvatars.resolveAvatar(p.avatar, p.playerId),
+        name: live.name || p.name,
+        avatar: live.avatar || mockAvatars.resolveAvatar(p.avatar, p.playerId),
         isFemale: genderDisplay.gender === 'female',
         genderIcon: genderDisplay.icon,
         genderClass: genderDisplay.className,
