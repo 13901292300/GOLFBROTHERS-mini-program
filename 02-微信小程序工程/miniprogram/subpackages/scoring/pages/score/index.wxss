@@ -3461,6 +3461,17 @@ page {
 }
 
 /*
+ * 演示 Elite：+2 / ≥+3 共用 score-double 灰底 marker（公共规则 #6b7280 过深）。
+ * 不改公共 .score-double / Classic 整格色块；≥+3 用已有 classic-triple 略加深一档。
+ */
+.score-page.is-score-elite-demo .score-double {
+  background: #a8aeb8;
+}
+.score-page.is-score-elite-demo .score-cell.classic-triple .score-double {
+  background: #8e959f;
+}
+
+/*
  * 演示 Elite 成绩表达（仅 is-score-elite-demo / demo-weekend-amateur）
  * - PAR 主成绩：信息蓝 var(--data-blue)（依赖已有 classicClass=classic-par）
  * - 左下 putt：黑
@@ -7580,7 +7591,6 @@ page {
 .score-page.is-score-classic.font-large .scoreboard-shell--fourball .fourball-hole-par-overlay__par text {
   font-size: 28rpx;
 }
-
 
 .offline-scoring-bar {
   flex-shrink: 0;

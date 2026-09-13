@@ -112,6 +112,15 @@
   box-sizing: border-box;
 }
 
+/* Classic OUT/IN/TOT：主数字与洞格共用同一顶区，不按整格垂直居中 */
+.score-page.is-score-classic.is-classic-app-replica .special-cell-inner {
+  min-height: 100%;
+  height: 100%;
+  justify-content: flex-start;
+  padding-top: var(--classic-app-replica-score-top);
+  box-sizing: border-box;
+}
+
 .score-page.is-classic-app-replica .hole-cell-score,
 .score-page.is-classic-app-replica.font-large .hole-cell-score,
 .score-page.is-classic-app-replica .score-cell.classic-eagle .hole-cell-score,
@@ -136,9 +145,10 @@
   font-size: var(--classic-app-replica-score-size-3digit) !important;
 }
 
-.score-page.is-classic-app-replica .special-cell-val,
-.score-page.is-classic-app-replica.font-large .special-cell-val {
+.score-page.is-score-classic.is-classic-app-replica .special-cell-val,
+.score-page.is-score-classic.is-classic-app-replica.font-large .special-cell-val {
   font-weight: var(--classic-app-replica-score-weight) !important;
+  line-height: 1;
 }
 
 .score-page.is-classic-app-replica .special-cell-val.is-replica-score-2digit,
