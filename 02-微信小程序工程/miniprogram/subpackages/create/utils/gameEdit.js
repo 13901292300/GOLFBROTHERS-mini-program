@@ -114,19 +114,10 @@ function hydrateCreateFormFromGame(game) {
   };
 }
 
-/** 从 courseHalfText（如「（A/B）」）解析前9/后9 COURSE 代码 */
+/** 从 courseHalfText（如「（A/B）」或「 A&D」）解析前9/后9 COURSE 代码 */
 function parseHalfFromComboText(text) {
-  const raw = (text || '').trim();
-  if (!raw) return { front9: null, back9: null };
-  const inner = raw.replace(/^[（(]/, '').replace(/[）)]$/, '');
-  const parts = inner.split('/').map((s) => s.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    return { front9: parts[0], back9: parts[1] };
-  }
-  if (parts.length === 1) {
-    return { front9: parts[0], back9: null };
-  }
-  return { front9: null, back9: null };
+  const parsed = halfCourse.parseCourseHalfText(text);
+  return { front9: parsed.front9Course, back9: parsed.back9Course };
 }
 
 /** 补全半场：显式字段 → courseHalfText → 球场默认前两个 COURSE */
