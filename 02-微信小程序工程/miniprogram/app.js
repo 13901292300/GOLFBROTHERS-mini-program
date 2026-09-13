@@ -46,6 +46,12 @@ App({
     } catch (eCompat) {
       /* ignore */
     }
+    try {
+      require('./utils/guestGolfAvatar.js').backfillStoredHosts();
+    } catch (eAvatar) {
+      /* ignore */
+    }
+
     this._bindScoreSyncNetworkListener();
     this._probeInitialNetworkType();
 
