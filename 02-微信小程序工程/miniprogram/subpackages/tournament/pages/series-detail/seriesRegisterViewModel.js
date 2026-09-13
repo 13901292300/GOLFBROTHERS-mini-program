@@ -7,6 +7,7 @@
  */
 
 var openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
+var playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
 var registrationInteractionModel = require('../../utils/registrationInteractionModel.js');
 var seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 
@@ -265,6 +266,19 @@ function projectDisplayUser(entry, index) {
     userType: userType
   });
   var seriesParticipantId = asString(src.seriesParticipantId);
+  var over = playerLiveDisplay.overlayScorePlayerDisplay({
+    userId: userId,
+    playerUserId: asString(src.playerUserId),
+    name: name,
+    avatar: avatar,
+    gender: genderRaw
+  });
+  if (over.applied) {
+    name = over.name || name;
+    avatar = over.avatar || avatar;
+    genderRaw = over.gender || genderRaw;
+    gender = resolveGenderDisplay({ gender: genderRaw });
+  }
   var listKey =
     asString(src.rosterEntryId) ||
     (playerId ? playerId + '@' + seriesParticipantId : '') ||
