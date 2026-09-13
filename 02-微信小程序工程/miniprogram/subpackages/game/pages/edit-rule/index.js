@@ -7,6 +7,7 @@ const numField = require("../../utils/numField.js");
 const configGuard = require("../../utils/sideGameConfigGuard.js");
 const pageBoot = require("../../utils/pageBoot.js");
 const ruleDefaults = require("../../utils/sideGameRuleDefaults.js");
+const threePush = require("../../utils/gameplay8421ThreePushOrder.js");
 
 const MUL_THUMB_LABEL = {
   m2: "鹰",
@@ -739,6 +740,10 @@ Page(pageBoot.bindPageTheme({
       showPush8421: is8421 && !is8421Fold,
       show8421Two: is8421Fold,
       show8421Three: is8421Fold,
+      show8421ThreeReorderOnPush: threePush.showReorderOnPushUi(
+        ruleId,
+        normalizePushRule(existing && existing.pushRule, true, is8421Fold)
+      ),
       noSettings: noSettings,
       pushOptions: PUSH_OPTIONS_8421,
       reward: isVegas
@@ -1120,6 +1125,12 @@ Page(pageBoot.bindPageTheme({
   setPush(e) {
     const value = e.currentTarget.dataset.value;
     const patch = { pushRule: value, pushText: pushThumb8421(value) };
+    if (catalog.is8421Three(this.data.ruleId)) {
+      patch.show8421ThreeReorderOnPush = threePush.showReorderOnPushUi(this.data.ruleId, value);
+      if (threePush.isWithinPushRule(value) && this.data.reorderOnPush !== "yes") {
+        patch.reorderOnPush = "no";
+      }
+    }
     if (value === "none") {
       patch.foldMeat = false;
       patch.foldMeatValue = false;
@@ -1139,7 +1150,10 @@ Page(pageBoot.bindPageTheme({
         foldMeat: false,
         foldMeatValue: false,
         lasuoFoldMeat: false,
-        pushText: "无顶洞"
+        pushText: "无顶洞",
+        show8421ThreeReorderOnPush: catalog.is8421Three(this.data.ruleId)
+          ? false
+          : this.data.show8421ThreeReorderOnPush
       });
       this.refreshLasuo();
       return;
@@ -1151,6 +1165,9 @@ Page(pageBoot.bindPageTheme({
     const patch = exclusiveFoldPatch(this.data, "foldPush");
     patch.pushRule = this.data.showVegas ? "push" : "tie";
     patch.pushText = pushThumb8421(patch.pushRule);
+    if (catalog.is8421Three(this.data.ruleId)) {
+      patch.show8421ThreeReorderOnPush = threePush.showReorderOnPushUi(this.data.ruleId, patch.pushRule);
+    }
     this.setData(patch);
     this.refreshLasuo();
   },
@@ -1692,6 +1709,7 @@ Page(pageBoot.bindPageTheme({
       scoreCode: catalog.is8421(this.data.ruleId) ? "8421" : ""
     };
     applySavedLasuoReorderOnPush(rule, this.data, existing);
+    threePush.persistReorderOnPush(rule, this.data.ruleId, this.data.pushRule, this.data.reorderOnPush);
     rule.ruleSnapshot = rec.stripLibraryMeta(rule);
     return session.upsertMyRule(rule);
   },

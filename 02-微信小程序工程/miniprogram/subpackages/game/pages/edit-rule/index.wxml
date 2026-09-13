@@ -1044,6 +1044,17 @@
                   <view class="radio-dot"></view>
                   <text class="opt-title">得分≤2分</text>
                 </view>
+                <block wx:if="{{show8421ThreeReorderOnPush}}">
+                  <view class="sec-label">顶洞是否更换组合</view>
+                  <view class="opt {{reorderOnPush === 'no' ? 'on' : ''}}" bindtap="setReorder" data-value="no">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">不换组合</text>
+                  </view>
+                  <view class="opt {{reorderOnPush === 'yes' ? 'on' : ''}}" bindtap="setReorder" data-value="yes">
+                    <view class="radio-dot"></view>
+                    <text class="opt-title">更换组合</text>
+                  </view>
+                </block>
               </view>
             </view>
             <view class="opt {{pushRule === 'none' ? 'on' : ''}}" bindtap="setPushMode" data-value="none">
