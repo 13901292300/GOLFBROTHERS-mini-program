@@ -5,6 +5,7 @@
 
 const teamMatchStore = require('./teamMatchStore.js');
 const mockAvatars = require('./mockAvatars.js');
+const guestGolfAvatar = require('./guestGolfAvatar.js');
 const chinesePinyinLite = require('./chinesePinyinLite.js');
 
 const GENDER_OPTIONS = [
@@ -1403,6 +1404,7 @@ function _rowToRegisterUser(row, teamOptions) {
     phone: resolvePhone(row) || (row && row.phone) || base.phone || '',
     userType: String((row && row.userType) || base.userType || '').trim(),
     identitySource: String((row && row.identitySource) || base.identitySource || '').trim(),
+    guestAvatarCode: String((row && row.guestAvatarCode) || base.guestAvatarCode || '').trim(),
     // 本场快照字段
     matchNickname: name,
     competitionName: name,
@@ -1473,6 +1475,7 @@ function commitPlayerManageDraft(matchOrGame, draft) {
   }
   matchOrGame.registerInfo.users = users;
   matchOrGame.registerInfo.totalCount = users.length;
+  guestGolfAvatar.ensureOnMatch(matchOrGame, { persistGender: false });
 
   if (Array.isArray(d.groupsDraft)) {
     matchOrGame.groups = _cloneJson(d.groupsDraft);
@@ -1688,6 +1691,7 @@ function commitSeriesPlayerManageDraft(matchOrGame, draft) {
     }
   }
 
+  guestGolfAvatar.ensureOnMatch(matchOrGame, { persistGender: false });
   _syncGroupPlayerSnapshots(matchOrGame, users);
   return { ok: true, match: matchOrGame, users: users };
 }
@@ -1703,6 +1707,7 @@ function _syncGroupPlayerSnapshots(matchOrGame, users) {
       name: resolveMatchNickname(u),
       gender: resolveMatchGender(u),
       avatar: u.avatar || '',
+      guestAvatarCode: u.guestAvatarCode || '',
       matchTeamId: teamId,
       matchTeamName: teamName
     };
@@ -1725,6 +1730,7 @@ function _syncGroupPlayerSnapshots(matchOrGame, users) {
       }
       if (map[id].gender) next.gender = map[id].gender;
       if (map[id].avatar) next.avatar = map[id].avatar;
+      if (map[id].guestAvatarCode) next.guestAvatarCode = map[id].guestAvatarCode;
       if (map[id].matchTeamId) {
         next.matchTeamId = map[id].matchTeamId;
         next.groupId = map[id].matchTeamId;
