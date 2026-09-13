@@ -24,7 +24,7 @@ function _readNet(deps) {
     var app = typeof getApp === 'function' ? getApp() : null;
     return require('./networkStatus.js').readFromGlobal(app && app.globalData);
   } catch (e) {
-    return { networkStatusKnown: false, networkConnected: true };
+    return { networkStatusKnown: false, networkConnected: true, networkForegroundRefreshing: false };
   }
 }
 
@@ -32,13 +32,18 @@ function _normalizeNet(raw) {
   var n = raw && typeof raw === 'object' ? raw : {};
   return {
     networkStatusKnown: n.networkStatusKnown === true,
-    networkConnected: n.networkConnected !== false
+    networkConnected: n.networkConnected !== false,
+    networkForegroundRefreshing: n.networkForegroundRefreshing === true
   };
 }
 
 function _canRecover(net) {
   var n = _normalizeNet(net);
-  return n.networkStatusKnown === true && n.networkConnected === true;
+  return (
+    n.networkStatusKnown === true &&
+    n.networkConnected === true &&
+    n.networkForegroundRefreshing !== true
+  );
 }
 
 function hasBlockedLocal(contextId, deps) {
@@ -69,6 +74,7 @@ function finishAfterFlush(result, deps) {
   if (!session) return snap;
   var net = _readNet(deps);
   if (!net.networkStatusKnown) return snap;
+  if (net.networkForegroundRefreshing) return snap;
   if (!net.networkConnected) {
     return offlineScoringState.revertToOffline(session);
   }
@@ -115,6 +121,7 @@ function handleNetworkState(state, deps) {
   var snap = offlineScoringState.get();
   if (!snap.session) return Promise.resolve(snap);
   if (!net.networkStatusKnown) return Promise.resolve(snap);
+  if (net.networkForegroundRefreshing) return Promise.resolve(snap);
   if (!net.networkConnected) {
     if (snap.mode === offlineScoringState.MODE_SYNCING) {
       return Promise.resolve(offlineScoringState.revertToOffline(snap.session));
