@@ -1,5 +1,6 @@
 const mockAvatars = require('./mockAvatars.js');
 const playerManage = require('./playerManage.js');
+const playerLiveDisplay = require('./playerLiveDisplay.js');
 /**
  * 出发表 groups — 领先榜唯一数据源（会话内 app.globalData.groups）
  * 结构：groups[].players[].holes[{ holeNo, score, putts, fairway, penalty, sand, diff }]
@@ -373,10 +374,13 @@ function buildGameTeeSheetView(game) {
     });
     const players = (grp.playersSlots || []).filter(Boolean).map((p) => {
       const enriched = tPositionUtil.enrichPlayer(p);
+      const live = playerLiveDisplay.applyLiveDisplayToView(p, {
+        gameId: (game && game.gameId) || ''
+      });
       return {
         playerId: enriched.playerId,
-        name: enriched.name,
-        avatar: enriched.avatar,
+        name: live.name || enriched.name,
+        avatar: live.avatar || enriched.avatar,
         v: enriched.v,
         teeMarkerClass: enriched.teeMarkerClass
       };
