@@ -465,6 +465,34 @@ function resolveCardStatus(isLive, isRegistrationOpen, listPhase) {
   return 'default';
 }
 
+/**
+ * 队内赛 / 队际赛 → 与系列赛同一套 cardStatus（live / registration / default）。
+ * 业务状态不改写：ongoing↔LIVE、registering 且报名未关↔报名开、其余（含已结束 / 报名已关）↔ default。
+ */
+function resolveOrdinaryMatchVisualFlags(match) {
+  var status = asString(match && match.status).toLowerCase();
+  var label = asString(match && match.statusLabel);
+  var isLive = status === 'ongoing' || label === 'LIVE';
+  var closed =
+    asString(match && match.registrationStatus).toLowerCase() === 'closed' ||
+    asString(match && match.registerStatus).toLowerCase() === 'closed';
+  var isRegistrationOpen =
+    !isLive &&
+    status !== 'finished' &&
+    (status === 'registering' || label === '报名中') &&
+    !closed;
+  return { isLive: isLive, isRegistrationOpen: isRegistrationOpen };
+}
+
+function resolveOrdinaryMatchCardStatus(match) {
+  var flags = resolveOrdinaryMatchVisualFlags(match);
+  return resolveCardStatus(
+    flags.isLive,
+    flags.isRegistrationOpen,
+    flags.isLive ? 'live' : 'registration'
+  );
+}
+
 function sanitizeCardSubtitle(raw) {
   return asString(raw).replace(/[\r\n\u2028\u2029]+/g, '');
 }
@@ -858,6 +886,9 @@ module.exports = {
   deriveSeriesListPhase: deriveSeriesListPhase,
   resolveIsRegistrationOpen: resolveIsRegistrationOpen,
   toSeriesClubCard: toSeriesClubCard,
+  resolveCardStatus: resolveCardStatus,
+  resolveOrdinaryMatchVisualFlags: resolveOrdinaryMatchVisualFlags,
+  resolveOrdinaryMatchCardStatus: resolveOrdinaryMatchCardStatus,
   filterOrdinaryMatchesForPublicLists: filterOrdinaryMatchesForPublicLists,
   stableTimeMs: stableTimeMs,
   sortCardsByStableTime: sortCardsByStableTime,
