@@ -6,6 +6,7 @@
  * 奖励只看胜者真实成绩：加在杆差上（加法）或乘杆差（乘法），再乘每杆分值 K。
  */
 const core = require("./settleCore.js");
+const specialResult = require("./specialResult.js");
 
 const STROKE2_SETTLE_VERSION = "v53-4.1.1";
 
@@ -93,23 +94,29 @@ function stroke2RewardState(rule) {
   return "missing";
 }
 
-function rewardMul(rule, winnerRel) {
+function rewardBand(winnerRel, par) {
+  const spec = specialResult.resolveGrossScoreSpecial({ rel: winnerRel, par: par });
+  if (spec.kind === specialResult.KIND_ALBATROSS_TIER) return "hio";
+  return scoreBand(winnerRel);
+}
+
+function rewardMul(rule, winnerRel, par) {
   if (stroke2RewardState(rule) !== "mul") return 1;
-  const m = lookup(rowMap(rule && rule.mulRows), scoreBand(winnerRel), MUL_DEFAULTS);
+  const m = lookup(rowMap(rule && rule.mulRows), rewardBand(winnerRel, par), MUL_DEFAULTS);
   if (!isFinite(m) || !(m > 0)) return 1;
   return m;
 }
 
-function rewardAdd(rule, winnerRel) {
-  const n = lookup(rowMap(rule && rule.addRows), scoreBand(winnerRel), ADD_DEFAULTS);
+function rewardAdd(rule, winnerRel, par) {
+  const n = lookup(rowMap(rule && rule.addRows), rewardBand(winnerRel, par), ADD_DEFAULTS);
   return isFinite(n) ? n : 0;
 }
 
-function applyReward(rawDiff, winnerRel, rule) {
+function applyReward(rawDiff, winnerRel, rule, par) {
   const mode = stroke2RewardState(rule);
   if (!(rawDiff > 0) || mode === "none" || mode === "missing") return rawDiff;
-  if (mode === "mul") return rawDiff * rewardMul(rule, winnerRel);
-  if (mode === "add") return rawDiff + rewardAdd(rule, winnerRel);
+  if (mode === "mul") return rawDiff * rewardMul(rule, winnerRel, par);
+  if (mode === "add") return rawDiff + rewardAdd(rule, winnerRel, par);
   return rawDiff;
 }
 
@@ -212,14 +219,14 @@ function calculateStrokePlayHoleResult(input) {
   }
   const leftWins = actualA < actualB;
   const winnerActualDiff = leftWins ? relA : relB;
-  const rewardKey = scoreBand(winnerActualDiff);
+  const rewardKey = rewardBand(winnerActualDiff, par);
   let rewardValue = 0;
   let adjustedGap = baseGap;
   if (rewardMode === "mul") {
-    rewardValue = rewardMul(rule, winnerActualDiff);
+    rewardValue = rewardMul(rule, winnerActualDiff, par);
     adjustedGap = baseGap * rewardValue;
   } else if (rewardMode === "add") {
-    rewardValue = rewardAdd(rule, winnerActualDiff);
+    rewardValue = rewardAdd(rule, winnerActualDiff, par);
     adjustedGap = baseGap + rewardValue;
   }
   const finalValue = core.round1(adjustedGap * k);
@@ -294,6 +301,7 @@ function settleStroke2(game, ctx) {
 
   let firstTrace = null;
   const byHole = {};
+  const specialByHole = {};
   holeOrder.forEach(function (label) {
     const ledger = core.holeLedger();
     if (core.holeOn(game, label)) {
@@ -304,6 +312,25 @@ function settleStroke2(game, ctx) {
         const leftRel = readRel(scores, label, left);
         const rightRel = readRel(scores, label, right);
         if (leftRel == null || rightRel == null) return;
+        const leftSpec = specialResult.resolveGrossScoreSpecial({ rel: leftRel, par: par });
+        const rightSpec = specialResult.resolveGrossScoreSpecial({ rel: rightRel, par: par });
+        const leftInf = leftSpec.kind === specialResult.KIND_PAR5_HIO_INFINITY;
+        const rightInf = rightSpec.kind === specialResult.KIND_PAR5_HIO_INFINITY;
+        if (leftInf !== rightInf) {
+          const plusId = leftInf ? left : right;
+          const minusId = leftInf ? right : left;
+          if (!specialByHole[label]) specialByHole[label] = [];
+          specialByHole[label].push(
+            specialResult.makePar5HioEvent({
+              hole: label,
+              plusIds: [plusId],
+              minusIds: [minusId],
+              matchup: { type: "pair", sideAIds: [left], sideBIds: [right] },
+              meatAllEaten: true
+            })
+          );
+          return;
+        }
         const holeRes = calculateStrokePlayHoleResult({
           leftScore: leftRel,
           rightScore: rightRel,
@@ -345,6 +372,7 @@ function settleStroke2(game, ctx) {
 
   return {
     byHole: byHole,
+    specialByHole: specialByHole,
     initial: initial,
     catalogId: "stroke-2",
     settleVersion: STROKE2_SETTLE_VERSION,

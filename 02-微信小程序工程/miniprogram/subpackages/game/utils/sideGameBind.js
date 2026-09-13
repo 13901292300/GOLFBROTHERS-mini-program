@@ -3301,22 +3301,25 @@ function listBoard(entry, gameId, pairId) {
   });
   const totals = players.map(function (player, pi) {
     let raw = 0;
-    let infSign = 0;
-    let infMixed = false;
+    let plusCount = 0;
+    let minusCount = 0;
     let settledCount = 0;
     holes.forEach(function (hole) {
       const cell = hole.cells[pi];
       if (!(cell && cell.played && cell.status === resultFormat.STATUS_SETTLED)) return;
       settledCount += 1;
       const sign = specialResult.asInfSign(cell.infSign);
-      if (sign) {
-        if (!infSign) infSign = sign;
-        else if (infSign !== sign) infMixed = true;
+      if (sign === 1) {
+        plusCount += 1;
+        return;
+      }
+      if (sign === -1) {
+        minusCount += 1;
         return;
       }
       raw = settle.round1(raw + Number(cell.raw));
     });
-    if (infMixed) infSign = 0;
+    const infSign = specialResult.netInfinitySign(plusCount, minusCount);
     if (!isBigPot) {
       focusGames.forEach(function (game) {
         const joined = (game.players || []).some(function (item) {

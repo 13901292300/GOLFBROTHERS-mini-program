@@ -65,9 +65,8 @@ assert(
 assert('listBoard 先读 infSignForPlayer', /specialResult\.infSignForPlayer/.test(bindJs));
 assert('未 bump settleVersion', !/SETTLE_VERSION/.test(read('subpackages/game/utils/specialResult.js')));
 assert(
-  '未改具体 settle 引擎',
-  !/specialResult/.test(read('subpackages/game/utils/settleStroke2.js')) &&
-    !/specialResult/.test(read('subpackages/game/utils/settleMatch2.js')) &&
+  '未改非比杆 settle 引擎',
+  !/specialResult/.test(read('subpackages/game/utils/settleMatch2.js')) &&
     !/specialResult/.test(read('subpackages/game/utils/settleYoucai.js')) &&
     !/specialResult/.test(read('subpackages/game/utils/settle8421.js'))
 );
