@@ -5,7 +5,7 @@ const hostSession = require('../../utils/sideGameHostSession.js');
 const rec = require('../../utils/sideGameRecord.js');
 const session = require('../../utils/sideGameBind.js');
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: '',
     headerBarStyle: '',
@@ -17,7 +17,8 @@ Page({
     partyLines: [],
     stale: false,
     resultText: '',
-    canEdit: true
+    canEdit: true,
+    themeClass: ''
   },
 
   onLoad(query) {
@@ -26,6 +27,7 @@ Page({
   },
 
   onShow() {
+    pageBoot.applyTheme(this);
     if (this._hostQuery) this.reload();
   },
 
@@ -97,4 +99,4 @@ Page({
     wx.showToast({ title: '已删除', icon: 'none' });
     nav.navigateBackSafe(1);
   }
-});
+}));

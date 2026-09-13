@@ -1,5 +1,6 @@
 @import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
+@import "../../styles/page-window.wxss";
 
 .gb-body--with-cta {
   padding-bottom: 160rpx;

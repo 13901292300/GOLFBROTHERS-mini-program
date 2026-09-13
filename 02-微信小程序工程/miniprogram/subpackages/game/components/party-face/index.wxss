@@ -270,7 +270,7 @@
 .party-face__stack-item .party-face__av {
   width: 100%;
   height: 100%;
-  border: 2rpx solid var(--bg-card, #fff);
+  border: 2rpx solid var(--bg-card);
 }
 
 .party-face__stack-item:nth-child(1) {

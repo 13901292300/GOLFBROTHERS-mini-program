@@ -3,29 +3,50 @@
 .gb-page.bright-mode {
   --bg-primary: #fcfcfc;
   --bg-card: #ffffff;
-  --bg-card: #ffffff;
   --bg-subtle: #f3f4f6;
   --bg-secondary: #f1f5f9;
   --border: #e5e7eb;
+  --border-color: #e5e7eb;
   --text-primary: #002d62;
   --text-secondary: #374151;
   --text-muted: #6b7280;
-  --text-muted: #6b7280;
   --shadow-card: 0 8rpx 12rpx -2rpx rgba(0, 0, 0, 0.05);
+  --cloud-blue: #00aeef;
+  --error: #dc2626;
+  --success: #16a34a;
 }
 
-.gb-page.dark-mode {
+.gb-page.dark-mode,
+.game-tab.dark-mode {
   --bg-primary: #000000;
-  --bg-card: #111111;
   --bg-card: #111111;
   --bg-subtle: #0a0a0a;
   --bg-secondary: #1a1a1a;
   --border: #222222;
+  --border-color: #222222;
   --text-primary: #f1f5f9;
   --text-secondary: #cbd5e1;
   --text-muted: #888888;
-  --text-muted: #888888;
   --shadow-card: none;
+  --cloud-blue: #00aeef;
+  --error: #f87171;
+  --success: #4ade80;
+}
+
+.game-tab.bright-mode {
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --bg-secondary: #f1f5f9;
+  --border: #e5e7eb;
+  --border-color: #e5e7eb;
+  --text-primary: #002d62;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --shadow-card: 0 8rpx 12rpx -2rpx rgba(0, 0, 0, 0.05);
+  --cloud-blue: #00aeef;
+  --error: #dc2626;
+  --success: #16a34a;
 }
 
 .gb-page {
@@ -173,7 +194,7 @@
 
 .cta-gold {
   background: var(--champion-gold);
-  color: #fff;
+  color: #111;
   font-size: 30rpx;
   font-weight: 900;
   font-style: italic;

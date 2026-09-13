@@ -8,7 +8,7 @@ const setupListDirty = require("../../utils/setupListDirty.js");
 const CANCEL_TITLE = "取消设置";
 const CANCEL_CONTENT = "返回后，本次未保存的游戏设置将不会保留，是否确认返回？";
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -20,7 +20,12 @@ Page({
     canEdit: true,
     canView: true,
     pageMode: "edit",
-    readonlyHint: ""
+    readonlyHint: "",
+    themeClass: ""
+  },
+
+  applyTheme() {
+    pageBoot.applyTheme(this);
   },
 
   onLoad(query) {
@@ -47,6 +52,7 @@ Page({
     });
     this._hostQuery = ctx;
     this._committed = false;
+    this.applyTheme();
     configGuard.attach(this, {
       host: host,
       leaveTitle: CANCEL_TITLE,
@@ -60,6 +66,7 @@ Page({
   },
 
   onShow() {
+    this.applyTheme();
     if (this._hostQuery) session.attachHost(this._hostQuery);
     if (!this._committed) session.ensureSetupDraft(this.data.entry);
     this.refreshGames();
@@ -114,4 +121,4 @@ Page({
     configGuard.enableUnloadAlert(false);
     if (!this._committed) session.discardSetupDraft();
   }
-});
+}));

@@ -1,4 +1,4 @@
-<view class="game-tab {{hasGames && !layoutIsFlow ? 'game-tab--fill' : ''}} {{layoutIsFlow ? 'game-tab--flow' : ''}}">
+<view class="game-tab {{themeClass}} {{hasGames && !layoutIsFlow ? 'game-tab--fill' : ''}} {{layoutIsFlow ? 'game-tab--flow' : ''}}">
   <block wx:if="{{!hasGames}}">
     <view class="empty-tab">
       <text class="empty-tab__title">{{loadError ? "加载失败，请重试" : emptyTitle}}</text>

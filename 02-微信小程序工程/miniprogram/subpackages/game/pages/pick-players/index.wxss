@@ -1,6 +1,7 @@
 @import "../../styles/gb-shell.wxss";
 @import "../../styles/game-ui.wxss";
 @import "../config/index.wxss";
+@import "../../styles/page-window.wxss";
 
 .pick-top {
   flex-shrink: 0;

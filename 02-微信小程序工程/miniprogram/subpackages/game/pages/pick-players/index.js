@@ -4,6 +4,7 @@ const hostSession = require("../../utils/sideGameHostSession.js");
 const eventGroups = require("../../utils/pickPlayersEventGroups.js");
 const nav = require("../../utils/nav.js");
 const configGuard = require("../../utils/sideGameConfigGuard.js");
+const pageBoot = require("../../utils/pageBoot.js");
 
 function countSelected(list) {
   return (list || []).filter(function (item) {
@@ -107,7 +108,7 @@ function rebuild(page, list) {
   };
 }
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -122,11 +123,13 @@ Page({
     canEdit: true,
     canView: true,
     pageMode: "edit",
-    readonlyHint: ""
+    readonlyHint: "",
+    themeClass: ""
   },
 
   onLoad(query) {
     if (!session.ensureHost(query)) return;
+    pageBoot.applyTheme(this);
     const entry = (query && query.entry) || "hub";
     if (!session.requireSetupDraft(entry)) return;
     const header = createHeaderStyle();
@@ -162,6 +165,10 @@ Page({
         locked: locked
       });
     }, 80);
+  },
+
+  onShow() {
+    pageBoot.applyTheme(this);
   },
 
   bootstrap(payload) {
@@ -324,4 +331,4 @@ Page({
     }
     nav.navigateBackSafe(1);
   }
-});
+}));

@@ -2,6 +2,7 @@ const { createHeaderStyle } = require("../../../../utils/headerEngine.js");
 const session = require("../../utils/sideGameBind.js");
 const catalog = require("../../utils/catalog.js");
 const nav = require("../../utils/nav.js");
+const pageBoot = require("../../utils/pageBoot.js");
 const { createSkipTapGuard } = require("../../utils/ruleCardGestures.js");
 
 const skipTap = createSkipTapGuard();
@@ -102,7 +103,7 @@ function isManageEntry(entry) {
 const DELETE_HINT =
   "长按规则可删除。删除仅从‘我的规则库’移除，不影响之前已设置的游戏。如需添加其他规则，可点击底部‘添加规则’进行配置。";
 
-Page({
+Page(pageBoot.bindPageTheme({
   data: {
     headerRootStyle: "",
     headerBarStyle: "",
@@ -112,7 +113,8 @@ Page({
     deleteHint: DELETE_HINT,
     myRules: [],
     ruleGroups: [],
-    emptyHint: ""
+    emptyHint: "",
+    themeClass: ""
   },
 
   onLoad(query) {
@@ -131,9 +133,11 @@ Page({
       groupId: (query && query.groupId) || "",
       scope: (query && query.scope) || "group"
     });
+    pageBoot.applyTheme(this);
   },
 
   onShow() {
+    pageBoot.applyTheme(this);
     session.attachHost({
       matchId: this.data.matchId,
       groupId: this.data.groupId,
@@ -304,4 +308,4 @@ Page({
       )
     });
   }
-});
+}));

@@ -309,7 +309,8 @@ Component({
     flowHeadTop: 0,
     flowPinH: 0,
     flowHeadH: 0,
-    flowFootSpacerPx: 0
+    flowFootSpacerPx: 0,
+    themeClass: ""
   },
 
   observers: {
@@ -325,11 +326,15 @@ Component({
   },
 
   lifetimes: {
+    created() {
+      pageBoot.paintNativeTheme();
+    },
     attached() {
       this._holeY = 0;
       this._vTicking = false;
       this._dockTicking = false;
       this._flowTabBottom = 0;
+      pageBoot.applyTheme(this);
       try {
         this._syncLayoutFlag();
         this._applyHost(this.properties.hostSnapshot);
@@ -344,6 +349,7 @@ Component({
 
   pageLifetimes: {
     show() {
+      pageBoot.applyTheme(this);
       try {
         this.reload();
         this.syncDockFromLayout();

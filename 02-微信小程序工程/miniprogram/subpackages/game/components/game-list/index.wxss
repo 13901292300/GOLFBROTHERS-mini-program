@@ -223,7 +223,7 @@
   flex-shrink: 0;
   border: 2rpx solid var(--border);
   border-radius: 6rpx;
-  background: #fff;
+  background: var(--bg-card);
   box-sizing: border-box;
 }
 

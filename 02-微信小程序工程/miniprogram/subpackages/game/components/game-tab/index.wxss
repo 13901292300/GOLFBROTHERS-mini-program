@@ -126,7 +126,7 @@
   height: 44rpx;
   line-height: 44rpx;
   border-radius: 50%;
-  background: #002d62;
+  background: var(--tour-blue);
   color: #ffffff;
   font-size: 22rpx;
   font-weight: 800;
@@ -304,10 +304,15 @@
 
 .board-hole-dot--pending {
   background: #ef4444;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.55);
 }
 
 .board-hole-dot--consumed {
   background: #94a3b8;
+}
+
+.game-tab.dark-mode .board-hole-dot--consumed {
+  background: #cbd5e1;
 }
 
 .board-cell--row {
@@ -408,8 +413,8 @@
   bottom: 0;
   z-index: 120;
   padding: 16rpx 0 calc(16rpx + env(safe-area-inset-bottom));
-  background: var(--bg-primary, #ffffff);
-  border-top: 2rpx solid var(--border-color, rgba(15, 23, 42, 0.08));
+  background: var(--bg-primary);
+  border-top: 2rpx solid var(--border);
   box-sizing: border-box;
 }
 

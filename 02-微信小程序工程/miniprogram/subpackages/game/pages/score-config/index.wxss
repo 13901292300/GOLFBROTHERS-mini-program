@@ -2,6 +2,7 @@
 @import "../../styles/game-ui.wxss";
 @import "../config/index.wxss";
 @import "../pick-players/index.wxss";
+@import "../../styles/page-window.wxss";
 
 .score-top {
   flex-shrink: 0;
