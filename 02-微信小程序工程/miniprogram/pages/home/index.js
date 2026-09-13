@@ -40,6 +40,16 @@ function decorateTournamentCard(match, card) {
   } else {
     out.statusTone = out.statusLabel === 'LIVE' ? 'live' : 'default';
   }
+  if (!out.cardStatus) {
+    out.cardStatus = seriesListCardAdapter.resolveOrdinaryMatchCardStatus(match);
+  }
+  if (!out.courseFirstName) {
+    if (Array.isArray(out.courseList) && out.courseList[0]) {
+      out.courseFirstName = out.courseList[0];
+    } else if (out.venue) {
+      out.courseFirstName = out.venue;
+    }
+  }
   return out;
 }
 
