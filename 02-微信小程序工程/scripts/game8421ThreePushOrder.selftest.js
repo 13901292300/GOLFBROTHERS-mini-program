@@ -225,9 +225,9 @@ var lasuo = { catalogId: 'lasuo-4', reorderOnPush: 'yes' };
 threePush.persistReorderOnPush(lasuo, 'lasuo-4', 'push', 'no');
 assert('persist 不改其它玩法', lasuo.reorderOnPush === 'yes');
 
-var four = { catalogId: '8421-4', reorderOnPush: 'no' };
+var four = { catalogId: '8421-4', reorderOnPush: 'no', pushRule: 'tie' };
 threePush.persistReorderOnPush(four, '8421-4', 'tie', 'no');
-assert('persist 不改四人8421', four.reorderOnPush === 'no');
+assert('persist 四人 tie 删除 reorderOnPush', !Object.prototype.hasOwnProperty.call(four, 'reorderOnPush'));
 
 assert(
   'UI 仅 within 显示',
@@ -235,7 +235,8 @@ assert(
     threePush.showReorderOnPushUi('8421-3', 'within-2') === true &&
     threePush.showReorderOnPushUi('8421-3', 'tie') === false &&
     threePush.showReorderOnPushUi('8421-3', 'none') === false &&
-    threePush.showReorderOnPushUi('8421-4', 'within-1') === false
+    threePush.showReorderOnPushUi('8421-4', 'tie') === false &&
+    threePush.showReorderOnPushUi('8421-4', 'within-1') === true
 );
 
 var keepResolver = holeOrder.resolveNextHoleOrder({

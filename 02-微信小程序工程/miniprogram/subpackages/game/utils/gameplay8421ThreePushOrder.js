@@ -1,5 +1,5 @@
 /**
- * 三人 8421：顶洞是否更换组合。
+ * 三人/四人 8421：顶洞是否更换组合（三人）/ 是否重新排序（四人）。
  * 不使用 resolveNextHoleOrder.pushPolicyFromReorderOnPush（缺字段会被当成 rerank）。
  *
  * within-1 / within-2：仅显式 "yes" 才 rerank；"no" / 缺失 / 其它值 = 不换组合。
@@ -13,13 +13,21 @@ function is8421ThreeId(id) {
   return asString(id) === "8421-3";
 }
 
+function is8421FourId(id) {
+  return asString(id) === "8421-4";
+}
+
+function is8421ReorderCatalog(id) {
+  return is8421ThreeId(id) || is8421FourId(id);
+}
+
 function isWithinPushRule(pushRule) {
   var p = asString(pushRule);
   return p === "within-1" || p === "within-2";
 }
 
 function showReorderOnPushUi(catalogId, pushRule) {
-  return is8421ThreeId(catalogId) && isWithinPushRule(pushRule);
+  return is8421ReorderCatalog(catalogId) && isWithinPushRule(pushRule);
 }
 
 function nextHolePushPolicy(rule) {
@@ -30,7 +38,7 @@ function nextHolePushPolicy(rule) {
 
 function persistReorderOnPush(rule, catalogId, pushRule, reorderOnPush) {
   if (!rule) return rule;
-  if (!is8421ThreeId(catalogId) && !is8421ThreeId(rule.catalogId)) return rule;
+  if (!is8421ReorderCatalog(catalogId) && !is8421ReorderCatalog(rule.catalogId)) return rule;
   if (isWithinPushRule(pushRule)) {
     rule.reorderOnPush = asString(reorderOnPush) === "yes" ? "yes" : "no";
   } else {
@@ -41,6 +49,8 @@ function persistReorderOnPush(rule, catalogId, pushRule, reorderOnPush) {
 
 module.exports = {
   is8421ThreeId: is8421ThreeId,
+  is8421FourId: is8421FourId,
+  is8421ReorderCatalog: is8421ReorderCatalog,
   isWithinPushRule: isWithinPushRule,
   showReorderOnPushUi: showReorderOnPushUi,
   nextHolePushPolicy: nextHolePushPolicy,

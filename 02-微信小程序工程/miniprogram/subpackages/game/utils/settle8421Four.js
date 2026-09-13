@@ -4,7 +4,8 @@
  * 固拉：第 1、2 名对第 3、4 名（与配置页队线一致）。乱拉/高手不见面：第 1、4 名对第 2、3 名。
  * 比较两队映射得分之和，高者胜。
  * D = |A和 − B和|。胜队每人 +D·K，负队每人 −D·K。无让杆。
- * 顶洞不换组合。乱拉按排序规则重排；高手不见面只在高手区/低手区内重排后再交叉组队。
+ * 打平顶洞始终 rerank（忽略遗留 reorderOnPush）。得分≤1/≤2 仅当 reorderOnPush==="yes" 才换组合。
+ * 乱拉按既有 nextOrder 重排；高手不见面只在高手区/低手区内重排后再交叉组队。
  * 包负分仅一队内恰好一人映射分为负时；转移额 = |映射负分| ×（本洞人均结果 / D）。分值翻倍：每块肉 = 本洞分值 D·K。
  */
 const core = require("./settleCore.js");
@@ -12,6 +13,7 @@ const s8421 = require("./settle8421.js");
 const settlePot = require("./settlePot.js");
 const assignmentNormalize = require("./assignmentNormalize.js");
 const holeOrder = require("./resolveNextHoleOrder.js");
+const threePush = require("./gameplay8421ThreePushOrder.js");
 
 function applySides(ledger, win, lose, unit) {
   s8421.addPts(ledger, win[0], unit);
@@ -93,13 +95,13 @@ function stableSort(arr, cmp) {
   return a;
 }
 
-function nextOrder(order, rec, hist, game, isPush) {
+function nextOrder(order, rec, hist, game, isPush, rule) {
   return holeOrder.resolveNextHoleOrder({
     currentOrder: order,
     holeScores: rec,
     rankingPolicy: holeOrder.rankingPolicyOf(game),
     rankingRule: { rankId: (game && game.rankId) || "gross-origin" },
-    pushPolicy: "rerank",
+    pushPolicy: threePush.nextHolePushPolicy(rule || (game && game.ruleSnapshot) || {}),
     isPush: isPush === true,
     tieBreakContext: { history: hist }
   });
@@ -291,7 +293,7 @@ function settle8421Four(game, ctx) {
       rec[id].pts = Number(ledger[id]) || 0;
     });
     hist.push(rec);
-    order = nextOrder(order, rec, hist, game, isPush === true);
+    order = nextOrder(order, rec, hist, game, isPush === true, rule);
     rankedNext = true;
     byHole[label] = ledger;
   });

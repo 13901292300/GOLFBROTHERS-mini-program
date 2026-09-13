@@ -508,6 +508,7 @@ Page(pageBoot.bindPageTheme({
     lasuoFoldDeduct: false,
     lasuoFoldBaoNeg: false,
     show8421Three: false,
+    is8421FourRule: false,
     pkBetter: true,
     pkWorse: true,
     pkTotal: true,
@@ -740,6 +741,7 @@ Page(pageBoot.bindPageTheme({
       showPush8421: is8421 && !is8421Fold,
       show8421Two: is8421Fold,
       show8421Three: is8421Fold,
+      is8421FourRule: catalog.is8421Four(ruleId),
       show8421ThreeReorderOnPush: threePush.showReorderOnPushUi(
         ruleId,
         normalizePushRule(existing && existing.pushRule, true, is8421Fold)
@@ -1125,7 +1127,7 @@ Page(pageBoot.bindPageTheme({
   setPush(e) {
     const value = e.currentTarget.dataset.value;
     const patch = { pushRule: value, pushText: pushThumb8421(value) };
-    if (catalog.is8421Three(this.data.ruleId)) {
+    if (threePush.is8421ReorderCatalog(this.data.ruleId)) {
       patch.show8421ThreeReorderOnPush = threePush.showReorderOnPushUi(this.data.ruleId, value);
       if (threePush.isWithinPushRule(value) && this.data.reorderOnPush !== "yes") {
         patch.reorderOnPush = "no";
@@ -1151,7 +1153,7 @@ Page(pageBoot.bindPageTheme({
         foldMeatValue: false,
         lasuoFoldMeat: false,
         pushText: "无顶洞",
-        show8421ThreeReorderOnPush: catalog.is8421Three(this.data.ruleId)
+        show8421ThreeReorderOnPush: threePush.is8421ReorderCatalog(this.data.ruleId)
           ? false
           : this.data.show8421ThreeReorderOnPush
       });
@@ -1165,7 +1167,7 @@ Page(pageBoot.bindPageTheme({
     const patch = exclusiveFoldPatch(this.data, "foldPush");
     patch.pushRule = this.data.showVegas ? "push" : "tie";
     patch.pushText = pushThumb8421(patch.pushRule);
-    if (catalog.is8421Three(this.data.ruleId)) {
+    if (threePush.is8421ReorderCatalog(this.data.ruleId)) {
       patch.show8421ThreeReorderOnPush = threePush.showReorderOnPushUi(this.data.ruleId, patch.pushRule);
     }
     this.setData(patch);
