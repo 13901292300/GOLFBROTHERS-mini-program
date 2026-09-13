@@ -1,5 +1,6 @@
 const { createHeaderStyle } = require('../../../../../utils/headerEngine.js');
 const temporaryCourse = require('../../../../../utils/temporaryCourse.js');
+const parInputFocus = require('./parInputFocus.js');
 
 function emptyPars() {
   const out = [];
@@ -11,6 +12,7 @@ function holeViews(pars) {
   return (pars || emptyPars()).map((par, i) => {
     const n = temporaryCourse.isValidPar(par) ? temporaryCourse.normalizePar(par) : null;
     return {
+      index: i,
       hole: i + 1,
       par: n,
       parText: n == null ? '' : String(n),
@@ -35,7 +37,8 @@ Page({
     back9ParTotal: 0,
     totalPar: 0,
     duplicateCourseParError: false,
-    canConfirm: false
+    canConfirm: false,
+    focusedHoleIndex: null
   },
 
   onLoad() {
@@ -80,25 +83,36 @@ Page({
     const key = temporaryCourse.normalizeCourseKey(e.currentTarget.dataset.key);
     if (!key) return;
     this._front9Course = key;
-    this._syncHoles();
+    this._syncHoles({ focusedHoleIndex: null });
   },
 
   onSelectBackCourse(e) {
     const key = temporaryCourse.normalizeCourseKey(e.currentTarget.dataset.key);
     if (!key) return;
     this._back9Course = key;
-    this._syncHoles();
+    this._syncHoles({ focusedHoleIndex: null });
+  },
+
+  onParFocus(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (!Number.isInteger(idx) || idx < 0 || idx > 17) return;
+    if (this.data.focusedHoleIndex === idx) return;
+    this.setData({ focusedHoleIndex: idx });
   },
 
   onParInput(e) {
     const idx = Number(e.currentTarget.dataset.index);
     if (!Number.isInteger(idx) || idx < 0 || idx > 17) return;
-    const parsed = temporaryCourse.parseParInput(e.detail && e.detail.value);
-    this._pars[idx] = parsed;
-    this._syncHoles();
+    const applied = parInputFocus.applyParInput({
+      holePars: this._pars,
+      index: idx,
+      raw: e.detail && e.detail.value
+    });
+    this._pars = applied.holePars;
+    this._syncHoles({ focusedHoleIndex: applied.focusedHoleIndex });
   },
 
-  _syncHoles() {
+  _syncHoles(extra) {
     const holes = holeViews(this._pars);
     this._pars = holes.map((h) => h.par);
     const pars = this._pars.slice();
@@ -110,7 +124,7 @@ Page({
       back9Course: back9Course,
       holePars: pars
     };
-    this.setData({
+    const data = {
       front9Course: front9Course,
       back9Course: back9Course,
       frontHoles: holes.slice(0, 9),
@@ -120,7 +134,11 @@ Page({
       totalPar: temporaryCourse.totalPar(pars),
       duplicateCourseParError: temporaryCourse.hasConflictingDuplicateCourse(payload),
       canConfirm: temporaryCourse.isValidTemporaryCourse(payload)
-    });
+    };
+    if (extra && typeof extra === 'object') {
+      Object.assign(data, extra);
+    }
+    this.setData(data);
   },
 
   onConfirm() {

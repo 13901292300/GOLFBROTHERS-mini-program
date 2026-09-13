@@ -59,8 +59,10 @@
             value="{{item.parText}}"
             placeholder="—"
             placeholder-class="par-ph"
+            focus="{{focusedHoleIndex === item.index}}"
+            bindfocus="onParFocus"
             bindinput="onParInput"
-            data-index="{{item.hole - 1}}"
+            data-index="{{item.index}}"
           />
         </view>
       </view>
@@ -99,8 +101,10 @@
             value="{{item.parText}}"
             placeholder="—"
             placeholder-class="par-ph"
+            focus="{{focusedHoleIndex === item.index}}"
+            bindfocus="onParFocus"
             bindinput="onParInput"
-            data-index="{{item.hole - 1}}"
+            data-index="{{item.index}}"
           />
         </view>
       </view>

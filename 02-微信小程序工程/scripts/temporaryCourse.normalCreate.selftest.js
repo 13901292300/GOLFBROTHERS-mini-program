@@ -690,6 +690,92 @@ assert(
     tempJs.indexOf("front9Course: 'A'") >= 0
 );
 
+assert(
+  'Temporary WXML PAR focus 单 index + bindfocus',
+  tempWxml.indexOf('maxlength="1"') >= 0 &&
+    tempWxml.indexOf('bindfocus="onParFocus"') >= 0 &&
+    tempWxml.indexOf('focus="{{focusedHoleIndex === item.index}}"') >= 0 &&
+    tempWxml.indexOf('hole1Focused') < 0 &&
+    tempJs.indexOf('setTimeout') < 0 &&
+    tempJs.indexOf('onParFocus') >= 0
+);
+
+var parInputFocus = require(path.join(
+  mini,
+  'subpackages',
+  'create',
+  'pages',
+  'course',
+  'temporary',
+  'parInputFocus.js'
+));
+
+function empty18() {
+  var out = [];
+  var i;
+  for (i = 0; i < 18; i++) out.push(null);
+  return out;
+}
+
+var r59 = parInputFocus.applyParInput({ holePars: empty18(), index: 0, raw: '4' });
+assert('CASE59 第1洞输入4 → focusedHoleIndex = 1', r59.parsed === 4 && r59.focusedHoleIndex === 1 && r59.holePars[0] === 4);
+
+var r60 = parInputFocus.applyParInput({ holePars: empty18(), index: 4, raw: '6' });
+assert('CASE60 第5洞输入6 → focusedHoleIndex = 5', r60.parsed === 6 && r60.focusedHoleIndex === 5 && r60.holePars[4] === 6);
+
+var r61 = parInputFocus.applyParInput({ holePars: empty18(), index: 8, raw: '4' });
+assert('CASE61 第9洞合法 → 第10洞', r61.focusedHoleIndex === 9);
+
+var r62 = parInputFocus.applyParInput({ holePars: empty18(), index: 16, raw: '3' });
+assert('CASE62 第17洞合法 → 第18洞', r62.focusedHoleIndex === 17);
+
+var r63 = parInputFocus.applyParInput({ holePars: empty18(), index: 17, raw: '5' });
+assert(
+  'CASE63 第18洞合法不越界不回第1洞',
+  r63.parsed === 5 && r63.focusedHoleIndex === null && r63.holePars[0] == null
+);
+
+var stay2 = parInputFocus.applyParInput({ holePars: empty18(), index: 0, raw: '2' });
+assert('CASE64 输入2 不跳', stay2.parsed == null && stay2.focusedHoleIndex === 0 && stay2.holePars[0] == null);
+
+var stay7 = parInputFocus.applyParInput({ holePars: empty18(), index: 0, raw: '7' });
+assert('CASE65 输入7 不跳', stay7.parsed == null && stay7.focusedHoleIndex === 0);
+
+var stayEmpty = parInputFocus.applyParInput({ holePars: [4].concat(empty18().slice(1)), index: 0, raw: '' });
+assert('CASE66 清空当前洞不跳', stayEmpty.parsed == null && stayEmpty.focusedHoleIndex === 0 && stayEmpty.holePars[0] == null);
+
+assert(
+  'CASE67 手动 focus 第5洞 → focusedHoleIndex=4',
+  /onParFocus\(e\)[\s\S]*dataset\.index/.test(tempJs) &&
+    /setData\(\{\s*focusedHoleIndex: idx\s*\}\)/.test(tempJs)
+);
+
+var seed68 = empty18();
+seed68[4] = 4;
+var r68 = parInputFocus.applyParInput({ holePars: seed68, index: 4, raw: '5' });
+assert(
+  'CASE68 重输第5洞后 focus 第6洞',
+  r68.holePars[4] === 5 && r68.focusedHoleIndex === 5
+);
+
+var seed69 = empty18();
+seed69[0] = 4;
+seed69[1] = 5;
+var r69 = parInputFocus.applyParInput({ holePars: seed69, index: 0, raw: '3' });
+assert(
+  'CASE69 下一洞已有值只 focus 不清空',
+  r69.focusedHoleIndex === 1 && r69.holePars[1] === 5 && r69.holePars[0] === 3
+);
+
+var r70 = parInputFocus.applyParInput({ holePars: empty18(), index: 8, raw: '5' });
+assert('CASE70 第9→第10跨 COURSE 区域', r70.focusedHoleIndex === 9 && r70.holePars[8] === 5);
+
+var overwrite = parInputFocus.applyParInput({ holePars: seed68, index: 4, raw: '45' });
+assert(
+  '已有值追加输入取末位覆盖',
+  parInputFocus.lastDigitRaw('45') === '5' && overwrite.holePars[4] === 5 && overwrite.focusedHoleIndex === 5
+);
+
 var normalJs = fs.readFileSync(
   path.join(mini, 'subpackages', 'create', 'pages', 'normal', 'index.js'),
   'utf8'
