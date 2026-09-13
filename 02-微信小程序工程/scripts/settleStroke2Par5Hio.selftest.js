@@ -167,6 +167,7 @@ assert(
 );
 
 var case4 = settleOf({
+  rule: ruleMul(),
   scores: {
     '5': { A: -4, B: 0 }
   }
@@ -188,6 +189,7 @@ assert(
 );
 
 var case5 = settleOf({
+  rule: ruleMul(),
   scores: {
     '5': { A: 0, B: -4 }
   }
@@ -211,6 +213,7 @@ assert(
 );
 
 var case7 = settleOf({
+  rule: ruleMul(),
   holeOrder: ['1', '5'],
   scores: {
     '1': { A: -1, B: 0 },
@@ -230,6 +233,7 @@ assert(
 );
 
 var case8 = settleOf({
+  rule: ruleMul(),
   holeOrder: ['1', '5', '10'],
   scores: {
     '1': { A: -1, B: 0 },
@@ -245,15 +249,16 @@ assert(
     case8.specialByHole['10'] &&
     playerKeys(case8.byHole['5']).length === 0 &&
     playerKeys(case8.byHole['10']).length === 0 &&
-    case8.byHole['1'].A === 1 &&
+    case8.byHole['1'].A === 2 &&
     tot8[0].infSign === 0 &&
-    tot8[0].raw === 1 &&
-    tot8[1].raw === -1 &&
-    tot8[0].text === '+1'
+    tot8[0].raw === 2 &&
+    tot8[1].raw === -2 &&
+    tot8[0].text === '+2'
   )
 );
 
 var case9 = settleOf({
+  rule: ruleMul(),
   holeOrder: ['1', '5', '10'],
   pars: { '1': 5, '5': 5, '10': 5 },
   scores: {
@@ -287,6 +292,7 @@ assert(
 );
 
 var case12 = settleOf({
+  rule: ruleMul(),
   k: 3,
   scores: { '5': { A: -4, B: 0 } }
 });
@@ -296,6 +302,7 @@ assert(
 );
 
 var case13 = settleOf({
+  rule: ruleMul(),
   offHoles: { '5': true },
   scores: { '5': { A: -4, B: 0 } }
 });
@@ -343,6 +350,82 @@ assert(
     specialResult.netInfinitySign(1, 1) === 0 &&
     specialResult.netInfinitySignForPlayer(case9.specialByHole, 'A') === 1 &&
     specialResult.netInfinitySignForPlayer(case8.specialByHole, 'A') === 0
+);
+
+var caseA = settleOf({
+  rule: noneRule,
+  scores: { '5': { A: -4, B: 0 } }
+});
+assert(
+  'CASE A reward=none PAR5 A=1 B=5 → 无 special，有限杆差 4',
+  !caseA.specialByHole['5'] &&
+    caseA.byHole['5'].A === 4 &&
+    caseA.byHole['5'].B === -4 &&
+    specialResult.netInfinitySignForPlayer(caseA.specialByHole, 'A') === 0
+);
+
+var caseB = settleOf({
+  rule: noneRule,
+  k: 2,
+  scores: { '5': { A: -4, B: 0 } }
+});
+assert(
+  'CASE B reward=none + K=2 → 有限 8',
+  !caseB.specialByHole['5'] && caseB.byHole['5'].A === 8 && caseB.byHole['5'].B === -8
+);
+
+var caseC = settleOf({
+  rule: ruleAdd(),
+  scores: { '5': { A: -4, B: 0 } }
+});
+assert('CASE C reward=add PAR5 A=1 → Infinity', !!(caseC.specialByHole['5'] && playerKeys(caseC.byHole['5']).length === 0));
+
+var caseD = settleOf({
+  rule: ruleMul(),
+  scores: { '5': { A: -4, B: 0 } }
+});
+assert('CASE D reward=mul PAR5 A=1 → Infinity', !!(caseD.specialByHole['5'] && playerKeys(caseD.byHole['5']).length === 0));
+
+var caseE = hole(1, 5, 3, 1, noneRule);
+assert(
+  'CASE E reward=none PAR3 A=1 → 有限杆差，不强制 hio',
+  caseE.baseGap === 4 &&
+    caseE.rewardMode === 'none' &&
+    caseE.rewardValue === 0 &&
+    caseE.leftValue === 4 &&
+    caseE.rewardKey !== 'hio'
+);
+
+var caseFAdd = hole(1, 3, 3, 1, ruleAdd());
+assert(
+  'CASE F reward=add PAR3 A=1 胜 → hio',
+  caseFAdd.rewardKey === 'hio' && caseFAdd.winnerActualDiff === -2
+);
+
+var caseG = hole(2, 4, 4, 1, ruleMul());
+assert(
+  'CASE G 普通 eagle 仍 m2',
+  caseG.rewardKey === 'm2' && caseG.rewardValue === 5
+);
+
+var caseH = settleOf({
+  rule: noneRule,
+  holeOrder: ['5', '10'],
+  pars: { '5': 5, '10': 5 },
+  scores: {
+    '5': { A: -4, B: 0 },
+    '10': { A: 0, B: -4 }
+  }
+});
+var totH = boardTotals(caseH);
+assert(
+  'CASE H reward=none 双方各一杆 PAR5 → 有限，无 Infinity',
+  !caseH.specialByHole['5'] &&
+    !caseH.specialByHole['10'] &&
+    caseH.byHole['5'].A === 4 &&
+    caseH.byHole['10'].A === -4 &&
+    totH[0].infSign === 0 &&
+    totH[0].raw === 0
 );
 
 if (failed) {

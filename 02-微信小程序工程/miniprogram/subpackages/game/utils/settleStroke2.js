@@ -94,21 +94,28 @@ function stroke2RewardState(rule) {
   return "missing";
 }
 
-function rewardBand(winnerRel, par) {
-  const spec = specialResult.resolveGrossScoreSpecial({ rel: winnerRel, par: par });
-  if (spec.kind === specialResult.KIND_ALBATROSS_TIER) return "hio";
+function strokeRewardEnabled(rule) {
+  const mode = stroke2RewardState(rule);
+  return mode === "add" || mode === "mul";
+}
+
+function rewardBand(winnerRel, par, rule) {
+  if (strokeRewardEnabled(rule)) {
+    const spec = specialResult.resolveGrossScoreSpecial({ rel: winnerRel, par: par });
+    if (spec.kind === specialResult.KIND_ALBATROSS_TIER) return "hio";
+  }
   return scoreBand(winnerRel);
 }
 
 function rewardMul(rule, winnerRel, par) {
   if (stroke2RewardState(rule) !== "mul") return 1;
-  const m = lookup(rowMap(rule && rule.mulRows), rewardBand(winnerRel, par), MUL_DEFAULTS);
+  const m = lookup(rowMap(rule && rule.mulRows), rewardBand(winnerRel, par, rule), MUL_DEFAULTS);
   if (!isFinite(m) || !(m > 0)) return 1;
   return m;
 }
 
 function rewardAdd(rule, winnerRel, par) {
-  const n = lookup(rowMap(rule && rule.addRows), rewardBand(winnerRel, par), ADD_DEFAULTS);
+  const n = lookup(rowMap(rule && rule.addRows), rewardBand(winnerRel, par, rule), ADD_DEFAULTS);
   return isFinite(n) ? n : 0;
 }
 
@@ -219,7 +226,7 @@ function calculateStrokePlayHoleResult(input) {
   }
   const leftWins = actualA < actualB;
   const winnerActualDiff = leftWins ? relA : relB;
-  const rewardKey = rewardBand(winnerActualDiff, par);
+  const rewardKey = rewardBand(winnerActualDiff, par, rule);
   let rewardValue = 0;
   let adjustedGap = baseGap;
   if (rewardMode === "mul") {
@@ -316,7 +323,7 @@ function settleStroke2(game, ctx) {
         const rightSpec = specialResult.resolveGrossScoreSpecial({ rel: rightRel, par: par });
         const leftInf = leftSpec.kind === specialResult.KIND_PAR5_HIO_INFINITY;
         const rightInf = rightSpec.kind === specialResult.KIND_PAR5_HIO_INFINITY;
-        if (leftInf !== rightInf) {
+        if (leftInf !== rightInf && strokeRewardEnabled(rule)) {
           const plusId = leftInf ? left : right;
           const minusId = leftInf ? right : left;
           if (!specialByHole[label]) specialByHole[label] = [];
