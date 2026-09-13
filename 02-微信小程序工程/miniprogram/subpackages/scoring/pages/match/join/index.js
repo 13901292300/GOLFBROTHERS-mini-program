@@ -10,6 +10,7 @@ const {
   isG6G7MatchPlayMode,
   isG8MatchPlayMode
 } = require('../../../../../utils/strokeEntityValidator.js');
+const halfCourse = require('../../../../../utils/halfCourse.js');
 
 const PENDING_BIND_KEY = 'gb_match_join_pending_bind_v1';
 
@@ -87,7 +88,7 @@ function resolveMatchName(match, matchId) {
   // 队际优先 organization* 快照；队内用 team*；避免 org/team 同步后重复拼接
   const orgName = resolveOrganizerDisplay(match).name;
   if (orgName) return orgName;
-  return String(match.courseName || matchId || '未知赛事').trim();
+  return halfCourse.formatCourseDisplayName(match) || String(matchId || '未知赛事').trim();
 }
 
 function resolveGroupName(match, groupId) {

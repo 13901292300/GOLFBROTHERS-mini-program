@@ -10,6 +10,7 @@ var matchPlayTeamScore = require('./matchPlayTeamScore.js');
 var seriesGameModeLabel = require('./seriesGameModeLabel.js');
 var seriesRoundDisplayLabels = require('./seriesRoundDisplayLabels.js');
 var seriesRoundVisualState = require('./seriesRoundVisualState.js');
+var halfCourse = require('./halfCourse.js');
 
 var DEFAULT_PLAZA_SUBTITLE = '两队 · 多轮比洞';
 
@@ -338,8 +339,8 @@ function buildNextValidRoundHint(series, deps) {
   var label = labels && labels[asString(round.roundId)] ? asString(labels[asString(round.roundId)]) : '';
   if (label) parts.push(label);
   if (asString(round.dateTime)) parts.push(asString(round.dateTime));
-  if (asString(round.courseName)) parts.push(asString(round.courseName));
-  if (asString(round.courseHalfText)) parts.push(asString(round.courseHalfText));
+  var courseLine = halfCourse.formatCourseLineForUi(round);
+  if (courseLine) parts.push(courseLine);
   return parts.join(' · ');
 }
 

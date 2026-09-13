@@ -10,6 +10,7 @@ var GAME_MODE_PENDING = '赛制待定';
 
 var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
 var seriesRyderCupAccumulate = require('../../../../utils/seriesRyderCupAccumulate.js');
+var halfCourse = require('../../../../utils/halfCourse.js');
 
 var ROUND_INFO_MONTH_LABELS = [
   'JAN',
@@ -229,7 +230,7 @@ function buildSeriesRoundInfoText(selectedKey, roundStates, series) {
   var src = findRoundInfoSource(key, roundStates, series);
   if (!src) return '';
   var dateText = formatRoundInfoMonthDay(parseRoundInfoDateParts(src.dateTime));
-  return [src.label, dateText, src.courseName, src.courseHalfText]
+  return [src.label, dateText, halfCourse.formatCourseLineForUi(src)]
     .filter(Boolean)
     .join(' · ');
 }

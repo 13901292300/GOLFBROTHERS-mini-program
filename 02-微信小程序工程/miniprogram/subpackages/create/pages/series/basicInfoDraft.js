@@ -13,6 +13,7 @@ var participantDraft = require('./participantDraft.js');
 var seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 var seriesSameDayMultiCourse = require('../../../../utils/seriesSameDayMultiCourse.js');
 var matchTitlePolicy = require('../../../../utils/matchTitlePolicy.js');
+var halfCourse = require('../../../../utils/halfCourse.js');
 
 var SERIES_NAME_MAX = matchTitlePolicy.SERIES_NAME_MAX;
 var SERIES_SUBTITLE_MAX = matchTitlePolicy.SERIES_SUBTITLE_MAX;
@@ -640,7 +641,7 @@ function summarizeRoundForConfirm(round, scoringMode, opts) {
       r.index,
       !!flags.sameDayMultiCourse
     ),
-    courseDisplay: hasCourse ? String(r.courseName) + (r.courseHalfText || '') : '未设置球场',
+    courseDisplay: hasCourse ? halfCourse.formatCourseLineForUi(r) : '未设置球场',
     dateTimeText: hasTime ? String(r.dateTime) : '未设置开球时间',
     gameModeText: hasMode ? String(r.gameMode) : '未设置赛制',
     feeText: hasFee ? String(r.fee) : '未设置费用',

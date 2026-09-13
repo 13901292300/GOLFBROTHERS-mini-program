@@ -20,6 +20,7 @@ const {
   buildRegisterTeamMap
 } = require('./strokeEntityValidator.js');
 const { buildMatchPlayResultSummary } = require('./matchPlayResult.js');
+const halfCourse = require('./halfCourse.js');
 
 const PAGE_SIZE = 20;
 const HISTORY_FILTERS = {
@@ -532,7 +533,7 @@ function _projectGameRecord(game, part, idSet) {
     matchType: 'normal',
     gameMode: '个人比杆赛',
     matchName: _trim(game.roundName || game.name) || '普通球局',
-    courseName: _trim(game.courseName),
+    courseName: halfCourse.formatCourseDisplayName(game),
     playedAt: playedAt,
     completedAt: finishedAt != null ? Number(finishedAt) || null : null,
     resultCategory: 'personal_stroke',
@@ -958,7 +959,7 @@ function _projectMatchRecord(match, part, idSet) {
     matchType: matchType || 'team-internal',
     gameMode: mode,
     matchName: _trim(match.roundName) || (card && card.title) || '球队赛',
-    courseName: _trim(match.courseName),
+    courseName: halfCourse.formatCourseDisplayName(match),
     playedAt: playedAt,
     completedAt: completedAt,
     status: 'completed',

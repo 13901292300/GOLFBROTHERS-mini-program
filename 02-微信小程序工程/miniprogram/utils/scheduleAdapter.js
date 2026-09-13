@@ -4,6 +4,8 @@
  * 首页日程：球队赛事报名同步等（不写盘，仅转换）。
  */
 
+const halfCourse = require('./halfCourse.js');
+
 /**
  * 从 match.teeTime 解析 YYYY-MM-DD
  * @param {string|number} teeTime
@@ -45,7 +47,7 @@ function buildTeamMatchScheduleContent(match) {
   const m = match && typeof match === 'object' ? match : {};
   const parts = [
     m.roundName != null ? String(m.roundName).trim() : '',
-    m.courseName != null ? String(m.courseName).trim() : '',
+    halfCourse.formatCourseDisplayName(m),
     m.teeTimeText != null ? String(m.teeTimeText).trim() : ''
   ].filter(Boolean);
   return parts.join(' ');

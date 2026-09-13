@@ -188,12 +188,7 @@ function hasOpenableTeamMatchScore(match, row) {
 }
 
 function buildScorecardCourseTitle(match) {
-  var courseName = asString(match && match.courseName).trim();
-  var front9Course = asString(match && match.front9Course).trim();
-  var back9Course = asString(match && match.back9Course).trim();
-  if (!courseName) return '';
-  if (!front9Course || !back9Course) return courseName;
-  return courseName + '（' + front9Course + '/' + back9Course + '）';
+  return halfCourse.formatCourseDisplayName(match);
 }
 
 /**

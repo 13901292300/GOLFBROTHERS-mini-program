@@ -15,6 +15,7 @@ const {
   resolveGameMode,
   isMatchPlayBoardMode
 } = require('../../../../utils/strokeEntityValidator.js');
+const halfCourse = require('../../../../utils/halfCourse.js');
 
 const HOLE_COUNT = 18;
 const DEFAULT_PARS = [4, 4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 5, 4, 3, 4, 3, 4, 5];
@@ -111,14 +112,7 @@ function formatDateTime(ts) {
 }
 
 function buildCourseLine(src) {
-  const course = String((src && (src.courseName || src.course)) || '').trim();
-  const front = String((src && src.front9Course) || '').trim();
-  const back = String((src && src.back9Course) || '').trim();
-  const half = String((src && (src.courseHalfText || src.courseHalf)) || '').trim();
-  let extra = '';
-  if (front || back) extra = ' • Course ' + [front, back].filter(Boolean).join('&');
-  else if (half) extra = ' • ' + half;
-  return (course || 'GOLF COURSE') + extra;
+  return halfCourse.formatCourseDisplayName(src) || 'GOLF COURSE';
 }
 
 function getGroupScoreData(match, groupId) {

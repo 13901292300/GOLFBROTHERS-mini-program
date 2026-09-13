@@ -9,6 +9,7 @@ var bannerConfig = require('../../../../utils/bannerConfig.js');
 var clubDateFormat = require('../../../../utils/clubDateFormat.js');
 var seriesGameModeLabel = require('../../../../utils/seriesGameModeLabel.js');
 var seriesCourseIdentity = require('../../../../utils/seriesCourseIdentity.js');
+var halfCourse = require('../../../../utils/halfCourse.js');
 var seriesColorMark = require('../../utils/seriesColorMark.js');
 var seriesStandingsViewModel = require('./seriesStandingsViewModel.js');
 var seriesRegisterViewModel = require('./seriesRegisterViewModel.js');
@@ -1420,9 +1421,7 @@ function buildRoundCard(series, round, deps, indexHint) {
   var idx = r.index != null ? Number(r.index) : indexHint != null ? indexHint + 1 : 1;
   var scoringMode = asString(series && series.scoringRule && series.scoringRule.mode).trim();
   var gate = evaluateRoundStationGate(series, r, deps);
-  var venue = [asString(r.courseName).trim(), asString(r.courseHalfText).trim()]
-    .filter(Boolean)
-    .join(' · ');
+  var venue = halfCourse.formatCourseLineForUi(r);
   return {
     roundId: asString(r.roundId).trim(),
     index: idx,

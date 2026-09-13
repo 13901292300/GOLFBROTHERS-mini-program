@@ -7,6 +7,7 @@ const gameStore = require('../../../utils/gameStore.js');
 const matchState = require('../../../utils/matchState.js');
 const holeLayout = require('../../../utils/holeLayout.js');
 const { remapPosterFonts } = require("./poster-data");
+const halfCourse = require('../../../utils/halfCourse.js');
 const { formatCalendarDateYMD, resolvePosterMatchDate } = require("./calendar-date");
 
 const HOLE_COUNT = 18;
@@ -545,7 +546,8 @@ function resolvePar(game) {
       courseId: game && game.courseId,
       courseName: game && game.courseName,
       front9Course: game && game.front9Course,
-      back9Course: game && game.back9Course
+      back9Course: game && game.back9Course,
+      courseLayoutRevision: game && game.courseLayoutRevision
     });
     const pars = layout && Array.isArray(layout.holePars) ? layout.holePars : [];
     if (pars.length) {
@@ -577,7 +579,8 @@ function resolveHolePars(game) {
       courseId: game && game.courseId,
       courseName: game && game.courseName,
       front9Course: game && game.front9Course,
-      back9Course: game && game.back9Course
+      back9Course: game && game.back9Course,
+      courseLayoutRevision: game && game.courseLayoutRevision
     });
     if (layout && Array.isArray(layout.holePars) && layout.holePars.length === HOLE_COUNT) {
       return layout.holePars.slice();
@@ -652,8 +655,8 @@ function buildScoreDataFromGame(game, gameId, groupIndex, playerId) {
     playerId: playerId,
     playerName: playerName,
     nickname: nickname,
-    courseName: game.courseName || '',
-    course: game.courseName || '',
+    courseName: halfCourse.formatCourseDisplayName(game),
+    course: halfCourse.formatCourseDisplayName(game),
     date: date,
     extra: extra,
     par: par,
