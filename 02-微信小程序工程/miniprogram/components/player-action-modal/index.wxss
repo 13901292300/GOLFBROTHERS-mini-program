@@ -183,3 +183,27 @@
 .player-action-modal--dark .player-action-modal__item {
   background: rgba(255, 255, 255, 0.08);
 }
+.player-action-modal__extras {
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.player-action-modal__extra {
+  height: 72rpx;
+  border-radius: 16rpx;
+  background: rgba(0, 45, 98, 0.06);
+  color: var(--golf-blue, #002d62);
+  font-size: 26rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-action-modal__extra:active {
+  opacity: 0.72;
+}
+.player-action-modal--dark .player-action-modal__extra {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}

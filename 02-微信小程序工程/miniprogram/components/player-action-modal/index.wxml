@@ -47,5 +47,14 @@
         </view>
       </view>
     </view>
+    <view wx:if="{{extraActions.length}}" class="player-action-modal__extras">
+      <view
+        wx:for="{{extraActions}}"
+        wx:key="key"
+        class="player-action-modal__extra"
+        data-key="{{item.key}}"
+        catchtap="onExtraTap"
+      >{{item.label}}</view>
+    </view>
   </view>
 </view>

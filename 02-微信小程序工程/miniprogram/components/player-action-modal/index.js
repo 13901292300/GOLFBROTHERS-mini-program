@@ -7,6 +7,7 @@ Component({
     visible: { type: Boolean, value: false },
     target: { type: Object, value: null },
     reactions: { type: Array, value: [] },
+    extraActions: { type: Array, value: [] },
     dark: { type: Boolean, value: false }
   },
 
@@ -27,6 +28,17 @@ Component({
           ? String(e.currentTarget.dataset.key).trim()
           : '';
       this.triggerEvent('reactiontap', { key: key });
+    },
+    onExtraTap(e) {
+      const key =
+        e &&
+        e.currentTarget &&
+        e.currentTarget.dataset &&
+        e.currentTarget.dataset.key != null
+          ? String(e.currentTarget.dataset.key).trim()
+          : '';
+      if (!key) return;
+      this.triggerEvent('extraaction', { key: key });
     }
   }
 });
