@@ -8,6 +8,7 @@
  */
 const core = require("./settleCore.js");
 const stroke = require("./settleStroke2.js");
+const specialResult = require("./specialResult.js");
 
 const MATCH2_SETTLE_VERSION = "v53-4.1.2";
 
@@ -99,8 +100,16 @@ function netRel(rel, n, isLeft) {
   return adjustedActual(rel, n, isLeft);
 }
 
-function winnerMul(rule, winnerRel) {
-  return stroke.rewardMul(rule, winnerRel);
+function winnerMul(rule, winnerRel, par) {
+  return stroke.rewardMul(rule, winnerRel, par);
+}
+
+function winnerMulKey(winnerRel, par, rule) {
+  if (match2MulState(rule) === "mul") {
+    const spec = specialResult.resolveGrossScoreSpecial({ rel: winnerRel, par: par });
+    if (spec.kind === specialResult.KIND_ALBATROSS_TIER) return "hio";
+  }
+  return stroke.scoreBand(winnerRel);
 }
 
 function match2MulState(rule) {
@@ -183,12 +192,12 @@ function calculateMatchPlayHoleResult(input) {
   }
   const leftWins = adjA < adjB;
   const winnerActualDiff = leftWins ? relA : relB;
-  const mulKey = stroke.scoreBand(winnerActualDiff);
-  const mul = winnerMul(rule, winnerActualDiff);
+  const mulKey = winnerMulKey(winnerActualDiff, par, rule);
+  const mul = winnerMul(rule, winnerActualDiff, par);
   const holePts = core.round1(1 * mul * k);
   return {
     outcome: leftWins ? "win" : "lose",
-    scoreType: scoreTypeOf(winnerActualDiff),
+    scoreType: SCORE_TYPE_BY_BAND[mulKey] || scoreTypeOf(winnerActualDiff),
     baseValue: k,
     multiplier: mul,
     multiplierKey: mulKey,
@@ -300,6 +309,7 @@ function settleMatch2(game, ctx) {
   let firstTrace = null;
 
   const byHole = {};
+  const specialByHole = {};
   holeOrder.forEach(function (label) {
     const ledger = core.holeLedger();
     const isLast = String(label) === lastLabel;
@@ -312,6 +322,27 @@ function settleMatch2(game, ctx) {
         const leftRel = readRel(scores, label, left);
         const rightRel = readRel(scores, label, right);
         if (leftRel == null || rightRel == null) return;
+        const leftSpec = specialResult.resolveGrossScoreSpecial({ rel: leftRel, par: par });
+        const rightSpec = specialResult.resolveGrossScoreSpecial({ rel: rightRel, par: par });
+        const leftInf = leftSpec.kind === specialResult.KIND_PAR5_HIO_INFINITY;
+        const rightInf = rightSpec.kind === specialResult.KIND_PAR5_HIO_INFINITY;
+        if (leftInf !== rightInf && resolved.mulState === "mul") {
+          const plusId = leftInf ? left : right;
+          const minusId = leftInf ? right : left;
+          core.consumeAllTopHoles(topHoleTrackers[key]);
+          meatPool[key] = 0;
+          if (!specialByHole[label]) specialByHole[label] = [];
+          specialByHole[label].push(
+            specialResult.makePar5HioEvent({
+              hole: label,
+              plusIds: [plusId],
+              minusIds: [minusId],
+              matchup: { type: "pair", sideAIds: [left], sideBIds: [right] },
+              meatAllEaten: true
+            })
+          );
+          return;
+        }
         const hn = pairHcapN(pair, label, par);
         const holeRes = calculateMatchPlayHoleResult({
           playerScore: leftRel,
@@ -384,6 +415,7 @@ function settleMatch2(game, ctx) {
 
   return {
     byHole: byHole,
+    specialByHole: specialByHole,
     initial: core.emptyLedger(ids),
     catalogId: "match-2",
     settleVersion: MATCH2_SETTLE_VERSION,
