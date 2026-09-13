@@ -11,6 +11,7 @@ const partyFormation = require("../../utils/partyFormation.js");
 const threeSetPairReset = require("../../utils/threeSetPairReset.js");
 const playerScoreCfg = require("../../utils/sideGame8421PlayerConfig.js");
 const ruleDefaults = require("../../utils/sideGameRuleDefaults.js");
+const instanceRuleSnapshot = require("../../utils/instanceRuleSnapshot.js");
 const normalizeHoleOrder = holeOrderUtil.normalizeHoleOrder;
 const rotateHoleOrderToStart = holeOrderUtil.rotateHoleOrderToStart;
 const holeOrderTextOf = holeOrderUtil.holeOrderTextOf;
@@ -2022,12 +2023,19 @@ Page(pageBoot.bindPageTheme({
       return { label: label, on: true };
     });
     const libId = decodeURIComponent((query && query.libId) || "") || (existing && existing.ruleLibId) || "";
-    const rawSnap =
-      (existing && existing.ruleSnapshot) ||
-        session.getMyRuleById(libId) ||
-        session.findMyRuleByName(decodeURIComponent((query && query.ruleName) || (existing && existing.name) || "")) ||
-        null;
-    let snapshot = session.cloneRule(session.unwrapGameplaySnapshot ? session.unwrapGameplaySnapshot(rawSnap) : rawSnap);
+    const libraryRow =
+      session.getMyRuleById(libId) ||
+      session.findMyRuleByName(
+        decodeURIComponent((query && query.ruleName) || (existing && existing.name) || "")
+      ) ||
+      null;
+    let snapshot = session.cloneRule(
+      instanceRuleSnapshot.snapshotForConfigLoad({
+        existingGame: existing,
+        libraryRule: libraryRow,
+        nameFallbackRule: libraryRow
+      })
+    );
     const catalogId = (snapshot && snapshot.catalogId) || (existing && existing.catalogId) || (query && query.ruleId) || "";
     if (catalogId && session.ensureStrokePlayReward) {
       snapshot = session.cloneRule(session.ensureStrokePlayReward(catalogId, snapshot || {}));
@@ -2663,15 +2671,34 @@ Page(pageBoot.bindPageTheme({
       lasuoHcapPatch(players)
     );
     const libId = this.data.ruleLibId;
-    if (libId && !(this._isDirty && this._isDirty())) {
-      const rule = session.getMyRuleById(libId);
-      if (rule) {
-        patch.ruleName = rule.name || this.data.ruleName;
-        patch.ruleSnapshot = session.cloneRule(
-          session.unwrapGameplaySnapshot ? session.unwrapGameplaySnapshot(rule) : rule
-        );
-        patch.ruleSummary = ruleSummaryOf(patch.ruleSnapshot, rule.catalogId || this.data.ruleId);
-      }
+    const rule = libId ? session.getMyRuleById(libId) : null;
+    const awaitingRuleEdit = !!this._awaitingRuleEditReturn;
+    const libraryRevisionChanged = instanceRuleSnapshot.libraryRevisionChanged(
+      this._ruleLibRevisionAtEditOpen,
+      rule && rule.revision
+    );
+    if (awaitingRuleEdit) {
+      this._awaitingRuleEditReturn = false;
+      this._ruleLibRevisionAtEditOpen = null;
+    }
+    if (
+      rule &&
+      instanceRuleSnapshot.shouldApplyLibrarySnapshotOnShow({
+        pageDirty: !!(this._isDirty && this._isDirty()),
+        hasExistingInstance: !!this.data.gameId,
+        libraryRule: rule,
+        libraryRevisionChanged: awaitingRuleEdit && libraryRevisionChanged
+      })
+    ) {
+      patch.ruleName = rule.name || this.data.ruleName;
+      patch.ruleSnapshot = instanceRuleSnapshot.nextEditorSnapshotOnShow({
+        pageDirty: false,
+        hasExistingInstance: !!this.data.gameId,
+        libraryRule: rule,
+        currentSnapshot: this.data.ruleSnapshot,
+        libraryRevisionChanged: true
+      });
+      patch.ruleSummary = ruleSummaryOf(patch.ruleSnapshot, rule.catalogId || this.data.ruleId);
     }
     const self = this;
     this._guardHydrating = true;
@@ -2699,6 +2726,11 @@ Page(pageBoot.bindPageTheme({
       wx.showToast({ title: "未找到该规则", icon: "none" });
       return;
     }
+    this._awaitingRuleEditReturn = true;
+    this._ruleLibRevisionAtEditOpen =
+      fromLib && fromLib.revision != null && fromLib.revision !== ""
+        ? Number(fromLib.revision)
+        : 0;
     wx.navigateTo({
       url: session.editRuleUrl(this.data.entry, this.data.maxPlayers, rule) + "&from=instance"
     });

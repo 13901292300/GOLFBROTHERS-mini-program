@@ -210,6 +210,14 @@ function resolveHistoricRuleSnapshot(game, row) {
       inst.ruleId ||
       (game.ruleSnapshot && game.ruleSnapshot.catalogId)
   );
+  if (catalogId === "landlord-mid") {
+    var own = require("./instanceRuleSnapshot.js");
+    var playOwned = own.ownedHistoricPlay(
+      game.ruleSnapshot || inst.ruleSnapshot,
+      row.ruleSnapshot
+    );
+    return mergeRuleSnapshot(buildRuleSnapshot(catalogId), playOwned);
+  }
   var play = pickFirstUsableGameplay(collectMatch2GameplayCandidates(game, row));
   if (!play || !Object.keys(play).length) {
     play = unwrapGameplaySnapshot(game.ruleSnapshot || inst.ruleSnapshot || row.ruleSnapshot || {});
