@@ -14,6 +14,7 @@ function settleLandlordMid(game, ctx) {
     catalogId: "landlord-mid",
     soloIndex: 1,
     pushPolicy: "rerank",
+    allowSplitHigh: false,
     teamNet: function (rec, solo, mates) {
       return core.round1((rec[mates[0]].net + rec[mates[1]].net) / 2);
     },

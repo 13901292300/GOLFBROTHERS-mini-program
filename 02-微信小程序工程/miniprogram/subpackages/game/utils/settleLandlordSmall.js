@@ -17,6 +17,7 @@ function settleLandlordSmall(game, ctx) {
     collectDebug: false,
     soloIndex: 2,
     keepOrderOnPush: false,
+    allowSplitHigh: false,
     autoMeatCount: 1,
     teamNet: function (rec, solo, mates) {
       return rec[shared.pickTeamWorst(mates, rec)].net;
