@@ -266,9 +266,9 @@ var c6 = settle(
   { A: -1, B: 1, C: 1, D: 0 }
 );
 assert(
-  'CASE6 头总两点乘法 rawCmp=5 × 胜方较好倍数2 → 10',
+  'CASE6 头总两点乘法 rawCmp=5 × 胜方个人最高倍2 → 10',
   dbg(c6).baseTeamScore === 5 &&
-    dbg(c6).multiplierSource === 'head-total-better' &&
+    dbg(c6).multiplierSource === 'head-total-max' &&
     Number(dbg(c6).multiplier) === 2 &&
     dbg(c6).rewardedTeamScore === 10 &&
     mirrored(c6, 10) &&
@@ -279,6 +279,7 @@ assert(
 var c7ht = settle(
   headTotal({
     reward: 'add',
+    addPre: 'win',
     addRows: addRows({ m2: 3, m1: 1 }),
     pushRule: 'none',
     baoMode: 'none'
@@ -286,15 +287,102 @@ var c7ht = settle(
   { A: -2, B: -1, C: 2, D: 0 }
 );
 assert(
-  'CASE7a 头总两点：负方小鸟不触发奖励',
+  'CASE7a 头总 addPre=win：总成绩输方小鸟不触发',
   dbg(c7ht).winningTeam === 'A' &&
     dbg(c7ht).baseTeamScore === 2 &&
+    dbg(c7ht).addRewardA === 3 &&
+    dbg(c7ht).addRewardB === 0 &&
     dbg(c7ht).rewardedTeamScore === 5 &&
     dbg(c7ht).addByPlayer == null &&
     pts(c7ht).B === pts(c7ht).C &&
     mirrored(c7ht, 5) &&
     sum4(c7ht) === 0,
   JSON.stringify(dbg(c7ht))
+);
+
+var htIgnore1 = settle(
+  headTotal({
+    reward: 'add',
+    addPre: 'ignore',
+    addRows: addRows({ hio: 0, m2: 4, m1: 0 }),
+    pushRule: 'none',
+    baoMode: 'none'
+  }),
+  { A: -3, B: -2, C: 2, D: 1 }
+);
+assert(
+  'CASE ignore：rawCmp=+2，A 无奖 B +4 → 2+0-4=-2',
+  dbg(htIgnore1).baseTeamScore === 2 &&
+    dbg(htIgnore1).addRewardA === 0 &&
+    dbg(htIgnore1).addRewardB === 4 &&
+    dbg(htIgnore1).rewardedTeamScore === -2 &&
+    mirrored(htIgnore1, -2) &&
+    sum4(htIgnore1) === 0,
+  JSON.stringify(dbg(htIgnore1))
+);
+
+var htIgnore2 = settle(
+  headTotal({
+    reward: 'add',
+    addPre: 'ignore',
+    addRows: addRows({ m1: 1, m2: 0 }),
+    pushRule: 'none',
+    baoMode: 'none'
+  }),
+  { A: -1, B: 0, C: -2, D: 3 }
+);
+assert(
+  'CASE ignore：rawCmp=-2，基础输方 A +1 仍生效 → -2+1=-1',
+  dbg(htIgnore2).baseTeamScore === -2 &&
+    dbg(htIgnore2).addRewardA === 1 &&
+    dbg(htIgnore2).addRewardB === 0 &&
+    dbg(htIgnore2).rewardedTeamScore === -1 &&
+    mirrored(htIgnore2, -1) &&
+    sum4(htIgnore2) === 0,
+  JSON.stringify(dbg(htIgnore2))
+);
+
+var htIgnore3 = settle(
+  headTotal({
+    reward: 'add',
+    addPre: 'ignore',
+    pkBetterW: '1',
+    pkTotalW: '2',
+    addRows: addRows({ m1: 2, m2: 4 }),
+    pushRule: 'none',
+    baoMode: 'none'
+  }),
+  { A: -1, B: -2, C: 2, D: 0 }
+);
+assert(
+  'CASE ignore：rawCmp=+1，A +2 B +4 → 1+2-4=-1',
+  dbg(htIgnore3).baseTeamScore === 1 &&
+    dbg(htIgnore3).addRewardA === 2 &&
+    dbg(htIgnore3).addRewardB === 4 &&
+    dbg(htIgnore3).rewardedTeamScore === -1 &&
+    mirrored(htIgnore3, -1) &&
+    sum4(htIgnore3) === 0,
+  JSON.stringify(dbg(htIgnore3))
+);
+
+var htNotLose = settle(
+  headTotal({
+    reward: 'add',
+    addPre: 'not-lose',
+    addRows: addRows({ m1: 1 }),
+    pushRule: 'none',
+    baoMode: 'none'
+  }),
+  { A: -1, B: -1, C: 1, D: 1 }
+);
+assert(
+  'CASE not-lose：总成绩平双方都有资格',
+  dbg(htNotLose).addRewardA === 1 &&
+    dbg(htNotLose).addRewardB === 1 &&
+    dbg(htNotLose).rewardedTeamScore ===
+      dbg(htNotLose).baseTeamScore + dbg(htNotLose).addRewardA - dbg(htNotLose).addRewardB &&
+    sum4(htNotLose) === 0,
+  JSON.stringify(dbg(htNotLose))
 );
 
 var c7tail = settle(
