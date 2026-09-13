@@ -127,7 +127,7 @@
 
         <view wx:if="{{showHoleRange}}" class="ds-card game-card" bindtap="openHoles">
           <view class="hole-preview">
-            <text class="game-card__name">有效洞</text>
+            <text class="game-card__name">游戏有效洞</text>
             <view class="hole-dots">
               <view wx:for="{{holes}}" wx:key="label" class="hole-dot {{item.on ? 'on' : ''}}"></view>
             </view>
@@ -325,8 +325,8 @@
 
   <view wx:if="{{showHoleSheet}}" class="sheet-mask" bindtap="closeHoles">
     <view class="sheet" catchtap="true">
-      <view class="sheet-title">有效洞</view>
-      <view class="sec-label">有效洞设置</view>
+      <view class="sheet-title">{{showHoleRange ? "游戏有效洞" : "有效洞"}}</view>
+      <view class="sec-label">{{showHoleRange ? "游戏有效洞设置" : "有效洞设置"}}</view>
       <view class="hcap-tags">
         <view class="hcap-tag {{holeTag === 'all' ? 'on' : ''}}" bindtap="toggleHoleAll">全选</view>
         <view class="hcap-tag {{holeTag === 'front9' ? 'on' : ''}}" bindtap="setHoleGroup" data-group="front9">前九</view>
@@ -504,7 +504,7 @@
         </view>
       </view>
       <block wx:if="{{!hcapNoHoles && (!hcapPersonal || hcapGroupRecv)}}">
-      <view class="sec-label">有效洞设置</view>
+      <view class="sec-label">让杆有效洞设置</view>
       <view class="hcap-tags">
         <view class="hcap-tag {{hcapTag === 'all' ? 'on' : ''}}" bindtap="toggleHcapAll">全选</view>
         <view class="hcap-tag {{hcapTag === 'front9' ? 'on' : ''}}" bindtap="setHcapHoleGroup" data-group="front9">前九</view>

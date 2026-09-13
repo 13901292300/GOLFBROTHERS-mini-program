@@ -3663,7 +3663,7 @@ Page(pageBoot.bindPageTheme({
     });
     if (!hit || !hit.on) return;
     if (hit.hcapAddOff) {
-      wx.showToast({ title: this.data.hcapNoHoles ? "已有让杆" : "有效洞已满，无法新增", icon: "none" });
+      wx.showToast({ title: this.data.hcapNoHoles ? "已有让杆" : "让杆有效洞已满，无法新增", icon: "none" });
       return;
     }
     const hcapHoles = holesForHcapForm(hit.hcapList || [], -1, null, this.data.holes);
@@ -4105,7 +4105,7 @@ Page(pageBoot.bindPageTheme({
           return { label: item.label, on: !!item.on && !item.locked };
         });
     if (!noHoles && hcapHoleCount(hcapHoles) < 1) {
-      wx.showToast({ title: "请选择有效洞", icon: "none" });
+      wx.showToast({ title: "请选择让杆有效洞", icon: "none" });
       return;
     }
     const gameHoles = this.data.holes;
@@ -4329,7 +4329,7 @@ Page(pageBoot.bindPageTheme({
       return { label: item.label, on: !!item.on };
     });
     if (hcapHoleCount(holes) < 1) {
-      wx.showToast({ title: "请选择有效洞", icon: "none" });
+      wx.showToast({ title: this.data.showHoleRange ? "请选择游戏有效洞" : "请选择有效洞", icon: "none" });
       return;
     }
     this.setData(
@@ -4981,7 +4981,7 @@ Page(pageBoot.bindPageTheme({
       }
     }
     if (!this.data.showThreeSet && this.data.holeCount < 1) {
-      wx.showToast({ title: "请选择有效洞", icon: "none" });
+      wx.showToast({ title: this.data.showHoleRange ? "请选择游戏有效洞" : "请选择有效洞", icon: "none" });
       return;
     }
     if (this.data.showLasuoN && this.data.bandMode === "split-high") {
