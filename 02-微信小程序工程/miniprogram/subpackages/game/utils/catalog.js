@@ -681,8 +681,10 @@ function lasuoPushText(rule) {
 }
 
 function listRewardText(rule, singleScheme) {
+  if (singleScheme) {
+    return rule && rule.reward === "mul" ? "有奖励" : "无奖励";
+  }
   if (!rule || rule.reward === "none") return "无奖励";
-  if (singleScheme) return "有奖励";
   if (rule.reward === "add") return "加法奖励";
   if (rule.reward === "mul") return "乘法奖励";
   return "无奖励";
