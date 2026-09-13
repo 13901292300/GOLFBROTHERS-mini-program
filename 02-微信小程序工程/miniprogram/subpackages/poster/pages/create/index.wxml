@@ -23,4 +23,13 @@
     bind:share="onPosterShare"
   />
 </view>
+
+<view wx:if="{{showLeaveSheet}}" class="leave-mask" catchtap="onLeaveContinue">
+  <view class="leave-sheet" catchtap="stopLeaveBubble">
+    <view class="leave-title">是否保存当前海报草稿？</view>
+    <button class="leave-btn leave-btn-primary" bindtap="onLeaveSave" disabled="{{leaveBusy}}">保存并退出</button>
+    <button class="leave-btn" bindtap="onLeaveDiscard" disabled="{{leaveBusy}}">不保存退出</button>
+    <button class="leave-btn leave-btn-ghost" bindtap="onLeaveContinue" disabled="{{leaveBusy}}">继续编辑</button>
+  </view>
+</view>
 </view>

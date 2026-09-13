@@ -623,6 +623,10 @@ Component({
       this._draftRestoredKey = "";
       this._draftRestoreLock = null;
       this._discardDraft = false;
+      this._sessionPhase = "editing";
+      this._leaveOnce = false;
+      this._shareMenuOpen = false;
+      this._circleShareBusy = false;
       this._backdropCache = {};
       this.applyTheme();
     },
@@ -672,18 +676,17 @@ Component({
       this._render();
     },
 
-    detached() {
-      this.saveDraft();
-    }
+    detached() {}
   },
 
   pageLifetimes: {
     show() {
       this.applyTheme();
+      if (this._sessionPhase === "done_share" && !this.data.showSharePanel) {
+        this.finishCompletedSession();
+      }
     },
-    hide() {
-      this.saveDraft();
-    }
+    hide() {}
   },
 
   methods: {
@@ -699,10 +702,54 @@ Component({
       if (this.data.themeClass !== themeClass) this.setData({ themeClass });
     },
 
-    saveDraft() {
-      if (this._discardDraft) return false;
-      const roundId = String(this.properties.roundId || "").trim();
+    _scopeRoundId(overrideRoundId) {
+      return String(overrideRoundId || this.properties.roundId || "").trim();
+    },
+
+    _canWriteDraft() {
+      return this._sessionPhase === "editing" && !this._discardDraft;
+    },
+
+    getSessionPhase() {
+      return this._sessionPhase || "editing";
+    },
+
+    isAwaitingShareMenu() {
+      return Boolean(this._shareMenuOpen);
+    },
+
+    skipDraftWrite() {
+      this._discardDraft = true;
+    },
+
+    _isPersistedUserFile(filePath) {
+      const path = this._localFilePath(filePath);
+      const root = (typeof wx !== "undefined" && wx.env && wx.env.USER_DATA_PATH) || "";
+      return Boolean(path && root && path.indexOf(root) === 0);
+    },
+
+    async saveDraft(overrideRoundId) {
+      if (!this._canWriteDraft()) return false;
+      const roundId = this._scopeRoundId(overrideRoundId);
       if (!roundId || !this.posterState) return false;
+      try {
+        if (this.posterState.photoPath && !this._isPersistedUserFile(this.posterState.photoPath)) {
+          this.posterState.photoPath = this._localFilePath(
+            await this._persistDraftFile(this.posterState.photoPath, "photo", { stable: true })
+          );
+        }
+      } catch (error) {
+        console.warn("[golf-poster] persist draft photo failed", error);
+      }
+      try {
+        if (this.posterState.subjectPath && !this._isPersistedUserFile(this.posterState.subjectPath)) {
+          this.posterState.subjectPath = this._localFilePath(
+            await this._persistDraftFile(this.posterState.subjectPath, "subject", { stable: true })
+          );
+        }
+      } catch (error) {
+        console.warn("[golf-poster] persist draft subject failed", error);
+      }
       return savePosterDraft({
         roundId,
         step: this.data.step,
@@ -730,10 +777,10 @@ Component({
     },
 
     clearDraft() {
-      this._discardDraft = true;
+      this.skipDraftWrite();
       this._draftRestoredKey = "";
       this._clearPosterCanvas();
-      clearPosterDraft();
+      clearPosterDraft(this._scopeRoundId());
       return true;
     },
 
@@ -749,7 +796,7 @@ Component({
       if (this._draftRestoreLock) return this._draftRestoreLock;
       const roundId = String(this.properties.roundId || "").trim();
       if (!roundId || !this.posterState) return Promise.resolve(false);
-      const draft = loadPosterDraft();
+      const draft = loadPosterDraft(roundId);
       if (!draft || String(draft.roundId) !== roundId) return Promise.resolve(false);
       const restoreKey = roundId + ":" + (draft.updatedAt || "");
       if (this._draftRestoredKey === restoreKey) return Promise.resolve(true);
@@ -1328,7 +1375,7 @@ Component({
         success: (result) => {
           if (!result.confirm) return;
           this._clearPosterCanvas();
-          clearPosterDraft();
+          clearPosterDraft(this._scopeRoundId());
           this._draftRestoredKey = "";
           this.posterState = createPosterModel(DEFAULT_TEMPLATE_ID, false, this.properties.brand);
           this._applyScoreFromRound(this.properties.roundId);
@@ -1449,12 +1496,14 @@ Component({
       return String(filePath || "").split("?")[0];
     },
 
-    _persistDraftFile(srcPath, kind) {
+    _persistDraftFile(srcPath, kind, options) {
       const source = this._localFilePath(srcPath);
       if (!source) return Promise.reject(new Error("empty draft file"));
       const roundId = String(this.properties.roundId || "draft").replace(/[^\w-]/g, "_");
       const ext = kind === "subject" ? ".png" : ".jpg";
-      const destPath = wx.env.USER_DATA_PATH + "/poster_" + kind + "_" + roundId + "_" + Date.now() + ext;
+      const destPath = options && options.stable
+        ? wx.env.USER_DATA_PATH + "/poster_" + kind + "_" + roundId + ext
+        : wx.env.USER_DATA_PATH + "/poster_" + kind + "_" + roundId + "_" + Date.now() + ext;
       const fs = wx.getFileSystemManager();
       return new Promise((resolve, reject) => {
         const copy = () => {
@@ -2502,8 +2551,56 @@ Component({
       this._render();
     },
 
+    _isAlbumAuthFail(error) {
+      const msg = String((error && error.errMsg) || error || "").toLowerCase();
+      return msg.indexOf("auth") !== -1 || msg.indexOf("authorize") !== -1 || msg.indexOf("permission") !== -1;
+    },
+
+    _promptAlbumSaveFailed(error) {
+      if (this._isAlbumAuthFail(error)) {
+        wx.showModal({
+          title: this.data.copy.saveFailed,
+          content: this.data.language === "en"
+            ? "Open Settings and allow access to Photos."
+            : "请在设置中允许保存图片到相册。",
+          confirmText: this.data.language === "en" ? "SETTINGS" : "去设置",
+          success: (result) => {
+            if (result.confirm) wx.openSetting();
+          }
+        });
+        return;
+      }
+      wx.showToast({
+        title: this.data.language === "en" ? "Save canceled. You can retry." : "未保存到相册，可重试",
+        icon: "none"
+      });
+    },
+
+    _markPosterSaved() {
+      this._sessionPhase = "done_share";
+      this._discardDraft = true;
+      this._draftRestoredKey = "";
+      clearPosterDraft(this._scopeRoundId());
+    },
+
+    finishCompletedSession() {
+      if (this._sessionPhase === "leaving") return;
+      if (this._sessionPhase !== "done_share") return;
+      this._sessionPhase = "leaving";
+      this._discardDraft = true;
+      this._shareMenuOpen = false;
+      this.setData({ showSharePanel: false, saving: false });
+      this.leaveToScorePage();
+    },
+
+    leaveToScorePage() {
+      this._backToScorePage();
+    },
+
     async exportPoster() {
-      if (this.data.saving) return;
+      if (this.data.saving || this._sessionPhase === "exporting" || this._sessionPhase === "done_share" || this._sessionPhase === "leaving") {
+        return;
+      }
       if (!this.posterCanvas) return;
       const dateValue = this.posterState && this.posterState.identity && this.posterState.identity.date
         ? this.posterState.identity.date.value
@@ -2519,34 +2616,34 @@ Component({
         });
         return;
       }
+      this._sessionPhase = "exporting";
       this.setData({ saving: true });
       wx.showLoading({ title: this.data.copy.saving, mask: true });
+      let albumStage = false;
       try {
         const tempFilePath = await this._exportPoster();
-        this._discardDraft = true;
-        this._draftRestoredKey = "";
-        clearPosterDraft();
+        if (this.properties.saveToAlbum) {
+          albumStage = true;
+          await this._saveToAlbum(tempFilePath);
+        }
+        this._markPosterSaved();
         this.triggerEvent("export", { tempFilePath });
         this.setData({
           saving: false,
           exportedImagePath: tempFilePath,
           showSharePanel: true
         });
-        if (this.properties.saveToAlbum) {
-          this._saveToAlbum(tempFilePath).catch(() => {});
-        }
       } catch (error) {
+        this._sessionPhase = "editing";
         this.setData({ saving: false });
-        wx.showModal({
-          title: this.data.copy.saveFailed,
-          content: this.data.language === "en"
-            ? "Open Settings and allow access to Photos."
-            : "请在设置中允许保存图片到相册。",
-          confirmText: this.data.language === "en" ? "SETTINGS" : "去设置",
-          success: (result) => {
-            if (result.confirm) wx.openSetting();
-          }
-        });
+        if (albumStage) {
+          this._promptAlbumSaveFailed(error);
+        } else {
+          wx.showToast({
+            title: this.data.language === "en" ? "Could not generate poster. Try again." : "海报生成失败，请重试",
+            icon: "none"
+          });
+        }
       } finally {
         wx.hideLoading();
         this._render();
@@ -2587,22 +2684,24 @@ Component({
     },
 
     closeSharePanel() {
+      if (this._sessionPhase === "done_share") {
+        this.finishCompletedSession();
+        return;
+      }
       this.setData({ showSharePanel: false });
     },
 
     stopPropagation() {},
 
     onShareToCircle() {
-      console.log("[poster] onShareToCircle 被点击");
+      if (this._sessionPhase !== "done_share" || this._circleShareBusy) return;
       const tempFilePath = this.data.exportedImagePath;
-      console.log("[poster] exportedImagePath:", tempFilePath);
       if (!tempFilePath) {
-        console.log("[poster] 没有图片路径，退出");
         wx.showToast({ title: this.data.copy.shareNeedExport, icon: "none" });
         return;
       }
+      this._circleShareBusy = true;
       this.setData({ showSharePanel: false });
-      console.log("[poster] 分享面板已关闭");
       const that = this;
       const roundId = String(this.properties.roundId || "");
       try {
@@ -2614,49 +2713,47 @@ Component({
       } catch (error) {
         console.warn("[golf-poster] posterCircleShare", error);
       }
-      console.log("[poster] 开始保存图片到相册...");
+      const reopenSharePanel = () => {
+        that._circleShareBusy = false;
+        if (that._sessionPhase === "done_share") {
+          that.setData({ showSharePanel: true });
+        }
+      };
       wx.saveImageToPhotosAlbum({
         filePath: tempFilePath,
         success: () => {
-          console.log("[poster] 保存到相册成功");
           wx.showToast({ title: "已保存到相册", icon: "success" });
-          console.log("[poster] 准备跳转到球友圈发布页，roundId:", that.properties.roundId);
           const url = that._momentPublishUrl({
             from: "poster",
             roundId: roundId,
             imagePath: tempFilePath
           });
-          console.log("[poster] 发布页 url:", url);
           if (!url) {
             wx.showToast({ title: "当前无法发布到球友圈", icon: "none" });
+            reopenSharePanel();
             return;
           }
           wx.navigateTo({
             url: url,
             success: (res) => {
-              console.log("[poster] 打开发布页成功");
+              that._circleShareBusy = false;
               const eventChannel = res && res.eventChannel;
               if (eventChannel && typeof eventChannel.on === "function") {
                 eventChannel.on("afterPublish", () => {
-                  console.log("[poster] 球友圈发布成功，准备返回记分页");
-                  that._backToScorePage();
+                  that.finishCompletedSession();
                 });
                 eventChannel.on("momentPublished", () => {
-                  console.log("[poster] momentPublished，准备返回记分页");
-                  that._backToScorePage();
+                  that.finishCompletedSession();
                 });
-              } else {
-                console.warn("[poster] 没有 eventChannel");
               }
             },
-            fail: (err) => {
-              console.log("[poster] 打开发布页失败:", err);
-              that._backToScorePage();
+            fail: () => {
+              that._circleShareBusy = false;
+              that.finishCompletedSession();
             }
           });
         },
         fail: (err) => {
-          console.log("[poster] 保存到相册失败:", err);
           const msg = (err && err.errMsg) || "";
           if (msg.indexOf("auth") !== -1) {
             wx.showModal({
@@ -2665,12 +2762,13 @@ Component({
               confirmText: "去设置",
               success: (res) => {
                 if (res.confirm) wx.openSetting();
-                else that._backToScorePage();
+                reopenSharePanel();
               }
             });
-          } else {
-            that._backToScorePage();
+            return;
           }
+          wx.showToast({ title: "发布前保存失败，可重试", icon: "none" });
+          reopenSharePanel();
         }
       });
     },
@@ -2781,60 +2879,77 @@ Component({
     },
 
     onShareToWechat() {
+      if (this._sessionPhase !== "done_share" || this._shareMenuOpen) return;
       const tempFilePath = this.data.exportedImagePath;
       if (!tempFilePath) {
         wx.showToast({ title: this.data.copy.shareNeedExport, icon: "none" });
         return;
       }
-      this.setData({ showSharePanel: false });
       this.triggerEvent("share", {
         tempFilePath,
         roundId: this.properties.roundId
       });
       if (typeof wx.showShareImageMenu === "function") {
-        wx.showShareImageMenu({ path: tempFilePath });
-      }
-      this._backToScorePage();
-    },
-
-    _backToScorePage() {
-      const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
-      console.log("[poster] 当前页面栈:", pages.map((p) => p && p.route));
-      console.log("[poster] 当前 roundId:", this.properties.roundId);
-
-      const scorePage = pages.find((p) => p && p.route && p.route.indexOf("scoring/pages/score") !== -1);
-      console.log("[poster] 找到记分页:", scorePage && scorePage.route ? scorePage.route : "未找到");
-
-      if (scorePage) {
-        const index = pages.indexOf(scorePage);
-        const delta = pages.length - index - 1;
-        console.log("[poster] 返回 delta:", delta, "当前栈深:", pages.length, "记分页下标:", index);
-        wx.navigateBack({
-          delta: delta,
-          success: () => console.log("[poster] navigateBack 成功"),
-          fail: (err) => {
-            console.error("[poster] navigateBack 失败:", err);
-            wx.reLaunch({ url: "/pages/home/index" });
+        this._shareMenuOpen = true;
+        wx.showShareImageMenu({
+          path: tempFilePath,
+          complete: () => {
+            this._shareMenuOpen = false;
+            this.finishCompletedSession();
           }
         });
         return;
       }
+      this.finishCompletedSession();
+    },
 
-      const roundId = String(this.properties.roundId || "").trim();
-      const scoreUrl = "/subpackages/scoring/pages/score/index" +
+    _scorePageUrl() {
+      const roundId = this._scopeRoundId();
+      return "/subpackages/scoring/pages/score/index" +
         (roundId ? "?gameId=" + encodeURIComponent(roundId) : "");
-      console.log("[poster] 未找到记分页，尝试 reLaunch 到记分页", scoreUrl);
+    },
+
+    _openScorePageFallback() {
+      const roundId = this._scopeRoundId();
+      const scoreUrl = this._scorePageUrl();
+      if (!roundId) {
+        wx.showToast({ title: "无法返回记分页", icon: "none" });
+        this._leaveOnce = false;
+        if (this._sessionPhase === "leaving") this._sessionPhase = "done_share";
+        return;
+      }
       wx.reLaunch({
         url: scoreUrl,
-        success: () => console.log("[poster] reLaunch 记分页成功"),
-        fail: (err) => {
-          console.error("[poster] reLaunch 记分页失败:", err);
-          wx.reLaunch({
-            url: "/pages/home/index",
-            fail: () => console.error("[poster] reLaunch 失败")
+        fail: () => {
+          wx.redirectTo({
+            url: scoreUrl,
+            fail: () => {
+              wx.showToast({ title: "无法返回记分页", icon: "none" });
+              this._leaveOnce = false;
+              if (this._sessionPhase === "leaving") this._sessionPhase = "done_share";
+            }
           });
         }
       });
+    },
+
+    _backToScorePage() {
+      if (this._leaveOnce) return;
+      this._leaveOnce = true;
+      const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
+      const scorePage = pages.find((p) => p && p.route && p.route.indexOf("scoring/pages/score") !== -1);
+
+      if (scorePage) {
+        const index = pages.indexOf(scorePage);
+        const delta = pages.length - index - 1;
+        wx.navigateBack({
+          delta: delta,
+          fail: () => this._openScorePageFallback()
+        });
+        return;
+      }
+
+      this._openScorePageFallback();
     },
 
     _selectedSticker() {

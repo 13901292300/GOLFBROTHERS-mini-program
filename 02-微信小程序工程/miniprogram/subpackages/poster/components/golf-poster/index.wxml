@@ -584,7 +584,7 @@
           <button data-step="brand" bindtap="jumpToStep">{{copy.editBrand}}</button>
           <button data-step="stickers" bindtap="jumpToStep">{{copy.editStickers}}</button>
         </view>
-        <button class="download-action" bindtap="exportPoster"><view class="download-icon"></view>{{copy.exportPoster}}</button>
+        <button class="download-action" bindtap="exportPoster" disabled="{{saving}}"><view class="download-icon"></view>{{copy.exportPoster}}</button>
       </view>
     </scroll-view>
 

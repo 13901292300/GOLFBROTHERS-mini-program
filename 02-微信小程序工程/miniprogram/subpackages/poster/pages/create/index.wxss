@@ -101,3 +101,50 @@ page {
   width: 100%;
   height: 100%;
 }
+
+.leave-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.leave-sheet {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 40rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--bg-card, #fff);
+  border-radius: 24rpx 24rpx 0 0;
+}
+
+.leave-title {
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-primary, #002d62);
+  margin-bottom: 28rpx;
+}
+
+.leave-btn {
+  width: 100%;
+  margin: 0 0 16rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.leave-btn-primary {
+  background: #002d62;
+  color: #fff;
+}
+
+.leave-btn-ghost {
+  background: transparent;
+  color: #6b7280;
+}
