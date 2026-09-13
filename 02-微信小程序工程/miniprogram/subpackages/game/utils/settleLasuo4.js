@@ -193,22 +193,31 @@ function rawCompare(rule, rec, aTeam, bTeam, par) {
 
 const SETTLE_LASUO4_VERSION = "v53-4.3.1";
 
-function bandValue(rows, rel, defaults) {
-  const band = stroke.scoreBand(rel);
+function resolveLasuo4Band(input) {
+  const rel = Number(input && input.rel);
+  const par = Number(input && input.par);
+  let gross = Number(input && input.gross);
+  if (!isFinite(gross) && isFinite(rel) && isFinite(par)) gross = rel + par;
+  if (gross === 1) return "hio";
+  return stroke.scoreBand(rel);
+}
+
+function bandValue(rows, score, defaults) {
+  const band = resolveLasuo4Band(score || {});
   const map = rowMap(rows);
   if (map[band] != null) return map[band];
   const fb = defaults && defaults[band];
   return fb != null && isFinite(Number(fb)) ? Number(fb) : 0;
 }
 
-function addValueOf(rel, rule) {
-  return bandValue(rule && rule.addRows, rel, ADD_DEFAULTS);
+function addValueOf(score, rule) {
+  return bandValue(rule && rule.addRows, score, ADD_DEFAULTS);
 }
 
-function weightedAddReward(rel, rule, weight) {
+function weightedAddReward(score, rule, weight) {
   const w = Number(weight);
   if (!isFinite(w) || w <= 0) return 0;
-  return addValueOf(rel, rule) * w;
+  return addValueOf(score, rule) * w;
 }
 
 function pickSlotPlayer(rec, team, worst) {
@@ -263,7 +272,7 @@ function teamAddReward(rule, rec, team) {
   const worstId = pickSlotPlayer(rec, team, true);
   let sum = 0;
   team.forEach(function (id) {
-    const v = addValueOf(rec[id].rel, rule);
+    const v = addValueOf(rec[id], rule);
     if (!v) return;
     let w = 0;
     if (String(id) === String(bestId) && bw) w = bw;
@@ -283,8 +292,8 @@ function headTailPersonalAdds(rule, rec, team) {
     worstId = String(team[0]) === String(bestId) ? team[1] : team[0];
   }
   const personal = {};
-  personal[bestId] = weightedAddReward(rec[bestId].rel, rule, bw);
-  personal[worstId] = (personal[worstId] || 0) + weightedAddReward(rec[worstId].rel, rule, ww);
+  personal[bestId] = weightedAddReward(rec[bestId], rule, bw);
+  personal[worstId] = (personal[worstId] || 0) + weightedAddReward(rec[worstId], rule, ww);
   return personal;
 }
 
@@ -333,8 +342,8 @@ function comboKey(relA, relB) {
   return "";
 }
 
-function personalMulOf(rel, rule) {
-  const band = stroke.scoreBand(rel);
+function personalMulOf(score, rule) {
+  const band = resolveLasuo4Band(score || {});
   const map = rowMap(rule && rule.mulRows);
   if (map[band] != null) return map[band];
   const fb = MUL_DEFAULTS[band];
@@ -344,7 +353,7 @@ function personalMulOf(rel, rule) {
 function resolveBestPersonalMultiplier(rule, rec, winTeam) {
   let best = null;
   winTeam.forEach(function (id) {
-    const m = personalMulOf(rec[id].rel, rule);
+    const m = personalMulOf(rec[id], rule);
     if (best == null || m > best) best = m;
   });
   if (best == null) return { m: 1, source: "default" };
@@ -353,7 +362,7 @@ function resolveBestPersonalMultiplier(rule, rec, winTeam) {
 
 function resolveWorstPersonalMultiplier(rule, rec, winTeam) {
   const worstId = pickSlotPlayer(rec, winTeam, true);
-  return { m: personalMulOf(rec[worstId].rel, rule), source: "worst" };
+  return { m: personalMulOf(rec[worstId], rule), source: "worst" };
 }
 
 function resolveComboThenPersonalProduct(rule, rec, winTeam) {
@@ -364,14 +373,14 @@ function resolveComboThenPersonalProduct(rule, rec, winTeam) {
   if (ck && comboMap[ck] != null) {
     return { m: comboMap[ck], source: ck };
   }
-  const m = personalMulOf(rec[idA].rel, rule) * personalMulOf(rec[idB].rel, rule);
+  const m = personalMulOf(rec[idA], rule) * personalMulOf(rec[idB], rule);
   return { m: m, source: "personal-product" };
 }
 
 function resolveHeadTotalMultiplier(rule, rec, winTeam) {
   let best = null;
   winTeam.forEach(function (id) {
-    const m = personalMulOf(rec[id].rel, rule);
+    const m = personalMulOf(rec[id], rule);
     if (best == null || m > best) best = m;
   });
   if (best == null) return { m: 1, source: "default" };
@@ -405,7 +414,7 @@ function resolveMultiplier(rule, rec, winTeam) {
   }
   let best = null;
   winTeam.forEach(function (id) {
-    const m = personalMulOf(rec[id].rel, rule);
+    const m = personalMulOf(rec[id], rule);
     if (best == null || m > best) best = m;
   });
   if (best == null) return { m: 1, source: "default" };
@@ -632,7 +641,7 @@ function settleLasuo4(game, ctx) {
         return;
       }
       const n = playerHcapN(playerOf(game, id), label, par);
-      rec[id] = { rel: rel, net: rel - n, pts: 0 };
+      rec[id] = { rel: rel, net: rel - n, pts: 0, par: par };
     });
     if (!ready) {
       prefixBlocked = true;
@@ -769,5 +778,6 @@ function settleLasuo4(game, ctx) {
 
 module.exports = {
   settle: settleLasuo4,
-  SETTLE_LASUO4_VERSION: SETTLE_LASUO4_VERSION
+  SETTLE_LASUO4_VERSION: SETTLE_LASUO4_VERSION,
+  resolveLasuo4Band: resolveLasuo4Band
 };

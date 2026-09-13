@@ -145,22 +145,46 @@ function mappedAt(diff, map) {
   return scoreMapUtil.mappedAt(diff, map);
 }
 
-function personalScore(diff, map, deduct, par) {
-  if (diff <= 3) {
-    const raw = mappedAt(diff, map);
+function resolve8421MapDiff(input) {
+  const diff = Number(input && (input.diff != null ? input.diff : input.rel));
+  const par = Number(input && input.par);
+  let gross = Number(input && input.gross);
+  if (!isFinite(gross) && isFinite(diff) && isFinite(par)) gross = diff + par;
+  if (gross === 1) return -3;
+  return diff;
+}
+
+function resolve8421ScoreBand(input) {
+  const mapDiff = resolve8421MapDiff(input);
+  if (!isFinite(mapDiff)) return "par";
+  if (mapDiff <= -3) return "hio";
+  if (mapDiff === -2) return "m2";
+  if (mapDiff === -1) return "m1";
+  if (mapDiff === 0) return "par";
+  if (mapDiff === 1) return "p1";
+  if (mapDiff === 2) return "p2";
+  if (mapDiff === 3) return "p3";
+  return null;
+}
+
+function personalScore(diff, map, deduct, par, gross) {
+  const mapDiff = resolve8421MapDiff({ diff: diff, par: par, gross: gross });
+  if (mapDiff <= 3) {
+    const raw = mappedAt(mapDiff, map);
     if (raw != null) return raw;
   }
   return deductScore(diff, deduct, par);
 }
 
-function personalScoreDebug(diff, map, deduct, par) {
+function personalScoreDebug(diff, map, deduct, par, gross) {
   const fromStart =
     deduct && deduct.deductWay === "doublepar-n"
       ? par + (Number(deduct.deductDoubleN) || 0)
       : Number(deduct && deduct.deductPlusN);
   const from = isFinite(fromStart) ? fromStart : 4;
-  if (diff <= 3) {
-    const raw = mappedAt(diff, map);
+  const mapDiff = resolve8421MapDiff({ diff: diff, par: par, gross: gross });
+  if (mapDiff <= 3) {
+    const raw = mappedAt(mapDiff, map);
     if (raw != null) {
       return { mappedScore: raw, from: from, nRaw: 0, nFinal: 0, usedDeduct: false };
     }
@@ -367,6 +391,8 @@ module.exports = {
   expandScoreCode,
   scoreMapFor,
   fromScoreRows,
+  resolve8421ScoreBand,
+  resolve8421MapDiff,
   deductCfg,
   resolve8421PlayerScoreConfig: playerScoreCfg.resolve8421PlayerScoreConfig,
   unwrapRule,
