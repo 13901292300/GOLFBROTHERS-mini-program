@@ -33,7 +33,8 @@ App({
     theme: 'bright',
     networkConnected: true,
     networkType: 'unknown',
-    networkStatusKnown: false
+    networkStatusKnown: false,
+    networkForegroundRefreshing: false
   },
   _networkEpoch: 0,
 
@@ -75,9 +76,8 @@ App({
     }
   },
 
-
   onShow: function () {
-    this._tryFlushScoreSync();
+    this._refreshNetworkStatusOnForeground();
   },
 
   _scheduleAvatarLocalCopy: function () {
@@ -100,6 +100,7 @@ App({
   },
 
   _applyNetworkState: function (state) {
+    if (this.globalData) this.globalData.networkForegroundRefreshing = false;
     networkStatus.applyToGlobalAndPublish(this.globalData, state);
     try {
       offlineScoringRecovery.handleNetworkState(networkStatus.readFromGlobal(this.globalData));
@@ -108,27 +109,31 @@ App({
     }
   },
 
+  _refreshNetworkStatusOnForeground: function () {
+    if (this.globalData) this.globalData.networkForegroundRefreshing = true;
+    this._probeNetworkType({ flushIfConnected: true });
+  },
+
   _probeInitialNetworkType: function () {
-    if (typeof wx === 'undefined' || typeof wx.getNetworkType !== 'function') return;
+    this._probeNetworkType({ flushIfConnected: false });
+  },
+
+  _probeNetworkType: function (opts) {
+    var options = opts && typeof opts === 'object' ? opts : {};
+    var flushIfConnected = !!options.flushIfConnected;
     var self = this;
-    var probeEpoch = self._networkEpoch || 0;
-    try {
-      wx.getNetworkType({
-        success: function (res) {
-          try {
-            if ((self._networkEpoch || 0) !== probeEpoch) return;
-            self._applyNetworkState(networkStatus.fromGetNetworkType(res));
-          } catch (eApply) {
-            /* ignore */
-          }
-        },
-        fail: function () {
-          /* 保持默认 connected / unknown，不挡启动 */
+    networkStatus.refresh({
+      globalData: self.globalData,
+      apply: function (state) {
+        self._applyNetworkState(state);
+      },
+      onComplete: function (info) {
+        var state = info && info.state;
+        if (flushIfConnected && state && state.networkConnected === true && !(info && info.failed)) {
+          self._tryFlushScoreSync();
         }
-      });
-    } catch (e) {
-      /* ignore */
-    }
+      }
+    });
   },
 
   _bindScoreSyncNetworkListener: function () {
@@ -136,7 +141,7 @@ App({
     if (typeof wx === 'undefined' || typeof wx.onNetworkStatusChange !== 'function') return;
     var self = this;
     wx.onNetworkStatusChange(function (res) {
-      self._networkEpoch = (self._networkEpoch || 0) + 1;
+      self._networkEpoch = networkStatus.bumpEpoch();
       var state = networkStatus.fromStatusChange(res);
       self._applyNetworkState(state);
       if (res && res.isConnected === true) {
@@ -149,7 +154,8 @@ App({
   _tryFlushScoreSync: function () {
     try {
       var p = require('./utils/teamClub/scoreSync.js').flush();
-      if (this.globalData && this.globalData.networkConnected !== false) {
+      var refreshing = !!(this.globalData && this.globalData.networkForegroundRefreshing);
+      if (this.globalData && this.globalData.networkConnected !== false && !refreshing) {
         try {
           offlineScoringRecovery.followFlush(p);
         } catch (eFollow) {
