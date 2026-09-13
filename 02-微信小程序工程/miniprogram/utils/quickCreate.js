@@ -5,6 +5,7 @@
 const gameStore = require('./gameStore.js');
 const matchStateUtil = require('./matchState.js');
 const { locateNearestCourseWithHalves } = require('./courseDatabase.js');
+const halfCourse = require('./halfCourse.js');
 const createTeeTimeNow = require('./createTeeTimeNow.js');
 
 function buildQuickCreateGame(courseInfo, user, now) {
@@ -26,7 +27,7 @@ function buildQuickCreateGame(courseInfo, user, now) {
     scoresByPlayer: {}
   };
   const gameId = 'g-' + Date.now();
-  const courseHalfText = courseInfo.halfText ? '（' + courseInfo.halfText + '）' : '';
+  const courseHalfText = halfCourse.halfTextFromPayload(courseInfo);
 
   const game = {
     gameId: gameId,
