@@ -1543,8 +1543,19 @@ function cancelRegistration(matchId, targetUserId) {
   const match = getMatchById(matchId);
   if (!match) return { ok: false, reason: 'not_found' };
 
+  if (!match.registerInfo || typeof match.registerInfo !== 'object') {
+    match.registerInfo = createDefaultRegisterInfo();
+  }
+  if (!Array.isArray(match.registerInfo.users)) {
+    match.registerInfo.users = [];
+  }
+  const beforeCount = match.registerInfo.users.length;
   const result = removeRegisteredUserAndCleanupGroups(match, uid);
   if (!result.ok) return result;
+  const afterCount = match.registerInfo.users.length;
+  if (beforeCount === afterCount) {
+    return { ok: false, reason: 'not_registered' };
+  }
   saveMatch(match);
 
   return { ok: true, match: match, wasGrouped: !!result.wasGrouped };

@@ -874,6 +874,7 @@ const EMPTY_REGISTER_INFO = {
 
 const EMPTY_CURRENT_USER_REGISTER_STATUS = {
   isRegistered: false,
+  userId: '',
   groupId: '',
   groupName: ''
 };
@@ -3707,16 +3708,32 @@ Page({
   },
 
   _resolveCurrentUserRegisterStatus(registerInfo) {
-    const currentUserId = String((gameStore.getCurrentUser() || {}).userId || '');
+    const currentUserId = String(playerLiveDisplay.currentAccountUserId() || '').trim();
     if (!currentUserId) return Object.assign({}, EMPTY_CURRENT_USER_REGISTER_STATUS);
     const users = registerInfo && Array.isArray(registerInfo.users) ? registerInfo.users : [];
-    const matched = users.find((user) => String(user.userId) === currentUserId);
+    const matched = users.find((user) => String((user && user.userId) || '') === currentUserId);
     if (!matched) return Object.assign({}, EMPTY_CURRENT_USER_REGISTER_STATUS);
     return {
       isRegistered: true,
+      userId: String(matched.userId),
       groupId: matched.groupId != null ? String(matched.groupId) : '',
       groupName: matched.groupName ? String(matched.groupName) : ''
     };
+  },
+
+  /**
+   * 本人取消报名唯一身份：已命中的 registerInfo.users[].userId。
+   * 未命中时才 fallback currentAccountUserId()，不以 gameStore CURRENT_USER 为权威源。
+   */
+  _resolveSelfCancelTargetUserId(registerInfo) {
+    const info = registerInfo || this.data.registerInfo;
+    const status = this._resolveCurrentUserRegisterStatus(info);
+    const fromRow = status && status.userId != null ? String(status.userId).trim() : '';
+    if (fromRow) return fromRow;
+    const pageStatus = this.data.currentUserRegisterStatus || EMPTY_CURRENT_USER_REGISTER_STATUS;
+    const fromPage = pageStatus.userId != null ? String(pageStatus.userId).trim() : '';
+    if (fromPage) return fromPage;
+    return String(playerLiveDisplay.currentAccountUserId() || '').trim();
   },
 
   switchRegisterSubTab(e) {
@@ -4360,8 +4377,9 @@ Page({
     if (!this.data.registerPermission.isOpen) return;
     if (!this.data.currentUserRegisterStatus.isRegistered) return;
     const match = teamMatchStore.getMatchById(this.data.matchId);
-    const user = gameStore.getCurrentUser() || {};
-    const userId = String(user.userId || '');
+    const registerInfo =
+      (match && match.registerInfo) || this.data.registerInfo;
+    const userId = this._resolveSelfCancelTargetUserId(registerInfo);
     const grouped = !!(match && userId && teamMatchStore.isUserInFormalGroups(match, userId));
     this.setData(this._buildSelfCancelDialogPatch(grouped));
   },
@@ -4400,14 +4418,15 @@ Page({
     }
 
     const matchId = this.data.matchId;
-    const user = gameStore.getCurrentUser() || {};
-    const userId = String(user.userId || '');
+    const match = teamMatchStore.getMatchById(matchId);
+    const registerInfo =
+      (match && match.registerInfo) || this.data.registerInfo;
+    const userId = this._resolveSelfCancelTargetUserId(registerInfo);
     if (!userId) {
       wx.showToast({ title: '用户信息缺失', icon: 'none' });
       return;
     }
 
-    const match = teamMatchStore.getMatchById(matchId);
     const registerUsers =
       match && match.registerInfo && Array.isArray(match.registerInfo.users)
         ? match.registerInfo.users
@@ -4461,7 +4480,12 @@ Page({
     if (!result || !result.ok) {
       this.setData({ registerCancelSubmitting: false });
       wx.showToast({
-        title: result && result.reason === 'not_found' ? '赛事数据缺失' : '取消失败',
+        title:
+          result && result.reason === 'not_found'
+            ? '赛事数据缺失'
+            : result && result.reason === 'not_registered'
+              ? '未找到报名记录，请刷新后重试'
+              : '取消失败',
         icon: 'none'
       });
       return;
