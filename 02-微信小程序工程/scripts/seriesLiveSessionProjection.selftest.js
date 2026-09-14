@@ -135,26 +135,27 @@ assert(
     createWxml.indexOf("label: '出发表'") < 0
 );
 
+var FIXED_TAB_IDS = 'info,standings,register,schedule,discussion';
+
 assert(
-  '无 LIVE 时报名保持原位',
-  live.tabIds(live.buildSeriesDetailTabs(false)).join(',') ===
-    'info,standings,register,schedule,discussion'
+  '无 LIVE 时 TAB 固定顺序',
+  live.tabIds(live.buildSeriesDetailTabs(false)).join(',') === FIXED_TAB_IDS
 );
 
 assert(
-  '有 LIVE 时报名移到最后且其它相对顺序不变',
-  live.tabIds(live.buildSeriesDetailTabs(true)).join(',') ===
-    'info,standings,schedule,discussion,register'
+  '有 LIVE 时报名仍第 3 位，不重排',
+  live.tabIds(live.buildSeriesDetailTabs(true)).join(',') === FIXED_TAB_IDS &&
+    live.tabIds(live.buildSeriesDetailTabs(true))[2] === 'register'
 );
 
 assert(
-  '多轮 LIVE 仍把报名放最后',
+  '多轮 LIVE 报名仍第 3 位',
   live.hasAnyLiveRound(twoLive) === true &&
-    live.tabIds(live.buildSeriesDetailTabs(true))[4] === 'register'
+    live.tabIds(live.buildSeriesDetailTabs(true))[2] === 'register'
 );
 
 assert(
-  'LIVE 结束后有后续未开始轮：报名回原位',
+  'LIVE 结束后有后续未开始轮：报名仍第 3 位',
   live.hasAnyLiveRound(liveThenDone) === false &&
     live.tabIds(live.buildSeriesDetailTabs(false))[2] === 'register'
 );
@@ -360,7 +361,7 @@ assert(
 );
 
 assert(
-  '详情装配：LIVE 时 tabs 报名在最后且默认 TAB 仍 info',
+  '详情装配：LIVE 时 tabs 报名仍第 3 位且默认 TAB 仍 info',
   (function () {
     var vm = detailVm.buildSeriesDetailViewModel(
       seriesOf('global_m', [
@@ -384,7 +385,8 @@ assert(
     return (
       vm.ok &&
       vm.hasLiveRound === true &&
-      vm.tabs[vm.tabs.length - 1].id === 'register' &&
+      vm.tabs[2].id === 'register' &&
+      vm.tabs[vm.tabs.length - 1].id === 'discussion' &&
       vm.tabs[0].id === 'info' &&
       vm.standings.selectedKey === 'r1'
     );

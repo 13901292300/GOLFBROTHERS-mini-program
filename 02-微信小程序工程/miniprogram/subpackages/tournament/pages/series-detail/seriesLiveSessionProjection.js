@@ -2,7 +2,7 @@
  * Series 详情：LIVE 会话纯投影
  * - 是否存在有效 LIVE 轮
  * - 默认目标轮（总榜 / 出发表共用）
- * - TAB 顺序（报名是否置末）
+ * - TAB 顺序（固定；LIVE 不把报名置末）
  * - 轮次层空态 / 查看领先榜（不写分组卡片右上角）
  * 不读 storage，不改 round/match 结构。
  */
@@ -114,8 +114,8 @@ function resolveSessionSelectedRoundId(input) {
 }
 
 /**
- * 有任意未取消 LIVE 时，报名 TAB 移到最后；其它 TAB 相对顺序不变。
- * 选中态必须用 id，禁止下标。
+ * 固定产品顺序：赛事信息 / 总榜 / 报名 / 出发表 / 讨论区。
+ * 任意 round LIVE 不得把报名移出首屏。选中态必须用 id，禁止下标。
  */
 function buildSeriesDetailTabs(hasLiveRound, options) {
   var tabs = cloneTabs(SERIES_TABS);
@@ -127,15 +127,7 @@ function buildSeriesDetailTabs(hasLiveRound, options) {
       }
     }
   }
-  if (!hasLiveRound) return tabs;
-  var register = null;
-  var rest = [];
-  for (var i = 0; i < tabs.length; i++) {
-    if (tabs[i].id === 'register') register = tabs[i];
-    else rest.push(tabs[i]);
-  }
-  if (register) rest.push(register);
-  return rest;
+  return tabs;
 }
 
 function resolveScheduleCardStatus(state) {
