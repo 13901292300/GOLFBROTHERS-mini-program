@@ -21,6 +21,7 @@ const seriesFinishLock = require('../../../../utils/seriesFinishLock.js');
 const seriesRyderCup = require('../../../../utils/seriesRyderCup.js');
 const seriesStoreDefault = require('../../../../utils/seriesStore.js');
 const halfCourse = require('../../../../utils/halfCourse.js');
+const seriesManageAccess = require('../../../../utils/seriesManageAccess.js');
 
 var PUBLISHED_STRUCTURE_LOCKED_MSG =
   seriesInfoUpdate.PUBLISHED_STRUCTURE_LOCKED_MSG || '系列赛发布后暂不支持修改此项';
@@ -1102,12 +1103,16 @@ Page({
 
   _resolveCurrentCreatorId: function () {
     try {
-      var user = gameStore.getCurrentUser ? gameStore.getCurrentUser() : null;
-      var uid = user && user.userId != null ? String(user.userId).trim() : '';
-      return uid;
+      if (
+        seriesManageAccess &&
+        typeof seriesManageAccess.resolveNewSeriesCreatedBy === 'function'
+      ) {
+        return seriesManageAccess.resolveNewSeriesCreatedBy() || '';
+      }
     } catch (e) {
-      return '';
+      /* ignore */
     }
+    return '';
   },
 
   _createAndSaveBlankDraft(stepOverride) {

@@ -33,17 +33,49 @@ function isSeriesEventOrgAdmin(series, userId) {
   return !!teamDirectory.isOrganizationAdmin(orgId, uid);
 }
 
+function isPlaceholderUserId(id) {
+  var s = asString(id).toLowerCase();
+  return !s || s === 'me' || s === 'mock' || s === 'demo';
+}
+
+/**
+ * 新 Series 草稿 createdBy：稳定账号 ID。
+ * 不写 gameStore 占位 'me'。
+ */
+function resolveNewSeriesCreatedBy() {
+  var candidates = [];
+  try {
+    candidates.push(require('./playerLiveDisplay.js').currentAccountUserId());
+  } catch (eLive) {
+    /* ignore */
+  }
+  try {
+    candidates.push(require('./teamClub/identity.js').currentUserIdOrEmpty());
+  } catch (eId) {
+    /* ignore */
+  }
+  var i;
+  for (i = 0; i < candidates.length; i++) {
+    var id = asString(candidates[i]);
+    if (id && !isPlaceholderUserId(id)) return id;
+  }
+  return '';
+}
+
 function isSeriesCreator(series, userOrId) {
-  var uid = resolveUserId(userOrId);
-  var createdBy = asString(series && series.createdBy);
-  return !!(uid && createdBy && uid === createdBy);
+  if (!series) return false;
+  return !!matchManageAccess.isCreatorOfMatch(
+    { createdBy: asString(series.createdBy) },
+    userOrId
+  );
 }
 
 function isSeriesHostPrivileged(series, userOrId) {
+  if (!series) return false;
+  // Series 创建者：与分站 isCreatorOfMatch 同一套 actor aliases（含历史 'me'）
+  if (isSeriesCreator(series, userOrId)) return true;
   var uid = resolveUserId(userOrId);
-  if (!uid || !series) return false;
-  // Series 创建者：可显示 M 入口；选轮后按钮仍走该分站 matchManageAccess
-  if (isSeriesCreator(series, uid)) return true;
+  if (!uid) return false;
   var hostMode = asString(series.hostMode);
   if (hostMode === 'team') {
     var teamId = asString(series.hostTeam && series.hostTeam.teamId);
@@ -176,6 +208,8 @@ function resolveSeriesManageFabVisible(input) {
 module.exports = {
   isClubTeamAdminUser: isClubTeamAdminUser,
   isSeriesEventOrgAdmin: isSeriesEventOrgAdmin,
+  isPlaceholderUserId: isPlaceholderUserId,
+  resolveNewSeriesCreatedBy: resolveNewSeriesCreatedBy,
   isSeriesCreator: isSeriesCreator,
   isSeriesHostPrivileged: isSeriesHostPrivileged,
   hasMatchManageEntryQualification: hasMatchManageEntryQualification,
