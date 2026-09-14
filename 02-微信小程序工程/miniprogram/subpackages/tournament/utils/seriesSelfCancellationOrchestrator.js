@@ -10,6 +10,7 @@ var seriesStationIndex = require('../../../utils/seriesStationIndex.js');
 var p3a = require('./removePlayerFromMatchCompetitionStructure.js');
 var seriesRegistrationCancellationGate = require('./seriesRegistrationCancellationGate.js');
 var seriesManageAccess = require('../../../utils/seriesManageAccess.js');
+var teamMatchFinish = require('../../../utils/teamMatchFinish.js');
 
 var JOURNAL_KEY = 'gb_series_self_cancel_journal_v1';
 var KNOWN_PHASES = {
@@ -205,7 +206,8 @@ function mapWriteReason(reason) {
   }
   if (
     r === seriesRegistrationCancellationGate.REASON_FINALIZED ||
-    r === seriesRegistrationCancellationGate.REASON_STATION
+    r === seriesRegistrationCancellationGate.REASON_STATION ||
+    r === seriesRegistrationCancellationGate.REASON_COMPLETED
   ) {
     return r;
   }
@@ -448,11 +450,23 @@ function createSeriesSelfCancellationOrchestrator(deps) {
 
   function blockFromGate(gateRes) {
     if (!gateRes || gateRes.cancellable) return '';
-    var r = asString(gateRes.reason);
-    if (r === seriesRegistrationCancellationGate.REASON_FINALIZED) {
-      return seriesRegistrationCancellationGate.REASON_FINALIZED;
-    }
-    return seriesRegistrationCancellationGate.REASON_STATION;
+    return asString(gateRes.reason);
+  }
+
+  function resolveOwnedCancelStation(series, round, roundIndex) {
+    return seriesRegistrationCancellationGate.resolveSeriesCancelStation({
+      series: series,
+      round: round,
+      roundIndex: roundIndex,
+      getMatchById: function (id) {
+        try {
+          return teamMatchStore.getMatchById(id);
+        } catch (eGet) {
+          return null;
+        }
+      },
+      getIndexByMatchId: getIndexByMatchId
+    });
   }
 
   function resolveGateBlockReason(series, playerId) {
@@ -759,30 +773,25 @@ function createSeriesSelfCancellationOrchestrator(deps) {
       var round = rounds[i];
       if (!round) continue;
       var roundId = asString(round.roundId);
-      var gate = verifyStation({
-        series: series,
-        roundId: roundId,
-        getMatchById: function (id) {
-          return teamMatchStore.getMatchById(id);
-        },
-        getIndexByMatchId: getIndexByMatchId
-      });
-      if (!gate.ok) {
+      var resolved = resolveOwnedCancelStation(series, round, round.index != null ? round.index : i + 1);
+      if (resolved.skip) continue;
+      if (!resolved.ok) {
         stationErrors.push({
           roundId: roundId,
           matchId: asString(round.matchId),
-          reason: gate.reason || 'managed_station_invalid'
+          reason: resolved.reason || 'managed_station_invalid'
         });
         continue;
       }
-      var cleaned = removeRespectingLiveScores(gate.match, playerId);
+      if (teamMatchFinish.isMatchCompleted(resolved.match)) continue;
+      var cleaned = removeRespectingLiveScores(resolved.match, playerId);
       var blocked = asString(cleaned && cleaned.blockedReason);
       if (blocked === 'player_has_real_score') {
         scoreBlocked = true;
         grouped = true;
         affectedStations.push({
-          roundId: gate.roundId,
-          matchId: gate.matchId,
+          roundId: resolved.roundId || roundId,
+          matchId: resolved.matchId,
           publishToken: asString(series.publishToken),
           changed: false
         });
@@ -791,8 +800,8 @@ function createSeriesSelfCancellationOrchestrator(deps) {
       if (cleaned && cleaned.changed) {
         grouped = true;
         affectedStations.push({
-          roundId: gate.roundId,
-          matchId: gate.matchId,
+          roundId: resolved.roundId || roundId,
+          matchId: resolved.matchId,
           publishToken: asString(series.publishToken),
           changed: true
         });
@@ -1255,19 +1264,14 @@ function createSeriesSelfCancellationOrchestrator(deps) {
       var round = rounds[i];
       if (!round) continue;
       var roundId = asString(round.roundId);
-      var gate = verifyStation({
-        series: series,
-        roundId: roundId,
-        getMatchById: function (id) {
-          return teamMatchStore.getMatchById(id);
-        },
-        getIndexByMatchId: getIndexByMatchId
-      });
-      if (!gate.ok) {
-        return { ok: false, reason: 'managed_station_invalid' };
+      var resolved = resolveOwnedCancelStation(series, round, round.index != null ? round.index : i + 1);
+      if (resolved.skip) continue;
+      if (!resolved.ok) {
+        return { ok: false, reason: resolved.reason || 'managed_station_invalid' };
       }
-      var before = deepClone(gate.match);
-      var working = deepClone(gate.match);
+      if (teamMatchFinish.isMatchCompleted(resolved.match)) continue;
+      var before = deepClone(resolved.match);
+      var working = deepClone(resolved.match);
       var changed = false;
       for (p = 0; p < ids.length; p++) {
         var cleaned = removeRespectingLiveScores(working, ids[p]);
@@ -1283,7 +1287,7 @@ function createSeriesSelfCancellationOrchestrator(deps) {
       grouped = true;
       matchesBefore.push(before);
       matchesAfter.push(working);
-      affectedRoundIds.push(gate.roundId || roundId);
+      affectedRoundIds.push(resolved.roundId || roundId);
     }
     return {
       ok: true,

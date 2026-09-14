@@ -527,7 +527,7 @@ assert(
       ]
     })
   );
-  assert('6 finalized 整批拒绝', res.ok === false && res.reason === 'finalized_score');
+  assert('6 completed 整批拒绝', res.ok === false && res.reason === 'completed_station_participation');
   assert('6 零写入', stable(h.seriesBag[h.series.seriesId]) === stable(beforeS) && stable(h.matches) === stable(beforeM) && journalOf(h) == null);
 })();
 
@@ -597,7 +597,7 @@ assert(
   var beforeS = freeze(h.seriesBag[h.series.seriesId]);
   var beforeM = freeze(h.matches);
   var res = h.svc.applyProxyCommitPlanWithStationCleanup(planArgs(h));
-  assert('12 写前 finalized', res.ok === false && res.reason === 'finalized_score');
+  assert('12 写前 completed', res.ok === false && res.reason === 'completed_station_participation');
   assert('12 零写入', stable(h.seriesBag[h.series.seriesId]) === stable(beforeS) && stable(h.matches) === stable(beforeM) && journalOf(h) == null);
 })();
 

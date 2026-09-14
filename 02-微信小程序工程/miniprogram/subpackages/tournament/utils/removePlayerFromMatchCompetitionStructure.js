@@ -258,5 +258,7 @@ function removePlayerFromMatchCompetitionStructure(match, playerId) {
 
 module.exports = {
   BLOCKED_PLAYER_HAS_REAL_SCORE: BLOCKED_PLAYER_HAS_REAL_SCORE,
+  inspectStructure: inspectStructure,
+  playerHasRealScore: playerHasRealScore,
   removePlayerFromMatchCompetitionStructure: removePlayerFromMatchCompetitionStructure
 };

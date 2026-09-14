@@ -172,9 +172,12 @@ function g2Match(status, redScores, blueScores) {
 }
 
 assert(
-  '只读：不写 storage / 不接页面 / 复用 P3-A 与 managed 核验',
+  '只读：不写 storage / 不接页面 / 复用 P3-A 与 isMatchCompleted，不以 managed gate 作资格',
   gateSrc.indexOf('removePlayerFromMatchCompetitionStructure') >= 0 &&
-    gateSrc.indexOf('verifyManagedStationForManage') >= 0 &&
+    gateSrc.indexOf('inspectStructure') >= 0 &&
+    gateSrc.indexOf('playerHasRealScore') >= 0 &&
+    gateSrc.indexOf('isMatchCompleted') >= 0 &&
+    gateSrc.indexOf('verifyManagedStationForManage') < 0 &&
     gateSrc.indexOf('saveMatch') < 0 &&
     gateSrc.indexOf('setStorageSync') < 0 &&
     gateSrc.indexOf('cancelSelfRegistration') < 0 &&
@@ -229,8 +232,8 @@ assert(
   assert(
     '4 G1 completed 永久锁定',
     res.cancellable === false &&
-      res.reason === 'finalized_score' &&
-      res.message === '该选手已有完赛成绩，不可取消报名' &&
+      res.reason === 'completed_station_participation' &&
+      res.message === '你已参加过已结束的分站比赛，无法取消报名' &&
       res.lockedRoundIds.join(',') === 'r1'
   );
 })();
@@ -244,7 +247,10 @@ assert(
     scoreData: { g1: { scoresByPlayer: { u1: { scores: [null, '', null] } } } }
   });
   var res = resolve(series, 'u1', [stationOf(match)]);
-  assert('5 completed 空成绩可取消', res.cancellable === true && res.reason === '');
+  assert(
+    '5 completed 已编组无成绩不可取消',
+    res.cancellable === false && res.reason === 'completed_station_participation'
+  );
 })();
 
 // 6. G2 四球只锁 entity 成员
@@ -330,9 +336,9 @@ assert(
   });
   var res = resolve(series, 'u1', [stationOf(m1), stationOf(m2)]);
   assert(
-    '10 LIVE 成绩不掩盖其他轮 finalized 全局锁',
+    '10 LIVE 成绩不掩盖其他轮已结束参赛全局锁',
     res.cancellable === false &&
-      res.reason === 'finalized_score' &&
+      res.reason === 'completed_station_participation' &&
       res.lockedRoundIds.join(',') === 'r2'
   );
 })();
@@ -345,7 +351,11 @@ assert(
     occupants: ['u1', 'u2'],
     scoreData: { g1: { scoresByPlayer: { u2: { scores: [4, 5] } } } }
   });
-  assert('11 completed 无该球员成绩不锁', resolve(series, 'u1', [stationOf(match)]).cancellable === true);
+  assert(
+    '11 completed 已编组无成绩仍锁',
+    resolve(series, 'u1', [stationOf(match)]).cancellable === false &&
+      resolve(series, 'u1', [stationOf(match)]).reason === 'completed_station_participation'
+  );
 })();
 
 // 12. managed 异常不可取消
@@ -370,8 +380,8 @@ assert(
 
   var missing = resolve(series, 'u1', []);
   assert(
-    '12 缺站不可当成无成绩可取消',
-    missing.cancellable === false && missing.reason === 'managed_station_invalid'
+    '12 缺站 match 无法证明参赛则 skip 允许取消',
+    missing.cancellable === true && missing.reason === ''
   );
 })();
 

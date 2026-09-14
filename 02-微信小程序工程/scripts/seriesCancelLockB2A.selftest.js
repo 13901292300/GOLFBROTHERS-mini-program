@@ -427,8 +427,14 @@ assert(
   var beforeMatches = freeze(h.matches);
   var insp = h.svc.inspectProxyCancellationImpact(args(h));
   var res = h.svc.cancelProxyRegistrationWithStationCleanup(args(h));
-  assert('4 inspect finalized_score', insp.ok === false && insp.blockedReason === 'finalized_score');
-  assert('4 cancel finalized_score', res.ok === false && res.reason === 'finalized_score');
+  assert(
+    '4 inspect completed_station_participation',
+    insp.ok === false && insp.blockedReason === 'completed_station_participation'
+  );
+  assert(
+    '4 cancel completed_station_participation',
+    res.ok === false && res.reason === 'completed_station_participation'
+  );
   assert(
     '4 零写入',
     stable(h.seriesBag[h.series.seriesId]) === stable(beforeSeries) &&
@@ -474,7 +480,7 @@ assert(
   var beforeSeries = freeze(h.seriesBag[h.series.seriesId]);
   var beforeMatches = freeze(h.matches);
   var res = h.svc.cancelProxyRegistrationWithStationCleanup(args(h));
-  assert('6 写前 finalized 拒绝', res.ok === false && res.reason === 'finalized_score');
+  assert('6 写前 completed 拒绝', res.ok === false && res.reason === 'completed_station_participation');
   assert(
     '6 零写入',
     stable(h.seriesBag[h.series.seriesId]) === stable(beforeSeries) &&

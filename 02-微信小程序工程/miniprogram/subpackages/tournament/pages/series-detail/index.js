@@ -438,7 +438,9 @@ function calcIsStickyRegisterExt(opts) {
 }
 
 var SELF_CANCEL_CTA_FINALIZED = '已有完赛成绩，不可取消报名';
+var SELF_CANCEL_CTA_COMPLETED_STATION = '你已参加过已结束的分站比赛，无法取消报名';
 var SERIES_ADMIN_REMOVE_FINALIZED = '已有完赛成绩，不可删除';
+var SERIES_ADMIN_REMOVE_COMPLETED_STATION = '该选手已参加过已结束的分站比赛，无法删除';
 
 function bumpAdminPlayerRemoveToken(current) {
   var n = Number(current);
@@ -466,6 +468,13 @@ function projectSeriesAdminRemovalInspect(inspect) {
       seriesRemovalLocked: true,
       seriesRemovalReason: 'finalized_score',
       seriesRemovalMessage: SERIES_ADMIN_REMOVE_FINALIZED
+    };
+  }
+  if (blocked === 'completed_station_participation') {
+    return {
+      seriesRemovalLocked: true,
+      seriesRemovalReason: 'completed_station_participation',
+      seriesRemovalMessage: SERIES_ADMIN_REMOVE_COMPLETED_STATION
     };
   }
   if (blocked === 'managed_station_invalid') {
@@ -551,13 +560,19 @@ function projectProxyCancelLockUser(user, inspect) {
   var blocked = inspect && inspect.blockedReason != null
     ? String(inspect.blockedReason)
     : '';
-  if (blocked !== 'finalized_score' && blocked !== 'managed_station_invalid') {
+  if (
+    blocked !== 'finalized_score' &&
+    blocked !== 'completed_station_participation' &&
+    blocked !== 'managed_station_invalid'
+  ) {
     return user;
   }
   var message =
     blocked === 'finalized_score'
       ? SELF_CANCEL_CTA_FINALIZED
-      : seriesStationManageGate.GATE_FAIL_MESSAGE;
+      : blocked === 'completed_station_participation'
+        ? SELF_CANCEL_CTA_COMPLETED_STATION
+        : seriesStationManageGate.GATE_FAIL_MESSAGE;
   return Object.assign({}, user, {
     selected: true,
     locked: true,
@@ -601,6 +616,13 @@ function resolveSelfCancelLockCta(currentCta, inspect) {
   if (blocked === 'finalized_score') {
     return {
       label: SELF_CANCEL_CTA_FINALIZED,
+      disabled: true,
+      action: 'none'
+    };
+  }
+  if (blocked === 'completed_station_participation') {
+    return {
+      label: SELF_CANCEL_CTA_COMPLETED_STATION,
       disabled: true,
       action: 'none'
     };
@@ -2536,6 +2558,7 @@ Page({
       recovery_required: '保存失败，请重试',
       player_has_real_score: '该球员已有比赛成绩，暂不可取消报名',
       finalized_score: SELF_CANCEL_CTA_FINALIZED,
+      completed_station_participation: SELF_CANCEL_CTA_COMPLETED_STATION,
       managed_station_invalid: seriesStationManageGate.GATE_FAIL_MESSAGE,
       not_self_registered: '报名状态已变化，请重新操作',
       series_not_found: '系列赛不存在',
@@ -7991,6 +8014,12 @@ Page({
     if (String(reason || '') === 'finalized_score') {
       if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
         wx.showToast({ title: SERIES_ADMIN_REMOVE_FINALIZED, icon: 'none' });
+      }
+      return;
+    }
+    if (String(reason || '') === 'completed_station_participation') {
+      if (typeof wx !== 'undefined' && typeof wx.showToast === 'function') {
+        wx.showToast({ title: SERIES_ADMIN_REMOVE_COMPLETED_STATION, icon: 'none' });
       }
       return;
     }

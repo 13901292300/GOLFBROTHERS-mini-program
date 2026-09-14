@@ -484,8 +484,8 @@ assert(
   var beforeM = freeze(h.matches);
   var insp = h.svc.inspectAdminPlayerRemovalImpact(adminArgs(h));
   var res = h.svc.removePlayerByAdminWithStationCleanup(adminArgs(h));
-  assert('finalized inspect', insp.ok === false && insp.blockedReason === 'finalized_score');
-  assert('finalized 拒绝', res.ok === false && res.reason === 'finalized_score');
+  assert('finalized inspect', insp.ok === false && insp.blockedReason === 'completed_station_participation');
+  assert('finalized 拒绝', res.ok === false && res.reason === 'completed_station_participation');
   assert(
     'finalized 零写入',
     stable(h.seriesBag[h.series.seriesId]) === stable(beforeS) &&
@@ -571,7 +571,7 @@ assert(
   var beforeS = freeze(h.seriesBag[h.series.seriesId]);
   var beforeM = freeze(h.matches);
   var res = h.svc.removePlayerByAdminWithStationCleanup(adminArgs(h));
-  assert('inspect 后写前变 finalized', res.ok === false && res.reason === 'finalized_score');
+  assert('inspect 后写前变 finalized', res.ok === false && res.reason === 'completed_station_participation');
   assert(
     '写前 finalized 零写入',
     stable(h.seriesBag[h.series.seriesId]) === stable(beforeS) &&

@@ -318,10 +318,13 @@ assert(
   var insp = h.svc.inspectSelfCancellationImpact(args(h));
   var res = h.svc.cancelSelfRegistrationWithStationCleanup(args(h));
   assert(
-    '1 inspect finalized_score',
-    insp.ok === false && insp.blockedReason === 'finalized_score'
+    '1 inspect completed_station_participation',
+    insp.ok === false && insp.blockedReason === 'completed_station_participation'
   );
-  assert('1 cancel finalized_score', res.ok === false && res.reason === 'finalized_score');
+  assert(
+    '1 cancel completed_station_participation',
+    res.ok === false && res.reason === 'completed_station_participation'
+  );
   assert('1 零写入 series', stable(h.seriesBag[h.series.seriesId]) === stable(beforeSeries));
   assert('1 零写入 matches', stable(h.matches) === stable(beforeMatches) && h.saveLog.length === 0);
   assert('1 无 journal', journalOf(h) == null);
@@ -382,7 +385,10 @@ assert(
   var beforeSeries = freeze(h.seriesBag[h.series.seriesId]);
   var beforeMatches = freeze(h.matches);
   var res = h.svc.cancelSelfRegistrationWithStationCleanup(args(h));
-  assert('4 写前变为 finalized_score', res.ok === false && res.reason === 'finalized_score');
+  assert(
+    '4 写前变为 completed_station_participation',
+    res.ok === false && res.reason === 'completed_station_participation'
+  );
   assert('4 零写入 series', stable(h.seriesBag[h.series.seriesId]) === stable(beforeSeries));
   assert('4 零写入 matches', stable(h.matches) === stable(beforeMatches) && h.saveLog.length === 0);
   assert('4 无 journal', journalOf(h) == null);

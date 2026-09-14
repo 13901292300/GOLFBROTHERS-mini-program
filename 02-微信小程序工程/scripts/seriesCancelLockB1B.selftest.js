@@ -74,7 +74,7 @@ assert(
     pageJs.indexOf('_selfCancelInspectToken') >= 0 &&
     /reloadViewModel:[\s\S]{0,400}_selfCancelInspectToken/.test(pageJs) &&
     /_safeSetData\(patch,[\s\S]{0,400}_applySelfCancelCtaInspectAfterReload/.test(pageJs) &&
-    /onRegisterCtaTap:[\s\S]{0,350}if \(cta\.disabled\) return;/.test(pageJs) &&
+    /onRegisterCtaTap:[\s\S]{0,900}if \(cta\.disabled\) return;/.test(pageJs) &&
     pageJs.indexOf('seriesRegistrationCancellationGate') < 0 &&
     pageWxml.indexOf('已有完赛成绩，不可取消报名') < 0 &&
     pageWxss.indexOf('selfCancelLock') < 0 &&
@@ -96,7 +96,19 @@ assert(
   );
 })();
 
-// 2. LIVE 有成绩 CTA 可点击
+// 1b. completed_station_participation
+(function () {
+  var next = pageIndex.resolveSelfCancelLockCta(cancelCta, {
+    ok: false,
+    blockedReason: 'completed_station_participation'
+  });
+  assert(
+    '1b completed_station_participation 覆盖 CTA',
+    next.label === '你已参加过已结束的分站比赛，无法取消报名' &&
+      next.disabled === true &&
+      next.action === 'none'
+  );
+})();
 (function () {
   var next = pageIndex.resolveSelfCancelLockCta(cancelCta, {
     ok: true,
