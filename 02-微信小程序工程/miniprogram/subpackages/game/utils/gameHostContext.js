@@ -9,6 +9,7 @@ var playerManage = require('../../../utils/playerManage.js');
 var strokeEntityValidator = require('../../../utils/strokeEntityValidator.js');
 var mockAvatars = require('../../../utils/mockAvatars.js');
 var playerCanonicalDisplay = require('../../../utils/playerCanonicalDisplay.js');
+var playerLiveDisplay = require('../../../utils/playerLiveDisplay.js');
 var catalog = require('./catalog.js');
 var temporaryCourse = require('../../../utils/temporaryCourse.js');
 
@@ -525,10 +526,11 @@ function buildFromGameHostSnapshot(snap) {
       var pid = playerCanonicalDisplay.resolveRosterPlayerId(slot);
       if (!pid) return;
       var rec = byPlayer[pid] || {};
+      var pres = presentationFromSlot(slot, pid, registerMap, ctx.currentUserId);
       var party = makeParty({
         partyId: pid,
         partyType: 'player',
-        displayName: slot.name || pid,
+        displayName: identityPresentationName(pres, slot, pid),
         memberPlayerIds: [pid],
         groupId: gid,
         teamId: ''
@@ -588,16 +590,34 @@ function presentationFromSlot(slot, pid, registerMap, currentUserId) {
   return pres;
 }
 
-function pushPlayerFromSlot(ctx, slot, pid, gid, teamId, registerMap) {
-  var pres = presentationFromSlot(slot, pid, registerMap, ctx.currentUserId);
+/**
+ * 普通用户身份名。self 用当前账号 nickname，禁止 resolveMatchNickname 覆盖。
+ * 非 self 保持原 host 行为（仍可走比赛名解析）。
+ */
+function identityPresentationName(pres, slot, pid) {
+  if (pres && asString(pres.identityType) === 'self') {
+    try {
+      var live = playerLiveDisplay.applyLiveDisplayToView(
+        Object.assign({}, slot || {}, { playerId: pid || (slot && slot.playerId) })
+      );
+      if (live && asString(live.name)) return asString(live.name);
+    } catch (eLive) {
+      /* ignore */
+    }
+    return asString(pres.displayName) || asString(slot && slot.name) || asString(pid);
+  }
   var nick = '';
   try {
     nick = asString(playerManage.resolveMatchNickname(slot));
   } catch (eNick) {
     nick = '';
   }
-  if (nick) pres.displayName = nick;
-  else if (!pres.displayName && slot && slot.name) pres.displayName = asString(slot.name);
+  return nick || asString(pres && pres.displayName) || asString(slot && slot.name) || asString(pid);
+}
+
+function pushPlayerFromSlot(ctx, slot, pid, gid, teamId, registerMap) {
+  var pres = presentationFromSlot(slot, pid, registerMap, ctx.currentUserId);
+  pres.displayName = identityPresentationName(pres, slot, pid);
   var aliases = playerCanonicalDisplay.buildLegacyAliasToPlayerId(
     Object.assign({}, slot || {}, { playerId: pid })
   );
@@ -732,10 +752,11 @@ function buildFromTeamMatchHostSnapshot(snap) {
     Object.keys(occupied).forEach(function (pid) {
       var p = occupied[pid];
       var rec = scoresByPlayer[pid] || {};
+      var pres = presentationFromSlot(p, pid, registerMap, ctx.currentUserId);
       var party = makeParty({
         partyId: pid,
         partyType: 'player',
-        displayName: playerManage.resolveMatchNickname(p) || pid,
+        displayName: identityPresentationName(pres, p, pid),
         memberPlayerIds: [pid],
         groupId: gid,
         teamId: asString(teamMap[pid])

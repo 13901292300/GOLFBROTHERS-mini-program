@@ -1,6 +1,7 @@
 /**
- * 把「我的」资料（昵称 / 头像 / 性别）同步到当前登录用户身份（新建比赛用）。
- * 已有比赛的头像/昵称展示由 playerLiveDisplay 在记分页覆盖，不批量改写历史赛事。
+ * 把「我的」资料同步到 CURRENT_USER 兼容缓存（新建比赛默认值）。
+ * 这不是账号资料权威源；权威仍是 userProfileStore.loadProfile / resolveCurrentAccountProfile。
+ * applySavedProfile 可继续复制 nickname / avatar / gender / displayName，供旧读取路径使用。
  */
 
 const gameStore = require('./gameStore.js');

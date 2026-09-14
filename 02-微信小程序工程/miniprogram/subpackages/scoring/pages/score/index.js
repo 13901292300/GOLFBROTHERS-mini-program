@@ -1038,9 +1038,19 @@ function resolveScoreTeeStyle(player, _fallbackIndex) {
     tp = player.tee;
   } else {
     const gender =
-      (player && (player.gender === 'female' || player.gender === 'male') && player.gender) ||
-      (player && (player.matchGender === 'female' || player.matchGender === 'male') && player.matchGender) ||
-      'male';
+      (function () {
+        try {
+          const over = playerLiveDisplay.overlayScorePlayerDisplay(player || {});
+          if (over && (over.gender === 'female' || over.gender === 'male')) return over.gender;
+        } catch (eLive) {
+          /* ignore */
+        }
+        return (
+          (player && (player.gender === 'female' || player.gender === 'male') && player.gender) ||
+          (player && (player.matchGender === 'female' || player.matchGender === 'male') && player.matchGender) ||
+          'male'
+        );
+      })();
     tp = gender === 'female' ? 'RED_T' : 'BLUE_T';
   }
   if (tp === 'BLACK_T') {
@@ -1085,6 +1095,12 @@ function resolveScoreTeeStyle(player, _fallbackIndex) {
 
 /** 展示用性别：显式字段 / 好友目录；异常缺失一律按男性 */
 function resolveScoreDisplayGender(player, playerId) {
+  try {
+    const over = playerLiveDisplay.overlayScorePlayerDisplay(player || {});
+    if (over && (over.gender === 'female' || over.gender === 'male')) return over.gender;
+  } catch (eLive) {
+    /* ignore */
+  }
   if (player && player.gender === 'female') return 'female';
   if (player && player.gender === 'male') return 'male';
   if (player && player.matchGender === 'female') return 'female';

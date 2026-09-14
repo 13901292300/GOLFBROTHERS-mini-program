@@ -1,9 +1,10 @@
 /**
- * 记分页头像 / 昵称展示层：最新用户资料优先，赛事成员快照兜底。
- * 不写回 gameStore / teamMatchStore / 成绩。
+ * 业务 player view 与当前账号 profile 的统一 overlay。
+ * 识别为 self：账号字段（avatar / nickname / gender / signature）来自
+ * userProfileStore.resolveCurrentAccountProfile，不写回成绩与比赛快照。
+ * 非 self：继续 snapshot / directory fallback；本轮不套用本人资料。
  *
- * 身份只认稳定账号字段 userId / playerUserId。
- * playerId（含本机占位符 me）不作为展示覆盖依据。
+ * identity 名 = 账号 nickname；match 名必须显式 policy，不得用 fallback 顺序隐式决定。
  */
 
 const userProfileStore = require('./userProfileStore.js');
@@ -218,19 +219,19 @@ function _currentAccountUserId() {
 
 function _loadCurrentUserLiveFields() {
   try {
-    const profile = userProfileStore.loadProfile() || {};
-    const display =
-      typeof userProfileStore.resolveCurrentUserAvatarDisplay === 'function'
-        ? userProfileStore.resolveCurrentUserAvatarDisplay(profile)
-        : _trim(profile.avatar);
-    const avatar = _trim(display);
+    const acc =
+      typeof userProfileStore.resolveCurrentAccountProfile === 'function'
+        ? userProfileStore.resolveCurrentAccountProfile()
+        : userProfileStore.loadProfile() || {};
+    const display = _trim(acc.displayAvatar) || _trim(acc.avatar);
     return {
-      nickname: _trim(profile.nickname) || _trim(profile.displayName),
-      avatar: mockAvatars.isDurableAvatarSrc(avatar) ? avatar : '',
-      gender: _normalizeLiveGender(profile.gender)
+      nickname: _trim(acc.nickname),
+      avatar: mockAvatars.isDurableAvatarSrc(display) ? display : '',
+      gender: _normalizeLiveGender(acc.gender),
+      signature: _trim(acc.signature)
     };
   } catch (e) {
-    return { nickname: '', avatar: '', gender: '' };
+    return { nickname: '', avatar: '', gender: '', signature: '' };
   }
 }
 
@@ -252,7 +253,8 @@ function _liveOverlayResult(snapshotName, snapshotAvatar, snapshotGender, userId
     name: live.nickname || snapshotName,
     avatar: live.avatar || snapshotAvatar,
     gender: live.gender || snapshotGender || '',
-    applied: !!(live.nickname || live.avatar || live.gender),
+    signature: live.signature || '',
+    applied: !!(live.nickname || live.avatar || live.gender || live.signature),
     userId: userId || ''
   };
 }
@@ -364,6 +366,7 @@ function overlayScorePlayerDisplay(player, ctx) {
       name: snapshotName,
       avatar: snapshotAvatar,
       gender: snapshotGender,
+      signature: '',
       applied: false,
       userId: ''
     };
@@ -376,6 +379,7 @@ function overlayScorePlayerDisplay(player, ctx) {
         name: snapshotName,
         avatar: snapshotAvatar,
         gender: snapshotGender,
+        signature: '',
         applied: false,
         userId: uid
       };
@@ -392,6 +396,7 @@ function overlayScorePlayerDisplay(player, ctx) {
     name: snapshotName,
     avatar: snapshotAvatar,
     gender: snapshotGender,
+    signature: '',
     applied: false,
     userId: ''
   };
@@ -407,8 +412,54 @@ function applyLiveDisplayToView(player, ctx) {
     displayAvatar: pres.displayAvatar,
     canonicalAvatar: pres.canonicalAvatar,
     avatar: pres.canonicalAvatar,
-    gender: gender
+    gender: gender,
+    signature: over.signature || ''
   };
+}
+
+/**
+ * 普通用户身份名。self → 当前账号 nickname；非 self / guest → 业务 snapshot。
+ * 不含 matchNickname 隐式抢占。
+ */
+function resolveIdentityPresentationName(player, ctx) {
+  const over = overlayScorePlayerDisplay(player, ctx);
+  return over.name || _snapshotName(player) || '';
+}
+
+/**
+ * 仅当产品明确要求「比赛名 / 参赛名」时使用。
+ */
+function resolveMatchPresentationName(player) {
+  try {
+    const playerManage = require('./playerManage.js');
+    const matchName = _trim(playerManage.resolveMatchNickname(player));
+    if (matchName) return matchName;
+  } catch (e) {
+    /* ignore */
+  }
+  return _trim(player && player.matchNickname) || '';
+}
+
+function pickPresentationName(player, policy, ctx) {
+  if (policy === 'match') return resolveMatchPresentationName(player);
+  return resolveIdentityPresentationName(player, ctx);
+}
+
+const EXPLICIT_TEE = /^(BLUE_T|RED_T|BLACK_T|GOLD_T|WHITE_T)$/;
+
+/**
+ * 展示 / 默认 T：显式 tPosition（或兼容 tee）优先，不被后来改的账号性别覆盖。
+ * 无显式 T 时：self 用当前账号 gender 推导；否则 snapshot gender / matchGender / sex。
+ */
+function resolveDisplayTeePosition(player) {
+  const p = player && typeof player === 'object' ? player : {};
+  const tp = _trim(p.tPosition);
+  if (EXPLICIT_TEE.test(tp)) return tp;
+  const tee = _trim(p.tee);
+  if (EXPLICIT_TEE.test(tee)) return tee;
+  const over = overlayScorePlayerDisplay(p);
+  const gender = over.gender || _snapshotGender(p);
+  return gender === 'female' ? 'RED_T' : 'BLUE_T';
 }
 
 /**
@@ -522,6 +573,10 @@ module.exports = {
   unclaimScoreMemberSelf,
   overlayScorePlayerDisplay,
   applyLiveDisplayToView,
+  resolveIdentityPresentationName,
+  resolveMatchPresentationName,
+  pickPresentationName,
+  resolveDisplayTeePosition,
   resolvePlayerPresentation: playerCanonicalDisplay.resolvePlayerPresentation,
   stampCurrentAccountOnWrite,
   overlayChatMessages,

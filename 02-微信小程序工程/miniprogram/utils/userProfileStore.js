@@ -1,10 +1,16 @@
 /**
- * 用户长期资料（本地持久化）
- * nickname：社区昵称
- * displayName：比赛/领先榜/记分卡显示名（同步 competitionName 兼容旧读取）
+ * 用户长期资料（本地持久化）——当前登录用户账号资料唯一权威源。
+ *
+ * 本地字段语义（必须钉死，禁止 displayName || nickname || name 混用）：
+ * - nickname：账号社交昵称
+ * - displayName / competitionName：本地「默认比赛名」，不是账号 nickname
+ * - signature：账号签名（不存在 bio / intro）
+ * - handicap：账号当前默认差点；不得覆盖已创建比赛的 handicap / hcap 快照
+ *
+ * 云端 user_profiles.displayName 字段名虽叫 displayName，真实语义是 ACCOUNT NICKNAME。
+ * 本模块不改云 schema；其他用户 directory 属 Phase 2。
+ *
  * identityType：PLAYER | CADDIE
- * signature / caddieCourse / phoneBound / phoneMasked
- * handicap / floatCoef：竞技展示字段（非编辑页写入）
  * nationality* / region*：公开地理字段（均可空；不复用球队 region）
  * updatedAt：成功保存时更新
  * avatar：canonical 持久头像（cloud:// 或稳定 https），用于身份 / 云同步 / 球局快照
@@ -187,6 +193,37 @@ function loadProfile() {
     _writeRaw(next);
   }
   return next;
+}
+
+/**
+ * 当前登录用户账号资料唯一读口。
+ * 来源只能是 loadProfile() + normalizeProfile，禁止从 GAME / score / team / slot 反拼。
+ * nickname 只取账号 nickname，不用本地 displayName 顶替。
+ */
+function resolveCurrentAccountProfile() {
+  const p = loadProfile() || {};
+  return {
+    userId: _strOrEmpty(p.userId),
+    avatar: _strOrEmpty(p.avatar),
+    displayAvatar: resolveCurrentUserAvatarDisplay(p),
+    nickname: _strOrEmpty(p.nickname),
+    gender: p.gender,
+    signature: _strOrEmpty(p.signature),
+    identityType: p.identityType,
+    caddieCourse: _strOrEmpty(p.caddieCourse),
+    nationalityCode: _strOrEmpty(p.nationalityCode),
+    nationalityName: _strOrEmpty(p.nationalityName),
+    regionCountryCode: _strOrEmpty(p.regionCountryCode),
+    regionCountryName: _strOrEmpty(p.regionCountryName),
+    regionProvinceCode: _strOrEmpty(p.regionProvinceCode),
+    regionProvinceName: _strOrEmpty(p.regionProvinceName),
+    regionCityCode: _strOrEmpty(p.regionCityCode),
+    regionCityName: _strOrEmpty(p.regionCityName),
+    handicap: p.handicap,
+    floatCoef: p.floatCoef,
+    // 本地默认比赛名；不是账号 nickname。云端 user_profiles.displayName 语义才是 nickname。
+    defaultCompetitionName: _strOrEmpty(p.displayName || p.competitionName)
+  };
 }
 
 /** 保存完整用户资料（更新 updatedAt），并同步当前用户身份与已有 GAME */
@@ -608,6 +645,8 @@ module.exports = {
   IDENTITY_PLAYER,
   IDENTITY_CADDIE,
   loadProfile,
+  normalizeProfile,
+  resolveCurrentAccountProfile,
   saveProfile,
   updateProfile,
   setDisplayName,

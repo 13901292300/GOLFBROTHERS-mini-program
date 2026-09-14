@@ -209,9 +209,20 @@ function resolvePlayerPresentation(player, ctx) {
   const accountUserIdRaw = resolveAccountUserId(p);
   const accountUserId = accountUserIdRaw || null;
   const identityType = resolveIdentityType(p, accountUserIdRaw, playerId, currentUserId);
-  const displayName =
+  let displayName =
     _asString(p.displayName || p.nickname || p.matchNickname || p.name || p.competitionName) ||
     playerId;
+  if (identityType === 'self' || (accountUserIdRaw && currentUserId && accountUserIdRaw === currentUserId)) {
+    try {
+      const acc =
+        typeof userProfileStore.resolveCurrentAccountProfile === 'function'
+          ? userProfileStore.resolveCurrentAccountProfile()
+          : userProfileStore.loadProfile() || {};
+      if (_asString(acc.nickname)) displayName = _asString(acc.nickname);
+    } catch (eNick) {
+      /* ignore */
+    }
+  }
   const canonicalAvatar = resolveCanonicalAvatar(p);
   let displayAvatar = '';
   if (identityType === 'self' || (accountUserIdRaw && currentUserId && accountUserIdRaw === currentUserId)) {

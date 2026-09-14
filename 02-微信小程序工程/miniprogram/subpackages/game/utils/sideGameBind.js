@@ -14,6 +14,7 @@ var settingsMod = require("./localSideGameSettings.js");
 var hostMod = require("./gameHostContext.js");
 var temporaryCourse = require("../../../utils/temporaryCourse.js");
 var playerCanonicalDisplay = require("../../../utils/playerCanonicalDisplay.js");
+var playerLiveDisplay = require("../../../utils/playerLiveDisplay.js");
 var identity = require("./sideGameIdentityProvider.js");
 var nav = require("./nav.js");
 var resultTone = require("./resultTone.js");
@@ -119,22 +120,44 @@ function presentPlayer(playerId) {
   var hitSrc = playerCanonicalDisplay.lookupPresentation(maps, aliases, id);
   if (hitSrc) {
     var hit = rec.jsonClone(hitSrc);
-    var liveName = rec.asString(hit.displayName || hit.name);
-    var rosterId = rec.asString(hit.playerId || hit.id) || id;
-    if (!liveName || liveName === id || liveName === rosterId || liveName === "球员") {
-      var resolved = nicknameFromCurrentGame(rosterIdOrAlias(host, id));
-      if (resolved) hit.displayName = resolved;
-      else if (liveName === "球员") hit.displayName = "";
+    if (rec.asString(hit.identityType) === "self") {
+      try {
+        var live = playerLiveDisplay.applyLiveDisplayToView({
+          userId: hit.accountUserId,
+          playerUserId: hit.accountUserId,
+          playerId: hit.playerId,
+          name: hit.displayName,
+          nickname: hit.displayName,
+          avatar: hit.canonicalAvatar || hit.avatar
+        });
+        if (live && live.name) hit.displayName = live.name;
+        if (live && live.displayAvatar) hit.displayAvatar = live.displayAvatar;
+        if (live && live.canonicalAvatar) {
+          hit.canonicalAvatar = live.canonicalAvatar;
+          hit.avatar = live.canonicalAvatar;
+        }
+      } catch (eLive) {
+        /* ignore */
+      }
+    } else {
+      var liveName = rec.asString(hit.displayName || hit.name);
+      var rosterId = rec.asString(hit.playerId || hit.id) || id;
+      if (!liveName || liveName === id || liveName === rosterId || liveName === "球员") {
+        var resolved = nicknameFromCurrentGame(rosterIdOrAlias(host, id));
+        if (resolved) hit.displayName = resolved;
+        else if (liveName === "球员") hit.displayName = "";
+      }
     }
+    var rosterIdHit = rec.asString(hit.playerId || hit.id) || id;
     if (!hit.displayAvatar) {
       hit.displayAvatar = playerCanonicalDisplay.resolveSeededDisplayAvatar(
         hit.canonicalAvatar || "",
-        rosterId
+        rosterIdHit
       );
     }
     if (!hit.canonicalAvatar) hit.canonicalAvatar = rec.asString(hit.avatar);
-    if (!hit.id) hit.id = hit.playerId || rosterId;
-    if (!hit.playerId) hit.playerId = rosterId;
+    if (!hit.id) hit.id = hit.playerId || rosterIdHit;
+    if (!hit.playerId) hit.playerId = rosterIdHit;
     return hit;
   }
   var fromGame = nicknameFromCurrentGame(id);
