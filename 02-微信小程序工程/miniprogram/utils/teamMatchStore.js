@@ -1719,7 +1719,153 @@ function listInterTeamMatchesByParticipatingTeamId(teamId) {
 
 function getMatchById(matchId) {
   if (!matchId) return null;
-  return normalizeStoredMatch(_readAll().find((item) => item && item.matchId === matchId) || null);
+  var found = _readAll().find((item) => item && item.matchId === matchId) || null;
+  return normalizeStoredMatch(found);
+}
+
+function _asTraceId(v) {
+  return v == null ? '' : String(v).trim();
+}
+
+function _cloneTraceJson(value) {
+  if (value == null) return value;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (eClone) {
+    return value;
+  }
+}
+
+function _writeCanonicalMatchRecord(match) {
+  if (!match || !match.matchId) return false;
+  var mid = _asTraceId(match.matchId);
+  var list = _readAll();
+  var next = [match].concat(
+    list.filter(function (item) {
+      return item && _asTraceId(item.matchId) !== mid;
+    })
+  );
+  _writeAll(next);
+  return true;
+}
+
+function isLegalManagedSeriesContext(ctx, expected) {
+  var exp = expected && typeof expected === 'object' ? expected : {};
+  if (!ctx || typeof ctx !== 'object') return false;
+  if (ctx.managed !== true) return false;
+  if (_asTraceId(ctx.seriesId) !== _asTraceId(exp.seriesId)) return false;
+  if (_asTraceId(ctx.roundId) !== _asTraceId(exp.roundId)) return false;
+  var token = _asTraceId(exp.publishToken);
+  if (token && _asTraceId(ctx.publishToken) !== token) return false;
+  return true;
+}
+
+function readLegacyUnscopedMatch(matchId) {
+  var mid = _asTraceId(matchId);
+  if (!mid) return null;
+  try {
+    var raw = wx.getStorageSync(STORAGE_KEY);
+    var list = Array.isArray(raw) ? raw : [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i] && String(list[i].matchId || '').trim() === mid) {
+        return list[i];
+      }
+    }
+  } catch (eRead) {
+    /* ignore */
+  }
+  return null;
+}
+
+function preserveLocalSeriesContextOnCloudPull(cloudMatch, localMatch) {
+  if (!cloudMatch || typeof cloudMatch !== 'object') return cloudMatch;
+  var cloudCtx =
+    cloudMatch.seriesContext && typeof cloudMatch.seriesContext === 'object'
+      ? cloudMatch.seriesContext
+      : null;
+  if (cloudCtx) return cloudMatch;
+  var localCtx =
+    localMatch && localMatch.seriesContext && typeof localMatch.seriesContext === 'object'
+      ? localMatch.seriesContext
+      : null;
+  if (!localCtx || localCtx.managed !== true) return cloudMatch;
+  return Object.assign({}, cloudMatch, { seriesContext: localCtx });
+}
+
+/**
+ * 仅当 canonical miss / 缺 seriesContext 时，从 legacy 固定桶恢复单条 Series station。
+ * 必须 ownership 全过；不得批量迁桶；不得推断 managed。
+ */
+function adoptLegacySeriesStationIfSafe(input) {
+  var src = input && typeof input === 'object' ? input : {};
+  var matchId = _asTraceId(src.matchId);
+  var expected = {
+    seriesId: _asTraceId(src.seriesId),
+    roundId: _asTraceId(src.roundId),
+    publishToken: _asTraceId(src.publishToken)
+  };
+  if (!matchId || !expected.seriesId || !expected.roundId) {
+    return { ok: false, adopted: false, reason: 'args_required' };
+  }
+  var canonical = getMatchById(matchId);
+  if (canonical && isLegalManagedSeriesContext(canonical.seriesContext, expected)) {
+    return { ok: true, adopted: false, reason: 'canonical_complete', match: canonical };
+  }
+  var legacy = readLegacyUnscopedMatch(matchId);
+  if (!legacy || typeof legacy !== 'object') {
+    return { ok: false, adopted: false, reason: 'legacy_miss' };
+  }
+  if (_asTraceId(legacy.matchId) !== matchId) {
+    return { ok: false, adopted: false, reason: 'legacy_id_mismatch' };
+  }
+  if (!isLegalManagedSeriesContext(legacy.seriesContext, expected)) {
+    return { ok: false, adopted: false, reason: 'legacy_ownership_fail' };
+  }
+  var next;
+  if (canonical && typeof canonical === 'object') {
+    next = Object.assign({}, canonical, {
+      seriesContext: _cloneTraceJson(legacy.seriesContext)
+    });
+  } else {
+    next = _cloneTraceJson(legacy);
+  }
+  _writeCanonicalMatchRecord(next);
+  var again = getMatchById(matchId);
+  if (!again || !isLegalManagedSeriesContext(again.seriesContext, expected)) {
+    return { ok: false, adopted: false, reason: 'adopt_verify_failed', match: again || null };
+  }
+  return {
+    ok: true,
+    adopted: true,
+    reason: canonical ? 'merged_series_context' : 'copied_legacy_match',
+    match: again
+  };
+}
+
+function adoptLegacySeriesStationsForSeries(series) {
+  if (!series || typeof series !== 'object') {
+    return { ok: false, adoptedCount: 0 };
+  }
+  var seriesId = _asTraceId(series.seriesId);
+  var publishToken = _asTraceId(series.publishToken);
+  var rounds = Array.isArray(series.rounds) ? series.rounds : [];
+  var adoptedCount = 0;
+  var i;
+  for (i = 0; i < rounds.length; i++) {
+    var round = rounds[i];
+    var matchId = _asTraceId(round && round.matchId);
+    var roundId = _asTraceId(round && round.roundId);
+    if (!matchId || !roundId) continue;
+    var res = adoptLegacySeriesStationIfSafe({
+      matchId: matchId,
+      seriesId: seriesId,
+      roundId: roundId,
+      publishToken: publishToken
+    });
+    if (res && res.adopted) adoptedCount += 1;
+  }
+  return { ok: true, adoptedCount: adoptedCount };
 }
 
 /** Series 发布：是否存在 matchId（不改旧 API） */
@@ -1799,7 +1945,7 @@ function saveMatchChecked(match, hooks) {
     const list = _readAll();
     const next = [toWrite].concat(list.filter((item) => item && item.matchId !== mid));
     try {
-      wx.setStorageSync(STORAGE_KEY, next || []);
+      _writeAll(next);
     } catch (e) {
       return { ok: false, reason: 'storage_write_failed' };
     }
@@ -1937,6 +2083,10 @@ module.exports = {
   clearUserMatchCache,
   STORAGE_KEY,
   saveMatchChecked,
+  adoptLegacySeriesStationIfSafe,
+  adoptLegacySeriesStationsForSeries,
+  preserveLocalSeriesContextOnCloudPull,
+  isLegalManagedSeriesContext,
   existsMatchId,
   listMatches,
   listInterTeamMatchesByParticipatingTeamId,

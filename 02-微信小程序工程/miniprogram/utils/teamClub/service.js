@@ -1031,7 +1031,13 @@ module.exports = {
         if (!res.ok) return failEnvelope(res);
         try {
           var store = require('../teamMatchStore.js');
-          store.saveMatch(res.data, { cacheOnly: true });
+          var pulled = res.data;
+          var localBefore = store.getMatchById(matchId);
+          var toSave =
+            typeof store.preserveLocalSeriesContextOnCloudPull === 'function'
+              ? store.preserveLocalSeriesContextOnCloudPull(pulled, localBefore)
+              : pulled;
+          store.saveMatch(toSave, { cacheOnly: true });
           var stored = store.getMatchById(matchId);
           return { ok: true, match: stored || res.data };
         } catch (e) {

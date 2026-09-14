@@ -9,6 +9,11 @@ function asString(v) {
 
 var GATE_FAIL_MESSAGE = '本轮比赛数据异常';
 
+function failGate(reason, extra) {
+  extra = extra || {};
+  return { ok: false, reason: reason, message: GATE_FAIL_MESSAGE };
+}
+
 /**
  * @param {object} input
  * @param {object} input.series
@@ -27,36 +32,46 @@ function verifyManagedStationForManage(input) {
     typeof src.getIndexByMatchId === 'function' ? src.getIndexByMatchId : null;
 
   if (!series) {
-    return { ok: false, reason: 'series_required', message: GATE_FAIL_MESSAGE };
+    return failGate('series_required', {});
   }
   if (!roundId) {
-    return { ok: false, reason: 'round_id_required', message: GATE_FAIL_MESSAGE };
+    return failGate('round_id_required', {});
   }
   if (!getMatchById || !getIndexByMatchId) {
-    return { ok: false, reason: 'deps_required', message: GATE_FAIL_MESSAGE };
+    return failGate('deps_required', {});
   }
 
   var seriesId = asString(series.seriesId);
   var publishToken = asString(series.publishToken);
   if (!seriesId || !publishToken) {
-    return { ok: false, reason: 'series_incomplete', message: GATE_FAIL_MESSAGE };
+    return failGate('series_incomplete', { seriesId: seriesId, roundId: roundId });
   }
 
   var rounds = Array.isArray(series.rounds) ? series.rounds : [];
   var round = null;
+  var roundIndex = -1;
   for (var i = 0; i < rounds.length; i++) {
     if (asString(rounds[i] && rounds[i].roundId) === roundId) {
       round = rounds[i];
+      roundIndex = i;
       break;
     }
   }
   if (!round) {
-    return { ok: false, reason: 'round_not_in_series', message: GATE_FAIL_MESSAGE };
+    return failGate('round_not_in_series', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex
+    });
   }
 
   var matchId = asString(round.matchId);
   if (!matchId) {
-    return { ok: false, reason: 'match_id_missing', message: GATE_FAIL_MESSAGE };
+    return failGate('match_id_missing', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex
+    });
   }
 
   var match = null;
@@ -65,24 +80,81 @@ function verifyManagedStationForManage(input) {
   } catch (e) {
     match = null;
   }
+  var ctx = match && match.seriesContext && typeof match.seriesContext === 'object'
+    ? match.seriesContext
+    : null;
+  if (!match || !ctx || ctx.managed !== true) {
+    try {
+      var teamMatchStore = require('./teamMatchStore.js');
+      if (typeof teamMatchStore.adoptLegacySeriesStationIfSafe === 'function') {
+        teamMatchStore.adoptLegacySeriesStationIfSafe({
+          matchId: matchId,
+          seriesId: seriesId,
+          roundId: roundId,
+          publishToken: publishToken
+        });
+      }
+    } catch (eAdopt) {
+      /* ignore */
+    }
+    try {
+      match = getMatchById(matchId);
+    } catch (e2) {
+      match = null;
+    }
+  }
   if (!match || typeof match !== 'object') {
-    return { ok: false, reason: 'match_not_found', message: GATE_FAIL_MESSAGE };
+    return failGate('match_not_found', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: false
+    });
   }
 
-  var ctx = match.seriesContext && typeof match.seriesContext === 'object'
+  ctx = match.seriesContext && typeof match.seriesContext === 'object'
     ? match.seriesContext
     : null;
   if (!ctx || ctx.managed !== true) {
-    return { ok: false, reason: 'not_managed', message: GATE_FAIL_MESSAGE };
+    return failGate('not_managed', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: !!(ctx && ctx.managed === true)
+    });
   }
   if (asString(ctx.seriesId) !== seriesId) {
-    return { ok: false, reason: 'series_id_mismatch', message: GATE_FAIL_MESSAGE };
+    return failGate('series_id_mismatch', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
   if (asString(ctx.roundId) !== roundId) {
-    return { ok: false, reason: 'round_id_mismatch', message: GATE_FAIL_MESSAGE };
+    return failGate('round_id_mismatch', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
   if (asString(ctx.publishToken) !== publishToken) {
-    return { ok: false, reason: 'publish_token_mismatch', message: GATE_FAIL_MESSAGE };
+    return failGate('publish_token_mismatch', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
 
   var indexRow = null;
@@ -92,16 +164,44 @@ function verifyManagedStationForManage(input) {
     indexRow = null;
   }
   if (!indexRow || typeof indexRow !== 'object') {
-    return { ok: false, reason: 'index_missing', message: GATE_FAIL_MESSAGE };
+    return failGate('index_missing', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
   if (asString(indexRow.seriesId) !== seriesId) {
-    return { ok: false, reason: 'index_series_mismatch', message: GATE_FAIL_MESSAGE };
+    return failGate('index_series_mismatch', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
   if (asString(indexRow.roundId) !== roundId) {
-    return { ok: false, reason: 'index_round_mismatch', message: GATE_FAIL_MESSAGE };
+    return failGate('index_round_mismatch', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
   if (asString(indexRow.matchId) && asString(indexRow.matchId) !== matchId) {
-    return { ok: false, reason: 'index_match_mismatch', message: GATE_FAIL_MESSAGE };
+    return failGate('index_match_mismatch', {
+      seriesId: seriesId,
+      roundId: roundId,
+      roundIndex: roundIndex,
+      matchId: matchId,
+      matchHit: true,
+      managed: true
+    });
   }
 
   return {
