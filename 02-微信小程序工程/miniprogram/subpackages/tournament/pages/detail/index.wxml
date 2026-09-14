@@ -350,13 +350,13 @@
                     <view class="gb-group-player-main-row">
                       <view class="gb-group-player-avatar-col">
                         <view class="gb-group-player-avatar-wrap">
-                          <image wx:if="{{pl.avatar}}" class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                          <image wx:if="{{pl.displayAvatar || pl.avatar}}" class="gb-group-player-avatar" src="{{pl.displayAvatar || pl.avatar}}" mode="aspectFill"></image>
                           <view wx:else class="gb-group-player-avatar gb-group-player-avatar--empty">+</view>
                         </view>
                         <text wx:if="{{pl.teamLabel}}" class="gb-group-player-team-label">{{pl.teamLabel}}</text>
                       </view>
                       <view class="gb-group-player-meta">
-                        <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                        <text class="gb-group-player-name">{{pl.displayName}}</text>
                         <view wx:if="{{pl.teeText || pl.teeLabel || pl.tee}}" class="gb-group-player-tee">
                           <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
                           <text class="gb-group-player-tee-text">{{pl.teeText || pl.teeLabel || pl.tee}}</text>
@@ -497,13 +497,13 @@
               <view class="tee-sheet-player-main">
                 <view class="tee-sheet-player-avatar-col">
                   <view class="gb-group-player-avatar-wrap">
-                    <image class="gb-group-player-avatar" src="{{pl.avatar}}" mode="aspectFill"></image>
+                    <image class="gb-group-player-avatar" src="{{pl.displayAvatar || pl.avatar}}" mode="aspectFill"></image>
                     <view wx:if="{{pl.v}}" class="tee-v-badge">V</view>
                   </view>
                   <text wx:if="{{pl.teamLabel}}" class="tee-player-team-label">{{pl.teamLabel}}</text>
                 </view>
                 <view class="gb-group-player-meta">
-                  <text class="gb-group-player-name">{{pl.displayName || pl.nickname || pl.name || '未知球员'}}</text>
+                  <text class="gb-group-player-name">{{pl.displayName}}</text>
                   <view wx:if="{{pl.teeText || pl.teeLabel || pl.teeMarkerClass}}" class="gb-group-player-tee">
                     <view wx:if="{{pl.teeMarkerClass}}" class="gb-group-player-tee-dot {{pl.teeMarkerClass}}"></view>
                     <text class="gb-group-player-tee-text">T</text>

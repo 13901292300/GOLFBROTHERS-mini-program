@@ -2252,7 +2252,9 @@ Page({
         const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
         const entry = {
           userId: primaryId,
-          nickname: this._resolveAnyPlayerNickname(u) || '未知球员',
+          playerUserId: primaryId,
+          nickname: String(u.nickname || u.name || '').trim() || '未知球员',
+          matchNickname: this._resolveAnyPlayerNickname(u) || '',
           avatar: u.avatar || u.avatarUrl || '',
           gender: gender,
           handicap: u.handicap != null ? u.handicap : '',
@@ -2300,18 +2302,31 @@ Page({
         const userId = this._resolveAnyPlayerId(p);
         if (!userId) return null;
         const src = lookup[userId] || {};
-        const gender = p.gender || src.gender || playerDirectory.getGenderById(userId, '');
-        const teeCode = tPosition.resolve({
+        const bound = {
+          userId: userId,
+          playerUserId: userId,
+          playerId: userId,
+          name: String(src.nickname || p.nickname || src.name || p.name || '').trim(),
+          nickname: src.nickname || p.nickname || '',
+          avatar: src.avatar || p.avatar || p.avatarUrl || '',
+          gender: p.gender || src.gender || '',
+          matchGender: p.matchGender || src.matchGender || '',
           tPosition: p.tPosition,
-          tee: p.tee,
-          gender: gender
-        });
-        const teeText = teeCode === tPosition.RED_T ? '红T' : '蓝T';
+          tee: p.tee
+        };
+        const live = playerLiveDisplay.applyLiveDisplayToView(bound);
+        const over = playerLiveDisplay.overlayScorePlayerDisplay(bound);
+        const gender = over.applied
+          ? live.gender || p.gender || src.gender || playerDirectory.getGenderById(userId, '')
+          : p.gender || src.gender || playerDirectory.getGenderById(userId, '');
+        const teeCode = playerLiveDisplay.resolveDisplayTeePosition(bound);
+        const teeText = teeCode === tPosition.RED_T ? '红T' : teeCode === tPosition.BLUE_T ? '蓝T' : '';
         const snapshotName =
-          this._resolveAnyPlayerNickname(p) ||
-          String(src.nickname || src.displayName || src.name || '').trim() ||
+          String(p.nickname || p.name || src.nickname || src.name || '').trim() ||
           '';
-        const publicName = String(src.nickname || src.displayName || '').trim();
+        const publicName = over.applied
+          ? String(live.name || '').trim()
+          : String(src.nickname || src.name || '').trim();
         const nickname = this._resolveViewerDisplayName(userId, publicName || snapshotName || '未知球员', {
           publicName: publicName,
           snapshotName: snapshotName,
@@ -2321,6 +2336,9 @@ Page({
           || (p.avatar ? String(p.avatar) : '')
           || (p.avatarUrl ? String(p.avatarUrl) : '')
           || '';
+        const displayAvatar = over.applied
+          ? live.displayAvatar || mockAvatars.resolveAvatar(avatarSrc, userId)
+          : mockAvatars.resolveAvatar(avatarSrc, userId);
         const slotIndex = Number(p.position != null ? p.position : p.slotIndex) || 0;
         let teamLabel = '';
         if (showTeamLabel) {
@@ -2339,12 +2357,15 @@ Page({
         return {
           playerId: userId,
           userId: userId,
+          playerUserId: userId,
           slotIndex: slotIndex,
           position: slotIndex,
           nickname: nickname,
           name: nickname,
           displayName: nickname,
-          avatar: mockAvatars.resolveAvatar(avatarSrc, userId),
+          displayAvatar: displayAvatar,
+          avatar: over.applied ? live.canonicalAvatar || displayAvatar : displayAvatar,
+          gender: gender,
           tee: teeText,
           teeText: teeText,
           teeLabel: teeText,
@@ -7101,6 +7122,14 @@ Page({
           player.tee ||
           '';
         return Object.assign({}, player, {
+          userId: display.userId || player.userId || playerId,
+          playerUserId: display.playerUserId || player.playerUserId || player.userId || playerId,
+          displayName: display.displayName || player.displayName || '',
+          nickname: display.nickname || player.nickname || player.displayName || '',
+          name: display.name || player.name || player.displayName || '',
+          displayAvatar: display.displayAvatar || player.displayAvatar || player.avatar || '',
+          avatar: display.avatar || player.avatar || '',
+          gender: display.gender || player.gender || '',
           tee: teeText || player.tee || '',
           teeText: teeText,
           teeLabel: display.teeLabel || teeText || player.teeLabel || '',

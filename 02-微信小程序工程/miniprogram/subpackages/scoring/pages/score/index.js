@@ -89,6 +89,10 @@ const contactStore = require('../../../../utils/contactStore.js');
 const userIdentityAlias = require('../../../../utils/userIdentityAlias.js');
 const playerDisplayName = require('../../../../utils/playerDisplayName.js');
 const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
+
+function withAccountBindFields(row, source) {
+  return playerLiveDisplay.copyAccountBindFields(source, row);
+}
 const scoreAvatarFastPath = require('../../../../utils/scoreAvatarFastPath.js');
 const discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
 const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
@@ -2025,7 +2029,7 @@ function enrichMatchPlaySide(side, sIdx, displayMode, match) {
   }
   // 杆差属 Side：G5/G678 均由 side.scores → enrichPlayerG5（gross-par）派生，不区分 member/combo
   const enriched = enrichPlayerG5(pseudo, sIdx, displayMode);
-  const m0 = members[0] || null;
+  const m0 = liveMembers[0] || null;
   const teeStyle = resolveScoreTeeStyle(primary || m0, sIdx);
   const relScoreStr = enriched.relScoreStr || '';
   const relClass = enriched.relClass || '';
@@ -2059,8 +2063,8 @@ function enrichMatchPlaySide(side, sIdx, displayMode, match) {
     sideId: (side && side.sideId) || '',
     sideKey: (side && side.sideKey) || (sIdx === 1 ? 'B' : 'A'),
     kind: kind,
-    members: members,
-    pairMembers: kind === 'pair' ? buildMatchPlayPairMembers(members) : [],
+    members: liveMembers,
+    pairMembers: kind === 'pair' ? buildMatchPlayPairMembers(liveMembers) : [],
     scores: scores,
     cells: enriched.cells || [],
     name: displayName,
@@ -4411,19 +4415,20 @@ Page({
     const p = player || {};
     const live = playerLiveDisplay.overlayScorePlayerDisplay(p);
     const uid = String(live.userId || p.userId || p.playerUserId || '').trim();
-    const snapshotName = String(
-      p.matchNickname || p.competitionName || p.name || ''
-    ).trim();
-    const publicName = String(p.nickname || p.displayName || '').trim();
+    const snapshotName = String(p.nickname || p.name || '').trim();
+    const matchName = String(p.matchNickname || p.competitionName || '').trim();
+    const publicName = live.applied
+      ? live.name
+      : String(p.nickname || p.displayName || snapshotName || '').trim();
     const ctx = this._getScoreViewerRemarkContext();
     return playerDisplayName.resolvePlayerDisplayNameForViewer({
       viewerUserId: ctx.viewer,
       targetUserId: uid,
-      publicName: publicName || snapshotName,
-      snapshotName: snapshotName || publicName,
+      publicName: publicName || snapshotName || matchName,
+      snapshotName: snapshotName || matchName || publicName,
       identityMasked: !!p.identityMasked,
       remarkNameMap: ctx.map,
-      defaultName: snapshotName || publicName || uid || '球员'
+      defaultName: snapshotName || publicName || matchName || uid || '球员'
     }).displayName;
   },
 
@@ -6974,21 +6979,47 @@ Page({
           },
           index
         );
-        return {
-          id: playerId,
-          playerId: playerId,
-          scorePlayerId: scorePlayerId || playerId,
-          name: player.name || playerId || '球员',
-          avatar: player.avatar || '',
-          gender: teeFields.gender,
-          tPosition: teeFields.tPosition,
-          colorClass: teeFields.colorClass,
-          scores: (record.scores || []).slice(),
-          putts: (record.putts || []).slice(),
-          fairways: sliceFairways(record.fairways),
-          penalties: slicePenalties(record.penalties),
-          sands: sliceSands(record.sands)
+        const bindSrc = {
+          registerUsers:
+            match && match.registerInfo && Array.isArray(match.registerInfo.users)
+              ? match.registerInfo.users
+              : []
         };
+        const bound = playerLiveDisplay.restoreAccountBindFromReliableSources(
+          Object.assign({}, player, { playerId: playerId }),
+          bindSrc
+        );
+        const accountId =
+          bound.userId ||
+          bound.playerUserId ||
+          profile.userId ||
+          profile.playerUserId ||
+          player.userId ||
+          player.playerUserId ||
+          player.accountUserId ||
+          '';
+        return withAccountBindFields(
+          {
+            id: playerId,
+            playerId: playerId,
+            userId: accountId || player.userId || playerId,
+            playerUserId: bound.playerUserId || accountId || player.playerUserId || player.userId || playerId,
+            scorePlayerId: scorePlayerId || playerId,
+            name: profile.name || player.name || playerId || '球员',
+            nickname: profile.nickname || player.nickname || player.name || '',
+            displayAvatar: profile.displayAvatar || player.displayAvatar || '',
+            avatar: profile.canonicalAvatar || profile.avatar || player.avatar || '',
+            gender: teeFields.gender,
+            tPosition: teeFields.tPosition,
+            colorClass: teeFields.colorClass,
+            scores: (record.scores || []).slice(),
+            putts: (record.putts || []).slice(),
+            fairways: sliceFairways(record.fairways),
+            penalties: slicePenalties(record.penalties),
+            sands: sliceSands(record.sands)
+          },
+          Object.assign({}, player, profile, entry, bound)
+        );
       });
 
     const patch = {
@@ -11427,11 +11458,16 @@ Page({
       const profile = match
         ? this._buildScoreTeamMatchPlayerProfile(match, playerId, entry)
         : {};
-      out.push({
-        playerId: playerId,
-        name: (profile && profile.name) || entry.name || playerId,
-        avatar: (profile && profile.avatar) || entry.avatar || entry.avatarUrl || ''
-      });
+      out.push(
+        withAccountBindFields(
+          {
+            playerId: playerId,
+            name: (profile && profile.name) || entry.name || playerId,
+            avatar: (profile && profile.avatar) || entry.avatar || entry.avatarUrl || ''
+          },
+          Object.assign({}, entry, profile)
+        )
+      );
     });
     return out;
   },
@@ -11450,12 +11486,30 @@ Page({
       : [];
     users.forEach((user) => {
       if (!user) return;
-      const id = String(user.userId || user.playerId || user.id || '').trim();
-      if (!id) return;
-      lookup[id] = {
-        name: user.matchNickname || user.competitionName || user.nickname || user.name || id,
-        avatar: user.avatar || user.avatarUrl || ''
+      const accountId = String(
+        user.userId || user.playerUserId || user.accountUserId || user.playerId || user.id || ''
+      ).trim();
+      if (!accountId) return;
+      const record = {
+        userId: String(user.userId || accountId).trim(),
+        playerUserId: String(user.playerUserId || user.userId || accountId).trim(),
+        accountUserId: String(user.accountUserId || user.userId || accountId).trim(),
+        matchNickname: user.matchNickname || user.competitionName || '',
+        name: user.nickname || user.name || accountId,
+        nickname: user.nickname || user.name || '',
+        avatar: user.avatar || user.avatarUrl || '',
+        gender: user.gender || user.matchGender || ''
       };
+      [
+        record.userId,
+        record.playerUserId,
+        record.accountUserId,
+        user.playerId,
+        user.id
+      ].forEach((key) => {
+        const id = String(key || '').trim();
+        if (id && !lookup[id]) lookup[id] = record;
+      });
     });
     return lookup;
   },
@@ -11670,32 +11724,35 @@ Page({
     const uid = String(userId || '').trim();
     const user = this._findScoreTeamMatchRegisterUser(match, uid) || {};
     const fb = fallback || {};
-    const displayName =
-      user.matchNickname ||
-      user.competitionName ||
+    const identityName =
       user.nickname ||
       user.name ||
+      fb.nickname ||
       fb.name ||
       uid;
+    const matchName = user.matchNickname || user.competitionName || fb.matchNickname || '';
     const live = playerLiveDisplay.applyLiveDisplayToView({
       userId: uid,
+      playerUserId: uid,
       playerId: uid,
-      name: displayName,
-      nickname: user.nickname || fb.nickname || '',
-      avatar: user.avatar || user.avatarUrl || fb.avatar || ''
+      name: identityName,
+      nickname: user.nickname || fb.nickname || identityName,
+      avatar: user.avatar || user.avatarUrl || fb.avatar || '',
+      gender: user.gender || fb.gender || ''
     });
     return {
       userId: uid,
       playerId: uid,
+      playerUserId: uid,
       id: uid,
-      name: displayName,
-      nickname: user.nickname || displayName,
-      competitionName: user.competitionName || user.matchNickname || displayName,
-      matchNickname: user.matchNickname || user.competitionName || displayName,
+      name: live.name || identityName,
+      nickname: live.name || user.nickname || identityName,
+      competitionName: matchName || identityName,
+      matchNickname: matchName,
       displayAvatar: live.displayAvatar,
       canonicalAvatar: live.canonicalAvatar,
       avatar: live.canonicalAvatar || user.avatar || user.avatarUrl || fb.avatar || '',
-      gender: user.gender || fb.gender || '',
+      gender: live.gender || user.gender || fb.gender || '',
       matchGender: user.matchGender || user.gender || fb.matchGender || '',
       handicap: user.handicap != null ? user.handicap : (fb.handicap != null ? fb.handicap : ''),
       groupId: user.groupId != null ? user.groupId : (fb.groupId != null ? fb.groupId : ''),
@@ -12054,7 +12111,40 @@ Page({
     const slots = teamMatchStore.resolveGroupSlots(group).map((slot) => {
       const position = Number(slot.position) || 0;
       const entry = this._findScoreTeamMatchPlayerEntry(group, position);
-      const userId = String(slot.userId || slot.playerId || '').trim();
+      const rawPlayer = slot && slot.player && typeof slot.player === 'object' ? slot.player : {};
+      const candidateIds = [
+        rawPlayer.userId,
+        rawPlayer.playerUserId,
+        rawPlayer.accountUserId,
+        slot.userId,
+        entry && entry.userId,
+        entry && entry.playerUserId,
+        entry && entry.accountUserId,
+        rawPlayer.playerId,
+        slot.playerId,
+        entry && entry.playerId
+      ]
+        .map((v) => String(v || '').trim())
+        .filter(Boolean);
+      let userId = '';
+      for (let ci = 0; ci < candidateIds.length; ci++) {
+        const hit = lookup[candidateIds[ci]];
+        if (hit && (hit.userId || hit.playerUserId || hit.accountUserId)) {
+          userId = String(hit.userId || hit.playerUserId || hit.accountUserId).trim();
+          break;
+        }
+      }
+      if (!userId) {
+        userId = String(
+          rawPlayer.userId ||
+            rawPlayer.playerUserId ||
+            rawPlayer.accountUserId ||
+            slot.userId ||
+            (entry && (entry.userId || entry.playerUserId || entry.accountUserId)) ||
+            candidateIds[0] ||
+            ''
+        ).trim();
+      }
       const scorePlayerId = entry && (entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId)
         ? String(entry.scorePlayerId || entry.slotScorePlayerId || entry.scoreOwnerId)
         : '';
@@ -12062,22 +12152,41 @@ Page({
         ? this._hasScoreTeamMatchHistory(match, group, scorePlayerId)
         : false;
       const display = lookup[userId] || {};
-      const entryName = entry && (entry.matchNickname || entry.competitionName || entry.nickname || entry.name);
       const entryAvatar = entry && (entry.avatar || entry.avatarUrl);
+      const live = playerLiveDisplay.applyLiveDisplayToView({
+        userId: userId,
+        playerUserId: userId,
+        playerId: userId,
+        name: display.name || '',
+        nickname: display.nickname || '',
+        avatar: display.avatar || entryAvatar || '',
+        gender: display.gender || (entry && entry.gender) || ''
+      });
+      const entryName = entry && (entry.nickname || entry.name);
       const teamLabel = showTeamLabel
         ? this._resolveGroupManageTeamLabel(match, entry, userId)
         : '';
       return {
         slotId: position || slot.slotId,
         player: userId
-          ? {
-              playerId: userId,
-              name: display.name || entryName || userId,
-              avatar: display.avatar || entryAvatar || '',
-              source: 'team_match',
-              teamLabel: teamLabel,
-              teamGroupName: teamLabel
-            }
+          ? playerLiveDisplay.copyAccountBindFields(
+              { userId: userId, playerUserId: userId },
+              {
+                playerId: userId,
+                userId: userId,
+                playerUserId: userId,
+                name: live.name || display.name || entryName || userId,
+                nickname: live.name || display.nickname || '',
+                displayAvatar: live.displayAvatar,
+                canonicalAvatar: live.canonicalAvatar,
+                avatar: live.canonicalAvatar || display.avatar || entryAvatar || '',
+                gender: live.gender || display.gender || '',
+                source: 'team_match',
+                teamLabel: teamLabel,
+                teamGroupName: teamLabel,
+                matchNickname: display.matchNickname || (entry && entry.matchNickname) || ''
+              }
+            )
           : null,
         playerId: userId || null,
         status: userId ? 'occupied' : 'empty',

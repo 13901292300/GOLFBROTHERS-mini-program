@@ -148,6 +148,52 @@ function resolvePlayerDisplayName(raw) {
   return playerManage.resolveMatchNickname(raw) || '未知球员';
 }
 
+function _identitySnapshotName(raw) {
+  const p = raw && typeof raw === 'object' ? raw : {};
+  return String(p.nickname || p.name || '').trim();
+}
+
+/**
+ * 出发表普通身份展示：self 用 account nickname/avatar；非 self 保持原 snapshot。
+ * 比赛名仍走 resolveMatchNickname，不得当默认 identity。
+ */
+function presentGroupPlayerIdentity(raw, userId) {
+  const uid = String(userId || '').trim();
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const snapshotName = _identitySnapshotName(src);
+  const matchName = resolvePlayerDisplayName(src);
+  const avatarRaw = src.avatar || src.avatarUrl || '';
+  const playerLiveDisplay = require('./playerLiveDisplay.js');
+  const bound = {
+    userId: uid,
+    playerUserId: uid,
+    playerId: uid,
+    name: snapshotName,
+    nickname: src.nickname || snapshotName,
+    avatar: avatarRaw,
+    gender: src.gender || src.matchGender || src.sex || ''
+  };
+  const over = playerLiveDisplay.overlayScorePlayerDisplay(bound);
+  const live = playerLiveDisplay.applyLiveDisplayToView(bound);
+  const name = over.applied
+    ? String(over.name || snapshotName || '未知球员').trim()
+    : String(snapshotName || matchName || '未知球员').trim();
+  const displayAvatar = over.applied
+    ? live.displayAvatar || mockAvatars.resolveAvatar(avatarRaw, uid)
+    : mockAvatars.resolveAvatar(avatarRaw, uid);
+  return {
+    userId: uid,
+    playerId: uid,
+    displayName: name,
+    nickname: name,
+    name: name,
+    displayAvatar: displayAvatar,
+    avatar: over.applied ? live.canonicalAvatar || displayAvatar : displayAvatar,
+    gender: over.applied ? live.gender || '' : '',
+    matchNickname: String(src.matchNickname || src.competitionName || '').trim()
+  };
+}
+
 /**
  * 从正式 group + lookup 解析展示球员（只读，不改 players）
  */
@@ -160,19 +206,9 @@ function resolveGroupDisplayPlayers(group, playerLookup) {
     const userId = playerManage.resolveUserId(raw);
     if (!userId || seen[userId]) return;
     const src = lookup[userId] || raw;
-    const name = resolvePlayerDisplayName(src);
-    const avatar = mockAvatars.resolveAvatar(
-      (src && (src.avatar || src.avatarUrl)) || (raw && (raw.avatar || raw.avatarUrl)) || '',
-      userId
-    );
+    const merged = Object.assign({}, src, raw, { userId: userId });
     seen[userId] = true;
-    out.push({
-      userId: userId,
-      displayName: name,
-      nickname: name,
-      name: name,
-      avatar: avatar
-    });
+    out.push(presentGroupPlayerIdentity(merged, userId));
   };
 
   const slots = Array.isArray(group && group.players) ? group.players.slice() : [];
@@ -670,12 +706,14 @@ function buildTeeSheetTabView(matchOrGame, options) {
       statusKey: (ms && ms.statusKey) || '',
       matchStatus: (ms && ms.status) || '',
       players: displayPlayers.map((p) => ({
-        playerId: p.userId,
+        playerId: p.userId || p.playerId,
         userId: p.userId,
         displayName: p.displayName,
         nickname: p.nickname,
         name: p.name,
-        avatar: p.avatar
+        displayAvatar: p.displayAvatar || p.avatar,
+        avatar: p.avatar,
+        gender: p.gender || ''
       }))
     };
   });
@@ -868,6 +906,8 @@ module.exports = {
   formatMatchPlayTeeMetaLine,
   applyMatchPlayStartHoleToTeeGroups,
   applyLiveHoleStatusBadgeToTeeGroups,
+  resolvePlayerDisplayName,
+  presentGroupPlayerIdentity,
   resolveGroupDisplayPlayers,
   inferStartHoleIfNeededForGameGroup,
   inferStartHoleIfNeededForGroupsStoreGroup,
