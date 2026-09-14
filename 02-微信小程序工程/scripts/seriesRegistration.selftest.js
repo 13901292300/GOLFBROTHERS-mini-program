@@ -1081,10 +1081,8 @@ function player(id) {
     }
   });
   assert(
-    '首页 closed Series 卡仍显示「报名已关闭」',
-    homeCards.length === 1 &&
-      homeCards[0].statusLabel === '报名已关闭' &&
-      homeCards[0]._cardKind === 'series'
+    '首页 closed Series 卡不出现在报名 TAB',
+    homeCards.length === 0
   );
 
   series.registrationState = 'open';

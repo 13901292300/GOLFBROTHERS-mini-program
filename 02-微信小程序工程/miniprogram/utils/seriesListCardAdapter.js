@@ -309,11 +309,22 @@ function hasSeriesStarted(series, listPhase, options) {
   return false;
 }
 
-/** 当前时间 < 报名截止；报名 TAB 即使已 LIVE 仍可保持报名金色 */
+/**
+ * Series 全局报名是否仍开放。
+ * listPhase=live 只表示赛事进程，不得单独关闭报名。
+ * 整体 finished / completed、无后续未开始轮、registrationState=closed 才关闭。
+ */
 function resolveIsRegistrationOpen(series, listPhase, options) {
   if (!series || typeof series !== 'object') return false;
-  if (listPhase === 'live' || listPhase === 'finished') return false;
-  if (asString(series.registrationState) === 'closed') return false;
+  var life = asString(series.lifecycleStatus).toLowerCase();
+  if (life === 'cancelled' || life === 'canceled' || life === 'archived') {
+    return false;
+  }
+  if (life && life !== 'published') return false;
+  if (seriesFinishLock.isSeriesCompleted(series)) return false;
+  if (listPhase === 'finished') return false;
+  if (asString(series.registrationState).toLowerCase() === 'closed') return false;
+  if (!hasUpcomingRound(series, options)) return false;
   var nowMs =
     options && Number.isFinite(Number(options.nowMs))
       ? Number(options.nowMs)
@@ -321,8 +332,8 @@ function resolveIsRegistrationOpen(series, listPhase, options) {
   var deadlineMs = parseDeadlineMs(
     series.registrationDeadline || series.registrationCloseAt
   );
-  if (Number.isFinite(deadlineMs)) return nowMs < deadlineMs;
-  return asString(series.registrationState) === 'open';
+  if (Number.isFinite(deadlineMs) && nowMs >= deadlineMs) return false;
+  return asString(series.registrationState).toLowerCase() === 'open';
 }
 
 function isUpcomingRoundState(state) {
@@ -361,23 +372,87 @@ function listRoundStateRows(series, options) {
   return list;
 }
 
-/** 仍有未开始轮次（state === upcoming；视觉层 unassigned/grouped 同义） */
+function roundVisualCountsAsUpcoming(state) {
+  return (
+    state === seriesRoundVisualState.STATE.unassigned ||
+    state === seriesRoundVisualState.STATE.grouped
+  );
+}
+
+/**
+ * 是否仍有未开始、未来可参赛的轮次。
+ * 事实源：station match + resolveSeriesRoundVisualState（与 listValidRoundVisuals 同源）。
+ * 未开始 = visual unassigned | grouped；不以 round.status 字符串白名单为准。
+ */
 function hasUpcomingRound(series, options) {
   if (!series || typeof series !== 'object') return false;
-  var states = listRoundStateRows(series, options);
-  for (var i = 0; i < states.length; i++) {
-    var row = states[i] || {};
-    var st = asString(row.state);
-    if (st === 'cancelled') continue;
-    if (isUpcomingRoundState(st) || asString(row.statusToken) === 'upcoming') {
-      return true;
-    }
+  var getter =
+    options && typeof options.getMatchById === 'function'
+      ? options.getMatchById
+      : null;
+  var valid = seriesRoundPhaseAggregate.listValidRoundVisuals(series, getter);
+  var i;
+  for (i = 0; i < valid.length; i++) {
+    if (roundVisualCountsAsUpcoming(valid[i] && valid[i].state)) return true;
   }
   return false;
 }
 
+function resolveRegistrationListExcludeReason(series, options) {
+  if (!series || typeof series !== 'object') return 'invalid';
+  var life = asString(series.lifecycleStatus).toLowerCase();
+  if (life === 'cancelled' || life === 'canceled') return 'cancelled';
+  if (life === 'archived') return 'archived';
+  if (life !== 'published') return 'lifecycle_not_published';
+  if (seriesFinishLock.isSeriesCompleted(series)) return 'series_completed';
+  if (asString(series.registrationState).toLowerCase() === 'closed') {
+    return 'registration_closed';
+  }
+  if (!hasUpcomingRound(series, options)) return 'no_upcoming_round';
+  var statuses = listValidStationStatuses(series, options || {});
+  var listPhase = deriveSeriesListPhase(series, statuses);
+  if (!resolveIsRegistrationOpen(series, listPhase, options)) {
+    return 'registration_not_open';
+  }
+  return '';
+}
+
 function showInRegistration(series, options) {
-  return hasUpcomingRound(series, options);
+  return resolveRegistrationListExcludeReason(series, options) === '';
+}
+
+function evaluateRegistrationListVisibility(series, options) {
+  var opts = options || {};
+  var sid = asString(series && series.seriesId);
+  var life = asString(series && series.lifecycleStatus);
+  var regState = asString(series && series.registrationState);
+  var phaseCache = asString(series && series.competitionPhaseCache);
+  var rounds = Array.isArray(series && series.rounds) ? series.rounds : [];
+  var statuses = listValidStationStatuses(series, opts);
+  var listPhase = deriveSeriesListPhase(series, statuses);
+  var flags = inspectSeriesRoundFlags(series, opts);
+  var upcoming = hasUpcomingRound(series, opts);
+  var allCompleted = seriesRoundPhaseAggregate.allValidRoundsCompleted(
+    series,
+    opts.getMatchById
+  );
+  var isOpen = resolveIsRegistrationOpen(series, listPhase, opts);
+  var excludeReason = resolveRegistrationListExcludeReason(series, opts);
+  var included = excludeReason === '';
+  return {
+    seriesId: sid,
+    listPhase: listPhase,
+    lifecycleStatus: life,
+    registrationState: regState,
+    competitionPhaseCache: phaseCache,
+    roundCount: rounds.length,
+    hasUpcomingRound: upcoming,
+    hasLiveRound: !!(flags && flags.hasLive),
+    allCompleted: !!allCompleted,
+    isRegistrationOpen: !!isOpen,
+    includedInRegistrationList: included,
+    excludeReason: excludeReason || 'none'
+  };
 }
 
 function inspectSeriesRoundFlags(series, options) {
@@ -812,11 +887,10 @@ function _buildList(deps, mode) {
         if (!series || typeof series !== 'object') continue;
         var sid = asString(series.seriesId);
         if (!sid || seen[sid]) continue;
+        var listOpts = { getMatchById: d.getMatchById };
         if (asString(series.lifecycleStatus) !== 'published') continue;
 
-        var statuses = listValidStationStatuses(series, {
-          getMatchById: d.getMatchById
-        });
+        var statuses = listValidStationStatuses(series, listOpts);
         var phase = deriveSeriesListPhase(series, statuses);
 
         var listContext =
@@ -838,8 +912,7 @@ function _buildList(deps, mode) {
           continue;
         }
 
-        // 报名列表：published 且尚未整体进入 LIVE/已结束；registrationState 只投影文案
-        // lifecycleStatus 已互斥排除 cancelled/archived/draft
+        // 报名列表：published + registrationState=open + 仍有未开始轮；LIVE 进程不互斥
         if (mode === 'registration_mine') {
           if (!playerId) continue;
           var entry = findRegisteredRosterEntry(series.roster, playerId);
@@ -882,6 +955,7 @@ module.exports = {
   getLiveCourseList: getLiveCourseList,
   hasUpcomingRound: hasUpcomingRound,
   showInRegistration: showInRegistration,
+  evaluateRegistrationListVisibility: evaluateRegistrationListVisibility,
   listValidStationStatuses: listValidStationStatuses,
   deriveSeriesListPhase: deriveSeriesListPhase,
   resolveIsRegistrationOpen: resolveIsRegistrationOpen,

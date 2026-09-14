@@ -62,10 +62,12 @@ function isCompletedMatch(match, round) {
 
 function isLiveMatch(match, round) {
   var ms = asLower(match && match.status);
-  if (ms === 'ongoing' || ms === 'live') return true;
+  if (match && typeof match === 'object') {
+    if (ms === 'ongoing' || ms === 'live') return true;
+    if (ms) return false;
+  }
   var rs = asLower(round && round.roundStatus);
-  if (rs === 'live' || rs === 'ongoing') return true;
-  return false;
+  return rs === 'live' || rs === 'ongoing';
 }
 
 /**

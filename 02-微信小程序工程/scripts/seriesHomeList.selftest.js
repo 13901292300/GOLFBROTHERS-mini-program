@@ -200,7 +200,7 @@ assert(
   );
 })();
 
-// ----- closed 仍保留报名卡 -----
+// ----- closed 不再进入报名 TAB -----
 (function () {
   var closedSeries = makeSeries({ registrationState: 'closed' });
   var d = depsBase({
@@ -216,22 +216,11 @@ assert(
     return c && String(c.id).indexOf('m-') === 0;
   });
   assert(
-    'published+closed → 仍 1 张 Series 卡',
-    seriesCards.length === 1 && seriesCards[0].seriesId === 'series-8',
+    'published+closed → 报名 TAB 无 Series 卡',
+    seriesCards.length === 0,
     'series=' + seriesCards.length
   );
-  assert(
-    'closed → 文案「报名已关闭」且中性 tone',
-    seriesCards[0].statusLabel === '报名已关闭' &&
-      seriesCards[0].statusTone === 'finished'
-  );
   assert('closed 后 8 托管分站仍隐藏', managedCards.length === 0);
-  assert(
-    'closed 卡仍进 tab=register',
-    seriesCards[0].navUrl.indexOf('tab=register') >= 0 &&
-      seriesCards[0].navUrl.indexOf('matchId=') < 0 &&
-      seriesCards[0].navUrl.indexOf('preview=') < 0
-  );
   assert(
     'closed 不改 lifecycle / 不写 registrationRevision',
     closedSeries.lifecycleStatus === 'published' &&
@@ -241,7 +230,7 @@ assert(
 
 // ----- reopen 同一张卡不重复 -----
 assert(
-  'reopen 后仍同一张卡、不重复',
+  'reopen 后出现一张卡、不重复',
   (function () {
     var series = makeSeries({ registrationState: 'closed' });
     var dClosed = depsBase({
@@ -262,9 +251,8 @@ assert(
       return c && c._cardKind === 'series';
     });
     return (
-      closedCards.length === 1 &&
+      closedCards.length === 0 &&
       openCards.length === 1 &&
-      closedCards[0].id === openCards[0].id &&
       openCards[0].statusLabel === '报名中'
     );
   })()
@@ -295,7 +283,7 @@ assert(
 );
 
 assert(
-  '我的报名：closed 仍可见（有效 registered）',
+  '我的报名：closed 不可见（有效 registered）',
   (function () {
     var d = depsBase({
       listSeries: function () {
@@ -309,13 +297,9 @@ assert(
       currentPlayerId: 'p1'
     });
     var cards = adapter.buildRegistrationMineCards(d);
-    var hit = cards.filter(function (c) {
+    return !cards.some(function (c) {
       return c && c.seriesId === 'series-8';
     });
-    return (
-      hit.length === 1 &&
-      hit[0].statusLabel === '报名已关闭'
-    );
   })()
 );
 
@@ -502,9 +486,12 @@ assert(
 );
 
 assert(
-  '报名入选不依赖 registrationState===open',
-  !/registrationState\)\s*!==\s*['"]open['"]/.test(adapterSrc) &&
-    !/registrationState\)\s*===\s*['"]open['"]\s*\)\s*continue/.test(adapterSrc)
+  '报名入选要求 registrationState===open',
+  adapter.resolveIsRegistrationOpen(
+    makeSeries({ registrationState: 'open' }),
+    'registration'
+  ) === true &&
+    adapter.showInRegistration(makeSeries({ registrationState: 'closed' })) === false
 );
 
 assert(
