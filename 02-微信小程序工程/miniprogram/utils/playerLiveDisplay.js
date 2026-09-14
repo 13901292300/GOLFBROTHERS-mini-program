@@ -375,6 +375,24 @@ function overlayScorePlayerDisplay(player, ctx) {
   const me = _currentAccountUserId();
   if (uid) {
     if (!_sameIdentity(uid, me)) {
+      let dirHit = null;
+      try {
+        const accountProfileDirectory = require('./accountProfileDirectory.js');
+        dirHit = accountProfileDirectory.getCached(uid);
+      } catch (eDir) {
+        dirHit = null;
+      }
+      if (dirHit && (dirHit.nickname || dirHit.avatar)) {
+        return {
+          name: dirHit.nickname || snapshotName,
+          avatar: dirHit.avatar || snapshotAvatar,
+          gender: snapshotGender,
+          signature: '',
+          applied: true,
+          source: 'directory',
+          userId: uid
+        };
+      }
       return {
         name: snapshotName,
         avatar: snapshotAvatar,
@@ -407,11 +425,13 @@ function applyLiveDisplayToView(player, ctx) {
   const over = overlayScorePlayerDisplay(p, ctx);
   const pres = playerCanonicalDisplay.resolvePlayerPresentation(p, ctx);
   const gender = over.gender || '';
+  const directoryAvatar =
+    over.applied && over.source === 'directory' && over.avatar ? over.avatar : '';
   return {
     name: over.name || pres.displayName,
-    displayAvatar: pres.displayAvatar,
-    canonicalAvatar: pres.canonicalAvatar,
-    avatar: pres.canonicalAvatar,
+    displayAvatar: directoryAvatar || pres.displayAvatar,
+    canonicalAvatar: directoryAvatar || pres.canonicalAvatar,
+    avatar: directoryAvatar || pres.canonicalAvatar,
     gender: gender,
     signature: over.signature || ''
   };

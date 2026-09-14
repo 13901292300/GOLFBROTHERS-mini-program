@@ -8,6 +8,7 @@
 
 var playerManage = require('./playerManage.js');
 var mockAvatars = require('./mockAvatars.js');
+var playerLiveDisplay = require('./playerLiveDisplay.js');
 var comboEntityProjection = require('./comboEntityProjection.js');
 var leaderboardSettingViewModel = require('./leaderboardSettingViewModel.js');
 var holeLayout = require('./holeLayout.js');
@@ -68,6 +69,21 @@ function resolveAnyPlayerId(raw) {
 function resolvePlayerDisplayName(raw) {
   if (!raw || typeof raw !== 'object') return '未知球员';
   return playerManage.resolveMatchNickname(raw) || '未知球员';
+}
+
+function presentIdentity(raw, fallbackName, fallbackAvatar, seedId) {
+  var live = playerLiveDisplay.applyLiveDisplayToView(
+    raw && typeof raw === 'object'
+      ? Object.assign({}, raw, {
+          name: fallbackName || (raw && (raw.nickname || raw.name)) || '',
+          avatar: fallbackAvatar || (raw && (raw.avatar || raw.avatarUrl)) || ''
+        })
+      : { userId: seedId, name: fallbackName, avatar: fallbackAvatar }
+  );
+  return {
+    name: live.name || fallbackName || '未知球员',
+    avatar: live.displayAvatar || mockAvatars.resolveAvatar(fallbackAvatar || '', seedId)
+  };
 }
 
 /**
@@ -460,14 +476,22 @@ function buildGrossPersonalRows(match) {
         merged
       );
       var slotIndex = Number(player && (player.position != null ? player.position : player.slotIndex)) || 0;
-      var name = resolvePlayerDisplayName(
-        Object.assign({}, lookup, player, {
+      var identSrc = Object.assign({}, lookup, player, {
           competitionName: player.competitionName || lookup.competitionName,
           matchNickname: player.matchNickname || lookup.matchNickname,
           nickname: lookup.nickname || player.nickname,
-          name: player.name || lookup.name
-        })
+          name: player.name || lookup.name,
+          avatar: player.avatar || lookup.avatar,
+          avatarUrl: player.avatarUrl || lookup.avatarUrl,
+          userId: lookup.userId || player.userId || player.playerUserId
+        });
+      var ident = presentIdentity(
+        identSrc,
+        resolvePlayerDisplayName(identSrc),
+        identSrc.avatar || identSrc.avatarUrl,
+        playerId
       );
+      var name = ident.name;
       flat.push({
         rowId: playerId,
         playerId: playerId,
@@ -602,18 +626,24 @@ function buildEntityLeaderboardRows(match) {
         var lookup = registerLookup[uid] || {};
         var mergedMember = Object.assign({}, lookup, slotPlayer || {});
         var genderDisplay = playerManage.getGenderDisplay(mergedMember);
-        var displayName = resolvePlayerDisplayName(mergedMember);
-        var publicName = comboEntityProjection.memberPublicName(mergedMember);
         var lookupAvatar =
           (lookup && (lookup.avatar || lookup.avatarUrl)) ||
           (slotPlayer && (slotPlayer.avatar || slotPlayer.avatarUrl)) ||
           '';
+        var ident = presentIdentity(
+          mergedMember,
+          resolvePlayerDisplayName(mergedMember),
+          lookupAvatar,
+          uid
+        );
+        var displayName = ident.name;
+        var publicName = comboEntityProjection.memberPublicName(mergedMember);
         memberViews.push({
           playerId: uid,
           userId: uid,
           name: displayName,
           displayName: displayName,
-          avatar: mockAvatars.resolveAvatar(lookupAvatar, uid),
+          avatar: ident.avatar || mockAvatars.resolveAvatar(lookupAvatar, uid),
           flag: (mergedMember && mergedMember.flag) || '',
           country: (mergedMember && mergedMember.country) || '',
           age: (mergedMember && mergedMember.age) || '',
@@ -775,14 +805,23 @@ function buildNetPersonalRows(match) {
         scorePlayerId: scorePlayerId,
         slotIndex: slotIndex,
         position: slotIndex,
-        name: resolvePlayerDisplayName(
-          Object.assign({}, lookup, player, {
+        name: (function () {
+          var identSrc = Object.assign({}, lookup, player, {
             competitionName: player.competitionName || lookup.competitionName,
             matchNickname: player.matchNickname || lookup.matchNickname,
             nickname: lookup.nickname || player.nickname,
-            name: player.name || lookup.name
-          })
-        ),
+            name: player.name || lookup.name,
+            avatar: player.avatar || lookup.avatar,
+            avatarUrl: player.avatarUrl || lookup.avatarUrl,
+            userId: lookup.userId || player.userId || player.playerUserId
+          });
+          return presentIdentity(
+            identSrc,
+            resolvePlayerDisplayName(identSrc),
+            identSrc.avatar || identSrc.avatarUrl,
+            playerId
+          ).name;
+        })(),
         group: (group && group.groupName) || '',
         groupId: group && group.groupId ? group.groupId : '',
         gender: genderDisplay.gender || '',

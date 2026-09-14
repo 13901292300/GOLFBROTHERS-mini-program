@@ -44,6 +44,7 @@ var EXTRA_METHODS = [
   'createMyProfile',
   'updateMyProfile',
   'searchUsers',
+  'getProfiles',
   'listInvites',
   'listNotices',
   'getApplication',

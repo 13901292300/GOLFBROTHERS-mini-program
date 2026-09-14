@@ -30,7 +30,7 @@ function callCloud(action, payload) {
     .then(function (res) {
       var result = res && res.result;
       if (!result) return errors.fail('cloud_error', '云服务返回为空');
-      snapshot.applyResult(action, result);
+      if (action !== 'getProfiles') snapshot.applyResult(action, result);
       if (result.ok && result.data && result.data.user && result.data.source === 'cloud') {
         identity.writeSession(result.data.user);
       }
@@ -181,6 +181,9 @@ module.exports = {
   },
   searchUsers: function (query, options) {
     return invoke('searchUsers', Object.assign({ query: query }, options || {}));
+  },
+  getProfiles: function (payload) {
+    return invoke('getProfiles', payload || {});
   },
   listNotices: function (options) {
     return invoke('listNotices', options || {});

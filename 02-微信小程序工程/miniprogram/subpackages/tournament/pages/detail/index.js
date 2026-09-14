@@ -37,6 +37,7 @@ const gameLifecycle = require('../../../../utils/gameLifecycle.js');
 const gameStore = require('../../../../utils/gameStore.js');
 const userProfileStore = require('../../../../utils/userProfileStore.js');
 const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
+const accountProfileDirectory = require('../../../../utils/accountProfileDirectory.js');
 const discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
 const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const teamDirectory = require('../../../../utils/teamDirectory.js');
@@ -4575,6 +4576,10 @@ Page({
     this.refreshGroupsDerived();
     this.refreshPartnerSection();
     this._syncLiveIdentitySurfaces();
+    this._hydrateAccountDirectoryThen(() => {
+      this.refreshGroupsDerived();
+      this._syncLiveIdentitySurfaces();
+    });
     // 仅在已展开逐洞详情时同步刷新，避免每次 onShow 无意义分配 openScorecard
     if (this.data.openIndex != null && this.data.openIndex !== -1 && this.data.openIndex !== '') {
       this.updateOpenScorecard();
@@ -4621,6 +4626,34 @@ Page({
 
   onDiscussionSend() {
     this.setData(this._hydrateDiscussionMessages());
+  },
+
+  _hydrateAccountDirectoryThen(done) {
+    const finish = typeof done === 'function' ? done : function () {};
+    try {
+      const match =
+        teamMatchStore.getMatchById(this.data.matchId) ||
+        teamMatchStore.getMatchById(this._matchId) ||
+        null;
+      const bag = [];
+      if (match && match.registerInfo && Array.isArray(match.registerInfo.users)) {
+        bag.push(match.registerInfo.users);
+      }
+      (match && Array.isArray(match.groups) ? match.groups : []).forEach((g) => {
+        if (g && Array.isArray(g.players)) bag.push(g.players);
+      });
+      const ids = accountProfileDirectory.collectAccountUserIds(bag);
+      Promise.resolve(accountProfileDirectory.resolveAccountProfiles(ids)).then(
+        function () {
+          finish();
+        },
+        function () {
+          finish();
+        }
+      );
+    } catch (e) {
+      finish();
+    }
   },
 
   _syncLiveIdentitySurfaces() {

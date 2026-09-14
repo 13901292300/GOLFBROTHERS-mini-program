@@ -120,11 +120,12 @@ function presentPlayer(playerId) {
   var hitSrc = playerCanonicalDisplay.lookupPresentation(maps, aliases, id);
   if (hitSrc) {
     var hit = rec.jsonClone(hitSrc);
-    if (rec.asString(hit.identityType) === "self") {
+    var accountUserId = rec.asString(hit.accountUserId);
+    if (accountUserId) {
       try {
         var live = playerLiveDisplay.applyLiveDisplayToView({
-          userId: hit.accountUserId,
-          playerUserId: hit.accountUserId,
+          userId: accountUserId,
+          playerUserId: accountUserId,
           playerId: hit.playerId,
           name: hit.displayName,
           nickname: hit.displayName,
@@ -139,9 +140,10 @@ function presentPlayer(playerId) {
       } catch (eLive) {
         /* ignore */
       }
-    } else {
-      var liveName = rec.asString(hit.displayName || hit.name);
-      var rosterId = rec.asString(hit.playerId || hit.id) || id;
+    }
+    var liveName = rec.asString(hit.displayName || hit.name);
+    var rosterId = rec.asString(hit.playerId || hit.id) || id;
+    if (!accountUserId || rec.asString(hit.identityType) !== "self") {
       if (!liveName || liveName === id || liveName === rosterId || liveName === "球员") {
         var resolved = nicknameFromCurrentGame(rosterIdOrAlias(host, id));
         if (resolved) hit.displayName = resolved;

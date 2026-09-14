@@ -5448,6 +5448,10 @@ Page({
 
     this._syncGameHostContext();
     this._syncLiveIdentitySurfaces();
+    this._hydrateAccountDirectoryThen(() => {
+      this.refreshPlayers();
+      this._syncLiveIdentitySurfaces();
+    });
 
     // 未改备注时不做讨论区作者名大投影
     if (remarkChanged) {
@@ -5488,6 +5492,62 @@ Page({
 
   onDiscussionSend() {
     this.setData(this._hydrateDiscussionMessages());
+  },
+
+  _collectDirectoryUserIds() {
+    const accountProfileDirectory = require('../../../../utils/accountProfileDirectory.js');
+    const bag = [];
+    if (this._playersSource) bag.push(this._playersSource);
+    (this._entitiesSource || []).forEach((ent) => {
+      if (ent && Array.isArray(ent.members)) bag.push(ent.members);
+    });
+    (this._matchSidesSource || []).forEach((side) => {
+      if (side && Array.isArray(side.members)) bag.push(side.members);
+    });
+    try {
+      const gameId = this.data.gameId || '';
+      if (gameId) {
+        const game = gameStore.getGameById(gameId) || gameStore.getGame(gameId);
+        if (game) bag.push(accountProfileDirectory.collectFromGame(game));
+      }
+    } catch (eG) {
+      /* ignore */
+    }
+    try {
+      const ms = this._matchState || (this._readMatchState && this._readMatchState()) || {};
+      const matchId = (ms && ms.matchId) || '';
+      if (matchId) {
+        const match = teamMatchStore.getMatchById(matchId);
+        if (match) {
+          if (match.registerInfo && Array.isArray(match.registerInfo.users)) {
+            bag.push(match.registerInfo.users);
+          }
+          (Array.isArray(match.groups) ? match.groups : []).forEach((g) => {
+            if (g && Array.isArray(g.players)) bag.push(g.players);
+          });
+        }
+      }
+    } catch (eM) {
+      /* ignore */
+    }
+    return accountProfileDirectory.collectAccountUserIds(bag);
+  },
+
+  _hydrateAccountDirectoryThen(done) {
+    const finish = typeof done === 'function' ? done : function () {};
+    try {
+      const accountProfileDirectory = require('../../../../utils/accountProfileDirectory.js');
+      Promise.resolve(accountProfileDirectory.resolveAccountProfiles(this._collectDirectoryUserIds())).then(
+        function () {
+          finish();
+        },
+        function () {
+          finish();
+        }
+      );
+    } catch (e) {
+      finish();
+    }
   },
 
   _syncLiveIdentitySurfaces() {

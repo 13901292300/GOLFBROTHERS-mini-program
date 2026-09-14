@@ -26,6 +26,7 @@ const gameProgress = require('../../../../utils/gameProgress.js');
 const contactFollowAction = require('../../../../utils/contactFollowAction.js');
 const openPlayerProfileUtil = require('../../../../utils/openPlayerProfile.js');
 const playerLiveDisplay = require('../../../../utils/playerLiveDisplay.js');
+const accountProfileDirectory = require('../../../../utils/accountProfileDirectory.js');
 const discussionMessageStore = require('../../../../utils/discussionMessageStore.js');
 const discussionCardVisit = require('../../../../utils/discussionCardVisit.js');
 const sideGameHostSnapshot = require('../../utils/sideGameHostSnapshot.js');
@@ -467,6 +468,10 @@ Page({
     this.applyMoreAccess();
     this.refreshGame();
     this._syncLiveIdentitySurfaces();
+    this._hydrateAccountDirectoryThen(() => {
+      this.refreshGame();
+      this._syncLiveIdentitySurfaces();
+    });
 
     const openCaddie =
       opt.openCaddie === '1' || opt.openCaddie === 'true' || opt.openCaddie === 1;
@@ -519,6 +524,10 @@ Page({
     // 从某组记分页返回 → 刷新领先榜/分组状态（数据持久化于 gameStore）
     this.refreshGame();
     this._syncLiveIdentitySurfaces();
+    this._hydrateAccountDirectoryThen(() => {
+      this.refreshGame();
+      this._syncLiveIdentitySurfaces();
+    });
     // 若停留在分组表，重建视口观察器（onHide 会解绑）
     if (this.data.activeTab === 'group') {
       wx.nextTick(() => this.setupTeeObserver());
@@ -2271,6 +2280,24 @@ Page({
 
   onDiscussionSend() {
     this.setData(this._hydrateDiscussionMessages());
+  },
+
+  _hydrateAccountDirectoryThen(done) {
+    const finish = typeof done === 'function' ? done : function () {};
+    try {
+      const game = gameStore.getGameById(this._gameId) || gameStore.getGame(this._gameId);
+      const ids = accountProfileDirectory.collectFromGame(game);
+      Promise.resolve(accountProfileDirectory.resolveAccountProfiles(ids)).then(
+        function () {
+          finish();
+        },
+        function () {
+          finish();
+        }
+      );
+    } catch (e) {
+      finish();
+    }
   },
 
   _syncLiveIdentitySurfaces() {

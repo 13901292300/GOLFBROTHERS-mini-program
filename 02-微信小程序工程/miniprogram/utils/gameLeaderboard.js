@@ -5,11 +5,12 @@ const { getProfileById, FRIEND_ID_SET } = require('./playerDirectory.js');
 const mockAvatars = require('./mockAvatars.js');
 const holeLayout = require('./holeLayout.js');
 const playerManage = require('./playerManage.js');
+const playerLiveDisplay = require('./playerLiveDisplay.js');
+const playerCanonicalDisplay = require('./playerCanonicalDisplay.js');
 const {
   formatPlayerActionMetric,
   isSameUserIdentity
 } = require('./playerActionModal.js');
-const playerLiveDisplay = require('./playerLiveDisplay.js');
 
 /**
  * 仅明确 DEMO GAME 可用的演示度量（与 playerActionModal 对齐）。
@@ -53,9 +54,7 @@ function isDemoLeaderboardGame(game) {
  */
 function resolveSlotAccountUserId(slot) {
   if (!slot || typeof slot !== 'object') return '';
-  const userId = String(slot.userId || '').trim();
-  if (userId) return userId;
-  return String(slot.playerUserId || '').trim();
+  return playerCanonicalDisplay.resolveAccountUserId(slot) || '';
 }
 
 /**
@@ -234,7 +233,7 @@ function enrichPlayerIdentity(m, metricsCtx) {
   return {
     playerId: m.playerId,
     // 与 playerId 同源稳定身份；供主页入口解析（勿用 slot/name）
-    userId: m.userId || m.playerUserId || m.playerId || '',
+    userId: playerCanonicalDisplay.resolveAccountUserId(m) || '',
     userType: m.userType || '',
     identitySource: m.identitySource || '',
     name: live.name || m.name || '',

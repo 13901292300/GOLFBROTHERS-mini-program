@@ -154,7 +154,7 @@ function _identitySnapshotName(raw) {
 }
 
 /**
- * 出发表普通身份展示：self 用 account nickname/avatar；非 self 保持原 snapshot。
+ * 出发表普通身份展示：self 用本地 account profile；其他注册用户用 directory nickname/avatar；guest 保持 snapshot。
  * 比赛名仍走 resolveMatchNickname，不得当默认 identity。
  */
 function presentGroupPlayerIdentity(raw, userId) {

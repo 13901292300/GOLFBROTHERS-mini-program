@@ -285,12 +285,30 @@ function buildPresentation(ctx) {
     var display =
       asString(p.displayAvatar) ||
       playerCanonicalDisplay.resolveSeededDisplayAvatar(canonical, p.playerId);
+    var displayName = asString(p.displayName) || p.playerId;
+    if (p.accountUserId) {
+      try {
+        var live = playerLiveDisplay.applyLiveDisplayToView({
+          userId: p.accountUserId,
+          playerUserId: p.accountUserId,
+          playerId: p.playerId,
+          name: displayName,
+          nickname: displayName,
+          avatar: canonical
+        });
+        if (live && live.name) displayName = live.name;
+        if (live && live.canonicalAvatar) canonical = live.canonicalAvatar;
+        if (live && live.displayAvatar) display = live.displayAvatar;
+      } catch (eLive) {
+        /* ignore */
+      }
+    }
     playerPresentationById[p.playerId] = {
       playerId: p.playerId,
       id: p.playerId,
       accountUserId: p.accountUserId == null ? null : p.accountUserId,
       identityType: asString(p.identityType),
-      displayName: asString(p.displayName) || p.playerId,
+      displayName: displayName,
       canonicalAvatar: canonical,
       displayAvatar: display,
       avatar: canonical

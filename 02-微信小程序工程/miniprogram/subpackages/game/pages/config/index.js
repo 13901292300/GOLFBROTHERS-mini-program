@@ -2704,6 +2704,27 @@ Page(pageBoot.bindPageTheme({
         self._guardHydrating = false;
       }
     });
+    try {
+      const dir = require("../../../../utils/accountProfileDirectory.js");
+      const host = typeof session.currentHost === "function" ? session.currentHost() : null;
+      Promise.resolve(
+        dir.resolveAccountProfiles(dir.collectAccountUserIds((host && host.players) || this.data.players))
+      ).then(function () {
+        const players2 = (self.data.players || []).map(faceOf);
+        const pairs2 = (self.data.pairs || []).map(pairFaces);
+        self.setData(
+          Object.assign(
+            {
+              players: players2,
+              pairs: pairs2
+            },
+            lasuoHcapPatch(players2)
+          )
+        );
+      });
+    } catch (eDir) {
+      /* snapshot faces already painted */
+    }
   },
 
   openRuleEdit() {

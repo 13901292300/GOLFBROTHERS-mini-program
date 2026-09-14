@@ -32,6 +32,37 @@ function publicUser(profile) {
   };
 }
 
+var GET_PROFILES_MAX = 40;
+
+function isDirectoryAccountUserId(id) {
+  var s = String(id || '').trim();
+  if (!s) return false;
+  if (s === 'me') return false;
+  if (/^guest_/i.test(s)) return false;
+  if (/^fr-/i.test(s)) return false;
+  if (/^m_/i.test(s)) return false;
+  if (/^entity_/i.test(s)) return false;
+  if (/^host-/i.test(s)) return false;
+  if (/^seat-/i.test(s)) return false;
+  if (/^p-\d/i.test(s)) return false;
+  if (/^gm-/i.test(s)) return false;
+  if (/^__empty_slot_/i.test(s)) return false;
+  if (s.indexOf(':') >= 0) return false;
+  if (/^\d{11}$/.test(s)) return false;
+  if (!/^u_[0-9a-f]{20}$/i.test(s)) return false;
+  return true;
+}
+
+function publicDirectoryProfile(profile) {
+  if (!profile) return null;
+  return {
+    userId: String(profile.userId || '').trim(),
+    nickname: String(profile.displayName || '').trim(),
+    avatar: String(profile.avatar || '').trim(),
+    updatedAt: profile.updatedAt != null ? profile.updatedAt : 0
+  };
+}
+
 function mapMemberView(m) {
   var tags = m.isCaptain ? ['captain'] : [];
   var grants = permissions.memberGrants(m);
@@ -2182,6 +2213,54 @@ function createEngine(store, wxCtx) {
     });
   }
 
+  function getProfiles(payload) {
+    return run(function (tx) {
+      return requireActor(tx, wxCtx).then(function (auth) {
+        if (!auth.ok) return auth;
+        var raw = payload && Array.isArray(payload.userIds) ? payload.userIds : [];
+        var seen = {};
+        var ids = [];
+        raw.forEach(function (item) {
+          var id = String(item || '').trim();
+          if (!id || seen[id]) return;
+          seen[id] = true;
+          if (!isDirectoryAccountUserId(id)) return;
+          if (ids.length >= GET_PROFILES_MAX) return;
+          ids.push(id);
+        });
+        return { ok: true, __ids: ids };
+      });
+    }).then(function (g) {
+      if (!g || !g.ok) return g;
+      var ids = g.__ids || [];
+      if (!ids.length) {
+        return errors.ok({ profilesByUserId: {}, missingUserIds: [] });
+      }
+      return Promise.all(
+        ids.map(function (id) {
+          return getDoc(C.COLLECTIONS.PROFILES, id).then(function (p) {
+            return { id: id, profile: p };
+          });
+        })
+      ).then(function (rows) {
+        var profilesByUserId = {};
+        var missingUserIds = [];
+        rows.forEach(function (row) {
+          var mapped = publicDirectoryProfile(row.profile);
+          if (mapped && mapped.userId) {
+            profilesByUserId[row.id] = mapped;
+          } else {
+            missingUserIds.push(row.id);
+          }
+        });
+        return errors.ok({
+          profilesByUserId: profilesByUserId,
+          missingUserIds: missingUserIds
+        });
+      });
+    });
+  }
+
   function searchUsers(payload) {
     var query = String((payload && (payload.query || payload.keyword)) || '').trim();
     var teamId = String((payload && payload.teamId) || '').trim();
@@ -2431,6 +2510,7 @@ function createEngine(store, wxCtx) {
     completeMatch: completeMatch,
     upsertMatchRef: upsertMatchRef,
     confirmMatchMigration: confirmMatchMigration,
+    getProfiles: getProfiles,
     searchUsers: searchUsers,
     listNotices: listNotices,
     getApplication: getApplication,
@@ -2485,6 +2565,7 @@ function stripClientIdentity(event) {
     payload.toUserId = e.payload.toUserId || e.payload.targetUserId || payload.toUserId;
     payload.keyword = e.payload.keyword || payload.keyword;
     payload.query = e.payload.query || payload.query;
+    payload.userIds = e.payload.userIds || payload.userIds;
     payload.message = e.payload.message || payload.message;
     payload.expectedVersion = e.payload.expectedVersion != null ? e.payload.expectedVersion : payload.expectedVersion;
     payload.ttlMs = e.payload.ttlMs || payload.ttlMs;
